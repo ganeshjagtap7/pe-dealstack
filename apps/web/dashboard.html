@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Analyst Overview Dashboard - PE OS</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        // Banker Blue Palette
+                        "primary": "#003366",
+                        "primary-hover": "#002855",
+                        "primary-light": "#F0F4F8",
+                        // Emerald Green Accents
+                        "secondary": "#059669",
+                        "secondary-light": "#ECFDF5",
+                        // Structure
+                        "background-body": "#F8F9FA",
+                        "surface-card": "#FFFFFF",
+                        "border-subtle": "#E5E7EB",
+                        "border-focus": "#CBD5E1",
+                        // Typography
+                        "text-main": "#111827",
+                        "text-secondary": "#4B5563",
+                        "text-muted": "#9CA3AF",
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"],
+                        "display": ["Inter", "sans-serif"],
+                    },
+                    boxShadow: {
+                        "card": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                        "card-hover": "0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)",
+                        "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.375rem",
+                        "md": "0.375rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #F8F9FA;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #D1D5DB;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9CA3AF;
+        }
+        body {
+            font-feature-settings: "cv11", "ss01";
+            -webkit-font-smoothing: antialiased;
+        }
+    </style>
+</head>
+<body class="bg-background-body text-text-main font-sans overflow-hidden">
+<div class="flex h-screen w-full overflow-hidden">
+<!-- Sidebar -->
+<aside class="hidden w-64 flex-col border-r border-border-subtle bg-surface-card md:flex shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20">
+<div class="flex h-16 items-center px-6 border-b border-border-subtle">
+<a href="index.html" class="flex items-center gap-2 text-primary">
+<div class="size-7">
+<svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-xl font-bold tracking-tight text-primary">PE OS</h2>
+</a>
+</div>
+<div class="flex flex-1 flex-col justify-between overflow-y-auto p-4 custom-scrollbar">
+<div class="flex flex-col gap-4">
+<!-- User Profile Card -->
+<div class="flex items-center gap-3 mb-2 p-2.5 rounded-lg border border-border-subtle bg-background-body/50">
+<div class="bg-center bg-no-repeat bg-cover rounded-full size-10 border border-gray-200 shadow-sm" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk");'></div>
+<div class="flex flex-col overflow-hidden">
+<h1 class="text-text-main text-sm font-bold truncate">Alex Morgan</h1>
+<p class="text-text-secondary text-xs font-normal truncate">Senior Analyst</p>
+</div>
+</div>
+<!-- Navigation -->
+<nav class="flex flex-col gap-1">
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary text-white shadow-md shadow-primary/20 group transition-all" href="dashboard.html">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+<span class="text-sm font-medium">Dashboard</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-primary-light hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">work</span>
+<span class="text-sm font-medium">Deals</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-primary-light hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">groups</span>
+<span class="text-sm font-medium">CRM</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-primary-light hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">pie_chart</span>
+<span class="text-sm font-medium">Portfolio</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-primary-light hover:text-primary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">bar_chart</span>
+<span class="text-sm font-medium">Analytics</span>
+</a>
+<a class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-text-secondary hover:bg-secondary-light hover:text-secondary transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px] text-secondary">auto_awesome</span>
+<span class="text-sm font-medium">AI Reports</span>
+</a>
+</nav>
+</div>
+<!-- New Deal Button -->
+<div class="flex flex-col gap-3 mt-4">
+<div class="h-px w-full bg-border-subtle"></div>
+<button class="flex w-full items-center justify-center gap-2 rounded-lg bg-white border border-border-subtle py-2.5 text-sm font-bold text-primary shadow-sm hover:bg-gray-50 hover:border-primary/30 transition-all">
+<span class="material-symbols-outlined text-[18px]">add</span>
+<span>New Deal</span>
+</button>
+</div>
+</div>
+</aside>
+
+<!-- Main Content -->
+<main class="flex h-full flex-1 flex-col overflow-hidden bg-background-body">
+<!-- Top Header -->
+<header class="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card/80 backdrop-blur-md z-10 sticky top-0">
+<div class="flex items-center gap-4 flex-1">
+<button class="md:hidden text-text-main">
+<span class="material-symbols-outlined">menu</span>
+</button>
+<!-- AI Search Bar -->
+<div class="relative hidden w-full max-w-lg md:block group">
+<div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+<span class="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[20px]">search</span>
+</div>
+<input class="block w-full rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm" placeholder="Ask AI anything about your portfolio..." type="text"/>
+<div class="absolute inset-y-0 right-0 flex items-center pr-2">
+<button class="p-1 hover:bg-gray-200 rounded transition-colors text-primary">
+<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+</button>
+</div>
+</div>
+</div>
+<div class="flex items-center gap-3">
+<!-- Market Status -->
+<div class="flex items-center px-3 py-1 bg-green-50 text-secondary border border-green-100 rounded-full text-xs font-semibold mr-2">
+<span class="w-2 h-2 bg-secondary rounded-full mr-2 animate-pulse"></span>
+                        Market Open
+                    </div>
+<div class="h-6 w-px bg-border-subtle mx-1"></div>
+<!-- Notifications -->
+<button class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative">
+<span class="material-symbols-outlined text-[20px]">notifications</span>
+<span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
+</button>
+<!-- Settings -->
+<button class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+</button>
+</div>
+</header>
+
+<!-- Dashboard Content -->
+<div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+<div class="mx-auto max-w-[1600px] flex flex-col gap-6">
+<!-- Welcome Header -->
+<div class="flex flex-col gap-1">
+<h1 class="text-2xl font-bold text-text-main tracking-tight font-display">Good Morning, Alex</h1>
+<p class="text-text-secondary text-sm">Here is your deal flow update and AI market analysis for <span class="font-medium text-primary">October 24, 2023</span>.</p>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+<!-- Sourcing Card -->
+<div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Sourcing</span>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">travel_explore</span>
+</div>
+<div class="flex items-end gap-2 mt-3">
+<span class="text-3xl font-bold text-primary tracking-tight">18</span>
+<span class="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">
+<span class="material-symbols-outlined text-[14px] mr-0.5">arrow_upward</span> 2 new
+                                </span>
+</div>
+<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+<div class="bg-blue-400 h-1.5 rounded-full" style="width: 75%"></div>
+</div>
+</div>
+
+<!-- Due Diligence Card (Active) -->
+<div class="relative flex flex-col gap-1 rounded-lg border border-primary bg-surface-card p-5 shadow-glow cursor-pointer group">
+<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-3xl"></div>
+<div class="flex items-center justify-between relative z-10">
+<span class="text-xs font-bold uppercase tracking-wider text-primary">Due Diligence</span>
+<span class="material-symbols-outlined text-primary text-[20px]">saved_search</span>
+</div>
+<div class="flex items-end gap-2 mt-3 relative z-10">
+<span class="text-3xl font-bold text-text-main tracking-tight">4</span>
+<span class="text-xs font-medium text-text-secondary mb-1.5">Active deals</span>
+</div>
+<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden relative z-10">
+<div class="bg-primary h-1.5 rounded-full" style="width: 100%"></div>
+</div>
+</div>
+
+<!-- LOI / Offer Card -->
+<div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold uppercase tracking-wider text-text-secondary">LOI / Offer</span>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">description</span>
+</div>
+<div class="flex items-end gap-2 mt-3">
+<span class="text-3xl font-bold text-text-main tracking-tight">2</span>
+<span class="text-xs font-medium text-text-secondary mb-1.5">Waiting response</span>
+</div>
+<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+<div class="bg-orange-400 h-1.5 rounded-full" style="width: 40%"></div>
+</div>
+</div>
+
+<!-- Closed Card -->
+<div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Closed (Q3)</span>
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">verified</span>
+</div>
+<div class="flex items-end gap-2 mt-3">
+<span class="text-3xl font-bold text-text-main tracking-tight">$42M</span>
+<span class="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">
+                                    +12% vs Q2
+                                </span>
+</div>
+<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+<div class="bg-secondary h-1.5 rounded-full" style="width: 100%"></div>
+</div>
+</div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+<!-- Left Column (2/3) -->
+<div class="lg:col-span-2 flex flex-col gap-6">
+<!-- AI Market Sentiment Card -->
+<div class="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
+<div class="p-6 border-b border-border-subtle flex items-start justify-between gap-4 bg-gradient-to-r from-white to-gray-50/50">
+<div class="flex flex-col gap-3">
+<div class="flex items-center gap-2">
+<div class="p-1.5 bg-secondary-light rounded text-secondary border border-secondary/20">
+<span class="material-symbols-outlined text-[20px] block">psychology</span>
+</div>
+<h2 class="text-lg font-bold text-primary">AI Market Sentiment</h2>
+</div>
+<p class="text-text-secondary text-sm max-w-2xl leading-relaxed">
+<span class="text-text-main font-semibold">Analysis:</span> SaaS valuations are stabilizing in the mid-market sector. The proprietary algorithm indicates a <span class="text-secondary font-semibold">Bullish trend</span> for enterprise software.
+                                            <br/>
+<span class="text-primary font-medium mt-2 inline-flex items-center gap-1 hover:underline cursor-pointer">
+                                                Recommended Action: Review Q3 projections for Project Alpha.
+                                                <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+</span>
+</p>
+</div>
+<div class="hidden sm:flex flex-col items-end border-l border-border-subtle pl-6 py-1">
+<div class="text-4xl font-bold text-secondary">78</div>
+<div class="text-[10px] text-text-muted uppercase tracking-wider font-bold">Confidence Score</div>
+</div>
+</div>
+<!-- Sentiment Indicators -->
+<div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border-subtle bg-gray-50/30">
+<div class="p-4 flex items-center gap-3 hover:bg-white transition-colors cursor-pointer group">
+<div class="bg-secondary-light p-2 rounded-md text-secondary border border-secondary/10 group-hover:border-secondary/30">
+<span class="material-symbols-outlined">trending_up</span>
+</div>
+<div>
+<div class="text-sm font-bold text-text-main">Tech Recovery</div>
+<div class="text-xs text-text-secondary font-medium">+15% sector avg</div>
+</div>
+</div>
+<div class="p-4 flex items-center gap-3 hover:bg-white transition-colors cursor-pointer group">
+<div class="bg-blue-50 p-2 rounded-md text-blue-600 border border-blue-100 group-hover:border-blue-200">
+<span class="material-symbols-outlined">show_chart</span>
+</div>
+<div>
+<div class="text-sm font-bold text-text-main">Low Volatility</div>
+<div class="text-xs text-text-secondary font-medium">Private mkts stable</div>
+</div>
+</div>
+<div class="p-4 flex items-center gap-3 hover:bg-white transition-colors cursor-pointer group">
+<div class="bg-orange-50 p-2 rounded-md text-orange-600 border border-orange-100 group-hover:border-orange-200">
+<span class="material-symbols-outlined">hub</span>
+</div>
+<div>
+<div class="text-sm font-bold text-text-main">Sector Focus</div>
+<div class="text-xs text-text-secondary font-medium">B2B Enterprise</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Active Priorities Table -->
+<div class="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden h-full">
+<div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
+<h3 class="font-bold text-text-main text-base">Active Priorities</h3>
+<div class="flex gap-2">
+<button class="text-xs font-semibold text-text-secondary hover:text-primary hover:bg-primary-light px-3 py-1.5 rounded-md border border-transparent hover:border-primary/20 transition-all">View All</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-left text-sm text-text-secondary">
+<thead class="bg-gray-50 text-xs uppercase font-semibold text-text-secondary border-b border-border-subtle">
+<tr>
+<th class="px-5 py-3 tracking-wide">Deal Name</th>
+<th class="px-5 py-3 tracking-wide">Stage</th>
+<th class="px-5 py-3 tracking-wide">Value</th>
+<th class="px-5 py-3 tracking-wide">Next Action</th>
+<th class="px-5 py-3 tracking-wide">Team</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-border-subtle bg-white">
+<tr class="hover:bg-primary-light/30 transition-colors group">
+<td class="px-5 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded bg-blue-100 border border-blue-200 flex items-center justify-center text-primary font-bold shadow-sm">T</div>
+<span class="font-semibold text-text-main group-hover:text-primary transition-colors">TechCorp SaaS</span>
+</div>
+</td>
+<td class="px-5 py-4">
+<span class="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">Due Diligence</span>
+</td>
+<td class="px-5 py-4 text-text-main font-medium font-mono">$125M</td>
+<td class="px-5 py-4 text-text-main">Review IP Report</td>
+<td class="px-5 py-4">
+<div class="flex -space-x-2">
+<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCebW-RwYpa4oRE7MZtfAn9drz1rz0jYgSsSo8u_JOJJUXCoBKb_c_2bTNNjsWO9vL3qzwJvW-GZqz5lE9XqDhiFEeMefmL7r23yeKgLuPhiG8F7ZoBT9S8dL8jG0AuDTkwcuaOU-Tn5bOi7B5rsV-0tUKogc8SPi36BE37ahJqXWZU_dhgbQ8FCVuwCSDVGr2f1GLukcCVkrJ8qdEMmTaSXvCEVW9aZFDFheRvVx_Xl3CEO-QncceGhDj4QKdqX5JCe6IgTWZmxlA"/>
+<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2FHcv8EugHl1MjUMrr_oCoBCYDJC_Q5Md4CM62QwdIteYx_glEaxyLrtpssliB2kMgvC1zLmEfJqPM4Qa9UdK80OQp7n5opwNTLaYXpOL2iD13SeLHs-w3hU8VpmPgqRS1_FudZULMreeN-dp8Gx2aU5OhMDkotQiLa6tvXajWNZziqBXWfAjXFBjEpi84u3V1xuF-0Ygb_BfFGufzikmWPhEuIzreWy637jPOjlGEeNvjR8iI2-wu7M0epV9OpkHUUqARfMDRnM"/>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-primary-light/30 transition-colors group">
+<td class="px-5 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold shadow-sm">N</div>
+<span class="font-semibold text-text-main group-hover:text-primary transition-colors">Nexus Logistics</span>
+</div>
+</td>
+<td class="px-5 py-4">
+<span class="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">Modelling</span>
+</td>
+<td class="px-5 py-4 text-text-main font-medium font-mono">$85M</td>
+<td class="px-5 py-4 text-text-main">Update LBO Model</td>
+<td class="px-5 py-4">
+<div class="flex -space-x-2">
+<div class="inline-block h-7 w-7 rounded-full ring-2 ring-white bg-gray-500 flex items-center justify-center text-[10px] text-white font-medium">AM</div>
+</div>
+</td>
+</tr>
+<tr class="hover:bg-primary-light/30 transition-colors group">
+<td class="px-5 py-4">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded bg-secondary-light border border-secondary/20 flex items-center justify-center text-secondary font-bold shadow-sm">G</div>
+<span class="font-semibold text-text-main group-hover:text-primary transition-colors">GreenEnergy Co</span>
+</div>
+</td>
+<td class="px-5 py-4">
+<span class="inline-flex items-center rounded-md bg-green-50 px-2.5 py-1 text-xs font-medium text-secondary ring-1 ring-inset ring-secondary/20">LOI Sent</span>
+</td>
+<td class="px-5 py-4 text-text-main font-medium font-mono">$210M</td>
+<td class="px-5 py-4 text-text-main">Partner Call</td>
+<td class="px-5 py-4">
+<div class="flex -space-x-2">
+<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEGfi6t03qt9emBQr6fh4sEialBa2nL7fjAiZpd0CVNwYRu_fyhxHmYfDG5vb48zDBZwqPQyFELpecT8kUFm35xDJR1vSuotSMT2vsqEnje3rlfod_vIt5E0yIbH46Bn14PkA67brGbydqlAzCRpfJVvi7DRIs369KBPMIdF9Bei3w_qRBHGpwQrVMD_QTO1qp5y19qPSvPWACv4UeKUHkSDGxbz-i7zYkllwmjeStYtnwkRwtRKeakEBi_-SzLrrNn9lTh3fZx7c"/>
+<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBk6o61R8E_VVc0Vpu5eAWMvxbxwxqbkAB8WZXt0da3qfZSqoG1s87gL73auGtedgS7V8JOGaFtyOuMK0Q11dAG9lWM58zKq0hQItDZ2rznR_hyZPmc29CWD4Kqvhp3ag36zVaVKCve2mCHALBl_Q2I2leawa_pg49iL9TFOF1NSQfUpbEJ3LRLcp3GtqWDQJhI43RBNIhmFHSrAIcfd24n4extZuf598MIetaLpQYu0MD0Zedk5EVpMyj6Qse55lSvKuP-A2fd7xo"/>
+<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAm6UN_ummd_tjB9MkCLSfzmyRcKJkSPRkNXkrEdG3bXcsVxi38VWfwlvh733gaab9q1061LwPujAxQHTqtNI9wa8K54HiUEF08JDXObrQSOPQkiKqP_1fXDAORkEu5OSERz88-ry6ocD67upoRdLU5ZW7NE2rwJQNK98VrFsfgJ0kqrKVAZe1j8qXy_lHekyvmS2BvoeNP8U-JaAbsdhlchhP7SCPD5tGCIWDoK2Oq82T5ldshqshFEisi9_LAGGxOXSKKsO2UpIk"/>
+</div>
+</td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Right Column (1/3) -->
+<div class="flex flex-col gap-6">
+<!-- My Tasks Widget -->
+<div class="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
+<div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-text-secondary">check_circle</span>
+<h3 class="font-bold text-text-main text-base">My Tasks</h3>
+</div>
+<span class="bg-primary-light text-primary text-xs font-bold px-2.5 py-1 rounded-full border border-primary/10">5 Pending</span>
+</div>
+<div class="p-0">
+<label class="flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors border-b border-border-subtle/50 cursor-pointer group">
+<input class="mt-1 size-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<div class="flex flex-col gap-0.5">
+<span class="text-sm font-semibold text-text-main group-hover:text-primary transition-colors">Review NDA for Project Bolt</span>
+<span class="text-xs text-text-muted font-medium">Due Today • Legal</span>
+</div>
+</label>
+<label class="flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors border-b border-border-subtle/50 cursor-pointer group">
+<input class="mt-1 size-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<div class="flex flex-col gap-0.5">
+<span class="text-sm font-semibold text-text-main group-hover:text-primary transition-colors">Finalize IC Memo Draft</span>
+<span class="text-xs text-text-muted font-medium">Due Tomorrow • Inv. Committee</span>
+</div>
+</label>
+<label class="flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors border-b border-border-subtle/50 cursor-pointer group">
+<input checked="" class="mt-1 size-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<div class="flex flex-col gap-0.5 opacity-50">
+<span class="text-sm font-medium text-text-main line-through">Call with Managing Partner</span>
+<span class="text-xs text-text-secondary font-medium">Completed • Strategy</span>
+</div>
+</label>
+<label class="flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer group">
+<input class="mt-1 size-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0" type="checkbox"/>
+<div class="flex flex-col gap-0.5">
+<span class="text-sm font-semibold text-text-main group-hover:text-primary transition-colors">Market Research: Logistics</span>
+<span class="text-xs text-text-muted font-medium">Due Friday • Research</span>
+</div>
+</label>
+</div>
+<div class="p-3 bg-gray-50 text-center border-t border-border-subtle">
+<button class="text-xs font-bold text-primary hover:text-primary-hover transition-colors uppercase tracking-wide">View All Tasks</button>
+</div>
+</div>
+
+<!-- Portfolio Allocation Widget -->
+<div class="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden p-6 gap-5">
+<div class="flex items-center justify-between">
+<h3 class="font-bold text-text-main">Portfolio Allocation</h3>
+<span class="material-symbols-outlined text-text-muted">pie_chart</span>
+</div>
+<div class="flex items-center gap-6">
+<div class="size-28 rounded-full border-[10px] border-primary border-r-secondary border-b-gray-300 rotate-45 shadow-inner"></div>
+<div class="flex flex-col gap-3 flex-1">
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-2">
+<div class="size-2.5 rounded-sm bg-primary shadow-sm"></div>
+<span class="text-text-secondary font-medium">SaaS</span>
+</div>
+<span class="text-text-main font-bold">55%</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-2">
+<div class="size-2.5 rounded-sm bg-secondary shadow-sm"></div>
+<span class="text-text-secondary font-medium">Healthcare</span>
+</div>
+<span class="text-text-main font-bold">30%</span>
+</div>
+<div class="flex items-center justify-between text-xs">
+<div class="flex items-center gap-2">
+<div class="size-2.5 rounded-sm bg-gray-300 shadow-sm"></div>
+<span class="text-text-secondary font-medium">Others</span>
+</div>
+<span class="text-text-main font-bold">15%</span>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Add Widget Button -->
+<button class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
+<span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
+<span class="text-sm font-semibold">Add Widget</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+<script src="dashboard.js"></script>
+</body></html>

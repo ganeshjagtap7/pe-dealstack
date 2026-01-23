@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Institutional Pricing Plans - PE OS</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1269e2",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "sans": ["Manrope", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings:
+            'FILL' 0,
+            'wght' 400,
+            'GRAD' 0,
+            'opsz' 24
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white font-display">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<!-- Navigation -->
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#e5e7eb] dark:border-b-[#1e293b] bg-white dark:bg-[#101822] px-6 lg:px-10 py-3 sticky top-0 z-50">
+<div class="flex items-center gap-4 text-[#111418] dark:text-white">
+<div class="size-8 text-primary">
+<svg class="w-full h-full" fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<h2 class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">PE OS</h2>
+</div>
+<div class="hidden md:flex flex-1 justify-center">
+<div class="flex items-center gap-9">
+<a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="index.html">Platform</a>
+<a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">Solutions</a>
+<a class="text-primary text-sm font-medium leading-normal" href="pricing.html">Pricing</a>
+<a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="#">Resources</a>
+</div>
+</div>
+<div class="flex gap-2">
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-transparent border border-[#d1d5db] dark:border-gray-600 text-[#111418] dark:text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+<span class="truncate">Log In</span>
+</button>
+<button class="flex min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors shadow-sm">
+<span class="truncate">Get Demo</span>
+</button>
+</div>
+</header>
+<div class="layout-container flex h-full grow flex-col">
+<div class="w-full flex flex-1 justify-center py-10 lg:py-20 px-4 sm:px-8">
+<div class="layout-content-container flex flex-col max-w-[1200px] flex-1">
+<!-- Page Heading -->
+<div class="flex flex-col items-center text-center gap-4 mb-10">
+<h1 class="text-[#111418] dark:text-white text-4xl lg:text-5xl font-extrabold leading-tight tracking-[-0.033em] max-w-3xl">
+                            Institutional-Grade Intelligence. <br class="hidden sm:block"/>Tailored Pricing.
+                        </h1>
+<p class="text-[#64748b] dark:text-gray-400 text-lg font-normal leading-normal max-w-xl">
+                            Choose the plan that fits your firm's investment strategy. Scale from boutique sourcing to enterprise-grade operations.
+                        </p>
+</div>
+<!-- Billing Toggle -->
+<div class="flex justify-center mb-12">
+<div class="flex p-1 bg-[#e2e8f0] dark:bg-[#1e293b] rounded-xl relative">
+<div class="relative flex items-center">
+<input class="peer/monthly sr-only" id="billing-monthly" name="billing" type="radio"/>
+<label class="flex cursor-pointer items-center justify-center rounded-lg px-6 py-2 text-sm font-semibold text-[#64748b] dark:text-gray-400 transition-all peer-checked/monthly:bg-white dark:peer-checked/monthly:bg-[#334155] peer-checked/monthly:text-[#111418] dark:peer-checked/monthly:text-white peer-checked/monthly:shadow-sm z-10" for="billing-monthly">
+                                    Monthly
+                                </label>
+</div>
+<div class="relative flex items-center">
+<input checked="" class="peer/annual sr-only" id="billing-annual" name="billing" type="radio"/>
+<label class="flex cursor-pointer items-center justify-center rounded-lg px-6 py-2 text-sm font-semibold text-[#64748b] dark:text-gray-400 transition-all peer-checked/annual:bg-white dark:peer-checked/annual:bg-[#334155] peer-checked/annual:text-[#111418] dark:peer-checked/annual:text-white peer-checked/annual:shadow-sm z-10" for="billing-annual">
+                                    Annual
+                                    <span class="ml-2 text-xs font-bold text-emerald-600 bg-emerald-100 dark:bg-emerald-900 dark:text-emerald-300 px-2 py-0.5 rounded-full">Save 20%</span>
+</label>
+</div>
+</div>
+</div>
+<!-- Pricing Cards Grid -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-20">
+<!-- Boutique Plan -->
+<div class="flex flex-col rounded-2xl border border-[#e2e8f0] dark:border-[#1e293b] bg-white dark:bg-[#1e293b] p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+<div class="mb-6">
+<h3 class="text-[#111418] dark:text-white text-xl font-bold mb-2">Boutique</h3>
+<p class="text-[#64748b] dark:text-gray-400 text-sm h-10">Perfect for solo analysts and small partnerships.</p>
+</div>
+<div class="mb-8 flex items-baseline gap-1">
+<span class="text-[#111418] dark:text-white text-4xl font-extrabold tracking-tight">$249</span>
+<span class="text-[#64748b] dark:text-gray-500 text-sm font-medium">/user/mo</span>
+</div>
+<button class="w-full rounded-lg bg-[#f1f5f9] dark:bg-[#334155] text-[#111418] dark:text-white h-12 px-4 text-sm font-bold hover:bg-[#e2e8f0] dark:hover:bg-[#475569] transition-colors mb-8">
+                                Start Free Trial
+                            </button>
+<div class="space-y-4 flex-1">
+<p class="text-xs font-bold text-[#64748b] dark:text-gray-500 uppercase tracking-wider">Includes:</p>
+<ul class="space-y-3">
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Basic AI Deal Ingestion</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>5 Active Deal Rooms</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Standard Screening</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Email Support</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Mid-Market Plan -->
+<div class="flex flex-col relative rounded-2xl border-2 border-primary bg-white dark:bg-[#1e293b] p-8 shadow-xl hover:-translate-y-1 transition-all duration-300 z-10">
+<div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary text-white px-4 py-1 rounded-full text-xs font-bold tracking-wide shadow-sm">
+                                MOST POPULAR
+                            </div>
+<div class="mb-6">
+<h3 class="text-[#111418] dark:text-white text-xl font-bold mb-2">Mid-Market</h3>
+<p class="text-[#64748b] dark:text-gray-400 text-sm h-10">For growing investment teams and deal flow.</p>
+</div>
+<div class="mb-8 flex items-baseline gap-1">
+<span class="text-[#111418] dark:text-white text-4xl font-extrabold tracking-tight">$599</span>
+<span class="text-[#64748b] dark:text-gray-500 text-sm font-medium">/user/mo</span>
+</div>
+<button class="w-full rounded-lg bg-primary text-white h-12 px-4 text-sm font-bold hover:bg-primary/90 transition-colors shadow-md mb-8">
+                                Get Started
+                            </button>
+<div class="space-y-4 flex-1">
+<p class="text-xs font-bold text-[#64748b] dark:text-gray-500 uppercase tracking-wider">Everything in Boutique, plus:</p>
+<ul class="space-y-3">
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Advanced 'Chat with Deals' AI</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Team Deal Rooms &amp; Collab</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Sentiment Analysis Engine</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Unlimited Historical Data</span>
+</li>
+</ul>
+</div>
+</div>
+<!-- Enterprise Plan -->
+<div class="flex flex-col rounded-2xl border border-[#e2e8f0] dark:border-[#1e293b] bg-white dark:bg-[#1e293b] p-8 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+<div class="mb-6">
+<h3 class="text-[#111418] dark:text-white text-xl font-bold mb-2">Enterprise</h3>
+<p class="text-[#64748b] dark:text-gray-400 text-sm h-10">Full-scale operational leverage and security.</p>
+</div>
+<div class="mb-8 flex items-baseline gap-1">
+<span class="text-[#111418] dark:text-white text-4xl font-extrabold tracking-tight">Custom</span>
+</div>
+<button class="w-full rounded-lg bg-[#f1f5f9] dark:bg-[#334155] text-[#111418] dark:text-white h-12 px-4 text-sm font-bold hover:bg-[#e2e8f0] dark:hover:bg-[#475569] transition-colors mb-8">
+                                Contact Sales
+                            </button>
+<div class="space-y-4 flex-1">
+<p class="text-xs font-bold text-[#64748b] dark:text-gray-500 uppercase tracking-wider">Everything in Mid-Market, plus:</p>
+<ul class="space-y-3">
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Custom API Limits &amp; Integration</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Unlimited Deal Rooms</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>Dedicated Account Manager</span>
+</li>
+<li class="flex items-start gap-3 text-sm text-[#334155] dark:text-gray-300">
+<span class="material-symbols-outlined text-primary text-[20px]">check_circle</span>
+<span>SSO &amp; Enterprise Audit Logs</span>
+</li>
+</ul>
+</div>
+</div>
+</div>
+<!-- Trust Section -->
+<div class="flex flex-col items-center justify-center mb-20 gap-8">
+<p class="text-sm font-semibold text-[#64748b] dark:text-gray-500 uppercase tracking-widest text-center">Trusted by leading PE Firms globally</p>
+<div class="flex flex-wrap justify-center gap-x-12 gap-y-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+<!-- Logo placeholders with actual company names -->
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl">account_balance</span>
+<span class="text-lg font-bold tracking-tight">KINGSFORD</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl">terrain</span>
+<span class="text-lg font-bold tracking-tight">SUMMIT</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl">token</span>
+<span class="text-lg font-bold tracking-tight">BLACKSTONE</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl">public</span>
+<span class="text-lg font-bold tracking-tight">GLOBAL HARBOR</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-2xl">diamond</span>
+<span class="text-lg font-bold tracking-tight">APEX</span>
+</div>
+</div>
+</div>
+<!-- Feature Comparison Table -->
+<div class="flex flex-col mb-20">
+<div class="flex flex-col md:flex-row md:items-end justify-between px-4 pb-6 pt-5">
+<h2 class="text-[#111418] dark:text-white text-[28px] font-bold leading-tight tracking-[-0.015em]">Detailed Feature Comparison</h2>
+</div>
+<div class="overflow-x-auto rounded-xl border border-[#e2e8f0] dark:border-[#1e293b] bg-white dark:bg-[#1e293b] shadow-sm">
+<table class="w-full text-left border-collapse">
+<thead class="bg-[#f8fafc] dark:bg-[#101822]">
+<tr>
+<th class="p-4 md:p-6 text-sm font-bold text-[#64748b] dark:text-gray-400 border-b border-[#e2e8f0] dark:border-[#334155] w-1/3 min-w-[200px] sticky left-0 z-10 bg-[#f8fafc] dark:bg-[#101822]">Feature</th>
+<th class="p-4 md:p-6 text-center text-sm font-bold text-[#111418] dark:text-white border-b border-[#e2e8f0] dark:border-[#334155] min-w-[140px]">Boutique</th>
+<th class="p-4 md:p-6 text-center text-sm font-bold text-primary border-b border-[#e2e8f0] dark:border-[#334155] min-w-[140px]">Mid-Market</th>
+<th class="p-4 md:p-6 text-center text-sm font-bold text-[#111418] dark:text-white border-b border-[#e2e8f0] dark:border-[#334155] min-w-[140px]">Enterprise</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-[#e2e8f0] dark:divide-[#334155]">
+<!-- Core Features -->
+<tr>
+<td class="bg-[#f1f5f9] dark:bg-[#334155]/30 p-3 px-6 text-xs font-bold uppercase tracking-wider text-[#64748b] dark:text-gray-400" colspan="4">Core Platform</td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">Deal Ingestion</td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm text-[#64748b] dark:text-gray-400">Basic AI</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">Advanced AI</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">Custom Models</span></td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">Deal Rooms</td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm text-[#64748b] dark:text-gray-400">5 Active</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">25 Active</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">Unlimited</span></td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">Historical Data</td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm text-[#64748b] dark:text-gray-400">1 Year</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">Unlimited</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">Unlimited</span></td>
+</tr>
+<!-- Intelligence -->
+<tr>
+<td class="bg-[#f1f5f9] dark:bg-[#334155]/30 p-3 px-6 text-xs font-bold uppercase tracking-wider text-[#64748b] dark:text-gray-400" colspan="4">Intelligence &amp; AI</td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">Chat with Deals</td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-[#cbd5e1] dark:text-gray-600">remove</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-primary">check</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-primary">check</span></td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">Sentiment Analysis</td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-[#cbd5e1] dark:text-gray-600">remove</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-primary">check</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-primary">check</span></td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">Custom API Access</td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-[#cbd5e1] dark:text-gray-600">remove</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-[#cbd5e1] dark:text-gray-600">remove</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-primary">check</span></td>
+</tr>
+<!-- Support & Security -->
+<tr>
+<td class="bg-[#f1f5f9] dark:bg-[#334155]/30 p-3 px-6 text-xs font-bold uppercase tracking-wider text-[#64748b] dark:text-gray-400" colspan="4">Support &amp; Security</td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">Support SLA</td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm text-[#64748b] dark:text-gray-400">Standard</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">Priority (24h)</span></td>
+<td class="p-4 md:p-6 text-center"><span class="text-sm font-semibold text-[#111418] dark:text-white">Dedicated (1h)</span></td>
+</tr>
+<tr class="hover:bg-gray-50 dark:hover:bg-[#1e293b]/50">
+<td class="p-4 md:p-6 text-sm font-medium text-[#111418] dark:text-white sticky left-0 bg-white dark:bg-[#1e293b]">SSO &amp; Audit Logs</td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-[#cbd5e1] dark:text-gray-600">remove</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-[#cbd5e1] dark:text-gray-600">remove</span></td>
+<td class="p-4 md:p-6 text-center"><span class="material-symbols-outlined text-primary">check</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+</div>
+<!-- FAQ / Bottom CTA -->
+<div class="flex flex-col items-center justify-center p-8 md:p-12 rounded-2xl bg-gradient-to-br from-[#1269e2]/10 to-[#1269e2]/5 border border-[#1269e2]/10">
+<h2 class="text-2xl md:text-3xl font-bold text-[#111418] dark:text-white mb-4 text-center">Ready to modernize your deal flow?</h2>
+<p class="text-[#64748b] dark:text-gray-400 text-center max-w-2xl mb-8">Join the hundreds of investment firms already using PE OS to gain a competitive information advantage.</p>
+<div class="flex flex-col sm:flex-row gap-4">
+<button class="flex min-w-[160px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-6 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors shadow-lg">
+<span class="truncate">Start Free Trial</span>
+</button>
+<button class="flex min-w-[160px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-12 px-6 bg-white dark:bg-[#1e293b] border border-[#d1d5db] dark:border-gray-600 text-[#111418] dark:text-white text-base font-bold leading-normal tracking-[0.015em] hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+<span class="truncate">Book a Demo</span>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="border-t border-solid border-t-[#e5e7eb] dark:border-t-[#1e293b] bg-white dark:bg-[#101822] py-12 px-10">
+<div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+<div class="flex items-center gap-3">
+<div class="size-6 text-primary">
+<svg class="w-full h-full" fill="none" viewbox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+<path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>
+</div>
+<span class="text-sm font-medium text-[#64748b] dark:text-gray-500">© 2024 PE Operating System. All rights reserved.</span>
+</div>
+<div class="flex gap-6">
+<a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="#">Privacy Policy</a>
+<a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="#">Terms of Service</a>
+<a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="#">Contact</a>
+</div>
+</div>
+</footer>
+</div>
+</div>
+</body></html>

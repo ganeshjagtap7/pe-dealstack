@@ -1,0 +1,22 @@
+{
+  "name": "@ai-crm/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "lint": "eslint .",
+    "clean": "rm -rf dist node_modules"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>AI-Native Deal CRM</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1a3b5d", // 'Banker Blue' as requested
+                        "primary-hover": "#132c45", // Darker shade for hover state
+                        "background-light": "#f8fafc", // Slate 50 - Off-white (kept as requested)
+                        "surface-white": "#ffffff",
+                        "border-subtle": "#e2e8f0", // Slate 200
+                        "text-main": "#0f172a", // Slate 900
+                        "text-muted": "#64748b", // Slate 500
+                        "accent-blue": "#2563eb",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"]
+                    },
+                    boxShadow: {
+                        "subtle": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
+                        "card": "0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)",
+                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04)"
+                    }
+                },
+            },
+        }
+    </script>
+<style>
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="font-display bg-background-light text-text-main h-screen flex overflow-hidden selection:bg-primary/10 selection:text-primary">
+<!-- Navbar -->
+<aside class="w-64 bg-white border-r border-border-subtle flex-col hidden md:flex shrink-0 z-30 relative text-text-main shadow-sm">
+<div class="p-6 flex items-center gap-3">
+<div class="bg-center bg-no-repeat bg-cover rounded-xl size-10 bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined text-[20px]">dataset</span>
+</div>
+<div class="flex flex-col">
+<h1 class="text-text-main text-base font-extrabold leading-none tracking-tight">Ventus AI</h1>
+<p class="text-text-muted text-xs font-medium mt-1">PE Operating System</p>
+</div>
+</div>
+<nav class="flex-1 px-4 py-4 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary text-white shadow-md shadow-primary/20 cursor-pointer group border border-primary/5">
+<span class="material-symbols-outlined text-[20px]">business_center</span>
+<p class="text-sm font-semibold">Deals</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">pie_chart</span>
+<p class="text-sm font-medium">Portfolio</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">auto_awesome</span>
+<p class="text-sm font-medium">AI Insights</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
+<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">folder_shared</span>
+<p class="text-sm font-medium">Documents</p>
+</div>
+</nav>
+<div class="p-4 border-t border-border-subtle">
+<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary mb-2">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+<p class="text-sm font-medium">Settings</p>
+</div>
+<div class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-50 border border-border-subtle">
+<div class="size-8 rounded-full bg-slate-200 bg-center bg-cover border border-white shadow-sm" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBjB2-f5sosRtm7M_Up0HtcNdSmCo5k3YyFeAeOAgN1hgoO-qf96zlezHWVXZYE2jC2nCxWrnruNHHb7Zs_JSriz4mQdfCDWTxToArRRNj2FSuGVemo1E4HdrgDqv7_agS4CQKsxiacBhXXom9yCoV96AX0TSIgEsuqJEgH_StAUJ_xT4ivmuXa4CP0dI4flfgbKfFXSJOTF2GHQUgr7OLMxrPcthrpkSHzVLtpskSZArf5BokcuOQI1a1gwWHF67SgA-XvO-r3urk");'></div>
+<div class="flex flex-col flex-1 min-w-0">
+<p class="text-text-main text-xs font-bold truncate">Alex Morgan</p>
+<p class="text-text-muted text-[10px] truncate">Senior Associate</p>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 flex flex-col h-full overflow-hidden relative bg-background-light">
+<header class="bg-surface-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-border-subtle px-8 py-5">
+<div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 max-w-[1600px] mx-auto w-full">
+<div class="flex flex-col gap-1 min-w-[200px]">
+<h2 class="text-text-main text-2xl font-bold leading-tight tracking-tight">Deal Pipeline</h2>
+<p class="text-text-muted text-sm font-medium flex items-center gap-2">
+<span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+                    14 Active Opportunities
+                </p>
+</div>
+<div class="flex-1 max-w-2xl w-full">
+<label class="group flex w-full items-center rounded-xl bg-white border border-border-subtle hover:border-primary/30 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/10 transition-all h-12 shadow-sm">
+<div class="pl-4 pr-3 text-text-muted group-focus-within:text-primary transition-colors">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</div>
+<input class="w-full bg-transparent border-none text-text-main placeholder-text-muted/70 focus:ring-0 text-sm font-medium" placeholder="Ask AI: Show me SaaS deals with EBITDA &gt; $5M..."/>
+<div class="pr-3 hidden sm:block">
+<kbd class="hidden sm:inline-block rounded px-2 py-1 text-[10px] font-bold text-text-muted bg-slate-100 border border-border-subtle">CMD+K</kbd>
+</div>
+</label>
+</div>
+<div class="flex items-center gap-4 justify-end">
+<button class="p-2.5 text-text-muted hover:text-text-main hover:bg-slate-100 rounded-full transition-colors relative">
+<span class="material-symbols-outlined">notifications</span>
+<span class="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+</button>
+<button class="flex items-center justify-center gap-2 h-11 px-6 bg-primary hover:bg-primary-hover text-white rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95 group">
+<span class="material-symbols-outlined text-[20px] group-hover:animate-pulse">smart_toy</span>
+<span class="text-sm font-bold tracking-wide">Ingest Deal Data</span>
+</button>
+</div>
+</div>
+<div class="flex gap-3 mt-6 overflow-x-auto custom-scrollbar pb-2 max-w-[1600px] mx-auto w-full">
+<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+<p class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Stage: All</p>
+<span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+</button>
+<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+<p class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Industry: SaaS, Health...</p>
+<span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+</button>
+<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3.5 hover:bg-slate-200 transition-all">
+<p class="text-primary text-xs font-bold">Deal Size &gt; $10M</p>
+<span class="material-symbols-outlined text-primary text-[16px]">close</span>
+</button>
+<div class="h-8 w-[1px] bg-border-subtle mx-1"></div>
+<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-transparent px-2 hover:bg-slate-100 transition-all">
+<span class="material-symbols-outlined text-text-muted text-[18px]">sort</span>
+<p class="text-text-muted text-xs font-semibold">Sort by: Smart Rank</p>
+</button>
+</div>
+</header>
+<div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+<div class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 pb-20">
+<a href="deal.html" class="block">
+<article class="bg-surface-white rounded-xl border border-border-subtle p-6 hover:border-primary/30 transition-all cursor-pointer group flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-slate-50 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="size-11 rounded-lg bg-slate-50 border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">webhook</span>
+</div>
+<div>
+<h3 class="text-text-main font-bold text-lg leading-tight group-hover:text-primary transition-colors">Apex Logistics</h3>
+<p class="text-text-muted text-xs font-medium">Supply Chain SaaS</p>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-md bg-emerald-50 border border-emerald-100 text-emerald-600 text-[10px] font-bold uppercase tracking-wider">Due Diligence</span>
+</div>
+<div class="grid grid-cols-2 gap-px bg-border-subtle rounded-lg overflow-hidden border border-border-subtle mb-6">
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">IRR (Proj)</span>
+<span class="text-text-main font-bold text-lg tabular-nums">24.5%</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">MoM</span>
+<span class="text-emerald-600 font-bold text-lg tabular-nums">3.5x</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>
+<span class="text-text-main font-bold text-lg tabular-nums">$12.4M</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">Revenue</span>
+<span class="text-text-main font-bold text-lg tabular-nums">$48M</span>
+</div>
+</div>
+<div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-purple-600 text-sm">auto_awesome</span>
+<span class="text-purple-600 text-xs font-bold uppercase">AI Thesis</span>
+</div>
+<p class="text-slate-600 text-xs leading-relaxed font-medium">
+                        Strong recurring revenue model with high retention. Note: Q3 churn spike detected in document "CIM_v3.pdf" requires deeper dive.
+                    </p>
+</div>
+<div class="flex items-center justify-between mt-5 pt-4 border-t border-border-subtle">
+<div class="flex items-center gap-1.5 text-text-muted hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]">description</span>
+<span class="text-[11px] font-medium">CIM_2023.pdf</span>
+</div>
+<span class="text-[11px] text-text-muted font-medium">Updated 2h ago</span>
+</div>
+</article>
+</a>
+<a href="deal.html" class="block">
+<article class="bg-surface-white rounded-xl border border-border-subtle p-6 hover:border-primary/30 transition-all cursor-pointer group flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-slate-50 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="size-11 rounded-lg bg-slate-50 border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">monitor_heart</span>
+</div>
+<div>
+<h3 class="text-text-main font-bold text-lg leading-tight group-hover:text-primary transition-colors">MediCare Plus</h3>
+<p class="text-text-muted text-xs font-medium">Healthcare Services</p>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-md bg-blue-50 border border-blue-100 text-blue-600 text-[10px] font-bold uppercase tracking-wider">Initial Review</span>
+</div>
+<div class="grid grid-cols-2 gap-px bg-border-subtle rounded-lg overflow-hidden border border-border-subtle mb-6">
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">IRR (Proj)</span>
+<span class="text-text-main font-bold text-lg tabular-nums">18.2%</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">MoM</span>
+<span class="text-text-main font-bold text-lg tabular-nums">2.1x</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>
+<span class="text-text-main font-bold text-lg tabular-nums">$45.0M</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">Revenue</span>
+<span class="text-text-main font-bold text-lg tabular-nums">$180M</span>
+</div>
+</div>
+<div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-purple-600 text-sm">auto_awesome</span>
+<span class="text-purple-600 text-xs font-bold uppercase">AI Thesis</span>
+</div>
+<p class="text-slate-600 text-xs leading-relaxed font-medium">
+                        Regulatory tailwinds present in regional market. Extraction confidence high (98%). Stable cash flow profile identified.
+                    </p>
+</div>
+<div class="flex items-center justify-between mt-5 pt-4 border-t border-border-subtle">
+<div class="flex items-center gap-1.5 text-text-muted hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]">description</span>
+<span class="text-[11px] font-medium">Teaser_deck.pdf</span>
+</div>
+<span class="text-[11px] text-text-muted font-medium">Updated 5h ago</span>
+</div>
+</article>
+</a>
+<a href="deal.html" class="block">
+<article class="bg-surface-white rounded-xl border border-border-subtle p-6 hover:border-primary/30 transition-all cursor-pointer group flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden">
+<div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-slate-50 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="size-11 rounded-lg bg-slate-50 border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">cloud_queue</span>
+</div>
+<div>
+<h3 class="text-text-main font-bold text-lg leading-tight group-hover:text-primary transition-colors">Nebula Systems</h3>
+<p class="text-text-muted text-xs font-medium">Cloud Infrastructure</p>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-md bg-amber-50 border border-amber-100 text-amber-600 text-[10px] font-bold uppercase tracking-wider">IOI Submitted</span>
+</div>
+<div class="grid grid-cols-2 gap-px bg-border-subtle rounded-lg overflow-hidden border border-border-subtle mb-6">
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">IRR (Proj)</span>
+<span class="text-text-main font-bold text-lg tabular-nums">29.1%</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">MoM</span>
+<span class="text-emerald-600 font-bold text-lg tabular-nums">4.2x</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>
+<span class="text-red-500 font-bold text-lg tabular-nums">$-2.5M</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">Revenue</span>
+<span class="text-text-main font-bold text-lg tabular-nums">$15M</span>
+</div>
+</div>
+<div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-purple-600 text-sm">auto_awesome</span>
+<span class="text-purple-600 text-xs font-bold uppercase">AI Thesis</span>
+</div>
+<p class="text-slate-600 text-xs leading-relaxed font-medium">
+                        High growth potential but currently burning cash. Requires operational restructuring post-acquisition to reach profitability.
+                    </p>
+</div>
+<div class="flex items-center justify-between mt-5 pt-4 border-t border-border-subtle">
+<div class="flex items-center gap-1.5 text-text-muted hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]">mail</span>
+<span class="text-[11px] font-medium">Email_thread.msg</span>
+</div>
+<span class="text-[11px] text-text-muted font-medium">Updated 1d ago</span>
+</div>
+</article>
+</a>
+<a href="deal.html" class="block">
+<article class="bg-surface-white rounded-xl border border-border-subtle p-6 hover:border-primary/30 transition-all cursor-pointer group flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden opacity-80 hover:opacity-100 grayscale hover:grayscale-0">
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="size-11 rounded-lg bg-slate-50 border border-border-subtle flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">local_shipping</span>
+</div>
+<div>
+<h3 class="text-text-main font-bold text-lg leading-tight group-hover:text-primary transition-colors">Titan Freight</h3>
+<p class="text-text-muted text-xs font-medium">Transportation</p>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-md bg-slate-100 border border-slate-200 text-slate-500 text-[10px] font-bold uppercase tracking-wider">Passed</span>
+</div>
+<div class="grid grid-cols-2 gap-px bg-border-subtle rounded-lg overflow-hidden border border-border-subtle mb-6">
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">IRR (Proj)</span>
+<span class="text-text-main font-bold text-lg tabular-nums">12%</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">MoM</span>
+<span class="text-text-main font-bold text-lg tabular-nums">1.5x</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>
+<span class="text-text-main font-bold text-lg tabular-nums">$8.0M</span>
+</div>
+<div class="bg-surface-white p-3.5 flex flex-col items-center">
+<span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">Revenue</span>
+<span class="text-text-main font-bold text-lg tabular-nums">$62M</span>
+</div>
+</div>
+<div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto">
+<div class="flex items-center gap-2 mb-2">
+<span class="material-symbols-outlined text-red-500 text-sm">warning</span>
+<span class="text-red-500 text-xs font-bold uppercase">Risk Flag</span>
+</div>
+<p class="text-slate-600 text-xs leading-relaxed font-medium">
+                        Margins compressing due to rising fuel costs. Owner seeking unrealistic multiple based on 2021 peak.
+                    </p>
+</div>
+<div class="flex items-center justify-between mt-5 pt-4 border-t border-border-subtle">
+<div class="flex items-center gap-1.5 text-text-muted hover:text-primary transition-colors">
+<span class="material-symbols-outlined text-[16px]">description</span>
+<span class="text-[11px] font-medium">Financials.xlsx</span>
+</div>
+<span class="text-[11px] text-text-muted font-medium">Updated 3d ago</span>
+</div>
+</article>
+</a>
+<article class="bg-surface-white rounded-xl border border-dashed border-primary/20 p-6 flex flex-col h-full relative overflow-hidden">
+<div class="absolute inset-0 bg-primary/[0.02]"></div>
+<div class="flex justify-between items-start mb-6 relative z-10">
+<div class="flex gap-3 items-center">
+<div class="size-11 rounded-lg bg-slate-100 flex items-center justify-center animate-pulse">
+</div>
+<div class="space-y-2">
+<div class="h-4 w-32 bg-slate-100 rounded animate-pulse"></div>
+<div class="h-3 w-20 bg-slate-100 rounded animate-pulse"></div>
+</div>
+</div>
+<span class="px-2.5 py-1 rounded-md bg-primary/5 border border-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider flex items-center gap-2">
+<span class="block size-2 bg-primary rounded-full animate-ping"></span>
+                        Processing
+                    </span>
+</div>
+<div class="grid grid-cols-2 gap-px bg-slate-100 rounded-lg overflow-hidden border border-slate-100 mb-6 opacity-60">
+<div class="bg-white p-3.5 h-16"></div>
+<div class="bg-white p-3.5 h-16"></div>
+<div class="bg-white p-3.5 h-16"></div>
+<div class="bg-white p-3.5 h-16"></div>
+</div>
+<div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto flex items-center justify-center gap-3">
+<span class="material-symbols-outlined text-primary animate-spin">sync</span>
+<span class="text-text-muted text-xs font-medium">Extracting financial tables...</span>
+</div>
+</article>
+<article class="bg-transparent rounded-xl border-2 border-dashed border-slate-300 p-6 hover:border-primary hover:bg-white/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-4">
+<div class="size-16 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:scale-110 group-hover:border-primary/20 transition-all shadow-sm group-hover:shadow-md">
+<span class="material-symbols-outlined text-text-muted group-hover:text-primary text-3xl">add</span>
+</div>
+<div>
+<h3 class="text-text-main font-bold text-lg group-hover:text-primary transition-colors">Upload Documents</h3>
+<p class="text-text-muted text-sm mt-1 max-w-[200px] font-medium">Drag &amp; drop CIMs, Teasers, or Excel models to auto-create deal blocks.</p>
+</div>
+</article>
+</div>
+</div>
+</main>
+</body></html>

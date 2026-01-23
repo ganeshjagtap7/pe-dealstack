@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html class="light" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PE OS - The Intelligence Layer for Private Equity</title>
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Theme Config -->
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+            extend: {
+                colors: {
+                "primary": "#1269e2",
+                "background-light": "#f8fafc", /* Slightly cooler off-white */
+                "background-dark": "#101822",
+                },
+                fontFamily: {
+                "display": ["Manrope", "sans-serif"]
+                },
+                borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "2xl": "1rem", "full": "9999px"},
+                backgroundImage: {
+                    'grid-pattern': "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231269e2' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")",
+                }
+            },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#1e293b] dark:text-white font-display overflow-x-hidden antialiased">
+<!-- Navbar -->
+<header class="sticky top-0 z-50 w-full border-b border-[#f0f2f4] dark:border-gray-800 bg-white/80 dark:bg-background-dark/80 backdrop-blur-md">
+<div class="px-4 md:px-10 lg:px-40 py-3 flex items-center justify-between">
+<div class="flex items-center gap-4">
+<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">candlestick_chart</span>
+</div>
+<h2 class="text-lg font-bold leading-tight tracking-[-0.015em] text-[#111418] dark:text-white">PE OS</h2>
+</div>
+<div class="hidden lg:flex items-center gap-8">
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Platform</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Solutions</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Resources</a>
+<a class="text-sm font-medium hover:text-primary transition-colors" href="#">Company</a>
+</div>
+<div class="flex items-center gap-4">
+<button class="hidden sm:flex h-9 items-center justify-center rounded-lg px-4 bg-primary text-white text-sm font-bold hover:bg-primary/90 transition-colors">
+                    Request Demo
+                </button>
+<button class="lg:hidden p-2 text-gray-600 dark:text-gray-300">
+<span class="material-symbols-outlined">menu</span>
+</button>
+</div>
+</div>
+</header>
+<!-- Hero Section -->
+<div class="relative w-full overflow-hidden bg-background-light dark:bg-background-dark">
+<!-- Abstract Background Pattern -->
+<div class="absolute inset-0 bg-grid-pattern pointer-events-none"></div>
+<div class="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl pointer-events-none"></div>
+<div class="relative px-4 md:px-10 lg:px-40 py-16 lg:py-24">
+<div class="max-w-7xl mx-auto">
+<div class="flex flex-col lg:flex-row gap-12 lg:gap-20 items-center">
+<!-- Text Content -->
+<div class="flex-1 flex flex-col gap-6 text-center lg:text-left z-10">
+<div class="inline-flex items-center gap-2 self-center lg:self-start rounded-full border border-primary/20 bg-primary/5 px-3 py-1">
+<span class="flex size-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-xs font-semibold text-primary uppercase tracking-wide">New: GPT-4o Integration</span>
+</div>
+<h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-[#111418] dark:text-white">
+                            The Intelligence Layer for <span class="text-primary">Private Equity</span>
+</h1>
+<p class="text-lg text-slate-600 dark:text-slate-300 font-medium leading-relaxed max-w-2xl mx-auto lg:mx-0">
+                            Automate deal flow analysis and unify your institutional CRM with the world's first AI-native PE operating system.
+                        </p>
+<div class="flex flex-wrap gap-4 justify-center lg:justify-start pt-4">
+<button class="h-12 px-8 rounded-lg bg-primary text-white text-base font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-primary/40 transition-all transform hover:-translate-y-0.5">
+                                Request Demo
+                            </button>
+<button class="h-12 px-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#111418] dark:text-white text-base font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
+<span class="material-symbols-outlined text-[20px]">play_circle</span>
+                                View Documentation
+                            </button>
+</div>
+<div class="flex items-center justify-center lg:justify-start gap-2 text-sm text-slate-500 dark:text-slate-400 pt-2">
+<span class="material-symbols-outlined text-[18px] text-green-500">check_circle</span>
+<span>SOC2 Type II Certified</span>
+<span class="mx-2">•</span>
+<span>No credit card required</span>
+</div>
+</div>
+<!-- Hero Image / Dashboard Preview -->
+<div class="flex-1 w-full max-w-[600px] lg:max-w-none perspective-1000">
+<div class="relative group transform transition-transform duration-700 hover:scale-[1.01] hover:rotate-1">
+<!-- Glow effect behind -->
+<div class="absolute -inset-1 bg-gradient-to-r from-primary to-blue-400 rounded-xl blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200"></div>
+<!-- Main Image Container -->
+<div class="relative rounded-xl overflow-hidden shadow-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+<div class="absolute top-0 w-full h-8 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center px-4 gap-2">
+<div class="size-2.5 rounded-full bg-red-400"></div>
+<div class="size-2.5 rounded-full bg-yellow-400"></div>
+<div class="size-2.5 rounded-full bg-green-400"></div>
+</div>
+<div class="pt-8 aspect-[4/3] bg-cover bg-center" data-alt="High-fidelity SaaS dashboard showing analytics charts and data tables for financial analysis" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuCHtjoKX7UkfdBVQY5RUxP-biUiJEa0N6wZsP-ujS84AAfnkBxVVteayhHvMS67a07ImNtncjK-c0D9_leqXYZhhE4ugfPcYKRDAqO2kquNHsdb6UiNnCWHkij5gdpVJFYuTUDBAMhJh1zDcwkGULMw8Hgh7g3igkRdyo43XsmnHwC5ZDc08WInOYb7CiwqoJE2R2LwK6H2G8BwxxqPFx9nEhReWxpZUlnfBtjAPCXqBmQ1GHpLQr9Arm3ny8sAKe69hmFtx8TFuVM');">
+<!-- Overlay to simulate UI structure if image is abstract -->
+<div class="w-full h-full bg-white/10 dark:bg-black/20 backdrop-contrast-125 p-6 flex flex-col gap-4">
+<!-- Simulated UI Elements Overlay -->
+<div class="flex gap-4">
+<div class="w-1/3 h-32 rounded bg-white/90 dark:bg-slate-800/90 shadow-sm backdrop-blur"></div>
+<div class="w-1/3 h-32 rounded bg-white/90 dark:bg-slate-800/90 shadow-sm backdrop-blur"></div>
+<div class="w-1/3 h-32 rounded bg-white/90 dark:bg-slate-800/90 shadow-sm backdrop-blur"></div>
+</div>
+<div class="flex-1 rounded bg-white/90 dark:bg-slate-800/90 shadow-sm backdrop-blur"></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Trusted By Section -->
+<div class="w-full bg-white dark:bg-background-dark border-y border-[#f0f2f4] dark:border-slate-800 py-12">
+<div class="max-w-7xl mx-auto px-4 md:px-10 lg:px-40 text-center">
+<h3 class="text-slate-500 dark:text-slate-400 text-sm font-semibold uppercase tracking-wider mb-8">Trusted by leading investment firms</h3>
+<div class="flex flex-wrap justify-center gap-x-12 gap-y-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+<!-- Logo 1: Generic Financial -->
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl">account_balance</span>
+<span class="text-xl font-bold tracking-tight">KINGSFORD</span>
+</div>
+<!-- Logo 2 -->
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl">terrain</span>
+<span class="text-xl font-bold tracking-tight">SUMMIT PARTNERS</span>
+</div>
+<!-- Logo 3 -->
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl">token</span>
+<span class="text-xl font-bold tracking-tight">BLACKSTONE</span>
+</div>
+<!-- Logo 4 -->
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl">public</span>
+<span class="text-xl font-bold tracking-tight">GLOBAL HARBOR</span>
+</div>
+<!-- Logo 5 -->
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-3xl">diamond</span>
+<span class="text-xl font-bold tracking-tight">APEX CAPITAL</span>
+</div>
+</div>
+</div>
+</div>
+<!-- Features Section -->
+<div class="relative py-20 bg-background-light dark:bg-background-dark">
+<div class="px-4 md:px-10 lg:px-40 max-w-7xl mx-auto">
+<div class="mb-16 text-center md:text-left md:flex md:items-end md:justify-between">
+<div class="max-w-2xl">
+<h2 class="text-3xl md:text-4xl font-extrabold text-[#111418] dark:text-white tracking-tight mb-4">
+                        Key Capabilities
+                    </h2>
+<p class="text-lg text-slate-600 dark:text-slate-300">
+                        Streamline your investment operations with next-generation tools designed for the modern analyst.
+                    </p>
+</div>
+<div class="mt-6 md:mt-0">
+<a class="text-primary font-bold hover:underline inline-flex items-center gap-1" href="#">
+                        View all features
+                        <span class="material-symbols-outlined text-sm">arrow_forward</span>
+</a>
+</div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+<!-- Feature 1 -->
+<div class="group p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+<div class="size-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-3xl">view_in_ar</span>
+</div>
+<h3 class="text-xl font-bold text-[#111418] dark:text-white mb-3">AI-Driven Deal Ingestion</h3>
+<p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+                        Instantly parse CIMs, Teasers, and NDAs into structured data. Our AI extracts key financial metrics and deal terms automatically.
+                    </p>
+</div>
+<!-- Feature 2 -->
+<div class="group p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+<div class="size-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-3xl">chat_bubble</span>
+</div>
+<h3 class="text-xl font-bold text-[#111418] dark:text-white mb-3">Chat with Deals</h3>
+<p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+                        Query your entire deal history using natural language. Ask complex questions like "Show me SaaS deals with &gt;$10M EBITDA from 2023."
+                    </p>
+</div>
+<!-- Feature 3 -->
+<div class="group p-8 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-xl hover:shadow-primary/5 transition-all duration-300">
+<div class="size-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform duration-300">
+<span class="material-symbols-outlined text-3xl">hub</span>
+</div>
+<h3 class="text-xl font-bold text-[#111418] dark:text-white mb-3">Institutional CRM</h3>
+<p class="text-slate-600 dark:text-slate-300 leading-relaxed">
+                        Track relationships, intermediaries, and deal pipelines with automated updates. Syncs bi-directionally with Outlook and Gmail.
+                    </p>
+</div>
+</div>
+</div>
+</div>
+<!-- CTA Section -->
+<div class="py-24 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800">
+<div class="max-w-4xl mx-auto px-6 text-center">
+<h2 class="text-3xl md:text-4xl font-extrabold text-[#111418] dark:text-white mb-6">
+                Ready to modernize your investment process?
+            </h2>
+<p class="text-lg text-slate-600 dark:text-slate-300 mb-10 max-w-2xl mx-auto">
+                Join over 200+ investment firms using PE OS to make data-driven decisions faster.
+            </p>
+<div class="flex flex-col sm:flex-row justify-center gap-4">
+<button class="h-14 px-8 rounded-lg bg-primary text-white text-lg font-bold shadow-lg shadow-primary/25 hover:bg-primary/90 hover:shadow-primary/40 transition-all">
+                    Start Your Free Trial
+                </button>
+<button class="h-14 px-8 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-[#111418] dark:text-white text-lg font-bold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">
+                    Talk to Sales
+                </button>
+</div>
+</div>
+</div>
+<!-- Footer -->
+<footer class="bg-background-light dark:bg-background-dark border-t border-slate-200 dark:border-slate-800 pt-16 pb-8">
+<div class="max-w-7xl mx-auto px-4 md:px-10 lg:px-40">
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-8 mb-12">
+<div class="col-span-2 lg:col-span-2">
+<div class="flex items-center gap-2 mb-4">
+<div class="size-6 rounded bg-primary/20 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-sm">candlestick_chart</span>
+</div>
+<h2 class="text-lg font-bold text-[#111418] dark:text-white">PE OS</h2>
+</div>
+<p class="text-slate-500 dark:text-slate-400 text-sm leading-relaxed mb-6 max-w-xs">
+                        The operating system for the modern private equity firm. Intelligence, automation, and execution in one platform.
+                    </p>
+<div class="flex gap-4">
+<a class="text-slate-400 hover:text-primary" href="#"><span class="material-symbols-outlined">public</span></a>
+<a class="text-slate-400 hover:text-primary" href="#"><span class="material-symbols-outlined">alternate_email</span></a>
+<a class="text-slate-400 hover:text-primary" href="#"><span class="material-symbols-outlined">rss_feed</span></a>
+</div>
+</div>
+<div>
+<h4 class="font-bold text-[#111418] dark:text-white mb-4">Product</h4>
+<ul class="flex flex-col gap-2 text-sm text-slate-500 dark:text-slate-400">
+<li><a class="hover:text-primary" href="#">Deal Flow</a></li>
+<li><a class="hover:text-primary" href="#">CRM</a></li>
+<li><a class="hover:text-primary" href="#">Intelligence</a></li>
+<li><a class="hover:text-primary" href="#">Integrations</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-[#111418] dark:text-white mb-4">Company</h4>
+<ul class="flex flex-col gap-2 text-sm text-slate-500 dark:text-slate-400">
+<li><a class="hover:text-primary" href="#">About Us</a></li>
+<li><a class="hover:text-primary" href="#">Careers</a></li>
+<li><a class="hover:text-primary" href="#">Blog</a></li>
+<li><a class="hover:text-primary" href="#">Contact</a></li>
+</ul>
+</div>
+<div>
+<h4 class="font-bold text-[#111418] dark:text-white mb-4">Resources</h4>
+<ul class="flex flex-col gap-2 text-sm text-slate-500 dark:text-slate-400">
+<li><a class="hover:text-primary" href="#">Documentation</a></li>
+<li><a class="hover:text-primary" href="#">API Reference</a></li>
+<li><a class="hover:text-primary" href="#">Community</a></li>
+<li><a class="hover:text-primary" href="#">Help Center</a></li>
+</ul>
+</div>
+</div>
+<div class="border-t border-slate-200 dark:border-slate-800 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
+<p class="text-sm text-slate-400">© 2024 PE OS Inc. All rights reserved.</p>
+<div class="flex gap-6 text-sm text-slate-400">
+<a class="hover:text-primary" href="#">Privacy Policy</a>
+<a class="hover:text-primary" href="#">Terms of Service</a>
+<a class="hover:text-primary" href="#">Security</a>
+</div>
+</div>
+</div>
+</footer>
+</body></html>

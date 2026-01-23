@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Due Diligence VDR - PE OS</title>
+    <script>
+      // Tailwind config
+      tailwind = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#1269e2",
+              "background-light": "#f6f7f8",
+              "background-dark": "#101822",
+              "surface-light": "#ffffff",
+              "surface-dark": "#1a2430",
+              "border-light": "#e2e8f0",
+              "border-dark": "#2d3748",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"],
+              "body": ["Inter", "sans-serif"]
+            },
+            borderRadius: {
+              "DEFAULT": "0.25rem",
+              "lg": "0.5rem",
+              "xl": "0.75rem",
+              "2xl": "1rem",
+              "full": "9999px"
+            },
+          },
+        },
+      }
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

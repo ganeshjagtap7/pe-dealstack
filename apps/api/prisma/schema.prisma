@@ -1,0 +1,142 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// Enums for type safety
+enum DealStage {
+  INITIAL_REVIEW
+  DUE_DILIGENCE
+  IOI_SUBMITTED
+  LOI_SUBMITTED
+  NEGOTIATION
+  CLOSING
+  PASSED
+  CLOSED_WON
+  CLOSED_LOST
+}
+
+enum DealStatus {
+  ACTIVE
+  PROCESSING
+  PASSED
+  ARCHIVED
+}
+
+enum DocumentType {
+  CIM
+  TEASER
+  FINANCIALS
+  LEGAL
+  NDA
+  LOI
+  EMAIL
+  OTHER
+}
+
+enum ActivityType {
+  DOCUMENT_UPLOADED
+  STAGE_CHANGED
+  NOTE_ADDED
+  MEETING_SCHEDULED
+  CALL_LOGGED
+  EMAIL_SENT
+  STATUS_UPDATED
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  industry    String?
+  description String?
+  website     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  deals       Deal[]
+
+  @@index([name])
+}
+
+model Deal {
+  id              String     @id @default(cuid())
+  name            String
+  companyId       String
+  stage           DealStage  @default(INITIAL_REVIEW)
+  status          DealStatus @default(ACTIVE)
+
+  // Financial metrics
+  irrProjected    Float?
+  mom             Float?
+  ebitda          Float?
+  revenue         Float?
+
+  // Deal details
+  industry        String?
+  dealSize        Float?
+  description     String?
+  aiThesis        String?
+
+  // Metadata
+  icon            String?    @default("business_center")
+  lastDocument    String?
+  lastDocumentUpdated DateTime?
+
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  documents       Document[]
+  activities      Activity[]
+
+  @@index([companyId])
+  @@index([stage])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+model Document {
+  id          String       @id @default(cuid())
+  dealId      String
+  name        String
+  type        DocumentType @default(OTHER)
+  fileUrl     String?
+  fileSize    Int?
+  mimeType    String?
+
+  // AI extracted data
+  extractedData Json?
+  confidence    Float?
+
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  deal        Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([type])
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  dealId      String
+  type        ActivityType
+  title       String
+  description String?
+  metadata    Json?
+
+  createdAt   DateTime     @default(now())
+
+  deal        Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([createdAt])
+}
