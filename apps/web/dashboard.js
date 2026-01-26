@@ -51,8 +51,8 @@ function initializeFeatures() {
 // Mobile Menu Toggle
 // ============================================================
 function initMobileMenu() {
-    const menuButton = document.querySelector('button.md\\:hidden');
-    const sidebar = document.querySelector('aside');
+    const menuButton = document.getElementById('mobile-menu-btn');
+    const sidebar = document.getElementById('pe-sidebar');
 
     if (menuButton && sidebar) {
         menuButton.addEventListener('click', () => {
@@ -69,8 +69,8 @@ function initMobileMenu() {
 // AI Search Functionality
 // ============================================================
 function initAISearch() {
-    const searchInput = document.querySelector('input[placeholder*="Ask AI"]');
-    const searchButton = document.querySelector('.absolute.inset-y-0.right-0 button');
+    const searchInput = document.getElementById('global-search');
+    const searchButton = searchInput?.parentElement?.querySelector('button');
 
     if (!searchInput) return;
 
@@ -183,7 +183,7 @@ function filterSearchSuggestions(query) {
 }
 
 function fillSearch(query) {
-    const searchInput = document.querySelector('input[placeholder*="Ask AI"]');
+    const searchInput = document.getElementById('global-search');
     if (searchInput) {
         searchInput.value = query;
         searchInput.focus();
@@ -248,7 +248,7 @@ function showAISearchResult(query) {
 // Notifications
 // ============================================================
 function initNotifications() {
-    const notifButton = document.querySelector('button[class*="relative"]');
+    const notifButton = document.getElementById('notifications-btn');
     if (!notifButton) return;
 
     // Create notification dropdown
@@ -347,13 +347,14 @@ function updateNotificationBadge() {
 }
 
 // ============================================================
-// Settings Dropdown
+// User Menu Dropdown
 // ============================================================
 function initSettings() {
-    const settingsButton = document.querySelectorAll('button')[document.querySelectorAll('button').length - 1];
-    if (!settingsButton) return;
+    const userMenuButton = document.getElementById('user-menu-btn');
+    if (!userMenuButton) return;
 
     const dropdown = document.createElement('div');
+    dropdown.id = 'user-menu-dropdown';
     dropdown.className = 'absolute top-full right-0 mt-2 w-56 bg-white rounded-lg border border-border-subtle shadow-card-hover z-50 hidden';
     dropdown.innerHTML = `
         <div class="p-2">
@@ -381,16 +382,16 @@ function initSettings() {
         </div>
     `;
 
-    settingsButton.parentElement.style.position = 'relative';
-    settingsButton.parentElement.appendChild(dropdown);
+    userMenuButton.parentElement.style.position = 'relative';
+    userMenuButton.parentElement.appendChild(dropdown);
 
-    settingsButton.addEventListener('click', (e) => {
+    userMenuButton.addEventListener('click', (e) => {
         e.stopPropagation();
         dropdown.classList.toggle('hidden');
     });
 
     document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target) && e.target !== settingsButton) {
+        if (!dropdown.contains(e.target) && e.target !== userMenuButton) {
             dropdown.classList.add('hidden');
         }
     });
@@ -408,7 +409,7 @@ function initSettings() {
 // Tasks Management
 // ============================================================
 function initTasks() {
-    const checkboxes = document.querySelectorAll('.p-4.hover\\:bg-gray-50 input[type="checkbox"]');
+    const checkboxes = document.querySelectorAll('.task-checkbox');
 
     checkboxes.forEach((checkbox, index) => {
         const task = state.tasks[index];
@@ -439,7 +440,7 @@ function initTasks() {
     });
 
     // View All Tasks button
-    const viewAllButton = document.querySelector('.p-3.bg-gray-50 button');
+    const viewAllButton = document.getElementById('view-all-tasks');
     if (viewAllButton) {
         viewAllButton.addEventListener('click', () => {
             showTasksModal();
@@ -449,7 +450,7 @@ function initTasks() {
 
 function updateTaskCount() {
     const pendingCount = state.tasks.filter(t => !t.completed).length;
-    const badge = document.querySelector('.bg-primary-light.text-primary');
+    const badge = document.getElementById('task-count');
     if (badge) {
         badge.textContent = `${pendingCount} Pending`;
     }
@@ -497,7 +498,8 @@ function showTasksModal() {
 // New Deal Modal
 // ============================================================
 function initNewDealModal() {
-    const newDealButton = document.querySelector('button[class*="New Deal"]');
+    // Listen for New Deal button in header (if present)
+    const newDealButton = document.getElementById('new-deal-btn');
     if (newDealButton) {
         newDealButton.addEventListener('click', showNewDealModal);
     }
@@ -661,16 +663,14 @@ function showStatDetail(stage) {
 // Priority Table Row Click
 // ============================================================
 function initPriorityTable() {
-    const tableRows = document.querySelectorAll('tbody tr');
+    const tableBody = document.getElementById('priorities-table');
+    if (!tableBody) return;
+
+    const tableRows = tableBody.querySelectorAll('tr');
 
     tableRows.forEach(row => {
+        // Rows already have onclick in HTML, but add cursor styling
         row.style.cursor = 'pointer';
-        row.addEventListener('click', (e) => {
-            // Don't navigate if clicking on team member images
-            if (!e.target.closest('.flex.-space-x-2')) {
-                window.location.href = 'deal.html';
-            }
-        });
     });
 }
 
@@ -679,7 +679,7 @@ function initPriorityTable() {
 // ============================================================
 function updateGreeting() {
     const hour = new Date().getHours();
-    const greetingEl = document.querySelector('h1.text-2xl');
+    const greetingEl = document.getElementById('greeting');
 
     if (greetingEl) {
         let greeting = 'Good Morning';
@@ -687,6 +687,13 @@ function updateGreeting() {
         else if (hour >= 17) greeting = 'Good Evening';
 
         greetingEl.textContent = `${greeting}, Alex`;
+    }
+
+    // Update date
+    const dateEl = document.getElementById('current-date');
+    if (dateEl) {
+        const options = { year: 'numeric', month: 'long', day: 'numeric' };
+        dateEl.textContent = new Date().toLocaleDateString('en-US', options);
     }
 }
 
@@ -761,4 +768,4 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-console.log('Dashboard fully initialized with interactive features');
+console.log('PE OS Dashboard fully initialized');

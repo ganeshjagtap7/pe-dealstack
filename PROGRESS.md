@@ -1043,6 +1043,248 @@ The CRM is now fully functional with:
 
 ---
 
+## January 27, 2026
+
+### Day 6 - Shared Layout & Collapsible Sidebar
+
+#### Shared Layout Component Created
+- **Type:** Architecture Improvement
+- **Description:** Created a shared layout component for consistent sidebar and header across all pages
+- **File Created:** `apps/web/js/layout.js`
+
+**Features:**
+- `NAV_ITEMS` configuration array for navigation items
+- `generateSidebar(activePage, options)` - Generates sidebar HTML with active state
+- `generateHeader(options)` - Generates header HTML
+- `generateStyles()` - Injects required CSS styles
+- `PELayout.init(activePage, options)` - Initialize layout on page load
+- Collapsible sidebar with localStorage persistence
+- Keyboard shortcut CMD+K to focus search
+
+#### Navigation Items Added
+| ID | Label | Icon | URL |
+|----|-------|------|-----|
+| dashboard | Dashboard | dashboard | /dashboard.html |
+| deals | Deals | work | /crm.html |
+| data-room | Data Room | folder_open | /vdr.html |
+| crm | CRM | groups | # (placeholder) |
+| portfolio | Portfolio | pie_chart | # (placeholder) |
+| admin | Admin | admin_panel_settings | # (placeholder) |
+| ai-reports | AI Reports | auto_awesome | # (placeholder) |
+
+#### Collapsible Sidebar Implementation
+- **Type:** New Feature
+- **Description:** Added ability to collapse/expand the sidebar for more screen space
+
+**Technical Details:**
+- Collapse button positioned at top-right of sidebar (-right-3)
+- CSS transitions for smooth animation (300ms)
+- Collapsed state saves to localStorage (`pe-sidebar-collapsed`)
+- Auto-restores collapsed state on page load
+- Chevron icon rotates 180deg when collapsed
+
+**Collapsed Behavior:**
+- Sidebar width changes from 256px to 72px
+- Navigation labels hidden
+- Logo text hidden
+- User info hidden
+- Dividers hidden
+- Icons centered
+- User avatar remains visible
+
+#### Pages Refactored to Use Shared Layout
+
+**1. Dashboard Page (`dashboard.html`)**
+- ✅ Added `<div id="sidebar-root"></div>` placeholder
+- ✅ Loads `js/layout.js`
+- ✅ Calls `PELayout.init('dashboard', { collapsible: true })`
+
+**2. CRM Page (`crm.html`)**
+- ✅ Replaced inline sidebar (50+ lines) with `<div id="sidebar-root"></div>`
+- ✅ Loads `js/layout.js` before main script
+- ✅ Calls `PELayout.init('deals', { collapsible: true })`
+- ✅ Keeps custom header with "Ingest Deal Data" button
+
+**3. Deal Page (`deal.html`)**
+- ✅ Replaced inline sidebar with `<div id="sidebar-root"></div>`
+- ✅ Loads `js/layout.js` before `deal.js`
+- ✅ `deal.js` calls `PELayout.init('deals', { collapsible: true })`
+
+**4. VDR Page (`vdr.tsx`)**
+- ✅ Removed PE OS navigation sidebar entirely
+- ✅ Shows only folder tree sidebar (280px)
+- ✅ VDR has its own React-based navigation
+
+#### Bug Fixes
+
+**1. Fixed Invalid Icon Name**
+- **Issue:** Sidebar showed "BRIEFCASE" text instead of icon
+- **Cause:** `briefcase` is not a valid Material Symbols icon name
+- **Fix:** Changed `icon: 'briefcase'` to `icon: 'work'` in NAV_ITEMS
+- **Files Fixed:**
+  - `apps/web/js/layout.js`
+  - `apps/web/crm.html`
+  - `apps/web/deal.html`
+
+**2. Fixed API Port Conflict**
+- **Issue:** CRM page showed "Unexpected token '<'" error
+- **Cause:** Vite dev server was responding on port 3001 instead of API
+- **Fix:** Killed conflicting processes and restarted servers properly
+- **Verification:** `curl http://localhost:3001/api/deals` returns JSON
+
+#### Files Modified Summary
+
+| File | Change |
+|------|--------|
+| `apps/web/js/layout.js` | Created shared layout component |
+| `apps/web/dashboard.html` | Use shared layout, enable collapsible |
+| `apps/web/crm.html` | Refactored to use shared layout |
+| `apps/web/deal.html` | Refactored to use shared layout |
+| `apps/web/deal.js` | Added PELayout.init() call |
+| `apps/web/src/vdr.tsx` | Removed PE OS sidebar |
+
+#### Design Tokens (from layout.js)
+```css
+/* Colors */
+--primary: #003366 (Banker Blue)
+--primary-hover: #002855
+--primary-light: #E6EEF5
+--secondary: #059669 (Success Green)
+--secondary-light: #D1FAE5
+--background-body: #F8F9FA
+--surface-card: #FFFFFF
+--border-subtle: #E5E7EB
+--text-main: #111827
+--text-secondary: #4B5563
+--text-muted: #9CA3AF
+
+/* Typography */
+--font-family: Inter, sans-serif
+
+/* Sidebar */
+--sidebar-width: 256px (expanded)
+--sidebar-width-collapsed: 72px
+--transition-duration: 300ms
+```
+
+#### Testing Results
+- ✅ Dashboard - Sidebar loads, collapse button works
+- ✅ CRM Page - Sidebar loads with "Deals" active, collapse works
+- ✅ Deal Page - Sidebar loads with "Deals" active, collapse works
+- ✅ VDR Page - Only shows folder tree sidebar
+- ✅ Data Room link navigates to /vdr.html
+- ✅ Collapse state persists across page navigation
+- ✅ All icons display correctly (no text fallbacks)
+
+#### Known Issues / Next Steps
+- [ ] CRM, Portfolio, Admin, AI Reports links are placeholders
+- [ ] Mobile menu button not implemented
+- [ ] User dropdown menu not implemented
+- [ ] Notifications panel not implemented
+
+---
+
+### Day 6 (Continued) - VDR Page PE OS Sidebar Integration
+
+#### VDR Page Updated to Use Shared Layout
+- **Type:** UI Consistency Improvement
+- **Description:** Added the shared PE OS collapsible sidebar to the VDR page for consistent navigation across all pages
+- **User Request:** "our VDR page looks totally different from our other pages. lets give our left collapsible sidebar to this vdr page also."
+
+**Files Modified:**
+
+**1. `apps/web/vdr.html`**
+- Added `<div id="sidebar-root"></div>` for PE OS sidebar injection
+- Added `class="bg-background-light text-text-main font-sans overflow-hidden h-screen flex"` to body
+- Loaded `js/layout.js` script
+- Added PELayout initialization:
+  ```javascript
+  PELayout.init('data-room', { collapsible: true });
+  ```
+- Set React root to `class="flex-1 flex overflow-hidden"` to work alongside sidebar
+
+**2. `apps/web/src/vdr.tsx`**
+- Changed root container from `h-screen w-full` to `h-full w-full`
+- Allows React app to fill remaining space after PE OS sidebar
+
+#### VDR Page Layout (After Update)
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ PE OS Sidebar │ Folder Tree │        Main Content        │ AI Insights    │
+│ (256px/72px)  │ (280px)     │        (Flex)              │ (300px)        │
+│ ┌───────────┐ │ ┌─────────┐ │  ┌───────────────────────┐ │ ┌────────────┐ │
+│ │ Dashboard │ │ │ 100     │ │  │  Header/Breadcrumbs   │ │ │ Summary    │ │
+│ │ Deals     │ │ │ 200     │ │  ├───────────────────────┤ │ │ Red Flags  │ │
+│ │ Data Room◄│ │ │ 300     │ │  │  Smart Filters        │ │ │ Missing    │ │
+│ │ CRM       │ │ │ 400     │ │  ├───────────────────────┤ │ │ Docs       │ │
+│ │ Portfolio │ │ │ 500     │ │  │  File Table           │ │ │            │ │
+│ │ Admin     │ │ └─────────┘ │  │                       │ │ │ [Generate] │ │
+│ │ ───────── │ │             │  │                       │ │ │            │ │
+│ │ AI Reports│ │             │  │                       │ │ │            │ │
+│ └───────────┘ │             │  └───────────────────────┘ │ └────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+#### Testing Checklist
+- [ ] VDR page loads with PE OS sidebar
+- [ ] "Data Room" nav item is highlighted (active state)
+- [ ] Sidebar collapse button works
+- [ ] Collapsed state persists (localStorage)
+- [ ] Folder tree still works
+- [ ] File upload still works
+- [ ] All other VDR features functional
+
+---
+
+### Day 6 (Continued) - VDR Color Theme Fix
+
+#### Issue
+- **Problem:** VDR page had a different color theme (light blue `#1269e2`) compared to other pages (Banker Blue `#003366`)
+- **User Request:** "vdr.html page has different color theme its light blue. i want to have exact same color theme for vdr page as of other pages."
+
+#### Root Cause
+1. **`tailwind.config.js`** had wrong primary color: `#1269e2` instead of `#003366`
+2. **`vdr.html`** was missing the Tailwind CDN script for runtime sidebar classes
+3. **`vdr.html`** was missing PE OS design system colors (`surface-card`, `border-subtle`, `background-body`)
+
+#### Fix Applied
+
+**1. Updated `apps/web/tailwind.config.js`**
+Changed primary color and added missing PE OS colors:
+```javascript
+colors: {
+  'primary': '#003366',        // Was: '#1269e2'
+  'primary-hover': '#002855',
+  'primary-light': '#E6EEF5',
+  'secondary': '#059669',
+  'secondary-light': '#D1FAE5',
+  'background-body': '#F8F9FA',
+  'surface-card': '#FFFFFF',
+  'border-subtle': '#E5E7EB',
+  'border-focus': '#CBD5E1',
+  'text-main': '#111827',
+  'text-secondary': '#4B5563',
+  'text-muted': '#9CA3AF',
+}
+```
+
+**2. Updated `apps/web/vdr.html`**
+- Added Tailwind CDN script: `<script src="https://cdn.tailwindcss.com"></script>`
+- Added Google Fonts (Inter, Material Symbols)
+- Changed `tailwind = {` to `tailwind.config = {` for CDN compatibility
+- Added missing PE OS colors to inline config
+
+#### Files Modified
+| File | Change |
+|------|--------|
+| `apps/web/tailwind.config.js` | Fixed primary color to #003366, added PE OS colors |
+| `apps/web/vdr.html` | Added Tailwind CDN, fonts, updated color config |
+
+#### Result
+VDR page now has consistent Banker Blue (#003366) theme matching Dashboard, CRM, and Deal pages.
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`

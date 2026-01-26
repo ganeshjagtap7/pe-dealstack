@@ -9,13 +9,25 @@ export default {
   theme: {
     extend: {
       colors: {
-        'primary': '#1269e2',
-        'background-light': '#f6f7f8',
+        // PE OS Design System - Banker Blue theme
+        'primary': '#003366',
+        'primary-hover': '#002855',
+        'primary-light': '#E6EEF5',
+        'secondary': '#059669',
+        'secondary-light': '#D1FAE5',
+        'background-body': '#F8F9FA',
+        'background-light': '#F8F9FA',
         'background-dark': '#101822',
-        'surface-light': '#ffffff',
+        'surface-card': '#FFFFFF',
+        'surface-light': '#FFFFFF',
         'surface-dark': '#1a2430',
-        'border-light': '#e2e8f0',
+        'border-subtle': '#E5E7EB',
+        'border-light': '#E5E7EB',
         'border-dark': '#2d3748',
+        'border-focus': '#CBD5E1',
+        'text-main': '#111827',
+        'text-secondary': '#4B5563',
+        'text-muted': '#9CA3AF',
       },
       fontFamily: {
         display: ['Inter', 'sans-serif'],

@@ -1,5 +1,5 @@
 // Deal Intelligence & Chat Terminal Interactive Features
-// DealOS - AI-Powered Deal Analysis
+// PE OS - AI-Powered Deal Analysis
 
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -117,53 +117,75 @@ function formatRelativeTime(dateString) {
 
 function populateDealPage(deal) {
     // Update page title
-    document.title = `${deal.name} - Deal Intelligence`;
+    document.title = `${deal.name} - PE OS Deal Intelligence`;
 
     // Update breadcrumb
-    const breadcrumbName = document.querySelector('nav span.text-slate-800');
-    if (breadcrumbName) breadcrumbName.textContent = deal.name;
+    const breadcrumbDeal = document.getElementById('breadcrumb-deal');
+    if (breadcrumbDeal) breadcrumbDeal.textContent = deal.name;
+
+    const breadcrumbIndustry = document.getElementById('breadcrumb-industry');
+    if (breadcrumbIndustry && deal.industry) breadcrumbIndustry.textContent = deal.industry;
 
     // Update deal header
-    const dealTitle = document.querySelector('h2.text-2xl');
+    const dealTitle = document.getElementById('deal-title');
     if (dealTitle) dealTitle.textContent = deal.name;
 
     // Update icon
-    const iconContainer = document.querySelector('.size-16 .material-symbols-outlined');
+    const iconContainer = document.getElementById('deal-icon');
     if (iconContainer && deal.icon) iconContainer.textContent = deal.icon;
 
-    // Update stage badges
-    const stageBadge = document.querySelector('span.bg-amber-50.text-amber-600');
+    // Update stage badge
+    const stageBadge = document.getElementById('deal-stage-badge');
     if (stageBadge) {
         stageBadge.textContent = getStageLabel(deal.stage);
     }
 
     // Update industry badge
-    const industryBadge = document.querySelector('span.bg-purple-50.text-purple-600');
+    const industryBadge = document.getElementById('deal-industry-badge');
     if (industryBadge && deal.industry) {
         industryBadge.textContent = deal.industry;
     }
 
     // Update financial metrics
-    const revenueEl = document.querySelector('.glass-panel:nth-child(1) .text-2xl');
+    const revenueEl = document.getElementById('deal-revenue');
     if (revenueEl) revenueEl.textContent = formatCurrency(deal.revenue);
 
-    const ebitdaEl = document.querySelector('.glass-panel:nth-child(2) .text-2xl');
+    const ebitdaEl = document.getElementById('deal-ebitda');
     if (ebitdaEl && deal.ebitda) {
         const margin = deal.revenue ? ((deal.ebitda / deal.revenue) * 100).toFixed(0) : 'N/A';
         ebitdaEl.textContent = margin + '%';
     }
 
-    const valuationEl = document.querySelector('.glass-panel:nth-child(3) .text-2xl');
-    if (valuationEl) valuationEl.textContent = formatCurrency(deal.dealSize);
+    const dealSizeEl = document.getElementById('deal-size');
+    if (dealSizeEl) dealSizeEl.textContent = formatCurrency(deal.dealSize);
+
+    // Update EBITDA multiple
+    const multipleEl = document.getElementById('deal-multiple');
+    if (multipleEl && deal.dealSize && deal.ebitda) {
+        const multiple = (deal.dealSize / deal.ebitda).toFixed(1);
+        multipleEl.textContent = `~${multiple}x EBITDA Multiple`;
+    }
+
+    // Update IRR
+    const irrEl = document.getElementById('deal-irr');
+    if (irrEl && deal.irrProjected) {
+        irrEl.textContent = deal.irrProjected.toFixed(1) + '%';
+    }
+
+    // Update MoM
+    const momEl = document.getElementById('deal-mom');
+    if (momEl && deal.mom) {
+        momEl.textContent = deal.mom.toFixed(1) + 'x';
+    }
 
     // Update last updated
-    const lastUpdated = document.querySelector('.grid.grid-cols-2.md\\:grid-cols-4 div:nth-child(4) span.text-sm');
+    const lastUpdated = document.getElementById('deal-updated');
     if (lastUpdated) lastUpdated.textContent = formatRelativeTime(deal.updatedAt);
 
     // Update AI Thesis in chat intro
-    const aiIntro = document.querySelector('.ai-bubble-gradient p');
+    const aiIntro = document.getElementById('ai-intro');
     if (aiIntro && deal.aiThesis) {
-        aiIntro.innerHTML = `I've analyzed the documents for <strong>${deal.name}</strong>. ${deal.aiThesis}`;
+        aiIntro.innerHTML = `<p>I've analyzed the documents for <strong>${deal.name}</strong>. ${deal.aiThesis}</p><p class="mt-3">What would you like to know about this deal?</p>`;
     }
 
     // Update documents list
@@ -174,42 +196,50 @@ function populateDealPage(deal) {
 }
 
 function updateDocumentsList(documents) {
-    const docsContainer = document.querySelector('.flex.gap-3.overflow-x-auto.pb-2');
+    const docsContainer = document.getElementById('documents-list');
     if (!docsContainer || documents.length === 0) return;
 
-    docsContainer.innerHTML = documents.map(doc => `
-        <div class="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-slate-200 shrink-0 hover:border-primary/50 hover:bg-slate-50 cursor-pointer transition-colors group shadow-sm" data-doc-id="${doc.id}">
-            <div class="size-10 bg-${getDocColor(doc.name)}-50 rounded flex items-center justify-center text-${getDocColor(doc.name)}-500 group-hover:bg-${getDocColor(doc.name)}-100 transition-colors">
+    docsContainer.innerHTML = documents.map(doc => {
+        const color = getDocColor(doc.name);
+        const colorClass = color === 'emerald' ? 'secondary' : color;
+        return `
+        <div class="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-primary-light/30 cursor-pointer transition-colors group shadow-sm" data-doc-id="${doc.id}">
+            <div class="size-10 bg-${color}-50 rounded flex items-center justify-center text-${color}-500 group-hover:bg-${color}-100 transition-colors">
                 <span class="material-symbols-outlined">${getDocIcon(doc.name)}</span>
             </div>
             <div class="flex flex-col">
-                <span class="text-sm font-bold text-slate-800">${doc.name}</span>
-                <span class="text-xs text-slate-500">${formatFileSize(doc.fileSize)} - Added ${formatRelativeTime(doc.createdAt)}</span>
+                <span class="text-sm font-bold text-text-main">${doc.name}</span>
+                <span class="text-xs text-text-muted">${formatFileSize(doc.fileSize)} - Added ${formatRelativeTime(doc.createdAt)}</span>
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 function updateChatContext(documents) {
-    const contextDocs = document.querySelector('.flex.-space-x-2');
+    const contextDocs = document.getElementById('context-docs');
     if (!contextDocs || documents.length === 0) return;
 
-    const colors = ['red', 'emerald', 'blue', 'purple'];
+    const colors = ['red', 'secondary', 'blue', 'purple'];
+    const bgColors = ['red-100', 'secondary-light', 'blue-100', 'purple-100'];
+    const textColors = ['red-700', 'secondary', 'blue-700', 'purple-700'];
     const icons = { pdf: 'P', xlsx: 'X', csv: 'C' };
 
     contextDocs.innerHTML = documents.slice(0, 3).map((doc, i) => {
         const ext = doc.name.split('.').pop()?.toLowerCase() || '';
         const icon = icons[ext] || 'D';
-        const color = colors[i % colors.length];
-        return `<div class="size-6 rounded-full bg-${color}-100 border border-white flex items-center justify-center text-[10px] text-${color}-700 font-bold z-${20-i*10} shadow-sm" title="${doc.name}">${icon}</div>`;
-    }).join('') + (documents.length > 3 ? `<div class="size-6 rounded-full bg-slate-200 border border-white flex items-center justify-center text-[10px] text-slate-600 z-0 shadow-sm">+${documents.length - 3}</div>` : '');
+        return `<div class="size-6 rounded-full bg-${bgColors[i % bgColors.length]} border border-white flex items-center justify-center text-[10px] text-${textColors[i % textColors.length]} font-bold z-${20-i*10} shadow-sm" title="${doc.name}">${icon}</div>`;
+    }).join('') + (documents.length > 3 ? `<div class="size-6 rounded-full bg-background-body border border-white flex items-center justify-center text-[10px] text-text-secondary z-0 shadow-sm">+${documents.length - 3}</div>` : '');
 }
 
 // ============================================================
 // DOM Ready
 // ============================================================
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('Deal Intelligence page initialized');
+    console.log('PE OS Deal Intelligence page initialized');
+
+    // Initialize shared layout with collapsible sidebar
+    PELayout.init('deals', { collapsible: true });
+
     loadDealData();
     initializeFeatures();
 });
@@ -229,9 +259,9 @@ function initializeFeatures() {
 // Chat Interface
 // ============================================================
 function initChatInterface() {
-    const textarea = document.querySelector('textarea[placeholder*="Ask about"]');
-    const sendButton = document.querySelector('button[title="Send Message"]');
-    const chatContainer = document.querySelector('.flex-1.overflow-y-auto.p-6');
+    const textarea = document.getElementById('chat-input');
+    const sendButton = document.getElementById('send-message-btn');
+    const chatContainer = document.getElementById('chat-messages');
 
     if (!textarea || !sendButton) return;
 
@@ -273,16 +303,16 @@ function initChatInterface() {
 }
 
 function addUserMessage(message) {
-    const chatContainer = document.querySelector('.flex-1.overflow-y-auto.p-6');
+    const chatContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex gap-4 max-w-[80%] self-end flex-row-reverse animate-fadeIn';
     messageDiv.innerHTML = `
-        <div class="size-8 rounded-full bg-slate-200 border border-white shrink-0 overflow-hidden shadow-sm">
-            <img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDy08M_NHIgxHrLrDJI8Oyg9MLywBJz5HDJK6Ttc4ngRCsROyC6yy5k0lo7Hou2UzpZz6yjSrqTM9CNmzwziX498CkbZU_-euCW_wcNvxaKwsGs7NeaAB0YSvoC-XStJn7IU76cx6kq8-5z3W9bajxbGFhqhC9xK64RbXihdSxWA6Av67hhtrHEP6uq8TtV_j6YvwfcjotugYfZ9LSOCPhDQAFU-yXQywxWUuY2mtxBth8fhjI-QzUwqNrQg0HvU5LeFxB6Jo3dr84"/>
+        <div class="size-8 rounded-full bg-border-subtle border border-white shrink-0 overflow-hidden shadow-sm">
+            <img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk"/>
         </div>
         <div class="flex flex-col gap-1 items-end">
-            <span class="text-xs font-bold text-slate-500 mr-1">You</span>
-            <div class="bg-white text-slate-800 border border-slate-200 rounded-2xl rounded-tr-none p-4 text-sm shadow-sm">
+            <span class="text-xs font-bold text-text-muted mr-1">You</span>
+            <div class="bg-white text-text-main border border-border-subtle rounded-2xl rounded-tr-none p-4 text-sm shadow-sm">
                 <p>${escapeHtml(message)}</p>
             </div>
         </div>
@@ -293,20 +323,20 @@ function addUserMessage(message) {
 }
 
 function showTypingIndicator() {
-    const chatContainer = document.querySelector('.flex-1.overflow-y-auto.p-6');
+    const chatContainer = document.getElementById('chat-messages');
     const typingDiv = document.createElement('div');
     typingDiv.id = 'typing-indicator';
     typingDiv.className = 'flex gap-4 max-w-[90%] animate-fadeIn';
     typingDiv.innerHTML = `
-        <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shrink-0 shadow-md shadow-indigo-200">
+        <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
             <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
         </div>
         <div class="flex flex-col gap-1 justify-center">
-            <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none px-4 py-3 text-sm text-slate-700 shadow-sm w-16">
+            <div class="bg-white border border-border-subtle rounded-2xl rounded-tl-none px-4 py-3 text-sm text-text-secondary shadow-sm w-16">
                 <div class="flex gap-1">
-                    <div class="size-1.5 bg-slate-400 rounded-full animate-bounce"></div>
-                    <div class="size-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s;"></div>
-                    <div class="size-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
+                    <div class="size-1.5 bg-text-muted rounded-full animate-bounce"></div>
+                    <div class="size-1.5 bg-text-muted rounded-full animate-bounce" style="animation-delay: 0.1s;"></div>
+                    <div class="size-1.5 bg-text-muted rounded-full animate-bounce" style="animation-delay: 0.2s;"></div>
                 </div>
             </div>
         </div>
@@ -321,7 +351,7 @@ function removeTypingIndicator() {
 }
 
 function addAIResponse(userMessage) {
-    const chatContainer = document.querySelector('.flex-1.overflow-y-auto.p-6');
+    const chatContainer = document.getElementById('chat-messages');
 
     // Generate contextual response
     const responses = generateAIResponse(userMessage);
@@ -329,19 +359,19 @@ function addAIResponse(userMessage) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex gap-4 max-w-[90%] animate-fadeIn';
     messageDiv.innerHTML = `
-        <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-indigo-600 flex items-center justify-center shrink-0 shadow-md shadow-indigo-200">
+        <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
             <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
         </div>
         <div class="flex flex-col gap-1">
-            <span class="text-xs font-bold text-slate-500 ml-1">DealOS AI</span>
-            <div class="ai-bubble-gradient border border-slate-200 rounded-2xl rounded-tl-none p-4 text-sm text-slate-700 shadow-sm">
+            <span class="text-xs font-bold text-text-muted ml-1">PE OS AI</span>
+            <div class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
                 ${responses}
             </div>
             <div class="flex gap-2 ml-1 mt-1">
-                <button class="ai-helpful-btn text-[10px] text-slate-400 hover:text-primary flex items-center gap-1 transition-colors font-medium">
+                <button class="ai-helpful-btn text-[10px] text-text-muted hover:text-primary flex items-center gap-1 transition-colors font-medium">
                     <span class="material-symbols-outlined text-sm">thumb_up</span> Helpful
                 </button>
-                <button class="ai-copy-btn text-[10px] text-slate-400 hover:text-primary flex items-center gap-1 transition-colors font-medium">
+                <button class="ai-copy-btn text-[10px] text-text-muted hover:text-primary flex items-center gap-1 transition-colors font-medium">
                     <span class="material-symbols-outlined text-sm">content_copy</span> Copy
                 </button>
             </div>
@@ -498,7 +528,7 @@ function generateAIResponse(userMessage) {
 }
 
 function scrollToBottom() {
-    const chatContainer = document.querySelector('.flex-1.overflow-y-auto.p-6');
+    const chatContainer = document.getElementById('chat-messages');
     if (chatContainer) {
         setTimeout(() => {
             chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -516,7 +546,7 @@ function escapeHtml(text) {
 // File Attachments
 // ============================================================
 function initFileAttachments() {
-    const attachButton = document.querySelector('button[title="Attach File"]');
+    const attachButton = document.getElementById('attach-file-btn');
     if (!attachButton) return;
 
     attachButton.addEventListener('click', () => {
@@ -548,7 +578,7 @@ function initFileAttachments() {
 }
 
 function uploadFile(file) {
-    const container = document.querySelector('.flex.gap-2.mb-3');
+    const container = document.getElementById('attached-files');
 
     // Create uploading indicator
     const uploadChip = document.createElement('div');
@@ -591,13 +621,13 @@ function uploadFile(file) {
 // ============================================================
 function initActionButtons() {
     // Share button
-    const shareBtn = document.querySelector('button[class*="Share"]');
+    const shareBtn = document.getElementById('share-btn');
     if (shareBtn) {
         shareBtn.addEventListener('click', showShareModal);
     }
 
     // Edit Deal button
-    const editBtn = document.querySelector('button[class*="Edit Deal"]');
+    const editBtn = document.getElementById('edit-deal-btn');
     if (editBtn) {
         editBtn.addEventListener('click', showEditDealModal);
     }
@@ -924,7 +954,7 @@ function initAIResponseActions() {
 // Context Settings
 // ============================================================
 function initContextSettings() {
-    const settingsBtn = document.querySelector('.flex.items-center.gap-3 button[class*="text-slate-400"]');
+    const settingsBtn = document.getElementById('ai-settings-btn');
     if (!settingsBtn) return;
 
     settingsBtn.addEventListener('click', showContextSettings);
@@ -1093,4 +1123,4 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-console.log('Deal Intelligence page fully initialized');
+console.log('PE OS Deal Intelligence page fully initialized');

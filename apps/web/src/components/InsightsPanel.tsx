@@ -19,12 +19,12 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
   if (!insights) {
     return (
       <aside className="w-[320px] min-w-[320px] bg-surface-light border-l border-border-light shadow-xl z-20 flex flex-col">
-        <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-blue-50/30">
+        <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-primary-light/30">
           <div className="flex items-center gap-2 mb-2">
             <span className="material-symbols-outlined text-primary">smart_toy</span>
-            <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">AI Quick Insights</h2>
+            <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
           </div>
-          <p className="text-xs text-slate-500">Select a folder to view insights</p>
+          <p className="text-xs text-text-secondary">Select a folder to view insights</p>
         </div>
       </aside>
     );
@@ -32,21 +32,21 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
 
   return (
     <aside className="w-[320px] min-w-[320px] bg-surface-light border-l border-border-light shadow-xl z-20 flex flex-col">
-      <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-blue-50/30">
+      <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-primary-light/30">
         <div className="flex items-center gap-2 mb-2">
           <span className="material-symbols-outlined text-primary">smart_toy</span>
-          <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">AI Quick Insights</h2>
+          <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
         </div>
-        <p className="text-xs text-slate-500">
-          Analysis for <span className="font-medium text-slate-900">{folderName}</span>
+        <p className="text-xs text-text-secondary">
+          Analysis for <span className="font-medium text-text-main">{folderName}</span>
         </p>
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-6">
         {/* Summary Block */}
         <div className="flex flex-col gap-2">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Summary</h3>
-          <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 leading-relaxed border border-slate-100">
+          <h3 className="text-xs font-bold text-text-main uppercase tracking-wide">Summary</h3>
+          <div className="rounded-lg bg-background-light p-3 text-sm text-text-secondary leading-relaxed border border-border-light">
             {insights.summary}
           </div>
         </div>
@@ -54,7 +54,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
         {/* Red Flags Block */}
         {insights.redFlags.length > 0 && (
           <div className="flex flex-col gap-3">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+            <h3 className="text-xs font-bold text-text-main uppercase tracking-wide flex items-center gap-2">
               Red Flags
               <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-full">
                 {insights.redFlags.length} Found
@@ -78,8 +78,8 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                     {flag.severity === 'high' ? 'error' : 'warning'}
                   </span>
                   <div>
-                    <p className="text-xs font-semibold text-slate-900">{flag.title}</p>
-                    <p className="text-xs text-slate-600 mt-1">{flag.description}</p>
+                    <p className="text-xs font-semibold text-text-main">{flag.title}</p>
+                    <p className="text-xs text-text-secondary mt-1">{flag.description}</p>
                     {flag.fileId && (
                       <button
                         className={`mt-2 text-[10px] font-bold hover:underline ${
@@ -100,15 +100,15 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
         {/* Missing Docs */}
         {insights.missingDocuments.length > 0 && (
           <div className="flex flex-col gap-2">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Missing Documents</h3>
+            <h3 className="text-xs font-bold text-text-main uppercase tracking-wide">Missing Documents</h3>
             <ul className="space-y-2">
               {insights.missingDocuments.map((doc) => (
                 <li
                   key={doc.id}
-                  className="flex items-center justify-between gap-2 text-xs text-slate-600 p-2 rounded hover:bg-slate-50 border border-transparent hover:border-slate-100"
+                  className="flex items-center justify-between gap-2 text-xs text-text-secondary p-2 rounded hover:bg-background-light border border-transparent hover:border-border-light"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="size-1.5 rounded-full bg-slate-300"></span>
+                    <span className="size-1.5 rounded-full bg-text-muted"></span>
                     <span>{doc.name}</span>
                   </div>
                   <button
@@ -128,7 +128,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
       <div className="p-4 border-t border-border-light">
         <button
           onClick={onGenerateReport}
-          className="w-full flex items-center justify-center gap-2 rounded-lg bg-slate-900 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
+          className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary-hover transition-colors shadow-lg shadow-primary/10"
         >
           <span className="material-symbols-outlined text-[18px]">summarize</span>
           Generate Full Report

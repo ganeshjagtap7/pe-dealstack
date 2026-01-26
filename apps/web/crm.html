@@ -1,38 +1,52 @@
 <!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>AI-Native Deal CRM</title>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Deals - PE OS</title>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        "primary": "#1a3b5d", // 'Banker Blue' as requested
-                        "primary-hover": "#132c45", // Darker shade for hover state
-                        "background-light": "#f8fafc", // Slate 50 - Off-white (kept as requested)
-                        "surface-white": "#ffffff",
-                        "border-subtle": "#e2e8f0", // Slate 200
-                        "text-main": "#0f172a", // Slate 900
-                        "text-muted": "#64748b", // Slate 500
-                        "accent-blue": "#2563eb",
+                        "primary": "#003366",
+                        "primary-hover": "#002855",
+                        "primary-light": "#E6EEF5",
+                        "secondary": "#059669",
+                        "secondary-light": "#D1FAE5",
+                        "background-body": "#F8F9FA",
+                        "surface-card": "#FFFFFF",
+                        "border-subtle": "#E5E7EB",
+                        "border-focus": "#CBD5E1",
+                        "text-main": "#111827",
+                        "text-secondary": "#4B5563",
+                        "text-muted": "#9CA3AF",
                     },
                     fontFamily: {
-                        "display": ["Manrope", "sans-serif"]
+                        "sans": ["Inter", "sans-serif"],
+                        "display": ["Inter", "sans-serif"],
                     },
                     boxShadow: {
-                        "subtle": "0 1px 2px 0 rgba(0, 0, 0, 0.05)",
-                        "card": "0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)",
-                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04)"
+                        "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                        "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "md": "0.375rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
                     }
                 },
             },
         }
     </script>
-<style>
+    <style>
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -41,11 +55,15 @@
             background: transparent;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #D1D5DB;
             border-radius: 3px;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
+            background: #9CA3AF;
+        }
+        body {
+            font-feature-settings: "cv11", "ss01";
+            -webkit-font-smoothing: antialiased;
         }
         @keyframes slideIn {
             from {
@@ -59,153 +77,142 @@
         }
     </style>
 </head>
-<body class="font-display bg-background-light text-text-main h-screen flex overflow-hidden selection:bg-primary/10 selection:text-primary">
-<!-- Navbar -->
-<aside class="w-64 bg-white border-r border-border-subtle flex-col hidden md:flex shrink-0 z-30 relative text-text-main shadow-sm">
-<div class="p-6 flex items-center gap-3">
-<div class="bg-center bg-no-repeat bg-cover rounded-xl size-10 bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
-<span class="material-symbols-outlined text-[20px]">dataset</span>
-</div>
-<div class="flex flex-col">
-<h1 class="text-text-main text-base font-extrabold leading-none tracking-tight">Ventus AI</h1>
-<p class="text-text-muted text-xs font-medium mt-1">PE Operating System</p>
-</div>
-</div>
-<nav class="flex-1 px-4 py-4 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary text-white shadow-md shadow-primary/20 cursor-pointer group border border-primary/5">
-<span class="material-symbols-outlined text-[20px]">business_center</span>
-<p class="text-sm font-semibold">Deals</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
-<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">pie_chart</span>
-<p class="text-sm font-medium">Portfolio</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
-<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">auto_awesome</span>
-<p class="text-sm font-medium">AI Insights</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
-<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">folder_shared</span>
-<p class="text-sm font-medium">Documents</p>
-</div>
-</nav>
-<div class="p-4 border-t border-border-subtle">
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary mb-2">
-<span class="material-symbols-outlined text-[20px]">settings</span>
-<p class="text-sm font-medium">Settings</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-50 border border-border-subtle">
-<div class="size-8 rounded-full bg-slate-200 bg-center bg-cover border border-white shadow-sm" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBjB2-f5sosRtm7M_Up0HtcNdSmCo5k3YyFeAeOAgN1hgoO-qf96zlezHWVXZYE2jC2nCxWrnruNHHb7Zs_JSriz4mQdfCDWTxToArRRNj2FSuGVemo1E4HdrgDqv7_agS4CQKsxiacBhXXom9yCoV96AX0TSIgEsuqJEgH_StAUJ_xT4ivmuXa4CP0dI4flfgbKfFXSJOTF2GHQUgr7OLMxrPcthrpkSHzVLtpskSZArf5BokcuOQI1a1gwWHF67SgA-XvO-r3urk");'></div>
-<div class="flex flex-col flex-1 min-w-0">
-<p class="text-text-main text-xs font-bold truncate">Alex Morgan</p>
-<p class="text-text-muted text-[10px] truncate">Senior Associate</p>
-</div>
-</div>
-</div>
-</aside>
-<main class="flex-1 flex flex-col h-full overflow-hidden relative bg-background-light">
-<header class="bg-surface-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-border-subtle px-8 py-5">
-<div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 max-w-[1600px] mx-auto w-full">
-<div class="flex flex-col gap-1 min-w-[200px]">
-<h2 class="text-text-main text-2xl font-bold leading-tight tracking-tight">Deal Pipeline</h2>
-<p id="deal-count" class="text-text-muted text-sm font-medium flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
-                    Loading...
-                </p>
-</div>
-<div class="flex-1 max-w-2xl w-full">
-<label class="group flex w-full items-center rounded-xl bg-white border border-border-subtle hover:border-primary/30 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/10 transition-all h-12 shadow-sm">
-<div class="pl-4 pr-3 text-text-muted group-focus-within:text-primary transition-colors">
-<span class="material-symbols-outlined text-[20px]">search</span>
-</div>
-<input id="search-input" class="w-full bg-transparent border-none text-text-main placeholder-text-muted/70 focus:ring-0 text-sm font-medium" placeholder="Search deals by name, industry, or thesis..."/>
-<div class="pr-3 hidden sm:block">
-<kbd class="hidden sm:inline-block rounded px-2 py-1 text-[10px] font-bold text-text-muted bg-slate-100 border border-border-subtle">CMD+K</kbd>
-</div>
-</label>
-</div>
-<div class="flex items-center gap-4 justify-end">
-<button class="p-2.5 text-text-muted hover:text-text-main hover:bg-slate-100 rounded-full transition-colors relative">
-<span class="material-symbols-outlined">notifications</span>
-<span class="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full border-2 border-white"></span>
-</button>
-<button id="ingest-btn" class="flex items-center justify-center gap-2 h-11 px-6 bg-primary hover:bg-primary-hover text-white rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95 group">
-<span class="material-symbols-outlined text-[20px] group-hover:animate-pulse">smart_toy</span>
-<span class="text-sm font-bold tracking-wide">Ingest Deal Data</span>
-</button>
-</div>
-</div>
-<div class="flex gap-3 mt-6 overflow-x-auto custom-scrollbar pb-2 max-w-[1600px] mx-auto w-full">
-<div class="relative">
-<button id="stage-filter-btn" class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
-<p id="stage-filter-text" class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Stage: All</p>
-<span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
-</button>
-<div id="stage-dropdown" class="hidden absolute top-full left-0 mt-2 bg-white border border-border-subtle rounded-lg shadow-lg z-50 min-w-[180px] py-1">
-<button data-stage="" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 font-medium">All Stages</button>
-<button data-stage="INITIAL_REVIEW" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Initial Review</button>
-<button data-stage="DUE_DILIGENCE" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Due Diligence</button>
-<button data-stage="IOI_SUBMITTED" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">IOI Submitted</button>
-<button data-stage="LOI_SUBMITTED" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">LOI Submitted</button>
-<button data-stage="NEGOTIATION" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Negotiation</button>
-<button data-stage="CLOSING" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Closing</button>
-<button data-stage="PASSED" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Passed</button>
-</div>
-</div>
-<div class="relative">
-<button id="industry-filter-btn" class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
-<p id="industry-filter-text" class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Industry: All</p>
-<span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
-</button>
-<div id="industry-dropdown" class="hidden absolute top-full left-0 mt-2 bg-white border border-border-subtle rounded-lg shadow-lg z-50 min-w-[180px] py-1">
-<button data-industry="" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 font-medium">All Industries</button>
-<button data-industry="SaaS" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">SaaS</button>
-<button data-industry="Healthcare" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Healthcare</button>
-<button data-industry="Cloud" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Cloud Infrastructure</button>
-<button data-industry="Transportation" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Transportation</button>
-<button data-industry="Fintech" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Fintech</button>
-</div>
-</div>
-<div class="relative">
-<button id="dealsize-filter-btn" class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
-<p id="dealsize-filter-text" class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Deal Size: All</p>
-<span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
-</button>
-<div id="dealsize-dropdown" class="hidden absolute top-full left-0 mt-2 bg-white border border-border-subtle rounded-lg shadow-lg z-50 min-w-[180px] py-1">
-<button data-min="" data-max="" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 font-medium">All Sizes</button>
-<button data-min="0" data-max="10" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Under $10M</button>
-<button data-min="10" data-max="50" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">$10M - $50M</button>
-<button data-min="50" data-max="100" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">$50M - $100M</button>
-<button data-min="100" data-max="" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Over $100M</button>
-</div>
-</div>
-<div class="h-8 w-[1px] bg-border-subtle mx-1"></div>
-<div class="relative">
-<button id="sort-btn" class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-transparent px-2 hover:bg-slate-100 transition-all">
-<span class="material-symbols-outlined text-text-muted text-[18px]">sort</span>
-<p id="sort-text" class="text-text-muted text-xs font-semibold">Sort by: Recent</p>
-</button>
-<div id="sort-dropdown" class="hidden absolute top-full right-0 mt-2 bg-white border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
-<button data-sort="updatedAt" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50 font-medium">Recent Activity</button>
-<button data-sort="dealSize" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Deal Size (High)</button>
-<button data-sort="dealSize" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Deal Size (Low)</button>
-<button data-sort="irrProjected" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">IRR (High)</button>
-<button data-sort="name" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-slate-50">Name (A-Z)</button>
-</div>
-</div>
-</div>
-</header>
-<div class="flex-1 overflow-y-auto custom-scrollbar p-8">
-<div id="deals-grid" class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 pb-20">
-<!-- Loading state -->
-<div id="loading-state" class="col-span-full flex flex-col items-center justify-center py-20">
-<span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
-<p class="text-text-muted text-sm font-medium">Loading deals...</p>
-</div>
-</div>
-</div>
-</main>
+<body class="bg-background-body text-text-main font-sans overflow-hidden">
+    <div class="flex h-screen w-full overflow-hidden">
+        <!-- Sidebar (injected by layout.js) -->
+        <div id="sidebar-root"></div>
 
+        <!-- Main Content -->
+        <main class="flex h-full flex-1 flex-col overflow-hidden bg-background-body">
+            <!-- Header -->
+            <header class="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-10 sticky top-0">
+                <div class="flex items-center gap-4 flex-1">
+                    <button class="md:hidden text-text-main" id="mobile-menu-btn">
+                        <span class="material-symbols-outlined">menu</span>
+                    </button>
+                    <div class="relative hidden w-full max-w-lg md:block group">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <span class="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[20px]">search</span>
+                        </div>
+                        <input
+                            id="search-input"
+                            class="block w-full rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm"
+                            placeholder="Search deals by name, industry, or thesis..."
+                            type="text"
+                        />
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                            <kbd class="hidden sm:inline-block rounded px-2 py-0.5 text-[10px] font-bold text-text-muted bg-gray-100 border border-border-subtle">CMD+K</kbd>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button id="ingest-btn" class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
+                        <span class="material-symbols-outlined text-[18px]">smart_toy</span>
+                        Ingest Deal Data
+                    </button>
+                    <button class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative" id="notifications-btn">
+                        <span class="material-symbols-outlined text-[20px]">notifications</span>
+                        <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
+                    </button>
+                    <div class="h-6 w-px bg-border-subtle"></div>
+                    <button class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors" id="user-menu-btn">
+                        <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk');"></div>
+                        <span class="hidden md:inline">Alex Morgan</span>
+                        <span class="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- Page Content -->
+            <div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+                <div class="mx-auto max-w-[1600px] flex flex-col gap-6">
+                    <!-- Page Header -->
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div class="flex flex-col gap-1">
+                            <h1 class="text-2xl font-bold text-text-main tracking-tight font-display">Deal Pipeline</h1>
+                            <p id="deal-count" class="text-text-secondary text-sm flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(5,150,105,0.4)]"></span>
+                                Loading...
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Filters Row -->
+                    <div class="flex flex-wrap gap-3 items-center">
+                        <div class="relative">
+                            <button id="stage-filter-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                                <p id="stage-filter-text" class="text-text-secondary group-hover:text-text-main text-sm font-medium">Stage: All</p>
+                                <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+                            </button>
+                            <div id="stage-dropdown" class="hidden absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[180px] py-1">
+                                <button data-stage="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">All Stages</button>
+                                <button data-stage="INITIAL_REVIEW" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Initial Review</button>
+                                <button data-stage="DUE_DILIGENCE" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Due Diligence</button>
+                                <button data-stage="IOI_SUBMITTED" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">IOI Submitted</button>
+                                <button data-stage="LOI_SUBMITTED" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">LOI Submitted</button>
+                                <button data-stage="NEGOTIATION" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Negotiation</button>
+                                <button data-stage="CLOSING" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Closing</button>
+                                <button data-stage="PASSED" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Passed</button>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <button id="industry-filter-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                                <p id="industry-filter-text" class="text-text-secondary group-hover:text-text-main text-sm font-medium">Industry: All</p>
+                                <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+                            </button>
+                            <div id="industry-dropdown" class="hidden absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[180px] py-1">
+                                <button data-industry="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">All Industries</button>
+                                <button data-industry="SaaS" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">SaaS</button>
+                                <button data-industry="Healthcare" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Healthcare</button>
+                                <button data-industry="Cloud" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Cloud Infrastructure</button>
+                                <button data-industry="Transportation" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Transportation</button>
+                                <button data-industry="Fintech" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Fintech</button>
+                            </div>
+                        </div>
+                        <div class="relative">
+                            <button id="dealsize-filter-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                                <p id="dealsize-filter-text" class="text-text-secondary group-hover:text-text-main text-sm font-medium">Deal Size: All</p>
+                                <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+                            </button>
+                            <div id="dealsize-dropdown" class="hidden absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[180px] py-1">
+                                <button data-min="" data-max="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">All Sizes</button>
+                                <button data-min="0" data-max="10" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Under $10M</button>
+                                <button data-min="10" data-max="50" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">$10M - $50M</button>
+                                <button data-min="50" data-max="100" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">$50M - $100M</button>
+                                <button data-min="100" data-max="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Over $100M</button>
+                            </div>
+                        </div>
+                        <div class="h-6 w-px bg-border-subtle mx-1 hidden sm:block"></div>
+                        <div class="relative">
+                            <button id="sort-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-primary-light transition-all">
+                                <span class="material-symbols-outlined text-text-muted text-[18px]">sort</span>
+                                <p id="sort-text" class="text-text-secondary text-sm font-medium">Sort by: Recent</p>
+                            </button>
+                            <div id="sort-dropdown" class="hidden absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+                                <button data-sort="updatedAt" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">Recent Activity</button>
+                                <button data-sort="dealSize" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Deal Size (High)</button>
+                                <button data-sort="dealSize" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Deal Size (Low)</button>
+                                <button data-sort="irrProjected" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">IRR (High)</button>
+                                <button data-sort="name" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Name (A-Z)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Deals Grid -->
+                    <div id="deals-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-6">
+                        <!-- Loading state -->
+                        <div id="loading-state" class="col-span-full flex flex-col items-center justify-center py-20">
+                            <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
+                            <p class="text-text-muted text-sm font-medium">Loading deals...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+<!-- Load shared layout -->
+<script src="js/layout.js"></script>
 <script>
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -222,15 +229,15 @@ let filters = {
 
 // Stage badge styles
 const stageStyles = {
-    'INITIAL_REVIEW': { bg: 'bg-blue-50', border: 'border-blue-100', text: 'text-blue-600', label: 'Initial Review' },
-    'DUE_DILIGENCE': { bg: 'bg-emerald-50', border: 'border-emerald-100', text: 'text-emerald-600', label: 'Due Diligence' },
-    'IOI_SUBMITTED': { bg: 'bg-amber-50', border: 'border-amber-100', text: 'text-amber-600', label: 'IOI Submitted' },
-    'LOI_SUBMITTED': { bg: 'bg-purple-50', border: 'border-purple-100', text: 'text-purple-600', label: 'LOI Submitted' },
-    'NEGOTIATION': { bg: 'bg-orange-50', border: 'border-orange-100', text: 'text-orange-600', label: 'Negotiation' },
-    'CLOSING': { bg: 'bg-teal-50', border: 'border-teal-100', text: 'text-teal-600', label: 'Closing' },
-    'PASSED': { bg: 'bg-slate-100', border: 'border-slate-200', text: 'text-slate-500', label: 'Passed' },
-    'CLOSED_WON': { bg: 'bg-green-50', border: 'border-green-100', text: 'text-green-600', label: 'Closed Won' },
-    'CLOSED_LOST': { bg: 'bg-red-50', border: 'border-red-100', text: 'text-red-600', label: 'Closed Lost' }
+    'INITIAL_REVIEW': { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', label: 'Initial Review' },
+    'DUE_DILIGENCE': { bg: 'bg-primary-light', border: 'border-primary/20', text: 'text-primary', label: 'Due Diligence' },
+    'IOI_SUBMITTED': { bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700', label: 'IOI Submitted' },
+    'LOI_SUBMITTED': { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700', label: 'LOI Submitted' },
+    'NEGOTIATION': { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', label: 'Negotiation' },
+    'CLOSING': { bg: 'bg-teal-50', border: 'border-teal-200', text: 'text-teal-700', label: 'Closing' },
+    'PASSED': { bg: 'bg-gray-100', border: 'border-gray-300', text: 'text-gray-600', label: 'Passed' },
+    'CLOSED_WON': { bg: 'bg-secondary-light', border: 'border-secondary/20', text: 'text-secondary', label: 'Closed Won' },
+    'CLOSED_LOST': { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', label: 'Closed Lost' }
 };
 
 // Format currency
@@ -250,16 +257,16 @@ function formatRelativeTime(dateString) {
     const diff = now - date;
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
-    if (days > 0) return `Updated ${days}d ago`;
-    if (hours > 0) return `Updated ${hours}h ago`;
-    return 'Updated just now';
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    return 'Just now';
 }
 
 // Get document icon
 function getDocIcon(docName) {
     if (!docName) return 'description';
     const ext = docName.split('.').pop()?.toLowerCase();
-    if (ext === 'pdf') return 'description';
+    if (ext === 'pdf') return 'picture_as_pdf';
     if (ext === 'xlsx' || ext === 'xls') return 'table_chart';
     if (ext === 'msg' || ext === 'eml') return 'mail';
     return 'description';
@@ -269,55 +276,54 @@ function getDocIcon(docName) {
 function renderDealCard(deal) {
     const style = stageStyles[deal.stage] || stageStyles['INITIAL_REVIEW'];
     const isPassed = deal.status === 'PASSED' || deal.stage === 'PASSED';
-    const momColor = deal.mom >= 3 ? 'text-emerald-600' : 'text-text-main';
-    const ebitdaColor = deal.ebitda < 0 ? 'text-red-500' : 'text-text-main';
+    const momColor = deal.mom >= 3 ? 'text-secondary' : 'text-text-main';
+    const ebitdaColor = deal.ebitda < 0 ? 'text-red-600' : 'text-text-main';
     const hasRiskFlag = deal.ebitda < 0 || deal.stage === 'PASSED';
 
     return `
-        <a href="deal.html?id=${deal.id}" class="block">
-            <article class="bg-surface-white rounded-xl border border-border-subtle p-6 hover:border-primary/30 transition-all cursor-pointer group flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden ${isPassed ? 'opacity-80 hover:opacity-100 grayscale hover:grayscale-0' : ''}">
-                <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-slate-50 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
-                <div class="flex justify-between items-start mb-6 relative z-10">
+        <a href="deal.html?id=${deal.id}" class="block group">
+            <article class="bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden ${isPassed ? 'opacity-70 hover:opacity-100' : ''}">
+                <div class="flex justify-between items-start mb-4">
                     <div class="flex gap-3 items-center">
-                        <div class="size-11 rounded-lg bg-slate-50 border border-border-subtle flex items-center justify-center text-primary">
-                            <span class="material-symbols-outlined">${deal.icon || 'business_center'}</span>
+                        <div class="size-10 rounded-lg bg-primary-light border border-primary/10 flex items-center justify-center text-primary">
+                            <span class="material-symbols-outlined text-[20px]">${deal.icon || 'business_center'}</span>
                         </div>
                         <div>
-                            <h3 class="text-text-main font-bold text-lg leading-tight group-hover:text-primary transition-colors">${deal.name}</h3>
+                            <h3 class="text-text-main font-bold text-base leading-tight group-hover:text-primary transition-colors">${deal.name}</h3>
                             <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
                         </div>
                     </div>
-                    <span class="px-2.5 py-1 rounded-md ${style.bg} ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider">${style.label}</span>
+                    <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider">${style.label}</span>
                 </div>
-                <div class="grid grid-cols-2 gap-px bg-border-subtle rounded-lg overflow-hidden border border-border-subtle mb-6">
-                    <div class="bg-surface-white p-3.5 flex flex-col items-center">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">IRR (Proj)</span>
-                        <span class="text-text-main font-bold text-lg tabular-nums">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : 'N/A'}</span>
+                <div class="grid grid-cols-2 gap-3 mb-4">
+                    <div class="bg-background-body rounded-md p-3">
+                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">IRR (Proj)</span>
+                        <span class="text-text-main font-bold text-lg">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : 'N/A'}</span>
                     </div>
-                    <div class="bg-surface-white p-3.5 flex flex-col items-center">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">MoM</span>
-                        <span class="${momColor} font-bold text-lg tabular-nums">${deal.mom ? deal.mom.toFixed(1) + 'x' : 'N/A'}</span>
+                    <div class="bg-background-body rounded-md p-3">
+                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">MoM</span>
+                        <span class="${momColor} font-bold text-lg">${deal.mom ? deal.mom.toFixed(1) + 'x' : 'N/A'}</span>
                     </div>
-                    <div class="bg-surface-white p-3.5 flex flex-col items-center">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>
-                        <span class="${ebitdaColor} font-bold text-lg tabular-nums">${formatCurrency(deal.ebitda)}</span>
+                    <div class="bg-background-body rounded-md p-3">
+                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">EBITDA</span>
+                        <span class="${ebitdaColor} font-bold text-lg">${formatCurrency(deal.ebitda)}</span>
                     </div>
-                    <div class="bg-surface-white p-3.5 flex flex-col items-center">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">Revenue</span>
-                        <span class="text-text-main font-bold text-lg tabular-nums">${formatCurrency(deal.revenue)}</span>
+                    <div class="bg-background-body rounded-md p-3">
+                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">Revenue</span>
+                        <span class="text-text-main font-bold text-lg">${formatCurrency(deal.revenue)}</span>
                     </div>
                 </div>
-                <div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto">
-                    <div class="flex items-center gap-2 mb-2">
-                        <span class="material-symbols-outlined ${hasRiskFlag ? 'text-red-500' : 'text-purple-600'} text-sm">${hasRiskFlag ? 'warning' : 'auto_awesome'}</span>
-                        <span class="${hasRiskFlag ? 'text-red-500' : 'text-purple-600'} text-xs font-bold uppercase">${hasRiskFlag ? 'Risk Flag' : 'AI Thesis'}</span>
+                <div class="bg-background-body rounded-md p-3 mt-auto border border-border-subtle">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <span class="material-symbols-outlined ${hasRiskFlag ? 'text-red-500' : 'text-secondary'} text-[14px]">${hasRiskFlag ? 'warning' : 'auto_awesome'}</span>
+                        <span class="${hasRiskFlag ? 'text-red-500' : 'text-secondary'} text-[10px] font-bold uppercase tracking-wider">${hasRiskFlag ? 'Risk Flag' : 'AI Thesis'}</span>
                     </div>
-                    <p class="text-slate-600 text-xs leading-relaxed font-medium line-clamp-3">${deal.aiThesis || 'No AI analysis available yet.'}</p>
+                    <p class="text-text-secondary text-xs leading-relaxed line-clamp-2">${deal.aiThesis || 'No AI analysis available yet.'}</p>
                 </div>
-                <div class="flex items-center justify-between mt-5 pt-4 border-t border-border-subtle">
-                    <div class="flex items-center gap-1.5 text-text-muted hover:text-primary transition-colors">
-                        <span class="material-symbols-outlined text-[16px]">${getDocIcon(deal.lastDocument)}</span>
-                        <span class="text-[11px] font-medium">${deal.lastDocument || 'No documents'}</span>
+                <div class="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
+                    <div class="flex items-center gap-1.5 text-text-muted">
+                        <span class="material-symbols-outlined text-[14px]">${getDocIcon(deal.lastDocument)}</span>
+                        <span class="text-[11px] font-medium truncate max-w-[120px]">${deal.lastDocument || 'No docs'}</span>
                     </div>
                     <span class="text-[11px] text-text-muted font-medium">${formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}</span>
                 </div>
@@ -329,13 +335,13 @@ function renderDealCard(deal) {
 // Render upload card
 function renderUploadCard() {
     return `
-        <article id="upload-card" class="bg-transparent rounded-xl border-2 border-dashed border-slate-300 p-6 hover:border-primary hover:bg-white/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-4">
-            <div class="size-16 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:scale-110 group-hover:border-primary/20 transition-all shadow-sm group-hover:shadow-md">
-                <span class="material-symbols-outlined text-text-muted group-hover:text-primary text-3xl">add</span>
+        <article id="upload-card" class="bg-surface-card/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-primary hover:bg-primary-light/30 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4">
+            <div class="size-14 rounded-full bg-surface-card border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-primary/30 transition-all shadow-sm">
+                <span class="material-symbols-outlined text-text-muted group-hover:text-primary text-2xl">add</span>
             </div>
             <div>
-                <h3 class="text-text-main font-bold text-lg group-hover:text-primary transition-colors">Upload Documents</h3>
-                <p class="text-text-muted text-sm mt-1 max-w-[200px] font-medium">Drag & drop CIMs, Teasers, or Excel models to auto-create deal blocks.</p>
+                <h3 class="text-text-main font-bold text-base group-hover:text-primary transition-colors">Upload Documents</h3>
+                <p class="text-text-muted text-sm mt-1 max-w-[180px]">Drop CIMs, Teasers, or Excel models</p>
             </div>
         </article>
     `;
@@ -403,7 +409,7 @@ async function loadDeals() {
         // Update deal count
         const activeDeals = deals.filter(d => d.status !== 'PASSED').length;
         document.getElementById('deal-count').innerHTML = `
-            <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+            <span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(5,150,105,0.4)]"></span>
             ${activeDeals} Active Opportunities
         `;
 
@@ -531,39 +537,39 @@ function initializeUploadModal() {
         modal.id = 'upload-modal';
         modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4';
         modal.innerHTML = `
-            <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 relative animate-[slideIn_0.2s_ease-out]">
-                <button id="close-upload-modal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors">
+            <div class="bg-surface-card rounded-xl shadow-2xl max-w-lg w-full p-6 relative animate-[slideIn_0.2s_ease-out]">
+                <button id="close-upload-modal" class="absolute top-4 right-4 text-text-muted hover:text-text-main transition-colors">
                     <span class="material-symbols-outlined">close</span>
                 </button>
                 <div class="text-center mb-6">
-                    <div class="size-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
+                    <div class="size-16 rounded-full bg-primary-light flex items-center justify-center mx-auto mb-4">
                         <span class="material-symbols-outlined text-primary text-3xl">smart_toy</span>
                     </div>
-                    <h3 class="text-xl font-bold text-slate-900">Ingest Deal Data</h3>
-                    <p class="text-slate-500 text-sm mt-1">Upload CIMs, Teasers, or Excel models to auto-create deal blocks</p>
+                    <h3 class="text-xl font-bold text-text-main">Ingest Deal Data</h3>
+                    <p class="text-text-secondary text-sm mt-1">Upload CIMs, Teasers, or Excel models to auto-create deal blocks</p>
                 </div>
-                <div id="drop-zone" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-all cursor-pointer">
+                <div id="drop-zone" class="border-2 border-dashed border-border-subtle rounded-xl p-8 text-center hover:border-primary hover:bg-primary-light/30 transition-all cursor-pointer">
                     <input type="file" id="file-input" class="hidden" accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.msg" multiple />
-                    <span class="material-symbols-outlined text-slate-400 text-4xl mb-3">cloud_upload</span>
-                    <p class="text-slate-600 font-medium">Drag & drop files here</p>
-                    <p class="text-slate-400 text-sm mt-1">or click to browse</p>
-                    <p class="text-slate-400 text-xs mt-3">Supported: PDF, Excel, Word, Email (.msg)</p>
+                    <span class="material-symbols-outlined text-text-muted text-4xl mb-3">cloud_upload</span>
+                    <p class="text-text-main font-medium">Drag & drop files here</p>
+                    <p class="text-text-muted text-sm mt-1">or click to browse</p>
+                    <p class="text-text-muted text-xs mt-3">Supported: PDF, Excel, Word, Email (.msg)</p>
                 </div>
                 <div id="upload-progress" class="hidden mt-4">
-                    <div class="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <div class="flex items-center gap-3 p-3 bg-background-body rounded-lg">
                         <span class="material-symbols-outlined text-primary animate-spin">sync</span>
                         <div class="flex-1">
-                            <p class="text-sm font-medium text-slate-700">Uploading...</p>
-                            <div class="h-1.5 bg-slate-200 rounded-full mt-1.5 overflow-hidden">
+                            <p class="text-sm font-medium text-text-main">Uploading...</p>
+                            <div class="h-1.5 bg-border-subtle rounded-full mt-1.5 overflow-hidden">
                                 <div id="progress-bar" class="h-full bg-primary rounded-full transition-all" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
                 </div>
                 <div id="upload-success" class="hidden mt-4">
-                    <div class="flex items-center gap-3 p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                        <span class="material-symbols-outlined text-emerald-500">check_circle</span>
-                        <p class="text-sm font-medium text-emerald-700">File uploaded successfully!</p>
+                    <div class="flex items-center gap-3 p-3 bg-secondary-light rounded-lg border border-secondary/20">
+                        <span class="material-symbols-outlined text-secondary">check_circle</span>
+                        <p class="text-sm font-medium text-secondary">File uploaded successfully!</p>
                     </div>
                 </div>
             </div>
@@ -584,16 +590,16 @@ function initializeUploadModal() {
 
         dropZone.addEventListener('dragover', (e) => {
             e.preventDefault();
-            dropZone.classList.add('border-primary', 'bg-primary/5');
+            dropZone.classList.add('border-primary', 'bg-primary-light/30');
         });
 
         dropZone.addEventListener('dragleave', () => {
-            dropZone.classList.remove('border-primary', 'bg-primary/5');
+            dropZone.classList.remove('border-primary', 'bg-primary-light/30');
         });
 
         dropZone.addEventListener('drop', (e) => {
             e.preventDefault();
-            dropZone.classList.remove('border-primary', 'bg-primary/5');
+            dropZone.classList.remove('border-primary', 'bg-primary-light/30');
             handleFiles(e.dataTransfer.files);
         });
 
@@ -602,18 +608,14 @@ function initializeUploadModal() {
         });
     }
 
-    // Ingest Deal Data button - use ID selector
+    // Ingest Deal Data button
     const ingestBtn = document.getElementById('ingest-btn');
     if (ingestBtn) {
         ingestBtn.addEventListener('click', (e) => {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Ingest button clicked');
             openUploadModal();
         });
-        console.log('Ingest button handler attached');
-    } else {
-        console.error('Ingest button not found');
     }
 }
 
@@ -644,8 +646,7 @@ async function handleFiles(files) {
     dropZone.classList.add('hidden');
     progressDiv.classList.remove('hidden');
 
-    // For now, show a demo upload (since we need a deal ID to upload to)
-    // In a real scenario, you'd either create a new deal or select an existing one
+    // Demo upload progress
     let progress = 0;
     const interval = setInterval(() => {
         progress += 10;
@@ -663,9 +664,8 @@ async function handleFiles(files) {
 }
 
 function showNotification(title, message, type = 'info') {
-    // Create notification element
     const notification = document.createElement('div');
-    const bgColor = type === 'success' ? 'bg-emerald-500' : type === 'error' ? 'bg-red-500' : 'bg-primary';
+    const bgColor = type === 'success' ? 'bg-secondary' : type === 'error' ? 'bg-red-500' : 'bg-primary';
     notification.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg z-50 flex items-center gap-3 animate-[slideIn_0.3s_ease-out]`;
     notification.innerHTML = `
         <span class="material-symbols-outlined text-white">${type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info'}</span>
@@ -680,7 +680,6 @@ function showNotification(title, message, type = 'info') {
 
 // Initialize upload card click handler
 function initializeUploadCard() {
-    // Use event delegation for dynamically added upload card
     document.addEventListener('click', (e) => {
         if (e.target.closest('#upload-card')) {
             openUploadModal();
@@ -705,22 +704,15 @@ function initializeKeyboardShortcuts() {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('DOM loaded, initializing...');
-    try {
-        initializeFilters();
-        console.log('Filters initialized');
-        loadDeals();
-        console.log('Deals loading started');
-        initializeUploadModal();
-        console.log('Upload modal initialized');
-        initializeUploadCard();
-        console.log('Upload card initialized');
-        initializeKeyboardShortcuts();
-        console.log('Keyboard shortcuts initialized');
-        console.log('All initializations complete');
-    } catch (error) {
-        console.error('Initialization error:', error);
-    }
+    // Initialize shared layout with collapsible sidebar
+    PELayout.init('deals', { collapsible: true });
+
+    initializeFilters();
+    loadDeals();
+    initializeUploadModal();
+    initializeUploadCard();
+    initializeKeyboardShortcuts();
 });
 </script>
-</body></html>
+</body>
+</html>

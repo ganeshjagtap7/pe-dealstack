@@ -15,10 +15,10 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
   const getStatusBadgeClass = (color: string, status: string) => {
     const baseClass = 'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold';
     const colorMap: Record<string, string> = {
-      green: 'bg-green-100 text-green-700',
+      green: 'bg-secondary-light text-secondary',
       orange: 'bg-orange-100 text-orange-700',
       yellow: 'bg-yellow-100 text-yellow-700',
-      slate: 'bg-slate-100 text-slate-600',
+      slate: 'bg-gray-100 text-text-secondary',
     };
     return `${baseClass} ${colorMap[color] || colorMap.slate}`;
   };
@@ -34,10 +34,10 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
             key={folder.id}
             className={`group flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-all ${
               isActive
-                ? 'bg-primary/5 ring-1 ring-primary/20'
+                ? 'bg-primary-light ring-1 ring-primary/20'
                 : isRestricted
-                ? 'opacity-60 hover:bg-slate-50'
-                : 'hover:bg-slate-50'
+                ? 'opacity-60 hover:bg-background-light'
+                : 'hover:bg-background-light'
             }`}
             onClick={() => !isRestricted && onFolderSelect(folder.id)}
             onKeyDown={(e) => {
@@ -55,8 +55,8 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                 isActive
                   ? 'text-primary'
                   : isRestricted
-                  ? 'text-slate-400'
-                  : 'text-slate-400 group-hover:text-primary'
+                  ? 'text-text-muted'
+                  : 'text-text-muted group-hover:text-primary'
               }`}
               style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}
             >
@@ -67,8 +67,8 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                 <span
                   className={`text-sm ${
                     isActive
-                      ? 'font-semibold text-slate-900'
-                      : 'font-medium text-slate-600 group-hover:text-slate-900'
+                      ? 'font-semibold text-text-main'
+                      : 'font-medium text-text-secondary group-hover:text-text-main'
                   }`}
                 >
                   {folder.name}
@@ -79,7 +79,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
                   {folder.statusLabel}
                 </span>
                 {!isRestricted && (
-                  <span className="text-[10px] text-slate-400">{folder.fileCount} files</span>
+                  <span className="text-[10px] text-text-muted">{folder.fileCount} files</span>
                 )}
               </div>
             </div>

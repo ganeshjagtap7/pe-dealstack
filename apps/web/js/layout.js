@@ -1,0 +1,320 @@
+/**
+ * PE OS - Shared Layout Component
+ * Provides consistent sidebar and header across all pages
+ */
+
+// Navigation items configuration
+const NAV_ITEMS = [
+    { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard.html' },
+    { id: 'deals', label: 'Deals', icon: 'work', href: '/crm.html' },
+    { id: 'data-room', label: 'Data Room', icon: 'folder_open', href: '/vdr.html' },
+    { id: 'crm', label: 'CRM', icon: 'groups', href: '#' },
+    { id: 'portfolio', label: 'Portfolio', icon: 'pie_chart', href: '#' },
+    { id: 'admin', label: 'Admin', icon: 'admin_panel_settings', href: '#' },
+    { divider: true },
+    { id: 'ai-reports', label: 'AI Reports', icon: 'auto_awesome', href: '#', isAI: true },
+];
+
+// User data (in real app, this would come from auth)
+const USER = {
+    name: 'Alex Morgan',
+    role: 'Senior Analyst',
+    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk'
+};
+
+// PE OS Logo SVG
+const LOGO_SVG = `<svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+    <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+</svg>`;
+
+/**
+ * Tailwind config for PE OS design system
+ */
+const TAILWIND_CONFIG = `
+tailwind.config = {
+    theme: {
+        extend: {
+            colors: {
+                "primary": "#003366",
+                "primary-hover": "#002855",
+                "primary-light": "#E6EEF5",
+                "secondary": "#059669",
+                "secondary-light": "#D1FAE5",
+                "background-body": "#F8F9FA",
+                "surface-card": "#FFFFFF",
+                "border-subtle": "#E5E7EB",
+                "border-focus": "#CBD5E1",
+                "text-main": "#111827",
+                "text-secondary": "#4B5563",
+                "text-muted": "#9CA3AF",
+            },
+            fontFamily: {
+                "sans": ["Inter", "sans-serif"],
+                "display": ["Inter", "sans-serif"],
+            },
+            boxShadow: {
+                "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+                "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
+            },
+            borderRadius: {
+                "DEFAULT": "0.5rem",
+                "md": "0.375rem",
+                "lg": "0.5rem",
+                "xl": "0.75rem",
+            }
+        },
+    },
+}`;
+
+/**
+ * Generate sidebar HTML
+ */
+function generateSidebar(activePage, options = {}) {
+    const { collapsible = false } = options;
+
+    const navItems = NAV_ITEMS.map(item => {
+        if (item.divider) {
+            return '<div class="sidebar-divider my-2 border-t border-border-subtle mx-2"></div>';
+        }
+
+        const isActive = item.id === activePage;
+        const baseClasses = 'nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors';
+        const activeClasses = 'bg-primary text-white shadow-sm';
+        const inactiveClasses = item.isAI
+            ? 'text-text-secondary hover:bg-secondary-light hover:text-secondary'
+            : 'text-text-secondary hover:bg-primary-light hover:text-primary';
+
+        const iconColor = item.isAI && !isActive ? 'text-secondary' : '';
+
+        return `
+            <a class="${baseClasses} ${isActive ? activeClasses : inactiveClasses}" href="${item.href}" title="${item.label}">
+                <span class="material-symbols-outlined text-[20px] ${iconColor}">${item.icon}</span>
+                <span class="nav-label text-sm font-medium">${item.label}</span>
+            </a>
+        `;
+    }).join('');
+
+    const collapseButton = collapsible ? `
+        <button id="sidebar-collapse-btn" class="absolute -right-3 top-20 z-30 flex h-6 w-6 items-center justify-center rounded-full border border-border-subtle bg-surface-card shadow-sm hover:bg-primary-light hover:text-primary transition-colors">
+            <span class="material-symbols-outlined text-[16px] collapse-icon">chevron_left</span>
+        </button>
+    ` : '';
+
+    return `
+        <aside id="pe-sidebar" class="hidden w-64 flex-col border-r border-border-subtle bg-surface-card md:flex shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 transition-all duration-300 relative">
+            ${collapseButton}
+            <div class="flex h-16 items-center px-6 border-b border-border-subtle">
+                <a href="/dashboard.html" class="flex items-center gap-2 text-primary">
+                    <div class="size-7 shrink-0">${LOGO_SVG}</div>
+                    <h2 class="logo-text text-xl font-bold tracking-tight text-primary">PE OS</h2>
+                </a>
+            </div>
+            <div class="flex flex-1 flex-col justify-between overflow-y-auto p-4 custom-scrollbar">
+                <nav class="flex flex-col gap-1">
+                    ${navItems}
+                </nav>
+                <div class="user-profile flex flex-col gap-3 mt-4">
+                    <div class="flex items-center gap-3 p-2.5 rounded-lg border border-border-subtle bg-background-body/50">
+                        <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 shrink-0 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
+                        <div class="user-info flex flex-col overflow-hidden">
+                            <h1 class="text-text-main text-xs font-bold truncate">${USER.name}</h1>
+                            <p class="text-text-secondary text-[10px] font-normal truncate">${USER.role}</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    `;
+}
+
+/**
+ * Generate header HTML
+ */
+function generateHeader(options = {}) {
+    const { showNewDealButton = false, searchPlaceholder = 'Ask AI anything about your portfolio...' } = options;
+
+    const newDealButton = showNewDealButton ? `
+        <button id="new-deal-btn" class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
+            <span class="material-symbols-outlined text-[18px]">add</span>
+            New Deal
+        </button>
+    ` : '';
+
+    return `
+        <header id="pe-header" class="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-10 sticky top-0">
+            <div class="flex items-center gap-4 flex-1">
+                <button class="md:hidden text-text-main" id="mobile-menu-btn">
+                    <span class="material-symbols-outlined">menu</span>
+                </button>
+                <div class="relative hidden w-full max-w-lg md:block group">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <span class="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[20px]">search</span>
+                    </div>
+                    <input
+                        id="global-search"
+                        class="block w-full rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm"
+                        placeholder="${searchPlaceholder}"
+                        type="text"
+                    />
+                    <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                        <button class="p-1 hover:bg-gray-200 rounded transition-colors text-primary">
+                            <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                ${newDealButton}
+                <button class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative" id="notifications-btn">
+                    <span class="material-symbols-outlined text-[20px]">notifications</span>
+                    <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
+                </button>
+                <div class="h-6 w-px bg-border-subtle"></div>
+                <button class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors" id="user-menu-btn">
+                    <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
+                    <span class="hidden md:inline">${USER.name}</span>
+                    <span class="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
+                </button>
+            </div>
+        </header>
+    `;
+}
+
+/**
+ * Generate required CSS styles
+ */
+function generateStyles() {
+    return `
+        <style id="pe-layout-styles">
+            .custom-scrollbar::-webkit-scrollbar {
+                width: 6px;
+                height: 6px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb {
+                background: #D1D5DB;
+                border-radius: 3px;
+            }
+            .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                background: #9CA3AF;
+            }
+            body {
+                font-feature-settings: "cv11", "ss01";
+                -webkit-font-smoothing: antialiased;
+            }
+            @keyframes slideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-10px) scale(0.95);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0) scale(1);
+                }
+            }
+            /* Collapsible Sidebar Styles */
+            #pe-sidebar.collapsed {
+                width: 72px;
+            }
+            #pe-sidebar.collapsed .nav-label,
+            #pe-sidebar.collapsed .logo-text,
+            #pe-sidebar.collapsed .user-info,
+            #pe-sidebar.collapsed .sidebar-divider {
+                display: none;
+            }
+            #pe-sidebar.collapsed .nav-item {
+                justify-content: center;
+                padding-left: 0;
+                padding-right: 0;
+            }
+            #pe-sidebar.collapsed .user-profile > div {
+                justify-content: center;
+                padding: 0.5rem;
+            }
+            #pe-sidebar.collapsed .collapse-icon {
+                transform: rotate(180deg);
+            }
+            #pe-sidebar .collapse-icon {
+                transition: transform 0.3s ease;
+            }
+        </style>
+    `;
+}
+
+/**
+ * Initialize the PE OS layout
+ * @param {string} activePage - The ID of the active page (e.g., 'deals', 'dashboard')
+ * @param {object} options - Configuration options
+ */
+function initPELayout(activePage, options = {}) {
+    const { collapsible = false } = options;
+
+    // Add styles to head if not already present
+    if (!document.getElementById('pe-layout-styles')) {
+        document.head.insertAdjacentHTML('beforeend', generateStyles());
+    }
+
+    // Find or create the layout containers
+    const sidebarRoot = document.getElementById('sidebar-root');
+    const headerRoot = document.getElementById('header-root');
+
+    if (sidebarRoot) {
+        sidebarRoot.outerHTML = generateSidebar(activePage, { collapsible });
+    }
+
+    if (headerRoot) {
+        headerRoot.outerHTML = generateHeader(options);
+    }
+
+    // Setup sidebar collapse toggle
+    if (collapsible) {
+        const collapseBtn = document.getElementById('sidebar-collapse-btn');
+        const sidebar = document.getElementById('pe-sidebar');
+
+        if (collapseBtn && sidebar) {
+            // Load saved state from localStorage
+            const isCollapsed = localStorage.getItem('pe-sidebar-collapsed') === 'true';
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+            }
+
+            collapseBtn.addEventListener('click', () => {
+                sidebar.classList.toggle('collapsed');
+                const nowCollapsed = sidebar.classList.contains('collapsed');
+                localStorage.setItem('pe-sidebar-collapsed', nowCollapsed.toString());
+            });
+        }
+    }
+
+    // Setup keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        // CMD+K to focus search
+        if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+            e.preventDefault();
+            const searchInput = document.getElementById('global-search');
+            if (searchInput) searchInput.focus();
+        }
+    });
+
+    console.log('PE OS Layout initialized for:', activePage);
+}
+
+/**
+ * Get the Tailwind config script content
+ */
+function getTailwindConfig() {
+    return TAILWIND_CONFIG;
+}
+
+// Export for use
+window.PELayout = {
+    init: initPELayout,
+    generateSidebar,
+    generateHeader,
+    getTailwindConfig,
+    NAV_ITEMS,
+    USER
+};

@@ -4,27 +4,48 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Due Diligence VDR - PE OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght@400&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
     <script>
-      // Tailwind config
-      tailwind = {
+      // Tailwind config - PE OS Design System
+      tailwind.config = {
         darkMode: "class",
         theme: {
           extend: {
             colors: {
-              "primary": "#1269e2",
-              "background-light": "#f6f7f8",
+              "primary": "#003366",
+              "primary-hover": "#002855",
+              "primary-light": "#E6EEF5",
+              "secondary": "#059669",
+              "secondary-light": "#D1FAE5",
+              "background-body": "#F8F9FA",
+              "background-light": "#F8F9FA",
               "background-dark": "#101822",
-              "surface-light": "#ffffff",
+              "surface-card": "#FFFFFF",
+              "surface-light": "#FFFFFF",
               "surface-dark": "#1a2430",
-              "border-light": "#e2e8f0",
+              "border-subtle": "#E5E7EB",
+              "border-light": "#E5E7EB",
               "border-dark": "#2d3748",
+              "border-focus": "#CBD5E1",
+              "text-main": "#111827",
+              "text-secondary": "#4B5563",
+              "text-muted": "#9CA3AF",
             },
             fontFamily: {
               "display": ["Inter", "sans-serif"],
-              "body": ["Inter", "sans-serif"]
+              "body": ["Inter", "sans-serif"],
+              "sans": ["Inter", "sans-serif"],
+            },
+            boxShadow: {
+              "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+              "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+              "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
             },
             borderRadius: {
-              "DEFAULT": "0.25rem",
+              "DEFAULT": "0.5rem",
+              "md": "0.375rem",
               "lg": "0.5rem",
               "xl": "0.75rem",
               "2xl": "1rem",
@@ -35,8 +56,21 @@
       }
     </script>
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="bg-background-light text-text-main font-sans overflow-hidden h-screen flex">
+    <!-- PE OS Sidebar (injected by layout.js) -->
+    <div id="sidebar-root"></div>
+
+    <!-- React VDR App Root -->
+    <div id="root" class="flex-1 flex overflow-hidden"></div>
+
+    <!-- Load shared layout -->
+    <script src="js/layout.js"></script>
+    <script>
+      // Initialize PE OS Layout with collapsible sidebar
+      document.addEventListener('DOMContentLoaded', function() {
+        PELayout.init('data-room', { collapsible: true });
+      });
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
