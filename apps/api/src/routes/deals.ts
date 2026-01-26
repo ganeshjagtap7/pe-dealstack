@@ -24,10 +24,49 @@ const createDealSchema = z.object({
 
 const updateDealSchema = createDealSchema.partial();
 
+// GET /api/deals/stats/summary - Get deal statistics (must be before :id route)
+router.get('/stats/summary', async (req, res) => {
+  try {
+    const { count: total } = await supabase
+      .from('Deal')
+      .select('*', { count: 'exact', head: true });
+
+    const { count: active } = await supabase
+      .from('Deal')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'ACTIVE');
+
+    const { count: passed } = await supabase
+      .from('Deal')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'PASSED');
+
+    const { data: deals } = await supabase
+      .from('Deal')
+      .select('stage')
+      .eq('status', 'ACTIVE');
+
+    const byStage = deals?.reduce((acc: Record<string, number>, deal) => {
+      acc[deal.stage] = (acc[deal.stage] || 0) + 1;
+      return acc;
+    }, {});
+
+    res.json({
+      total: total || 0,
+      active: active || 0,
+      passed: passed || 0,
+      byStage: Object.entries(byStage || {}).map(([stage, count]) => ({ stage, count })),
+    });
+  } catch (error) {
+    console.error('Error fetching stats:', error);
+    res.status(500).json({ error: 'Failed to fetch statistics' });
+  }
+});
+
 // GET /api/deals - Get all deals with company info
 router.get('/', async (req, res) => {
   try {
-    const { stage, status, industry } = req.query;
+    const { stage, status, industry, search, sortBy, sortOrder, minDealSize, maxDealSize } = req.query;
 
     let query = supabase
       .from('Deal')
@@ -36,12 +75,28 @@ router.get('/', async (req, res) => {
         company:Company(*),
         documents:Document(*),
         activities:Activity(*)
-      `)
-      .order('updatedAt', { ascending: false });
+      `);
 
+    // Apply filters
     if (stage) query = query.eq('stage', stage);
     if (status) query = query.eq('status', status);
     if (industry) query = query.ilike('industry', `%${industry}%`);
+
+    // Deal size range filters
+    if (minDealSize) query = query.gte('dealSize', Number(minDealSize));
+    if (maxDealSize) query = query.lte('dealSize', Number(maxDealSize));
+
+    // Text search across multiple fields
+    if (search) {
+      const searchTerm = `%${search}%`;
+      query = query.or(`name.ilike.${searchTerm},industry.ilike.${searchTerm},aiThesis.ilike.${searchTerm}`);
+    }
+
+    // Sorting
+    const validSortFields = ['updatedAt', 'createdAt', 'dealSize', 'irrProjected', 'revenue', 'ebitda', 'name'];
+    const sortField = validSortFields.includes(sortBy as string) ? (sortBy as string) : 'updatedAt';
+    const ascending = sortOrder === 'asc';
+    query = query.order(sortField, { ascending, nullsFirst: false });
 
     const { data, error } = await query;
 
@@ -224,46 +279,6 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting deal:', error);
     res.status(500).json({ error: 'Failed to delete deal' });
-  }
-});
-
-// GET /api/deals/stats/summary - Get deal statistics
-router.get('/stats/summary', async (req, res) => {
-  try {
-    const { count: total } = await supabase
-      .from('Deal')
-      .select('*', { count: 'exact', head: true });
-
-    const { count: active } = await supabase
-      .from('Deal')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'ACTIVE');
-
-    const { count: passed } = await supabase
-      .from('Deal')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'PASSED');
-
-    // Get deals by stage
-    const { data: deals } = await supabase
-      .from('Deal')
-      .select('stage')
-      .eq('status', 'ACTIVE');
-
-    const byStage = deals?.reduce((acc: any, deal) => {
-      acc[deal.stage] = (acc[deal.stage] || 0) + 1;
-      return acc;
-    }, {});
-
-    res.json({
-      total: total || 0,
-      active: active || 0,
-      passed: passed || 0,
-      byStage: Object.entries(byStage || {}).map(([stage, count]) => ({ stage, count })),
-    });
-  } catch (error) {
-    console.error('Error fetching stats:', error);
-    res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
 

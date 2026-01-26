@@ -878,13 +878,180 @@ const files = await fetch(`/api/vdr/folders/${folderId}/files`).then(r => r.json
 
 ---
 
+---
+
+## January 26, 2026
+
+### Day 5 - Full Stack Integration & AI Features
+
+#### Migration from Prisma to Direct Supabase Client
+- **Type:** Architecture Change
+- **Description:** Replaced Prisma ORM with direct Supabase JavaScript client for simpler, more direct database access
+- **Files Modified:**
+  - `apps/api/src/supabase.ts` - Supabase client initialization
+  - `apps/api/src/routes/deals.ts` - Rewrote using Supabase queries
+  - `apps/api/src/routes/companies.ts` - Rewrote using Supabase queries
+
+#### New Database Schema (Direct SQL)
+- **Type:** Infrastructure
+- **File Created:** `apps/api/supabase-schema.sql`
+- **Description:** Created SQL schema for direct execution in Supabase SQL Editor
+- **Tables:**
+  - `Company` - Company information with UUID primary keys
+  - `Deal` - Deal tracking with financial metrics, stages, AI thesis
+  - `Document` - Document metadata with extracted data (JSONB)
+  - `Activity` - Activity/audit log for deal events
+- **Indexes Added:** 8 performance indexes on frequently queried columns
+- **Seed Data:** 4 companies, 4 deals, 4 documents, 2 activities
+
+#### New API Routes Created
+
+**1. Activities API** (`apps/api/src/routes/activities.ts`)
+- `GET /api/deals/:dealId/activities` - List activities for a deal
+- `POST /api/deals/:dealId/activities` - Create new activity
+- Features: Zod validation, automatic timestamps
+
+**2. Documents API** (`apps/api/src/routes/documents.ts`)
+- `GET /api/deals/:dealId/documents` - List documents for a deal
+- `POST /api/deals/:dealId/documents` - Upload document metadata
+- `GET /api/documents/:id` - Get single document
+- `DELETE /api/documents/:id` - Delete document
+- Features: Supabase Storage ready (placeholder for file upload)
+
+**3. AI API** (`apps/api/src/routes/ai.ts`)
+- `POST /api/deals/:dealId/chat` - Chat with AI about a deal
+- `POST /api/deals/:dealId/generate-thesis` - Generate investment thesis
+- `POST /api/deals/:dealId/analyze-risks` - Analyze deal risks (JSON response)
+- `GET /api/ai/status` - Check AI service availability
+- Features: OpenAI GPT-4 Turbo integration, conversation history, deal context injection
+
+**4. OpenAI Integration** (`apps/api/src/openai.ts`)
+- OpenAI client setup with API key from environment
+- System prompt for PE deal analysis
+- `generateDealContext()` - Builds context from deal data for AI prompts
+- Graceful fallback when API key not configured
+
+#### Updated Main Server (`apps/api/src/index.ts`)
+- Mounted all new routers
+- Updated API info endpoint with all available routes
+- Enhanced startup logging with all endpoint URLs
+
+#### Frontend Integration - CRM Page
+
+**File:** `apps/web/crm.html`
+
+**Features Implemented:**
+1. **API Data Loading**
+   - Fetches deals from `http://localhost:3001/api/deals`
+   - Loading state with spinner
+   - Error handling with user-friendly messages
+
+2. **Filter System**
+   - Stage filter dropdown (All, Initial Review, Due Diligence, IOI Submitted, etc.)
+   - Industry filter dropdown (dynamically populated from deals)
+   - Active filter state tracking
+   - Filters update URL params and refetch data
+
+3. **Search Functionality**
+   - Real-time search with 300ms debounce
+   - Searches across deal name, company name, industry, AI thesis
+   - Server-side filtering via `?search=` query param
+
+4. **Upload Modal**
+   - "Ingest Deal Data" button opens modal
+   - Drag & drop file upload zone
+   - File type validation (PDF, Excel, Word, Email)
+   - Progress bar animation
+   - Success notification
+   - Keyboard shortcut: ESC to close
+
+5. **Keyboard Shortcuts**
+   - CMD+K to focus search bar
+   - ESC to close upload modal
+
+6. **Dynamic Deal Cards**
+   - Real data from API (company, financials, stage, AI thesis)
+   - Clickable cards link to `deal.html?id={dealId}`
+   - Stage badges with appropriate colors
+   - Relative time formatting ("2 hours ago", "3 days ago")
+
+#### Frontend Integration - Deal Page
+
+**File:** `apps/web/deal.js`
+
+**Features Implemented:**
+1. **Dynamic Data Loading**
+   - Reads deal ID from URL parameter (`?id=`)
+   - Fetches deal data from `GET /api/deals/:id`
+   - Populates all page sections with real data
+
+2. **Data Population**
+   - Deal header (name, stage, industry)
+   - Financial metrics (Revenue, EBITDA margin, Deal Size)
+   - AI Thesis display in chat intro
+   - Documents list with file icons and sizes
+   - Last updated timestamp
+
+3. **Chat Interface**
+   - Keyword-based responses using real deal data
+   - Responses for: risks, valuation, financials, thesis, general overview
+   - Dynamic calculations (EV/EBITDA, revenue multiples)
+   - Formatted HTML responses with cards and bullet points
+
+4. **Utility Functions**
+   - `formatCurrency()` - Currency formatting ($48M, $1.2B)
+   - `formatFileSize()` - File size formatting (KB, MB)
+   - `getStageLabel()` - Stage enum to display name
+   - `formatRelativeTime()` - Relative time display
+   - `getDocIcon()` / `getDocColor()` - Document type styling
+
+#### Environment Configuration
+- **File:** `apps/api/.env`
+- Added `OPENAI_API_KEY` for AI features
+- Supabase URL and anon key configured
+
+#### Testing Results
+- API Server: Running on `http://localhost:3001`
+- Web Server: Running on `http://localhost:3000`
+- All endpoints tested and working:
+  - ✅ GET /api/deals - Returns deals with filters
+  - ✅ GET /api/deals/:id - Returns single deal with relations
+  - ✅ GET /api/deals/:dealId/activities - Returns activities
+  - ✅ POST /api/deals/:dealId/chat - AI chat working
+  - ✅ GET /api/ai/status - Returns AI availability
+- Frontend tested:
+  - ✅ CRM page loads deals from API
+  - ✅ Filters work (stage, industry)
+  - ✅ Search functionality works
+  - ✅ Upload modal opens and closes
+  - ✅ Deal cards link to detail page
+  - ✅ Deal detail page loads real data
+
+#### Current Project State
+The CRM is now fully functional with:
+- Real database (Supabase PostgreSQL)
+- REST API with all CRUD operations
+- AI integration (OpenAI GPT-4)
+- Dynamic frontend with API data
+- Working filters, search, and navigation
+
+#### Known Issues / Next Steps
+- [ ] Real file upload to Supabase Storage (currently demo only)
+- [ ] Real AI chat (currently keyword-based responses)
+- [ ] Consistent design across all pages (headers/sidebars differ)
+- [ ] Convert to SPA or add shared layout components
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`
 - **VDR entry point:** `apps/web/vdr.html` (React app)
-- **Database:** Supabase (PostgreSQL) - requires configuration
+- **Database:** Supabase (PostgreSQL) - configured and seeded
+- **AI:** OpenAI GPT-4 Turbo - configured
 - Run `npm run dev` from root to start all apps
-- Run `npm run dev:web` for frontend only
-- Run `npm run dev:api` for API only
+- Run `npm run dev:web` for frontend only (port 3000)
+- Run `npm run dev:api` for API only (port 3001)
+- **Access CRM at:** `http://localhost:3000/crm.html`
 - **Access VDR at:** `http://localhost:3000/vdr.html`
 - **Setup Database:** See [SUPABASE_SETUP.md](SUPABASE_SETUP.md)

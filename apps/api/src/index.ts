@@ -3,6 +3,9 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import dealsRouter from './routes/deals.js';
 import companiesRouter from './routes/companies.js';
+import activitiesRouter from './routes/activities.js';
+import documentsRouter from './routes/documents.js';
+import aiRouter from './routes/ai.js';
 import { supabase } from './supabase.js';
 
 dotenv.config();
@@ -44,6 +47,9 @@ app.get('/api', (req, res) => {
     endpoints: {
       deals: '/api/deals',
       companies: '/api/companies',
+      activities: '/api/activities',
+      documents: '/api/documents',
+      ai: '/api/ai',
       health: '/health',
     },
   });
@@ -52,6 +58,9 @@ app.get('/api', (req, res) => {
 // Mount routers
 app.use('/api/deals', dealsRouter);
 app.use('/api/companies', companiesRouter);
+app.use('/api', activitiesRouter);
+app.use('/api', documentsRouter);
+app.use('/api', aiRouter);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -67,6 +76,9 @@ app.listen(PORT, () => {
   console.log(`🚀 API server running at http://localhost:${PORT}`);
   console.log(`📊 Deals API: http://localhost:${PORT}/api/deals`);
   console.log(`🏢 Companies API: http://localhost:${PORT}/api/companies`);
+  console.log(`📋 Activities API: http://localhost:${PORT}/api/activities`);
+  console.log(`📄 Documents API: http://localhost:${PORT}/api/documents`);
+  console.log(`🤖 AI API: http://localhost:${PORT}/api/ai/status`);
   console.log(`❤️  Health check: http://localhost:${PORT}/health`);
 });
 
