@@ -33,12 +33,11 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
           <div
             key={folder.id}
             className={`group flex cursor-pointer items-start gap-3 rounded-lg p-3 transition-all ${
-              isActive
-                ? 'bg-primary-light ring-1 ring-primary/20'
-                : isRestricted
+              isRestricted
                 ? 'opacity-60 hover:bg-background-light'
                 : 'hover:bg-background-light'
             }`}
+            style={isActive ? { backgroundColor: '#E6EEF5', boxShadow: 'inset 0 0 0 1px rgba(0, 51, 102, 0.2)' } : undefined}
             onClick={() => !isRestricted && onFolderSelect(folder.id)}
             onKeyDown={(e) => {
               if ((e.key === 'Enter' || e.key === ' ') && !isRestricted) {
@@ -52,13 +51,18 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
           >
             <span
               className={`material-symbols-outlined mt-0.5 ${
-                isActive
-                  ? 'text-primary'
-                  : isRestricted
-                  ? 'text-text-muted'
-                  : 'text-text-muted group-hover:text-primary'
+                isRestricted ? 'text-text-muted' : ''
               }`}
-              style={{ fontVariationSettings: isActive ? "'FILL' 1" : undefined }}
+              style={{
+                fontVariationSettings: isActive ? "'FILL' 1" : undefined,
+                color: isActive ? '#003366' : isRestricted ? undefined : '#9CA3AF'
+              }}
+              onMouseOver={(e) => {
+                if (!isActive && !isRestricted) e.currentTarget.style.color = '#003366';
+              }}
+              onMouseOut={(e) => {
+                if (!isActive && !isRestricted) e.currentTarget.style.color = '#9CA3AF';
+              }}
             >
               {isRestricted ? 'lock' : 'folder'}
             </span>

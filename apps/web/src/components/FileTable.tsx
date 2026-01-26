@@ -17,21 +17,21 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
     return iconMap[type] || iconMap.other;
   };
 
-  const getFileIconColor = (type: string): string => {
-    const colorMap: Record<string, string> = {
-      excel: 'bg-secondary-light text-secondary',
-      pdf: 'bg-red-50 text-red-600',
-      doc: 'bg-primary-light text-primary',
-      other: 'bg-background-light text-text-secondary',
+  const getFileIconColor = (type: string): { className: string; style?: React.CSSProperties } => {
+    const colorMap: Record<string, { className: string; style?: React.CSSProperties }> = {
+      excel: { className: 'bg-secondary-light text-secondary' },
+      pdf: { className: 'bg-red-50 text-red-600' },
+      doc: { className: '', style: { backgroundColor: '#E6EEF5', color: '#003366' } },
+      other: { className: 'bg-background-light text-text-secondary' },
     };
     return colorMap[type] || colorMap.other;
   };
 
-  const getAnalysisColorClass = (color: string): string => {
-    const colorMap: Record<string, string> = {
-      primary: 'text-primary',
-      orange: 'text-orange-600',
-      slate: 'text-text-muted',
+  const getAnalysisColor = (color: string): { className: string; style?: React.CSSProperties } => {
+    const colorMap: Record<string, { className: string; style?: React.CSSProperties }> = {
+      primary: { className: '', style: { color: '#003366' } },
+      orange: { className: 'text-orange-600' },
+      slate: { className: 'text-text-muted' },
     };
     return colorMap[color] || colorMap.slate;
   };
@@ -46,7 +46,8 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
                 <th className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-text-secondary sm:pl-6" scope="col">
                   <div className="flex items-center gap-2">
                     <input
-                      className="h-4 w-4 rounded border-border-light text-primary focus:ring-primary"
+                      className="h-4 w-4 rounded border-border-light"
+                      style={{ accentColor: '#003366' }}
                       type="checkbox"
                       aria-label="Select all files"
                     />
@@ -78,26 +79,23 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
                 files.map((file) => (
                   <tr
                     key={file.id}
-                    className={`group hover:bg-background-light transition-colors cursor-pointer ${
-                      file.isHighlighted ? 'bg-primary-light' : ''
-                    }`}
+                    className="group hover:bg-background-light transition-colors cursor-pointer"
+                    style={file.isHighlighted ? { backgroundColor: '#E6EEF5' } : undefined}
                     onClick={() => onFileClick?.(file)}
                   >
                     <td
-                      className={`whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 ${
-                        file.isHighlighted ? 'border-l-4 border-l-primary' : ''
-                      }`}
+                      className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6"
+                      style={file.isHighlighted ? { borderLeft: '4px solid #003366' } : undefined}
                     >
                       <div className="flex items-center gap-3">
                         <div
-                          className={`flex size-10 shrink-0 items-center justify-center rounded ${getFileIconColor(
-                            file.type
-                          )}`}
+                          className={`flex size-10 shrink-0 items-center justify-center rounded ${getFileIconColor(file.type).className}`}
+                          style={getFileIconColor(file.type).style}
                         >
                           <span className="material-symbols-outlined">{getFileIcon(file.type)}</span>
                         </div>
                         <div className="flex flex-col">
-                          <div className="font-medium text-text-main group-hover:text-primary transition-colors">
+                          <div className="font-medium text-text-main transition-colors file-name-hover">
                             {file.name}
                           </div>
                           <div className="text-xs text-text-muted">{file.size}</div>
@@ -106,7 +104,10 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
                     </td>
                     <td className="px-3 py-4 text-sm text-text-secondary">
                       <div className="flex flex-col gap-1">
-                        <div className={`flex items-center gap-1.5 text-xs font-medium ${getAnalysisColorClass(file.analysis.color)}`}>
+                        <div
+                          className={`flex items-center gap-1.5 text-xs font-medium ${getAnalysisColor(file.analysis.color).className}`}
+                          style={getAnalysisColor(file.analysis.color).style}
+                        >
                           <span className="material-symbols-outlined text-[14px]">
                             {file.analysis.type === 'key-insight' || file.analysis.type === 'complete'
                               ? 'auto_awesome'
@@ -134,12 +135,14 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-text-secondary text-xs">{file.date}</td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
                       <button
-                        className="text-text-muted hover:text-primary transition-colors"
+                        className="text-text-muted transition-colors"
                         aria-label="More options"
                         onClick={(e) => {
                           e.stopPropagation();
                           // Handle menu open
                         }}
+                        onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
+                        onMouseOut={(e) => e.currentTarget.style.color = '#9CA3AF'}
                       >
                         <span className="material-symbols-outlined">more_vert</span>
                       </button>
@@ -154,7 +157,11 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
 
       {files.length > 0 && (
         <div className="flex justify-center mt-4">
-          <button className="text-xs font-medium text-text-secondary hover:text-primary">
+          <button
+            className="text-xs font-medium text-text-secondary"
+            onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
+            onMouseOut={(e) => e.currentTarget.style.color = '#4B5563'}
+          >
             View all {files.length} files in Financials
           </button>
         </div>

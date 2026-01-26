@@ -44,4 +44,9 @@
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
   }
+
+  /* PE OS Primary Color Hover Effects */
+  .group:hover .file-name-hover {
+    color: #003366;
+  }
 }

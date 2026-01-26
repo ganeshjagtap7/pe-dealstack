@@ -67,6 +67,21 @@ tailwind.config = {
     },
 }`;
 
+// PE OS Design System Colors - Hardcoded for consistency
+const PE_COLORS = {
+    primary: '#003366',
+    primaryHover: '#002855',
+    primaryLight: '#E6EEF5',
+    secondary: '#059669',
+    secondaryLight: '#D1FAE5',
+    backgroundBody: '#F8F9FA',
+    surfaceCard: '#FFFFFF',
+    borderSubtle: '#E5E7EB',
+    textMain: '#111827',
+    textSecondary: '#4B5563',
+    textMuted: '#9CA3AF',
+};
+
 /**
  * Generate sidebar HTML
  */
@@ -75,39 +90,53 @@ function generateSidebar(activePage, options = {}) {
 
     const navItems = NAV_ITEMS.map(item => {
         if (item.divider) {
-            return '<div class="sidebar-divider my-2 border-t border-border-subtle mx-2"></div>';
+            return `<div class="sidebar-divider my-2 mx-2" style="border-top: 1px solid ${PE_COLORS.borderSubtle};"></div>`;
         }
 
         const isActive = item.id === activePage;
         const baseClasses = 'nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors';
-        const activeClasses = 'bg-primary text-white shadow-sm';
-        const inactiveClasses = item.isAI
-            ? 'text-text-secondary hover:bg-secondary-light hover:text-secondary'
-            : 'text-text-secondary hover:bg-primary-light hover:text-primary';
 
-        const iconColor = item.isAI && !isActive ? 'text-secondary' : '';
+        // Use inline styles for colors to ensure consistency across all pages
+        const activeStyle = `background-color: ${PE_COLORS.primary}; color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.05);`;
+        const inactiveStyle = `color: ${PE_COLORS.textSecondary};`;
+        const aiIconStyle = item.isAI && !isActive ? `color: ${PE_COLORS.secondary};` : '';
 
-        return `
-            <a class="${baseClasses} ${isActive ? activeClasses : inactiveClasses}" href="${item.href}" title="${item.label}">
-                <span class="material-symbols-outlined text-[20px] ${iconColor}">${item.icon}</span>
-                <span class="nav-label text-sm font-medium">${item.label}</span>
-            </a>
-        `;
+        if (isActive) {
+            return `
+                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${activeStyle}" data-active="true">
+                    <span class="material-symbols-outlined text-[20px]">${item.icon}</span>
+                    <span class="nav-label text-sm font-medium">${item.label}</span>
+                </a>
+            `;
+        } else {
+            return `
+                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${inactiveStyle}"
+                   onmouseover="this.style.backgroundColor='${item.isAI ? PE_COLORS.secondaryLight : PE_COLORS.primaryLight}';this.style.color='${item.isAI ? PE_COLORS.secondary : PE_COLORS.primary}';"
+                   onmouseout="this.style.backgroundColor='';this.style.color='${PE_COLORS.textSecondary}';">
+                    <span class="material-symbols-outlined text-[20px]" style="${aiIconStyle}">${item.icon}</span>
+                    <span class="nav-label text-sm font-medium">${item.label}</span>
+                </a>
+            `;
+        }
     }).join('');
 
     const collapseButton = collapsible ? `
-        <button id="sidebar-collapse-btn" class="absolute -right-3 top-20 z-30 flex h-6 w-6 items-center justify-center rounded-full border border-border-subtle bg-surface-card shadow-sm hover:bg-primary-light hover:text-primary transition-colors">
+        <button id="sidebar-collapse-btn" class="absolute -right-3 top-20 z-30 flex h-6 w-6 items-center justify-center rounded-full shadow-sm transition-colors"
+                style="border: 1px solid ${PE_COLORS.borderSubtle}; background-color: ${PE_COLORS.surfaceCard};"
+                onmouseover="this.style.backgroundColor='${PE_COLORS.primaryLight}';this.style.color='${PE_COLORS.primary}';"
+                onmouseout="this.style.backgroundColor='${PE_COLORS.surfaceCard}';this.style.color='inherit';">
             <span class="material-symbols-outlined text-[16px] collapse-icon">chevron_left</span>
         </button>
     ` : '';
 
     return `
-        <aside id="pe-sidebar" class="hidden w-64 flex-col border-r border-border-subtle bg-surface-card md:flex shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 transition-all duration-300 relative">
+        <aside id="pe-sidebar" class="hidden w-64 flex-col md:flex shadow-[4px_0_24px_rgba(0,0,0,0.02)] z-20 transition-all duration-300 relative"
+               style="border-right: 1px solid ${PE_COLORS.borderSubtle}; background-color: ${PE_COLORS.surfaceCard};">
             ${collapseButton}
-            <div class="flex h-16 items-center px-6 border-b border-border-subtle">
-                <a href="/dashboard.html" class="flex items-center gap-2 text-primary">
+            <div class="flex h-16 items-center px-6" style="border-bottom: 1px solid ${PE_COLORS.borderSubtle};">
+                <a href="/dashboard.html" class="flex items-center gap-2" style="color: ${PE_COLORS.primary};">
                     <div class="size-7 shrink-0">${LOGO_SVG}</div>
-                    <h2 class="logo-text text-xl font-bold tracking-tight text-primary">PE OS</h2>
+                    <h2 class="logo-text text-xl font-bold tracking-tight" style="color: ${PE_COLORS.primary};">PE OS</h2>
                 </a>
             </div>
             <div class="flex flex-1 flex-col justify-between overflow-y-auto p-4 custom-scrollbar">
@@ -115,11 +144,11 @@ function generateSidebar(activePage, options = {}) {
                     ${navItems}
                 </nav>
                 <div class="user-profile flex flex-col gap-3 mt-4">
-                    <div class="flex items-center gap-3 p-2.5 rounded-lg border border-border-subtle bg-background-body/50">
+                    <div class="flex items-center gap-3 p-2.5 rounded-lg" style="border: 1px solid ${PE_COLORS.borderSubtle}; background-color: rgba(248, 249, 250, 0.5);">
                         <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 shrink-0 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
                         <div class="user-info flex flex-col overflow-hidden">
-                            <h1 class="text-text-main text-xs font-bold truncate">${USER.name}</h1>
-                            <p class="text-text-secondary text-[10px] font-normal truncate">${USER.role}</p>
+                            <h1 class="text-xs font-bold truncate" style="color: ${PE_COLORS.textMain};">${USER.name}</h1>
+                            <p class="text-[10px] font-normal truncate" style="color: ${PE_COLORS.textSecondary};">${USER.role}</p>
                         </div>
                     </div>
                 </div>

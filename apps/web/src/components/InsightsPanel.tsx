@@ -21,7 +21,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
       <aside className="w-[320px] min-w-[320px] bg-surface-light border-l border-border-light shadow-xl z-20 flex flex-col">
         <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-primary-light/30">
           <div className="flex items-center gap-2 mb-2">
-            <span className="material-symbols-outlined text-primary">smart_toy</span>
+            <span className="material-symbols-outlined" style={{ color: '#003366' }}>smart_toy</span>
             <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
           </div>
           <p className="text-xs text-text-secondary">Select a folder to view insights</p>
@@ -34,7 +34,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
     <aside className="w-[320px] min-w-[320px] bg-surface-light border-l border-border-light shadow-xl z-20 flex flex-col">
       <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-primary-light/30">
         <div className="flex items-center gap-2 mb-2">
-          <span className="material-symbols-outlined text-primary">smart_toy</span>
+          <span className="material-symbols-outlined" style={{ color: '#003366' }}>smart_toy</span>
           <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
         </div>
         <p className="text-xs text-text-secondary">
@@ -112,7 +112,8 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
                     <span>{doc.name}</span>
                   </div>
                   <button
-                    className="text-primary font-medium hover:underline"
+                    className="font-medium hover:underline"
+                    style={{ color: '#003366' }}
                     onClick={() => onRequestDocument?.(doc.id)}
                   >
                     Request
@@ -128,7 +129,10 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
       <div className="p-4 border-t border-border-light">
         <button
           onClick={onGenerateReport}
-          className="w-full flex items-center justify-center gap-2 rounded-lg bg-primary py-2.5 text-sm font-bold text-white hover:bg-primary-hover transition-colors shadow-lg shadow-primary/10"
+          className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-white transition-colors shadow-lg"
+          style={{ backgroundColor: '#003366', boxShadow: '0 10px 15px -3px rgba(0, 51, 102, 0.1)' }}
+          onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#002855'}
+          onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#003366'}
         >
           <span className="material-symbols-outlined text-[18px]">summarize</span>
           Generate Full Report

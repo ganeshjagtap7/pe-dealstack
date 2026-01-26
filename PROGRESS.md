@@ -1285,6 +1285,77 @@ VDR page now has consistent Banker Blue (#003366) theme matching Dashboard, CRM,
 
 ---
 
+### Day 6 (Continued) - VDR React Components Color Fix
+
+#### Issue
+- **Problem:** While the PE OS sidebar was fixed, the VDR React components still showed light blue (#1269e2) instead of Banker Blue (#003366)
+- **Affected Elements:**
+  - Upload Files button
+  - Generate Full Report button
+  - Folder icons in Data Room Index
+  - Smart filter chips
+  - File table hover states
+  - Various links and buttons
+
+#### Root Cause
+The React components were using Tailwind classes like `bg-primary`, `text-primary`, `hover:text-primary` which were compiled with the old color value. Even though `tailwind.config.js` was updated, Vite's compiled CSS still had the old values cached.
+
+#### Solution
+Replaced Tailwind color classes with hardcoded inline styles using the correct Banker Blue (#003366) color values throughout all VDR React components.
+
+#### Files Modified
+
+**1. `apps/web/src/vdr.tsx`**
+- Upload Files button: Changed to inline style `backgroundColor: '#003366'`
+- New Folder button: Added hover handlers with hardcoded colors
+- Breadcrumb links (Deals, Project Apex): Added hover handlers
+
+**2. `apps/web/src/components/InsightsPanel.tsx`**
+- Generate Full Report button: Changed to inline style `backgroundColor: '#003366'`
+- AI Quick Insights icon: Changed to inline style `color: '#003366'`
+- Request button: Changed to inline style `color: '#003366'`
+
+**3. `apps/web/src/components/FolderTree.tsx`**
+- Folder icons: Added inline styles for active (#003366) and inactive (#9CA3AF) states
+- Active folder background: Changed to inline style `backgroundColor: '#E6EEF5'`
+- Added onMouseOver/onMouseOut handlers for hover effects
+
+**4. `apps/web/src/components/FiltersBar.tsx`**
+- Smart filter chips: Converted to inline styles for active/inactive states
+- Search input focus ring: Added CSS variable `--tw-ring-color: '#003366'`
+- Search icon: Added focus/blur handlers to change color
+
+**5. `apps/web/src/components/FileTable.tsx`**
+- `getFileIconColor()`: Updated to return inline styles for doc type
+- `getAnalysisColor()`: Updated to return inline styles for primary color
+- Checkbox: Added `accentColor: '#003366'`
+- Highlighted rows: Changed to inline styles
+- More options button: Added hover handlers
+- View all link: Added hover handlers
+
+**6. `apps/web/src/index.css`**
+- Added CSS rule: `.group:hover .file-name-hover { color: #003366; }`
+
+#### Color Values Used
+| Element | Color | Hex Code |
+|---------|-------|----------|
+| Primary (buttons, icons) | Banker Blue | #003366 |
+| Primary Hover | Dark Blue | #002855 |
+| Primary Light (backgrounds) | Light Blue | #E6EEF5 |
+| Text Secondary | Gray | #4B5563 |
+| Text Muted | Light Gray | #9CA3AF |
+| Border Light | Border Gray | #E5E7EB |
+
+#### Testing Checklist
+- [x] Upload Files button shows Banker Blue
+- [x] Generate Full Report button shows Banker Blue
+- [x] Folder icons show Banker Blue when active
+- [x] Smart filter chips show correct colors
+- [x] All hover states work correctly
+- [x] VDR page matches other pages' color theme
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`
