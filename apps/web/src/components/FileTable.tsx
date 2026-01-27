@@ -1,12 +1,77 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { VDRFile } from '../types/vdr.types';
 
 interface FileTableProps {
   files: VDRFile[];
   onFileClick?: (file: VDRFile) => void;
+  onDeleteFile?: (fileId: string) => void;
+  onRenameFile?: (fileId: string, newName: string) => void;
 }
 
-export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
+export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick, onDeleteFile, onRenameFile }) => {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState('');
+  const menuRef = useRef<HTMLDivElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Focus rename input when starting rename
+  useEffect(() => {
+    if (renamingFileId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingFileId]);
+
+  const handleMenuToggle = (e: React.MouseEvent, fileId: string) => {
+    e.stopPropagation();
+    setOpenMenuId(openMenuId === fileId ? null : fileId);
+  };
+
+  const handleDelete = (e: React.MouseEvent, fileId: string) => {
+    e.stopPropagation();
+    if (window.confirm('Are you sure you want to delete this file?')) {
+      onDeleteFile?.(fileId);
+    }
+    setOpenMenuId(null);
+  };
+
+  const handleRenameStart = (e: React.MouseEvent, file: VDRFile) => {
+    e.stopPropagation();
+    setRenamingFileId(file.id);
+    setRenameValue(file.name);
+    setOpenMenuId(null);
+  };
+
+  const handleRenameSubmit = (fileId: string) => {
+    if (renameValue.trim() && renameValue !== files.find(f => f.id === fileId)?.name) {
+      onRenameFile?.(fileId, renameValue.trim());
+    }
+    setRenamingFileId(null);
+    setRenameValue('');
+  };
+
+  const handleRenameKeyDown = (e: React.KeyboardEvent, fileId: string) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleRenameSubmit(fileId);
+    } else if (e.key === 'Escape') {
+      setRenamingFileId(null);
+      setRenameValue('');
+    }
+  };
+
   const getFileIcon = (type: string): string => {
     const iconMap: Record<string, string> = {
       excel: 'table_view',
@@ -95,9 +160,22 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
                           <span className="material-symbols-outlined">{getFileIcon(file.type)}</span>
                         </div>
                         <div className="flex flex-col">
-                          <div className="font-medium text-text-main transition-colors file-name-hover">
-                            {file.name}
-                          </div>
+                          {renamingFileId === file.id ? (
+                            <input
+                              ref={renameInputRef}
+                              type="text"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onKeyDown={(e) => handleRenameKeyDown(e, file.id)}
+                              onBlur={() => handleRenameSubmit(file.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              className="font-medium text-text-main px-2 py-1 border border-primary rounded focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[200px]"
+                            />
+                          ) : (
+                            <div className="font-medium text-text-main transition-colors file-name-hover">
+                              {file.name}
+                            </div>
+                          )}
                           <div className="text-xs text-text-muted">{file.size}</div>
                         </div>
                       </div>
@@ -134,18 +212,50 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick }) => {
                     </td>
                     <td className="whitespace-nowrap px-3 py-4 text-sm text-text-secondary text-xs">{file.date}</td>
                     <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <button
-                        className="text-text-muted transition-colors"
-                        aria-label="More options"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          // Handle menu open
-                        }}
-                        onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
-                        onMouseOut={(e) => e.currentTarget.style.color = '#9CA3AF'}
-                      >
-                        <span className="material-symbols-outlined">more_vert</span>
-                      </button>
+                      <div className="relative" ref={openMenuId === file.id ? menuRef : null}>
+                        <button
+                          className="text-text-muted transition-colors p-1 rounded hover:bg-background-light"
+                          aria-label="More options"
+                          onClick={(e) => handleMenuToggle(e, file.id)}
+                          onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
+                          onMouseOut={(e) => e.currentTarget.style.color = openMenuId === file.id ? '#003366' : '#9CA3AF'}
+                          style={{ color: openMenuId === file.id ? '#003366' : undefined }}
+                        >
+                          <span className="material-symbols-outlined">more_vert</span>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        {openMenuId === file.id && (
+                          <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-border-light py-1 z-50">
+                            <button
+                              onClick={(e) => handleRenameStart(e, file)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-background-light hover:text-text-main transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                              Rename
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onFileClick?.(file);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-background-light hover:text-text-main transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">download</span>
+                              Download
+                            </button>
+                            <div className="border-t border-border-light my-1"></div>
+                            <button
+                              onClick={(e) => handleDelete(e, file.id)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))

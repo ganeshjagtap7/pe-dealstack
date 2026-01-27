@@ -7,6 +7,8 @@ interface InsightsPanelProps {
   onGenerateReport: () => void;
   onViewFile?: (fileId: string) => void;
   onRequestDocument?: (docId: string) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const InsightsPanel: React.FC<InsightsPanelProps> = ({
@@ -15,14 +17,47 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
   onGenerateReport,
   onViewFile,
   onRequestDocument,
+  isCollapsed = false,
+  onToggleCollapse,
 }) => {
+  // Collapsed state - show just a thin bar
+  if (isCollapsed) {
+    return (
+      <aside className="w-12 min-w-12 bg-surface-light border-l border-border-light shadow-xl z-20 flex flex-col items-center py-4">
+        <button
+          onClick={onToggleCollapse}
+          className="p-2 rounded-lg hover:bg-background-light transition-colors"
+          title="Expand AI Quick Insights"
+        >
+          <span className="material-symbols-outlined" style={{ color: '#003366' }}>smart_toy</span>
+        </button>
+        <button
+          onClick={onToggleCollapse}
+          className="p-2 rounded-lg hover:bg-background-light transition-colors mt-2"
+          title="Expand panel"
+        >
+          <span className="material-symbols-outlined text-text-muted">chevron_left</span>
+        </button>
+      </aside>
+    );
+  }
+
   if (!insights) {
     return (
       <aside className="w-[320px] min-w-[320px] bg-surface-light border-l border-border-light shadow-xl z-20 flex flex-col">
         <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-primary-light/30">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="material-symbols-outlined" style={{ color: '#003366' }}>smart_toy</span>
-            <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined" style={{ color: '#003366' }}>smart_toy</span>
+              <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
+            </div>
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 rounded hover:bg-background-light transition-colors"
+              title="Collapse panel"
+            >
+              <span className="material-symbols-outlined text-text-muted text-[20px]">chevron_right</span>
+            </button>
           </div>
           <p className="text-xs text-text-secondary">Select a folder to view insights</p>
         </div>
@@ -33,9 +68,18 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
   return (
     <aside className="w-[320px] min-w-[320px] bg-surface-light border-l border-border-light shadow-xl z-20 flex flex-col">
       <div className="p-5 border-b border-border-light bg-gradient-to-r from-white to-primary-light/30">
-        <div className="flex items-center gap-2 mb-2">
-          <span className="material-symbols-outlined" style={{ color: '#003366' }}>smart_toy</span>
-          <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined" style={{ color: '#003366' }}>smart_toy</span>
+            <h2 className="text-sm font-bold text-text-main tracking-wide uppercase">AI Quick Insights</h2>
+          </div>
+          <button
+            onClick={onToggleCollapse}
+            className="p-1 rounded hover:bg-background-light transition-colors"
+            title="Collapse panel"
+          >
+            <span className="material-symbols-outlined text-text-muted text-[20px]">chevron_right</span>
+          </button>
         </div>
         <p className="text-xs text-text-secondary">
           Analysis for <span className="font-medium text-text-main">{folderName}</span>

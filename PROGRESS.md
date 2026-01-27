@@ -1834,6 +1834,134 @@ const response = await fetch(`${API_BASE_URL}/ingest`, {
 
 ---
 
+## January 28, 2026
+
+### Day 8 - VDR Enhanced Functionality
+
+#### New Folder Creation Feature
+- **Type:** New Feature
+- **Description:** Added ability to create new folders in the VDR folder tree
+- **File Modified:** `apps/web/src/vdr.tsx`
+
+**Features:**
+- "New Folder" button in header opens creation modal
+- Modal with folder name input and Cancel/Create buttons
+- Auto-generates folder number (100, 200, 300... 600, 700, etc.)
+- New folders default to "Ready" status with 0 files
+- Real-time folder tree updates
+- ESC key closes modal
+- Click outside modal to cancel
+
+**State Management:**
+```typescript
+const [showNewFolderModal, setShowNewFolderModal] = useState(false);
+const [newFolderName, setNewFolderName] = useState('');
+```
+
+#### File Actions Menu (3-Dot Menu)
+- **Type:** New Feature
+- **Description:** Added functional dropdown menu for file row actions
+- **File Modified:** `apps/web/src/components/FileTable.tsx`
+
+**Features:**
+- 3-dot menu button on each file row
+- Dropdown menu with Rename, Download, Delete options
+- Inline rename with text input field
+- Keyboard support: Enter to save, Escape to cancel
+- Delete confirmation dialog
+- Click outside to close menu
+- Auto-focus rename input field
+
+**Actions:**
+| Action | Behavior |
+|--------|----------|
+| Rename | Opens inline input, Enter saves, Escape cancels |
+| Download | Triggers file click handler (placeholder) |
+| Delete | Shows confirmation dialog, removes from file list |
+
+**State Management:**
+```typescript
+const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
+const [renameValue, setRenameValue] = useState('');
+```
+
+#### Collapsible AI Quick Insights Panel
+- **Type:** New Feature
+- **Description:** Made the right-side AI Quick Insights panel collapsible
+- **File Modified:** `apps/web/src/components/InsightsPanel.tsx`
+
+**Features:**
+- Collapse button (chevron icon) in panel header
+- Collapsed state shows thin 48px bar with:
+  - AI icon (smart_toy)
+  - Expand button (chevron_left)
+- Expanded state shows full 320px panel
+- Smooth transition between states
+- State managed in parent component
+
+**Props Added:**
+```typescript
+interface InsightsPanelProps {
+  // ...existing props
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+}
+```
+
+**Collapsed Layout:**
+```
+┌──────┐
+│  🤖  │  <- AI icon
+│  ◀   │  <- Expand button
+│      │
+└──────┘
+  48px
+```
+
+#### Parent Component Updates
+- **File Modified:** `apps/web/src/vdr.tsx`
+
+**New State & Handlers:**
+```typescript
+const [insightsPanelCollapsed, setInsightsPanelCollapsed] = useState(false);
+
+const handleDeleteFile = (fileId: string) => {
+  setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
+  // Also updates folder file counts
+};
+
+const handleRenameFile = (fileId: string, newName: string) => {
+  setAllFiles((prev) =>
+    prev.map((f) => (f.id === fileId ? { ...f, name: newName } : f))
+  );
+};
+
+const handleToggleInsightsPanel = () => {
+  setInsightsPanelCollapsed((prev) => !prev);
+};
+```
+
+#### Files Modified Summary
+
+| File | Changes |
+|------|---------|
+| `apps/web/src/vdr.tsx` | Added new folder modal, file action handlers, insights panel collapse state |
+| `apps/web/src/components/FileTable.tsx` | Added 3-dot dropdown menu, inline rename, delete with confirmation |
+| `apps/web/src/components/InsightsPanel.tsx` | Added collapsible functionality with thin collapsed bar |
+
+#### Testing Checklist
+- [x] "New Folder" button opens modal
+- [x] New folder appears in folder tree
+- [x] 3-dot menu opens on click
+- [x] Rename changes file name in real-time
+- [x] Delete removes file after confirmation
+- [x] Insights panel collapses to thin bar
+- [x] Expand button restores full panel
+- [x] All hover states and transitions work
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`
