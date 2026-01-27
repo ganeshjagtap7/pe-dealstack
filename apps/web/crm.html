@@ -548,6 +548,13 @@ function initializeUploadModal() {
                     <h3 class="text-xl font-bold text-text-main">Ingest Deal Data</h3>
                     <p class="text-text-secondary text-sm mt-1">Upload CIMs, Teasers, or Excel models to auto-create deal blocks</p>
                 </div>
+                <!-- Deal Selector -->
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-text-main mb-2">Select Deal</label>
+                    <select id="upload-deal-select" class="w-full px-3 py-2 border border-border-subtle rounded-lg bg-surface-card text-text-main focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="">Loading deals...</option>
+                    </select>
+                </div>
                 <div id="drop-zone" class="border-2 border-dashed border-border-subtle rounded-xl p-8 text-center hover:border-primary hover:bg-primary-light/30 transition-all cursor-pointer">
                     <input type="file" id="file-input" class="hidden" accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.msg" multiple />
                     <span class="material-symbols-outlined text-text-muted text-4xl mb-3">cloud_upload</span>
@@ -603,8 +610,13 @@ function initializeUploadModal() {
             handleFiles(e.dataTransfer.files);
         });
 
-        fileInput.addEventListener('change', (e) => {
-            handleFiles(e.target.files);
+        fileInput.addEventListener('change', function(e) {
+            console.log('File input changed, files:', this.files);
+            if (this.files && this.files.length > 0) {
+                handleFiles(this.files);
+                // Reset input so the same file can be selected again
+                setTimeout(() => { this.value = ''; }, 100);
+            }
         });
     }
 
@@ -619,10 +631,30 @@ function initializeUploadModal() {
     }
 }
 
-function openUploadModal() {
+async function openUploadModal() {
     const modal = document.getElementById('upload-modal');
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
+
+    // Populate deal selector
+    const dealSelect = document.getElementById('upload-deal-select');
+    dealSelect.innerHTML = '<option value="">Loading deals...</option>';
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/deals`);
+        const deals = await response.json();
+
+        dealSelect.innerHTML = '<option value="">Select a deal...</option>';
+        deals.forEach(deal => {
+            const option = document.createElement('option');
+            option.value = deal.id;
+            option.textContent = `${deal.name} (${deal.stage})`;
+            dealSelect.appendChild(option);
+        });
+    } catch (error) {
+        console.error('Failed to load deals:', error);
+        dealSelect.innerHTML = '<option value="">Failed to load deals</option>';
+    }
 }
 
 function closeUploadModal() {
@@ -636,7 +668,17 @@ function closeUploadModal() {
 }
 
 async function handleFiles(files) {
+    console.log('handleFiles called with', files.length, 'files');
     if (files.length === 0) return;
+
+    const dealSelect = document.getElementById('upload-deal-select');
+    const dealId = dealSelect.value;
+    console.log('Selected dealId:', dealId);
+
+    if (!dealId) {
+        showNotification('Error', 'Please select a deal first', 'error');
+        return;
+    }
 
     const dropZone = document.getElementById('drop-zone');
     const progressDiv = document.getElementById('upload-progress');
@@ -646,21 +688,60 @@ async function handleFiles(files) {
     dropZone.classList.add('hidden');
     progressDiv.classList.remove('hidden');
 
-    // Demo upload progress
-    let progress = 0;
-    const interval = setInterval(() => {
-        progress += 10;
-        progressBar.style.width = `${progress}%`;
-        if (progress >= 100) {
-            clearInterval(interval);
-            progressDiv.classList.add('hidden');
-            successDiv.classList.remove('hidden');
-            setTimeout(() => {
-                closeUploadModal();
-                showNotification('Success', 'Document uploaded! Select a deal to attach it to.', 'success');
-            }, 1500);
+    // Upload each file to the API
+    let uploadedCount = 0;
+    const totalFiles = files.length;
+
+    for (const file of files) {
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            console.log('Uploading file:', file.name, 'to deal:', dealId);
+
+            // Animate progress
+            progressBar.style.width = `${(uploadedCount / totalFiles) * 50}%`;
+
+            const uploadUrl = `${API_BASE_URL}/deals/${dealId}/documents`;
+            console.log('Upload URL:', uploadUrl);
+
+            const response = await fetch(uploadUrl, {
+                method: 'POST',
+                body: formData,
+            });
+            console.log('Upload response status:', response.status);
+
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error || 'Upload failed');
+            }
+
+            const result = await response.json();
+            console.log('Upload result:', result);
+            uploadedCount++;
+            progressBar.style.width = `${(uploadedCount / totalFiles) * 100}%`;
+
+        } catch (error) {
+            console.error('Upload error:', error);
+            showNotification('Error', `Failed to upload ${file.name}: ${error.message}`, 'error');
         }
-    }, 150);
+    }
+
+    if (uploadedCount > 0) {
+        progressDiv.classList.add('hidden');
+        successDiv.classList.remove('hidden');
+
+        const extractionMsg = files[0]?.type === 'application/pdf'
+            ? ' PDF text extracted!'
+            : '';
+
+        setTimeout(() => {
+            closeUploadModal();
+            showNotification('Success', `${uploadedCount} document(s) uploaded!${extractionMsg}`, 'success');
+            loadDeals(); // Refresh the deals list
+        }, 1500);
+    } else {
+        closeUploadModal();
+    }
 }
 
 function showNotification(title, message, type = 'info') {

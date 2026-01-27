@@ -2,8 +2,28 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import multer from 'multer';
+import { createRequire } from 'module';
+
+// Use createRequire to load CommonJS pdf-parse v1.x module
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
 
 const router = Router();
+
+// Helper function to extract text from PDF
+async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string; numPages: number } | null> {
+  try {
+    // pdf-parse v1.x: just call the function with the buffer
+    const data = await pdfParse(buffer);
+    return {
+      text: data.text || '',
+      numPages: data.numpages || 1,
+    };
+  } catch (error) {
+    console.error('PDF extraction error:', error);
+    return null;
+  }
+}
 
 // Configure multer for memory storage (we'll upload to Supabase)
 const upload = multer({
@@ -223,6 +243,31 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         : req.body.tags;
     }
 
+    // Extract text from PDF if applicable
+    let extractedText: string | null = null;
+    let extractionStatus = 'pending';
+    let numPages: number | null = null;
+
+    if (file && mimeType === 'application/pdf') {
+      extractionStatus = 'processing';
+      console.log(`Starting PDF extraction for: ${documentName}`);
+
+      const extraction = await extractTextFromPDF(file.buffer);
+      if (extraction) {
+        // Remove null characters that PostgreSQL can't store
+        extractedText = extraction.text.replace(/\u0000/g, '');
+        numPages = extraction.numPages;
+        extractionStatus = 'completed';
+        console.log(`PDF extraction completed: ${numPages} pages, ${extractedText.length} chars`);
+      } else {
+        extractionStatus = 'failed';
+        console.log(`PDF extraction failed for: ${documentName}`);
+      }
+    } else if (file) {
+      // Non-PDF files don't need text extraction
+      extractionStatus = 'completed';
+    }
+
     // Create document record
     const { data: document, error: docError } = await supabase
       .from('Document')
@@ -236,6 +281,8 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         fileSize,
         mimeType,
         extractedData: req.body.extractedData ? JSON.parse(req.body.extractedData) : null,
+        extractedText,
+        status: extractionStatus,
         confidence: req.body.confidence ? parseFloat(req.body.confidence) : null,
         aiAnalysis,
         aiAnalyzedAt: aiAnalysis ? new Date().toISOString() : null,
@@ -257,12 +304,22 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       .eq('id', dealId);
 
     // Log activity
+    const activityDescription = extractedText
+      ? `${docType} document uploaded and processed (${numPages} pages extracted)`
+      : `${docType} document uploaded`;
+
     await supabase.from('Activity').insert({
       dealId,
       type: 'DOCUMENT_UPLOADED',
       title: `Document uploaded: ${documentName}`,
-      description: `${docType} document uploaded`,
-      metadata: { documentId: document.id, documentType: docType },
+      description: activityDescription,
+      metadata: {
+        documentId: document.id,
+        documentType: docType,
+        extractionStatus,
+        numPages,
+        textLength: extractedText?.length || 0,
+      },
     });
 
     res.status(201).json(document);

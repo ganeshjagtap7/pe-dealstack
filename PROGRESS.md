@@ -1625,6 +1625,89 @@ After Login/Signup → crm.html (CRM Dashboard)
 
 ---
 
+### Day 7 (Continued) - PDF Upload & Text Extraction
+
+#### Document Upload Feature
+- **Type:** Backend + Frontend Feature (Major)
+- **Files Modified:**
+  - `apps/api/src/routes/documents.ts` - Added PDF text extraction
+  - `apps/web/crm.html` - Wired up upload modal to API
+  - `apps/api/package.json` - Added pdf-parse dependency
+
+#### Backend Implementation
+
+**PDF Text Extraction:**
+```javascript
+// Using pdf-parse v1.1.1 with createRequire for ES modules
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
+
+async function extractTextFromPDF(buffer) {
+  const data = await pdfParse(buffer);
+  return {
+    text: data.text.replace(/\u0000/g, ''), // Remove null chars for PostgreSQL
+    numPages: data.numpages
+  };
+}
+```
+
+**Upload Flow:**
+1. File received via multer (memory storage, 50MB limit)
+2. Uploaded to Supabase Storage bucket "documents"
+3. If PDF: extract text using pdf-parse
+4. Save document record with extractedText and status
+5. Update deal's lastDocument field
+6. Log activity with extraction metadata
+
+**Document Record Fields:**
+| Field | Type | Description |
+|-------|------|-------------|
+| extractedText | TEXT | Full text content from PDF |
+| status | TEXT | pending → processing → completed/failed |
+| numPages | INTEGER | Number of pages (in activity metadata) |
+
+#### Frontend Implementation
+
+**Upload Modal Enhancements:**
+- Added deal selector dropdown (populated from API)
+- Wired drag-and-drop to actual API upload
+- Real progress tracking during upload
+- Success/error notifications with extraction info
+
+**API Integration:**
+```javascript
+const response = await fetch(`${API_BASE_URL}/deals/${dealId}/documents`, {
+  method: 'POST',
+  body: formData, // Contains file
+});
+```
+
+#### Database Changes
+Added columns to Document table (run in Supabase SQL Editor):
+```sql
+ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "extractedText" TEXT;
+ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'pending';
+```
+
+#### Dependencies Added
+| Package | Version | Purpose |
+|---------|---------|---------|
+| pdf-parse | ^1.1.1 | PDF text extraction |
+
+#### Testing Results
+- Uploaded: "Acquisition Automation System – Full Architecture Guide.pdf"
+- Extraction: **12 pages, 7,237 characters** successfully extracted
+- Status: `completed`
+- Stored in Supabase with full text content
+
+#### Known Issues Fixed
+- **pdf-parse v2.x incompatibility:** Downgraded to v1.1.1 for simpler API
+- **ES Module import:** Used `createRequire` for CommonJS compatibility
+- **PostgreSQL null characters:** Added `.replace(/\u0000/g, '')` sanitization
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`
