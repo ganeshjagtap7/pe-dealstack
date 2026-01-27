@@ -546,21 +546,14 @@ function initializeUploadModal() {
                         <span class="material-symbols-outlined text-primary text-3xl">smart_toy</span>
                     </div>
                     <h3 class="text-xl font-bold text-text-main">Ingest Deal Data</h3>
-                    <p class="text-text-secondary text-sm mt-1">Upload CIMs, Teasers, or Excel models to auto-create deal blocks</p>
-                </div>
-                <!-- Deal Selector -->
-                <div class="mb-4">
-                    <label class="block text-sm font-medium text-text-main mb-2">Select Deal</label>
-                    <select id="upload-deal-select" class="w-full px-3 py-2 border border-border-subtle rounded-lg bg-surface-card text-text-main focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
-                        <option value="">Loading deals...</option>
-                    </select>
+                    <p class="text-text-secondary text-sm mt-1">Upload a CIM or Teaser PDF - AI will extract data and create the deal automatically</p>
                 </div>
                 <div id="drop-zone" class="border-2 border-dashed border-border-subtle rounded-xl p-8 text-center hover:border-primary hover:bg-primary-light/30 transition-all cursor-pointer">
-                    <input type="file" id="file-input" class="hidden" accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.msg" multiple />
+                    <input type="file" id="file-input" class="hidden" accept=".pdf" />
                     <span class="material-symbols-outlined text-text-muted text-4xl mb-3">cloud_upload</span>
                     <p class="text-text-main font-medium">Drag & drop files here</p>
                     <p class="text-text-muted text-sm mt-1">or click to browse</p>
-                    <p class="text-text-muted text-xs mt-3">Supported: PDF, Excel, Word, Email (.msg)</p>
+                    <p class="text-text-muted text-xs mt-3">Supported: PDF (CIM, Teaser, Financials)</p>
                 </div>
                 <div id="upload-progress" class="hidden mt-4">
                     <div class="flex items-center gap-3 p-3 bg-background-body rounded-lg">
@@ -631,30 +624,10 @@ function initializeUploadModal() {
     }
 }
 
-async function openUploadModal() {
+function openUploadModal() {
     const modal = document.getElementById('upload-modal');
     modal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-
-    // Populate deal selector
-    const dealSelect = document.getElementById('upload-deal-select');
-    dealSelect.innerHTML = '<option value="">Loading deals...</option>';
-
-    try {
-        const response = await fetch(`${API_BASE_URL}/deals`);
-        const deals = await response.json();
-
-        dealSelect.innerHTML = '<option value="">Select a deal...</option>';
-        deals.forEach(deal => {
-            const option = document.createElement('option');
-            option.value = deal.id;
-            option.textContent = `${deal.name} (${deal.stage})`;
-            dealSelect.appendChild(option);
-        });
-    } catch (error) {
-        console.error('Failed to load deals:', error);
-        dealSelect.innerHTML = '<option value="">Failed to load deals</option>';
-    }
 }
 
 function closeUploadModal() {
@@ -671,12 +644,11 @@ async function handleFiles(files) {
     console.log('handleFiles called with', files.length, 'files');
     if (files.length === 0) return;
 
-    const dealSelect = document.getElementById('upload-deal-select');
-    const dealId = dealSelect.value;
-    console.log('Selected dealId:', dealId);
+    // Only support one file at a time for auto-deal creation
+    const file = files[0];
 
-    if (!dealId) {
-        showNotification('Error', 'Please select a deal first', 'error');
+    if (file.type !== 'application/pdf') {
+        showNotification('Error', 'Please upload a PDF file for auto-deal creation', 'error');
         return;
     }
 
@@ -688,59 +660,62 @@ async function handleFiles(files) {
     dropZone.classList.add('hidden');
     progressDiv.classList.remove('hidden');
 
-    // Upload each file to the API
-    let uploadedCount = 0;
-    const totalFiles = files.length;
-
-    for (const file of files) {
-        try {
-            const formData = new FormData();
-            formData.append('file', file);
-            console.log('Uploading file:', file.name, 'to deal:', dealId);
-
-            // Animate progress
-            progressBar.style.width = `${(uploadedCount / totalFiles) * 50}%`;
-
-            const uploadUrl = `${API_BASE_URL}/deals/${dealId}/documents`;
-            console.log('Upload URL:', uploadUrl);
-
-            const response = await fetch(uploadUrl, {
-                method: 'POST',
-                body: formData,
-            });
-            console.log('Upload response status:', response.status);
-
-            if (!response.ok) {
-                const error = await response.json();
-                throw new Error(error.error || 'Upload failed');
-            }
-
-            const result = await response.json();
-            console.log('Upload result:', result);
-            uploadedCount++;
-            progressBar.style.width = `${(uploadedCount / totalFiles) * 100}%`;
-
-        } catch (error) {
-            console.error('Upload error:', error);
-            showNotification('Error', `Failed to upload ${file.name}: ${error.message}`, 'error');
-        }
+    // Update progress text to show AI is processing
+    const progressText = progressDiv.querySelector('p.text-sm');
+    if (progressText) {
+        progressText.textContent = 'Extracting text & analyzing with AI...';
     }
 
-    if (uploadedCount > 0) {
+    try {
+        const formData = new FormData();
+        formData.append('file', file);
+        console.log('Ingesting file:', file.name);
+
+        // Animate progress slowly since AI takes time
+        progressBar.style.width = '30%';
+
+        const response = await fetch(`${API_BASE_URL}/ingest`, {
+            method: 'POST',
+            body: formData,
+        });
+        console.log('Ingest response status:', response.status);
+
+        progressBar.style.width = '80%';
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Ingest failed');
+        }
+
+        const result = await response.json();
+        console.log('Ingest result:', result);
+        progressBar.style.width = '100%';
+
         progressDiv.classList.add('hidden');
         successDiv.classList.remove('hidden');
 
-        const extractionMsg = files[0]?.type === 'application/pdf'
-            ? ' PDF text extracted!'
-            : '';
+        // Update success message with deal info
+        const successText = successDiv.querySelector('p');
+        if (successText && result.deal) {
+            successText.textContent = `Deal "${result.deal.name}" created!`;
+        }
 
         setTimeout(() => {
             closeUploadModal();
-            showNotification('Success', `${uploadedCount} document(s) uploaded!${extractionMsg}`, 'success');
+            const industry = result.extractedData?.industry || 'Unknown';
+            const revenue = result.extractedData?.revenue ? `$${result.extractedData.revenue}M revenue` : '';
+            showNotification('Deal Created',
+                `"${result.deal.name}" - ${industry}${revenue ? ', ' + revenue : ''}`,
+                'success'
+            );
             loadDeals(); // Refresh the deals list
         }, 1500);
-    } else {
-        closeUploadModal();
+
+    } catch (error) {
+        console.error('Ingest error:', error);
+        progressDiv.classList.add('hidden');
+        dropZone.classList.remove('hidden');
+        showNotification('Error', `Failed to process: ${error.message}`, 'error');
     }
 }
 

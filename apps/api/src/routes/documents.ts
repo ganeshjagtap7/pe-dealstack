@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import multer from 'multer';
 import { createRequire } from 'module';
+import { extractDealDataFromText } from '../services/aiExtractor.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -247,6 +248,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     let extractedText: string | null = null;
     let extractionStatus = 'pending';
     let numPages: number | null = null;
+    let aiExtractedData: Record<string, any> | null = null;
 
     if (file && mimeType === 'application/pdf') {
       extractionStatus = 'processing';
@@ -259,6 +261,25 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         numPages = extraction.numPages;
         extractionStatus = 'completed';
         console.log(`PDF extraction completed: ${numPages} pages, ${extractedText.length} chars`);
+
+        // Run AI extraction on the extracted text
+        try {
+          console.log(`Starting AI data extraction for: ${documentName}`);
+          const aiData = await extractDealDataFromText(extractedText);
+          if (aiData) {
+            aiExtractedData = aiData;
+            extractionStatus = 'analyzed';
+            console.log(`AI extraction completed for: ${documentName}`, {
+              companyName: aiData.companyName,
+              industry: aiData.industry,
+            });
+          } else {
+            console.log(`AI extraction returned no data for: ${documentName}`);
+          }
+        } catch (aiError) {
+          // Log AI error but don't fail the upload - text extraction still worked
+          console.error(`AI extraction failed for ${documentName}:`, aiError);
+        }
       } else {
         extractionStatus = 'failed';
         console.log(`PDF extraction failed for: ${documentName}`);
@@ -269,6 +290,10 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     }
 
     // Create document record
+    // Use AI extracted data if available, otherwise fall back to request body
+    const extractedDataToSave = aiExtractedData
+      || (req.body.extractedData ? JSON.parse(req.body.extractedData) : null);
+
     const { data: document, error: docError } = await supabase
       .from('Document')
       .insert({
@@ -280,12 +305,12 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         fileUrl,
         fileSize,
         mimeType,
-        extractedData: req.body.extractedData ? JSON.parse(req.body.extractedData) : null,
+        extractedData: extractedDataToSave,
         extractedText,
         status: extractionStatus,
-        confidence: req.body.confidence ? parseFloat(req.body.confidence) : null,
+        confidence: aiExtractedData ? 0.85 : (req.body.confidence ? parseFloat(req.body.confidence) : null),
         aiAnalysis,
-        aiAnalyzedAt: aiAnalysis ? new Date().toISOString() : null,
+        aiAnalyzedAt: aiExtractedData ? new Date().toISOString() : (aiAnalysis ? new Date().toISOString() : null),
         tags: tags.length > 0 ? tags : null,
         isHighlighted: req.body.isHighlighted === 'true' || req.body.isHighlighted === true,
       })
@@ -304,9 +329,12 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       .eq('id', dealId);
 
     // Log activity
-    const activityDescription = extractedText
-      ? `${docType} document uploaded and processed (${numPages} pages extracted)`
-      : `${docType} document uploaded`;
+    let activityDescription = `${docType} document uploaded`;
+    if (extractedText && aiExtractedData) {
+      activityDescription = `${docType} document uploaded, processed (${numPages} pages), and AI-analyzed`;
+    } else if (extractedText) {
+      activityDescription = `${docType} document uploaded and processed (${numPages} pages extracted)`;
+    }
 
     await supabase.from('Activity').insert({
       dealId,
@@ -319,6 +347,9 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         extractionStatus,
         numPages,
         textLength: extractedText?.length || 0,
+        aiExtracted: !!aiExtractedData,
+        extractedCompany: aiExtractedData?.companyName || null,
+        extractedIndustry: aiExtractedData?.industry || null,
       },
     });
 

@@ -1708,6 +1708,132 @@ ALTER TABLE "Document" ADD COLUMN IF NOT EXISTS "status" TEXT DEFAULT 'pending';
 
 ---
 
+### Day 7 (Continued) - AI Data Extraction & Auto-Deal Creation
+
+#### AI Data Extraction Service
+- **Type:** Backend Feature (Major)
+- **File Created:** `apps/api/src/services/aiExtractor.ts`
+- **Description:** Automated AI-powered extraction of business data from PDF documents using OpenAI GPT-4-turbo
+
+**Features:**
+- `extractDealDataFromText(text)` - Analyzes document text and extracts structured data
+- Uses GPT-4-turbo with JSON response format
+- Truncates text to 15,000 chars for token limit
+- Returns null gracefully if AI unavailable or extraction fails
+
+**Extracted Data Schema:**
+```typescript
+interface ExtractedDealData {
+  companyName: string | null;
+  industry: string | null;
+  description: string;
+  revenue: number | null;      // In millions USD
+  ebitda: number | null;       // In millions USD
+  ebitdaMargin: number | null; // Percentage
+  revenueGrowth: number | null; // Percentage
+  keyRisks: string[];          // 2-5 risks
+  investmentHighlights: string[]; // 2-5 highlights
+  summary: string;             // Executive summary
+}
+```
+
+**System Prompt:**
+```
+You are a senior private equity analyst. Analyze this document
+and extract key business and financial data. Return valid JSON
+matching the specified schema. If data is not found, use null.
+```
+
+#### Auto-Deal Creation from PDF Upload (Ingest API)
+- **Type:** Backend Feature (Major)
+- **File Created:** `apps/api/src/routes/ingest.ts`
+- **Description:** Upload a CIM/teaser PDF and automatically create a complete deal with AI-extracted data
+
+**Endpoint:** `POST /api/ingest`
+
+**Flow:**
+1. **Upload PDF** - Receive file via multer
+2. **Extract Text** - Use pdf-parse to extract document text
+3. **AI Analysis** - Call GPT-4-turbo to extract company/financial data
+4. **Create Company** - Find existing or create new company record
+5. **Create Deal** - Create deal with extracted metrics and AI thesis
+6. **Upload File** - Store PDF in Supabase Storage
+7. **Create Document** - Save document record with extracted data
+8. **Log Activity** - Record deal creation activity
+
+**Response:**
+```json
+{
+  "success": true,
+  "deal": { "id": "...", "name": "Clay", "industry": "Technology", ... },
+  "document": { "id": "...", "name": "CIM.pdf", ... },
+  "extractedData": { "companyName": "Clay", "industry": "Technology", ... }
+}
+```
+
+**Industry Icons Mapping:**
+- Healthcare → `monitor_heart`
+- Technology/Software → `memory`/`code`
+- Cloud/SaaS → `cloud`/`cloud_queue`
+- Manufacturing → `precision_manufacturing`
+- Transportation/Logistics → `local_shipping`/`webhook`
+- Financial Services → `account_balance`
+- Default → `business_center`
+
+#### Frontend Upload Modal Update
+- **Type:** Frontend Feature
+- **File Modified:** `apps/web/crm.html`
+- **Description:** Removed deal selector - upload modal now auto-creates deals
+
+**Changes:**
+- Removed deal selector dropdown
+- Changed file input to accept only PDFs
+- Updated description: "Upload a CIM or Teaser PDF - AI will extract data and create the deal automatically"
+- Progress text shows "Extracting text & analyzing with AI..."
+- Success shows created deal name
+- Notification shows deal name, industry, and revenue
+
+**Updated handleFiles():**
+```javascript
+// Before: Required deal selection, uploaded to existing deal
+// After: Calls /api/ingest, auto-creates deal from extracted data
+
+const response = await fetch(`${API_BASE_URL}/ingest`, {
+  method: 'POST',
+  body: formData,
+});
+```
+
+#### Updated Server Routes
+- **File Modified:** `apps/api/src/index.ts`
+- Added ingest router: `app.use('/api/ingest', ingestRouter)`
+- Added console log: `📥 Ingest API: http://localhost:3001/api/ingest`
+- Updated API info endpoint with ingest route
+
+#### Testing Results
+- Uploaded: "Acquisition Automation System – Full Architecture Guide.pdf"
+- **AI Extraction Results:**
+  - Company Name: Clay
+  - Industry: Technology
+  - 5 key risks identified
+  - 5 investment highlights extracted
+- **Created:**
+  - Company: Clay (6ee687d0-7555-4b92-aa49-862027a9e0e4)
+  - Deal: Clay (c495b2c8-b390-467e-99f8-773d1df17189)
+  - Document attached with full extracted text
+- **UI:** New "Clay" deal card appears in CRM with AI thesis
+
+#### Files Summary
+
+| File | Type | Description |
+|------|------|-------------|
+| `apps/api/src/services/aiExtractor.ts` | New | AI data extraction service |
+| `apps/api/src/routes/ingest.ts` | New | Auto-deal creation endpoint |
+| `apps/api/src/index.ts` | Modified | Mount ingest router |
+| `apps/web/crm.html` | Modified | Simplified upload modal |
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`

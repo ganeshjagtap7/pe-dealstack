@@ -10,6 +10,7 @@ import foldersRouter from './routes/folders.js';
 import usersRouter from './routes/users.js';
 import chatRouter from './routes/chat.js';
 import notificationsRouter from './routes/notifications.js';
+import ingestRouter from './routes/ingest.js';
 import { supabase } from './supabase.js';
 
 dotenv.config();
@@ -58,6 +59,7 @@ app.get('/api', (req, res) => {
       conversations: '/api/conversations',
       notifications: '/api/notifications',
       ai: '/api/ai',
+      ingest: '/api/ingest',
       health: '/health',
     },
   });
@@ -73,6 +75,7 @@ app.use('/api', foldersRouter);
 app.use('/api/users', usersRouter);
 app.use('/api', chatRouter);
 app.use('/api/notifications', notificationsRouter);
+app.use('/api/ingest', ingestRouter);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -95,6 +98,7 @@ app.listen(PORT, () => {
   console.log(`💬 Chat API: http://localhost:${PORT}/api/conversations`);
   console.log(`🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
   console.log(`🤖 AI API: http://localhost:${PORT}/api/ai/status`);
+  console.log(`📥 Ingest API: http://localhost:${PORT}/api/ingest`);
   console.log(`❤️  Health check: http://localhost:${PORT}/health`);
 });
 
