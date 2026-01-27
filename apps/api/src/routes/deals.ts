@@ -20,9 +20,19 @@ const createDealSchema = z.object({
   description: z.string().optional(),
   aiThesis: z.string().optional(),
   icon: z.string().optional(),
+  assignedTo: z.string().uuid().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().default('MEDIUM'),
+  tags: z.array(z.string()).optional(),
+  targetCloseDate: z.string().optional(),
+  source: z.string().optional(),
 });
 
 const updateDealSchema = createDealSchema.partial();
+
+const addTeamMemberSchema = z.object({
+  userId: z.string().uuid(),
+  role: z.enum(['LEAD', 'MEMBER', 'VIEWER']).optional().default('MEMBER'),
+});
 
 // GET /api/deals/stats/summary - Get deal statistics (must be before :id route)
 router.get('/stats/summary', async (req, res) => {
@@ -66,21 +76,28 @@ router.get('/stats/summary', async (req, res) => {
 // GET /api/deals - Get all deals with company info
 router.get('/', async (req, res) => {
   try {
-    const { stage, status, industry, search, sortBy, sortOrder, minDealSize, maxDealSize } = req.query;
+    const { stage, status, industry, search, sortBy, sortOrder, minDealSize, maxDealSize, assignedTo, priority } = req.query;
 
     let query = supabase
       .from('Deal')
       .select(`
         *,
         company:Company(*),
-        documents:Document(*),
-        activities:Activity(*)
+        assignedUser:User!assignedTo(id, name, avatar, email),
+        teamMembers:DealTeamMember(
+          id,
+          role,
+          addedAt,
+          user:User(id, name, avatar, email)
+        )
       `);
 
     // Apply filters
     if (stage) query = query.eq('stage', stage);
     if (status) query = query.eq('status', status);
     if (industry) query = query.ilike('industry', `%${industry}%`);
+    if (assignedTo) query = query.eq('assignedTo', assignedTo);
+    if (priority) query = query.eq('priority', priority);
 
     // Deal size range filters
     if (minDealSize) query = query.gte('dealSize', Number(minDealSize));
@@ -93,7 +110,7 @@ router.get('/', async (req, res) => {
     }
 
     // Sorting
-    const validSortFields = ['updatedAt', 'createdAt', 'dealSize', 'irrProjected', 'revenue', 'ebitda', 'name'];
+    const validSortFields = ['updatedAt', 'createdAt', 'dealSize', 'irrProjected', 'revenue', 'ebitda', 'name', 'priority'];
     const sortField = validSortFields.includes(sortBy as string) ? (sortBy as string) : 'updatedAt';
     const ascending = sortOrder === 'asc';
     query = query.order(sortField, { ascending, nullsFirst: false });
@@ -119,8 +136,36 @@ router.get('/:id', async (req, res) => {
       .select(`
         *,
         company:Company(*),
-        documents:Document(*),
-        activities:Activity(*)
+        assignedUser:User!assignedTo(id, name, avatar, email, title),
+        teamMembers:DealTeamMember(
+          id,
+          role,
+          addedAt,
+          user:User(id, name, avatar, email, title, department)
+        ),
+        documents:Document(
+          id,
+          name,
+          type,
+          fileUrl,
+          fileSize,
+          aiAnalysis,
+          createdAt
+        ),
+        activities:Activity(
+          id,
+          type,
+          title,
+          description,
+          createdAt,
+          user:User!userId(id, name, avatar)
+        ),
+        folders:Folder(
+          id,
+          name,
+          fileCount,
+          isRestricted
+        )
       `)
       .eq('id', id)
       .single();
@@ -130,6 +175,13 @@ router.get('/:id', async (req, res) => {
         return res.status(404).json({ error: 'Deal not found' });
       }
       throw error;
+    }
+
+    // Sort activities by date (most recent first)
+    if (data?.activities) {
+      data.activities.sort((a: any, b: any) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
     }
 
     res.json(data);
@@ -181,10 +233,16 @@ router.post('/', async (req, res) => {
         description: data.description,
         aiThesis: data.aiThesis,
         icon: data.icon || 'business_center',
+        assignedTo: data.assignedTo,
+        priority: data.priority || 'MEDIUM',
+        tags: data.tags,
+        targetCloseDate: data.targetCloseDate,
+        source: data.source,
       })
       .select(`
         *,
-        company:Company(*)
+        company:Company(*),
+        assignedUser:User!assignedTo(id, name, avatar, email)
       `)
       .single();
 
@@ -279,6 +337,146 @@ router.delete('/:id', async (req, res) => {
   } catch (error) {
     console.error('Error deleting deal:', error);
     res.status(500).json({ error: 'Failed to delete deal' });
+  }
+});
+
+// =====================
+// DEAL TEAM MANAGEMENT
+// =====================
+
+// GET /api/deals/:id/team - Get team members for a deal
+router.get('/:id/team', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const { data, error } = await supabase
+      .from('DealTeamMember')
+      .select(`
+        id,
+        role,
+        addedAt,
+        user:User(id, name, avatar, email, title, department)
+      `)
+      .eq('dealId', id)
+      .order('addedAt', { ascending: true });
+
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (error) {
+    console.error('Error fetching team members:', error);
+    res.status(500).json({ error: 'Failed to fetch team members' });
+  }
+});
+
+// POST /api/deals/:id/team - Add team member to deal
+router.post('/:id/team', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = addTeamMemberSchema.parse(req.body);
+
+    // Check if already a team member
+    const { data: existing } = await supabase
+      .from('DealTeamMember')
+      .select('id')
+      .eq('dealId', id)
+      .eq('userId', data.userId)
+      .single();
+
+    if (existing) {
+      return res.status(400).json({ error: 'User is already a team member' });
+    }
+
+    const { data: member, error } = await supabase
+      .from('DealTeamMember')
+      .insert({
+        dealId: id,
+        userId: data.userId,
+        role: data.role,
+      })
+      .select(`
+        id,
+        role,
+        addedAt,
+        user:User(id, name, avatar, email, title)
+      `)
+      .single();
+
+    if (error) throw error;
+
+    // Log activity
+    await supabase.from('Activity').insert({
+      dealId: id,
+      userId: data.userId,
+      type: 'TEAM_MEMBER_ADDED',
+      title: `Team member added`,
+      description: `Added as ${data.role}`,
+    });
+
+    res.status(201).json(member);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    console.error('Error adding team member:', error);
+    res.status(500).json({ error: 'Failed to add team member' });
+  }
+});
+
+// PATCH /api/deals/:dealId/team/:memberId - Update team member role
+router.patch('/:dealId/team/:memberId', async (req, res) => {
+  try {
+    const { dealId, memberId } = req.params;
+    const { role } = req.body;
+
+    if (!['LEAD', 'MEMBER', 'VIEWER'].includes(role)) {
+      return res.status(400).json({ error: 'Invalid role' });
+    }
+
+    const { data: member, error } = await supabase
+      .from('DealTeamMember')
+      .update({ role })
+      .eq('id', memberId)
+      .eq('dealId', dealId)
+      .select(`
+        id,
+        role,
+        addedAt,
+        user:User(id, name, avatar, email, title)
+      `)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Team member not found' });
+      }
+      throw error;
+    }
+
+    res.json(member);
+  } catch (error) {
+    console.error('Error updating team member:', error);
+    res.status(500).json({ error: 'Failed to update team member' });
+  }
+});
+
+// DELETE /api/deals/:dealId/team/:memberId - Remove team member
+router.delete('/:dealId/team/:memberId', async (req, res) => {
+  try {
+    const { dealId, memberId } = req.params;
+
+    const { error } = await supabase
+      .from('DealTeamMember')
+      .delete()
+      .eq('id', memberId)
+      .eq('dealId', dealId);
+
+    if (error) throw error;
+
+    res.status(204).send();
+  } catch (error) {
+    console.error('Error removing team member:', error);
+    res.status(500).json({ error: 'Failed to remove team member' });
   }
 });
 

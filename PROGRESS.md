@@ -1356,6 +1356,275 @@ Replaced Tailwind color classes with hardcoded inline styles using the correct B
 
 ---
 
+---
+
+### Day 6 (Continued) - Database Schema Enhancement & API Update
+
+#### Database Schema Enhancement
+- **Type:** Infrastructure Upgrade (Major)
+- **Description:** Added comprehensive database schema to support all application features including VDR folders, users, chat, notifications, and team management
+- **User Request:** "to make this product working in real and to have real data into it what more need to be in our supabase db?"
+
+#### New Tables Created
+
+| Table | Purpose |
+|-------|---------|
+| **User** | User profiles with role, department, title |
+| **Folder** | VDR folder structure with parent-child hierarchy |
+| **FolderInsight** | AI-generated insights per folder (summary, red flags, recommendations) |
+| **DealTeamMember** | Deal team assignments with roles (LEAD, MEMBER, VIEWER) |
+| **Contact** | Company contacts with contact type |
+| **Conversation** | AI chat conversation threads |
+| **ChatMessage** | Individual chat messages (user/assistant) |
+| **Notification** | User notifications with types and read status |
+| **AuditLog** | Comprehensive audit trail for compliance |
+
+#### Enhanced Existing Tables
+
+**Deal Table Additions:**
+- `assignedTo` - UUID reference to User
+- `priority` - Enum (LOW, MEDIUM, HIGH, URGENT)
+- `tags` - Text array for categorization
+- `targetCloseDate` / `actualCloseDate` - Date tracking
+- `source` - Lead source tracking
+
+**Document Table Additions:**
+- `folderId` - UUID reference to Folder
+- `uploadedBy` - UUID reference to User
+- `aiAnalysis` - JSONB for AI analysis results
+- `aiAnalyzedAt` - Timestamp of analysis
+- `tags` - Text array
+- `isHighlighted` - Boolean for important documents
+- `mimeType` - File MIME type
+
+**Company Table Additions:**
+- `logo` - Logo URL
+- `headquarters` - Location
+- `Founded` - Year founded
+- `employees` - Employee count
+
+**Activity Table Additions:**
+- `userId` - UUID reference to User who performed action
+- `metadata` - JSONB for additional data
+
+#### Seed Data Added
+
+| Table | Records | Details |
+|-------|---------|---------|
+| User | 5 | Sarah Chen (MD), Michael Ross (VP), Emily Watson (Associate), David Kim (Analyst), Lisa Park (VP Legal) |
+| Folder | 5 | Financials, Legal, Commercial, Management, Technical |
+| FolderInsight | 2 | AI insights for Financials and Legal folders |
+| DealTeamMember | 12 | Team assignments across all 4 deals |
+| Contact | 8 | Company contacts (CEO, CFO, etc.) |
+| Notification | 3 | Sample notifications for testing |
+| Document | 8 | Documents distributed across folders |
+
+#### Database Features Added
+
+**Triggers:**
+- `update_folder_file_count` - Auto-updates folder file count on document changes
+- `update_deal_updated_at` - Auto-updates deal timestamp on modifications
+
+**Views:**
+- `DealSummary` - Optimized view for deal list with company and team info
+- `FolderTree` - Recursive CTE for folder hierarchy
+
+**Indexes:**
+- 15+ performance indexes on foreign keys and frequently queried columns
+
+---
+
+#### API Update to Support New Schema
+- **Type:** Backend Feature (Major)
+- **Description:** Created new API routes and updated existing ones to support the enhanced database schema
+- **User Request:** "update the API to use the new database schema"
+
+#### New Route Files Created
+
+| File | Purpose | Endpoints |
+|------|---------|-----------|
+| `apps/api/src/routes/folders.ts` | VDR folder management | GET/POST /deals/:dealId/folders, GET/PATCH/DELETE /folders/:id, GET/POST /folders/:id/insights |
+| `apps/api/src/routes/users.ts` | User management | GET/POST/PATCH/DELETE /users, GET /users/:id/deals, GET /users/:id/notifications |
+| `apps/api/src/routes/chat.ts` | AI conversation persistence | GET/POST/DELETE /conversations, POST /conversations/:id/messages |
+| `apps/api/src/routes/notifications.ts` | Notification system | GET/POST/PATCH/DELETE /notifications, POST /mark-all-read |
+
+#### Updated Route Files
+
+**`apps/api/src/routes/deals.ts`:**
+- Added `assignedTo`, `priority`, `tags`, `targetCloseDate`, `source` to create/update schemas
+- Added team member management endpoints:
+  - `GET /api/deals/:id/team` - Get team members
+  - `POST /api/deals/:id/team` - Add team member
+  - `PATCH /api/deals/:dealId/team/:memberId` - Update role
+  - `DELETE /api/deals/:dealId/team/:memberId` - Remove member
+- Updated queries to include `assignedUser` and `teamMembers` relations
+- Added `folders` relation to single deal query
+
+**`apps/api/src/routes/documents.ts`:**
+- Added `folderId`, `aiAnalysis`, `tags`, `isHighlighted` to schema
+- Added `GET /api/folders/:folderId/documents` endpoint
+- Updated queries to include `uploader` and `folder` relations
+- Added AI analysis timestamp tracking
+
+#### Updated `apps/api/src/index.ts`
+
+Mounted all new routes:
+```javascript
+app.use('/api', foldersRouter);      // Folder routes
+app.use('/api/users', usersRouter);   // User routes
+app.use('/api', chatRouter);          // Chat routes
+app.use('/api/notifications', notificationsRouter); // Notification routes
+```
+
+#### New API Endpoints Summary
+
+**Folder Management:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/deals/:dealId/folders` | List folders with insights |
+| POST | `/api/deals/:dealId/folders` | Create folder |
+| GET | `/api/folders/:id` | Get folder with documents |
+| PATCH | `/api/folders/:id` | Update folder |
+| DELETE | `/api/folders/:id` | Delete folder (cascade option) |
+| GET | `/api/folders/:id/insights` | Get folder insights |
+| POST | `/api/folders/:id/insights` | Create/update insights |
+
+**User Management:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/users` | List users (filter by role, department) |
+| GET | `/api/users/:id` | Get user with deal memberships |
+| POST | `/api/users` | Create user |
+| PATCH | `/api/users/:id` | Update user |
+| DELETE | `/api/users/:id` | Soft/hard delete |
+| GET | `/api/users/:id/deals` | Get deals assigned to user |
+| GET | `/api/users/:id/notifications` | Get user notifications |
+
+**Chat/Conversations:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/conversations` | List conversations |
+| GET | `/api/conversations/:id` | Get conversation with messages |
+| POST | `/api/conversations` | Create conversation |
+| DELETE | `/api/conversations/:id` | Delete conversation |
+| POST | `/api/conversations/:id/messages` | Send message & get AI response |
+| GET | `/api/conversations/:id/messages` | Get messages |
+
+**Notifications:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/notifications` | List notifications with unread count |
+| GET | `/api/notifications/:id` | Get single notification |
+| POST | `/api/notifications` | Create notification |
+| PATCH | `/api/notifications/:id` | Mark read/unread |
+| POST | `/api/notifications/mark-all-read` | Mark all as read |
+| DELETE | `/api/notifications/:id` | Delete notification |
+| DELETE | `/api/notifications` | Delete all (optionally read only) |
+
+**Deal Team Management:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/deals/:id/team` | Get team members |
+| POST | `/api/deals/:id/team` | Add team member |
+| PATCH | `/api/deals/:dealId/team/:memberId` | Update member role |
+| DELETE | `/api/deals/:dealId/team/:memberId` | Remove member |
+
+#### Utility Functions Exported
+
+From `notifications.ts`:
+- `createNotification(data)` - Create single notification
+- `notifyDealTeam(dealId, type, title, message, excludeUserId)` - Notify all team members
+
+#### Testing Results
+All endpoints tested successfully:
+- ✅ GET /api/users - Returns 5 users
+- ✅ GET /api/deals - Returns deals with team members
+- ✅ GET /api/deals/:id/team - Returns team with user details
+- ✅ GET /api/deals/:dealId/folders - Returns folders with insights
+- ✅ GET /api/deals/:dealId/documents - Returns documents with folder info
+- ✅ GET /api/notifications - Returns notifications with unread count
+
+#### Current Project State
+The API is now fully updated to support:
+- VDR folder hierarchy with AI insights
+- User management with role-based access
+- Deal team assignments and collaboration
+- AI chat persistence with conversation history
+- Notification system for team communication
+- Document organization within folders
+
+---
+
+### Day 7 - Authentication Pages & Landing Page Update
+
+#### Login Page
+- **Type:** New Page
+- **File:** `apps/web/login.html`
+- **Description:** Institutional login screen with split-screen layout
+
+**Features:**
+- Split-screen design (branding left, form right)
+- PE OS branding with Banker Blue (#003366) color scheme
+- Dashboard preview with hover animation effects
+- Email/password fields with validation
+- "Remember me" checkbox with session persistence
+- Password visibility toggle
+- SSO (Single Sign-On) button placeholder
+- Link to signup page
+- Auto-redirect if already logged in
+- Light mode enforced
+
+#### Signup Page
+- **Type:** New Page
+- **File:** `apps/web/signup.html`
+- **Description:** Firm registration and user signup page
+
+**Features:**
+- Full Name, Work Email, Password, Confirm Password fields
+- Firm Name input
+- Role dropdown (Partner/MD, Principal, VP, Associate, Analyst, Operations/Admin)
+- Real-time password strength indicator (Weak/Fair/Good/Strong)
+- Password match validation
+- AES-256 encryption security badge
+- Terms of Service and Privacy Policy links
+- Session storage on successful signup
+- Auto-redirect if already logged in
+- Light mode enforced
+
+#### Landing Page Updates
+- **Type:** Enhancement
+- **File:** `apps/web/index.html`
+- **Description:** Added authentication navigation to landing page
+
+**Changes:**
+| Location | Before | After |
+|----------|--------|-------|
+| Header | "Request Demo" button only | Added "Login" link + "Get Started" button |
+| Hero Section | "Request Demo" button | "Get Started Free" linking to signup |
+| CTA Section | "Start Your Free Trial" button | Now links to signup page |
+
+**New File Created:**
+- `apps/web/landingpage.html` - Redirect to index.html for URL compatibility
+
+#### Authentication Flow
+```
+Landing Page (index.html)
+    ├── Login link → login.html
+    │       └── Sign up link → signup.html
+    └── Get Started → signup.html
+            └── Sign in link → login.html
+
+After Login/Signup → crm.html (CRM Dashboard)
+```
+
+#### Session Management
+- Uses localStorage (Remember Me) or sessionStorage
+- Stores: email, name, loggedIn status, rememberMe preference
+- Auto-redirects logged-in users away from auth pages
+- Logout clears session (to be implemented in CRM header)
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`

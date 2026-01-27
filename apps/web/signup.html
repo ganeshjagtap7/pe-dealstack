@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Firm Registration & Signup - PE OS</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#003366",
+                        "background-light": "#f8f9fa",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "Noto Sans", "sans-serif"],
+                        "body": ["Manrope", "Noto Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen flex flex-col font-display text-[#111418] dark:text-white transition-colors duration-200">
+    <!-- Header -->
+    <header class="w-full border-b border-[#e5e7eb] dark:border-gray-800 bg-white dark:bg-[#1a202c] sticky top-0 z-50">
+        <div class="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-3 text-[#111418] dark:text-white cursor-pointer select-none">
+                <div class="size-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+                    <span class="material-symbols-outlined text-2xl">bar_chart</span>
+                </div>
+                <h2 class="text-xl font-bold leading-tight tracking-tight">PE OS</h2>
+            </a>
+            <div class="flex items-center gap-4">
+                <span class="text-sm font-medium text-[#617289] dark:text-gray-400 hidden sm:block">Already have an account?</span>
+                <a href="login.html" class="text-primary hover:text-primary/80 font-bold text-sm transition-colors">
+                    Log in
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+        <div class="w-full max-w-[520px] bg-white dark:bg-[#1a202c] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-[#e5e7eb] dark:border-gray-700 p-8 sm:p-10 relative overflow-hidden">
+            <!-- Top accent bar -->
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/80 to-primary"></div>
+
+            <!-- Header Section -->
+            <div class="mb-8 text-center">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 dark:bg-primary/20 text-primary text-xs font-semibold mb-4 border border-primary/10">
+                    <span class="w-2 h-2 rounded-full bg-primary"></span>
+                    Secure Firm Registration
+                </div>
+                <h1 class="text-2xl sm:text-[32px] font-bold text-[#111418] dark:text-white leading-tight mb-3">
+                    Initialize your Firm Workspace
+                </h1>
+                <p class="text-[#617289] dark:text-gray-400 text-sm sm:text-base">
+                    Secure, AI-native operating system for Private Equity.
+                </p>
+            </div>
+
+            <!-- Registration Form -->
+            <form id="signupForm" class="flex flex-col gap-5">
+                <!-- Full Name -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="fullname">Full Name</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">person</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
+                            id="fullname"
+                            name="fullname"
+                            placeholder="John Doe"
+                            type="text"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <!-- Work Email -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="email">Work Email</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">mail</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm invalid:border-red-500 invalid:text-red-600 focus:invalid:border-red-500 focus:invalid:ring-red-500"
+                            id="email"
+                            name="email"
+                            placeholder="name@firm.com"
+                            type="email"
+                            required
+                        />
+                    </div>
+                    <p class="text-xs text-[#617289] dark:text-gray-500 mt-1">Please use your professional email address.</p>
+                </div>
+
+                <!-- Password -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="password">Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">lock</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-10 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
+                            id="password"
+                            name="password"
+                            placeholder="••••••••"
+                            type="password"
+                            required
+                            minlength="8"
+                        />
+                        <button
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9ca3af] hover:text-[#617289] cursor-pointer"
+                            type="button"
+                            onclick="togglePasswordVisibility('password', this)"
+                        >
+                            <span class="material-symbols-outlined text-[20px]">visibility</span>
+                        </button>
+                    </div>
+                    <p class="text-xs text-[#617289] dark:text-gray-500 mt-1">Min 8 characters, one uppercase, one number</p>
+                    <!-- Password strength indicator -->
+                    <div id="passwordStrength" class="hidden">
+                        <div class="flex gap-1 mt-2">
+                            <div id="strength1" class="h-1 flex-1 rounded bg-gray-200"></div>
+                            <div id="strength2" class="h-1 flex-1 rounded bg-gray-200"></div>
+                            <div id="strength3" class="h-1 flex-1 rounded bg-gray-200"></div>
+                            <div id="strength4" class="h-1 flex-1 rounded bg-gray-200"></div>
+                        </div>
+                        <p id="strengthText" class="text-xs mt-1 text-gray-500"></p>
+                    </div>
+                </div>
+
+                <!-- Confirm Password -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="confirm_password">Confirm Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">lock_reset</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
+                            id="confirm_password"
+                            name="confirm_password"
+                            placeholder="••••••••"
+                            type="password"
+                            required
+                        />
+                    </div>
+                    <p id="passwordMatch" class="hidden text-xs mt-1"></p>
+                </div>
+
+                <!-- Firm Name -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="firmname">Firm Name</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">business</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
+                            id="firmname"
+                            name="firmname"
+                            placeholder="Acme Capital"
+                            type="text"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <!-- Role -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="role">Role</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">badge</span>
+                        </div>
+                        <select
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-10 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm appearance-none cursor-pointer"
+                            id="role"
+                            name="role"
+                            required
+                        >
+                            <option disabled selected value="">Select your role</option>
+                            <option value="partner">Partner / Managing Director</option>
+                            <option value="principal">Principal</option>
+                            <option value="vp">Vice President</option>
+                            <option value="associate">Associate</option>
+                            <option value="analyst">Analyst</option>
+                            <option value="ops">Operations / Admin</option>
+                        </select>
+                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">expand_more</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="errorMessage" class="hidden text-red-500 text-sm text-center bg-red-50 dark:bg-red-900/20 p-3 rounded-lg"></div>
+
+                <!-- Success Message -->
+                <div id="successMessage" class="hidden text-green-600 text-sm text-center bg-green-50 dark:bg-green-900/20 p-3 rounded-lg"></div>
+
+                <!-- Submit Button -->
+                <div class="pt-2">
+                    <button
+                        id="submitBtn"
+                        class="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-primary hover:bg-[#002855] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all shadow-[0_1px_2px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_12px_rgba(0,51,102,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
+                        type="submit"
+                    >
+                        <span id="submitText">Create Firm Workspace</span>
+                        <span id="submitSpinner" class="hidden ml-2">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Security Badge -->
+                <div class="flex items-center justify-center gap-2 mt-2">
+                    <span class="material-symbols-outlined text-green-600 text-lg">lock</span>
+                    <span class="text-xs text-[#617289] dark:text-gray-400 font-medium">AES-256 Encryption</span>
+                </div>
+
+                <!-- Terms -->
+                <p class="text-xs text-center text-[#9ca3af] dark:text-gray-500 mt-2 leading-relaxed">
+                    By clicking "Create Firm Workspace", you agree to our
+                    <a class="text-primary hover:underline" href="#">Terms of Service</a> and
+                    <a class="text-primary hover:underline" href="#">Privacy Policy</a>.
+                </p>
+            </form>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full py-6 text-center text-xs text-[#9ca3af] dark:text-gray-600">
+        © 2024 PE OS Inc. All rights reserved.
+    </footer>
+
+    <script>
+        // Toggle password visibility
+        function togglePasswordVisibility(inputId, button) {
+            const input = document.getElementById(inputId);
+            const icon = button.querySelector('.material-symbols-outlined');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                input.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        // Password strength checker
+        const passwordInput = document.getElementById('password');
+        const passwordStrength = document.getElementById('passwordStrength');
+        const strengthBars = [
+            document.getElementById('strength1'),
+            document.getElementById('strength2'),
+            document.getElementById('strength3'),
+            document.getElementById('strength4')
+        ];
+        const strengthText = document.getElementById('strengthText');
+
+        passwordInput.addEventListener('input', function() {
+            const password = this.value;
+            passwordStrength.classList.remove('hidden');
+
+            let strength = 0;
+            if (password.length >= 8) strength++;
+            if (/[A-Z]/.test(password)) strength++;
+            if (/[0-9]/.test(password)) strength++;
+            if (/[^A-Za-z0-9]/.test(password)) strength++;
+
+            // Reset bars
+            strengthBars.forEach(bar => {
+                bar.className = 'h-1 flex-1 rounded bg-gray-200';
+            });
+
+            // Color based on strength
+            const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'];
+            const texts = ['Weak', 'Fair', 'Good', 'Strong'];
+
+            for (let i = 0; i < strength; i++) {
+                strengthBars[i].className = `h-1 flex-1 rounded ${colors[strength - 1]}`;
+            }
+
+            strengthText.textContent = strength > 0 ? texts[strength - 1] : '';
+            strengthText.className = `text-xs mt-1 ${strength <= 1 ? 'text-red-500' : strength === 2 ? 'text-orange-500' : strength === 3 ? 'text-yellow-600' : 'text-green-500'}`;
+
+            if (password.length === 0) {
+                passwordStrength.classList.add('hidden');
+            }
+        });
+
+        // Password match checker
+        const confirmPassword = document.getElementById('confirm_password');
+        const passwordMatch = document.getElementById('passwordMatch');
+
+        confirmPassword.addEventListener('input', function() {
+            if (this.value.length > 0) {
+                passwordMatch.classList.remove('hidden');
+                if (this.value === passwordInput.value) {
+                    passwordMatch.textContent = 'Passwords match';
+                    passwordMatch.className = 'text-xs mt-1 text-green-500';
+                    this.classList.remove('border-red-500');
+                    this.classList.add('border-green-500');
+                } else {
+                    passwordMatch.textContent = 'Passwords do not match';
+                    passwordMatch.className = 'text-xs mt-1 text-red-500';
+                    this.classList.remove('border-green-500');
+                    this.classList.add('border-red-500');
+                }
+            } else {
+                passwordMatch.classList.add('hidden');
+                this.classList.remove('border-red-500', 'border-green-500');
+            }
+        });
+
+        // Form submission
+        const signupForm = document.getElementById('signupForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const submitText = document.getElementById('submitText');
+        const submitSpinner = document.getElementById('submitSpinner');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+
+        signupForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            // Get form values
+            const fullname = document.getElementById('fullname').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const password = passwordInput.value;
+            const confirmPass = confirmPassword.value;
+            const firmname = document.getElementById('firmname').value.trim();
+            const role = document.getElementById('role').value;
+
+            // Validate
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+
+            if (password !== confirmPass) {
+                errorMessage.textContent = 'Passwords do not match.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (password.length < 8) {
+                errorMessage.textContent = 'Password must be at least 8 characters.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+                errorMessage.textContent = 'Password must contain at least one uppercase letter and one number.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (!role) {
+                errorMessage.textContent = 'Please select your role.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitText.textContent = 'Creating workspace...';
+            submitSpinner.classList.remove('hidden');
+
+            try {
+                // Simulate API call - replace with actual registration
+                await new Promise(resolve => setTimeout(resolve, 2000));
+
+                // Store user data
+                const userData = {
+                    name: fullname,
+                    email: email,
+                    firmName: firmname,
+                    role: role,
+                    loggedIn: true,
+                    createdAt: new Date().toISOString()
+                };
+
+                localStorage.setItem('peosUser', JSON.stringify(userData));
+
+                // Show success
+                successMessage.textContent = 'Workspace created successfully! Redirecting...';
+                successMessage.classList.remove('hidden');
+
+                // Redirect to CRM after short delay
+                setTimeout(() => {
+                    window.location.href = 'crm.html';
+                }, 1500);
+
+            } catch (error) {
+                errorMessage.textContent = 'An error occurred. Please try again.';
+                errorMessage.classList.remove('hidden');
+            } finally {
+                submitBtn.disabled = false;
+                submitText.textContent = 'Create Firm Workspace';
+                submitSpinner.classList.add('hidden');
+            }
+        });
+
+        // Force light mode
+        document.documentElement.classList.remove('dark');
+
+        // Check if already logged in
+        document.addEventListener('DOMContentLoaded', function() {
+            const user = localStorage.getItem('peosUser') || sessionStorage.getItem('peosUser');
+            if (user) {
+                const userData = JSON.parse(user);
+                if (userData.loggedIn) {
+                    window.location.href = 'crm.html';
+                }
+            }
+        });
+    </script>
+</body>
+</html>

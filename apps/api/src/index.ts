@@ -6,6 +6,10 @@ import companiesRouter from './routes/companies.js';
 import activitiesRouter from './routes/activities.js';
 import documentsRouter from './routes/documents.js';
 import aiRouter from './routes/ai.js';
+import foldersRouter from './routes/folders.js';
+import usersRouter from './routes/users.js';
+import chatRouter from './routes/chat.js';
+import notificationsRouter from './routes/notifications.js';
 import { supabase } from './supabase.js';
 
 dotenv.config();
@@ -49,6 +53,10 @@ app.get('/api', (req, res) => {
       companies: '/api/companies',
       activities: '/api/activities',
       documents: '/api/documents',
+      folders: '/api/deals/:dealId/folders',
+      users: '/api/users',
+      conversations: '/api/conversations',
+      notifications: '/api/notifications',
       ai: '/api/ai',
       health: '/health',
     },
@@ -61,6 +69,10 @@ app.use('/api/companies', companiesRouter);
 app.use('/api', activitiesRouter);
 app.use('/api', documentsRouter);
 app.use('/api', aiRouter);
+app.use('/api', foldersRouter);
+app.use('/api/users', usersRouter);
+app.use('/api', chatRouter);
+app.use('/api/notifications', notificationsRouter);
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -78,6 +90,10 @@ app.listen(PORT, () => {
   console.log(`🏢 Companies API: http://localhost:${PORT}/api/companies`);
   console.log(`📋 Activities API: http://localhost:${PORT}/api/activities`);
   console.log(`📄 Documents API: http://localhost:${PORT}/api/documents`);
+  console.log(`📁 Folders API: http://localhost:${PORT}/api/deals/:dealId/folders`);
+  console.log(`👥 Users API: http://localhost:${PORT}/api/users`);
+  console.log(`💬 Chat API: http://localhost:${PORT}/api/conversations`);
+  console.log(`🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
   console.log(`🤖 AI API: http://localhost:${PORT}/api/ai/status`);
   console.log(`❤️  Health check: http://localhost:${PORT}/health`);
 });
