@@ -208,6 +208,11 @@
         </div>
     </div>
 
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- Auth Helper -->
+    <script src="js/auth.js"></script>
+
     <script>
         // Password visibility toggle
         const togglePassword = document.getElementById('togglePassword');
@@ -230,9 +235,8 @@
         loginForm.addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const email = document.getElementById('email').value;
+            const email = document.getElementById('email').value.trim();
             const password = document.getElementById('password').value;
-            const rememberMe = document.getElementById('rememberMe').checked;
 
             // Show loading state
             signInBtn.disabled = true;
@@ -242,33 +246,34 @@
             errorMessage.classList.add('hidden');
 
             try {
-                // Simulate API call - replace with actual authentication
-                await new Promise(resolve => setTimeout(resolve, 1500));
+                // Sign in with Supabase
+                const { user, session, error } = await PEAuth.signIn(email, password);
 
-                // For demo purposes, accept any valid-looking email
-                if (email && password.length >= 1) {
-                    // Store user session
-                    const userData = {
-                        email: email,
-                        name: email.split('@')[0],
-                        loggedIn: true,
-                        rememberMe: rememberMe
-                    };
+                if (error) {
+                    throw error;
+                }
 
-                    if (rememberMe) {
-                        localStorage.setItem('peosUser', JSON.stringify(userData));
-                    } else {
-                        sessionStorage.setItem('peosUser', JSON.stringify(userData));
-                    }
-
-                    // Redirect to CRM
-                    window.location.href = 'crm.html';
+                if (user && session) {
+                    // Get redirect destination or default to CRM
+                    const redirect = sessionStorage.getItem('authRedirect') || 'crm.html';
+                    sessionStorage.removeItem('authRedirect');
+                    window.location.href = redirect;
                 } else {
-                    throw new Error('Invalid credentials');
+                    throw new Error('Authentication failed');
                 }
             } catch (error) {
-                // Show error
-                errorMessage.textContent = 'Invalid email or password. Please try again.';
+                // Show error message
+                let message = 'Invalid email or password. Please try again.';
+                if (error.message) {
+                    if (error.message.includes('Invalid login credentials')) {
+                        message = 'Invalid email or password. Please try again.';
+                    } else if (error.message.includes('Email not confirmed')) {
+                        message = 'Please verify your email address before signing in.';
+                    } else {
+                        message = error.message;
+                    }
+                }
+                errorMessage.textContent = message;
                 errorMessage.classList.remove('hidden');
             } finally {
                 // Reset button state
@@ -284,20 +289,16 @@
             alert('SSO integration would be configured here.\n\nThis would typically redirect to your identity provider (Okta, Azure AD, etc.)');
         }
 
-        // Check for existing session
-        document.addEventListener('DOMContentLoaded', function() {
-            const user = localStorage.getItem('peosUser') || sessionStorage.getItem('peosUser');
-            if (user) {
-                const userData = JSON.parse(user);
-                if (userData.loggedIn) {
-                    // Already logged in, redirect to CRM
-                    window.location.href = 'crm.html';
-                }
-            }
-        });
+        // Check for existing session on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Force light mode
+            document.documentElement.classList.remove('dark');
 
-        // Force light mode
-        document.documentElement.classList.remove('dark');
+            // Initialize auth and check if already logged in
+            await PEAuth.initSupabase();
+            const notAuth = await PEAuth.checkNotAuth();
+            // If user is authenticated, checkNotAuth will redirect to CRM
+        });
     </script>
 </body>
 </html>

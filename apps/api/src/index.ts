@@ -12,6 +12,7 @@ import chatRouter from './routes/chat.js';
 import notificationsRouter from './routes/notifications.js';
 import ingestRouter from './routes/ingest.js';
 import { supabase } from './supabase.js';
+import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
 
 dotenv.config();
 
@@ -65,17 +66,23 @@ app.get('/api', (req, res) => {
   });
 });
 
-// Mount routers
-app.use('/api/deals', dealsRouter);
-app.use('/api/companies', companiesRouter);
-app.use('/api', activitiesRouter);
-app.use('/api', documentsRouter);
-app.use('/api', aiRouter);
-app.use('/api', foldersRouter);
-app.use('/api/users', usersRouter);
-app.use('/api', chatRouter);
-app.use('/api/notifications', notificationsRouter);
-app.use('/api/ingest', ingestRouter);
+// ========================================
+// Protected Routes (require authentication)
+// ========================================
+app.use('/api/deals', authMiddleware, dealsRouter);
+app.use('/api/companies', authMiddleware, companiesRouter);
+app.use('/api', authMiddleware, activitiesRouter);
+app.use('/api', authMiddleware, documentsRouter);
+app.use('/api', authMiddleware, foldersRouter);
+app.use('/api/users', authMiddleware, usersRouter);
+app.use('/api', authMiddleware, chatRouter);
+app.use('/api/notifications', authMiddleware, notificationsRouter);
+app.use('/api/ingest', authMiddleware, ingestRouter);
+
+// ========================================
+// Public Routes (no authentication needed)
+// ========================================
+app.use('/api', aiRouter); // AI status check is public
 
 // Error handling middleware
 app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -89,17 +96,22 @@ app.use((err: Error, req: express.Request, res: express.Response, next: express.
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 API server running at http://localhost:${PORT}`);
-  console.log(`📊 Deals API: http://localhost:${PORT}/api/deals`);
-  console.log(`🏢 Companies API: http://localhost:${PORT}/api/companies`);
-  console.log(`📋 Activities API: http://localhost:${PORT}/api/activities`);
-  console.log(`📄 Documents API: http://localhost:${PORT}/api/documents`);
-  console.log(`📁 Folders API: http://localhost:${PORT}/api/deals/:dealId/folders`);
-  console.log(`👥 Users API: http://localhost:${PORT}/api/users`);
-  console.log(`💬 Chat API: http://localhost:${PORT}/api/conversations`);
-  console.log(`🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
-  console.log(`🤖 AI API: http://localhost:${PORT}/api/ai/status`);
-  console.log(`📥 Ingest API: http://localhost:${PORT}/api/ingest`);
-  console.log(`❤️  Health check: http://localhost:${PORT}/health`);
+  console.log(`🔐 Auth: Supabase JWT authentication enabled`);
+  console.log('');
+  console.log('Protected routes (require Bearer token):');
+  console.log(`  📊 Deals API: http://localhost:${PORT}/api/deals`);
+  console.log(`  🏢 Companies API: http://localhost:${PORT}/api/companies`);
+  console.log(`  📋 Activities API: http://localhost:${PORT}/api/activities`);
+  console.log(`  📄 Documents API: http://localhost:${PORT}/api/documents`);
+  console.log(`  📁 Folders API: http://localhost:${PORT}/api/deals/:dealId/folders`);
+  console.log(`  👥 Users API: http://localhost:${PORT}/api/users`);
+  console.log(`  💬 Chat API: http://localhost:${PORT}/api/conversations`);
+  console.log(`  🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
+  console.log(`  📥 Ingest API: http://localhost:${PORT}/api/ingest`);
+  console.log('');
+  console.log('Public routes (no auth required):');
+  console.log(`  🤖 AI Status: http://localhost:${PORT}/api/ai/status`);
+  console.log(`  ❤️  Health check: http://localhost:${PORT}/health`);
 });
 
 // Graceful shutdown

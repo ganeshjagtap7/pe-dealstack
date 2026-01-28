@@ -33,7 +33,7 @@ async function loadDealData() {
     state.dealId = dealId;
 
     try {
-        const response = await fetch(`${API_BASE_URL}/deals/${dealId}`);
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`);
         if (!response.ok) throw new Error('Deal not found');
 
         const deal = await response.json();
@@ -234,8 +234,13 @@ function updateChatContext(documents) {
 // ============================================================
 // DOM Ready
 // ============================================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     console.log('PE OS Deal Intelligence page initialized');
+
+    // Initialize auth and check if user is logged in
+    await PEAuth.initSupabase();
+    const auth = await PEAuth.checkAuth();
+    if (!auth) return; // Will redirect to login
 
     // Initialize shared layout with collapsible sidebar
     PELayout.init('deals', { collapsible: true });

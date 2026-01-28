@@ -1962,6 +1962,237 @@ const handleToggleInsightsPanel = () => {
 
 ---
 
+## January 29, 2026
+
+### Day 9 - Supabase Authentication Implementation
+
+#### Full Authentication System
+- **Type:** Major Feature (Security)
+- **Description:** Implemented complete Supabase Authentication with login/signup, JWT verification, protected routes, and auth helpers
+- **User Request:** "Implement Supabase Authentication with login/signup pages, auth helper, backend middleware, and protected routes"
+
+#### Frontend Auth Helper Created
+- **File Created:** `apps/web/js/auth.js`
+- **Description:** Central authentication module for all frontend pages
+
+**Functions Implemented:**
+| Function | Description |
+|----------|-------------|
+| `initSupabase()` | Initialize Supabase client |
+| `signUp(email, password, metadata)` | Register new user with firm info |
+| `signIn(email, password)` | Login with email/password |
+| `signOut()` | Logout and redirect to login |
+| `getUser()` | Get current authenticated user |
+| `getSession()` | Get current session |
+| `getAccessToken()` | Get JWT token for API calls |
+| `checkAuth(redirectTo)` | Check auth, redirect to login if not authenticated |
+| `checkNotAuth()` | For login/signup pages - redirect to CRM if already logged in |
+| `onAuthStateChange(callback)` | Listen for auth state changes |
+| `resetPassword(email)` | Send password reset email |
+| `updatePassword(newPassword)` | Update user password |
+| `authFetch(url, options)` | Fetch wrapper that adds Authorization header |
+
+**Critical Implementation Detail:**
+```javascript
+// Must define PEAuth immediately to avoid "not defined" errors
+window.PEAuth = {};
+
+// ... all functions defined ...
+
+// Assign all functions at the end
+window.PEAuth = {
+  initSupabase, signUp, signIn, signOut, getUser, getSession,
+  getAccessToken, checkAuth, checkNotAuth, onAuthStateChange,
+  resetPassword, updatePassword, authFetch, SUPABASE_URL,
+};
+```
+
+#### Backend Auth Middleware Created
+- **File Created:** `apps/api/src/middleware/auth.ts`
+- **Description:** Express middleware for JWT verification using Supabase
+
+**Implementation:**
+```typescript
+export async function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader?.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  const token = authHeader.substring(7);
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+  req.user = user;
+  next();
+}
+```
+
+#### Protected Routes Configuration
+
+**Backend (apps/api/src/index.ts):**
+```typescript
+// Protected Routes - require authentication
+app.use('/api/deals', authMiddleware, dealsRouter);
+app.use('/api/companies', authMiddleware, companiesRouter);
+app.use('/api/documents', authMiddleware, documentsRouter);
+app.use('/api/activities', authMiddleware, activitiesRouter);
+app.use('/api', authMiddleware, foldersRouter);
+app.use('/api/users', authMiddleware, usersRouter);
+app.use('/api', authMiddleware, chatRouter);
+app.use('/api/notifications', authMiddleware, notificationsRouter);
+app.use('/api/ingest', authMiddleware, ingestRouter);
+
+// Public Routes - no authentication required
+app.use('/api', aiRouter);  // /api/ai/status is public
+```
+
+**Frontend Protected Pages:**
+| Page | File | Protection |
+|------|------|------------|
+| CRM | `crm.html` | `PEAuth.checkAuth()` on load |
+| Deal Detail | `deal.html` | `PEAuth.checkAuth()` on load |
+| Dashboard | `dashboard.html` | `PEAuth.checkAuth()` on load |
+| VDR | `vdr.html` | `PEAuth.checkAuth()` on load |
+| CRM Dynamic | `crm-dynamic.html` | `PEAuth.checkAuth()` on load |
+
+**Frontend Auth Pages:**
+| Page | File | Protection |
+|------|------|------------|
+| Login | `login.html` | `PEAuth.checkNotAuth()` - redirect to CRM if logged in |
+| Signup | `signup.html` | `PEAuth.checkNotAuth()` - redirect to CRM if logged in |
+
+#### Login/Signup Pages Updated for Supabase
+
+**Login Page (`login.html`):**
+- Added Supabase CDN script
+- Form submits to `PEAuth.signIn(email, password)`
+- Shows loading spinner during authentication
+- Displays error messages from Supabase
+- On success, redirects to CRM (or stored redirect URL)
+
+**Signup Page (`signup.html`):**
+- Added Supabase CDN script
+- Form submits to `PEAuth.signUp(email, password, metadata)`
+- Metadata includes: fullName, firmName, role
+- On success, redirects to CRM
+
+#### VDR React App Auth Integration
+- **File Modified:** `apps/web/src/main.tsx`
+- **Description:** Added auth check before React app renders
+
+**Implementation:**
+```typescript
+async function initApp() {
+  // Wait for PEAuth to be available
+  const waitForAuth = () => {
+    return new Promise<void>((resolve) => {
+      if (window.PEAuth) resolve();
+      else {
+        const interval = setInterval(() => {
+          if (window.PEAuth) { clearInterval(interval); resolve(); }
+        }, 50);
+      }
+    });
+  };
+
+  await waitForAuth();
+  await window.PEAuth.initSupabase();
+  const isAuthenticated = await window.PEAuth.checkAuth();
+  if (!isAuthenticated) return; // checkAuth redirects to login
+
+  // User is authenticated, render the app
+  ReactDOM.createRoot(document.getElementById('root')!).render(...);
+}
+```
+
+#### Deal.js Updated for Auth
+- **File Modified:** `apps/web/deal.js`
+- **Changes:**
+  - Added auth check in `DOMContentLoaded`
+  - Changed `fetch()` calls to `PEAuth.authFetch()` for authenticated API requests
+
+#### Supabase CDN Script
+- **URL:** `https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js`
+- **Note:** Must use UMD bundle, not ES module version
+- **Required:** Script tag must appear BEFORE `auth.js` in HTML
+
+#### Bugs Fixed During Implementation
+
+**Bug 1: "Cannot read properties of undefined (reading 'createClient')"**
+- **Cause:** Supabase CDN script wasn't loading correctly with dynamic loading
+- **Fix:** Changed to UMD bundle URL and added script directly to HTML pages
+
+**Bug 2: "PEAuth is not defined"**
+- **Cause:** auth.js was failing before reaching the export line
+- **Fix:** Added `window.PEAuth = {}` at the very top of auth.js file
+
+#### Authentication Flow
+```
+User visits protected page (e.g., /crm.html)
+    │
+    ▼
+PEAuth.checkAuth() called
+    │
+    ├─► No session → Redirect to /login.html
+    │                      │
+    │                      ▼
+    │               User enters credentials
+    │                      │
+    │                      ▼
+    │               PEAuth.signIn() called
+    │                      │
+    │                      ▼
+    │               Supabase validates credentials
+    │                      │
+    │                      ├─► Error → Show error message
+    │                      │
+    │                      ▼
+    │               Session stored by Supabase
+    │                      │
+    │                      ▼
+    │               Redirect to /crm.html
+    │
+    └─► Has session → Page loads normally
+                      │
+                      ▼
+                API calls use PEAuth.authFetch()
+                      │
+                      ▼
+                Backend validates JWT token
+                      │
+                      ▼
+                Returns protected data
+```
+
+#### Files Modified Summary
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| `apps/web/js/auth.js` | Created | Full auth helper module |
+| `apps/api/src/middleware/auth.ts` | Created | JWT verification middleware |
+| `apps/api/src/index.ts` | Modified | Apply auth middleware to routes |
+| `apps/web/login.html` | Modified | Use Supabase Auth |
+| `apps/web/signup.html` | Modified | Use Supabase Auth |
+| `apps/web/crm.html` | Modified | Add auth check |
+| `apps/web/deal.html` | Modified | Add auth check |
+| `apps/web/deal.js` | Modified | Add auth check, use authFetch |
+| `apps/web/dashboard.html` | Modified | Add auth check |
+| `apps/web/vdr.html` | Modified | Add auth check |
+| `apps/web/crm-dynamic.html` | Modified | Add auth check |
+| `apps/web/src/main.tsx` | Modified | Add auth check for React app |
+
+#### Testing Results
+- ✅ Signup creates user in Supabase Auth
+- ✅ Login authenticates and creates session
+- ✅ Protected pages redirect to login when not authenticated
+- ✅ Login/signup pages redirect to CRM when already authenticated
+- ✅ API calls include Authorization header
+- ✅ Backend validates JWT and returns protected data
+- ✅ VDR React app waits for auth before rendering
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`

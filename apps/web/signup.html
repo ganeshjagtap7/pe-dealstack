@@ -258,6 +258,11 @@
         © 2024 PE OS Inc. All rights reserved.
     </footer>
 
+    <!-- Supabase Client -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <!-- Auth Helper -->
+    <script src="js/auth.js"></script>
+
     <script>
         // Toggle password visibility
         function togglePasswordVisibility(inputId, button) {
@@ -391,52 +396,73 @@
             submitSpinner.classList.remove('hidden');
 
             try {
-                // Simulate API call - replace with actual registration
-                await new Promise(resolve => setTimeout(resolve, 2000));
-
-                // Store user data
-                const userData = {
-                    name: fullname,
-                    email: email,
+                // Sign up with Supabase
+                const { user, session, error } = await PEAuth.signUp(email, password, {
+                    fullName: fullname,
                     firmName: firmname,
                     role: role,
-                    loggedIn: true,
-                    createdAt: new Date().toISOString()
-                };
+                });
 
-                localStorage.setItem('peosUser', JSON.stringify(userData));
+                if (error) {
+                    throw error;
+                }
 
-                // Show success
-                successMessage.textContent = 'Workspace created successfully! Redirecting...';
-                successMessage.classList.remove('hidden');
+                if (user) {
+                    // Show success message
+                    if (session) {
+                        // Email confirmation disabled - user is logged in
+                        successMessage.textContent = 'Account created successfully! Redirecting...';
+                        successMessage.classList.remove('hidden');
 
-                // Redirect to CRM after short delay
-                setTimeout(() => {
-                    window.location.href = 'crm.html';
-                }, 1500);
+                        // Redirect to CRM after short delay
+                        setTimeout(() => {
+                            window.location.href = 'crm.html';
+                        }, 1500);
+                    } else {
+                        // Email confirmation enabled - show message
+                        successMessage.textContent = 'Account created! Please check your email to verify your account, then log in.';
+                        successMessage.classList.remove('hidden');
+                        submitBtn.disabled = true;
+                        submitText.textContent = 'Check your email';
+                    }
+                } else {
+                    throw new Error('Failed to create account');
+                }
 
             } catch (error) {
-                errorMessage.textContent = 'An error occurred. Please try again.';
+                // Show error message
+                let message = 'An error occurred. Please try again.';
+                if (error.message) {
+                    if (error.message.includes('User already registered')) {
+                        message = 'An account with this email already exists. Please log in instead.';
+                    } else if (error.message.includes('Password')) {
+                        message = error.message;
+                    } else {
+                        message = error.message;
+                    }
+                }
+                errorMessage.textContent = message;
                 errorMessage.classList.remove('hidden');
             } finally {
-                submitBtn.disabled = false;
-                submitText.textContent = 'Create Firm Workspace';
+                if (!successMessage.classList.contains('hidden') && successMessage.textContent.includes('Check your email')) {
+                    // Keep button disabled if waiting for email confirmation
+                } else {
+                    submitBtn.disabled = false;
+                    submitText.textContent = 'Create Firm Workspace';
+                }
                 submitSpinner.classList.add('hidden');
             }
         });
 
-        // Force light mode
-        document.documentElement.classList.remove('dark');
+        // Check if already logged in on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Force light mode
+            document.documentElement.classList.remove('dark');
 
-        // Check if already logged in
-        document.addEventListener('DOMContentLoaded', function() {
-            const user = localStorage.getItem('peosUser') || sessionStorage.getItem('peosUser');
-            if (user) {
-                const userData = JSON.parse(user);
-                if (userData.loggedIn) {
-                    window.location.href = 'crm.html';
-                }
-            }
+            // Initialize auth and check if already logged in
+            await PEAuth.initSupabase();
+            const notAuth = await PEAuth.checkNotAuth();
+            // If user is authenticated, checkNotAuth will redirect to CRM
         });
     </script>
 </body>

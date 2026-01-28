@@ -163,13 +163,15 @@
 </div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/auth.js"></script>
 <script>
 const API_BASE_URL = 'http://localhost:3001/api';
 
 // Fetch and display deals
 async function loadDeals() {
     try {
-        const response = await fetch(`${API_BASE_URL}/deals`);
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
         if (!response.ok) throw new Error('Failed to fetch deals');
 
         const deals = await response.json();
@@ -334,6 +336,13 @@ function renderUploadCard() {
 }
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', loadDeals);
+document.addEventListener('DOMContentLoaded', async function() {
+    // Initialize auth and check if user is logged in
+    await PEAuth.initSupabase();
+    const auth = await PEAuth.checkAuth();
+    if (!auth) return; // Will redirect to login
+
+    loadDeals();
+});
 </script>
 </body></html>
