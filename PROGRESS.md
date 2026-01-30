@@ -2193,6 +2193,33 @@ PEAuth.checkAuth() called
 
 ---
 
+## January 30, 2026
+
+### Day 10 - Landing Page Navigation Update
+
+#### Added Pricing Link to Navigation
+- **Type:** UI Enhancement
+- **Description:** Added "Pricing" link to the landing page navigation bar
+- **User Request:** "Add a Pricing link which will redirect to the pricing page"
+- **File Modified:** `apps/web/index.html`
+
+**Changes:**
+- Added new navigation link between "Solutions" and "Resources"
+- Link points to `pricing.html`
+- Styling matches existing navigation items
+
+**Navigation Structure (After):**
+```
+Platform | Solutions | Pricing | Resources | Company | Login | Get Started
+```
+
+**Code Change:**
+```html
+<a class="text-sm font-medium hover:text-primary transition-colors" href="pricing.html">Pricing</a>
+```
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`
