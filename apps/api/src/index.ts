@@ -11,6 +11,7 @@ import usersRouter from './routes/users.js';
 import chatRouter from './routes/chat.js';
 import notificationsRouter from './routes/notifications.js';
 import ingestRouter from './routes/ingest.js';
+import memosRouter from './routes/memos.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
 
@@ -78,6 +79,7 @@ app.use('/api/users', authMiddleware, usersRouter);
 app.use('/api', authMiddleware, chatRouter);
 app.use('/api/notifications', authMiddleware, notificationsRouter);
 app.use('/api/ingest', authMiddleware, ingestRouter);
+app.use('/api/memos', authMiddleware, memosRouter);
 
 // ========================================
 // Public Routes (no authentication needed)
@@ -108,6 +110,7 @@ app.listen(PORT, () => {
   console.log(`  💬 Chat API: http://localhost:${PORT}/api/conversations`);
   console.log(`  🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
   console.log(`  📥 Ingest API: http://localhost:${PORT}/api/ingest`);
+  console.log(`  📝 Memos API: http://localhost:${PORT}/api/memos`);
   console.log('');
   console.log('Public routes (no auth required):');
   console.log(`  🤖 AI Status: http://localhost:${PORT}/api/ai/status`);

@@ -2220,6 +2220,165 @@ Platform | Solutions | Pricing | Resources | Company | Login | Get Started
 
 ---
 
+### Investment Memo Builder Feature
+
+#### Overview
+- **Type:** Major Feature
+- **Description:** Full-featured automated investment memo builder with AI-powered content generation
+- **Timestamp:** January 30, 2026 - 11:30 PM IST
+
+#### Database Schema Created
+- **File Created:** `apps/api/memo-schema.sql`
+- **Description:** Complete Supabase schema for memo management
+
+**Tables Created:**
+
+| Table | Description |
+|-------|-------------|
+| `Memo` | Main memo storage with deal associations, status, versioning |
+| `MemoSection` | Individual sections within a memo (Executive Summary, Financials, etc.) |
+| `MemoConversation` | AI chat conversations linked to memos |
+| `MemoChatMessage` | Individual chat messages in conversations |
+
+**Memo Table Fields:**
+```sql
+- id (UUID, Primary Key)
+- dealId (FK to Deal)
+- title, projectName
+- type: IC_MEMO, TEASER, SUMMARY, CUSTOM
+- status: DRAFT, REVIEW, FINAL, ARCHIVED
+- sponsor, memoDate, version
+- createdBy, lastEditedBy (FK to User)
+- collaborators (UUID array)
+- complianceChecked, complianceNotes
+- metadata (JSONB)
+- timestamps
+```
+
+**MemoSection Types:**
+- EXECUTIVE_SUMMARY
+- COMPANY_OVERVIEW
+- FINANCIAL_PERFORMANCE
+- MARKET_DYNAMICS
+- COMPETITIVE_LANDSCAPE
+- RISK_ASSESSMENT
+- DEAL_STRUCTURE
+- VALUE_CREATION
+- EXIT_STRATEGY
+- RECOMMENDATION
+- APPENDIX
+- CUSTOM
+
+**Security Features:**
+- Row Level Security (RLS) enabled on all tables
+- Users can only access memos they created or are collaborators on
+- Cascade delete for related records
+- Performance indexes on key columns
+- Auto-update triggers for `updatedAt` timestamps
+
+#### API Routes Created
+- **File Created:** `apps/api/src/routes/memos.ts`
+- **Description:** Full REST API with AI integration
+
+**Memo CRUD Endpoints:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/memos` | List all memos (with filters: dealId, status, type) |
+| GET | `/api/memos/:id` | Get single memo with sections, deal, and conversations |
+| POST | `/api/memos` | Create new memo (auto-creates default IC sections) |
+| PATCH | `/api/memos/:id` | Update memo metadata |
+| DELETE | `/api/memos/:id` | Delete memo and all related data |
+
+**Section Endpoints:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/memos/:id/sections` | Get all sections for a memo |
+| POST | `/api/memos/:id/sections` | Add new section |
+| PATCH | `/api/memos/:id/sections/:sectionId` | Update section content |
+| DELETE | `/api/memos/:id/sections/:sectionId` | Delete section |
+| POST | `/api/memos/:id/sections/reorder` | Reorder sections via drag-drop |
+
+**AI Endpoints:**
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/memos/:id/sections/:sectionId/generate` | Regenerate section content with AI |
+| POST | `/api/memos/:id/chat` | Send message to AI assistant |
+| GET | `/api/memos/:id/conversations` | Get chat history |
+
+**AI System Prompt:**
+```
+Senior PE investment analyst persona with capabilities:
+- Generate professional, data-driven memo sections
+- Cite documents with page numbers
+- Present balanced analysis (opportunities + risks)
+- Use PE/finance terminology
+- Structure with headers, bullets, tables
+- Output as HTML for rendering
+```
+
+#### Backend Integration
+- **File Modified:** `apps/api/src/index.ts`
+
+**Changes:**
+```typescript
+// Import
+import memosRouter from './routes/memos.js';
+
+// Protected route
+app.use('/api/memos', authMiddleware, memosRouter);
+
+// Console log
+console.log(`  📝 Memos API: http://localhost:${PORT}/api/memos`);
+```
+
+#### Frontend UI Created
+- **File Created:** `apps/web/memo-builder.html`
+- **File Created:** `apps/web/memo-builder.js`
+
+**Features:**
+- Three-panel layout (Sections | Editor | AI Chat)
+- Drag-and-drop section reordering
+- Inline content editing with rich text
+- Citation buttons linking to source documents
+- Financial data tables with highlighting
+- Chart/figure integration
+- AI-powered content regeneration per section
+- Real-time AI chat assistant
+- Collaborator avatars
+- Document panel for source materials
+- Compliance checklist integration
+- Export to PDF functionality
+
+**Demo Data (Project Apollo):**
+- Sample IC memo for "Project Apollo"
+- Pre-populated sections: Executive Summary, Financial Performance, Market Dynamics, Risk Assessment, Deal Structure
+- Financial table with FY21-FY24 projections
+- Citation examples linking to CIM pages
+
+**UI Components:**
+- Section navigation with drag handles
+- Active section highlighting
+- AI badge for generated content
+- Regenerate button per section
+- Chat interface with message history
+- Document thumbnails
+
+#### Files Summary
+
+| File | Type | Description |
+|------|------|-------------|
+| `apps/api/memo-schema.sql` | Created | Database schema with 4 tables, RLS, indexes |
+| `apps/api/src/routes/memos.ts` | Created | 733-line API with CRUD, AI generation, chat |
+| `apps/api/src/index.ts` | Modified | Added memos router and console log |
+| `apps/web/memo-builder.html` | Created | Full UI with three-panel layout |
+| `apps/web/memo-builder.js` | Created | Frontend logic with demo data |
+
+#### Access
+- **Memo Builder:** `http://localhost:3000/memo-builder.html`
+- **Memos API:** `http://localhost:3001/api/memos`
+
+---
+
 ## Notes
 - Project directory: `/Users/ganesh/AI CRM`
 - Main entry point: `apps/web/index.html`

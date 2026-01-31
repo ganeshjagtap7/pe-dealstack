@@ -1,0 +1,1170 @@
+/**
+ * PE OS - Automated Investment Memo Builder
+ * Main JavaScript file for memo editing, AI chat, and document management
+ */
+
+const API_BASE_URL = 'http://localhost:3001/api';
+
+// ============================================================
+// Demo Data (Project Apollo)
+// ============================================================
+const DEMO_MEMO = {
+    id: 'demo-memo-1',
+    title: 'Investment Committee Memo',
+    projectName: 'Project Apollo',
+    type: 'IC_MEMO',
+    status: 'DRAFT',
+    lastEdited: '2m ago',
+    sponsor: 'J. Smith (MD)',
+    date: 'October 24, 2023',
+    collaborators: [
+        { id: 'u1', name: 'Sarah Chen', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFSHjMJ9VxUdMFeXx4tKRpfKLJjL-H5Z8SZVtTFp9zX1rxtkTpy3KTkSdzabl2idECVCUKzNu9e10Pa4g3DFZvozoHAV4p0mzL0Elz-00J-Q8GNfm1AscvnzG8lYY6dD61u3QYMn8EAzJe2eybbh0HSMhhmQFUvL6mQyak72Pf31Wq8Ofh3nsp2li1W6-wtsnx-RmQNPGbvyYq1ui4C5tEVwCZ8b5NN97_1CyL2i76UgOcgLWJCT0h36fFKzEXWCNld0VG1kakYUA' },
+        { id: 'u2', name: 'Michael Torres', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCuOCHCWbtO8KzFz5f8HO0E-uPd-FPegsqdkrbnj-5gNz_Mcmw9RomhrkKGPu1jDXAc4Qko9m-PP4voAYncq9h-jKps0BsTvzp6VlTkXkV3AGjjwCjXeHEJEnKv01lh1OT4_uwSd_XDrc1MbQxuX_VBZgaBcyFm3Rf1GpG0V9JWuXV2OU1h88eswvXO4xR7K41AM9Ljz28BI0BLsASYhMb0NB4P6-XdaxhVnA8KggpfXXnjfBmsC-GBfB-o9E_9iImbhgZOw6iXNOo' },
+    ],
+    sections: [
+        {
+            id: 's1',
+            type: 'EXECUTIVE_SUMMARY',
+            title: 'Executive Summary',
+            sortOrder: 0,
+            aiGenerated: true,
+            content: `<p class="text-slate-800 leading-relaxed text-[15px] mb-4">
+                Project Apollo represents a unique opportunity to acquire a market-leading provider of enterprise SaaS solutions in the logistics vertical. The Company has demonstrated robust financial performance with a
+                <span class="font-semibold text-slate-900">3-year revenue CAGR of 22%</span>
+                <button class="citation-btn inline-flex items-center gap-0.5 rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-primary hover:bg-blue-100 hover:text-blue-800 transition-colors align-top mx-0.5 border border-blue-100/50" data-source="CIM" data-page="14" title="Source: Confidential Information Memorandum p.14">
+                    <span>CIM p.14</span>
+                    <span class="material-symbols-outlined text-[10px]">open_in_new</span>
+                </button>
+                and industry-leading retention rates.
+            </p>
+            <p class="text-slate-800 leading-relaxed text-[15px]">
+                We propose acquiring 100% of the equity for an enterprise value of <span class="font-semibold text-slate-900">$500M</span>, representing a 12.5x multiple on FY23 EBITDA. The transaction is expected to be funded through a combination of $250M of senior debt and $250M of equity from Fund IV.
+            </p>`
+        },
+        {
+            id: 's2',
+            type: 'FINANCIAL_PERFORMANCE',
+            title: 'Financial Performance',
+            sortOrder: 1,
+            aiGenerated: false,
+            isActive: true,
+            content: `<p class="text-slate-800 leading-relaxed text-[15px] mb-6">
+                The Company has consistently outperformed budget expectations. Revenue increased by 15% in FY23, driven primarily by expansion into the APAC region and successful cross-selling of the new analytics module. EBITDA margins have expanded from 28% to 32% over the last 24 months.
+            </p>`,
+            hasTable: true,
+            tableData: {
+                headers: ['($ in Millions)', 'FY21A', 'FY22A', 'FY23E', 'FY24P'],
+                rows: [
+                    { metric: 'Total Revenue', values: ['$120.5', '$145.2', '$167.0', '$192.0'], highlight: 'FY23E' },
+                    { metric: 'Growth %', values: ['-', '20.5%', '15.0%', '15.0%'], isSubMetric: true, highlight: 'FY23E' },
+                    { metric: 'Gross Profit', values: ['$84.3', '$104.5', '$123.5', '$144.0'], highlight: 'FY23E' },
+                    { metric: 'EBITDA', values: ['$33.7', '$43.5', '$53.4', '$63.4'], isBold: true, highlight: 'FY23E' },
+                    { metric: 'Margin %', values: ['28.0%', '30.0%', '32.0%', '33.0%'], isSubMetric: true, highlight: 'FY23E' },
+                ],
+                footnote: 'Source: Management Presentation, Model V4.2'
+            },
+            hasChart: true,
+            chartImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAcaI521dcrRKfCSoAHN-ltDG4p90UC1lCA0hfRQYs2XAiQuA7J_6EVFHBDz22ikOVZoV6jESQV0H2hpqtRtaZmwyTA2VZVLhNfmkR1Qy_CprLZ1tNvU80lKizEZj2Ab3ActdQeqUMhZ8pLYZeglfhzkSgw8WQDt46aUcIaEAMRZf8uf_ZMPAHjyabdDvrh_Ru03mwHw6nUOGOo0Kx9p3O1OI62Y_OdX68pwVaYXF4CE_ZpWH5f-GB8RPu6XBx-qvv7CMwD3gMiMPc',
+            chartCaption: 'Figure 1.2: Quarterly Revenue Growth',
+            chartNote: 'Note: Q4 figures are projected.'
+        },
+        {
+            id: 's3',
+            type: 'MARKET_DYNAMICS',
+            title: 'Market Dynamics',
+            sortOrder: 2,
+            aiGenerated: false,
+            content: `<p class="text-slate-800 leading-relaxed text-[15px] mb-4">
+                The global supply chain software market is expected to grow at a CAGR of 11.2% through 2028. Project Apollo operates in the highly fragmented "Last Mile" segment.
+            </p>`,
+            hasPlaceholder: true,
+            placeholderText: 'Add Competitive Landscape Analysis'
+        },
+        {
+            id: 's4',
+            type: 'RISK_ASSESSMENT',
+            title: 'Risk Assessment',
+            sortOrder: 3,
+            aiGenerated: false,
+            content: `<p class="text-slate-800 leading-relaxed text-[15px]">
+                Key risks include customer concentration (top 3 customers represent 35% of revenue), technology obsolescence risk, and integration complexity. Mitigants have been identified for each risk category.
+            </p>`
+        },
+        {
+            id: 's5',
+            type: 'DEAL_STRUCTURE',
+            title: 'Deal Structure',
+            sortOrder: 4,
+            aiGenerated: false,
+            content: `<p class="text-slate-800 leading-relaxed text-[15px]">
+                Proposed structure includes $250M senior secured debt (5.0x EBITDA) and $250M equity from Fund IV. Management rollover of 20% is expected, with standard reps, warranties, and indemnification provisions.
+            </p>`
+        }
+    ]
+};
+
+const DEMO_MESSAGES = [
+    {
+        id: 'm1',
+        role: 'assistant',
+        content: `<p>I've drafted the <strong>Financial Performance</strong> section based on the Q3 Excel model ingestion. </p>
+        <p class="mt-2">I noticed a significant margin expansion in Q3. Would you like me to add a breakdown of the cost-saving initiatives that drove this?</p>`,
+        timestamp: '10:23 AM',
+        quickActions: [
+            { label: 'Yes, add breakdown', action: 'add_breakdown' },
+            { label: 'No, keep it high-level', action: 'keep_highlevel' }
+        ]
+    },
+    {
+        id: 'm2',
+        role: 'user',
+        content: `<p>Please insert a chart comparing our Q3 growth against the key competitors mentioned in the CIM.</p>`,
+        timestamp: '10:25 AM'
+    },
+    {
+        id: 'm3',
+        role: 'assistant',
+        content: `<p>Done. I've pulled competitor data from Pitchbook and visualized the Q3 revenue growth comparison.</p>`,
+        timestamp: 'Just now',
+        sourceDoc: {
+            name: 'Pitchbook_Competitive_Set_Q3.pdf',
+            page: 4,
+            table: 'Table 2.1',
+            icon: 'picture_as_pdf'
+        }
+    }
+];
+
+// ============================================================
+// State
+// ============================================================
+const state = {
+    memo: null,
+    sections: [],
+    activeSection: null,
+    messages: [],
+    isDirty: false,
+    isAIPanelOpen: true,
+    draggedItem: null
+};
+
+// ============================================================
+// Initialization
+// ============================================================
+document.addEventListener('DOMContentLoaded', async function() {
+    console.log('PE OS Memo Builder initialized');
+
+    // Initialize auth and check if user is logged in
+    await PEAuth.initSupabase();
+    const auth = await PEAuth.checkAuth();
+    if (!auth) return; // Will redirect to login
+
+    // Check for memo ID in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const memoId = urlParams.get('id');
+
+    if (memoId) {
+        // Try to load memo from API
+        const loaded = await loadMemoFromAPI(memoId);
+        if (!loaded) {
+            // Fall back to demo data
+            console.log('Failed to load memo from API, using demo data');
+            loadDemoData();
+        }
+    } else {
+        // No ID provided, use demo data
+        loadDemoData();
+    }
+
+    // Render UI
+    renderSidebar();
+    renderSections();
+    renderMessages();
+
+    // Setup event handlers
+    setupEventHandlers();
+    setupDragDrop();
+});
+
+// ============================================================
+// API Integration
+// ============================================================
+async function loadMemoFromAPI(memoId) {
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${memoId}`);
+        if (!response.ok) {
+            console.error('Failed to load memo:', response.status);
+            return false;
+        }
+
+        const memo = await response.json();
+
+        // Transform API data to match our state structure
+        state.memo = {
+            id: memo.id,
+            title: memo.title,
+            projectName: memo.projectName || memo.deal?.name || 'Untitled Project',
+            type: memo.type,
+            status: memo.status,
+            lastEdited: formatRelativeTime(new Date(memo.updatedAt)),
+            sponsor: memo.sponsor || '',
+            date: memo.memoDate || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }),
+            collaborators: [],
+        };
+
+        state.sections = (memo.sections || []).map(s => ({
+            id: s.id,
+            type: s.type,
+            title: s.title,
+            sortOrder: s.sortOrder,
+            aiGenerated: s.aiGenerated,
+            content: s.content || '',
+            hasTable: !!s.tableData,
+            tableData: s.tableData,
+            hasChart: !!s.chartConfig,
+            chartConfig: s.chartConfig,
+            citations: s.citations || [],
+        })).sort((a, b) => a.sortOrder - b.sortOrder);
+
+        // Load messages from conversation
+        if (memo.conversations?.length > 0) {
+            const latestConv = memo.conversations[0];
+            state.messages = (latestConv.messages || []).map(m => ({
+                id: m.id,
+                role: m.role,
+                content: m.content.startsWith('<') ? m.content : `<p>${m.content}</p>`,
+                timestamp: formatTime(new Date(m.createdAt)),
+            }));
+        } else {
+            state.messages = [];
+        }
+
+        // Set active section
+        state.activeSection = state.sections[1]?.id || state.sections[0]?.id || null;
+
+        // Update header
+        updateHeader();
+
+        console.log('Memo loaded from API:', memo.id);
+        return true;
+    } catch (error) {
+        console.error('Error loading memo from API:', error);
+        return false;
+    }
+}
+
+async function saveMemoToAPI() {
+    if (!state.memo?.id || state.memo.id.startsWith('demo-')) {
+        console.log('Demo memo, not saving to API');
+        return;
+    }
+
+    try {
+        await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: state.memo.title,
+                projectName: state.memo.projectName,
+                status: state.memo.status,
+            }),
+        });
+        console.log('Memo saved');
+    } catch (error) {
+        console.error('Error saving memo:', error);
+    }
+}
+
+async function saveSectionToAPI(sectionId) {
+    if (!state.memo?.id || state.memo.id.startsWith('demo-')) {
+        return;
+    }
+
+    const section = state.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    try {
+        await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/sections/${sectionId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: section.content,
+                sortOrder: section.sortOrder,
+            }),
+        });
+        console.log('Section saved:', sectionId);
+    } catch (error) {
+        console.error('Error saving section:', error);
+    }
+}
+
+async function reorderSectionsAPI() {
+    if (!state.memo?.id || state.memo.id.startsWith('demo-')) {
+        return;
+    }
+
+    try {
+        await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/sections/reorder`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sections: state.sections.map(s => ({ id: s.id, sortOrder: s.sortOrder })),
+            }),
+        });
+        console.log('Sections reordered');
+    } catch (error) {
+        console.error('Error reordering sections:', error);
+    }
+}
+
+async function regenerateSectionAPI(sectionId, customPrompt = null) {
+    if (!state.memo?.id || state.memo.id.startsWith('demo-')) {
+        return null;
+    }
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/sections/${sectionId}/generate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ customPrompt }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to regenerate');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error regenerating section:', error);
+        return null;
+    }
+}
+
+async function sendChatMessageAPI(content) {
+    if (!state.memo?.id || state.memo.id.startsWith('demo-')) {
+        return null;
+    }
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to send message');
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error sending chat message:', error);
+        return null;
+    }
+}
+
+function formatRelativeTime(date) {
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+}
+
+// ============================================================
+// Data Loading
+// ============================================================
+function loadDemoData() {
+    state.memo = DEMO_MEMO;
+    state.sections = [...DEMO_MEMO.sections].sort((a, b) => a.sortOrder - b.sortOrder);
+    state.messages = [...DEMO_MESSAGES];
+
+    // Set active section
+    const activeSection = state.sections.find(s => s.isActive) || state.sections[1];
+    state.activeSection = activeSection?.id || null;
+
+    // Update header
+    updateHeader();
+}
+
+function updateHeader() {
+    document.getElementById('memo-title').textContent = state.memo.projectName;
+    document.getElementById('memo-type').textContent = state.memo.title;
+    document.getElementById('memo-status').textContent = state.memo.status;
+    document.getElementById('last-edited').textContent = `Last edited ${state.memo.lastEdited}`;
+    document.getElementById('doc-title').textContent = state.memo.title;
+    document.getElementById('doc-project').textContent = state.memo.projectName;
+    document.getElementById('doc-date').textContent = `Date: ${state.memo.date}`;
+    document.getElementById('doc-sponsor').textContent = `Sponsor: ${state.memo.sponsor}`;
+}
+
+// ============================================================
+// Sidebar Rendering
+// ============================================================
+function renderSidebar() {
+    const container = document.getElementById('sections-outline');
+    container.innerHTML = state.sections.map((section, index) => `
+        <button class="section-item flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left group ${
+            state.activeSection === section.id
+                ? 'bg-white shadow-sm border border-slate-200 text-primary'
+                : 'text-slate-700 hover:bg-slate-100'
+        }"
+        data-section-id="${section.id}"
+        draggable="true">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined ${state.activeSection === section.id ? 'text-primary' : 'text-slate-400 group-hover:text-primary'} text-[18px]">drag_indicator</span>
+                ${section.title}
+            </div>
+            ${state.activeSection === section.id ? '<div class="size-1.5 rounded-full bg-primary"></div>' : ''}
+        </button>
+    `).join('');
+
+    // Add click handlers
+    container.querySelectorAll('.section-item').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            if (e.target.classList.contains('material-symbols-outlined')) return; // Ignore drag handle clicks
+            const sectionId = btn.dataset.sectionId;
+            setActiveSection(sectionId);
+        });
+    });
+}
+
+function setActiveSection(sectionId) {
+    state.activeSection = sectionId;
+    renderSidebar();
+
+    // Scroll to section in editor
+    const sectionEl = document.querySelector(`[data-content-section="${sectionId}"]`);
+    if (sectionEl) {
+        sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// ============================================================
+// Document Content Rendering
+// ============================================================
+function renderSections() {
+    const container = document.getElementById('sections-content');
+    container.innerHTML = state.sections.map((section, index) => renderSection(section, index)).join('');
+
+    // Add event handlers for section buttons
+    setupSectionButtons();
+}
+
+function renderSection(section, index) {
+    const isActive = state.activeSection === section.id;
+
+    let tableHtml = '';
+    if (section.hasTable && section.tableData) {
+        tableHtml = renderTable(section.tableData);
+    }
+
+    let chartHtml = '';
+    if (section.hasChart) {
+        chartHtml = `
+            <div class="relative w-full h-64 rounded-lg bg-white border border-slate-200 overflow-hidden group/chart mb-2">
+                <div class="absolute top-3 right-3 z-10 opacity-0 group-hover/chart:opacity-100 transition-opacity">
+                    <button class="bg-white shadow border border-slate-200 rounded p-1.5 text-slate-500 hover:text-primary">
+                        <span class="material-symbols-outlined text-[18px]">more_horiz</span>
+                    </button>
+                </div>
+                <img alt="${section.chartCaption}" class="w-full h-full object-cover object-left-top opacity-90" src="${section.chartImage}"/>
+                <div class="absolute bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-4 py-2 border-t border-slate-100">
+                    <p class="text-xs font-semibold text-slate-700">${section.chartCaption}</p>
+                </div>
+            </div>
+            ${section.chartNote ? `<p class="text-xs text-slate-400 italic mb-2">${section.chartNote}</p>` : ''}
+        `;
+    }
+
+    let placeholderHtml = '';
+    if (section.hasPlaceholder) {
+        placeholderHtml = `
+            <div class="p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center">
+                <button class="add-content-btn inline-flex flex-col items-center gap-2 text-slate-400 hover:text-primary transition-colors group/add" data-section-id="${section.id}">
+                    <div class="size-8 rounded-full bg-slate-200 flex items-center justify-center group-hover/add:bg-primary/10 transition-colors">
+                        <span class="material-symbols-outlined group-hover/add:text-primary">add</span>
+                    </div>
+                    <span class="text-sm font-medium">${section.placeholderText}</span>
+                </button>
+            </div>
+        `;
+    }
+
+    const sectionClasses = isActive
+        ? 'border-l-2 border-primary/30 bg-primary/5 p-4 rounded-r-lg'
+        : 'border-l-2 border-transparent hover:border-slate-200';
+
+    return `
+        <section class="group/section relative pl-4 -ml-4 ${sectionClasses} transition-colors" data-content-section="${section.id}">
+            <div class="absolute -left-8 top-1 opacity-0 group-hover/section:opacity-100 transition-opacity cursor-grab active:cursor-grabbing p-1 hover:bg-slate-100 rounded">
+                <span class="material-symbols-outlined text-slate-400 text-[20px]">drag_indicator</span>
+            </div>
+
+            <div class="flex justify-between items-start mb-3">
+                <h2 class="text-xl font-bold text-[#0d131b] flex items-center gap-2">
+                    ${index + 1}. ${section.title}
+                    ${section.aiGenerated ? '<span class="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide">AI Generated</span>' : ''}
+                </h2>
+                ${isActive ? `
+                <div class="flex gap-2">
+                    <button class="regenerate-btn flex items-center gap-1 text-xs font-medium text-primary hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-100/50 transition-colors" data-section-id="${section.id}">
+                        <span class="material-symbols-outlined text-[14px]">refresh</span>
+                        Regenerate
+                    </button>
+                    <button class="edit-data-btn flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-200/50 transition-colors" data-section-id="${section.id}">
+                        <span class="material-symbols-outlined text-[14px]">edit</span>
+                        Edit Data
+                    </button>
+                </div>
+                ` : ''}
+            </div>
+
+            ${section.content}
+            ${tableHtml}
+            ${chartHtml}
+            ${placeholderHtml}
+        </section>
+    `;
+}
+
+function renderTable(tableData) {
+    const headerCells = tableData.headers.map((h, i) => {
+        const isHighlight = h === 'FY23E';
+        return `<th class="px-4 py-3 font-semibold ${i === 0 ? 'w-1/3' : 'text-right'} ${isHighlight ? 'text-primary bg-blue-50/50' : ''}">${h}</th>`;
+    }).join('');
+
+    const rows = tableData.rows.map(row => {
+        const metricClass = row.isBold ? 'font-bold text-slate-900' : (row.isSubMetric ? 'pl-8 text-slate-500 italic' : 'font-medium text-slate-800');
+        const rowClass = row.isBold ? 'hover:bg-slate-50/50 bg-slate-50/30' : 'hover:bg-slate-50/50';
+
+        const valueCells = row.values.map((v, i) => {
+            const isHighlightCol = tableData.headers[i + 1] === row.highlight;
+            const valueClass = row.isBold ? 'text-slate-800' : (row.isSubMetric ? 'text-slate-500' : 'text-slate-600');
+            return `<td class="px-4 py-2.5 text-right ${valueClass} font-mono ${isHighlightCol ? 'bg-blue-50/30' : ''} ${row.isBold && isHighlightCol ? 'font-bold text-slate-900' : ''}">${v}</td>`;
+        }).join('');
+
+        return `
+            <tr class="${rowClass}">
+                <td class="px-4 py-2.5 ${metricClass}">${row.metric}</td>
+                ${valueCells}
+            </tr>
+        `;
+    }).join('');
+
+    return `
+        <div class="overflow-hidden border border-slate-200 rounded-lg bg-white shadow-sm mb-6">
+            <table class="w-full text-sm text-left">
+                <thead class="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
+                    <tr>${headerCells}</tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    ${rows}
+                </tbody>
+            </table>
+            <div class="bg-slate-50 border-t border-slate-200 px-4 py-2">
+                <p class="text-[10px] text-slate-500">${tableData.footnote} <span class="underline cursor-pointer hover:text-primary ml-1">[Link to Source]</span></p>
+            </div>
+        </div>
+    `;
+}
+
+function setupSectionButtons() {
+    // Regenerate buttons
+    document.querySelectorAll('.regenerate-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sectionId = btn.dataset.sectionId;
+            regenerateSection(sectionId);
+        });
+    });
+
+    // Edit data buttons
+    document.querySelectorAll('.edit-data-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sectionId = btn.dataset.sectionId;
+            editSectionData(sectionId);
+        });
+    });
+
+    // Add content buttons
+    document.querySelectorAll('.add-content-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sectionId = btn.dataset.sectionId;
+            addSectionContent(sectionId);
+        });
+    });
+
+    // Citation buttons
+    document.querySelectorAll('.citation-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const source = btn.dataset.source;
+            const page = btn.dataset.page;
+            showCitation(source, page);
+        });
+    });
+}
+
+// ============================================================
+// Chat Rendering
+// ============================================================
+function renderMessages() {
+    const container = document.getElementById('chat-messages');
+    container.innerHTML = state.messages.map(msg => renderMessage(msg)).join('');
+
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+
+    // Add quick action handlers
+    container.querySelectorAll('.quick-action-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const action = btn.dataset.action;
+            handleQuickAction(action);
+        });
+    });
+}
+
+function renderMessage(msg) {
+    if (msg.role === 'assistant') {
+        return `
+            <div class="flex gap-3">
+                <div class="size-8 shrink-0 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm mt-1">
+                    <span class="material-symbols-outlined text-[16px]">smart_toy</span>
+                </div>
+                <div class="flex flex-col gap-1 max-w-[85%]">
+                    <span class="text-[11px] font-semibold text-slate-500 ml-1">AI Analyst • ${msg.timestamp}</span>
+                    <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-3 shadow-sm text-sm text-slate-700 leading-relaxed">
+                        ${msg.content}
+                        ${msg.sourceDoc ? renderSourceDoc(msg.sourceDoc) : ''}
+                    </div>
+                    ${msg.quickActions ? renderQuickActions(msg.quickActions) : ''}
+                </div>
+            </div>
+        `;
+    } else {
+        return `
+            <div class="flex gap-3 flex-row-reverse">
+                <div class="size-8 shrink-0 rounded-full bg-slate-200 border border-white flex items-center justify-center overflow-hidden mt-1">
+                    <img alt="User avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAV31Zl0-ZHzKDQvgazCW09de1WLUDQN-81rWj2ffRFZEpC4pPGzSYaSdT7A1axfBKmDIPC_3wiFDo4hTwQUDd-Ow7ZB50lrLV6MND55clVnnmWDRPX5SP0WNJYU2gHNkEn3rjPdRqwEHupH8qrLotpj-EJeIorbNlmchrTJXBVY7i2VtoVmtfPMZwmtMwgh3Exr08j8jkjaax18yKkqArKfWdLvLyKwvXFjkY4llIT2uuMAPzxsJEd4m3heiJghB3yRKAFlV8cxus"/>
+                </div>
+                <div class="flex flex-col gap-1 items-end max-w-[85%]">
+                    <span class="text-[11px] font-semibold text-slate-500 mr-1">You • ${msg.timestamp}</span>
+                    <div class="bg-primary text-white rounded-2xl rounded-tr-none p-3 shadow-sm text-sm leading-relaxed">
+                        ${msg.content}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function renderSourceDoc(doc) {
+    return `
+        <div class="mt-3 bg-slate-50 border border-slate-200 rounded p-2 flex items-center gap-3">
+            <div class="size-8 bg-white border border-slate-200 rounded flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-red-500 text-[18px]">${doc.icon}</span>
+            </div>
+            <div class="flex flex-col overflow-hidden">
+                <span class="text-xs font-semibold text-slate-800 truncate">${doc.name}</span>
+                <span class="text-[10px] text-slate-500">Page ${doc.page} • ${doc.table}</span>
+            </div>
+            <button class="ml-auto text-slate-400 hover:text-primary">
+                <span class="material-symbols-outlined text-[18px]">visibility</span>
+            </button>
+        </div>
+    `;
+}
+
+function renderQuickActions(actions) {
+    return `
+        <div class="flex gap-2 mt-1 ml-1">
+            ${actions.map(a => `
+                <button class="quick-action-btn text-xs bg-white border border-slate-200 px-2 py-1 rounded-full text-slate-600 hover:text-primary hover:border-primary transition-colors" data-action="${a.action}">
+                    ${a.label}
+                </button>
+            `).join('')}
+        </div>
+    `;
+}
+
+// ============================================================
+// Event Handlers
+// ============================================================
+function setupEventHandlers() {
+    // Send message
+    const sendBtn = document.getElementById('send-btn');
+    const chatInput = document.getElementById('chat-input');
+
+    sendBtn.addEventListener('click', sendMessage);
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage();
+        }
+    });
+
+    // Prompt chips
+    document.querySelectorAll('.prompt-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            const prompt = chip.dataset.prompt;
+            chatInput.value = prompt;
+            chatInput.focus();
+        });
+    });
+
+    // Close AI panel
+    document.getElementById('close-ai-panel').addEventListener('click', toggleAIPanel);
+
+    // Export PDF
+    document.getElementById('export-btn').addEventListener('click', exportToPDF);
+
+    // Share button
+    document.getElementById('share-btn').addEventListener('click', () => {
+        alert('Share functionality coming soon! This would open a modal to invite collaborators.');
+    });
+
+    // File attachment
+    document.getElementById('attach-btn').addEventListener('click', () => {
+        document.getElementById('file-input').click();
+    });
+
+    document.getElementById('file-input').addEventListener('change', handleFileAttachment);
+}
+
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const content = input.value.trim();
+    if (!content) return;
+
+    // Add user message
+    const userMsg = {
+        id: `m${Date.now()}`,
+        role: 'user',
+        content: `<p>${escapeHtml(content)}</p>`,
+        timestamp: formatTime(new Date())
+    };
+    state.messages.push(userMsg);
+    input.value = '';
+    renderMessages();
+
+    // Show typing indicator
+    showTypingIndicator();
+
+    // Try real API first
+    const apiResponse = await sendChatMessageAPI(content);
+
+    // Hide typing indicator
+    hideTypingIndicator();
+
+    if (apiResponse) {
+        // Use real API response
+        const aiMsg = {
+            id: apiResponse.id || `m${Date.now()}`,
+            role: 'assistant',
+            content: apiResponse.content.startsWith('<') ? apiResponse.content : `<p>${apiResponse.content}</p>`,
+            timestamp: apiResponse.timestamp ? formatTime(new Date(apiResponse.timestamp)) : 'Just now'
+        };
+        state.messages.push(aiMsg);
+    } else {
+        // Fall back to simulated response
+        const aiResponse = generateAIResponse(content);
+        state.messages.push(aiResponse);
+    }
+
+    renderMessages();
+}
+
+function showTypingIndicator() {
+    const container = document.getElementById('chat-messages');
+    const indicator = document.createElement('div');
+    indicator.id = 'typing-indicator';
+    indicator.className = 'flex gap-3';
+    indicator.innerHTML = `
+        <div class="size-8 shrink-0 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm mt-1">
+            <span class="material-symbols-outlined text-[16px]">smart_toy</span>
+        </div>
+        <div class="flex flex-col gap-1">
+            <span class="text-[11px] font-semibold text-slate-500 ml-1">AI Analyst • typing...</span>
+            <div class="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-3 shadow-sm">
+                <div class="flex gap-1">
+                    <span class="size-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0ms"></span>
+                    <span class="size-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 150ms"></span>
+                    <span class="size-2 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 300ms"></span>
+                </div>
+            </div>
+        </div>
+    `;
+    container.appendChild(indicator);
+    container.scrollTop = container.scrollHeight;
+}
+
+function hideTypingIndicator() {
+    const indicator = document.getElementById('typing-indicator');
+    if (indicator) indicator.remove();
+}
+
+function generateAIResponse(userInput) {
+    const lowercaseInput = userInput.toLowerCase();
+
+    let response = {
+        id: `m${Date.now()}`,
+        role: 'assistant',
+        timestamp: 'Just now'
+    };
+
+    if (lowercaseInput.includes('tone') || lowercaseInput.includes('rewrite')) {
+        response.content = `<p>I've rewritten the section with a more formal tone, emphasizing quantitative data and removing subjective language.</p>
+        <p class="mt-2">The revised version now uses industry-standard PE terminology and maintains objectivity throughout. Should I apply this to other sections as well?</p>`;
+    } else if (lowercaseInput.includes('ebitda') || lowercaseInput.includes('bridge')) {
+        response.content = `<p>I've added an EBITDA bridge analysis showing the walk from FY22 to FY23:</p>
+        <ul class="list-disc list-inside mt-2 text-slate-600">
+            <li>FY22 EBITDA: $43.5M</li>
+            <li>Revenue growth impact: +$6.5M</li>
+            <li>Margin expansion: +$3.4M</li>
+            <li>FY23 EBITDA: $53.4M</li>
+        </ul>
+        <p class="mt-2">Shall I insert this as a new visual in the Financial Performance section?</p>`;
+        response.quickActions = [
+            { label: 'Yes, add visual', action: 'add_ebitda_visual' },
+            { label: 'Add as text only', action: 'add_ebitda_text' }
+        ];
+    } else if (lowercaseInput.includes('risk')) {
+        response.content = `<p>Here's a summary of the key risks identified:</p>
+        <ul class="list-disc list-inside mt-2 text-slate-600">
+            <li><strong>High:</strong> Customer concentration (35% in top 3)</li>
+            <li><strong>Medium:</strong> Technology obsolescence, integration complexity</li>
+            <li><strong>Low:</strong> Regulatory changes, market competition</li>
+        </ul>
+        <p class="mt-2">All risks have documented mitigants in the full Risk Assessment section.</p>`;
+    } else if (lowercaseInput.includes('chart') || lowercaseInput.includes('visual')) {
+        response.content = `<p>I can create several visualizations for this memo:</p>
+        <ul class="list-disc list-inside mt-2 text-slate-600">
+            <li>Revenue waterfall chart</li>
+            <li>Competitive market share comparison</li>
+            <li>IRR sensitivity analysis</li>
+            <li>Exit valuation scenarios</li>
+        </ul>
+        <p class="mt-2">Which would you like me to generate?</p>`;
+    } else {
+        response.content = `<p>I understand you'd like help with "${escapeHtml(userInput.substring(0, 50))}${userInput.length > 50 ? '...' : ''}"</p>
+        <p class="mt-2">I can help you refine this section, add supporting data, or generate additional analysis. What specific aspect would you like me to focus on?</p>`;
+    }
+
+    return response;
+}
+
+function handleQuickAction(action) {
+    console.log('Quick action:', action);
+
+    // Simulate AI processing the action
+    setTimeout(() => {
+        let response;
+        switch (action) {
+            case 'add_breakdown':
+                response = {
+                    id: `m${Date.now()}`,
+                    role: 'assistant',
+                    content: `<p>I've added a detailed breakdown of the cost-saving initiatives:</p>
+                    <ul class="list-disc list-inside mt-2 text-slate-600">
+                        <li>Operational efficiency gains: $2.1M</li>
+                        <li>Vendor consolidation: $0.8M</li>
+                        <li>Automation investments: $1.5M</li>
+                    </ul>
+                    <p class="mt-2">This has been inserted into the Financial Performance section.</p>`,
+                    timestamp: 'Just now'
+                };
+                break;
+            default:
+                response = {
+                    id: `m${Date.now()}`,
+                    role: 'assistant',
+                    content: `<p>Got it! I've processed your request.</p>`,
+                    timestamp: 'Just now'
+                };
+        }
+        state.messages.push(response);
+        renderMessages();
+    }, 1000);
+}
+
+// ============================================================
+// Drag & Drop
+// ============================================================
+function setupDragDrop() {
+    const container = document.getElementById('sections-outline');
+
+    container.addEventListener('dragstart', (e) => {
+        const item = e.target.closest('.section-item');
+        if (!item) return;
+
+        state.draggedItem = item;
+        item.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+    });
+
+    container.addEventListener('dragend', (e) => {
+        const item = e.target.closest('.section-item');
+        if (item) {
+            item.classList.remove('dragging');
+        }
+        state.draggedItem = null;
+
+        // Remove all drag-over classes
+        container.querySelectorAll('.section-item').forEach(el => {
+            el.classList.remove('drag-over');
+        });
+    });
+
+    container.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const afterElement = getDragAfterElement(container, e.clientY);
+        const dragging = container.querySelector('.dragging');
+
+        if (!dragging) return;
+
+        // Remove previous drag-over classes
+        container.querySelectorAll('.section-item').forEach(el => {
+            el.classList.remove('drag-over');
+        });
+
+        if (afterElement) {
+            afterElement.classList.add('drag-over');
+            container.insertBefore(dragging, afterElement);
+        } else {
+            container.appendChild(dragging);
+        }
+    });
+
+    container.addEventListener('drop', async (e) => {
+        e.preventDefault();
+
+        // Update section order
+        const items = container.querySelectorAll('.section-item');
+        const newOrder = Array.from(items).map((item, index) => ({
+            id: item.dataset.sectionId,
+            sortOrder: index
+        }));
+
+        // Update state
+        newOrder.forEach(({ id, sortOrder }) => {
+            const section = state.sections.find(s => s.id === id);
+            if (section) section.sortOrder = sortOrder;
+        });
+
+        state.sections.sort((a, b) => a.sortOrder - b.sortOrder);
+        state.isDirty = true;
+
+        // Re-render sections content
+        renderSections();
+
+        // Save to API
+        await reorderSectionsAPI();
+
+        console.log('Section order updated:', newOrder);
+    });
+}
+
+function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.section-item:not(.dragging)')];
+
+    return draggableElements.reduce((closest, child) => {
+        const box = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+
+        if (offset < 0 && offset > closest.offset) {
+            return { offset, element: child };
+        } else {
+            return closest;
+        }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// ============================================================
+// Section Actions
+// ============================================================
+async function regenerateSection(sectionId) {
+    const section = state.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    // Show loading state
+    const btn = document.querySelector(`.regenerate-btn[data-section-id="${sectionId}"]`);
+    const originalText = btn.innerHTML;
+    btn.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">refresh</span> Generating...`;
+    btn.disabled = true;
+
+    // Try real API first
+    const apiResult = await regenerateSectionAPI(sectionId);
+
+    if (apiResult) {
+        // Update section with API result
+        section.content = apiResult.content;
+        section.aiGenerated = true;
+        renderSections();
+
+        // Add AI message about regeneration
+        state.messages.push({
+            id: `m${Date.now()}`,
+            role: 'assistant',
+            content: `<p>I've regenerated the <strong>${section.title}</strong> section using AI analysis of the available deal documents and data.</p>`,
+            timestamp: 'Just now'
+        });
+        renderMessages();
+    } else {
+        // Fall back to demo behavior
+        setTimeout(() => {
+            section.aiGenerated = true;
+            renderSections();
+
+            // Add AI message about regeneration
+            state.messages.push({
+                id: `m${Date.now()}`,
+                role: 'assistant',
+                content: `<p>I've regenerated the <strong>${section.title}</strong> section with updated analysis based on the latest data room documents.</p>`,
+                timestamp: 'Just now'
+            });
+            renderMessages();
+        }, 2000);
+    }
+}
+
+function editSectionData(sectionId) {
+    const section = state.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    alert(`Edit Data modal for "${section.title}" would open here.\n\nThis would allow you to:\n- Edit table values\n- Update chart data\n- Modify citations`);
+}
+
+function addSectionContent(sectionId) {
+    const section = state.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    // Simulate adding content
+    state.messages.push({
+        id: `m${Date.now()}`,
+        role: 'assistant',
+        content: `<p>I'll generate a <strong>${section.placeholderText}</strong> for you. Analyzing competitor data from the CIM and Pitchbook...</p>`,
+        timestamp: 'Just now'
+    });
+    renderMessages();
+
+    setTimeout(() => {
+        section.hasPlaceholder = false;
+        section.content += `
+            <div class="mt-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+                <h4 class="font-semibold text-slate-800 mb-2">Competitive Landscape Analysis</h4>
+                <p class="text-sm text-slate-600">The market includes 5 major competitors with Project Apollo holding the #2 position by revenue. Key differentiators include superior technology stack and customer retention rates 15% above industry average.</p>
+            </div>
+        `;
+        section.aiGenerated = true;
+        renderSections();
+
+        state.messages.push({
+            id: `m${Date.now()}`,
+            role: 'assistant',
+            content: `<p>Done! I've added a Competitive Landscape Analysis based on data from the CIM and Pitchbook reports.</p>`,
+            timestamp: 'Just now'
+        });
+        renderMessages();
+    }, 2500);
+}
+
+function showCitation(source, page) {
+    alert(`Citation Source: ${source}\nPage: ${page}\n\nThis would open the source document viewer focused on page ${page}.`);
+}
+
+// ============================================================
+// Export
+// ============================================================
+async function exportToPDF() {
+    const btn = document.getElementById('export-btn');
+    const originalText = btn.textContent;
+    btn.textContent = 'Generating...';
+    btn.disabled = true;
+
+    try {
+        const element = document.getElementById('memo-content');
+        const opt = {
+            margin: [0.5, 0.5, 0.5, 0.5],
+            filename: `${state.memo.projectName}_IC_Memo.pdf`,
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
+        };
+
+        await html2pdf().set(opt).from(element).save();
+
+        // Show success
+        btn.textContent = 'Exported!';
+        setTimeout(() => {
+            btn.textContent = originalText;
+            btn.disabled = false;
+        }, 2000);
+    } catch (error) {
+        console.error('Export error:', error);
+        btn.textContent = originalText;
+        btn.disabled = false;
+        alert('Export failed. Please try again.');
+    }
+}
+
+// ============================================================
+// UI Helpers
+// ============================================================
+function toggleAIPanel() {
+    const panel = document.getElementById('ai-panel');
+    state.isAIPanelOpen = !state.isAIPanelOpen;
+
+    if (state.isAIPanelOpen) {
+        panel.classList.remove('hidden');
+    } else {
+        panel.classList.add('hidden');
+    }
+}
+
+function handleFileAttachment(e) {
+    const files = e.target.files;
+    if (!files.length) return;
+
+    const fileNames = Array.from(files).map(f => f.name).join(', ');
+
+    state.messages.push({
+        id: `m${Date.now()}`,
+        role: 'user',
+        content: `<p>Attached: ${escapeHtml(fileNames)}</p>`,
+        timestamp: formatTime(new Date())
+    });
+
+    state.messages.push({
+        id: `m${Date.now() + 1}`,
+        role: 'assistant',
+        content: `<p>I've received the file(s). Analyzing the content to extract relevant data for the memo...</p>`,
+        timestamp: 'Just now'
+    });
+
+    renderMessages();
+
+    // Reset file input
+    e.target.value = '';
+}
+
+// ============================================================
+// Utility Functions
+// ============================================================
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatTime(date) {
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
+console.log('PE OS Memo Builder script loaded');
