@@ -145,7 +145,10 @@ const state = {
     messages: [],
     isDirty: false,
     isAIPanelOpen: true,
-    draggedItem: null
+    draggedItem: null,
+    editingSection: null,
+    aiPanelWidth: 400, // Default width
+    isResizing: false,
 };
 
 // ============================================================
@@ -614,14 +617,20 @@ function renderSection(section, index) {
                     ${section.aiGenerated ? '<span class="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide">AI Generated</span>' : ''}
                 </h2>
                 ${isActive ? `
-                <div class="flex gap-2">
-                    <button class="regenerate-btn flex items-center gap-1 text-xs font-medium text-primary hover:text-blue-800 px-2 py-1 rounded hover:bg-blue-100/50 transition-colors" data-section-id="${section.id}">
-                        <span class="material-symbols-outlined text-[14px]">refresh</span>
-                        Regenerate
+                <div class="flex gap-1">
+                    <button class="regenerate-btn p-1.5 rounded hover:bg-blue-100 text-primary hover:text-blue-800 transition-colors" data-section-id="${section.id}" title="Regenerate with AI">
+                        <span class="material-symbols-outlined text-[16px]">refresh</span>
                     </button>
-                    <button class="edit-data-btn flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-200/50 transition-colors" data-section-id="${section.id}">
-                        <span class="material-symbols-outlined text-[14px]">edit</span>
-                        Edit Data
+                    <button class="edit-content-btn p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors" data-section-id="${section.id}" title="Edit content">
+                        <span class="material-symbols-outlined text-[16px]">edit_note</span>
+                    </button>
+                    ${section.hasTable ? `
+                    <button class="edit-data-btn p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors" data-section-id="${section.id}" title="Edit table data">
+                        <span class="material-symbols-outlined text-[16px]">table_chart</span>
+                    </button>
+                    ` : ''}
+                    <button class="delete-section-btn p-1.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors" data-section-id="${section.id}" title="Delete section">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
                     </button>
                 </div>
                 ` : ''}
@@ -685,7 +694,19 @@ function setupSectionButtons() {
         });
     });
 
-    // Edit data buttons
+    // Edit content buttons
+    document.querySelectorAll('.edit-content-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sectionId = btn.dataset.sectionId;
+            const section = state.sections.find(s => s.id === sectionId);
+            if (section) {
+                state.editingSection = section;
+                showEditSectionModal(section);
+            }
+        });
+    });
+
+    // Edit data (table) buttons
     document.querySelectorAll('.edit-data-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const sectionId = btn.dataset.sectionId;
@@ -693,7 +714,15 @@ function setupSectionButtons() {
         });
     });
 
-    // Add content buttons
+    // Delete section buttons
+    document.querySelectorAll('.delete-section-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const sectionId = btn.dataset.sectionId;
+            deleteSection(sectionId);
+        });
+    });
+
+    // Add content buttons (for placeholders)
     document.querySelectorAll('.add-content-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             const sectionId = btn.dataset.sectionId;
@@ -818,8 +847,9 @@ function setupEventHandlers() {
         });
     });
 
-    // Close AI panel
+    // Close/Expand AI panel
     document.getElementById('close-ai-panel').addEventListener('click', toggleAIPanel);
+    document.getElementById('expand-ai-panel').addEventListener('click', expandAIPanel);
 
     // Export PDF
     document.getElementById('export-btn').addEventListener('click', exportToPDF);
@@ -835,6 +865,122 @@ function setupEventHandlers() {
     });
 
     document.getElementById('file-input').addEventListener('change', handleFileAttachment);
+
+    // Edit Data Modal
+    document.getElementById('close-edit-modal').addEventListener('click', closeEditDataModal);
+    document.getElementById('cancel-edit-modal').addEventListener('click', closeEditDataModal);
+    document.getElementById('edit-modal-backdrop').addEventListener('click', closeEditDataModal);
+    document.getElementById('save-edit-modal').addEventListener('click', saveTableData);
+
+    // Edit Section Content Modal
+    document.getElementById('close-edit-section').addEventListener('click', closeEditSectionModal);
+    document.getElementById('cancel-edit-section').addEventListener('click', closeEditSectionModal);
+    document.getElementById('edit-section-backdrop').addEventListener('click', closeEditSectionModal);
+    document.getElementById('save-edit-section').addEventListener('click', saveSectionContent);
+
+    // Add Section Modal
+    document.getElementById('add-section-btn').addEventListener('click', showAddSectionModal);
+    document.getElementById('cancel-add-section').addEventListener('click', closeAddSectionModal);
+    document.getElementById('add-section-backdrop').addEventListener('click', closeAddSectionModal);
+    document.getElementById('confirm-add-section').addEventListener('click', addNewSection);
+
+    // Auto-fill title when type changes
+    document.getElementById('new-section-type').addEventListener('change', (e) => {
+        const type = e.target.value;
+        const titleMap = {
+            'EXECUTIVE_SUMMARY': 'Executive Summary',
+            'COMPANY_OVERVIEW': 'Company Overview',
+            'FINANCIAL_PERFORMANCE': 'Financial Performance',
+            'MARKET_DYNAMICS': 'Market Dynamics',
+            'COMPETITIVE_LANDSCAPE': 'Competitive Landscape',
+            'RISK_ASSESSMENT': 'Risk Assessment',
+            'DEAL_STRUCTURE': 'Deal Structure',
+            'VALUE_CREATION': 'Value Creation',
+            'EXIT_STRATEGY': 'Exit Strategy',
+            'RECOMMENDATION': 'Recommendation',
+            'APPENDIX': 'Appendix',
+            'CUSTOM': '',
+        };
+        document.getElementById('new-section-title').value = titleMap[type] || '';
+    });
+
+    // Setup AI panel resize
+    setupAIPanelResize();
+}
+
+// ============================================================
+// AI Panel Resize
+// ============================================================
+function setupAIPanelResize() {
+    const resizeHandle = document.getElementById('ai-resize-handle');
+    const aiPanel = document.getElementById('ai-panel');
+
+    if (!resizeHandle || !aiPanel) return;
+
+    // Load saved width from localStorage
+    const savedWidth = localStorage.getItem('aiPanelWidth');
+    if (savedWidth) {
+        state.aiPanelWidth = parseInt(savedWidth, 10);
+        aiPanel.style.width = `${state.aiPanelWidth}px`;
+    }
+
+    let startX = 0;
+    let startWidth = 0;
+
+    const startResize = (e) => {
+        e.preventDefault();
+        state.isResizing = true;
+        startX = e.clientX || e.touches?.[0]?.clientX || 0;
+        startWidth = aiPanel.offsetWidth;
+
+        document.body.classList.add('resizing-panel');
+        aiPanel.classList.add('resizing');
+
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+        document.addEventListener('touchmove', doResize);
+        document.addEventListener('touchend', stopResize);
+    };
+
+    const doResize = (e) => {
+        if (!state.isResizing) return;
+
+        const clientX = e.clientX || e.touches?.[0]?.clientX || 0;
+        const diff = startX - clientX; // Inverted because we're dragging from right side
+        let newWidth = startWidth + diff;
+
+        // Constraints: min 280px, max 700px
+        newWidth = Math.max(280, Math.min(700, newWidth));
+
+        state.aiPanelWidth = newWidth;
+        aiPanel.style.width = `${newWidth}px`;
+    };
+
+    const stopResize = () => {
+        if (!state.isResizing) return;
+
+        state.isResizing = false;
+        document.body.classList.remove('resizing-panel');
+        aiPanel.classList.remove('resizing');
+
+        document.removeEventListener('mousemove', doResize);
+        document.removeEventListener('mouseup', stopResize);
+        document.removeEventListener('touchmove', doResize);
+        document.removeEventListener('touchend', stopResize);
+
+        // Save to localStorage
+        localStorage.setItem('aiPanelWidth', state.aiPanelWidth.toString());
+    };
+
+    resizeHandle.addEventListener('mousedown', startResize);
+    resizeHandle.addEventListener('touchstart', startResize);
+
+    // Double-click to reset to default width
+    resizeHandle.addEventListener('dblclick', () => {
+        state.aiPanelWidth = 400;
+        aiPanel.style.width = '400px';
+        localStorage.setItem('aiPanelWidth', '400');
+    });
 }
 
 async function sendMessage() {
@@ -1094,12 +1240,30 @@ async function regenerateSection(sectionId) {
 
     // Show loading state
     const btn = document.querySelector(`.regenerate-btn[data-section-id="${sectionId}"]`);
-    const originalText = btn.innerHTML;
-    btn.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">refresh</span> Generating...`;
-    btn.disabled = true;
+    if (btn) {
+        btn.innerHTML = `<span class="material-symbols-outlined text-[14px] animate-spin">sync</span>`;
+        btn.disabled = true;
+    }
+
+    // Add thinking message
+    const thinkingMsgId = `m${Date.now()}`;
+    state.messages.push({
+        id: thinkingMsgId,
+        role: 'assistant',
+        content: `<p>Regenerating <strong>${section.title}</strong> content...</p>
+        <div class="flex items-center gap-2 mt-2 text-slate-500">
+            <span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+            <span class="text-xs">Analyzing deal context and documents</span>
+        </div>`,
+        timestamp: 'Just now'
+    });
+    renderMessages();
 
     // Try real API first
     const apiResult = await regenerateSectionAPI(sectionId);
+
+    // Remove thinking message
+    state.messages = state.messages.filter(m => m.id !== thinkingMsgId);
 
     if (apiResult) {
         // Update section with API result
@@ -1107,37 +1271,427 @@ async function regenerateSection(sectionId) {
         section.aiGenerated = true;
         renderSections();
 
-        // Add AI message about regeneration
+        // Add success message
         state.messages.push({
             id: `m${Date.now()}`,
             role: 'assistant',
-            content: `<p>I've regenerated the <strong>${section.title}</strong> section using AI analysis of the available deal documents and data.</p>`,
+            content: `<p>Done! I've regenerated the <strong>${section.title}</strong> section using AI analysis of the available deal documents.</p>
+            <p class="mt-2 text-xs text-slate-500">Review the content and use the edit button to make any adjustments.</p>`,
             timestamp: 'Just now'
         });
         renderMessages();
     } else {
-        // Fall back to demo behavior
-        setTimeout(() => {
-            section.aiGenerated = true;
-            renderSections();
+        // Fall back to demo behavior with simulated content
+        await new Promise(resolve => setTimeout(resolve, 1500));
 
-            // Add AI message about regeneration
-            state.messages.push({
-                id: `m${Date.now()}`,
-                role: 'assistant',
-                content: `<p>I've regenerated the <strong>${section.title}</strong> section with updated analysis based on the latest data room documents.</p>`,
-                timestamp: 'Just now'
-            });
-            renderMessages();
-        }, 2000);
+        // Generate demo content based on section type
+        const demoContent = generateDemoContent(section.type, section.title);
+        section.content = demoContent;
+        section.aiGenerated = true;
+        renderSections();
+
+        state.messages.push({
+            id: `m${Date.now()}`,
+            role: 'assistant',
+            content: `<p>I've regenerated the <strong>${section.title}</strong> section with updated analysis.</p>
+            <p class="mt-2 text-xs text-amber-600">Note: Running in demo mode. Connect to API for real AI generation.</p>`,
+            timestamp: 'Just now'
+        });
+        renderMessages();
     }
+}
+
+function generateDemoContent(type, title) {
+    const contentMap = {
+        'EXECUTIVE_SUMMARY': `<p class="text-slate-800 leading-relaxed text-[15px] mb-4">
+            This opportunity represents a compelling investment thesis with strong fundamentals and attractive return potential.
+            The company has demonstrated <strong>consistent growth</strong> and market leadership in its sector.
+        </p>
+        <p class="text-slate-800 leading-relaxed text-[15px]">
+            Key highlights include robust revenue growth, expanding margins, and a defensible competitive position.
+            The proposed transaction offers an attractive entry valuation with multiple value creation levers.
+        </p>`,
+        'FINANCIAL_PERFORMANCE': `<p class="text-slate-800 leading-relaxed text-[15px] mb-4">
+            The company has delivered strong financial performance with revenue growing at a <strong>15-20% CAGR</strong> over the past three years.
+            EBITDA margins have expanded from 25% to 32% through operational improvements.
+        </p>
+        <p class="text-slate-800 leading-relaxed text-[15px]">
+            Cash flow generation remains robust, with conversion rates exceeding 90% of EBITDA.
+            Working capital management has improved significantly.
+        </p>`,
+        'MARKET_DYNAMICS': `<p class="text-slate-800 leading-relaxed text-[15px] mb-4">
+            The target market is large and growing, with an estimated TAM of <strong>$50B+</strong> and projected growth of 8-10% annually.
+            Key growth drivers include digital transformation and increasing regulatory requirements.
+        </p>
+        <p class="text-slate-800 leading-relaxed text-[15px]">
+            The competitive landscape remains fragmented, presenting consolidation opportunities.
+        </p>`,
+        'RISK_ASSESSMENT': `<p class="text-slate-800 leading-relaxed text-[15px] mb-4">
+            Key risks have been identified and mitigants developed:
+        </p>
+        <ul class="list-disc pl-5 text-slate-700 space-y-2 text-[15px]">
+            <li><strong>High:</strong> Customer concentration - top 3 customers represent 30% of revenue. Mitigant: Active pipeline diversification.</li>
+            <li><strong>Medium:</strong> Technology obsolescence risk. Mitigant: Ongoing R&D investment roadmap.</li>
+            <li><strong>Low:</strong> Regulatory changes. Mitigant: Compliance team in place.</li>
+        </ul>`,
+        'DEAL_STRUCTURE': `<p class="text-slate-800 leading-relaxed text-[15px] mb-4">
+            Proposed transaction structure includes equity investment at an attractive multiple,
+            with management rollover and appropriate governance rights.
+        </p>
+        <p class="text-slate-800 leading-relaxed text-[15px]">
+            Debt financing package has been secured at competitive terms. Exit analysis suggests multiple paths to liquidity.
+        </p>`,
+    };
+
+    return contentMap[type] || `<p class="text-slate-800 leading-relaxed text-[15px]">
+        AI-generated content for "${title}" would be populated here based on deal data and documents.
+        Click the edit button to customize this section.
+    </p>`;
 }
 
 function editSectionData(sectionId) {
     const section = state.sections.find(s => s.id === sectionId);
     if (!section) return;
 
-    alert(`Edit Data modal for "${section.title}" would open here.\n\nThis would allow you to:\n- Edit table values\n- Update chart data\n- Modify citations`);
+    state.editingSection = section;
+
+    // If section has table data, show table editor
+    if (section.hasTable && section.tableData) {
+        showEditDataModal(section);
+    } else {
+        // Otherwise show content editor
+        showEditSectionModal(section);
+    }
+}
+
+function showEditDataModal(section) {
+    const modal = document.getElementById('edit-data-modal');
+    const title = document.getElementById('edit-modal-title');
+    const subtitle = document.getElementById('edit-modal-subtitle');
+    const content = document.getElementById('edit-modal-content');
+
+    title.textContent = `Edit ${section.title} Data`;
+    subtitle.textContent = 'Modify table values below. Changes will be reflected in the memo.';
+
+    // Render table editor
+    const tableData = section.tableData;
+    let tableHtml = `<div class="overflow-x-auto">
+        <table class="w-full text-sm border-collapse" id="edit-table">
+            <thead>
+                <tr class="bg-slate-100">
+                    ${tableData.headers.map((h, i) => `
+                        <th class="px-3 py-2 text-left font-semibold border border-slate-200 ${i === 0 ? 'bg-slate-50' : ''}">
+                            ${i === 0 ? h : `<input type="text" value="${h}" class="w-full px-2 py-1 border border-slate-200 rounded text-center font-semibold bg-white" data-header="${i}">`}
+                        </th>
+                    `).join('')}
+                </tr>
+            </thead>
+            <tbody>
+                ${tableData.rows.map((row, rowIdx) => `
+                    <tr class="${row.isBold ? 'bg-slate-50 font-bold' : ''}">
+                        <td class="px-3 py-2 border border-slate-200 bg-slate-50">
+                            <input type="text" value="${row.metric}" class="w-full px-2 py-1 border border-slate-200 rounded ${row.isSubMetric ? 'pl-6 italic' : ''}" data-row="${rowIdx}" data-field="metric">
+                        </td>
+                        ${row.values.map((v, colIdx) => `
+                            <td class="px-3 py-2 border border-slate-200">
+                                <input type="text" value="${v}" class="w-full px-2 py-1 border border-slate-200 rounded text-right font-mono" data-row="${rowIdx}" data-col="${colIdx}">
+                            </td>
+                        `).join('')}
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    </div>
+    <div class="mt-4 flex gap-2">
+        <button id="add-table-row" class="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-primary border border-slate-200 hover:border-primary rounded-lg transition-colors">
+            <span class="material-symbols-outlined text-[14px]">add</span>
+            Add Row
+        </button>
+    </div>
+    <div class="mt-4">
+        <label class="block text-sm font-medium text-slate-700 mb-1">Table Footnote</label>
+        <input type="text" id="table-footnote" value="${tableData.footnote || ''}" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm">
+    </div>`;
+
+    content.innerHTML = tableHtml;
+
+    // Add row button handler
+    document.getElementById('add-table-row')?.addEventListener('click', () => {
+        const tbody = document.querySelector('#edit-table tbody');
+        const colCount = tableData.headers.length;
+        const newRowIdx = tableData.rows.length;
+        const newRow = document.createElement('tr');
+        newRow.innerHTML = `
+            <td class="px-3 py-2 border border-slate-200 bg-slate-50">
+                <input type="text" value="New Metric" class="w-full px-2 py-1 border border-slate-200 rounded" data-row="${newRowIdx}" data-field="metric">
+            </td>
+            ${Array(colCount - 1).fill(0).map((_, i) => `
+                <td class="px-3 py-2 border border-slate-200">
+                    <input type="text" value="$0" class="w-full px-2 py-1 border border-slate-200 rounded text-right font-mono" data-row="${newRowIdx}" data-col="${i}">
+                </td>
+            `).join('')}
+        `;
+        tbody.appendChild(newRow);
+    });
+
+    modal.classList.remove('hidden');
+}
+
+function showEditSectionModal(section) {
+    const modal = document.getElementById('edit-section-modal');
+    const title = document.getElementById('edit-section-title');
+    const textarea = document.getElementById('edit-section-content');
+
+    title.textContent = `Edit: ${section.title}`;
+
+    // Convert HTML to plain text for editing (or show raw HTML)
+    textarea.value = section.content || '';
+
+    modal.classList.remove('hidden');
+}
+
+function closeEditDataModal() {
+    document.getElementById('edit-data-modal').classList.add('hidden');
+    state.editingSection = null;
+}
+
+function closeEditSectionModal() {
+    document.getElementById('edit-section-modal').classList.add('hidden');
+    state.editingSection = null;
+}
+
+function saveTableData() {
+    if (!state.editingSection) return;
+
+    const section = state.editingSection;
+
+    // Collect data from inputs
+    const headerInputs = document.querySelectorAll('#edit-table thead input[data-header]');
+    const newHeaders = [section.tableData.headers[0]]; // Keep first header
+    headerInputs.forEach(input => {
+        newHeaders.push(input.value);
+    });
+
+    const rowInputs = document.querySelectorAll('#edit-table tbody tr');
+    const newRows = [];
+    rowInputs.forEach((tr, rowIdx) => {
+        const metricInput = tr.querySelector('[data-field="metric"]');
+        const valueInputs = tr.querySelectorAll('[data-col]');
+        const originalRow = section.tableData.rows[rowIdx] || {};
+
+        newRows.push({
+            metric: metricInput?.value || 'Metric',
+            values: Array.from(valueInputs).map(input => input.value),
+            isBold: originalRow.isBold || false,
+            isSubMetric: originalRow.isSubMetric || false,
+            highlight: originalRow.highlight,
+        });
+    });
+
+    const footnote = document.getElementById('table-footnote')?.value || '';
+
+    // Update section
+    section.tableData = {
+        headers: newHeaders,
+        rows: newRows,
+        footnote,
+    };
+
+    state.isDirty = true;
+
+    // Re-render and close modal
+    renderSections();
+    closeEditDataModal();
+
+    // Save to API if real memo
+    saveSectionToAPI(section.id);
+
+    // Show success message in chat
+    state.messages.push({
+        id: `m${Date.now()}`,
+        role: 'assistant',
+        content: `<p>I've updated the table data in the <strong>${section.title}</strong> section. The changes are now reflected in the memo.</p>`,
+        timestamp: 'Just now'
+    });
+    renderMessages();
+}
+
+function saveSectionContent() {
+    if (!state.editingSection) return;
+
+    const section = state.editingSection;
+    const textarea = document.getElementById('edit-section-content');
+    const newContent = textarea.value;
+
+    // Update section content
+    section.content = newContent;
+    state.isDirty = true;
+
+    // Re-render
+    renderSections();
+    closeEditSectionModal();
+
+    // Save to API
+    saveSectionToAPI(section.id);
+
+    // Show success in chat
+    state.messages.push({
+        id: `m${Date.now()}`,
+        role: 'assistant',
+        content: `<p>Content updated for <strong>${section.title}</strong>.</p>`,
+        timestamp: 'Just now'
+    });
+    renderMessages();
+}
+
+// ============================================================
+// Add Section Modal
+// ============================================================
+function showAddSectionModal() {
+    const modal = document.getElementById('add-section-modal');
+    document.getElementById('new-section-type').value = 'CUSTOM';
+    document.getElementById('new-section-title').value = '';
+    document.getElementById('new-section-ai').checked = false;
+    modal.classList.remove('hidden');
+}
+
+function closeAddSectionModal() {
+    document.getElementById('add-section-modal').classList.add('hidden');
+}
+
+async function addNewSection() {
+    const type = document.getElementById('new-section-type').value;
+    const title = document.getElementById('new-section-title').value.trim();
+    const generateAI = document.getElementById('new-section-ai').checked;
+
+    if (!title) {
+        alert('Please enter a section title');
+        return;
+    }
+
+    // Create new section
+    const newSection = {
+        id: `s${Date.now()}`,
+        type,
+        title,
+        sortOrder: state.sections.length,
+        aiGenerated: generateAI,
+        content: generateAI ? '' : '<p>Enter your content here...</p>',
+    };
+
+    // Add to state
+    state.sections.push(newSection);
+    state.isDirty = true;
+
+    // Close modal
+    closeAddSectionModal();
+
+    // Re-render
+    renderSidebar();
+    renderSections();
+
+    // Set as active
+    setActiveSection(newSection.id);
+
+    // If not demo mode, save to API
+    if (!state.memo.id.startsWith('demo-')) {
+        try {
+            const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/sections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type,
+                    title,
+                    content: newSection.content,
+                    aiGenerated: generateAI,
+                }),
+            });
+
+            if (response.ok) {
+                const savedSection = await response.json();
+                // Update local section with server ID
+                newSection.id = savedSection.id;
+                console.log('Section saved to API:', savedSection.id);
+
+                // If AI generation requested, call generate endpoint
+                if (generateAI) {
+                    regenerateSection(savedSection.id);
+                }
+            }
+        } catch (error) {
+            console.error('Error saving section:', error);
+        }
+    } else if (generateAI) {
+        // Demo mode AI generation
+        setTimeout(() => {
+            const section = state.sections.find(s => s.id === newSection.id);
+            if (section) {
+                section.content = `<p>AI-generated content for "${title}" would appear here. This is a demo preview.</p>
+                <p>In production, this would call the AI API to generate professional content based on the deal context and data room documents.</p>`;
+                section.aiGenerated = true;
+                renderSections();
+            }
+        }, 1500);
+    }
+
+    // Show success in chat
+    state.messages.push({
+        id: `m${Date.now()}`,
+        role: 'assistant',
+        content: `<p>I've added a new <strong>${title}</strong> section to your memo.${generateAI ? ' Generating AI content...' : ' Click on it to add content.'}</p>`,
+        timestamp: 'Just now'
+    });
+    renderMessages();
+}
+
+// ============================================================
+// Delete Section
+// ============================================================
+async function deleteSection(sectionId) {
+    const section = state.sections.find(s => s.id === sectionId);
+    if (!section) return;
+
+    if (!confirm(`Are you sure you want to delete the "${section.title}" section? This cannot be undone.`)) {
+        return;
+    }
+
+    // Remove from state
+    state.sections = state.sections.filter(s => s.id !== sectionId);
+
+    // Update sortOrders
+    state.sections.forEach((s, i) => s.sortOrder = i);
+
+    state.isDirty = true;
+
+    // Set new active section
+    if (state.activeSection === sectionId) {
+        state.activeSection = state.sections[0]?.id || null;
+    }
+
+    // Re-render
+    renderSidebar();
+    renderSections();
+
+    // Delete from API if not demo
+    if (!state.memo.id.startsWith('demo-')) {
+        try {
+            await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/sections/${sectionId}`, {
+                method: 'DELETE',
+            });
+            console.log('Section deleted from API');
+        } catch (error) {
+            console.error('Error deleting section:', error);
+        }
+    }
+
+    // Show in chat
+    state.messages.push({
+        id: `m${Date.now()}`,
+        role: 'assistant',
+        content: `<p>Removed the <strong>${section.title}</strong> section from the memo.</p>`,
+        timestamp: 'Just now'
+    });
+    renderMessages();
 }
 
 function addSectionContent(sectionId) {
@@ -1218,13 +1772,38 @@ async function exportToPDF() {
 // ============================================================
 function toggleAIPanel() {
     const panel = document.getElementById('ai-panel');
+    const collapsedPanel = document.getElementById('ai-panel-collapsed');
+    const resizeHandle = document.getElementById('ai-resize-handle');
     state.isAIPanelOpen = !state.isAIPanelOpen;
 
     if (state.isAIPanelOpen) {
         panel.classList.remove('hidden');
+        panel.classList.add('flex');
+        panel.style.width = `${state.aiPanelWidth}px`;
+        collapsedPanel.classList.add('hidden');
+        collapsedPanel.classList.remove('flex');
+        if (resizeHandle) resizeHandle.classList.remove('hidden');
     } else {
         panel.classList.add('hidden');
+        panel.classList.remove('flex');
+        collapsedPanel.classList.remove('hidden');
+        collapsedPanel.classList.add('flex');
+        if (resizeHandle) resizeHandle.classList.add('hidden');
     }
+}
+
+function expandAIPanel() {
+    state.isAIPanelOpen = true;
+    const panel = document.getElementById('ai-panel');
+    const collapsedPanel = document.getElementById('ai-panel-collapsed');
+    const resizeHandle = document.getElementById('ai-resize-handle');
+
+    panel.classList.remove('hidden');
+    panel.classList.add('flex');
+    panel.style.width = `${state.aiPanelWidth}px`;
+    collapsedPanel.classList.add('hidden');
+    collapsedPanel.classList.remove('flex');
+    if (resizeHandle) resizeHandle.classList.remove('hidden');
 }
 
 function handleFileAttachment(e) {

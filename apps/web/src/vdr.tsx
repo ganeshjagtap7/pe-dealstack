@@ -41,6 +41,10 @@ function getDealIdFromUrl(): string | null {
 const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = ({ onSelectDeal }) => {
   const [deals, setDeals] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const createInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const loadDeals = async () => {
@@ -56,6 +60,43 @@ const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = 
     };
     loadDeals();
   }, []);
+
+  // Auto-focus input when modal opens
+  useEffect(() => {
+    if (showCreateModal && createInputRef.current) {
+      createInputRef.current.focus();
+    }
+  }, [showCreateModal]);
+
+  const handleCreateDataRoom = async () => {
+    if (!newRoomName.trim() || creating) return;
+
+    setCreating(true);
+    try {
+      const newDeal = await createDeal(newRoomName.trim());
+      if (newDeal && newDeal.id) {
+        // Navigate to the new data room
+        window.location.href = `/vdr.html?dealId=${newDeal.id}`;
+      }
+    } catch (error: any) {
+      console.error('Error creating data room:', error);
+      alert(error.message || 'Failed to create data room. Please try again.');
+    } finally {
+      setCreating(false);
+      setShowCreateModal(false);
+      setNewRoomName('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleCreateDataRoom();
+    } else if (e.key === 'Escape') {
+      setShowCreateModal(false);
+      setNewRoomName('');
+    }
+  };
 
   const handleDealClick = (dealId: string) => {
     // Navigate to the deal's data room
@@ -75,12 +116,89 @@ const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = 
 
   return (
     <div className="flex flex-col h-full w-full bg-slate-50">
+      {/* Create Data Room Modal */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => { setShowCreateModal(false); setNewRoomName(''); }}
+          />
+          {/* Modal */}
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between p-5 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg" style={{ backgroundColor: '#E6EEF5' }}>
+                  <span className="material-symbols-outlined text-primary">add_box</span>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">Create Data Room</h3>
+              </div>
+              <button
+                onClick={() => { setShowCreateModal(false); setNewRoomName(''); }}
+                className="p-1 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-slate-400">close</span>
+              </button>
+            </div>
+            {/* Content */}
+            <div className="p-5">
+              <label className="block text-sm font-medium text-slate-600 mb-2">
+                Data Room Name
+              </label>
+              <input
+                ref={createInputRef}
+                type="text"
+                value={newRoomName}
+                onChange={(e) => setNewRoomName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="e.g., Project Apollo, Acme Corp Acquisition"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-slate-900 placeholder:text-slate-400"
+              />
+              <p className="mt-2 text-xs text-slate-400">
+                A new data room will be created with default folders for due diligence.
+              </p>
+            </div>
+            {/* Footer */}
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200 bg-slate-50/50">
+              <button
+                onClick={() => { setShowCreateModal(false); setNewRoomName(''); }}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateDataRoom}
+                disabled={!newRoomName.trim() || creating}
+                className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 flex items-center gap-2"
+              >
+                {creating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    Creating...
+                  </>
+                ) : (
+                  'Create Data Room'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
         <div>
           <h1 className="text-xl font-bold text-slate-900">All Data Rooms</h1>
           <p className="text-sm text-slate-500">{deals.length} active deals</p>
         </div>
+        <button
+          onClick={() => setShowCreateModal(true)}
+          className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-800 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[18px]">add</span>
+          Create Data Room
+        </button>
       </header>
 
       {/* Deals Grid */}
@@ -89,10 +207,20 @@ const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = 
           <div className="flex flex-col items-center justify-center h-full">
             <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">folder_open</span>
             <h3 className="text-lg font-semibold text-slate-700 mb-2">No Data Rooms Yet</h3>
-            <p className="text-slate-500 mb-4">Create a deal from the CRM to get started</p>
-            <a href="/crm.html" className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors">
-              Go to Deals
-            </a>
+            <p className="text-slate-500 mb-6">Create your first data room to get started with due diligence</p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowCreateModal(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                Create Data Room
+              </button>
+              <span className="text-slate-400">or</span>
+              <a href="/crm.html" className="px-4 py-2 text-slate-600 hover:text-slate-900 transition-colors font-medium">
+                Go to Deals
+              </a>
+            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">

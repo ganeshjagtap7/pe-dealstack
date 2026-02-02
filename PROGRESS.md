@@ -3609,3 +3609,293 @@ VDR Overview (/vdr.html)
 | ⏳ Real file storage | Needs S3/Supabase Storage |
 | ⏳ Real AI analysis | Needs OpenAI integration |
 
+
+---
+
+## February 2, 2026 - Session 2
+
+### Timestamp: 2026-02-02 ~14:00 - 16:30 IST
+
+---
+
+### Memo Builder - Full Feature Implementation
+
+#### 1. Collapsible AI Analyst Sidebar
+- **Time:** ~14:00
+- **Type:** New Feature
+- **Files Modified:**
+  - `apps/web/memo-builder.html`
+  - `apps/web/memo-builder.js`
+
+**Implementation:**
+- Added collapsed state sidebar with vertical "AI Analyst" text
+- Smooth CSS transitions for expand/collapse
+- Toggle button in panel header
+- Persists state during session
+
+**UI States:**
+| State | Width | Shows |
+|-------|-------|-------|
+| Expanded | 400px (default) | Full chat interface |
+| Collapsed | 48px | Icon + vertical text |
+
+---
+
+#### 2. Resizable AI Panel (VS Code Style)
+- **Time:** ~14:30
+- **Type:** New Feature
+- **Files Modified:**
+  - `apps/web/memo-builder.html` (resize handle + CSS)
+  - `apps/web/memo-builder.js` (drag logic)
+
+**Features:**
+- Drag handle between editor and AI panel
+- Mouse and touch support
+- Width constraints: 280px min, 700px max
+- LocalStorage persistence (`aiPanelWidth` key)
+- Double-click to reset to default (400px)
+- Visual feedback on hover (handle turns blue)
+- Body cursor changes during resize
+
+**CSS Added:**
+```css
+#ai-resize-handle { touch-action: none; }
+body.resizing-panel { cursor: col-resize !important; user-select: none; }
+#ai-panel.resizing { transition: none; }
+```
+
+**State Properties:**
+```javascript
+state.aiPanelWidth = 400;  // Current width
+state.isResizing = false;  // Drag in progress
+```
+
+---
+
+#### 3. Compact Edit Buttons
+- **Time:** ~14:45
+- **Type:** UI Enhancement
+- **File Modified:** `apps/web/memo-builder.js`
+
+**Before:** Text buttons ("Edit Data", "Regenerate")
+**After:** Icon-only buttons with tooltips
+
+**Buttons on Active Section:**
+| Icon | Action | Tooltip |
+|------|--------|---------|
+| refresh | Regenerate with AI | "Regenerate with AI" |
+| edit_note | Edit content | "Edit content" |
+| table_chart | Edit table data | "Edit table data" |
+| delete | Delete section | "Delete section" |
+
+**Styling:** `p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700`
+
+---
+
+#### 4. Edit Data Modal (Table Editor)
+- **Time:** ~15:00
+- **Type:** New Feature
+- **Files Modified:**
+  - `apps/web/memo-builder.html` (modal HTML)
+  - `apps/web/memo-builder.js` (showEditDataModal, saveTableData)
+
+**Features:**
+- Full table editing with editable cells
+- Add new rows dynamically
+- Edit metric names and values
+- Edit table footnotes
+- Save syncs to API (if not demo mode)
+- Success message in AI chat
+
+**Modal Structure:**
+```
+┌─────────────────────────────────────┐
+│ Edit Financial Performance Data     │
+│ Modify table values below           │
+├─────────────────────────────────────┤
+│ [Editable Table]                    │
+│ + Add Row                           │
+│ Footnote: [________________]        │
+├─────────────────────────────────────┤
+│              Cancel | Save Changes  │
+└─────────────────────────────────────┘
+```
+
+---
+
+#### 5. Edit Section Content Modal
+- **Time:** ~15:15
+- **Type:** New Feature
+- **Files Modified:**
+  - `apps/web/memo-builder.html`
+  - `apps/web/memo-builder.js` (showEditSectionModal, saveSectionContent)
+
+**Features:**
+- Raw HTML editor for section content
+- Monospace font for code-like editing
+- Helper text showing supported HTML tags
+- Saves to API and re-renders section
+
+---
+
+#### 6. Add Section Modal
+- **Time:** ~15:30
+- **Type:** New Feature
+- **Files Modified:**
+  - `apps/web/memo-builder.html`
+  - `apps/web/memo-builder.js` (showAddSectionModal, addNewSection)
+
+**Section Types Available:**
+- Executive Summary
+- Company Overview
+- Financial Performance
+- Market Dynamics
+- Competitive Landscape
+- Risk Assessment
+- Deal Structure
+- Value Creation
+- Exit Strategy
+- Recommendation
+- Appendix
+- Custom Section
+
+**Features:**
+- Type dropdown with auto-fill title
+- Optional "Generate with AI" checkbox
+- Saves to API if not demo mode
+- Triggers AI generation if checkbox checked
+
+---
+
+#### 7. Delete Section
+- **Time:** ~15:45
+- **Type:** New Feature
+- **File Modified:** `apps/web/memo-builder.js`
+
+**Features:**
+- Confirmation dialog before delete
+- Updates sortOrder of remaining sections
+- Removes from sidebar and editor
+- Deletes from API if not demo mode
+- Shows removal message in AI chat
+
+---
+
+#### 8. Regenerate Section with AI
+- **Time:** ~16:00
+- **Type:** Enhancement
+- **File Modified:** `apps/web/memo-builder.js`
+
+**Flow:**
+1. Shows loading spinner on button
+2. Adds "Regenerating..." message in chat
+3. Calls API (`POST /api/memos/:id/sections/:sectionId/generate`)
+4. Falls back to demo content if API unavailable
+5. Updates section with AI Generated badge
+6. Shows success message in chat
+
+**Demo Content Types:**
+- EXECUTIVE_SUMMARY - Investment thesis summary
+- FINANCIAL_PERFORMANCE - Revenue/EBITDA analysis
+- MARKET_DYNAMICS - TAM and growth drivers
+- RISK_ASSESSMENT - Risk matrix with mitigants
+- DEAL_STRUCTURE - Transaction structure details
+
+---
+
+### VDR - Create Data Room Feature
+
+#### Create Data Room Button
+- **Time:** ~16:15
+- **Type:** New Feature
+- **File Modified:** `apps/web/src/vdr.tsx`
+
+**Location:** All Data Rooms overview page header
+
+**Implementation:**
+- "Create Data Room" button in header (always visible)
+- Also in empty state with "Go to Deals" alternative
+- Opens modal for entering data room name
+
+**Modal Features:**
+- Auto-focus on input
+- Enter key to submit
+- Escape key to cancel
+- Loading state during creation
+- Error handling with user-friendly messages
+- Creates deal via `createDeal()` API
+- Navigates to new data room on success
+
+**State Added:**
+```javascript
+const [showCreateModal, setShowCreateModal] = useState(false);
+const [newRoomName, setNewRoomName] = useState('');
+const [creating, setCreating] = useState(false);
+```
+
+**Empty State Updated:**
+```
+┌─────────────────────────────────────┐
+│         📁 No Data Rooms Yet        │
+│                                     │
+│  Create your first data room to    │
+│  get started with due diligence    │
+│                                     │
+│  [Create Data Room]  or  Go to Deals│
+└─────────────────────────────────────┘
+```
+
+---
+
+### Files Changed Summary (This Session)
+
+| File | Changes |
+|------|---------|
+| `apps/web/memo-builder.html` | Resize handle, 3 modals, CSS for resize |
+| `apps/web/memo-builder.js` | Panel resize, edit modals, section CRUD, AI regenerate |
+| `apps/web/src/vdr.tsx` | Create Data Room button + modal |
+
+---
+
+### Technical Notes
+
+**LocalStorage Keys Used:**
+- `aiPanelWidth` - Memo Builder AI panel width (default: 400)
+
+**API Endpoints Used:**
+- `POST /api/memos/:id/sections` - Create section
+- `PATCH /api/memos/:id/sections/:sectionId` - Update section
+- `DELETE /api/memos/:id/sections/:sectionId` - Delete section
+- `POST /api/memos/:id/sections/:sectionId/generate` - AI regenerate
+- `POST /api/deals` - Create new deal/data room
+
+---
+
+### Feature Status Update
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| ✅ Memo Builder - Collapsible AI Panel | Complete | With smooth transitions |
+| ✅ Memo Builder - Resizable AI Panel | Complete | VS Code style drag |
+| ✅ Memo Builder - Edit Tables | Complete | Full table editing |
+| ✅ Memo Builder - Edit Content | Complete | HTML editor |
+| ✅ Memo Builder - Add Sections | Complete | With AI generation |
+| ✅ Memo Builder - Delete Sections | Complete | With confirmation |
+| ✅ Memo Builder - AI Regenerate | Complete | Demo fallback |
+| ✅ VDR - Create Data Room | Complete | From overview page |
+| ⏳ VDR - Request Document | Pending | Gmail/Slack integration possible |
+| ⏳ Real AI Integration | Pending | OpenAI API connected but needs testing |
+
+---
+
+### Questions Discussed
+
+**Q: How will "Request" button work in production for missing documents?**
+
+**A: Three implementation options:**
+1. **Basic** - Database record + in-app notification toast
+2. **Email (Gmail)** - Google API + OAuth2 to send emails
+3. **Slack** - Incoming webhooks to post to #deal-requests channel
+
+Both Gmail and Slack integrations are technically feasible. Slack webhooks would be quickest to implement.
+

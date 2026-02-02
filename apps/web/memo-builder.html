@@ -93,6 +93,28 @@
         .section-item.drag-over {
             border-top: 2px solid #003366;
         }
+        /* Panel transitions */
+        #ai-panel, #ai-panel-collapsed {
+            transition: width 0.15s ease-out;
+        }
+        #ai-panel.resizing {
+            transition: none;
+        }
+        /* Small icon buttons */
+        .icon-btn {
+            @apply p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors;
+        }
+        /* Resize handle */
+        #ai-resize-handle {
+            touch-action: none;
+        }
+        body.resizing-panel {
+            cursor: col-resize !important;
+            user-select: none;
+        }
+        body.resizing-panel * {
+            cursor: col-resize !important;
+        }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#0d131b] h-screen overflow-hidden flex font-display selection:bg-primary/20 selection:text-primary">
@@ -151,13 +173,17 @@
 
         <!-- Left Sidebar: Document Outline -->
         <aside class="w-64 bg-slate-50 border-r border-slate-200 flex flex-col shrink-0 hidden md:flex">
-            <div class="p-4 border-b border-slate-100">
+            <div class="p-4 border-b border-slate-100 flex-1 overflow-y-auto custom-scrollbar">
                 <h3 class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">Sections</h3>
                 <nav id="sections-outline" class="flex flex-col gap-1">
                     <!-- Sections will be rendered here by JS -->
                 </nav>
+                <button id="add-section-btn" class="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-500 hover:text-primary hover:bg-white border border-dashed border-slate-300 hover:border-primary rounded-lg transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">add</span>
+                    Add Section
+                </button>
             </div>
-            <div class="p-4 mt-auto">
+            <div class="p-4 shrink-0">
                 <div id="compliance-badge" class="bg-primary-light rounded-lg p-3 border border-primary/20">
                     <div class="flex items-center gap-2 text-primary font-semibold text-xs mb-1">
                         <span class="material-symbols-outlined text-[16px]">verified_user</span>
@@ -199,18 +225,34 @@
             </div>
         </main>
 
-        <!-- Right Sidebar: AI Assistant -->
-        <aside id="ai-panel" class="w-[400px] bg-white border-l border-slate-200 flex flex-col shrink-0 shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)] z-10">
+        <!-- Resize Handle for AI Panel -->
+        <div id="ai-resize-handle" class="w-1 bg-transparent hover:bg-primary/30 cursor-col-resize shrink-0 transition-colors z-20 group relative">
+            <div class="absolute inset-y-0 -left-1 -right-1"></div>
+            <div class="absolute top-1/2 -translate-y-1/2 left-1/2 -translate-x-1/2 w-1 h-8 rounded-full bg-slate-300 group-hover:bg-primary opacity-0 group-hover:opacity-100 transition-opacity"></div>
+        </div>
+
+        <!-- Right Sidebar: AI Assistant (Collapsed State) -->
+        <aside id="ai-panel-collapsed" class="hidden w-12 bg-white border-l border-slate-200 flex-col shrink-0 z-10">
+            <button id="expand-ai-panel" class="flex flex-col items-center justify-center gap-2 py-4 hover:bg-slate-50 transition-colors" title="Open AI Analyst">
+                <div class="size-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
+                    <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                </div>
+                <span class="text-[10px] font-medium text-slate-500 [writing-mode:vertical-rl] rotate-180">AI Analyst</span>
+            </button>
+        </aside>
+
+        <!-- Right Sidebar: AI Assistant (Expanded State) -->
+        <aside id="ai-panel" class="flex flex-col shrink-0 bg-white border-l border-slate-200 shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)] z-10" style="width: 400px;">
             <!-- Header -->
-            <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-white">
+            <div class="p-3 border-b border-slate-100 flex items-center justify-between bg-white">
                 <div class="flex items-center gap-2">
                     <div class="size-6 rounded bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
                         <span class="material-symbols-outlined text-[14px]">auto_awesome</span>
                     </div>
                     <span class="font-bold text-slate-800 text-sm">AI Analyst</span>
                 </div>
-                <button id="close-ai-panel" class="text-slate-400 hover:text-slate-600">
-                    <span class="material-symbols-outlined">close</span>
+                <button id="close-ai-panel" class="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors" title="Collapse panel">
+                    <span class="material-symbols-outlined text-[20px]">chevron_right</span>
                 </button>
             </div>
 
@@ -259,6 +301,114 @@
     <input type="file" id="file-input" class="hidden" accept=".pdf,.xlsx,.xls,.doc,.docx,.csv" multiple />
 
     </div><!-- End Main App Container -->
+
+    <!-- Edit Data Modal -->
+    <div id="edit-data-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50 transition-opacity" id="edit-modal-backdrop"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+                <!-- Modal Header -->
+                <div class="flex items-center justify-between p-4 border-b border-slate-200">
+                    <div>
+                        <h3 id="edit-modal-title" class="text-lg font-bold text-slate-900">Edit Table Data</h3>
+                        <p id="edit-modal-subtitle" class="text-sm text-slate-500">Modify the values in the table below</p>
+                    </div>
+                    <button id="close-edit-modal" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                        <span class="material-symbols-outlined text-slate-500">close</span>
+                    </button>
+                </div>
+                <!-- Modal Body -->
+                <div class="flex-1 overflow-y-auto p-4 custom-scrollbar">
+                    <div id="edit-modal-content">
+                        <!-- Table editor will be rendered here -->
+                    </div>
+                </div>
+                <!-- Modal Footer -->
+                <div class="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50">
+                    <button id="cancel-edit-modal" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="save-edit-modal" class="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">
+                        Save Changes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Section Modal -->
+    <div id="add-section-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50 transition-opacity" id="add-section-backdrop"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-md">
+                <div class="p-6">
+                    <h3 class="text-lg font-bold text-slate-900 mb-4">Add New Section</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Section Type</label>
+                            <select id="new-section-type" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm">
+                                <option value="EXECUTIVE_SUMMARY">Executive Summary</option>
+                                <option value="COMPANY_OVERVIEW">Company Overview</option>
+                                <option value="FINANCIAL_PERFORMANCE">Financial Performance</option>
+                                <option value="MARKET_DYNAMICS">Market Dynamics</option>
+                                <option value="COMPETITIVE_LANDSCAPE">Competitive Landscape</option>
+                                <option value="RISK_ASSESSMENT">Risk Assessment</option>
+                                <option value="DEAL_STRUCTURE">Deal Structure</option>
+                                <option value="VALUE_CREATION">Value Creation</option>
+                                <option value="EXIT_STRATEGY">Exit Strategy</option>
+                                <option value="RECOMMENDATION">Recommendation</option>
+                                <option value="APPENDIX">Appendix</option>
+                                <option value="CUSTOM">Custom Section</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-700 mb-1">Section Title</label>
+                            <input type="text" id="new-section-title" class="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm" placeholder="Enter section title">
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" id="new-section-ai" class="rounded border-slate-300 text-primary focus:ring-primary">
+                            <label for="new-section-ai" class="text-sm text-slate-700">Generate content with AI</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
+                    <button id="cancel-add-section" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="confirm-add-section" class="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">
+                        Add Section
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inline Edit Section Content Modal -->
+    <div id="edit-section-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+        <div class="flex min-h-full items-center justify-center p-4">
+            <div class="fixed inset-0 bg-black/50 transition-opacity" id="edit-section-backdrop"></div>
+            <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+                <div class="flex items-center justify-between p-4 border-b border-slate-200">
+                    <h3 id="edit-section-title" class="text-lg font-bold text-slate-900">Edit Section Content</h3>
+                    <button id="close-edit-section" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                        <span class="material-symbols-outlined text-slate-500">close</span>
+                    </button>
+                </div>
+                <div class="flex-1 overflow-y-auto p-4">
+                    <textarea id="edit-section-content" class="w-full h-96 px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm font-mono resize-none" placeholder="Enter section content (supports HTML)"></textarea>
+                    <p class="mt-2 text-xs text-slate-400">You can use HTML tags like &lt;p&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;strong&gt; for formatting.</p>
+                </div>
+                <div class="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50">
+                    <button id="cancel-edit-section" class="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors">
+                        Cancel
+                    </button>
+                    <button id="save-edit-section" class="px-4 py-2 text-sm font-bold text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">
+                        Save Content
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- Supabase Client -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
