@@ -16,6 +16,8 @@ import {
   fetchDocuments,
   fetchFolderInsights,
   fetchDeal,
+  fetchAllDeals,
+  initializeDealFolders,
   createDeal,
   createFolder,
   uploadDocument,
@@ -35,6 +37,102 @@ function getDealIdFromUrl(): string | null {
   return params.get('dealId') || params.get('id');
 }
 
+// Data Rooms Overview Component (when no dealId is provided)
+const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = ({ onSelectDeal }) => {
+  const [deals, setDeals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadDeals = async () => {
+      setLoading(true);
+      try {
+        const fetchedDeals = await fetchAllDeals();
+        setDeals(fetchedDeals);
+      } catch (error) {
+        console.error('Error loading deals:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadDeals();
+  }, []);
+
+  const handleDealClick = (dealId: string) => {
+    // Navigate to the deal's data room
+    window.location.href = `/vdr.html?dealId=${dealId}`;
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: '#003366' }}></div>
+          <p className="text-slate-500">Loading Data Rooms...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full w-full bg-slate-50">
+      {/* Header */}
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">All Data Rooms</h1>
+          <p className="text-sm text-slate-500">{deals.length} active deals</p>
+        </div>
+      </header>
+
+      {/* Deals Grid */}
+      <div className="flex-1 overflow-auto p-6">
+        {deals.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">folder_open</span>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">No Data Rooms Yet</h3>
+            <p className="text-slate-500 mb-4">Create a deal from the CRM to get started</p>
+            <a href="/crm.html" className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors">
+              Go to Deals
+            </a>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {deals.map((deal) => (
+              <div
+                key={deal.id}
+                onClick={() => handleDealClick(deal.id)}
+                className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer group"
+              >
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-primary/10 transition-colors">
+                    <span className="material-symbols-outlined text-slate-600 group-hover:text-primary">folder_open</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-slate-900 truncate">{deal.name || deal.companyName || 'Untitled Deal'}</h3>
+                    <p className="text-sm text-slate-500">{deal.Company?.industry || deal.industry || 'N/A'}</p>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    deal.stage === 'DUE_DILIGENCE' ? 'bg-blue-100 text-blue-700' :
+                    deal.stage === 'IOI_SUBMITTED' ? 'bg-purple-100 text-purple-700' :
+                    deal.stage === 'SCREENING' ? 'bg-amber-100 text-amber-700' :
+                    'bg-slate-100 text-slate-600'
+                  }`}>
+                    {(deal.stage || 'SCREENING').replace(/_/g, ' ')}
+                  </span>
+                  <span className="text-slate-400 text-xs">
+                    {new Date(deal.updatedAt || deal.createdAt).toLocaleDateString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 export const VDRApp: React.FC = () => {
   const [dealId, setDealId] = useState<string | null>(getDealIdFromUrl());
   const [dealName, setDealName] = useState('');
@@ -49,7 +147,7 @@ export const VDRApp: React.FC = () => {
   const [insightsPanelCollapsed, setInsightsPanelCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
-  const [useMockData, setUseMockData] = useState(!getDealIdFromUrl());
+  const [useMockData, setUseMockData] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
@@ -301,61 +399,101 @@ export const VDRApp: React.FC = () => {
   // Load data when dealId changes or on initial load
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
-
-      // If no dealId, use mock data
+      // If no dealId, the overview component will be shown instead
       if (!dealId) {
-        setUseMockData(true);
-        setDealName('Project Apex');
-        setFolders(mockFolders);
-        setAllFiles(mockFiles);
-        setInsights(mockInsights);
-        setActiveFolderId(mockFolders[0]?.id || null);
         setLoading(false);
         return;
       }
+
+      setLoading(true);
 
       try {
         // Fetch deal info
         const deal = await fetchDeal(dealId);
         if (deal) {
-          setDealName(deal.name || 'Data Room');
+          setDealName(deal.name || deal.companyName || 'Data Room');
+        } else {
+          // Deal not found, redirect to overview
+          window.location.href = '/vdr.html';
+          return;
         }
 
-        // Fetch folders
-        const apiFolders = await fetchFolders(dealId);
+        // Try to fetch existing folders
+        let apiFolders = await fetchFolders(dealId);
+
+        // If no folders exist, auto-create default folders
+        if (apiFolders.length === 0) {
+          console.log('No folders found, initializing default folders...');
+          const initResult = await initializeDealFolders(dealId);
+          apiFolders = initResult.folders;
+        }
+
         if (apiFolders.length > 0) {
-          setUseMockData(false);
-          const transformedFolders = apiFolders.map(transformFolder);
+          // Use mock files for visualization, mapped to real folder IDs
+          const demoFiles: VDRFile[] = [];
+          const transformedFolders = apiFolders.map((apiFolder, idx) => {
+            const folder = transformFolder(apiFolder);
+
+            // Get corresponding mock folder for visual properties
+            const mockFolder = mockFolders[idx % mockFolders.length];
+
+            // Map some mock files to this folder
+            const filesForFolder = mockFiles
+              .filter((_, fileIdx) => fileIdx % apiFolders.length === idx)
+              .map(file => ({
+                ...file,
+                id: `demo-${folder.id}-${file.id}`,
+                folderId: folder.id,
+              }));
+            demoFiles.push(...filesForFolder);
+
+            // Use mock folder visual properties for better visualization
+            return {
+              ...folder,
+              fileCount: filesForFolder.length,
+              status: mockFolder?.status || folder.status,
+              statusLabel: mockFolder?.statusLabel || folder.statusLabel,
+              statusColor: mockFolder?.statusColor || folder.statusColor,
+              readinessPercent: mockFolder?.readinessPercent || folder.readinessPercent,
+            };
+          });
+
           setFolders(transformedFolders);
+          setAllFiles(demoFiles);
 
           // Set first folder as active
           setActiveFolderId(transformedFolders[0].id);
 
-          // Fetch insights for all folders
+          // Use mock insights for visualization
           const insightsMap: Record<string, FolderInsights> = {};
-          for (const folder of apiFolders) {
-            const folderInsight = await fetchFolderInsights(folder.id);
-            insightsMap[folder.id] = transformInsights(folderInsight, folder.id);
-          }
+          const mockInsightKeys = Object.keys(mockInsights);
+          transformedFolders.forEach((folder, idx) => {
+            const mockKey = mockInsightKeys[idx % mockInsightKeys.length];
+            if (mockKey && mockInsights[mockKey]) {
+              insightsMap[folder.id] = {
+                ...mockInsights[mockKey],
+                folderId: folder.id,
+              };
+            } else {
+              insightsMap[folder.id] = transformInsights(null, folder.id);
+            }
+          });
           setInsights(insightsMap);
+          setUseMockData(true); // Mark as demo mode for visualization
         } else {
-          // No folders found - use mock data to show UI
-          setUseMockData(true);
-          setFolders(mockFolders);
-          setAllFiles(mockFiles);
-          setInsights(mockInsights);
-          setActiveFolderId(mockFolders[0]?.id || null);
+          // Still no folders (init failed) - show empty state
+          setUseMockData(false);
+          setFolders([]);
+          setAllFiles([]);
+          setInsights({});
         }
       } catch (error) {
         console.error('Error loading VDR data:', error);
-        // On error, use mock data to show UI
-        setUseMockData(true);
-        setDealName('Project Apex');
-        setFolders(mockFolders);
-        setAllFiles(mockFiles);
-        setInsights(mockInsights);
-        setActiveFolderId(mockFolders[0]?.id || null);
+        // On error, show empty state (not mock data)
+        setUseMockData(false);
+        setFolders([]);
+        setAllFiles([]);
+        setInsights({});
       } finally {
         setLoading(false);
       }
@@ -498,6 +636,11 @@ Generated by PE OS VDR System
     setInsightsPanelCollapsed((prev) => !prev);
   };
 
+  // If no dealId, show the overview of all data rooms
+  if (!dealId) {
+    return <DataRoomsOverview onSelectDeal={(id) => setDealId(id)} />;
+  }
+
   // Loading state
   if (loading) {
     return (
@@ -588,13 +731,21 @@ Generated by PE OS VDR System
       {/* Context Sidebar (Folder Tree) */}
       <aside className="w-[280px] min-w-[280px] flex flex-col border-r border-slate-200 bg-white">
         <div className="p-5 border-b border-slate-200/50">
+          {/* Back to all data rooms link */}
+          <a
+            href="/vdr.html"
+            className="flex items-center gap-1 text-xs text-slate-500 hover:text-primary mb-2 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
+            All Data Rooms
+          </a>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#003366' }}>{dealName}</span>
             {useMockData && (
               <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded">Demo</span>
             )}
           </div>
-          <h2 className="text-lg font-bold text-slate-900">Data Room Index</h2>
+          <h2 className="text-lg font-bold text-slate-900">Data Room</h2>
         </div>
 
         <FolderTree folders={folders} activeFolder={activeFolderId || ''} onFolderSelect={setActiveFolderId} />

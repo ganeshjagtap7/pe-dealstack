@@ -308,6 +308,36 @@ export async function createDeal(name: string): Promise<any | null> {
 }
 
 /**
+ * Fetch all deals (for Data Rooms overview)
+ */
+export async function fetchAllDeals(): Promise<any[]> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/deals`);
+    if (!response.ok) throw new Error('Failed to fetch deals');
+    return await response.json();
+  } catch (error) {
+    console.error('Error fetching deals:', error);
+    return [];
+  }
+}
+
+/**
+ * Initialize default folders for a deal (if none exist)
+ */
+export async function initializeDealFolders(dealId: string): Promise<{ created: boolean; folders: APIFolder[] }> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/deals/${dealId}/folders/init`, {
+      method: 'POST',
+    });
+    if (!response.ok) throw new Error('Failed to initialize folders');
+    return await response.json();
+  } catch (error) {
+    console.error('Error initializing folders:', error);
+    return { created: false, folders: [] };
+  }
+}
+
+/**
  * Transform API folder to VDR Folder type
  */
 export function transformFolder(apiFolder: APIFolder): import('../types/vdr.types').Folder {

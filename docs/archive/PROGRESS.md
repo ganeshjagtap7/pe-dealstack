@@ -3513,3 +3513,99 @@ When users clicked "+ New Folder" in VDR without a dealId, folders were only sto
 | `apps/api/src/middleware/auth.ts` | Default analyst role |
 | `apps/api/src/middleware/rbac.ts` | DEAL_CREATE for analyst, debug logging |
 
+
+---
+
+## February 2, 2026 (Continued)
+
+### VDR (Virtual Data Room) - Full Integration
+
+#### VDR Overview Page - All Data Rooms
+- **Type:** New Feature
+- **File Modified:** `apps/web/src/vdr.tsx`
+- **Description:** Created a Data Rooms overview page showing all deals
+
+**Features:**
+- Grid view of all CRM deals as data room cards
+- Shows deal name, industry, stage badge, and last updated date
+- Click any card to open that deal's data room
+- Empty state with CTA to create deals from CRM
+- Real-time data from `/api/deals` endpoint
+
+#### Auto-Initialize Default Folders
+- **Type:** New Feature
+- **Files Modified:**
+  - `apps/api/src/routes/folders.ts`
+  - `apps/web/src/services/vdrApi.ts`
+
+**API Endpoint:** `POST /api/deals/:dealId/folders/init`
+
+**Default Folders Created:**
+| Folder | Sort Order | Description |
+|--------|------------|-------------|
+| 100 Financials | 100 | Financial statements, projections, and analysis |
+| 200 Legal | 200 | Legal documents, contracts, and agreements |
+| 300 Commercial | 300 | Commercial due diligence materials |
+| 400 HR & Data | 400 | HR documents and data room materials |
+| 500 Intellectual Property | 500 | IP documentation and patents |
+
+**Behavior:**
+- Checks if deal already has folders
+- Only creates if none exist
+- Returns existing folders if already initialized
+
+#### Demo Data Visualization
+- **Type:** Enhancement
+- **File Modified:** `apps/web/src/vdr.tsx`
+- **Description:** Real folders with demo files for team visualization
+
+**How It Works:**
+- Real folders are created and stored in database
+- Demo/mock files are mapped to real folder IDs for visualization
+- Mock insights (red flags, summaries) shown for each folder
+- "Demo" badge indicates visualization mode
+- When real files are uploaded, they will be stored in database
+
+#### Data Room Navigation
+- **Type:** Enhancement
+- **Files:** `apps/web/deal.js`, `apps/web/src/vdr.tsx`
+
+**Navigation Flow:**
+```
+CRM Page (/crm.html)
+    └── Click deal card → Deal Page
+            └── Click "Data Room" button → VDR for that deal
+
+VDR Overview (/vdr.html)
+    └── Click deal card → VDR with dealId
+            └── Click "All Data Rooms" → Back to overview
+```
+
+---
+
+### Files Changed Summary (VDR Integration)
+
+| File | Change Type |
+|------|-------------|
+| `apps/web/src/vdr.tsx` | Major update - overview page, demo data |
+| `apps/web/src/services/vdrApi.ts` | Added fetchAllDeals, initializeDealFolders |
+| `apps/api/src/routes/folders.ts` | Added /folders/init endpoint |
+| `apps/web/deal.js` | Data Room button navigation (existing) |
+
+---
+
+### VDR Features Status
+
+| Feature | Status |
+|---------|--------|
+| ✅ All Data Rooms overview | Complete |
+| ✅ Deal-specific data room | Complete |
+| ✅ Auto-create default folders | Complete |
+| ✅ Demo data visualization | Complete |
+| ✅ Folder navigation | Complete |
+| ✅ File upload UI | Complete |
+| ✅ AI Insights panel | Complete (demo) |
+| ✅ Smart filters | Complete |
+| ⏳ Real file storage | Needs S3/Supabase Storage |
+| ⏳ Real AI analysis | Needs OpenAI integration |
+

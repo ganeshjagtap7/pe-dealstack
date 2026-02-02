@@ -297,6 +297,59 @@ router.get('/folders/:id/insights', async (req: Request, res: Response, next: Ne
   }
 });
 
+// POST /api/deals/:dealId/folders/init - Initialize default folders for a deal
+router.post('/deals/:dealId/folders/init', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { dealId } = req.params;
+
+    // Check if deal already has folders
+    const { data: existingFolders } = await supabase
+      .from('Folder')
+      .select('id')
+      .eq('dealId', dealId)
+      .limit(1);
+
+    if (existingFolders && existingFolders.length > 0) {
+      // Already has folders, return them
+      const { data: folders, error } = await supabase
+        .from('Folder')
+        .select('*')
+        .eq('dealId', dealId)
+        .order('sortOrder', { ascending: true });
+
+      if (error) throw error;
+      return res.json({ created: false, folders });
+    }
+
+    // Create default VDR folders
+    const defaultFolders = [
+      { name: '100 Financials', sortOrder: 100, description: 'Financial statements, projections, and analysis' },
+      { name: '200 Legal', sortOrder: 200, description: 'Legal documents, contracts, and agreements' },
+      { name: '300 Commercial', sortOrder: 300, description: 'Commercial due diligence materials' },
+      { name: '400 HR & Data', sortOrder: 400, description: 'HR documents and data room materials' },
+      { name: '500 Intellectual Property', sortOrder: 500, description: 'IP documentation and patents' },
+    ];
+
+    const foldersToInsert = defaultFolders.map(folder => ({
+      ...folder,
+      dealId,
+      parentId: null,
+      isRestricted: false,
+    }));
+
+    const { data: folders, error } = await supabase
+      .from('Folder')
+      .insert(foldersToInsert)
+      .select();
+
+    if (error) throw error;
+
+    res.status(201).json({ created: true, folders });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // POST /api/folders/:id/insights - Create/update folder insights
 router.post('/folders/:id/insights', async (req: Request, res: Response, next: NextFunction) => {
   try {
