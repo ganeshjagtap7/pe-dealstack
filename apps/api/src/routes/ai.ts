@@ -2,6 +2,28 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { openai, isAIEnabled, DEAL_ANALYSIS_SYSTEM_PROMPT, generateDealContext } from '../openai.js';
 import { z } from 'zod';
+import multer from 'multer';
+import { createRequire } from 'module';
+import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';
+import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES } from '../services/fileValidator.js';
+import { AuditLog } from '../services/auditLog.js';
+
+// Use createRequire to load CommonJS pdf-parse module
+const require = createRequire(import.meta.url);
+const pdfParse = require('pdf-parse');
+
+// Configure multer for file uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024, files: 1 },
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -238,6 +260,278 @@ router.get('/ai/status', (req, res) => {
     enabled: isAIEnabled(),
     model: 'gpt-4-turbo-preview',
   });
+});
+
+// POST /api/ai/ingest - Ingest a document and create a deal from AI-extracted data
+router.post('/ai/ingest', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Validate file
+    const validation = validateFile(file.buffer, file.originalname, file.mimetype);
+    if (!validation.isValid) {
+      return res.status(400).json({ error: 'File validation failed', details: validation.error });
+    }
+
+    if (isPotentiallyDangerous(file.buffer, file.originalname)) {
+      return res.status(400).json({ error: 'File appears to contain unsafe content' });
+    }
+
+    // Check AI availability
+    if (!isAIEnabled()) {
+      return res.status(503).json({
+        error: 'AI service unavailable',
+        message: 'OpenAI API key not configured. Cannot process document.',
+      });
+    }
+
+    const safeName = validation.sanitizedFilename || sanitizeFilename(file.originalname);
+    console.log(`AI Ingest: Processing file ${safeName} (${file.mimetype})`);
+
+    // Extract text from PDF
+    let extractedText = '';
+    let numPages = 0;
+
+    if (file.mimetype === 'application/pdf') {
+      try {
+        const pdfData = await pdfParse(file.buffer);
+        extractedText = pdfData.text?.replace(/\u0000/g, '') || '';
+        numPages = pdfData.numpages || 1;
+        console.log(`Extracted ${extractedText.length} chars from ${numPages} pages`);
+      } catch (pdfError) {
+        console.error('PDF extraction error:', pdfError);
+        return res.status(400).json({ error: 'Failed to extract text from PDF' });
+      }
+    } else {
+      // For non-PDF files, attempt text extraction or return error
+      return res.status(400).json({
+        error: 'Only PDF files are supported for AI ingestion at this time',
+      });
+    }
+
+    if (extractedText.length < 100) {
+      return res.status(400).json({
+        error: 'Insufficient text content',
+        message: 'Document does not contain enough text for AI analysis',
+      });
+    }
+
+    // Extract deal data using AI
+    console.log('Starting AI extraction...');
+    const extractedData = await extractDealDataFromText(extractedText);
+
+    if (!extractedData) {
+      return res.status(500).json({
+        error: 'AI extraction failed',
+        message: 'Could not extract deal information from document',
+      });
+    }
+
+    // Create or find company
+    let companyId: string | null = null;
+    if (extractedData.companyName) {
+      // Check if company already exists
+      const { data: existingCompany } = await supabase
+        .from('Company')
+        .select('id')
+        .ilike('name', extractedData.companyName)
+        .single();
+
+      if (existingCompany) {
+        companyId = existingCompany.id;
+      } else {
+        // Create new company
+        const { data: newCompany, error: companyError } = await supabase
+          .from('Company')
+          .insert({
+            name: extractedData.companyName,
+            industry: extractedData.industry,
+            description: extractedData.description,
+          })
+          .select()
+          .single();
+
+        if (companyError) {
+          console.error('Error creating company:', companyError);
+        } else {
+          companyId = newCompany.id;
+        }
+      }
+    }
+
+    // Create the deal
+    const dealName = extractedData.companyName
+      ? `Project ${extractedData.companyName.charAt(0).toUpperCase()}${Math.random().toString(36).substring(2, 5)}`
+      : `New Opportunity - ${new Date().toLocaleDateString()}`;
+
+    const { data: deal, error: dealError } = await supabase
+      .from('Deal')
+      .insert({
+        name: dealName,
+        companyId,
+        stage: 'INITIAL_REVIEW',
+        status: 'ACTIVE',
+        industry: extractedData.industry,
+        revenue: extractedData.revenue,
+        ebitda: extractedData.ebitda,
+        description: extractedData.description,
+        aiThesis: extractedData.summary,
+        icon: 'business_center',
+        priority: 'MEDIUM',
+        source: `AI Ingest: ${safeName}`,
+      })
+      .select()
+      .single();
+
+    if (dealError) {
+      console.error('Error creating deal:', dealError);
+      return res.status(500).json({ error: 'Failed to create deal from extracted data' });
+    }
+
+    // Upload document to storage and create document record
+    const timestamp = Date.now();
+    const filePath = `${deal.id}/${timestamp}_${safeName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    let fileUrl = null;
+    if (!uploadError) {
+      const { data: urlData } = supabase.storage
+        .from('documents')
+        .getPublicUrl(filePath);
+      fileUrl = urlData?.publicUrl;
+    }
+
+    // Create document record
+    const { data: document } = await supabase
+      .from('Document')
+      .insert({
+        dealId: deal.id,
+        name: safeName,
+        type: 'CIM',
+        fileUrl,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+        extractedText,
+        extractedData,
+        status: 'analyzed',
+        confidence: 0.85,
+        aiAnalyzedAt: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    // Log activity
+    await supabase.from('Activity').insert({
+      dealId: deal.id,
+      type: 'DOCUMENT_UPLOADED',
+      title: 'Deal Created via AI Ingestion',
+      description: `AI analyzed "${safeName}" and created deal "${dealName}" with extracted company information`,
+      metadata: {
+        documentId: document?.id,
+        companyName: extractedData.companyName,
+        industry: extractedData.industry,
+        numPages,
+        textLength: extractedText.length,
+      },
+    });
+
+    // Audit log
+    await AuditLog.aiIngest(req, safeName, deal.id);
+
+    console.log(`AI Ingest complete: Created deal ${deal.id} from ${safeName}`);
+
+    res.status(201).json({
+      success: true,
+      deal: {
+        id: deal.id,
+        name: deal.name,
+        stage: deal.stage,
+        industry: deal.industry,
+      },
+      company: extractedData.companyName ? {
+        id: companyId,
+        name: extractedData.companyName,
+      } : null,
+      document: document ? {
+        id: document.id,
+        name: document.name,
+      } : null,
+      extracted: {
+        companyName: extractedData.companyName,
+        industry: extractedData.industry,
+        revenue: extractedData.revenue,
+        ebitda: extractedData.ebitda,
+        summary: extractedData.summary,
+        keyRisks: extractedData.keyRisks,
+        investmentHighlights: extractedData.investmentHighlights,
+      },
+    });
+  } catch (error) {
+    console.error('AI Ingest error:', error);
+    res.status(500).json({ error: 'Failed to process AI ingestion' });
+  }
+});
+
+// POST /api/ai/extract - Extract data from document without creating a deal (preview)
+router.post('/ai/extract', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file provided' });
+    }
+
+    // Validate file
+    const validation = validateFile(file.buffer, file.originalname, file.mimetype);
+    if (!validation.isValid) {
+      return res.status(400).json({ error: 'File validation failed', details: validation.error });
+    }
+
+    if (!isAIEnabled()) {
+      return res.status(503).json({
+        error: 'AI service unavailable',
+        message: 'OpenAI API key not configured',
+      });
+    }
+
+    // Extract text from PDF only
+    if (file.mimetype !== 'application/pdf') {
+      return res.status(400).json({ error: 'Only PDF files are supported' });
+    }
+
+    const pdfData = await pdfParse(file.buffer);
+    const extractedText = pdfData.text?.replace(/\u0000/g, '') || '';
+
+    if (extractedText.length < 100) {
+      return res.status(400).json({ error: 'Insufficient text content' });
+    }
+
+    // Extract deal data
+    const extractedData = await extractDealDataFromText(extractedText);
+
+    if (!extractedData) {
+      return res.status(500).json({ error: 'AI extraction failed' });
+    }
+
+    res.json({
+      success: true,
+      filename: validation.sanitizedFilename || file.originalname,
+      numPages: pdfData.numpages || 1,
+      textLength: extractedText.length,
+      extracted: extractedData,
+    });
+  } catch (error) {
+    console.error('AI Extract error:', error);
+    res.status(500).json({ error: 'Failed to extract data' });
+  }
 });
 
 export default router;

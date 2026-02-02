@@ -2,6 +2,8 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { openai, isAIEnabled } from '../openai.js';
 import { z } from 'zod';
+import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
+import { AuditLog } from '../services/auditLog.js';
 
 const router = Router();
 
@@ -193,6 +195,9 @@ router.post('/', async (req, res) => {
       .eq('id', memo.id)
       .single();
 
+    // Audit log
+    await AuditLog.memoCreated(req, memo.id, memo.title);
+
     res.status(201).json(fullMemo);
   } catch (error) {
     console.error('Error creating memo:', error);
@@ -233,10 +238,17 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/memos/:id - Delete memo
-router.delete('/:id', async (req, res) => {
+// DELETE /api/memos/:id - Delete memo (requires MEMO_DELETE permission)
+router.delete('/:id', requirePermission(PERMISSIONS.MEMO_DELETE), async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Get memo title before deleting for audit log
+    const { data: memo } = await supabase
+      .from('Memo')
+      .select('title')
+      .eq('id', id)
+      .single();
 
     const { error } = await supabase
       .from('Memo')
@@ -244,6 +256,9 @@ router.delete('/:id', async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+
+    // Audit log
+    await AuditLog.memoDeleted(req, id, memo?.title || 'Untitled');
 
     res.json({ success: true });
   } catch (error) {
@@ -529,6 +544,9 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 
     if (updateError) throw updateError;
 
+    // Audit log AI generation
+    await AuditLog.aiGenerate(req, section.title, id);
+
     res.json(updatedSection);
   } catch (error) {
     console.error('Error generating section:', error);
@@ -681,6 +699,9 @@ router.post('/:id/chat', async (req, res) => {
       .from('MemoConversation')
       .update({ updatedAt: new Date().toISOString() })
       .eq('id', conversationId);
+
+    // Audit log AI chat
+    await AuditLog.aiChat(req, `Memo: ${memo?.title || id}`);
 
     res.json({
       id: aiMessage.id,

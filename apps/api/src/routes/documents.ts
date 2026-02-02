@@ -4,6 +4,8 @@ import { z } from 'zod';
 import multer from 'multer';
 import { createRequire } from 'module';
 import { extractDealDataFromText } from '../services/aiExtractor.js';
+import { AuditLog } from '../services/auditLog.js';
+import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES, FILE_SIZE_LIMITS } from '../services/fileValidator.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -27,26 +29,19 @@ async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string; numPa
 }
 
 // Configure multer for memory storage (we'll upload to Supabase)
+// Initial filter based on MIME type, deep validation happens after upload
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 100 * 1024 * 1024, // 100MB max (individual limits applied after)
+    files: 1, // Single file upload only
   },
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.ms-outlook',
-      'message/rfc822',
-    ];
-    if (allowedTypes.includes(file.mimetype)) {
+    // Basic MIME type check - deep validation with magic bytes happens after
+    if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Allowed: PDF, Excel, CSV, Word, Email'));
+      cb(new Error('Invalid file type. Allowed: PDF, Excel, CSV, Word, Email, Images'));
     }
   },
 });
@@ -181,16 +176,36 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     let mimeType = null;
     let documentName = req.body.name;
 
-    // If file is provided, upload to Supabase Storage
+    // If file is provided, validate and upload to Supabase Storage
     if (file) {
+      // Deep file validation with magic bytes verification
+      const validation = validateFile(file.buffer, file.originalname, file.mimetype);
+      if (!validation.isValid) {
+        console.warn(`File validation failed for ${file.originalname}: ${validation.error}`);
+        return res.status(400).json({
+          error: 'File validation failed',
+          details: validation.error,
+        });
+      }
+
+      // Additional check for potentially dangerous content
+      if (isPotentiallyDangerous(file.buffer, file.originalname)) {
+        console.warn(`Potentially dangerous file detected: ${file.originalname}`);
+        return res.status(400).json({
+          error: 'File validation failed',
+          details: 'File appears to contain executable or script content',
+        });
+      }
+
       fileSize = file.size;
       mimeType = file.mimetype;
-      documentName = documentName || file.originalname;
+      // Use sanitized filename from validation
+      const safeName = validation.sanitizedFilename || sanitizeFilename(file.originalname);
+      documentName = documentName || safeName;
 
-      // Generate unique filename
+      // Generate unique filename with sanitization
       const timestamp = Date.now();
-      const sanitizedName = file.originalname.replace(/[^a-zA-Z0-9.-]/g, '_');
-      const filePath = `${dealId}/${timestamp}_${sanitizedName}`;
+      const filePath = `${dealId}/${timestamp}_${safeName}`;
 
       // Upload to Supabase Storage
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -353,6 +368,9 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       },
     });
 
+    // Audit log
+    await AuditLog.documentUploaded(req, document.id, documentName, dealId);
+
     res.status(201).json(document);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -477,6 +495,9 @@ router.delete('/documents/:id', async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+
+    // Audit log
+    await AuditLog.documentDeleted(req, id, doc.name);
 
     res.status(204).send();
   } catch (error) {

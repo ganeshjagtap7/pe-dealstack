@@ -115,6 +115,10 @@
                 </nav>
             </div>
             <div class="flex items-center gap-4">
+                <button id="data-room-btn" class="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle" onclick="openDataRoom()">
+                    <span class="material-symbols-outlined text-[18px]">folder_open</span>
+                    Data Room
+                </button>
                 <button id="share-btn" class="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle">
                     <span class="material-symbols-outlined text-[18px]">share</span>
                     Share
@@ -157,6 +161,23 @@
                                     <span id="deal-industry-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-secondary-light text-secondary border border-secondary/20">Technology</span>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Stage Pipeline -->
+                    <div id="stage-pipeline" class="glass-panel p-4 rounded-xl">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-xs font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
+                                <span class="material-symbols-outlined text-primary text-sm">timeline</span>
+                                Deal Pipeline
+                            </h3>
+                            <button id="change-stage-btn" class="text-xs text-primary hover:text-primary-hover font-medium flex items-center gap-1 transition-colors">
+                                <span class="material-symbols-outlined text-sm">edit</span>
+                                Change Stage
+                            </button>
+                        </div>
+                        <div class="flex items-center gap-1" id="pipeline-stages">
+                            <!-- Pipeline stages will be rendered by JS -->
                         </div>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
@@ -315,6 +336,41 @@
                     </div>
                 </div>
 
+                <!-- Add Note Section -->
+                <div class="glass-panel p-4 rounded-xl mb-4">
+                    <h3 class="text-sm font-bold text-text-main uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-amber-500 text-lg">sticky_note_2</span>
+                        Add Note
+                    </h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="note-input" placeholder="Add a note about this deal..." class="flex-1 px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                        <button id="add-note-btn" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
+                            <span class="material-symbols-outlined text-lg">add</span>
+                            Add
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Activity Feed -->
+                <div class="glass-panel p-5 rounded-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
+                            <span class="material-symbols-outlined text-primary text-lg">history</span>
+                            Activity Feed
+                        </h3>
+                        <button id="refresh-activities-btn" class="text-xs text-primary hover:text-primary-hover font-medium flex items-center gap-1 transition-colors">
+                            <span class="material-symbols-outlined text-sm">refresh</span>
+                            Refresh
+                        </button>
+                    </div>
+                    <div id="activity-feed" class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                        <div class="flex items-center justify-center py-8 text-text-muted">
+                            <span class="material-symbols-outlined animate-spin text-primary mr-2">sync</span>
+                            Loading activities...
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Recent Documents -->
                 <div class="mt-auto pt-6 border-t border-border-subtle">
                     <h3 class="text-sm font-bold text-text-main mb-3">Recent Documents</h3>
@@ -417,6 +473,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/layout.js"></script>
+    <script src="js/docPreview.js"></script>
+    <script src="js/notificationCenter.js"></script>
+    <script src="js/globalSearch.js"></script>
     <script src="deal.js"></script>
 </body>
 </html>

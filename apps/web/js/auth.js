@@ -42,6 +42,7 @@ async function signUp(email, password, metadata = {}) {
     email,
     password,
     options: {
+      emailRedirectTo: `${window.location.origin}/verify-email.html`,
       data: {
         full_name: metadata.fullName || '',
         firm_name: metadata.firmName || '',

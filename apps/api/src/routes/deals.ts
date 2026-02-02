@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
+import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
+import { AuditLog } from '../services/auditLog.js';
 
 const router = Router();
 
@@ -191,8 +193,8 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// POST /api/deals - Create new deal
-router.post('/', async (req, res) => {
+// POST /api/deals - Create new deal (requires DEAL_CREATE permission)
+router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) => {
   try {
     const data = createDealSchema.parse(req.body);
 
@@ -256,6 +258,9 @@ router.post('/', async (req, res) => {
       description: `New deal "${deal.name}" created`,
     });
 
+    // Audit log
+    await AuditLog.dealCreated(req, deal.id, deal.name);
+
     res.status(201).json(deal);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -311,6 +316,9 @@ router.patch('/:id', async (req, res) => {
       });
     }
 
+    // Audit log
+    await AuditLog.dealUpdated(req, deal.id, deal.name, data);
+
     res.json(deal);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -321,10 +329,17 @@ router.patch('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/deals/:id - Delete deal
-router.delete('/:id', async (req, res) => {
+// DELETE /api/deals/:id - Delete deal (requires DEAL_DELETE permission)
+router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, res) => {
   try {
     const { id } = req.params;
+
+    // Get deal name before deleting for audit log
+    const { data: deal } = await supabase
+      .from('Deal')
+      .select('name')
+      .eq('id', id)
+      .single();
 
     const { error } = await supabase
       .from('Deal')
@@ -332,6 +347,9 @@ router.delete('/:id', async (req, res) => {
       .eq('id', id);
 
     if (error) throw error;
+
+    // Audit log
+    await AuditLog.dealDeleted(req, id, deal?.name || 'Unknown');
 
     res.status(204).send();
   } catch (error) {

@@ -3,12 +3,13 @@ import { VDRFile } from '../types/vdr.types';
 
 interface FileTableProps {
   files: VDRFile[];
+  folderName?: string;
   onFileClick?: (file: VDRFile) => void;
   onDeleteFile?: (fileId: string) => void;
   onRenameFile?: (fileId: string, newName: string) => void;
 }
 
-export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick, onDeleteFile, onRenameFile }) => {
+export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -82,50 +83,49 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick, onDele
     return iconMap[type] || iconMap.other;
   };
 
-  const getFileIconColor = (type: string): { className: string; style?: React.CSSProperties } => {
-    const colorMap: Record<string, { className: string; style?: React.CSSProperties }> = {
-      excel: { className: 'bg-secondary-light text-secondary' },
-      pdf: { className: 'bg-red-50 text-red-600' },
-      doc: { className: '', style: { backgroundColor: '#E6EEF5', color: '#003366' } },
-      other: { className: 'bg-background-light text-text-secondary' },
+  const getFileIconStyle = (type: string): { bg: string; text: string } => {
+    const colorMap: Record<string, { bg: string; text: string }> = {
+      excel: { bg: 'bg-green-50', text: 'text-green-600' },
+      pdf: { bg: 'bg-red-50', text: 'text-red-600' },
+      doc: { bg: 'bg-blue-50', text: 'text-blue-600' },
+      other: { bg: 'bg-slate-50', text: 'text-slate-600' },
     };
     return colorMap[type] || colorMap.other;
   };
 
-  const getAnalysisColor = (color: string): { className: string; style?: React.CSSProperties } => {
-    const colorMap: Record<string, { className: string; style?: React.CSSProperties }> = {
-      primary: { className: '', style: { color: '#003366' } },
-      orange: { className: 'text-orange-600' },
-      slate: { className: 'text-text-muted' },
-    };
-    return colorMap[color] || colorMap.slate;
+  const getAnalysisStyle = (color: string, type: string): { className: string; icon: string } => {
+    if (type === 'key-insight' || type === 'complete') {
+      return { className: 'text-primary', icon: 'auto_awesome' };
+    } else if (type === 'warning') {
+      return { className: 'text-orange-600', icon: 'warning' };
+    }
+    return { className: 'text-slate-400', icon: 'check_circle' };
   };
 
   return (
     <div className="flex-1 overflow-auto px-6 py-4">
       <div className="min-w-full inline-block align-middle">
-        <div className="border rounded-lg bg-surface-light shadow-sm overflow-hidden">
-          <table className="min-w-full divide-y divide-border-light">
-            <thead className="bg-background-light/80">
+        <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+          <table className="min-w-full divide-y divide-slate-200">
+            <thead className="bg-slate-50/80">
               <tr>
-                <th className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-text-secondary sm:pl-6" scope="col">
+                <th className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-slate-500 sm:pl-6" scope="col">
                   <div className="flex items-center gap-2">
                     <input
-                      className="h-4 w-4 rounded border-border-light"
-                      style={{ accentColor: '#003366' }}
+                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
                       type="checkbox"
                       aria-label="Select all files"
                     />
                     Name
                   </div>
                 </th>
-                <th className="px-3 py-3.5 text-left text-xs font-semibold text-text-secondary w-[40%]" scope="col">
+                <th className="px-3 py-3.5 text-left text-xs font-semibold text-slate-500 w-[40%]" scope="col">
                   AI Analysis
                 </th>
-                <th className="px-3 py-3.5 text-left text-xs font-semibold text-text-secondary" scope="col">
+                <th className="px-3 py-3.5 text-left text-xs font-semibold text-slate-500" scope="col">
                   Author
                 </th>
-                <th className="px-3 py-3.5 text-left text-xs font-semibold text-text-secondary" scope="col">
+                <th className="px-3 py-3.5 text-left text-xs font-semibold text-slate-500" scope="col">
                   Date
                 </th>
                 <th className="relative py-3.5 pl-3 pr-4 sm:pr-6" scope="col">
@@ -133,132 +133,126 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick, onDele
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border-light bg-white">
+            <tbody className="divide-y divide-slate-200 bg-white">
               {files.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-sm text-text-secondary">
-                    No files found
+                  <td colSpan={5} className="py-12 text-center">
+                    <span className="material-symbols-outlined text-4xl text-slate-300 mb-2 block">folder_open</span>
+                    <p className="text-sm text-slate-500">No files in this folder yet</p>
+                    <p className="text-xs text-slate-400 mt-1">Upload files to get started</p>
                   </td>
                 </tr>
               ) : (
-                files.map((file) => (
-                  <tr
-                    key={file.id}
-                    className="group hover:bg-background-light transition-colors cursor-pointer"
-                    style={file.isHighlighted ? { backgroundColor: '#E6EEF5' } : undefined}
-                    onClick={() => onFileClick?.(file)}
-                  >
-                    <td
-                      className="whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6"
-                      style={file.isHighlighted ? { borderLeft: '4px solid #003366' } : undefined}
+                files.map((file) => {
+                  const iconStyle = getFileIconStyle(file.type);
+                  const analysisStyle = getAnalysisStyle(file.analysis.color, file.analysis.type);
+
+                  return (
+                    <tr
+                      key={file.id}
+                      className={`group hover:bg-slate-50 transition-colors cursor-pointer ${
+                        file.isHighlighted ? 'bg-primary/5' : ''
+                      }`}
+                      onClick={() => onFileClick?.(file)}
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className={`flex size-10 shrink-0 items-center justify-center rounded ${getFileIconColor(file.type).className}`}
-                          style={getFileIconColor(file.type).style}
-                        >
-                          <span className="material-symbols-outlined">{getFileIcon(file.type)}</span>
+                      <td
+                        className={`whitespace-nowrap py-4 pl-4 pr-3 text-sm sm:pl-6 ${
+                          file.isHighlighted ? 'border-l-4 border-l-primary' : ''
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`flex size-10 shrink-0 items-center justify-center rounded ${iconStyle.bg}`}>
+                            <span className={`material-symbols-outlined ${iconStyle.text}`}>{getFileIcon(file.type)}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            {renamingFileId === file.id ? (
+                              <input
+                                ref={renameInputRef}
+                                type="text"
+                                value={renameValue}
+                                onChange={(e) => setRenameValue(e.target.value)}
+                                onKeyDown={(e) => handleRenameKeyDown(e, file.id)}
+                                onBlur={() => handleRenameSubmit(file.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                className="font-medium text-slate-900 px-2 py-1 border border-primary rounded focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[200px]"
+                              />
+                            ) : (
+                              <div className="font-medium text-slate-900 group-hover:text-primary transition-colors">
+                                {file.name}
+                              </div>
+                            )}
+                            <div className="text-xs text-slate-400">{file.size}</div>
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          {renamingFileId === file.id ? (
-                            <input
-                              ref={renameInputRef}
-                              type="text"
-                              value={renameValue}
-                              onChange={(e) => setRenameValue(e.target.value)}
-                              onKeyDown={(e) => handleRenameKeyDown(e, file.id)}
-                              onBlur={() => handleRenameSubmit(file.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              className="font-medium text-text-main px-2 py-1 border border-primary rounded focus:outline-none focus:ring-2 focus:ring-primary/20 min-w-[200px]"
-                            />
-                          ) : (
-                            <div className="font-medium text-text-main transition-colors file-name-hover">
-                              {file.name}
+                      </td>
+                      <td className="px-3 py-4 text-sm text-slate-500">
+                        <div className="flex flex-col gap-1">
+                          <div className={`flex items-center gap-1.5 text-xs font-medium ${analysisStyle.className}`}>
+                            <span className="material-symbols-outlined text-[14px]">{analysisStyle.icon}</span>
+                            {file.analysis.label}
+                          </div>
+                          <p className="text-xs leading-relaxed text-slate-600 line-clamp-2">
+                            {file.analysis.description}
+                          </p>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="size-6 rounded-full bg-cover bg-slate-200"
+                            style={{ backgroundImage: `url('${file.author.avatar}')` }}
+                            aria-label={file.author.name}
+                          />
+                          <span className="text-xs">{file.author.name}</span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap px-3 py-4 text-xs text-slate-500">{file.date}</td>
+                      <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
+                        <div className="relative" ref={openMenuId === file.id ? menuRef : null}>
+                          <button
+                            className="text-slate-400 hover:text-primary transition-colors p-1 rounded hover:bg-slate-100"
+                            aria-label="More options"
+                            onClick={(e) => handleMenuToggle(e, file.id)}
+                          >
+                            <span className="material-symbols-outlined">more_vert</span>
+                          </button>
+
+                          {/* Dropdown Menu */}
+                          {openMenuId === file.id && (
+                            <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                              <button
+                                onClick={(e) => handleRenameStart(e, file)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">edit</span>
+                                Rename
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onFileClick?.(file);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">download</span>
+                                Download
+                              </button>
+                              <div className="border-t border-slate-200 my-1"></div>
+                              <button
+                                onClick={(e) => handleDelete(e, file.id)}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">delete</span>
+                                Delete
+                              </button>
                             </div>
                           )}
-                          <div className="text-xs text-text-muted">{file.size}</div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-3 py-4 text-sm text-text-secondary">
-                      <div className="flex flex-col gap-1">
-                        <div
-                          className={`flex items-center gap-1.5 text-xs font-medium ${getAnalysisColor(file.analysis.color).className}`}
-                          style={getAnalysisColor(file.analysis.color).style}
-                        >
-                          <span className="material-symbols-outlined text-[14px]">
-                            {file.analysis.type === 'key-insight' || file.analysis.type === 'complete'
-                              ? 'auto_awesome'
-                              : file.analysis.type === 'warning'
-                              ? 'warning'
-                              : 'check_circle'}
-                          </span>
-                          {file.analysis.label}
-                        </div>
-                        <p className="text-xs leading-relaxed text-text-secondary line-clamp-2">
-                          {file.analysis.description}
-                        </p>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-text-secondary">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="size-6 rounded-full bg-cover"
-                          style={{ backgroundImage: `url('${file.author.avatar}')` }}
-                          aria-label={file.author.name}
-                        />
-                        <span className="text-xs">{file.author.name}</span>
-                      </div>
-                    </td>
-                    <td className="whitespace-nowrap px-3 py-4 text-sm text-text-secondary text-xs">{file.date}</td>
-                    <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                      <div className="relative" ref={openMenuId === file.id ? menuRef : null}>
-                        <button
-                          className="text-text-muted transition-colors p-1 rounded hover:bg-background-light"
-                          aria-label="More options"
-                          onClick={(e) => handleMenuToggle(e, file.id)}
-                          onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
-                          onMouseOut={(e) => e.currentTarget.style.color = openMenuId === file.id ? '#003366' : '#9CA3AF'}
-                          style={{ color: openMenuId === file.id ? '#003366' : undefined }}
-                        >
-                          <span className="material-symbols-outlined">more_vert</span>
-                        </button>
-
-                        {/* Dropdown Menu */}
-                        {openMenuId === file.id && (
-                          <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-border-light py-1 z-50">
-                            <button
-                              onClick={(e) => handleRenameStart(e, file)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-background-light hover:text-text-main transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">edit</span>
-                              Rename
-                            </button>
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onFileClick?.(file);
-                                setOpenMenuId(null);
-                              }}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-background-light hover:text-text-main transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">download</span>
-                              Download
-                            </button>
-                            <div className="border-t border-border-light my-1"></div>
-                            <button
-                              onClick={(e) => handleDelete(e, file.id)}
-                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                            >
-                              <span className="material-symbols-outlined text-[18px]">delete</span>
-                              Delete
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -267,12 +261,8 @@ export const FileTable: React.FC<FileTableProps> = ({ files, onFileClick, onDele
 
       {files.length > 0 && (
         <div className="flex justify-center mt-4">
-          <button
-            className="text-xs font-medium text-text-secondary"
-            onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
-            onMouseOut={(e) => e.currentTarget.style.color = '#4B5563'}
-          >
-            View all {files.length} files in Financials
+          <button className="text-xs font-medium text-slate-500 hover:text-primary transition-colors">
+            View all {files.length} files in {folderName}
           </button>
         </div>
       )}

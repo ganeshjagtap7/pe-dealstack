@@ -69,10 +69,11 @@ export async function authMiddleware(
     }
 
     // Attach user to request
+    // Default to 'analyst' role if no role is set in user_metadata
     req.user = {
       id: user.id,
       email: user.email || '',
-      role: user.user_metadata?.role,
+      role: user.user_metadata?.role || 'analyst',
       user_metadata: user.user_metadata,
     };
 
@@ -108,7 +109,7 @@ export async function optionalAuthMiddleware(
           req.user = {
             id: user.id,
             email: user.email || '',
-            role: user.user_metadata?.role,
+            role: user.user_metadata?.role || 'analyst',
             user_metadata: user.user_metadata,
           };
         }

@@ -23,6 +23,15 @@ function getDealIdFromUrl() {
     return params.get('id');
 }
 
+function openDataRoom() {
+    const dealId = getDealIdFromUrl();
+    if (dealId) {
+        window.location.href = `vdr.html?dealId=${dealId}`;
+    } else {
+        showNotification('Error', 'No deal ID available', 'error');
+    }
+}
+
 async function loadDealData() {
     const dealId = getDealIdFromUrl();
     if (!dealId) {
@@ -88,6 +97,22 @@ function formatCurrency(value) {
     return `$${value.toFixed(1)}M`;
 }
 
+// Stage configuration - ordered pipeline stages
+const DEAL_STAGES = [
+    { key: 'INITIAL_REVIEW', label: 'Initial Review', icon: 'search', color: 'slate' },
+    { key: 'DUE_DILIGENCE', label: 'Due Diligence', icon: 'fact_check', color: 'amber' },
+    { key: 'IOI_SUBMITTED', label: 'IOI Submitted', icon: 'description', color: 'blue' },
+    { key: 'LOI_SUBMITTED', label: 'LOI Submitted', icon: 'verified', color: 'indigo' },
+    { key: 'NEGOTIATION', label: 'Negotiation', icon: 'handshake', color: 'purple' },
+    { key: 'CLOSING', label: 'Closing', icon: 'gavel', color: 'emerald' },
+];
+
+const TERMINAL_STAGES = [
+    { key: 'CLOSED_WON', label: 'Closed Won', icon: 'celebration', color: 'green' },
+    { key: 'CLOSED_LOST', label: 'Closed Lost', icon: 'cancel', color: 'red' },
+    { key: 'PASSED', label: 'Passed', icon: 'block', color: 'gray' },
+];
+
 function getStageLabel(stage) {
     const labels = {
         'INITIAL_REVIEW': 'Initial Review',
@@ -103,6 +128,14 @@ function getStageLabel(stage) {
     return labels[stage] || stage;
 }
 
+function getStageIndex(stage) {
+    return DEAL_STAGES.findIndex(s => s.key === stage);
+}
+
+function isTerminalStage(stage) {
+    return TERMINAL_STAGES.some(s => s.key === stage);
+}
+
 function formatRelativeTime(dateString) {
     if (!dateString) return 'N/A';
     const date = new Date(dateString);
@@ -115,9 +148,273 @@ function formatRelativeTime(dateString) {
     return 'Just now';
 }
 
+function renderStagePipeline(currentStage) {
+    const container = document.getElementById('pipeline-stages');
+    if (!container) return;
+
+    const currentIndex = getStageIndex(currentStage);
+    const isTerminal = isTerminalStage(currentStage);
+
+    // Build pipeline HTML
+    let html = '';
+
+    DEAL_STAGES.forEach((stage, index) => {
+        const isPast = index < currentIndex;
+        const isCurrent = index === currentIndex && !isTerminal;
+        const isFuture = index > currentIndex || isTerminal;
+
+        // Stage indicator
+        let stageClass = '';
+        let iconClass = '';
+        let textClass = '';
+
+        if (isPast) {
+            stageClass = 'bg-secondary text-white';
+            iconClass = 'text-white';
+            textClass = 'text-secondary font-medium';
+        } else if (isCurrent) {
+            stageClass = 'bg-primary text-white ring-2 ring-primary/30 shadow-lg';
+            iconClass = 'text-white';
+            textClass = 'text-primary font-bold';
+        } else {
+            stageClass = 'bg-gray-100 text-gray-400';
+            iconClass = 'text-gray-400';
+            textClass = 'text-gray-400';
+        }
+
+        html += `
+            <div class="flex-1 flex flex-col items-center relative group cursor-pointer" data-stage="${stage.key}">
+                <div class="flex items-center w-full">
+                    ${index > 0 ? `<div class="flex-1 h-0.5 ${isPast || isCurrent ? 'bg-secondary' : 'bg-gray-200'}"></div>` : '<div class="flex-1"></div>'}
+                    <div class="size-8 rounded-full ${stageClass} flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110">
+                        ${isPast ? '<span class="material-symbols-outlined text-sm">check</span>' : `<span class="material-symbols-outlined text-sm ${iconClass}">${stage.icon}</span>`}
+                    </div>
+                    ${index < DEAL_STAGES.length - 1 ? `<div class="flex-1 h-0.5 ${isPast ? 'bg-secondary' : 'bg-gray-200'}"></div>` : '<div class="flex-1"></div>'}
+                </div>
+                <span class="text-[10px] mt-1.5 ${textClass} text-center leading-tight whitespace-nowrap">${stage.label}</span>
+            </div>
+        `;
+    });
+
+    // Add terminal stage indicator if applicable
+    if (isTerminal) {
+        const terminalStage = TERMINAL_STAGES.find(s => s.key === currentStage);
+        if (terminalStage) {
+            const colorClass = currentStage === 'CLOSED_WON' ? 'bg-green-500 text-white' :
+                               currentStage === 'CLOSED_LOST' ? 'bg-red-500 text-white' :
+                               'bg-gray-500 text-white';
+            html += `
+                <div class="flex items-center ml-2">
+                    <div class="h-0.5 w-4 bg-gray-300"></div>
+                    <div class="px-3 py-1.5 rounded-full ${colorClass} flex items-center gap-1.5 text-xs font-bold shadow-lg">
+                        <span class="material-symbols-outlined text-sm">${terminalStage.icon}</span>
+                        ${terminalStage.label}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    container.innerHTML = html;
+
+    // Add click handlers to stages
+    container.querySelectorAll('[data-stage]').forEach(el => {
+        el.addEventListener('click', () => {
+            const targetStage = el.getAttribute('data-stage');
+            if (targetStage !== currentStage) {
+                showStageChangeModal(currentStage, targetStage);
+            }
+        });
+    });
+}
+
+function showStageChangeModal(fromStage, toStage) {
+    const fromLabel = getStageLabel(fromStage);
+    const toLabel = getStageLabel(toStage);
+    const fromIndex = getStageIndex(fromStage);
+    const toIndex = getStageIndex(toStage);
+    const isMovingBack = toIndex < fromIndex;
+
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full animate-fadeIn">
+            <div class="p-6 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">swap_horiz</span>
+                        Change Deal Stage
+                    </h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-slate-600">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <div class="flex items-center justify-center gap-4 mb-6">
+                    <div class="text-center">
+                        <div class="size-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-2">
+                            <span class="material-symbols-outlined text-gray-500">circle</span>
+                        </div>
+                        <span class="text-sm font-medium text-gray-600">${fromLabel}</span>
+                    </div>
+                    <span class="material-symbols-outlined text-2xl ${isMovingBack ? 'text-amber-500' : 'text-primary'}">
+                        ${isMovingBack ? 'arrow_back' : 'arrow_forward'}
+                    </span>
+                    <div class="text-center">
+                        <div class="size-12 rounded-full ${isMovingBack ? 'bg-amber-100' : 'bg-primary-light'} flex items-center justify-center mx-auto mb-2">
+                            <span class="material-symbols-outlined ${isMovingBack ? 'text-amber-600' : 'text-primary'}">circle</span>
+                        </div>
+                        <span class="text-sm font-bold ${isMovingBack ? 'text-amber-600' : 'text-primary'}">${toLabel}</span>
+                    </div>
+                </div>
+
+                ${isMovingBack ? `
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+                        <div class="flex items-start gap-2">
+                            <span class="material-symbols-outlined text-amber-500 text-sm mt-0.5">warning</span>
+                            <p class="text-sm text-amber-700">You are moving this deal backwards in the pipeline. This will be logged in the activity feed.</p>
+                        </div>
+                    </div>
+                ` : ''}
+
+                <div class="mb-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-2">Add a note (optional)</label>
+                    <textarea id="stage-change-note" class="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none" rows="2" placeholder="Reason for stage change..."></textarea>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="this.closest('.fixed').remove()" class="flex-1 px-4 py-2.5 border border-slate-200 rounded-lg font-medium hover:bg-slate-50 transition-colors">
+                        Cancel
+                    </button>
+                    <button onclick="confirmStageChange('${toStage}', document.getElementById('stage-change-note').value); this.closest('.fixed').remove();" class="flex-1 px-4 py-2.5 bg-primary text-white rounded-lg font-medium hover:bg-primary-hover transition-colors">
+                        Confirm Change
+                    </button>
+                </div>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+}
+
+async function confirmStageChange(newStage, note) {
+    if (!state.dealId) {
+        showNotification('Error', 'No deal loaded', 'error');
+        return;
+    }
+
+    const oldStage = state.dealData?.stage;
+
+    try {
+        // Update deal stage via API
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stage: newStage }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update stage');
+        }
+
+        const updatedDeal = await response.json();
+        state.dealData = updatedDeal;
+
+        // Update UI
+        const stageBadge = document.getElementById('deal-stage-badge');
+        if (stageBadge) {
+            stageBadge.textContent = getStageLabel(newStage);
+        }
+
+        // Re-render pipeline
+        renderStagePipeline(newStage);
+
+        // Show success notification
+        showNotification(
+            'Stage Updated',
+            `Deal moved from ${getStageLabel(oldStage)} to ${getStageLabel(newStage)}`,
+            'success'
+        );
+
+    } catch (error) {
+        console.error('Error updating stage:', error);
+        showNotification('Error', 'Failed to update deal stage', 'error');
+    }
+}
+
+function showTerminalStageModal() {
+    const currentStage = state.dealData?.stage;
+
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.innerHTML = `
+        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full animate-fadeIn">
+            <div class="p-6 border-b border-slate-200">
+                <div class="flex items-center justify-between">
+                    <h3 class="font-bold text-slate-900 text-lg">Close Deal</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-slate-600">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-slate-600 mb-4">Select the final outcome for this deal:</p>
+
+                <div class="space-y-3 mb-6">
+                    <button onclick="confirmStageChange('CLOSED_WON', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-green-200 bg-green-50 hover:border-green-400 transition-colors group">
+                        <div class="size-10 rounded-full bg-green-500 text-white flex items-center justify-center">
+                            <span class="material-symbols-outlined">celebration</span>
+                        </div>
+                        <div class="text-left">
+                            <div class="font-bold text-green-700">Closed Won</div>
+                            <div class="text-xs text-green-600">Deal successfully completed</div>
+                        </div>
+                    </button>
+
+                    <button onclick="confirmStageChange('CLOSED_LOST', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-red-200 bg-red-50 hover:border-red-400 transition-colors group">
+                        <div class="size-10 rounded-full bg-red-500 text-white flex items-center justify-center">
+                            <span class="material-symbols-outlined">cancel</span>
+                        </div>
+                        <div class="text-left">
+                            <div class="font-bold text-red-700">Closed Lost</div>
+                            <div class="text-xs text-red-600">Deal not completed</div>
+                        </div>
+                    </button>
+
+                    <button onclick="confirmStageChange('PASSED', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-gray-200 bg-gray-50 hover:border-gray-400 transition-colors group">
+                        <div class="size-10 rounded-full bg-gray-500 text-white flex items-center justify-center">
+                            <span class="material-symbols-outlined">block</span>
+                        </div>
+                        <div class="text-left">
+                            <div class="font-bold text-gray-700">Passed</div>
+                            <div class="text-xs text-gray-600">Decided not to pursue</div>
+                        </div>
+                    </button>
+                </div>
+
+                <button onclick="this.closest('.fixed').remove()" class="w-full px-4 py-2 border border-slate-200 rounded-lg font-medium hover:bg-slate-50 transition-colors">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+}
+
 function populateDealPage(deal) {
     // Update page title
     document.title = `${deal.name} - PE OS Deal Intelligence`;
+
+    // Render stage pipeline
+    renderStagePipeline(deal.stage);
 
     // Update breadcrumb
     const breadcrumbDeal = document.getElementById('breadcrumb-deal');
@@ -193,6 +490,9 @@ function populateDealPage(deal) {
 
     // Update chat context documents
     updateChatContext(deal.documents || []);
+
+    // Update activity feed
+    renderActivityFeed(deal.activities || []);
 }
 
 function updateDocumentsList(documents) {
@@ -203,7 +503,7 @@ function updateDocumentsList(documents) {
         const color = getDocColor(doc.name);
         const colorClass = color === 'emerald' ? 'secondary' : color;
         return `
-        <div class="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-primary-light/30 cursor-pointer transition-colors group shadow-sm" data-doc-id="${doc.id}">
+        <div class="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-primary-light/30 cursor-pointer transition-colors group shadow-sm doc-preview-item" data-doc-id="${doc.id}" data-doc-name="${doc.name}" data-doc-url="${doc.fileUrl || ''}">
             <div class="size-10 bg-${color}-50 rounded flex items-center justify-center text-${color}-500 group-hover:bg-${color}-100 transition-colors">
                 <span class="material-symbols-outlined">${getDocIcon(doc.name)}</span>
             </div>
@@ -213,6 +513,199 @@ function updateDocumentsList(documents) {
             </div>
         </div>
     `}).join('');
+
+    // Add click handlers for document preview
+    docsContainer.querySelectorAll('.doc-preview-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const docName = item.dataset.docName;
+            const docUrl = item.dataset.docUrl;
+            const docId = item.dataset.docId;
+
+            if (docUrl && window.PEDocPreview) {
+                window.PEDocPreview.preview(docUrl, docName);
+            } else if (docId) {
+                // Fetch document URL from API if not available
+                fetchAndPreviewDocument(docId, docName);
+            } else {
+                showNotification('Error', 'Document URL not available', 'error');
+            }
+        });
+    });
+}
+
+async function fetchAndPreviewDocument(docId, docName) {
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/documents/${docId}/download`);
+        if (!response.ok) throw new Error('Failed to get document URL');
+
+        const data = await response.json();
+        if (data.url && window.PEDocPreview) {
+            window.PEDocPreview.preview(data.url, docName);
+        } else {
+            showNotification('Error', 'Could not generate preview URL', 'error');
+        }
+    } catch (error) {
+        console.error('Error fetching document:', error);
+        showNotification('Error', 'Failed to load document', 'error');
+    }
+}
+
+// ============================================================
+// Activity Feed
+// ============================================================
+function renderActivityFeed(activities) {
+    const container = document.getElementById('activity-feed');
+    if (!container) return;
+
+    if (!activities || activities.length === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 text-text-muted">
+                <span class="material-symbols-outlined text-3xl mb-2">inbox</span>
+                <p class="text-sm">No activities yet</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = activities.slice(0, 10).map(activity => {
+        const { icon, color, bgColor } = getActivityIcon(activity.type);
+        const timeAgo = formatRelativeTime(activity.createdAt);
+
+        return `
+            <div class="flex items-start gap-3 p-3 bg-white rounded-lg border border-border-subtle hover:border-primary/30 transition-colors">
+                <div class="size-8 rounded-full ${bgColor} flex items-center justify-center shrink-0">
+                    <span class="material-symbols-outlined text-sm ${color}">${icon}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-text-main leading-tight">${activity.title}</p>
+                    ${activity.description ? `<p class="text-xs text-text-muted mt-0.5 line-clamp-2">${activity.description}</p>` : ''}
+                    <div class="flex items-center gap-2 mt-1.5">
+                        <span class="text-[10px] text-text-muted font-medium">${timeAgo}</span>
+                        ${activity.user?.name ? `
+                            <span class="text-[10px] text-text-muted">•</span>
+                            <span class="text-[10px] text-text-muted">${activity.user.name}</span>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function getActivityIcon(type) {
+    const icons = {
+        'DOCUMENT_UPLOADED': { icon: 'upload_file', color: 'text-blue-600', bgColor: 'bg-blue-100' },
+        'STAGE_CHANGED': { icon: 'swap_horiz', color: 'text-purple-600', bgColor: 'bg-purple-100' },
+        'NOTE_ADDED': { icon: 'sticky_note_2', color: 'text-amber-600', bgColor: 'bg-amber-100' },
+        'MEETING_SCHEDULED': { icon: 'event', color: 'text-green-600', bgColor: 'bg-green-100' },
+        'CALL_LOGGED': { icon: 'call', color: 'text-cyan-600', bgColor: 'bg-cyan-100' },
+        'EMAIL_SENT': { icon: 'mail', color: 'text-red-600', bgColor: 'bg-red-100' },
+        'STATUS_UPDATED': { icon: 'update', color: 'text-indigo-600', bgColor: 'bg-indigo-100' },
+        'TEAM_MEMBER_ADDED': { icon: 'person_add', color: 'text-secondary', bgColor: 'bg-secondary-light' },
+    };
+    return icons[type] || { icon: 'info', color: 'text-gray-600', bgColor: 'bg-gray-100' };
+}
+
+async function loadActivities() {
+    if (!state.dealId) return;
+
+    const container = document.getElementById('activity-feed');
+    if (container) {
+        container.innerHTML = `
+            <div class="flex items-center justify-center py-8 text-text-muted">
+                <span class="material-symbols-outlined animate-spin text-primary mr-2">sync</span>
+                Loading activities...
+            </div>
+        `;
+    }
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/activities?limit=10`);
+        if (!response.ok) throw new Error('Failed to fetch activities');
+
+        const result = await response.json();
+        renderActivityFeed(result.data || result);
+    } catch (error) {
+        console.error('Error loading activities:', error);
+        if (container) {
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-8 text-red-500">
+                    <span class="material-symbols-outlined text-2xl mb-2">error</span>
+                    <p class="text-sm">Failed to load activities</p>
+                </div>
+            `;
+        }
+    }
+}
+
+function initActivityFeed() {
+    // Refresh button handler
+    const refreshBtn = document.getElementById('refresh-activities-btn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', loadActivities);
+    }
+
+    // Add note handlers
+    const noteInput = document.getElementById('note-input');
+    const addNoteBtn = document.getElementById('add-note-btn');
+
+    if (addNoteBtn) {
+        addNoteBtn.addEventListener('click', () => addNote());
+    }
+
+    if (noteInput) {
+        noteInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                addNote();
+            }
+        });
+    }
+}
+
+async function addNote() {
+    const noteInput = document.getElementById('note-input');
+    const note = noteInput?.value?.trim();
+
+    if (!note) {
+        showNotification('Error', 'Please enter a note', 'error');
+        return;
+    }
+
+    if (!state.dealId) {
+        showNotification('Error', 'No deal loaded', 'error');
+        return;
+    }
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/activities`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                type: 'NOTE_ADDED',
+                title: 'Note added',
+                description: note,
+            }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to add note');
+        }
+
+        const newActivity = await response.json();
+
+        // Clear input
+        noteInput.value = '';
+
+        // Reload activities to show the new note
+        loadActivities();
+
+        showNotification('Note Added', 'Your note has been saved', 'success');
+
+    } catch (error) {
+        console.error('Error adding note:', error);
+        showNotification('Error', 'Failed to add note', 'error');
+    }
 }
 
 function updateChatContext(documents) {
@@ -253,11 +746,30 @@ function initializeFeatures() {
     initChatInterface();
     initFileAttachments();
     initActionButtons();
+    initStagePipeline();
+    initActivityFeed();
     initCitationButtons();
     initDocumentPreviews();
     initAIResponseActions();
     initContextSettings();
     initBreadcrumbNavigation();
+}
+
+// ============================================================
+// Stage Pipeline
+// ============================================================
+function initStagePipeline() {
+    const changeStageBtn = document.getElementById('change-stage-btn');
+    if (changeStageBtn) {
+        changeStageBtn.addEventListener('click', () => {
+            const currentStage = state.dealData?.stage;
+            if (isTerminalStage(currentStage)) {
+                showNotification('Stage Locked', 'This deal has been closed and cannot be moved.', 'warning');
+                return;
+            }
+            showTerminalStageModal();
+        });
+    }
 }
 
 // ============================================================
@@ -287,7 +799,7 @@ function initChatInterface() {
     // Send button click
     sendButton.addEventListener('click', sendMessage);
 
-    function sendMessage() {
+    async function sendMessage() {
         const message = textarea.value.trim();
         if (!message) return;
 
@@ -296,14 +808,44 @@ function initChatInterface() {
         textarea.value = '';
         textarea.style.height = 'auto';
 
-        // Simulate AI typing
+        // Show typing indicator
+        showTypingIndicator();
+
+        // Try real AI API first
+        if (state.dealId) {
+            try {
+                const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/chat`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        message: message,
+                        history: state.messages.slice(-10).map(m => ({
+                            role: m.role,
+                            content: m.content,
+                        })),
+                    }),
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    removeTypingIndicator();
+                    addAIResponseFromAPI(data.response);
+
+                    // Store message in history
+                    state.messages.push({ role: 'user', content: message });
+                    state.messages.push({ role: 'assistant', content: data.response });
+                    return;
+                }
+            } catch (error) {
+                console.error('AI Chat API error:', error);
+            }
+        }
+
+        // Fall back to mock response if API fails
         setTimeout(() => {
-            showTypingIndicator();
-            setTimeout(() => {
-                removeTypingIndicator();
-                addAIResponse(message);
-            }, 2000);
-        }, 500);
+            removeTypingIndicator();
+            addAIResponse(message);
+        }, 1000);
     }
 }
 
@@ -355,10 +897,63 @@ function removeTypingIndicator() {
     if (typing) typing.remove();
 }
 
+function addAIResponseFromAPI(responseText) {
+    const chatContainer = document.getElementById('chat-messages');
+
+    // Format the response (add paragraph tags if needed)
+    const formattedResponse = responseText.startsWith('<')
+        ? responseText
+        : `<p>${responseText.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex gap-4 max-w-[90%] animate-fadeIn';
+    messageDiv.innerHTML = `
+        <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
+            <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
+        </div>
+        <div class="flex flex-col gap-1">
+            <span class="text-xs font-bold text-text-muted ml-1">PE OS AI <span class="text-primary/60 font-normal">• GPT-4</span></span>
+            <div class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
+                ${formattedResponse}
+            </div>
+            <div class="flex gap-2 ml-1 mt-1">
+                <button class="ai-helpful-btn text-[10px] text-text-muted hover:text-primary flex items-center gap-1 transition-colors font-medium">
+                    <span class="material-symbols-outlined text-sm">thumb_up</span> Helpful
+                </button>
+                <button class="ai-copy-btn text-[10px] text-text-muted hover:text-primary flex items-center gap-1 transition-colors font-medium">
+                    <span class="material-symbols-outlined text-sm">content_copy</span> Copy
+                </button>
+            </div>
+        </div>
+    `;
+
+    chatContainer.appendChild(messageDiv);
+
+    // Add event listeners to new buttons
+    messageDiv.querySelector('.ai-helpful-btn').addEventListener('click', function() {
+        this.innerHTML = '<span class="material-symbols-outlined text-sm">thumb_up</span> Marked helpful';
+        this.classList.add('text-primary');
+        showNotification('Feedback Received', 'Thank you for your feedback!', 'success');
+    });
+
+    messageDiv.querySelector('.ai-copy-btn').addEventListener('click', function() {
+        const text = messageDiv.querySelector('.ai-bubble-gradient').innerText;
+        navigator.clipboard.writeText(text);
+        this.innerHTML = '<span class="material-symbols-outlined text-sm">check</span> Copied';
+        this.classList.add('text-primary');
+        setTimeout(() => {
+            this.innerHTML = '<span class="material-symbols-outlined text-sm">content_copy</span> Copy';
+            this.classList.remove('text-primary');
+        }, 2000);
+    });
+
+    scrollToBottom();
+}
+
 function addAIResponse(userMessage) {
     const chatContainer = document.getElementById('chat-messages');
 
-    // Generate contextual response
+    // Generate contextual response (fallback mock)
     const responses = generateAIResponse(userMessage);
 
     const messageDiv = document.createElement('div');
@@ -638,54 +1233,206 @@ function initActionButtons() {
     }
 }
 
-function showShareModal() {
+async function showShareModal() {
+    const deal = state.dealData;
+    const teamMembers = deal?.teamMembers || [];
+
+    // Fetch available users for invite
+    let availableUsers = [];
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/users`);
+        if (response.ok) {
+            availableUsers = await response.json();
+            // Filter out users already on the team
+            const teamUserIds = new Set(teamMembers.map(m => m.user?.id));
+            availableUsers = availableUsers.filter(u => !teamUserIds.has(u.id));
+        }
+    } catch (error) {
+        console.error('Error fetching users:', error);
+    }
+
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.id = 'team-modal';
     modal.innerHTML = `
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full animate-fadeIn">
+        <div class="bg-white rounded-xl shadow-2xl max-w-lg w-full animate-fadeIn max-h-[90vh] overflow-hidden flex flex-col">
             <div class="p-6 border-b border-slate-200">
                 <div class="flex items-center justify-between">
-                    <h3 class="font-bold text-slate-900 text-lg">Share Deal</h3>
+                    <h3 class="font-bold text-slate-900 text-lg flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">group</span>
+                        Deal Team
+                    </h3>
                     <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-slate-600">
                         <span class="material-symbols-outlined">close</span>
                     </button>
                 </div>
             </div>
-            <div class="p-6">
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Share with team members</label>
-                    <input type="email" placeholder="Enter email address" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
-                </div>
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">Permission</label>
-                    <select class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
-                        <option>Can view</option>
-                        <option>Can edit</option>
-                        <option>Can comment</option>
-                    </select>
-                </div>
-                <div class="bg-slate-50 rounded-lg p-3 mb-4">
-                    <div class="flex items-center justify-between text-sm">
-                        <span class="text-slate-600">Copy link</span>
-                        <button onclick="copyShareLink()" class="text-primary hover:text-blue-600 font-semibold">Copy</button>
+            <div class="p-6 overflow-y-auto flex-1">
+                <!-- Current Team Members -->
+                <div class="mb-6">
+                    <h4 class="text-sm font-semibold text-slate-700 mb-3">Current Team (${teamMembers.length})</h4>
+                    <div id="team-list" class="space-y-2">
+                        ${teamMembers.length === 0 ? `
+                            <p class="text-sm text-slate-500 italic">No team members yet</p>
+                        ` : teamMembers.map(member => `
+                            <div class="flex items-center justify-between p-3 bg-slate-50 rounded-lg group">
+                                <div class="flex items-center gap-3">
+                                    <div class="size-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+                                        ${(member.user?.name || 'U').charAt(0)}
+                                    </div>
+                                    <div>
+                                        <p class="text-sm font-medium text-slate-900">${member.user?.name || 'Unknown'}</p>
+                                        <p class="text-xs text-slate-500">${member.user?.email || ''}</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="px-2 py-0.5 rounded text-xs font-medium ${member.role === 'LEAD' ? 'bg-primary-light text-primary' : 'bg-slate-200 text-slate-600'}">${member.role}</span>
+                                    <button onclick="removeTeamMember('${member.id}')" class="p-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                                        <span class="material-symbols-outlined text-sm">close</span>
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
                     </div>
                 </div>
-                <button onclick="shareWithTeam(); this.closest('.fixed').remove();" class="w-full bg-primary hover:bg-blue-600 text-white font-semibold py-2.5 rounded-lg transition-colors">
-                    Share
-                </button>
+
+                <!-- Add New Member -->
+                <div class="mb-4">
+                    <h4 class="text-sm font-semibold text-slate-700 mb-3">Add Team Member</h4>
+                    <div class="flex gap-2">
+                        <div class="flex-1 relative">
+                            <select id="user-select" class="w-full px-4 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                                <option value="">Select a user...</option>
+                                ${availableUsers.map(u => `<option value="${u.id}">${u.name} (${u.email})</option>`).join('')}
+                            </select>
+                        </div>
+                        <select id="role-select" class="px-3 py-2.5 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                            <option value="MEMBER">Member</option>
+                            <option value="LEAD">Lead</option>
+                            <option value="VIEWER">Viewer</option>
+                        </select>
+                    </div>
+                    <button id="add-member-btn" class="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors">
+                        <span class="material-symbols-outlined text-lg">person_add</span>
+                        Add to Team
+                    </button>
+                </div>
+
+                <!-- Share Link -->
+                <div class="pt-4 border-t border-slate-200">
+                    <h4 class="text-sm font-semibold text-slate-700 mb-3">Share Link</h4>
+                    <div class="flex gap-2">
+                        <input type="text" id="share-link" value="${window.location.href}" class="flex-1 px-3 py-2 border border-slate-200 rounded-lg text-sm text-slate-600 bg-slate-50" readonly>
+                        <button onclick="copyShareLink()" class="px-4 py-2 border border-slate-200 rounded-lg text-sm font-medium hover:bg-slate-50 transition-colors flex items-center gap-1">
+                            <span class="material-symbols-outlined text-sm">content_copy</span>
+                            Copy
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     `;
     document.body.appendChild(modal);
+
+    // Add member button handler
+    document.getElementById('add-member-btn')?.addEventListener('click', async () => {
+        await addTeamMember();
+    });
 
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.remove();
     });
 }
 
+async function addTeamMember() {
+    if (!state.dealId) return;
+
+    const userSelect = document.getElementById('user-select');
+    const roleSelect = document.getElementById('role-select');
+    const userId = userSelect.value;
+    const role = roleSelect.value;
+
+    if (!userId) {
+        showNotification('Error', 'Please select a user to add', 'error');
+        return;
+    }
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/team`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, role }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.error || 'Failed to add team member');
+        }
+
+        const newMember = await response.json();
+
+        // Update local state
+        if (state.dealData) {
+            state.dealData.teamMembers = [...(state.dealData.teamMembers || []), newMember];
+        }
+
+        // Close and reopen modal to refresh
+        document.getElementById('team-modal')?.remove();
+        showShareModal();
+
+        showNotification('Team Updated', `${newMember.user?.name || 'User'} added to the team`, 'success');
+
+    } catch (error) {
+        console.error('Error adding team member:', error);
+        showNotification('Error', error.message, 'error');
+    }
+}
+
+async function removeTeamMember(memberId) {
+    if (!state.dealId || !memberId) return;
+
+    if (!confirm('Are you sure you want to remove this team member?')) {
+        return;
+    }
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/team/${memberId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to remove team member');
+        }
+
+        // Update local state
+        if (state.dealData) {
+            state.dealData.teamMembers = (state.dealData.teamMembers || []).filter(m => m.id !== memberId);
+        }
+
+        // Close and reopen modal to refresh
+        document.getElementById('team-modal')?.remove();
+        showShareModal();
+
+        showNotification('Team Updated', 'Team member removed', 'success');
+
+    } catch (error) {
+        console.error('Error removing team member:', error);
+        showNotification('Error', 'Failed to remove team member', 'error');
+    }
+}
+
 function showEditDealModal() {
+    const deal = state.dealData || {};
+
+    // Build stage options
+    const allStages = [...DEAL_STAGES, ...TERMINAL_STAGES];
+    const stageOptions = allStages.map(s =>
+        `<option value="${s.key}" ${deal.stage === s.key ? 'selected' : ''}>${s.label}</option>`
+    ).join('');
+
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto';
+    modal.id = 'edit-deal-modal';
     modal.innerHTML = `
         <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full my-8 animate-fadeIn">
             <div class="p-6 border-b border-slate-200">
@@ -700,49 +1447,47 @@ function showEditDealModal() {
                 <div class="grid grid-cols-2 gap-4">
                     <div class="col-span-2">
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Deal Name</label>
-                        <input type="text" value="Project Apex Logistics" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                        <input type="text" id="edit-deal-name" value="${deal.name || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Stage</label>
-                        <select class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
-                            <option>Sourcing</option>
-                            <option selected>Due Diligence</option>
-                            <option>LOI / Offer</option>
-                            <option>Closed</option>
+                        <select id="edit-deal-stage" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                            ${stageOptions}
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Industry</label>
-                        <input type="text" value="SaaS / Logistics" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                        <input type="text" id="edit-deal-industry" value="${deal.industry || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Revenue (LTM)</label>
-                        <input type="text" value="$120M" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Revenue (in millions)</label>
+                        <input type="number" id="edit-deal-revenue" value="${deal.revenue || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 120">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">EBITDA Margin</label>
-                        <input type="text" value="22%" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">EBITDA (in millions)</label>
+                        <input type="number" id="edit-deal-ebitda" value="${deal.ebitda || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 26">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Valuation Ask</label>
-                        <input type="text" value="$450M" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Deal Size (in millions)</label>
+                        <input type="number" id="edit-deal-size" value="${deal.dealSize || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 450">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Retention Rate</label>
-                        <input type="text" value="94%" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Projected IRR (%)</label>
+                        <input type="number" id="edit-deal-irr" value="${deal.irrProjected || ''}" step="0.1" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 24">
                     </div>
                     <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Lead Partner</label>
-                        <input type="text" value="Sarah Jenkins" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">MoM Multiple</label>
+                        <input type="number" id="edit-deal-mom" value="${deal.mom || ''}" step="0.1" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 3.5">
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Analyst</label>
-                        <input type="text" value="Mike Ross" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                    <div class="col-span-2">
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Description</label>
+                        <textarea id="edit-deal-description" rows="2" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="Brief description of the deal...">${deal.description || ''}</textarea>
                     </div>
                 </div>
             </div>
             <div class="p-6 border-t border-slate-200 flex gap-3">
-                <button onclick="saveDealChanges(); this.closest('.fixed').remove();" class="flex-1 bg-primary hover:bg-blue-600 text-white font-semibold py-2.5 rounded-lg transition-colors">
+                <button id="save-deal-btn" class="flex-1 bg-primary hover:bg-blue-600 text-white font-semibold py-2.5 rounded-lg transition-colors flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-lg">save</span>
                     Save Changes
                 </button>
                 <button onclick="this.closest('.fixed').remove()" class="px-6 py-2.5 border border-slate-200 rounded-lg font-semibold hover:bg-slate-50 transition-colors">
@@ -753,9 +1498,72 @@ function showEditDealModal() {
     `;
     document.body.appendChild(modal);
 
+    // Add save handler
+    document.getElementById('save-deal-btn').addEventListener('click', async () => {
+        await saveDealChangesFromModal();
+    });
+
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.remove();
     });
+}
+
+async function saveDealChangesFromModal() {
+    if (!state.dealId) {
+        showNotification('Error', 'No deal loaded', 'error');
+        return;
+    }
+
+    const oldStage = state.dealData?.stage;
+    const newStage = document.getElementById('edit-deal-stage').value;
+
+    const updateData = {
+        name: document.getElementById('edit-deal-name').value,
+        stage: newStage,
+        industry: document.getElementById('edit-deal-industry').value,
+        revenue: parseFloat(document.getElementById('edit-deal-revenue').value) || null,
+        ebitda: parseFloat(document.getElementById('edit-deal-ebitda').value) || null,
+        dealSize: parseFloat(document.getElementById('edit-deal-size').value) || null,
+        irrProjected: parseFloat(document.getElementById('edit-deal-irr').value) || null,
+        mom: parseFloat(document.getElementById('edit-deal-mom').value) || null,
+        description: document.getElementById('edit-deal-description').value,
+    };
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updateData),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update deal');
+        }
+
+        const updatedDeal = await response.json();
+        state.dealData = updatedDeal;
+
+        // Update page with new data
+        populateDealPage(updatedDeal);
+
+        // Close modal
+        document.getElementById('edit-deal-modal')?.remove();
+
+        // Show success notification
+        if (oldStage !== newStage) {
+            showNotification(
+                'Deal Updated',
+                `Deal updated and stage changed to ${getStageLabel(newStage)}`,
+                'success'
+            );
+        } else {
+            showNotification('Deal Updated', 'Deal details have been saved', 'success');
+        }
+
+    } catch (error) {
+        console.error('Error saving deal:', error);
+        showNotification('Error', 'Failed to save deal changes', 'error');
+    }
 }
 
 // ============================================================
@@ -1101,7 +1909,8 @@ function shareWithTeam() {
 }
 
 function saveDealChanges() {
-    showNotification('Changes Saved', 'Deal details have been updated', 'success');
+    // Legacy function - now handled by saveDealChangesFromModal
+    saveDealChangesFromModal();
 }
 
 function downloadDocument(docName) {

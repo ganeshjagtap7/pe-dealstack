@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase';
+import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
+import { AuditLog } from '../services/auditLog.js';
 
 const router = Router();
 
@@ -98,8 +100,8 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
-// POST /api/users - Create a new user
-router.post('/', async (req: Request, res: Response, next: NextFunction) => {
+// POST /api/users - Create a new user (requires USER_CREATE permission)
+router.post('/', requirePermission(PERMISSIONS.USER_CREATE), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = createUserSchema.safeParse(req.body);
 
@@ -129,14 +131,17 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (error) throw error;
 
+    // Audit log
+    await AuditLog.userCreated(req, user.id, user.email);
+
     res.status(201).json(user);
   } catch (error) {
     next(error);
   }
 });
 
-// PATCH /api/users/:id - Update a user
-router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
+// PATCH /api/users/:id - Update a user (requires USER_EDIT permission)
+router.patch('/:id', requirePermission(PERMISSIONS.USER_EDIT), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const validation = updateUserSchema.safeParse(req.body);
@@ -165,17 +170,31 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
       throw error;
     }
 
+    // Audit log - log role changes with higher severity
+    if (validation.data.role) {
+      await AuditLog.userUpdated(req, user.id, user.email, { roleChanged: true, newRole: validation.data.role });
+    } else {
+      await AuditLog.userUpdated(req, user.id, user.email, validation.data);
+    }
+
     res.json(user);
   } catch (error) {
     next(error);
   }
 });
 
-// DELETE /api/users/:id - Soft delete a user (set isActive = false)
-router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
+// DELETE /api/users/:id - Soft delete a user (requires USER_DELETE permission)
+router.delete('/:id', requirePermission(PERMISSIONS.USER_DELETE), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
     const { hard } = req.query;
+
+    // Get user email before deleting for audit log
+    const { data: userToDelete } = await supabase
+      .from('User')
+      .select('email')
+      .eq('id', id)
+      .single();
 
     if (hard === 'true') {
       // Hard delete - remove from database
@@ -194,6 +213,9 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 
       if (error) throw error;
     }
+
+    // Audit log
+    await AuditLog.userDeleted(req, id, userToDelete?.email || 'Unknown');
 
     res.status(204).send();
   } catch (error) {

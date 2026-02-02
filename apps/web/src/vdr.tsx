@@ -1,27 +1,63 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { FolderTree } from './components/FolderTree';
 import { FiltersBar } from './components/FiltersBar';
 import { FileTable } from './components/FileTable';
 import { InsightsPanel } from './components/InsightsPanel';
-import { mockFolders, mockFiles, mockInsights, smartFilters, mockCollaborators } from './data/vdrMockData';
-import { VDRFile, SmartFilter, Folder } from './types/vdr.types';
+import {
+  smartFilters as defaultSmartFilters,
+  mockCollaborators,
+  mockFolders,
+  mockFiles,
+  mockInsights
+} from './data/vdrMockData';
+import { VDRFile, SmartFilter, Folder, FolderInsights } from './types/vdr.types';
+import {
+  fetchFolders,
+  fetchDocuments,
+  fetchFolderInsights,
+  fetchDeal,
+  createDeal,
+  createFolder,
+  uploadDocument,
+  deleteDocument,
+  renameDocument,
+  getDocumentDownloadUrl,
+  transformFolder,
+  transformDocument,
+  transformInsights,
+} from './services/vdrApi';
+
+const API_BASE_URL = 'http://localhost:3001/api';
+
+// Get dealId from URL params
+function getDealIdFromUrl(): string | null {
+  const params = new URLSearchParams(window.location.search);
+  return params.get('dealId') || params.get('id');
+}
 
 export const VDRApp: React.FC = () => {
-  const [activeFolderId, setActiveFolderId] = useState('100');
+  const [dealId, setDealId] = useState<string | null>(getDealIdFromUrl());
+  const [dealName, setDealName] = useState('');
+  const [activeFolderId, setActiveFolderId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState<SmartFilter[]>(smartFilters);
-  const [allFiles, setAllFiles] = useState(mockFiles);
-  const [folders, setFolders] = useState<Folder[]>(mockFolders);
+  const [filters, setFilters] = useState<SmartFilter[]>(defaultSmartFilters);
+  const [allFiles, setAllFiles] = useState<VDRFile[]>([]);
+  const [folders, setFolders] = useState<Folder[]>([]);
+  const [insights, setInsights] = useState<Record<string, FolderInsights>>({});
   const [showNewFolderModal, setShowNewFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
   const [insightsPanelCollapsed, setInsightsPanelCollapsed] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [useMockData, setUseMockData] = useState(!getDealIdFromUrl());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
+  // Derived state
   const activeFolder = folders.find((f) => f.id === activeFolderId);
-  const activeFolderInsights = mockInsights[activeFolderId];
+  const activeFolderInsights = activeFolderId ? insights[activeFolderId] : null;
 
-  // Filter files by folder, search, and smart filters
+  // Filter files by folder, search, and smart filters - MUST be before any conditional returns
   const filteredFiles = useMemo(() => {
     let results = allFiles.filter((file) => file.folderId === activeFolderId);
 
@@ -47,19 +83,41 @@ export const VDRApp: React.FC = () => {
     return results;
   }, [allFiles, activeFolderId, searchQuery, filters]);
 
-  const handleFilterToggle = (filterId: string) => {
-    setFilters((prev) =>
-      prev.map((f) => (f.id === filterId ? { ...f, active: !f.active } : f))
-    );
-  };
-
-  const handleUploadClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  // File upload handler - MUST be before any conditional returns
+  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
-    if (!files || files.length === 0) return;
+    if (!files || files.length === 0 || !activeFolderId) return;
+
+    if (useMockData) {
+      // Demo mode - add files locally
+      for (const file of Array.from(files)) {
+        const newFile: VDRFile = {
+          id: `demo-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          name: file.name,
+          size: `${(file.size / 1024 / 1024).toFixed(1)} MB`,
+          type: file.name.endsWith('.pdf') ? 'pdf' : file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'excel' : 'doc',
+          analysis: {
+            type: 'standard',
+            label: 'Processing...',
+            description: 'AI analysis pending for this document.',
+            color: 'slate',
+          },
+          author: {
+            name: 'You',
+            avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk',
+          },
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          folderId: activeFolderId,
+          tags: [],
+        };
+        setAllFiles((prev) => [newFile, ...prev]);
+      }
+      event.target.value = '';
+      return;
+    }
+
+    // Real API upload
+    if (!dealId) return;
 
     const maxFileSize = 50 * 1024 * 1024; // 50MB
     const allowedTypes = [
@@ -70,99 +128,299 @@ export const VDRApp: React.FC = () => {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
 
-    const newFiles: VDRFile[] = [];
+    setUploading(true);
 
-    Array.from(files).forEach((file) => {
+    for (const file of Array.from(files)) {
       // Validate file size
       if (file.size > maxFileSize) {
         alert(`File ${file.name} exceeds maximum size of 50MB`);
-        return;
+        continue;
       }
 
       // Validate file type
       if (!allowedTypes.includes(file.type)) {
         alert(`File ${file.name} has unsupported file type`);
+        continue;
+      }
+
+      try {
+        const uploadedDoc = await uploadDocument(dealId, activeFolderId, file);
+        if (uploadedDoc) {
+          const transformedFile = transformDocument(uploadedDoc);
+          setAllFiles((prev) => [transformedFile, ...prev]);
+
+          // Update folder file count
+          setFolders((prev) =>
+            prev.map((folder) =>
+              folder.id === activeFolderId
+                ? { ...folder, fileCount: folder.fileCount + 1 }
+                : folder
+            )
+          );
+        }
+      } catch (error) {
+        console.error(`Error uploading ${file.name}:`, error);
+        alert(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
+
+    setUploading(false);
+    // Reset input
+    event.target.value = '';
+  }, [dealId, activeFolderId, useMockData]);
+
+  // File click handler - MUST be before any conditional returns
+  const handleFileClick = useCallback(async (file: VDRFile) => {
+    if (useMockData) {
+      alert(`Preview: ${file.name}\n\nThis is a demo. In production, the document would open in a preview modal.`);
+      return;
+    }
+
+    // Try to get download URL and show preview
+    try {
+      const downloadUrl = await getDocumentDownloadUrl(file.id);
+      if (downloadUrl) {
+        // Use PEDocPreview if available, otherwise open in new tab
+        if ((window as any).PEDocPreview) {
+          (window as any).PEDocPreview.preview(downloadUrl, file.name);
+        } else {
+          window.open(downloadUrl, '_blank');
+        }
+      } else {
+        alert(`Unable to load document: ${file.name}`);
+      }
+    } catch (error) {
+      console.error('Error loading file:', error);
+      alert(`Error loading file: ${file.name}`);
+    }
+  }, [useMockData]);
+
+  // Create folder handler - MUST be before any conditional returns
+  const handleCreateFolder = useCallback(async () => {
+    if (!newFolderName.trim()) return;
+
+    let currentDealId = dealId;
+
+    // If no deal exists, create one first
+    if (!currentDealId) {
+      try {
+        const newDeal = await createDeal(newFolderName.trim());
+        if (newDeal && newDeal.id) {
+          currentDealId = newDeal.id;
+          setDealId(currentDealId);
+          setDealName(newDeal.name || newFolderName.trim());
+          setUseMockData(false);
+          // Clear mock data
+          setFolders([]);
+          setAllFiles([]);
+          setInsights({});
+          // Update URL without reload
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.set('dealId', currentDealId);
+          window.history.pushState({}, '', newUrl.toString());
+        } else {
+          throw new Error('Failed to create deal');
+        }
+      } catch (error) {
+        console.error('Error creating deal:', error);
+        alert('Failed to create data room. Please try again.');
+        setShowNewFolderModal(false);
+        setNewFolderName('');
+        return;
+      }
+    }
+
+    // Now create the folder
+    try {
+      const newApiFolder = await createFolder(currentDealId, newFolderName.trim());
+      if (newApiFolder) {
+        const newFolder = transformFolder(newApiFolder);
+        setFolders((prev) => [...prev, newFolder]);
+        setActiveFolderId(newFolder.id);
+
+        // Initialize empty insights for new folder
+        setInsights((prev) => ({
+          ...prev,
+          [newFolder.id]: transformInsights(null, newFolder.id),
+        }));
+      }
+    } catch (error) {
+      console.error('Error creating folder:', error);
+      alert('Failed to create folder');
+    }
+
+    setShowNewFolderModal(false);
+    setNewFolderName('');
+  }, [newFolderName, dealId]);
+
+  // Delete file handler - MUST be before any conditional returns
+  const handleDeleteFile = useCallback(async (fileId: string) => {
+    if (useMockData) {
+      // Demo mode - delete locally
+      setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
+      return;
+    }
+
+    const success = await deleteDocument(fileId);
+    if (success) {
+      setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
+      // Update folder file count
+      setFolders((prev) =>
+        prev.map((folder) => {
+          const filesInFolder = allFiles.filter(
+            (f) => f.folderId === folder.id && f.id !== fileId
+          ).length;
+          return { ...folder, fileCount: filesInFolder };
+        })
+      );
+    } else {
+      alert('Failed to delete file');
+    }
+  }, [allFiles, useMockData]);
+
+  // Rename file handler - MUST be before any conditional returns
+  const handleRenameFile = useCallback(async (fileId: string, newName: string) => {
+    if (useMockData) {
+      // Demo mode - rename locally
+      setAllFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, name: newName } : f))
+      );
+      return;
+    }
+
+    const success = await renameDocument(fileId, newName);
+    if (success) {
+      setAllFiles((prev) =>
+        prev.map((f) => (f.id === fileId ? { ...f, name: newName } : f))
+      );
+    } else {
+      alert('Failed to rename file');
+    }
+  }, [useMockData]);
+
+  // Load data when dealId changes or on initial load
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+
+      // If no dealId, use mock data
+      if (!dealId) {
+        setUseMockData(true);
+        setDealName('Project Apex');
+        setFolders(mockFolders);
+        setAllFiles(mockFiles);
+        setInsights(mockInsights);
+        setActiveFolderId(mockFolders[0]?.id || null);
+        setLoading(false);
         return;
       }
 
-      // Determine file type
-      let fileType: 'excel' | 'pdf' | 'doc' | 'other' = 'other';
-      if (file.type.includes('excel') || file.type.includes('spreadsheet')) {
-        fileType = 'excel';
-      } else if (file.type.includes('pdf')) {
-        fileType = 'pdf';
-      } else if (file.type.includes('word') || file.type.includes('document')) {
-        fileType = 'doc';
+      try {
+        // Fetch deal info
+        const deal = await fetchDeal(dealId);
+        if (deal) {
+          setDealName(deal.name || 'Data Room');
+        }
+
+        // Fetch folders
+        const apiFolders = await fetchFolders(dealId);
+        if (apiFolders.length > 0) {
+          setUseMockData(false);
+          const transformedFolders = apiFolders.map(transformFolder);
+          setFolders(transformedFolders);
+
+          // Set first folder as active
+          setActiveFolderId(transformedFolders[0].id);
+
+          // Fetch insights for all folders
+          const insightsMap: Record<string, FolderInsights> = {};
+          for (const folder of apiFolders) {
+            const folderInsight = await fetchFolderInsights(folder.id);
+            insightsMap[folder.id] = transformInsights(folderInsight, folder.id);
+          }
+          setInsights(insightsMap);
+        } else {
+          // No folders found - use mock data to show UI
+          setUseMockData(true);
+          setFolders(mockFolders);
+          setAllFiles(mockFiles);
+          setInsights(mockInsights);
+          setActiveFolderId(mockFolders[0]?.id || null);
+        }
+      } catch (error) {
+        console.error('Error loading VDR data:', error);
+        // On error, use mock data to show UI
+        setUseMockData(true);
+        setDealName('Project Apex');
+        setFolders(mockFolders);
+        setAllFiles(mockFiles);
+        setInsights(mockInsights);
+        setActiveFolderId(mockFolders[0]?.id || null);
+      } finally {
+        setLoading(false);
       }
+    };
 
-      const newFile: VDRFile = {
-        id: `f-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        name: file.name,
-        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-        type: fileType,
-        analysis: {
-          type: 'standard',
-          label: 'Processing...',
-          description: 'AI analysis in progress. This may take a few moments.',
-          color: 'slate',
-        },
-        author: {
-          name: 'You',
-          avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCO6GIn4UhlI4C8A-rUopfedCoExgcFNw9lqL74O0ToVnyDYmuppE4SCK4e3w9Snc4Y7YC1yLHg4yXxzD33Vi8s1dIbVkhAY-dl5yzQJHrFbK1c4DN55KR9cuMqFyTgHh3eHxtD7Qj1QeCZ3vWiJ8dwrdWaSGLpz1z8qzxvy3sU1R1YIbHA6Guqw-7hBQwlCzDkElLXcbLutbv8jFvGenyTIkJ78xTEd9CkpcKw8oiErdB0yqZ9A6MdYsW6e1laJqopTVEsy78RrWs',
-        },
-        date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-        folderId: activeFolderId,
-        tags: ['uploaded'],
-      };
+    loadData();
+  }, [dealId]);
 
-      newFiles.push(newFile);
-    });
+  // Load documents when active folder changes (only for real data)
+  useEffect(() => {
+    const loadDocuments = async () => {
+      if (!dealId || !activeFolderId || useMockData) return;
 
-    if (newFiles.length > 0) {
-      setAllFiles((prev) => [...newFiles, ...prev]);
+      try {
+        const docs = await fetchDocuments(dealId, activeFolderId);
+        const transformedDocs = docs.map(transformDocument);
+        // Only update files for current folder
+        setAllFiles(prev => {
+          const otherFiles = prev.filter(f => f.folderId !== activeFolderId);
+          return [...otherFiles, ...transformedDocs];
+        });
+      } catch (error) {
+        console.error('Error loading documents:', error);
+      }
+    };
 
-      // Simulate AI processing after 2 seconds
-      setTimeout(() => {
-        setAllFiles((prev) =>
-          prev.map((f) =>
-            newFiles.find((nf) => nf.id === f.id)
-              ? {
-                  ...f,
-                  analysis: {
-                    type: 'complete',
-                    label: 'Analysis Complete',
-                    description: 'Document successfully processed and indexed.',
-                    color: 'primary',
-                  },
-                }
-              : f
-          )
-        );
-      }, 2000);
+    loadDocuments();
+  }, [dealId, activeFolderId, useMockData]);
+
+  // Auto-focus the new folder input when modal opens
+  useEffect(() => {
+    if (showNewFolderModal && newFolderInputRef.current) {
+      newFolderInputRef.current.focus();
     }
+  }, [showNewFolderModal]);
 
-    // Reset input
-    event.target.value = '';
+  // Event handlers (non-hooks)
+  const handleFilterToggle = (filterId: string) => {
+    setFilters((prev) =>
+      prev.map((f) => (f.id === filterId ? { ...f, active: !f.active } : f))
+    );
+  };
+
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
   };
 
   const handleGenerateReport = () => {
     const folder = activeFolder;
-    const insights = activeFolderInsights;
+    const folderInsights = activeFolderInsights;
 
-    if (!folder || !insights) return;
+    if (!folder) return;
 
     // Generate markdown report
     const report = `# VDR Analysis Report - ${folder.name}
 Generated: ${new Date().toLocaleString()}
 
 ## Summary
-${insights.summary}
+${folderInsights?.summary || 'No summary available.'}
 
-**Completion Status:** ${insights.completionPercent}%
+**Completion Status:** ${folderInsights?.completionPercent || 0}%
 **Total Files:** ${folder.fileCount}
 
-## Red Flags (${insights.redFlags.length})
-${insights.redFlags
+## Red Flags (${folderInsights?.redFlags?.length || 0})
+${(folderInsights?.redFlags || [])
   .map(
     (flag) => `
 ### ${flag.title} [${flag.severity.toUpperCase()}]
@@ -171,8 +429,8 @@ ${flag.description}
   )
   .join('\n')}
 
-## Missing Documents (${insights.missingDocuments.length})
-${insights.missingDocuments.map((doc) => `- ${doc.name}`).join('\n')}
+## Missing Documents (${folderInsights?.missingDocuments?.length || 0})
+${(folderInsights?.missingDocuments || []).map((doc) => `- ${doc.name}`).join('\n')}
 
 ## Files in Folder
 ${filteredFiles
@@ -203,10 +461,6 @@ Generated by PE OS VDR System
     URL.revokeObjectURL(url);
   };
 
-  const handleFileClick = (file: VDRFile) => {
-    alert(`File clicked: ${file.name}\n\nIn a production app, this would open a file viewer or download the file.`);
-  };
-
   const handleViewFile = (fileId: string) => {
     const file = allFiles.find((f) => f.id === fileId);
     if (file) {
@@ -221,13 +475,6 @@ Generated by PE OS VDR System
     }
   };
 
-  // Auto-focus the new folder input when modal opens
-  useEffect(() => {
-    if (showNewFolderModal && newFolderInputRef.current) {
-      newFolderInputRef.current.focus();
-    }
-  }, [showNewFolderModal]);
-
   const handleOpenNewFolderModal = () => {
     setNewFolderName('');
     setShowNewFolderModal(true);
@@ -236,31 +483,6 @@ Generated by PE OS VDR System
   const handleCloseNewFolderModal = () => {
     setShowNewFolderModal(false);
     setNewFolderName('');
-  };
-
-  const handleCreateFolder = () => {
-    if (!newFolderName.trim()) return;
-
-    // Generate a unique folder ID based on existing folders
-    const existingNumbers = folders
-      .map((f) => parseInt(f.id))
-      .filter((n) => !isNaN(n))
-      .sort((a, b) => b - a);
-    const nextNumber = existingNumbers.length > 0 ? existingNumbers[0] + 100 : 100;
-    const newId = nextNumber.toString();
-
-    const newFolder: Folder = {
-      id: newId,
-      name: `${newId} ${newFolderName.trim()}`,
-      status: 'reviewing',
-      fileCount: 0,
-      statusLabel: 'New',
-      statusColor: 'yellow',
-    };
-
-    setFolders((prev) => [...prev, newFolder]);
-    setActiveFolderId(newId);
-    handleCloseNewFolderModal();
   };
 
   const handleNewFolderKeyDown = (e: React.KeyboardEvent) => {
@@ -272,31 +494,24 @@ Generated by PE OS VDR System
     }
   };
 
-  // File actions
-  const handleDeleteFile = (fileId: string) => {
-    setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
-    // Update folder file count
-    setFolders((prev) =>
-      prev.map((folder) => {
-        const filesInFolder = allFiles.filter((f) => f.folderId === folder.id && f.id !== fileId).length;
-        return { ...folder, fileCount: filesInFolder };
-      })
-    );
-  };
-
-  const handleRenameFile = (fileId: string, newName: string) => {
-    setAllFiles((prev) =>
-      prev.map((f) => (f.id === fileId ? { ...f, name: newName } : f))
-    );
-  };
-
-  // Insights panel toggle
   const handleToggleInsightsPanel = () => {
     setInsightsPanelCollapsed((prev) => !prev);
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: '#003366' }}></div>
+          <p className="text-slate-500">Loading Data Room...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-background-light dark:bg-background-dark text-text-main dark:text-gray-100 flex h-full w-full overflow-hidden antialiased selection:bg-primary/20">
+    <div className="bg-slate-50 text-slate-900 flex h-full w-full overflow-hidden antialiased selection:bg-primary/20">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -318,23 +533,23 @@ Generated by PE OS VDR System
           {/* Modal */}
           <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-5 border-b border-border-light">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200">
               <div className="flex items-center gap-3">
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary-light">
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg" style={{ backgroundColor: '#E6EEF5' }}>
                   <span className="material-symbols-outlined text-primary">create_new_folder</span>
                 </div>
-                <h3 className="text-lg font-semibold text-text-main">Create New Folder</h3>
+                <h3 className="text-lg font-semibold text-slate-900">Create New Folder</h3>
               </div>
               <button
                 onClick={handleCloseNewFolderModal}
-                className="p-1 rounded-lg hover:bg-background-light transition-colors"
+                className="p-1 rounded-lg hover:bg-slate-50 transition-colors"
               >
-                <span className="material-symbols-outlined text-text-muted">close</span>
+                <span className="material-symbols-outlined text-slate-400">close</span>
               </button>
             </div>
             {/* Content */}
             <div className="p-5">
-              <label className="block text-sm font-medium text-text-secondary mb-2">
+              <label className="block text-sm font-medium text-slate-600 mb-2">
                 Folder Name
               </label>
               <input
@@ -344,27 +559,24 @@ Generated by PE OS VDR System
                 onChange={(e) => setNewFolderName(e.target.value)}
                 onKeyDown={handleNewFolderKeyDown}
                 placeholder="e.g., Tax Documents, Contracts"
-                className="w-full px-4 py-3 rounded-lg border border-border-light focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-text-main placeholder:text-text-muted"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-slate-900 placeholder:text-slate-400"
               />
-              <p className="mt-2 text-xs text-text-muted">
-                The folder will be automatically numbered based on existing folders.
+              <p className="mt-2 text-xs text-slate-400">
+                The folder will be created in the current deal's data room.
               </p>
             </div>
             {/* Footer */}
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-border-light bg-background-light/50">
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200 bg-slate-50/50">
               <button
                 onClick={handleCloseNewFolderModal}
-                className="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main transition-colors"
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleCreateFolder}
                 disabled={!newFolderName.trim()}
-                className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{ backgroundColor: newFolderName.trim() ? '#003366' : '#9CA3AF' }}
-                onMouseOver={(e) => { if (newFolderName.trim()) e.currentTarget.style.backgroundColor = '#002855'; }}
-                onMouseOut={(e) => { if (newFolderName.trim()) e.currentTarget.style.backgroundColor = '#003366'; }}
+                className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300"
               >
                 Create Folder
               </button>
@@ -374,23 +586,24 @@ Generated by PE OS VDR System
       )}
 
       {/* Context Sidebar (Folder Tree) */}
-      <aside className="w-[280px] min-w-[280px] flex flex-col border-r border-border-light bg-surface-light">
-        <div className="p-5 border-b border-border-light/50">
+      <aside className="w-[280px] min-w-[280px] flex flex-col border-r border-slate-200 bg-white">
+        <div className="p-5 border-b border-slate-200/50">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-bold uppercase tracking-wider text-text-muted">Project Apex</span>
+            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#003366' }}>{dealName}</span>
+            {useMockData && (
+              <span className="px-1.5 py-0.5 text-[10px] font-medium bg-amber-100 text-amber-700 rounded">Demo</span>
+            )}
           </div>
-          <h2 className="text-lg font-bold text-text-main">Data Room Index</h2>
+          <h2 className="text-lg font-bold text-slate-900">Data Room Index</h2>
         </div>
 
-        <FolderTree folders={folders} activeFolder={activeFolderId} onFolderSelect={setActiveFolderId} />
+        <FolderTree folders={folders} activeFolder={activeFolderId || ''} onFolderSelect={setActiveFolderId} />
 
         {/* Bottom Action */}
-        <div className="p-4 border-t border-border-light bg-background-light/50">
+        <div className="p-4 border-t border-slate-200 bg-slate-50/50">
           <button
             onClick={handleOpenNewFolderModal}
-            className="w-full flex items-center justify-center gap-2 rounded-lg border border-border-light bg-white py-2 text-sm font-medium text-text-secondary transition-colors shadow-sm"
-            onMouseOver={(e) => { e.currentTarget.style.backgroundColor = '#E6EEF5'; e.currentTarget.style.color = '#003366'; }}
-            onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'white'; e.currentTarget.style.color = '#4B5563'; }}
+            className="w-full flex items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 hover:text-primary transition-colors shadow-sm"
           >
             <span className="material-symbols-outlined text-[18px]">add</span>
             New Folder
@@ -399,49 +612,50 @@ Generated by PE OS VDR System
       </aside>
 
       {/* 3. Main Content Area */}
-      <main className="flex-1 flex flex-col min-w-0 bg-background-light relative">
+      <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
         {/* Top Header & Breadcrumbs */}
-        <header className="flex h-16 items-center justify-between border-b border-border-light bg-surface-light px-6">
-          <div className="flex items-center gap-2 text-sm text-text-secondary">
-            <a
-              href="crm.html"
-              className="cursor-pointer"
-              onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
-              onMouseOut={(e) => e.currentTarget.style.color = '#4B5563'}
-            >Deals</a>
+        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span className="flex items-center gap-1">
+              <span className="material-symbols-outlined text-[16px]">folder_data</span>
+              Data Room
+            </span>
             <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            <span
-              className="cursor-pointer"
-              onMouseOver={(e) => e.currentTarget.style.color = '#003366'}
-              onMouseOut={(e) => e.currentTarget.style.color = '#4B5563'}
-            >Project Apex</span>
+            <span className="text-slate-700">{dealName}</span>
             <span className="material-symbols-outlined text-[16px]">chevron_right</span>
-            <span className="font-semibold text-text-main">{activeFolder?.name || 'Unknown'}</span>
+            <span className="font-semibold text-slate-900">{activeFolder?.name || 'Select Folder'}</span>
           </div>
           <div className="flex items-center gap-3">
             <div className="flex -space-x-2">
               {mockCollaborators.map((collab, idx) => (
                 <div
                   key={idx}
-                  className="size-8 rounded-full border-2 border-white bg-cover"
+                  className="size-8 rounded-full border-2 border-white bg-cover bg-slate-200"
                   style={{ backgroundImage: `url('${collab.avatar}')` }}
                   aria-label={collab.name}
                 />
               ))}
-              <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-background-light text-xs font-bold text-text-secondary">
+              <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-xs font-bold text-slate-600">
                 +4
               </div>
             </div>
-            <div className="h-4 w-px bg-border-light mx-2"></div>
+            <div className="h-4 w-px bg-slate-200 mx-2"></div>
             <button
               onClick={handleUploadClick}
-              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow transition-colors"
-              style={{ backgroundColor: '#003366' }}
-              onMouseOver={(e) => e.currentTarget.style.backgroundColor = '#002855'}
-              onMouseOut={(e) => e.currentTarget.style.backgroundColor = '#003366'}
+              disabled={uploading || !activeFolderId}
+              className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-800 transition-colors disabled:opacity-50"
             >
-              <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
-              Upload Files
+              {uploading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Uploading...
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
+                  Upload Files
+                </>
+              )}
             </button>
           </div>
         </header>
@@ -455,17 +669,27 @@ Generated by PE OS VDR System
         />
 
         {/* File List Table */}
-        <FileTable
-          files={filteredFiles}
-          onFileClick={handleFileClick}
-          onDeleteFile={handleDeleteFile}
-          onRenameFile={handleRenameFile}
-        />
+        {activeFolderId ? (
+          <FileTable
+            files={filteredFiles}
+            folderName={activeFolder?.name || 'Folder'}
+            onFileClick={handleFileClick}
+            onDeleteFile={handleDeleteFile}
+            onRenameFile={handleRenameFile}
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center">
+              <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">folder_open</span>
+              <p className="text-slate-500">Select a folder to view files</p>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* 4. Quick Insights Panel (Right Sidebar) */}
       <InsightsPanel
-        insights={activeFolderInsights}
+        insights={activeFolderInsights || undefined}
         folderName={activeFolder?.name || ''}
         onGenerateReport={handleGenerateReport}
         onViewFile={handleViewFile}

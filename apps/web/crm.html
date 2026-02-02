@@ -137,6 +137,30 @@
                         </div>
                     </div>
 
+                    <!-- Bulk Actions Bar (Hidden by default) -->
+                    <div id="bulk-actions-bar" class="hidden bg-primary text-white rounded-xl p-4 flex items-center justify-between shadow-lg animate-[slideIn_0.2s_ease-out]">
+                        <div class="flex items-center gap-3">
+                            <button id="clear-selection-btn" class="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+                                <span class="material-symbols-outlined text-[20px]">close</span>
+                            </button>
+                            <span id="selection-count" class="font-bold text-sm">0 deals selected</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button id="bulk-stage-btn" class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">swap_horiz</span>
+                                Change Stage
+                            </button>
+                            <button id="bulk-export-btn" class="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">download</span>
+                                Export CSV
+                            </button>
+                            <button id="bulk-pass-btn" class="flex items-center gap-2 px-4 py-2 bg-red-500/80 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">block</span>
+                                Mark as Passed
+                            </button>
+                        </div>
+                    </div>
+
                     <!-- Filters Row -->
                     <div class="flex flex-wrap gap-3 items-center">
                         <div class="relative">
@@ -182,17 +206,49 @@
                                 <button data-min="100" data-max="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Over $100M</button>
                             </div>
                         </div>
+                        <div class="relative">
+                            <button id="priority-filter-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                                <p id="priority-filter-text" class="text-text-secondary group-hover:text-text-main text-sm font-medium">Priority: All</p>
+                                <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+                            </button>
+                            <div id="priority-dropdown" class="hidden absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+                                <button data-priority="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">All Priorities</button>
+                                <button data-priority="URGENT" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center gap-2">
+                                    <span class="size-2 rounded-full bg-red-500"></span> Urgent
+                                </button>
+                                <button data-priority="HIGH" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center gap-2">
+                                    <span class="size-2 rounded-full bg-orange-500"></span> High
+                                </button>
+                                <button data-priority="MEDIUM" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center gap-2">
+                                    <span class="size-2 rounded-full bg-amber-500"></span> Medium
+                                </button>
+                                <button data-priority="LOW" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center gap-2">
+                                    <span class="size-2 rounded-full bg-gray-400"></span> Low
+                                </button>
+                            </div>
+                        </div>
                         <div class="h-6 w-px bg-border-subtle mx-1 hidden sm:block"></div>
+                        <button id="clear-filters-btn" class="hidden h-9 px-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium transition-colors flex items-center gap-1">
+                            <span class="material-symbols-outlined text-[16px]">filter_alt_off</span>
+                            Clear
+                        </button>
+                        <div class="flex-1"></div>
                         <div class="relative">
                             <button id="sort-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-primary-light transition-all">
                                 <span class="material-symbols-outlined text-text-muted text-[18px]">sort</span>
                                 <p id="sort-text" class="text-text-secondary text-sm font-medium">Sort by: Recent</p>
                             </button>
-                            <div id="sort-dropdown" class="hidden absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+                            <div id="sort-dropdown" class="hidden absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[180px] py-1">
                                 <button data-sort="updatedAt" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">Recent Activity</button>
+                                <button data-sort="createdAt" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Newest First</button>
+                                <button data-sort="createdAt" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Oldest First</button>
+                                <div class="border-t border-gray-100 my-1"></div>
                                 <button data-sort="dealSize" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Deal Size (High)</button>
                                 <button data-sort="dealSize" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Deal Size (Low)</button>
                                 <button data-sort="irrProjected" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">IRR (High)</button>
+                                <button data-sort="revenue" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Revenue (High)</button>
+                                <div class="border-t border-gray-100 my-1"></div>
+                                <button data-sort="priority" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Priority (Urgent first)</button>
                                 <button data-sort="name" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Name (A-Z)</button>
                             </div>
                         </div>
@@ -215,6 +271,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/layout.js"></script>
+<script src="js/notificationCenter.js"></script>
+<script src="js/globalSearch.js"></script>
 <script>
 const API_BASE_URL = 'http://localhost:3001/api';
 
@@ -224,10 +282,15 @@ let filters = {
     industry: '',
     minDealSize: '',
     maxDealSize: '',
+    priority: '',
     search: '',
     sortBy: 'updatedAt',
     sortOrder: 'desc'
 };
+
+// Bulk selection state
+let selectedDeals = new Set();
+let allDeals = []; // Store all loaded deals for reference
 
 // Stage badge styles
 const stageStyles = {
@@ -281,22 +344,31 @@ function renderDealCard(deal) {
     const momColor = deal.mom >= 3 ? 'text-secondary' : 'text-text-main';
     const ebitdaColor = deal.ebitda < 0 ? 'text-red-600' : 'text-text-main';
     const hasRiskFlag = deal.ebitda < 0 || deal.stage === 'PASSED';
+    const isSelected = selectedDeals.has(deal.id);
 
     return `
-        <a href="deal.html?id=${deal.id}" class="block group">
-            <article class="bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden ${isPassed ? 'opacity-70 hover:opacity-100' : ''}">
-                <div class="flex justify-between items-start mb-4">
-                    <div class="flex gap-3 items-center">
-                        <div class="size-10 rounded-lg bg-primary-light border border-primary/10 flex items-center justify-center text-primary">
-                            <span class="material-symbols-outlined text-[20px]">${deal.icon || 'business_center'}</span>
+        <div class="relative group/card" data-deal-id="${deal.id}">
+            <!-- Selection Checkbox -->
+            <div class="absolute top-3 left-3 z-10">
+                <label class="flex items-center justify-center size-6 rounded bg-white/90 backdrop-blur border border-border-subtle cursor-pointer hover:border-primary shadow-sm transition-all ${isSelected ? 'bg-primary border-primary' : ''}" onclick="event.stopPropagation();">
+                    <input type="checkbox" class="deal-checkbox sr-only" data-deal-id="${deal.id}" ${isSelected ? 'checked' : ''} onchange="toggleDealSelection('${deal.id}')">
+                    <span class="material-symbols-outlined text-[16px] ${isSelected ? 'text-white' : 'text-transparent group-hover/card:text-gray-300'}">${isSelected ? 'check' : 'check'}</span>
+                </label>
+            </div>
+            <a href="deal.html?id=${deal.id}" class="block">
+                <article class="bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden ${isPassed ? 'opacity-70 hover:opacity-100' : ''} ${isSelected ? 'ring-2 ring-primary border-primary' : ''}">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="flex gap-3 items-center pl-6">
+                            <div class="size-10 rounded-lg bg-primary-light border border-primary/10 flex items-center justify-center text-primary">
+                                <span class="material-symbols-outlined text-[20px]">${deal.icon || 'business_center'}</span>
+                            </div>
+                            <div>
+                                <h3 class="text-text-main font-bold text-base leading-tight group-hover/card:text-primary transition-colors">${deal.name}</h3>
+                                <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
+                            </div>
                         </div>
-                        <div>
-                            <h3 class="text-text-main font-bold text-base leading-tight group-hover:text-primary transition-colors">${deal.name}</h3>
-                            <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
-                        </div>
+                        <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider">${style.label}</span>
                     </div>
-                    <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider">${style.label}</span>
-                </div>
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div class="bg-background-body rounded-md p-3">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">IRR (Proj)</span>
@@ -325,12 +397,19 @@ function renderDealCard(deal) {
                 <div class="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
                     <div class="flex items-center gap-1.5 text-text-muted">
                         <span class="material-symbols-outlined text-[14px]">${getDocIcon(deal.lastDocument)}</span>
-                        <span class="text-[11px] font-medium truncate max-w-[120px]">${deal.lastDocument || 'No docs'}</span>
+                        <span class="text-[11px] font-medium truncate max-w-[100px]">${deal.lastDocument || 'No docs'}</span>
                     </div>
-                    <span class="text-[11px] text-text-muted font-medium">${formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}</span>
+                    <div class="flex items-center gap-3">
+                        <a href="vdr.html?dealId=${deal.id}" onclick="event.stopPropagation();" class="flex items-center gap-1 text-[11px] text-text-muted hover:text-primary transition-colors" title="Open Data Room">
+                            <span class="material-symbols-outlined text-[14px]">folder_open</span>
+                            <span class="hidden sm:inline">VDR</span>
+                        </a>
+                        <span class="text-[11px] text-text-muted font-medium">${formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}</span>
+                    </div>
                 </div>
             </article>
         </a>
+    </div>
     `;
 }
 
@@ -382,10 +461,48 @@ function buildQueryString() {
     if (filters.industry) params.set('industry', filters.industry);
     if (filters.minDealSize) params.set('minDealSize', filters.minDealSize);
     if (filters.maxDealSize) params.set('maxDealSize', filters.maxDealSize);
+    if (filters.priority) params.set('priority', filters.priority);
     if (filters.search) params.set('search', filters.search);
     if (filters.sortBy) params.set('sortBy', filters.sortBy);
     if (filters.sortOrder) params.set('sortOrder', filters.sortOrder);
     return params.toString();
+}
+
+// Check if any filters are active
+function hasActiveFilters() {
+    return filters.stage || filters.industry || filters.minDealSize || filters.maxDealSize || filters.priority;
+}
+
+// Update clear filters button visibility
+function updateClearFiltersButton() {
+    const btn = document.getElementById('clear-filters-btn');
+    if (btn) {
+        if (hasActiveFilters()) {
+            btn.classList.remove('hidden');
+            btn.classList.add('flex');
+        } else {
+            btn.classList.add('hidden');
+            btn.classList.remove('flex');
+        }
+    }
+}
+
+// Clear all filters
+function clearAllFilters() {
+    filters.stage = '';
+    filters.industry = '';
+    filters.minDealSize = '';
+    filters.maxDealSize = '';
+    filters.priority = '';
+
+    // Reset UI
+    document.getElementById('stage-filter-text').textContent = 'Stage: All';
+    document.getElementById('industry-filter-text').textContent = 'Industry: All';
+    document.getElementById('dealsize-filter-text').textContent = 'Deal Size: All';
+    document.getElementById('priority-filter-text').textContent = 'Priority: All';
+
+    updateClearFiltersButton();
+    loadDeals();
 }
 
 // Load deals from API
@@ -407,6 +524,7 @@ async function loadDeals() {
         }
 
         const deals = await response.json();
+        allDeals = deals; // Store for bulk operations
 
         // Update deal count
         const activeDeals = deals.filter(d => d.status !== 'PASSED').length;
@@ -505,6 +623,21 @@ function initializeFilters() {
         });
     });
 
+    // Priority filter
+    toggleDropdown('priority-filter-btn', 'priority-dropdown');
+    document.querySelectorAll('#priority-dropdown button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            filters.priority = btn.dataset.priority;
+            const priorityLabels = { URGENT: 'Urgent', HIGH: 'High', MEDIUM: 'Medium', LOW: 'Low' };
+            document.getElementById('priority-filter-text').textContent = filters.priority
+                ? `Priority: ${priorityLabels[filters.priority] || filters.priority}`
+                : 'Priority: All';
+            document.getElementById('priority-dropdown').classList.add('hidden');
+            loadDeals();
+            updateClearFiltersButton();
+        });
+    });
+
     // Sort
     toggleDropdown('sort-btn', 'sort-dropdown');
     document.querySelectorAll('#sort-dropdown button').forEach(btn => {
@@ -516,6 +649,9 @@ function initializeFilters() {
             loadDeals();
         });
     });
+
+    // Clear filters button
+    document.getElementById('clear-filters-btn')?.addEventListener('click', clearAllFilters);
 
     // Search input with debounce
     const searchInput = document.getElementById('search-input');
@@ -721,6 +857,262 @@ async function handleFiles(files) {
     }
 }
 
+// ============================================================
+// Bulk Selection Operations
+// ============================================================
+function toggleDealSelection(dealId) {
+    if (selectedDeals.has(dealId)) {
+        selectedDeals.delete(dealId);
+    } else {
+        selectedDeals.add(dealId);
+    }
+    updateBulkActionsBar();
+    updateDealCardSelection(dealId);
+}
+
+function updateDealCardSelection(dealId) {
+    const card = document.querySelector(`[data-deal-id="${dealId}"]`);
+    if (!card) return;
+
+    const checkbox = card.querySelector('.deal-checkbox');
+    const checkboxLabel = checkbox?.closest('label');
+    const article = card.querySelector('article');
+    const checkIcon = checkboxLabel?.querySelector('.material-symbols-outlined');
+
+    if (selectedDeals.has(dealId)) {
+        checkbox.checked = true;
+        checkboxLabel?.classList.add('bg-primary', 'border-primary');
+        checkboxLabel?.classList.remove('bg-white/90');
+        article?.classList.add('ring-2', 'ring-primary', 'border-primary');
+        if (checkIcon) {
+            checkIcon.classList.remove('text-transparent', 'group-hover/card:text-gray-300');
+            checkIcon.classList.add('text-white');
+        }
+    } else {
+        checkbox.checked = false;
+        checkboxLabel?.classList.remove('bg-primary', 'border-primary');
+        checkboxLabel?.classList.add('bg-white/90');
+        article?.classList.remove('ring-2', 'ring-primary', 'border-primary');
+        if (checkIcon) {
+            checkIcon.classList.add('text-transparent', 'group-hover/card:text-gray-300');
+            checkIcon.classList.remove('text-white');
+        }
+    }
+}
+
+function updateBulkActionsBar() {
+    const bar = document.getElementById('bulk-actions-bar');
+    const countSpan = document.getElementById('selection-count');
+
+    if (selectedDeals.size > 0) {
+        bar.classList.remove('hidden');
+        countSpan.textContent = `${selectedDeals.size} deal${selectedDeals.size > 1 ? 's' : ''} selected`;
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function clearSelection() {
+    const dealIds = [...selectedDeals];
+    selectedDeals.clear();
+    dealIds.forEach(id => updateDealCardSelection(id));
+    updateBulkActionsBar();
+}
+
+function selectAllDeals() {
+    allDeals.forEach(deal => {
+        selectedDeals.add(deal.id);
+        updateDealCardSelection(deal.id);
+    });
+    updateBulkActionsBar();
+}
+
+// Bulk Stage Change
+function showBulkStageModal() {
+    const stageOptions = Object.entries(stageStyles).map(([key, style]) =>
+        `<button data-stage="${key}" class="w-full text-left px-4 py-3 hover:bg-primary-light flex items-center gap-3 transition-colors">
+            <span class="px-2 py-0.5 rounded ${style.bg} ${style.text} text-xs font-bold">${style.label}</span>
+        </button>`
+    ).join('');
+
+    const modal = document.createElement('div');
+    modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.id = 'bulk-stage-modal';
+    modal.innerHTML = `
+        <div class="bg-surface-card rounded-xl shadow-2xl max-w-md w-full animate-[slideIn_0.2s_ease-out]">
+            <div class="p-4 border-b border-border-subtle flex items-center justify-between">
+                <h3 class="font-bold text-text-main">Change Stage for ${selectedDeals.size} Deal${selectedDeals.size > 1 ? 's' : ''}</h3>
+                <button onclick="this.closest('#bulk-stage-modal').remove()" class="text-text-muted hover:text-text-main">
+                    <span class="material-symbols-outlined">close</span>
+                </button>
+            </div>
+            <div class="max-h-[400px] overflow-y-auto divide-y divide-border-subtle">
+                ${stageOptions}
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    // Add click handlers
+    modal.querySelectorAll('[data-stage]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const newStage = btn.dataset.stage;
+            await bulkUpdateStage(newStage);
+            modal.remove();
+        });
+    });
+
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.remove();
+    });
+}
+
+async function bulkUpdateStage(newStage) {
+    const dealIds = [...selectedDeals];
+    let successCount = 0;
+    let errorCount = 0;
+
+    showNotification('Updating...', `Changing stage for ${dealIds.length} deals`, 'info');
+
+    for (const dealId of dealIds) {
+        try {
+            const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ stage: newStage }),
+            });
+
+            if (response.ok) {
+                successCount++;
+            } else {
+                errorCount++;
+            }
+        } catch (error) {
+            console.error('Error updating deal:', dealId, error);
+            errorCount++;
+        }
+    }
+
+    clearSelection();
+    loadDeals();
+
+    const stageLabel = stageStyles[newStage]?.label || newStage;
+    if (errorCount === 0) {
+        showNotification('Success', `${successCount} deals moved to ${stageLabel}`, 'success');
+    } else {
+        showNotification('Partial Success', `${successCount} updated, ${errorCount} failed`, 'error');
+    }
+}
+
+// Bulk Mark as Passed
+async function bulkMarkAsPassed() {
+    const dealIds = [...selectedDeals];
+    if (!confirm(`Are you sure you want to mark ${dealIds.length} deal${dealIds.length > 1 ? 's' : ''} as Passed?`)) {
+        return;
+    }
+
+    await bulkUpdateStage('PASSED');
+}
+
+// CSV Export
+function exportSelectedToCSV() {
+    const dealIds = [...selectedDeals];
+    const dealsToExport = allDeals.filter(d => dealIds.includes(d.id));
+
+    if (dealsToExport.length === 0) {
+        showNotification('Error', 'No deals selected for export', 'error');
+        return;
+    }
+
+    // Define CSV headers
+    const headers = [
+        'Name',
+        'Industry',
+        'Stage',
+        'Status',
+        'Revenue ($M)',
+        'EBITDA ($M)',
+        'Deal Size ($M)',
+        'IRR Projected (%)',
+        'MoM Multiple',
+        'AI Thesis',
+        'Created At',
+        'Updated At'
+    ];
+
+    // Build CSV rows
+    const rows = dealsToExport.map(deal => [
+        escapeCSV(deal.name),
+        escapeCSV(deal.industry || ''),
+        escapeCSV(stageStyles[deal.stage]?.label || deal.stage),
+        escapeCSV(deal.status || ''),
+        deal.revenue?.toString() || '',
+        deal.ebitda?.toString() || '',
+        deal.dealSize?.toString() || '',
+        deal.irrProjected?.toString() || '',
+        deal.mom?.toString() || '',
+        escapeCSV(deal.aiThesis || ''),
+        deal.createdAt ? new Date(deal.createdAt).toISOString() : '',
+        deal.updatedAt ? new Date(deal.updatedAt).toISOString() : ''
+    ]);
+
+    // Combine headers and rows
+    const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // Create and download file
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `deals-export-${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    showNotification('Export Complete', `${dealsToExport.length} deals exported to CSV`, 'success');
+}
+
+function escapeCSV(value) {
+    if (value === null || value === undefined) return '';
+    const str = String(value);
+    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+        return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+}
+
+// Initialize bulk action handlers
+function initializeBulkActions() {
+    // Clear selection button
+    document.getElementById('clear-selection-btn')?.addEventListener('click', clearSelection);
+
+    // Bulk stage change button
+    document.getElementById('bulk-stage-btn')?.addEventListener('click', showBulkStageModal);
+
+    // Export CSV button
+    document.getElementById('bulk-export-btn')?.addEventListener('click', exportSelectedToCSV);
+
+    // Mark as Passed button
+    document.getElementById('bulk-pass-btn')?.addEventListener('click', bulkMarkAsPassed);
+
+    // Keyboard shortcuts for bulk selection
+    document.addEventListener('keydown', (e) => {
+        // CMD+A to select all when focused on grid
+        if ((e.metaKey || e.ctrlKey) && e.key === 'a' && document.activeElement?.closest('#deals-grid')) {
+            e.preventDefault();
+            selectAllDeals();
+        }
+        // Escape to clear selection
+        if (e.key === 'Escape' && selectedDeals.size > 0) {
+            clearSelection();
+        }
+    });
+}
+
 function showNotification(title, message, type = 'info') {
     const notification = document.createElement('div');
     const bgColor = type === 'success' ? 'bg-secondary' : type === 'error' ? 'bg-red-500' : 'bg-primary';
@@ -775,6 +1167,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     initializeUploadModal();
     initializeUploadCard();
     initializeKeyboardShortcuts();
+    initializeBulkActions();
 });
 </script>
 </body>

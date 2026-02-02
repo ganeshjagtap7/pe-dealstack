@@ -12,6 +12,7 @@ const NAV_ITEMS = [
     { id: 'portfolio', label: 'Portfolio', icon: 'pie_chart', href: '#' },
     { id: 'admin', label: 'Admin', icon: 'admin_panel_settings', href: '#' },
     { divider: true },
+    { id: 'memo-builder', label: 'Memo Builder', icon: 'edit_document', href: '/memo-builder.html', isAI: true },
     { id: 'ai-reports', label: 'AI Reports', icon: 'auto_awesome', href: '#', isAI: true },
 ];
 

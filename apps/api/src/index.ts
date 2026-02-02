@@ -14,6 +14,7 @@ import ingestRouter from './routes/ingest.js';
 import memosRouter from './routes/memos.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
 
@@ -82,18 +83,25 @@ app.use('/api/ingest', authMiddleware, ingestRouter);
 app.use('/api/memos', authMiddleware, memosRouter);
 
 // ========================================
-// Public Routes (no authentication needed)
+// AI Routes (mixed - some protected, some public)
 // ========================================
-app.use('/api', aiRouter); // AI status check is public
+// AI deal chat and analysis endpoints (require auth)
+app.use('/api', authMiddleware, aiRouter);
 
-// Error handling middleware
-app.use((err: Error, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Error:', err);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined,
+// AI status endpoint (public - no auth required)
+app.get('/api/ai/status', (req, res) => {
+  const { isAIEnabled } = require('./openai.js');
+  res.json({
+    enabled: isAIEnabled(),
+    model: 'gpt-4-turbo-preview',
   });
 });
+
+// 404 handler for unmatched routes
+app.use(notFoundHandler);
+
+// Global error handling middleware
+app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
@@ -111,6 +119,9 @@ app.listen(PORT, () => {
   console.log(`  🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
   console.log(`  📥 Ingest API: http://localhost:${PORT}/api/ingest`);
   console.log(`  📝 Memos API: http://localhost:${PORT}/api/memos`);
+  console.log(`  🤖 AI Ingest: http://localhost:${PORT}/api/ai/ingest`);
+  console.log(`  🤖 AI Extract: http://localhost:${PORT}/api/ai/extract`);
+  console.log(`  🤖 Deal Chat: http://localhost:${PORT}/api/deals/:dealId/chat`);
   console.log('');
   console.log('Public routes (no auth required):');
   console.log(`  🤖 AI Status: http://localhost:${PORT}/api/ai/status`);

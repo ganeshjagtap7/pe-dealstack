@@ -159,9 +159,12 @@ document.addEventListener('DOMContentLoaded', async function() {
     const auth = await PEAuth.checkAuth();
     if (!auth) return; // Will redirect to login
 
-    // Check for memo ID in URL
+    // Check for memo ID or action in URL
     const urlParams = new URLSearchParams(window.location.search);
     const memoId = urlParams.get('id');
+    const createNew = urlParams.get('new') === 'true';
+    const dealId = urlParams.get('dealId');
+    const projectName = urlParams.get('project');
 
     if (memoId) {
         // Try to load memo from API
@@ -171,8 +174,20 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('Failed to load memo from API, using demo data');
             loadDemoData();
         }
+    } else if (createNew) {
+        // Create a new memo
+        console.log('Creating new memo...');
+        const created = await createNewMemo({
+            dealId: dealId || undefined,
+            projectName: projectName || (dealId ? undefined : 'New Project'),
+        });
+        if (!created) {
+            console.log('Failed to create memo, using demo data');
+            loadDemoData();
+        }
     } else {
-        // No ID provided, use demo data
+        // No ID or action provided, use demo data
+        // In production, you might want to show a memo selector instead
         loadDemoData();
     }
 
@@ -189,6 +204,90 @@ document.addEventListener('DOMContentLoaded', async function() {
 // ============================================================
 // API Integration
 // ============================================================
+
+/**
+ * Create a new memo via API
+ * @param {Object} options - Memo creation options
+ * @returns {Object|null} Created memo or null on failure
+ */
+async function createMemoAPI(options = {}) {
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/memos`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title: options.title || 'Investment Committee Memo',
+                projectName: options.projectName || 'New Project',
+                dealId: options.dealId || null,
+                type: options.type || 'IC_MEMO',
+                status: 'DRAFT',
+                sponsor: options.sponsor || '',
+            }),
+        });
+
+        if (!response.ok) {
+            const error = await response.json();
+            console.error('Failed to create memo:', error);
+            return null;
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error creating memo:', error);
+        return null;
+    }
+}
+
+/**
+ * List all memos from API
+ * @param {Object} filters - Optional filters (dealId, status, type)
+ * @returns {Array} List of memos
+ */
+async function listMemosAPI(filters = {}) {
+    try {
+        const params = new URLSearchParams();
+        if (filters.dealId) params.append('dealId', filters.dealId);
+        if (filters.status) params.append('status', filters.status);
+        if (filters.type) params.append('type', filters.type);
+
+        const url = `${API_BASE_URL}/memos${params.toString() ? '?' + params.toString() : ''}`;
+        const response = await PEAuth.authFetch(url);
+
+        if (!response.ok) {
+            console.error('Failed to list memos:', response.status);
+            return [];
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error('Error listing memos:', error);
+        return [];
+    }
+}
+
+/**
+ * Create a new memo and load it
+ * @param {Object} options - Memo creation options
+ */
+async function createNewMemo(options = {}) {
+    const memo = await createMemoAPI(options);
+    if (memo) {
+        await loadMemoFromAPI(memo.id);
+        updateURLWithMemoId(memo.id);
+        return true;
+    }
+    return false;
+}
+
+/**
+ * Update URL with memo ID without page reload
+ */
+function updateURLWithMemoId(memoId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set('id', memoId);
+    window.history.pushState({ memoId }, '', url);
+}
+
 async function loadMemoFromAPI(memoId) {
     try {
         const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${memoId}`);
