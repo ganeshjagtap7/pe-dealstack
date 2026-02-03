@@ -11,6 +11,7 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.91.1",
     "@types/multer": "^2.0.0",

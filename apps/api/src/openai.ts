@@ -13,6 +13,12 @@ export const openai = apiKey ? new OpenAI({ apiKey }) : null;
 
 export const isAIEnabled = () => !!openai;
 
+// Log startup status
+console.log(`OpenAI: ${isAIEnabled() ? 'Enabled' : 'Disabled (no API key)'}`);
+if (apiKey) {
+  console.log(`OpenAI API Key: ${apiKey.substring(0, 10)}...${apiKey.substring(apiKey.length - 4)}`);
+}
+
 // System prompt for deal analysis
 export const DEAL_ANALYSIS_SYSTEM_PROMPT = `You are DealOS AI, an expert private equity analyst assistant. You help analyze deals, financial data, and investment opportunities.
 

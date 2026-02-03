@@ -6,6 +6,7 @@ import { createRequire } from 'module';
 import { extractDealDataFromText } from '../services/aiExtractor.js';
 import { AuditLog } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES, FILE_SIZE_LIMITS } from '../services/fileValidator.js';
+import { embedDocument } from '../rag.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -370,6 +371,22 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
 
     // Audit log
     await AuditLog.documentUploaded(req, document.id, documentName, dealId);
+
+    // Trigger RAG embedding in background (don't block response)
+    if (extractedText && extractedText.length > 0) {
+      console.log(`[RAG] Starting document embedding for: ${documentName}`);
+      embedDocument(document.id, dealId, extractedText)
+        .then(result => {
+          if (result.success) {
+            console.log(`[RAG] Embedded document ${documentName}: ${result.chunkCount} chunks`);
+          } else {
+            console.error(`[RAG] Failed to embed document ${documentName}:`, result.error);
+          }
+        })
+        .catch(err => {
+          console.error(`[RAG] Embedding error for ${documentName}:`, err);
+        });
+    }
 
     res.status(201).json(document);
   } catch (error) {

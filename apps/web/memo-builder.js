@@ -202,6 +202,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Setup event handlers
     setupEventHandlers();
     setupDragDrop();
+
+    // Show/hide demo banner and update AI status
+    updateModeIndicators();
 });
 
 // ============================================================
@@ -338,7 +341,22 @@ async function loadMemoFromAPI(memoId) {
                 timestamp: formatTime(new Date(m.createdAt)),
             }));
         } else {
-            state.messages = [];
+            // Add welcome message for real AI
+            state.messages = [{
+                id: 'welcome',
+                role: 'assistant',
+                content: `<p class="font-medium text-emerald-700">AI Analyst Connected</p>
+                <p class="mt-2">I'm ready to help you build this investment memo for <strong>${state.memo.projectName}</strong>.</p>
+                <p class="mt-2">Try asking me to:</p>
+                <ul class="mt-1 list-disc pl-5 text-slate-600">
+                    <li>Generate content for any section</li>
+                    <li>Analyze financial metrics</li>
+                    <li>Identify risks and opportunities</li>
+                    <li>Compare against market benchmarks</li>
+                </ul>
+                <p class="mt-2 text-xs text-slate-500">Click "Regenerate" on any section to generate AI content, or type a question below.</p>`,
+                timestamp: formatTime(new Date()),
+            }];
         }
 
         // Set active section
@@ -1229,6 +1247,97 @@ function getDragAfterElement(container, y) {
             return closest;
         }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// ============================================================
+// Mode Indicators (Demo vs Real)
+// ============================================================
+function updateModeIndicators() {
+    const isDemo = state.memo?.id?.startsWith('demo-');
+    const demoBanner = document.getElementById('demo-banner');
+
+    if (isDemo) {
+        demoBanner?.classList.remove('hidden');
+        setupDemoBannerHandlers();
+    } else {
+        demoBanner?.classList.add('hidden');
+    }
+
+    // Update AI panel header to show connection status
+    updateAIPanelStatus(!isDemo);
+}
+
+function setupDemoBannerHandlers() {
+    const createBtn = document.getElementById('create-real-memo-btn');
+    const dismissBtn = document.getElementById('dismiss-demo-banner');
+
+    createBtn?.addEventListener('click', async () => {
+        createBtn.innerHTML = `
+            <span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
+            Creating...
+        `;
+        createBtn.disabled = true;
+
+        // Prompt for project name
+        const projectName = prompt('Enter a project name for your new memo:', 'New Project');
+        if (!projectName) {
+            createBtn.innerHTML = `
+                <span class="material-symbols-outlined text-[16px]">add</span>
+                Create Real Memo with AI
+            `;
+            createBtn.disabled = false;
+            return;
+        }
+
+        const created = await createNewMemo({
+            projectName: projectName,
+            title: 'Investment Committee Memo',
+        });
+
+        if (!created) {
+            alert('Failed to create memo. Please try again.');
+            createBtn.innerHTML = `
+                <span class="material-symbols-outlined text-[16px]">add</span>
+                Create Real Memo with AI
+            `;
+            createBtn.disabled = false;
+        }
+    });
+
+    dismissBtn?.addEventListener('click', () => {
+        document.getElementById('demo-banner')?.classList.add('hidden');
+    });
+}
+
+function updateAIPanelStatus(isConnected) {
+    // Update the AI panel header to show status
+    const aiHeader = document.querySelector('#ai-panel .p-3.border-b');
+    if (!aiHeader) return;
+
+    const statusIndicator = aiHeader.querySelector('.ai-status-indicator');
+    if (statusIndicator) {
+        statusIndicator.remove();
+    }
+
+    const indicator = document.createElement('span');
+    indicator.className = 'ai-status-indicator ml-auto mr-2 flex items-center gap-1 text-xs';
+
+    if (isConnected) {
+        indicator.innerHTML = `
+            <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span class="text-emerald-600 font-medium">AI Connected</span>
+        `;
+    } else {
+        indicator.innerHTML = `
+            <span class="size-2 rounded-full bg-amber-500"></span>
+            <span class="text-amber-600 font-medium">Demo Mode</span>
+        `;
+    }
+
+    const closeBtn = aiHeader.querySelector('#close-ai-panel');
+    if (closeBtn) {
+        closeBtn.parentNode.insertBefore(indicator, closeBtn);
+    }
 }
 
 // ============================================================

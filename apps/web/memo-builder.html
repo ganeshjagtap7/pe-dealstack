@@ -125,6 +125,25 @@
     <!-- Main App Container -->
     <div class="flex-1 flex flex-col overflow-hidden">
 
+    <!-- Demo Mode Banner -->
+    <div id="demo-banner" class="hidden bg-gradient-to-r from-amber-500 to-orange-500 text-white px-6 py-2 shrink-0 z-30">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-[20px]">science</span>
+                <span class="text-sm font-medium">Demo Mode — AI features use simulated responses</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <button id="create-real-memo-btn" class="flex items-center gap-2 px-4 py-1.5 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-semibold transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">add</span>
+                    Create Real Memo with AI
+                </button>
+                <button id="dismiss-demo-banner" class="p-1 hover:bg-white/20 rounded transition-colors" title="Dismiss">
+                    <span class="material-symbols-outlined text-[18px]">close</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Top Navigation -->
     <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 bg-white px-6 py-3 shrink-0 z-20 shadow-sm">
         <div class="flex items-center gap-4">

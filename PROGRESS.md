@@ -3899,3 +3899,366 @@ const [creating, setCreating] = useState(false);
 
 Both Gmail and Slack integrations are technically feasible. Slack webhooks would be quickest to implement.
 
+
+---
+
+## February 3, 2026
+
+### Session: ~10:30 IST - AI Integration for Memo Builder
+
+#### Summary
+Connected Memo Builder AI features to real OpenAI API. The backend already had full AI integration, and the frontend was structured to call it - but only in "real memo" mode (not demo mode). Added UI improvements to make the mode distinction clearer.
+
+---
+
+### Backend AI Features (Already Implemented)
+
+#### Section Generation Endpoint
+- **Route:** `POST /api/memos/:id/sections/:sectionId/generate`
+- **File:** `apps/api/src/routes/memos.ts:438-555`
+- **Features:**
+  - Uses GPT-4 Turbo model
+  - Pulls context from memo, deal, company, and documents
+  - Professional PE analyst system prompt
+  - Saves generated content back to database
+  - Audit logging for AI generation
+
+#### Chat Endpoint  
+- **Route:** `POST /api/memos/:id/chat`
+- **File:** `apps/api/src/routes/memos.ts:562-716`
+- **Features:**
+  - Conversation persistence in database
+  - Context from memo sections and deal data
+  - Recent message history (last 10 messages)
+  - Audit logging for AI chat
+
+#### OpenAI Configuration
+- **File:** `apps/api/src/openai.ts`
+- **API Key:** Configured in `.env`
+- **Model:** gpt-4-turbo-preview
+
+---
+
+### Frontend Updates
+
+#### Demo Mode Banner
+- **Time:** ~10:45
+- **File Modified:** `apps/web/memo-builder.html`
+
+**Added:**
+```html
+<!-- Demo Mode Banner -->
+<div id="demo-banner" class="hidden bg-gradient-to-r from-amber-500 to-orange-500 ...">
+    <span>Demo Mode — AI features use simulated responses</span>
+    <button id="create-real-memo-btn">Create Real Memo with AI</button>
+</div>
+```
+
+**Behavior:**
+- Shows amber banner when using demo data
+- "Create Real Memo with AI" button prompts for project name
+- Creates real memo in database and redirects
+- Dismiss button to hide banner
+
+#### AI Status Indicator
+- **Time:** ~11:00
+- **File Modified:** `apps/web/memo-builder.js`
+
+**Added Functions:**
+- `updateModeIndicators()` - Shows/hides demo banner based on memo ID
+- `setupDemoBannerHandlers()` - Click handlers for banner buttons
+- `updateAIPanelStatus(isConnected)` - Adds status dot to AI panel header
+
+**Visual Indicators:**
+- Demo Mode: 🟠 amber dot + "Demo Mode" label
+- Connected: 🟢 green pulsing dot + "AI Connected" label
+
+#### Welcome Message for Real Memos
+- **Time:** ~11:15
+- **File Modified:** `apps/web/memo-builder.js`
+
+When a real memo loads with no conversation history, shows:
+```
+AI Analyst Connected
+I'm ready to help you build this investment memo for [Project Name].
+
+Try asking me to:
+• Generate content for any section
+• Analyze financial metrics
+• Identify risks and opportunities
+• Compare against market benchmarks
+```
+
+---
+
+### How to Use Real AI
+
+**Option 1: Create from Demo Mode**
+1. Go to `/memo-builder.html` (loads demo)
+2. Click "Create Real Memo with AI" in banner
+3. Enter project name
+4. AI features now use real OpenAI
+
+**Option 2: Create via URL**
+```
+/memo-builder.html?new=true&project=Project%20Apollo
+```
+
+**Option 3: Link from Deal**
+```
+/memo-builder.html?new=true&dealId=<deal-uuid>
+```
+
+**Option 4: Load Existing**
+```
+/memo-builder.html?id=<memo-uuid>
+```
+
+---
+
+### Database Requirements
+
+Before using real AI, ensure the memo tables exist in Supabase:
+
+```bash
+# Run in Supabase SQL Editor:
+# apps/api/memo-schema.sql
+
+# Tables created:
+# - Memo
+# - MemoSection  
+# - MemoConversation
+# - MemoChatMessage
+```
+
+---
+
+### Files Changed This Session
+
+| File | Changes |
+|------|---------|
+| `apps/web/memo-builder.html` | Demo mode banner |
+| `apps/web/memo-builder.js` | Mode indicators, AI status, welcome message |
+
+---
+
+### Feature Status Update
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| ✅ Backend AI Section Generation | Complete | GPT-4 Turbo |
+| ✅ Backend AI Chat | Complete | With conversation history |
+| ✅ Frontend AI API Calls | Complete | regenerateSectionAPI, sendChatMessageAPI |
+| ✅ Demo Mode Banner | Complete | With "Create Real Memo" button |
+| ✅ AI Status Indicator | Complete | Green/amber dot in AI panel |
+| ✅ AI Welcome Message | Complete | For new real memos |
+| ⏳ Database Schema | Needs Verification | Run memo-schema.sql if not done |
+
+---
+
+### Next Steps (From LAUNCH-CHECKLIST.md)
+
+**P0 - Remaining:**
+1. Enable email verification flow (Supabase config)
+2. Fix AI deal ingestion pipeline
+3. Implement deal AI chat assistant
+4. Add AI analysis caching
+5. Database migrations strategy
+6. API endpoint tests
+7. Frontend smoke tests
+
+
+---
+
+### Deal Page AI Chat - Real API Connected
+
+#### Time: ~11:30 IST
+#### Issue Found
+- Frontend called `/api/deals/:dealId/chat`
+- Backend only had `/api/conversations/:id/messages` (wrong endpoint)
+
+#### Fix Applied
+- **File Modified:** `apps/api/src/routes/deals.ts`
+- Added `POST /api/deals/:dealId/chat` endpoint
+
+**Implementation:**
+```typescript
+router.post('/:dealId/chat', async (req, res) => {
+  // 1. Get deal with context (company, documents)
+  // 2. Build context for OpenAI
+  // 3. Call GPT-4-turbo-preview
+  // 4. Return response (with fallback if AI disabled)
+});
+```
+
+**Context Sent to AI:**
+- Deal name, stage, industry
+- Financial metrics (revenue, EBITDA, IRR, MoM)
+- Company info
+- Document previews (first 300 chars)
+- AI thesis if available
+- Conversation history (last 10 messages)
+
+---
+
+### AI Status Summary
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| ✅ Memo Builder - Section Regeneration | Real AI | GPT-4 Turbo via `/api/memos/:id/sections/:sectionId/generate` |
+| ✅ Memo Builder - AI Chat | Real AI | GPT-4 Turbo via `/api/memos/:id/chat` |
+| ✅ Deal Page - AI Chat | Real AI | GPT-4 Turbo via `/api/deals/:dealId/chat` (just added) |
+| ✅ OpenAI API Key | Configured | In `apps/api/.env` |
+| ⚠️ Database Tables | Need Verification | Run `memo-schema.sql` in Supabase if not done |
+
+---
+
+### How to Test Real AI
+
+**1. Memo Builder:**
+```
+/memo-builder.html?new=true&project=Test%20Project
+```
+- Click "Regenerate" on any section → Real GPT-4 response
+- Type in chat → Real AI answers
+
+**2. Deal Page:**
+```
+/deal.html?id=<deal-uuid>
+```
+- Type in chat → AI responds with deal-specific context
+
+**Fallback Behavior:**
+- If `OPENAI_API_KEY` not set → Shows structured fallback responses
+- Demo mode (memo ID starts with `demo-`) → Uses simulated responses
+
+
+---
+
+## February 3, 2026
+
+### RAG Implementation for Deal AI Chat
+
+#### Time: ~18:00 IST
+
+#### Goal
+Implement Retrieval Augmented Generation (RAG) so uploaded documents provide intelligent, semantic context for AI chat responses instead of simple text truncation.
+
+#### Implementation Summary
+
+**1. Database Schema (pgvector)**
+- Created `DocumentChunk` table for storing document embeddings
+- Added pgvector extension with 768-dimension vectors (Gemini embedding size)
+- Created IVFFlat index for fast similarity search
+- Added `match_document_chunks` function for cosine similarity search
+
+**2. New Files Created**
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/gemini.ts` | Gemini API client for embeddings (text-embedding-004) |
+| `apps/api/src/rag.ts` | RAG utilities: chunkText, embedDocument, searchDocumentChunks, buildRAGContext |
+
+**3. Files Modified**
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/routes/documents.ts` | Added automatic RAG embedding on document upload |
+| `apps/api/src/routes/deals.ts` | Added RAG-powered semantic search for chat context |
+| `apps/api/src/index.ts` | Registered Gemini/RAG startup logging |
+| `apps/api/.env` | Added GEMINI_API_KEY |
+
+#### Technical Details
+
+**Document Chunking:**
+- ~500 tokens per chunk with 50 token overlap
+- Chunks stored with metadata (documentId, dealId, chunkIndex)
+
+**Semantic Search Flow:**
+1. User sends chat message
+2. Message embedded via Gemini text-embedding-004
+3. pgvector finds top 10 most similar document chunks (cosine similarity > 0.4)
+4. Relevant chunks assembled into context
+5. Context + deal info sent to OpenAI GPT-4-turbo-preview
+
+**Fallback Behavior:**
+- If Gemini not configured → Uses keyword-based relevance scoring
+- If no semantic matches → Falls back to keyword search
+
+---
+
+### File Upload from Chat Attach Button
+
+#### Time: ~17:30 IST
+
+#### Goal
+Enable document upload directly from the chat attach button in deal page.
+
+#### Changes Made
+
+**File:** `apps/web/deal.js`
+
+| Function | Change |
+|----------|--------|
+| `uploadFile()` | Changed from mock simulation to real API upload via `/api/documents/upload` |
+| `addSystemMessage()` | New function to show system notifications in chat |
+
+**Upload Flow:**
+1. User clicks attach button → File picker opens
+2. File selected → Shows upload progress in chat
+3. FormData sent to `/api/documents/upload` with authentication
+4. On success → System message confirms upload
+5. After 3 seconds → Deal data reloads to show new document
+6. RAG embedding triggers automatically in background
+
+---
+
+### AI Chat Not Responding - Debugging & Fix
+
+#### Time: ~18:30 IST
+
+#### Problem
+AI chat was returning generic template responses instead of real GPT-4 answers despite API key being configured.
+
+#### Investigation
+1. Added detailed logging to `apps/api/src/routes/deals.ts`
+2. Added logging to `apps/api/src/openai.ts` for startup status
+3. Added frontend debugging in `apps/web/deal.js`
+
+#### Root Cause
+OpenAI API returning 429 error - **quota exceeded** (no billing credits)
+
+**Server Logs:**
+```
+[CHAT] OpenAI enabled: true, openai client: true
+[RAG] Found 5 relevant chunks
+[CHAT] Calling OpenAI with 3 messages...
+Error: RateLimitError: 429 You exceeded your current quota
+```
+
+#### Resolution
+User added billing credits to OpenAI account → AI chat now working correctly.
+
+---
+
+### Current AI Stack Summary
+
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Embeddings | Gemini text-embedding-004 | 768-dim vectors for RAG |
+| Vector DB | Supabase pgvector | Document chunk storage & search |
+| Chat LLM | OpenAI GPT-4-turbo-preview | AI responses |
+| Similarity | Cosine via pgvector | Finding relevant chunks |
+
+---
+
+### Feature Status
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| ✅ RAG Document Embedding | Complete | Auto-triggers on upload |
+| ✅ Semantic Document Search | Complete | pgvector cosine similarity |
+| ✅ Chat Attach Button Upload | Complete | Real API integration |
+| ✅ Deal AI Chat | Complete | With RAG context |
+| ✅ OpenAI Integration | Complete | Credits added |
+| ✅ Gemini Embeddings | Complete | text-embedding-004 |

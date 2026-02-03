@@ -814,6 +814,7 @@ function initChatInterface() {
         // Try real AI API first
         if (state.dealId) {
             try {
+                console.log('[Chat] Sending request to API...');
                 const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/chat`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -826,8 +827,11 @@ function initChatInterface() {
                     }),
                 });
 
+                console.log('[Chat] Response status:', response.status, response.ok);
+
                 if (response.ok) {
                     const data = await response.json();
+                    console.log('[Chat] AI response received:', data.model);
                     removeTypingIndicator();
                     addAIResponseFromAPI(data.response);
 
@@ -835,13 +839,18 @@ function initChatInterface() {
                     state.messages.push({ role: 'user', content: message });
                     state.messages.push({ role: 'assistant', content: data.response });
                     return;
+                } else {
+                    // Log the error response
+                    const errorData = await response.json().catch(() => ({}));
+                    console.error('[Chat] API error response:', response.status, errorData);
                 }
             } catch (error) {
-                console.error('AI Chat API error:', error);
+                console.error('[Chat] API request failed:', error);
             }
         }
 
         // Fall back to mock response if API fails
+        console.log('[Chat] Falling back to mock response');
         setTimeout(() => {
             removeTypingIndicator();
             addAIResponse(message);
@@ -895,6 +904,22 @@ function showTypingIndicator() {
 function removeTypingIndicator() {
     const typing = document.getElementById('typing-indicator');
     if (typing) typing.remove();
+}
+
+function addSystemMessage(message, icon = 'info') {
+    const chatContainer = document.getElementById('chat-messages');
+    if (!chatContainer) return;
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex justify-center my-3 animate-fadeIn';
+    messageDiv.innerHTML = `
+        <div class="flex items-center gap-2 bg-slate-100 text-slate-600 rounded-full px-4 py-2 text-xs">
+            <span class="material-symbols-outlined text-sm">${icon}</span>
+            ${message}
+        </div>
+    `;
+    chatContainer.appendChild(messageDiv);
+    scrollToBottom();
 }
 
 function addAIResponseFromAPI(responseText) {
@@ -1177,8 +1202,14 @@ function initFileAttachments() {
     });
 }
 
-function uploadFile(file) {
+async function uploadFile(file) {
     const container = document.getElementById('attached-files');
+    const dealId = state.dealId;
+
+    if (!dealId) {
+        showNotification('Error', 'No deal selected', 'error');
+        return;
+    }
 
     // Create uploading indicator
     const uploadChip = document.createElement('div');
@@ -1189,10 +1220,28 @@ function uploadFile(file) {
     `;
     container.appendChild(uploadChip);
 
-    // Simulate upload
-    setTimeout(() => {
-        uploadChip.classList.remove('animate-pulse', 'bg-blue-50', 'text-blue-600');
-        uploadChip.classList.add('bg-slate-50', 'text-slate-600');
+    try {
+        // Create FormData for file upload
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('name', file.name);
+
+        // Upload to deal documents API
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/documents`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Upload failed');
+        }
+
+        const uploadedDoc = await response.json();
+
+        // Update chip to show success
+        uploadChip.classList.remove('animate-pulse', 'bg-blue-50', 'text-blue-600', 'border-blue-100');
+        uploadChip.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
 
         const fileIcon = file.name.endsWith('.pdf') ? 'picture_as_pdf' :
                          file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'table_chart' :
@@ -1203,7 +1252,36 @@ function uploadFile(file) {
         uploadChip.innerHTML = `
             <span class="material-symbols-outlined text-${iconColor}-500 text-sm">${fileIcon}</span>
             ${file.name}
-            <button class="hover:text-red-500 ml-1 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
+            <span class="material-symbols-outlined text-emerald-500 text-sm">check_circle</span>
+        `;
+
+        // Add to state's attached files
+        state.attachedFiles.push({
+            id: uploadedDoc.id,
+            name: uploadedDoc.name,
+            type: uploadedDoc.type
+        });
+
+        showNotification('Document Uploaded', `${file.name} uploaded and being processed for AI context`, 'success');
+
+        // Show system message in chat
+        addSystemMessage(`📄 ${file.name} uploaded. You can now ask questions about this document.`, 'attach_file');
+
+        // Refresh the documents section after a brief delay (for embedding to complete)
+        setTimeout(() => {
+            loadDealData();
+        }, 3000);
+
+    } catch (error) {
+        console.error('Upload error:', error);
+
+        // Show error state
+        uploadChip.classList.remove('animate-pulse', 'bg-blue-50', 'text-blue-600', 'border-blue-100');
+        uploadChip.classList.add('bg-red-50', 'text-red-600', 'border-red-200');
+        uploadChip.innerHTML = `
+            <span class="material-symbols-outlined text-red-500 text-sm">error</span>
+            Failed: ${file.name}
+            <button class="hover:text-red-700 ml-1 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
         `;
 
         uploadChip.querySelector('button').addEventListener('click', function() {
@@ -1212,8 +1290,8 @@ function uploadFile(file) {
             setTimeout(() => uploadChip.remove(), 300);
         });
 
-        showNotification('File Uploaded', `${file.name} added to context`, 'success');
-    }, 2000);
+        showNotification('Upload Failed', error.message || 'Could not upload file', 'error');
+    }
 }
 
 // ============================================================

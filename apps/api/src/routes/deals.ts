@@ -3,6 +3,8 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { AuditLog } from '../services/auditLog.js';
+import { searchDocumentChunks, buildRAGContext } from '../rag.js';
+import { isGeminiEnabled } from '../gemini.js';
 
 const router = Router();
 
@@ -497,5 +499,312 @@ router.delete('/:dealId/team/:memberId', async (req, res) => {
     res.status(500).json({ error: 'Failed to remove team member' });
   }
 });
+
+// ============================================================
+// Deal AI Chat
+// ============================================================
+
+// Import OpenAI for chat functionality
+import { openai, isAIEnabled } from '../openai.js';
+
+// System prompt for deal analysis
+const DEAL_ANALYST_PROMPT = `You are DealOS AI, an expert Private Equity investment analyst assistant.
+
+Your role is to help investment professionals analyze deals by providing:
+- Financial analysis (EBITDA, revenue, margins, multiples)
+- Deal evaluation and risk assessment
+- Investment thesis development
+- Due diligence insights
+- Market and competitive analysis
+
+**IMPORTANT**: You have access to the full contents of uploaded documents in the deal context below.
+When answering questions:
+- Reference specific information from the documents
+- Quote relevant passages when appropriate
+- Cite which document the information comes from (e.g., "According to the Teaser Deck...")
+- If information isn't in the documents, say so clearly
+
+Guidelines:
+- Be concise but thorough
+- Use specific numbers and data from documents when available
+- Highlight both opportunities and risks
+- Use professional financial terminology
+- Format responses with clear structure (bullet points, sections)`;
+
+// Helper: Extract keywords from a question for document relevance scoring
+function extractKeywords(text: string): string[] {
+  const stopWords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+    'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might',
+    'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'whom', 'whose',
+    'where', 'when', 'why', 'how', 'all', 'each', 'every', 'both', 'few', 'more', 'most', 'other',
+    'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same', 'so', 'than', 'too', 'very', 'just',
+    'and', 'but', 'if', 'or', 'because', 'as', 'until', 'while', 'of', 'at', 'by', 'for', 'with',
+    'about', 'against', 'between', 'into', 'through', 'during', 'before', 'after', 'above', 'below',
+    'to', 'from', 'up', 'down', 'in', 'out', 'on', 'off', 'over', 'under', 'again', 'further', 'then',
+    'once', 'here', 'there', 'me', 'my', 'myself', 'we', 'our', 'ours', 'ourselves', 'you', 'your',
+    'yours', 'yourself', 'yourselves', 'he', 'him', 'his', 'himself', 'she', 'her', 'hers', 'herself',
+    'it', 'its', 'itself', 'they', 'them', 'their', 'theirs', 'themselves', 'i', 'tell', 'give', 'show']);
+
+  return text.toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 2 && !stopWords.has(word));
+}
+
+// Helper: Score document relevance based on question keywords
+function scoreDocumentRelevance(doc: any, keywords: string[]): number {
+  if (!doc.extractedText && !doc.name) return 0;
+
+  const docText = `${doc.name || ''} ${doc.extractedText || ''}`.toLowerCase();
+  let score = 0;
+
+  for (const keyword of keywords) {
+    // Count occurrences of keyword in document
+    const regex = new RegExp(keyword, 'gi');
+    const matches = docText.match(regex);
+    if (matches) {
+      score += matches.length;
+    }
+  }
+
+  // Boost score if keyword appears in document name
+  const docName = (doc.name || '').toLowerCase();
+  for (const keyword of keywords) {
+    if (docName.includes(keyword)) {
+      score += 5; // Name matches are more valuable
+    }
+  }
+
+  return score;
+}
+
+// Helper: Build context using keyword-based relevance (fallback when RAG not available)
+function buildKeywordContext(message: string, documents: any[]): string {
+  const keywords = extractKeywords(message);
+
+  // Score and sort documents by relevance to the question
+  const scoredDocs = documents.map((doc: any) => ({
+    ...doc,
+    relevanceScore: scoreDocumentRelevance(doc, keywords)
+  })).sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
+
+  // Separate highly relevant docs from others
+  const relevantDocs = scoredDocs.filter((d: any) => d.relevanceScore > 0);
+  const otherDocs = scoredDocs.filter((d: any) => d.relevanceScore === 0);
+
+  const parts: string[] = [];
+  parts.push(`(${documents.length} documents available)`);
+
+  // Add relevant documents first with more context (3000 chars each)
+  if (relevantDocs.length > 0) {
+    parts.push(`\n[MOST RELEVANT TO YOUR QUESTION]`);
+    relevantDocs.forEach((doc: any) => {
+      parts.push(`\n### ${doc.name} (${doc.type})`);
+      if (doc.extractedText) {
+        const textLength = Math.min(doc.extractedText.length, 3000);
+        parts.push(doc.extractedText.substring(0, textLength));
+        if (doc.extractedText.length > textLength) {
+          parts.push(`... [truncated, ${doc.extractedText.length - textLength} more chars]`);
+        }
+      } else {
+        parts.push('(No text extracted from this document)');
+      }
+    });
+  }
+
+  // Add other documents with less context (1000 chars each)
+  if (otherDocs.length > 0) {
+    parts.push(`\n[OTHER AVAILABLE DOCUMENTS]`);
+    otherDocs.forEach((doc: any) => {
+      parts.push(`\n### ${doc.name} (${doc.type})`);
+      if (doc.extractedText) {
+        const textLength = Math.min(doc.extractedText.length, 1000);
+        parts.push(doc.extractedText.substring(0, textLength));
+        if (doc.extractedText.length > textLength) {
+          parts.push(`... [truncated, ${doc.extractedText.length - textLength} more chars]`);
+        }
+      } else {
+        parts.push('(No text extracted from this document)');
+      }
+    });
+  }
+
+  return parts.join('\n');
+}
+
+// POST /api/deals/:dealId/chat - Send a message to AI about this deal
+router.post('/:dealId/chat', async (req, res) => {
+  console.log(`[CHAT] Received chat request for deal ${req.params.dealId}`);
+  console.log(`[CHAT] OpenAI enabled: ${isAIEnabled()}, openai client: ${!!openai}`);
+
+  try {
+    const { dealId } = req.params;
+    const { message, history = [] } = req.body;
+    const user = (req as any).user;
+
+    console.log(`[CHAT] Message: "${message?.substring(0, 50)}..."`);
+
+    if (!message || typeof message !== 'string') {
+      return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Get deal with context
+    const { data: deal, error: dealError } = await supabase
+      .from('Deal')
+      .select(`
+        id, name, stage, status, industry, dealSize, revenue, ebitda,
+        irrProjected, mom, aiThesis, description,
+        company:Company(id, name, description, industry),
+        documents:Document(id, name, type, extractedText, embeddingStatus)
+      `)
+      .eq('id', dealId)
+      .single();
+
+    if (dealError) {
+      if (dealError.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Deal not found' });
+      }
+      throw dealError;
+    }
+
+    // Build deal context
+    const contextParts = [`Deal: ${deal.name}`];
+    contextParts.push(`Stage: ${deal.stage}`);
+    if (deal.industry) contextParts.push(`Industry: ${deal.industry}`);
+    if (deal.dealSize) contextParts.push(`Deal Size: $${deal.dealSize}M`);
+    if (deal.revenue) contextParts.push(`Revenue: $${deal.revenue}M`);
+    if (deal.ebitda) contextParts.push(`EBITDA: $${deal.ebitda}M`);
+    if (deal.irrProjected) contextParts.push(`Projected IRR: ${deal.irrProjected}%`);
+    if (deal.mom) contextParts.push(`MoM: ${deal.mom}x`);
+    if (deal.aiThesis) contextParts.push(`\nInvestment Thesis: ${deal.aiThesis}`);
+
+    const company = deal.company as any;
+    if (company) {
+      contextParts.push(`\nCompany: ${company.name}`);
+      if (company.description) contextParts.push(`Description: ${company.description}`);
+    }
+
+    // Use RAG for semantic document search if Gemini is enabled
+    let documentContext = '';
+    if (deal.documents?.length > 0) {
+      if (isGeminiEnabled()) {
+        // Use RAG: semantic search over document chunks
+        console.log(`[RAG] Searching document chunks for deal ${dealId}...`);
+        const searchResults = await searchDocumentChunks(message, dealId, 10, 0.4);
+
+        if (searchResults.length > 0) {
+          console.log(`[RAG] Found ${searchResults.length} relevant chunks`);
+          documentContext = buildRAGContext(searchResults, deal.documents);
+        } else {
+          // Fallback to keyword-based if no semantic matches
+          console.log(`[RAG] No semantic matches, falling back to keyword search`);
+          documentContext = buildKeywordContext(message, deal.documents);
+        }
+      } else {
+        // Fallback to keyword-based relevance when Gemini not available
+        documentContext = buildKeywordContext(message, deal.documents);
+      }
+    } else {
+      documentContext = '(No documents uploaded to this deal yet)';
+    }
+
+    contextParts.push(`\n--- DOCUMENT CONTENTS ---`);
+    contextParts.push(documentContext);
+
+    const dealContext = contextParts.join('\n');
+
+    // Check if AI is enabled
+    if (!isAIEnabled() || !openai) {
+      // Return fallback response
+      return res.json({
+        response: generateFallbackResponse(message, deal),
+        model: 'fallback',
+      });
+    }
+
+    // Build messages for OpenAI
+    const messages: any[] = [
+      { role: 'system', content: DEAL_ANALYST_PROMPT },
+      { role: 'system', content: `Current Deal Context:\n${dealContext}` },
+    ];
+
+    // Add conversation history (last 10 messages)
+    history.slice(-10).forEach((msg: any) => {
+      messages.push({ role: msg.role, content: msg.content });
+    });
+
+    // Add current message
+    messages.push({ role: 'user', content: message });
+
+    // Call OpenAI
+    console.log(`[CHAT] Calling OpenAI with ${messages.length} messages...`);
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4-turbo-preview',
+      messages,
+      max_tokens: 1500,
+      temperature: 0.7,
+    });
+
+    console.log(`[CHAT] OpenAI response received`);
+    const aiResponse = completion.choices[0]?.message?.content || 'I apologize, I was unable to generate a response.';
+
+    // Log AI chat activity
+    await AuditLog.aiChat(req, `Deal: ${deal.name}`);
+
+    res.json({
+      response: aiResponse,
+      model: 'gpt-4-turbo-preview',
+    });
+  } catch (error) {
+    console.error('Error in deal chat:', error);
+    res.status(500).json({ error: 'Failed to process chat message' });
+  }
+});
+
+// Fallback response when AI is not available
+function generateFallbackResponse(query: string, deal: any): string {
+  const queryLower = query.toLowerCase();
+
+  if (queryLower.includes('risk')) {
+    return `**Risk Analysis for ${deal.name}:**
+
+Based on available information:
+1. **Market Risk**: ${deal.industry || 'Industry'} sector dynamics
+2. **Financial Risk**: ${deal.irrProjected ? `${deal.irrProjected}% projected IRR` : 'IRR not calculated'}
+3. **Execution Risk**: Review operational capabilities
+
+*Enable OpenAI API for detailed AI-powered analysis.*`;
+  }
+
+  if (queryLower.includes('thesis') || queryLower.includes('investment')) {
+    return deal.aiThesis || `**Investment Considerations for ${deal.name}:**
+
+- Stage: ${deal.stage}
+- Industry: ${deal.industry || 'N/A'}
+- Deal Size: ${deal.dealSize ? `$${deal.dealSize}M` : 'N/A'}
+- Projected Returns: ${deal.mom ? `${deal.mom}x MoM` : 'N/A'}
+
+*Upload documents and enable AI for a comprehensive thesis.*`;
+  }
+
+  if (queryLower.includes('financial') || queryLower.includes('metric') || queryLower.includes('number')) {
+    return `**${deal.name} Financial Summary:**
+
+- Deal Size: ${deal.dealSize ? `$${deal.dealSize}M` : 'Not specified'}
+- Revenue: ${deal.revenue ? `$${deal.revenue}M` : 'Not available'}
+- EBITDA: ${deal.ebitda ? `$${deal.ebitda}M` : 'Not available'}
+- Projected IRR: ${deal.irrProjected ? `${deal.irrProjected}%` : 'Not calculated'}
+- MoM: ${deal.mom ? `${deal.mom}x` : 'Not specified'}`;
+  }
+
+  return `I can help you analyze **${deal.name}**. Try asking about:
+
+• "What are the key risks?"
+• "Summarize the financial metrics"
+• "Generate an investment thesis"
+• "What documents are available?"
+
+*Note: Enable OpenAI API for full AI-powered analysis.*`;
+}
 
 export default router;
