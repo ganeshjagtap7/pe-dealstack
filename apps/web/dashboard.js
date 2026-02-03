@@ -190,7 +190,10 @@ function fillSearch(query) {
     }
 }
 
-function showAISearchResult(query) {
+async function showAISearchResult(query) {
+    const API_BASE_URL = 'http://localhost:3001/api';
+
+    // Create modal with loading state
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
     modal.innerHTML = `
@@ -201,7 +204,7 @@ function showAISearchResult(query) {
                         <span class="material-symbols-outlined text-secondary">auto_awesome</span>
                     </div>
                     <div>
-                        <h3 class="font-bold text-text-main">AI Search Results</h3>
+                        <h3 class="font-bold text-text-main">AI Portfolio Assistant</h3>
                         <p class="text-sm text-text-secondary">"${query}"</p>
                     </div>
                 </div>
@@ -209,30 +212,10 @@ function showAISearchResult(query) {
                     <span class="material-symbols-outlined">close</span>
                 </button>
             </div>
-            <div class="p-6">
-                <div class="bg-secondary-light border border-secondary/20 rounded-lg p-4 mb-4">
-                    <div class="flex items-start gap-3">
-                        <span class="material-symbols-outlined text-secondary">psychology</span>
-                        <div class="flex-1">
-                            <p class="text-sm text-text-main"><strong>AI Analysis:</strong> Based on your portfolio data, I found 3 relevant insights related to your query.</p>
-                        </div>
-                    </div>
-                </div>
-                <div class="space-y-3">
-                    <div class="p-4 border border-border-subtle rounded-lg hover:border-primary/30 transition-colors">
-                        <div class="flex items-start justify-between mb-2">
-                            <h4 class="font-semibold text-text-main">TechCorp SaaS</h4>
-                            <span class="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded">Due Diligence</span>
-                        </div>
-                        <p class="text-sm text-text-secondary">Current valuation: $125M. Strong performance indicators with 94% customer retention.</p>
-                    </div>
-                    <div class="p-4 border border-border-subtle rounded-lg hover:border-primary/30 transition-colors">
-                        <div class="flex items-start justify-between mb-2">
-                            <h4 class="font-semibold text-text-main">Portfolio EBITDA Average</h4>
-                            <span class="text-xs font-medium text-secondary bg-secondary-light px-2 py-1 rounded">22.3%</span>
-                        </div>
-                        <p class="text-sm text-text-secondary">Your portfolio maintains a healthy EBITDA margin across all active investments.</p>
-                    </div>
+            <div id="ai-response-content" class="p-6">
+                <div class="flex items-center justify-center py-12">
+                    <span class="material-symbols-outlined text-primary animate-spin text-3xl mr-3">sync</span>
+                    <span class="text-text-secondary">Analyzing your portfolio...</span>
                 </div>
             </div>
         </div>
@@ -242,6 +225,86 @@ function showAISearchResult(query) {
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.remove();
     });
+
+    // Call the API
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/portfolio/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: query }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to get AI response');
+        }
+
+        const data = await response.json();
+        const contentDiv = document.getElementById('ai-response-content');
+
+        // Format the response with markdown-like rendering
+        const formattedResponse = data.response
+            .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+
+        contentDiv.innerHTML = `
+            <div class="bg-secondary-light border border-secondary/20 rounded-lg p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <span class="material-symbols-outlined text-secondary">psychology</span>
+                    <div class="flex-1">
+                        <p class="text-sm text-text-main leading-relaxed">${formattedResponse}</p>
+                    </div>
+                </div>
+            </div>
+            ${data.relatedDeals && data.relatedDeals.length > 0 ? `
+                <div class="mt-4">
+                    <h4 class="text-xs font-bold text-text-secondary uppercase tracking-wide mb-3">Related Deals</h4>
+                    <div class="space-y-2">
+                        ${data.relatedDeals.map(deal => `
+                            <a href="deal.html?id=${deal.id}" class="block p-3 border border-border-subtle rounded-lg hover:border-primary/30 hover:bg-primary-light/30 transition-colors">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <span class="font-semibold text-text-main">${deal.name}</span>
+                                        <span class="text-xs text-text-muted ml-2">${deal.industry || ''}</span>
+                                    </div>
+                                    <span class="text-xs font-medium text-primary bg-primary-light px-2 py-1 rounded">${formatStage(deal.stage)}</span>
+                                </div>
+                                ${deal.revenue ? `<p class="text-xs text-text-secondary mt-1">Revenue: $${deal.revenue}M</p>` : ''}
+                            </a>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            <div class="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between text-xs text-text-muted">
+                <span>${data.context?.activeDeals || 0} active deals analyzed</span>
+                <span>Avg IRR: ${data.context?.avgIRR || 'N/A'}%</span>
+            </div>
+        `;
+    } catch (error) {
+        console.error('AI Search error:', error);
+        const contentDiv = document.getElementById('ai-response-content');
+        contentDiv.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 text-red-500">
+                <span class="material-symbols-outlined text-3xl mb-2">error</span>
+                <p class="text-sm font-medium">Failed to get AI response</p>
+                <p class="text-xs text-text-muted mt-1">Please try again later</p>
+            </div>
+        `;
+    }
+}
+
+function formatStage(stage) {
+    const stageLabels = {
+        'INITIAL_REVIEW': 'Initial Review',
+        'DUE_DILIGENCE': 'Due Diligence',
+        'IOI_SUBMITTED': 'IOI Submitted',
+        'LOI_SUBMITTED': 'LOI Submitted',
+        'NEGOTIATION': 'Negotiation',
+        'CLOSING': 'Closing',
+        'CLOSED_WON': 'Closed Won',
+        'CLOSED_LOST': 'Closed Lost',
+        'PASSED': 'Passed',
+    };
+    return stageLabels[stage] || stage;
 }
 
 // ============================================================

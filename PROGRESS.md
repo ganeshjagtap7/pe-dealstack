@@ -4530,3 +4530,90 @@ Called `updateIndustryFilter(deals)` in `loadDeals()` after fetching deals from 
 - Filter always reflects actual data in the system
 
 ---
+
+### AI Portfolio Assistant (Dashboard Search)
+
+#### Time: ~15:30 IST
+
+#### Goal
+Make the dashboard search bar functional - connect it to a real AI-powered portfolio assistant instead of showing hardcoded demo data.
+
+#### Problem
+The "Ask AI anything about your portfolio..." search bar on the dashboard was showing hardcoded mock results. Users couldn't actually get real portfolio insights.
+
+#### Solution Implemented
+
+**1. Backend: New API Endpoint**
+
+**File:** `apps/api/src/routes/ai.ts`
+
+**Endpoint:** `POST /api/portfolio/chat`
+
+```javascript
+// Fetches all deals and builds portfolio context
+const portfolioContext = `
+PORTFOLIO SUMMARY:
+- Total Deals: ${totalDeals} (${activeDeals.length} active)
+- Total Revenue: $${totalRevenue.toFixed(1)}M
+- Total EBITDA: $${totalEbitda.toFixed(1)}M
+- Average Projected IRR: ${avgIRR.toFixed(1)}%
+
+DEALS BY STAGE: ...
+DEALS BY INDUSTRY: ...
+RECENT DEALS (Top 10): ...
+`;
+
+// Sends to OpenAI with portfolio-specific system prompt
+const completion = await openai.chat.completions.create({
+  model: 'gpt-4-turbo-preview',
+  messages: [
+    { role: 'system', content: portfolioAssistantPrompt },
+    { role: 'user', content: `${portfolioContext}\n\nUser Question: ${message}` },
+  ],
+});
+```
+
+**Response includes:**
+- AI-generated response text
+- Portfolio context summary (total deals, avg IRR)
+- Related deals mentioned in the response (clickable links)
+
+**2. Frontend: Dashboard Integration**
+
+**File:** `apps/web/dashboard.js`
+
+**Changes to `showAISearchResult()`:**
+- Now calls real API instead of showing hardcoded data
+- Shows loading spinner while AI processes
+- Displays formatted AI response with markdown rendering
+- Shows related deals as clickable cards linking to deal pages
+- Shows portfolio stats in footer (X active deals, Y% avg IRR)
+
+#### Example Queries Now Work
+- "What's our total EBITDA across active deals?"
+- "Which deals are in Due Diligence?"
+- "Compare our SaaS vs Healthcare investments"
+- "Show me recent deals with negative EBITDA"
+- "What's the average revenue of our portfolio?"
+
+#### Technical Flow
+
+```
+User types query → Press Enter
+    ↓
+Show loading modal
+    ↓
+POST /api/portfolio/chat { message: query }
+    ↓
+Backend fetches all deals from Supabase
+    ↓
+Builds portfolio summary context
+    ↓
+Sends to OpenAI GPT-4 Turbo
+    ↓
+Returns response + related deals
+    ↓
+Frontend displays formatted response
+```
+
+---
