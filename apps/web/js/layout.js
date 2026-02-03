@@ -172,7 +172,7 @@ function generateHeader(options = {}) {
     ` : '';
 
     return `
-        <header id="pe-header" class="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-10 sticky top-0">
+        <header id="pe-header" class="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-40 sticky top-0">
             <div class="flex items-center gap-4 flex-1">
                 <button class="md:hidden text-text-main" id="mobile-menu-btn">
                     <span class="material-symbols-outlined">menu</span>
@@ -330,6 +330,9 @@ function initPELayout(activePage, options = {}) {
     });
 
     console.log('PE OS Layout initialized for:', activePage);
+
+    // Dispatch custom event to signal layout is ready
+    window.dispatchEvent(new CustomEvent('pe-layout-ready', { detail: { activePage } }));
 }
 
 /**

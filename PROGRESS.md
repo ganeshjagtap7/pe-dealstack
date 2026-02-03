@@ -4617,3 +4617,90 @@ Frontend displays formatted response
 ```
 
 ---
+
+
+### Dashboard Search Bar Fix - Race Condition & Z-Index
+
+#### Time: ~16:15 IST
+
+#### Problem 1: Search Bar Not Responding
+The dashboard search bar was not working - typing queries and pressing Enter did nothing. No modal appeared, no API calls were made.
+
+#### Root Cause Analysis
+**Race condition between layout injection and dashboard initialization:**
+
+1. On DOMContentLoaded, the inline script runs `await PEAuth.checkAuth()` (async)
+2. `PELayout.init()` only runs AFTER auth completes - this injects the header with `#global-search`
+3. But `dashboard.js` also has a DOMContentLoaded listener that calls `initAISearch()`
+4. `initAISearch()` tries to find `#global-search` which does not exist yet
+5. Result: Search functionality never initializes
+
+#### Solution Implemented
+
+**1. Added Custom Event in layout.js**
+
+**File:** `apps/web/js/layout.js`
+
+```javascript
+// At end of initPELayout() function
+console.log('PE OS Layout initialized for:', activePage);
+
+// Dispatch custom event to signal layout is ready
+window.dispatchEvent(new CustomEvent('pe-layout-ready', { detail: { activePage } }));
+```
+
+**2. Updated Dashboard Initialization**
+
+**File:** `apps/web/dashboard.js`
+
+```javascript
+// Prevent double initialization
+let dashboardInitialized = false;
+
+function initDashboard() {
+    if (dashboardInitialized) return;
+    dashboardInitialized = true;
+    console.log('Dashboard initialized');
+    initializeFeatures();
+}
+
+// Wait for PE Layout to be ready (header with search bar is injected async after auth)
+window.addEventListener('pe-layout-ready', initDashboard);
+
+// Fallback: If layout is already initialized (e.g., script loads late)
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('global-search')) {
+        initDashboard();
+    }
+});
+```
+
+#### Problem 2: Search Dropdown Behind Cards
+After fix #1, the search worked but the suggestions dropdown appeared BEHIND the Due Diligence stat card.
+
+#### Root Cause
+- Header had `z-index: 10` (`z-10` in Tailwind)
+- Dropdown inside header had `z-50` but was constrained by parent stacking context
+- Stat cards with shadows created their own stacking context above `z-10`
+
+#### Solution
+
+**File:** `apps/web/js/layout.js`
+
+```javascript
+// Changed header z-index from z-10 to z-40
+<header id="pe-header" class="... z-40 sticky top-0">
+```
+
+#### Files Changed
+| File | Change |
+|------|--------|
+| `apps/web/js/layout.js` | Added `pe-layout-ready` event dispatch, increased header z-index to z-40 |
+| `apps/web/dashboard.js` | Listen for `pe-layout-ready` event instead of DOMContentLoaded |
+
+#### Result
+- Search bar now responds to Enter key and button clicks
+- Suggestions dropdown appears above all content
+- AI Portfolio Assistant modal displays correctly with real data
+
+---

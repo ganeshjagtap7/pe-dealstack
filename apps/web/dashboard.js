@@ -29,9 +29,25 @@ const state = {
 // ============================================================
 // DOM Ready
 // ============================================================
-document.addEventListener('DOMContentLoaded', function() {
+// Prevent double initialization
+let dashboardInitialized = false;
+
+function initDashboard() {
+    if (dashboardInitialized) return;
+    dashboardInitialized = true;
     console.log('Dashboard initialized');
     initializeFeatures();
+}
+
+// Wait for PE Layout to be ready (header with search bar is injected async after auth)
+window.addEventListener('pe-layout-ready', initDashboard);
+
+// Fallback: If layout is already initialized (e.g., script loads late)
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if global-search exists (layout already initialized)
+    if (document.getElementById('global-search')) {
+        initDashboard();
+    }
 });
 
 function initializeFeatures() {
