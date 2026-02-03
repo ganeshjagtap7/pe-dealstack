@@ -4262,3 +4262,271 @@ User added billing credits to OpenAI account → AI chat now working correctly.
 | ✅ Deal AI Chat | Complete | With RAG context |
 | ✅ OpenAI Integration | Complete | Credits added |
 | ✅ Gemini Embeddings | Complete | text-embedding-004 |
+
+---
+
+## February 3, 2026 (Continued)
+
+### AI Caching System
+
+#### Time: ~20:00 IST
+
+#### Goal
+Reduce OpenAI API costs by caching AI analysis results (thesis, risks) in the database with TTL-based invalidation.
+
+#### Implementation
+
+**1. New Files Created**
+
+| File | Purpose |
+|------|---------|
+| `apps/api/src/services/aiCache.ts` | AI cache service with TTL validation |
+| `apps/api/ai-cache-migration.sql` | Database migration for cache columns |
+
+**2. Cache Service Features**
+
+```typescript
+export const AICache = {
+  getThesis(dealId: string): Promise<CacheResult<string>>
+  setThesis(dealId: string, thesis: string): Promise<boolean>
+  getRisks(dealId: string): Promise<CacheResult<any[]>>
+  setRisks(dealId: string, risks: any[]): Promise<boolean>
+  invalidate(dealId: string): Promise<boolean>
+  getStats(dealId: string): Promise<CacheStats>
+}
+```
+
+**3. Database Schema Changes**
+
+```sql
+ALTER TABLE "Deal"
+ADD COLUMN IF NOT EXISTS "aiRisks" JSONB DEFAULT NULL,
+ADD COLUMN IF NOT EXISTS "aiCacheUpdatedAt" TIMESTAMPTZ DEFAULT NULL;
+```
+
+**4. API Endpoints Added**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/deals/:id/ai-cache` | Get cache stats for a deal |
+| DELETE | `/api/deals/:id/ai-cache` | Manually invalidate cache |
+
+**5. Files Modified**
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/routes/ai.ts` | Added cache check to thesis/risks endpoints, added `?refresh=true` param |
+| `apps/api/src/routes/documents.ts` | Auto-invalidate cache on document upload |
+
+**Cache Behavior:**
+- 24-hour TTL (configurable via `CACHE_TTL_HOURS`)
+- Cache hit returns stored data with age
+- Cache miss generates fresh AI response
+- `?refresh=true` bypasses cache
+- Document upload invalidates deal's cache
+- Console logs show cache HIT/MISS/STALE status
+
+**API Response with Cache:**
+```json
+{
+  "thesis": "...",
+  "dealId": "...",
+  "cached": true,
+  "cacheAge": 2.5
+}
+```
+
+---
+
+### Chat History Persistence
+
+#### Time: ~21:00 IST
+
+#### Goal
+Persist AI chat history in Supabase database for cross-device access and Vercel deployment readiness.
+
+#### Implementation
+
+**1. Database Schema**
+
+```sql
+CREATE TABLE "ChatMessage" (
+  "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "dealId" UUID NOT NULL REFERENCES "Deal"("id") ON DELETE CASCADE,
+  "userId" UUID REFERENCES "User"("id") ON DELETE SET NULL,
+  "role" TEXT NOT NULL CHECK ("role" IN ('user', 'assistant', 'system')),
+  "content" TEXT NOT NULL,
+  "metadata" JSONB DEFAULT '{}',
+  "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes for efficient queries
+CREATE INDEX idx_chat_message_deal_id ON "ChatMessage"("dealId");
+CREATE INDEX idx_chat_message_created_at ON "ChatMessage"("createdAt");
+CREATE INDEX idx_chat_message_deal_created ON "ChatMessage"("dealId", "createdAt");
+```
+
+**2. API Endpoints**
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/deals/:dealId/chat/history` | Get chat history (with pagination) |
+| DELETE | `/api/deals/:dealId/chat/history` | Clear chat history for a deal |
+
+**3. Files Modified**
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/routes/ai.ts` | Auto-save messages to DB, added history endpoints |
+| `apps/web/deal.js` | Load history on page load, restore messages to UI |
+
+**4. Frontend Implementation**
+
+```javascript
+async function loadChatHistory() {
+  const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/chat/history`);
+  const data = await response.json();
+
+  if (data.messages && data.messages.length > 0) {
+    data.messages.forEach(msg => {
+      if (msg.role === 'user') addUserMessageFromHistory(msg.content);
+      else if (msg.role === 'assistant') addAIResponseFromHistory(msg.content);
+    });
+  }
+}
+```
+
+**Message Flow:**
+1. User sends message → Saved to DB with role='user'
+2. AI responds → Saved to DB with role='assistant'
+3. Page refresh → History loaded from DB
+4. Messages rendered with proper styling
+
+---
+
+### Markdown Rendering in AI Chat
+
+#### Time: ~20:30 IST
+
+#### Goal
+Render AI responses with proper formatting (bold, italic, lists, code).
+
+#### Implementation
+
+**File Modified:** `apps/web/deal.js`
+
+**Added `parseMarkdown()` function:**
+```javascript
+function parseMarkdown(text) {
+  let html = text
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')    // Bold
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')                // Italic
+    .replace(/`(.+?)`/g, '<code class="...">$1</code>') // Inline code
+    .replace(/^\d+\.\s+(.+)$/gm, '<li>$1</li>')         // Numbered lists
+    .replace(/^[-•]\s+(.+)$/gm, '<li>$1</li>');         // Bullet lists
+
+  // Wrap consecutive <li> in <ul>/<ol>
+  html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul class="...">$&</ul>');
+
+  return html;
+}
+```
+
+**Applied to:**
+- `addAIResponseFromAPI()` - New AI responses
+- `addAIResponseFromHistory()` - Historical messages
+
+---
+
+### Migration Files Created
+
+| File | Purpose | Run In |
+|------|---------|--------|
+| `apps/api/ai-cache-migration.sql` | Add aiRisks, aiCacheUpdatedAt to Deal | Supabase SQL Editor |
+| `apps/api/chat-history-migration.sql` | Create ChatMessage table | Supabase SQL Editor |
+
+---
+
+### Feature Status Update
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| ✅ AI Response Caching | Complete | 24-hour TTL, auto-invalidation |
+| ✅ Chat History Persistence | Complete | Supabase database storage |
+| ✅ Markdown Rendering | Complete | Bold, italic, lists, code |
+| ✅ Cache Invalidation | Complete | Auto on document upload |
+| ✅ Vercel Deployment Ready | Complete | No local storage dependencies |
+
+---
+
+### LAUNCH-CHECKLIST.md Updates
+
+Updated the following items:
+- [x] Add AI analysis caching - Complete
+- AI Features: 100% (was 90%)
+
+---
+
+## February 3, 2026
+
+### Dynamic Industry Filter for CRM Page
+
+#### Time: ~14:45 IST
+
+#### Goal
+Make the industry filter on the CRM/Deals page dynamic - automatically populate with industries from actual deals instead of hardcoded values.
+
+#### Problem
+The industry filter dropdown was hardcoded with only 5 options:
+- SaaS, Healthcare, Cloud Infrastructure, Transportation, Fintech
+
+When adding deals with new industries (MarTech, PropTech, EdTech, etc.), they wouldn't appear in the filter.
+
+#### Solution Implemented
+
+**File Modified:** `apps/web/crm.html`
+
+**Added `updateIndustryFilter()` function:**
+```javascript
+function updateIndustryFilter(deals) {
+    const industries = [...new Set(deals.map(d => d.industry).filter(Boolean))].sort();
+    const dropdown = document.getElementById('industry-dropdown');
+
+    dropdown.innerHTML = `
+        <button data-industry="" class="...">All Industries</button>
+        ${industries.map(ind =>
+            `<button data-industry="${ind}" class="...">${ind}</button>`
+        ).join('')}
+    `;
+
+    // Re-attach click handlers for filter selection
+    dropdown.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            filters.industry = btn.dataset.industry;
+            // Update UI and reload deals
+        });
+    });
+}
+```
+
+**Integration Point:**
+Called `updateIndustryFilter(deals)` in `loadDeals()` after fetching deals from API.
+
+#### Technical Details
+
+| Aspect | Implementation |
+|--------|----------------|
+| Data Source | Extracts unique industries from loaded deals |
+| Sorting | Alphabetically sorted |
+| Empty Handling | Filters out null/undefined industries |
+| Event Handlers | Re-attached after DOM rebuild |
+| Performance | Runs on every deals load (~minimal overhead) |
+
+#### User Experience Improvement
+- Add a deal with "MarTech" industry → Filter instantly shows "MarTech" option
+- Works with any industry name the AI extractor assigns
+- No code changes needed when adding new industries
+- Filter always reflects actual data in the system
+
+---

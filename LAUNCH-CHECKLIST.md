@@ -4,7 +4,7 @@
 **Current Status:** Beta/MVP (5.8/10 readiness)
 **Target:** Closed Beta Launch
 **Created:** February 2, 2026
-**Last Updated:** February 2, 2026
+**Last Updated:** February 3, 2026
 
 ---
 
@@ -14,7 +14,7 @@
 |----------|--------|----------|
 | Core Deal Management | 90% | - |
 | Authentication & Security | 75% | P0 |
-| AI Features | 35% | P0 |
+| AI Features | 100% | P0 |
 | Integrations | 10% | P1 |
 | Polish & UX | 80% | P2 |
 | Testing & QA | 0% | P0 |
@@ -54,25 +54,34 @@
 
 ### 2. AI Features (Core Differentiator)
 
-- [ ] **Fix AI deal ingestion pipeline**
-  - Current: PDF upload partially works
-  - Needed: Reliable extraction of Company, Revenue, EBITDA, Industry
-  - Add confidence thresholds and manual review flow
-  - File: `apps/api/src/routes/ingest.ts`
+- [x] **Fix AI deal ingestion pipeline**
+  - PDF text extraction with pdf-parse ✓
+  - Reliable extraction of Company, Revenue, EBITDA, Industry ✓
+  - Confidence scores (0-100) for each extracted field ✓
+  - Manual review flow for low-confidence extractions ✓
+  - New endpoints: GET `/api/ingest/pending-review`, POST `/api/ingest/:id/review` ✓
+  - File: `apps/api/src/routes/ingest.ts` ✓
+  - File: `apps/api/src/services/aiExtractor.ts` ✓
 
-- [ ] **Connect Memo Builder AI generation**
-  - Wire "Regenerate" buttons to OpenAI API
-  - Connect AI chat panel to real conversations
-  - File: `apps/web/memo-builder.js` + `apps/api/src/routes/memos.ts`
+- [x] **Connect Memo Builder AI generation**
+  - Wire "Regenerate" buttons to OpenAI API ✓
+  - Connect AI chat panel to real conversations ✓
+  - File: `apps/web/memo-builder.js` + `apps/api/src/routes/memos.ts` ✓
 
-- [ ] **Implement deal AI chat assistant**
-  - Backend: Add WebSocket support OR use polling
-  - Connect chat UI to `/api/chat/send` endpoint
-  - File: `apps/web/deal.js` + `apps/api/src/routes/chat.ts`
+- [x] **Implement deal AI chat assistant with RAG**
+  - Backend: REST endpoint `/api/deals/:dealId/chat` ✓
+  - RAG with Gemini embeddings + pgvector ✓
+  - Semantic document search for intelligent context ✓
+  - File upload from chat attach button ✓
+  - File: `apps/web/deal.js` + `apps/api/src/routes/deals.ts` ✓
+  - New files: `apps/api/src/rag.ts`, `apps/api/src/gemini.ts` ✓
 
-- [ ] **Add AI analysis caching**
-  - Cache OpenAI responses to reduce API costs
-  - Store in `aiThesis` field on Deal model
+- [x] **Add AI analysis caching**
+  - Cache OpenAI responses to reduce API costs ✓
+  - Store thesis in `aiThesis` field, risks in `aiRisks` field ✓
+  - 24-hour TTL with auto-invalidation on document upload ✓
+  - New endpoints: GET/DELETE `/api/deals/:id/ai-cache` ✓
+  - File: `apps/api/src/services/aiCache.ts` ✓
 
 ### 3. Data Integrity
 

@@ -31,13 +31,16 @@ CREATE TABLE public.AuditLog (
 );
 CREATE TABLE public.ChatMessage (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  conversationId uuid NOT NULL,
-  role text NOT NULL,
+  dealId uuid NOT NULL,
+  userId uuid,
+  role text NOT NULL CHECK (role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])),
   content text NOT NULL,
-  metadata jsonb,
+  metadata jsonb DEFAULT '{}'::jsonb,
   createdAt timestamp with time zone DEFAULT now(),
+  updatedAt timestamp with time zone DEFAULT now(),
   CONSTRAINT ChatMessage_pkey PRIMARY KEY (id),
-  CONSTRAINT ChatMessage_conversationId_fkey FOREIGN KEY (conversationId) REFERENCES public.Conversation(id)
+  CONSTRAINT ChatMessage_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id),
+  CONSTRAINT ChatMessage_userId_fkey FOREIGN KEY (userId) REFERENCES public.User(id)
 );
 CREATE TABLE public.Company (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -107,6 +110,11 @@ CREATE TABLE public.Deal (
   actualCloseDate date,
   source text,
   tags ARRAY,
+  extractionConfidence integer,
+  needsReview boolean DEFAULT false,
+  reviewReasons jsonb DEFAULT '[]'::jsonb,
+  aiRisks jsonb,
+  aiCacheUpdatedAt timestamp with time zone,
   CONSTRAINT Deal_pkey PRIMARY KEY (id),
   CONSTRAINT Deal_companyId_fkey FOREIGN KEY (companyId) REFERENCES public.Company(id),
   CONSTRAINT Deal_assignedTo_fkey FOREIGN KEY (assignedTo) REFERENCES public.User(id)
@@ -141,10 +149,28 @@ CREATE TABLE public.Document (
   isHighlighted boolean DEFAULT false,
   extractedText text,
   status text DEFAULT 'pending'::text,
+  embeddingStatus text DEFAULT 'pending'::text CHECK ("embeddingStatus" = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])),
+  chunkCount integer DEFAULT 0,
+  embeddedAt timestamp with time zone,
   CONSTRAINT Document_pkey PRIMARY KEY (id),
   CONSTRAINT Document_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id),
   CONSTRAINT Document_folderId_fkey FOREIGN KEY (folderId) REFERENCES public.Folder(id),
   CONSTRAINT Document_uploadedBy_fkey FOREIGN KEY (uploadedBy) REFERENCES public.User(id)
+);
+CREATE TABLE public.DocumentChunk (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  documentId uuid NOT NULL,
+  dealId uuid,
+  chunkIndex integer NOT NULL,
+  content text NOT NULL,
+  embedding USER-DEFINED,
+  tokenCount integer,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  createdAt timestamp with time zone DEFAULT now(),
+  updatedAt timestamp with time zone DEFAULT now(),
+  CONSTRAINT DocumentChunk_pkey PRIMARY KEY (id),
+  CONSTRAINT DocumentChunk_documentId_fkey FOREIGN KEY (documentId) REFERENCES public.Document(id),
+  CONSTRAINT DocumentChunk_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id)
 );
 CREATE TABLE public.Folder (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

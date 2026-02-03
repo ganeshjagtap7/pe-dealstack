@@ -7,6 +7,7 @@ import { extractDealDataFromText } from '../services/aiExtractor.js';
 import { AuditLog } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES, FILE_SIZE_LIMITS } from '../services/fileValidator.js';
 import { embedDocument } from '../rag.js';
+import { AICache } from '../services/aiCache.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -371,6 +372,11 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
 
     // Audit log
     await AuditLog.documentUploaded(req, document.id, documentName, dealId);
+
+    // Invalidate AI cache since new document was uploaded
+    // This ensures next thesis/risk analysis uses fresh data
+    await AICache.invalidate(dealId);
+    console.log(`[AICache] Invalidated cache for deal ${dealId} due to document upload`);
 
     // Trigger RAG embedding in background (don't block response)
     if (extractedText && extractedText.length > 0) {

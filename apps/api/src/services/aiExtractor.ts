@@ -1,7 +1,33 @@
 import { openai, isAIEnabled } from '../openai.js';
 
-// Schema for extracted deal data
+// Schema for extracted deal data with confidence scores
+export interface ExtractedField<T> {
+  value: T;
+  confidence: number; // 0-100
+  source?: string; // Quote from document supporting extraction
+}
+
 export interface ExtractedDealData {
+  companyName: ExtractedField<string | null>;
+  industry: ExtractedField<string | null>;
+  description: ExtractedField<string>;
+  revenue: ExtractedField<number | null>;
+  ebitda: ExtractedField<number | null>;
+  ebitdaMargin: ExtractedField<number | null>;
+  revenueGrowth: ExtractedField<number | null>;
+  employees: ExtractedField<number | null>;
+  foundedYear: ExtractedField<number | null>;
+  headquarters: ExtractedField<string | null>;
+  keyRisks: string[];
+  investmentHighlights: string[];
+  summary: string;
+  overallConfidence: number; // Average confidence score
+  needsReview: boolean; // True if any key field has low confidence
+  reviewReasons: string[]; // Why review is needed
+}
+
+// Legacy interface for backwards compatibility
+export interface LegacyExtractedDealData {
   companyName: string | null;
   industry: string | null;
   description: string;
@@ -14,32 +40,85 @@ export interface ExtractedDealData {
   summary: string;
 }
 
-const EXTRACTION_SYSTEM_PROMPT = `You are a senior private equity analyst. Analyze this document and extract key business and financial data. Return valid JSON matching the specified schema. If data is not found, use null for optional fields or empty arrays for list fields.
+const EXTRACTION_SYSTEM_PROMPT = `You are a senior private equity analyst with expertise in analyzing CIMs, teasers, and financial documents. Your task is to extract key business and financial data with HIGH ACCURACY.
 
-Return JSON with exactly this structure:
+CRITICAL INSTRUCTIONS:
+1. Only extract data that is EXPLICITLY stated in the document
+2. For each data point, provide a confidence score (0-100):
+   - 90-100: Data is explicitly stated with clear context
+   - 70-89: Data is clearly implied or calculated from stated figures
+   - 50-69: Data is inferred from partial information
+   - 0-49: Data is estimated or uncertain
+3. Include a source quote for each extraction when confidence is below 90
+4. Financial figures MUST be in millions USD - convert if necessary
+5. If you cannot find data, set value to null with confidence 0
+
+Return JSON with this exact structure:
 {
-  "companyName": string or null - The company name mentioned in the document,
-  "industry": string or null - The industry/sector (e.g., "Healthcare", "Technology", "Manufacturing"),
-  "description": string - A 1-2 sentence description of what the company does,
-  "revenue": number or null - Annual revenue in millions USD (e.g., 50 means $50M),
-  "ebitda": number or null - EBITDA in millions USD,
-  "ebitdaMargin": number or null - EBITDA margin as percentage (e.g., 25 means 25%),
-  "revenueGrowth": number or null - Year-over-year revenue growth as percentage,
-  "keyRisks": string[] - List of 2-5 key risks or concerns,
-  "investmentHighlights": string[] - List of 2-5 positive investment highlights,
-  "summary": string - A 2-3 sentence executive summary of the investment opportunity
+  "companyName": {
+    "value": string or null,
+    "confidence": number (0-100),
+    "source": "quote from document if confidence < 90"
+  },
+  "industry": {
+    "value": string or null (e.g., "Healthcare Services", "Enterprise Software", "Industrial Manufacturing"),
+    "confidence": number (0-100),
+    "source": "quote if needed"
+  },
+  "description": {
+    "value": string - 2-3 sentence business description,
+    "confidence": number (0-100)
+  },
+  "revenue": {
+    "value": number or null - Annual revenue in millions USD,
+    "confidence": number (0-100),
+    "source": "quote showing revenue figure"
+  },
+  "ebitda": {
+    "value": number or null - EBITDA in millions USD,
+    "confidence": number (0-100),
+    "source": "quote showing EBITDA"
+  },
+  "ebitdaMargin": {
+    "value": number or null - EBITDA margin as percentage (e.g., 25.5 means 25.5%),
+    "confidence": number (0-100)
+  },
+  "revenueGrowth": {
+    "value": number or null - YoY revenue growth percentage,
+    "confidence": number (0-100),
+    "source": "quote if available"
+  },
+  "employees": {
+    "value": number or null - Employee count,
+    "confidence": number (0-100)
+  },
+  "foundedYear": {
+    "value": number or null - Year company was founded,
+    "confidence": number (0-100)
+  },
+  "headquarters": {
+    "value": string or null - City, State or City, Country,
+    "confidence": number (0-100)
+  },
+  "keyRisks": ["risk 1", "risk 2", ...] - 3-5 key investment risks,
+  "investmentHighlights": ["highlight 1", ...] - 3-5 positive investment points,
+  "summary": string - 3-4 sentence executive summary of the opportunity
 }
 
-Important:
-- Extract only what is explicitly stated or clearly implied in the document
-- For financial figures, convert to millions USD if given in other units
-- If the document doesn't contain enough information, still provide a summary based on what's available
-- Be concise and professional in your descriptions`;
+COMMON PATTERNS TO LOOK FOR:
+- Revenue: "revenue of $X", "sales of $X", "top-line of $X", "$X in revenue"
+- EBITDA: "EBITDA of $X", "Adjusted EBITDA", "run-rate EBITDA"
+- Company Name: Usually in header, "Company Overview", or "About [Company]"
+- Industry: Look for sector descriptions, market focus, business type
+
+FINANCIAL CONVERSION:
+- "50 million" or "$50M" or "$50,000,000" = 50
+- "1.5 billion" or "$1.5B" = 1500
+- Remove commas and convert to number`;
 
 /**
  * Extract structured deal data from document text using AI
- * @param text - The extracted text from the document
- * @returns Extracted deal data or null if extraction fails
+ * Returns data with confidence scores for manual review
  */
 export async function extractDealDataFromText(text: string): Promise<ExtractedDealData | null> {
   if (!isAIEnabled() || !openai) {
@@ -53,10 +132,10 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
   }
 
   try {
-    // Truncate text to first 15,000 characters to stay within token limits
-    const truncatedText = text.slice(0, 15000);
+    // Use more text for better extraction (up to 20,000 chars)
+    const truncatedText = text.slice(0, 20000);
 
-    console.log(`Starting AI extraction for ${truncatedText.length} characters...`);
+    console.log(`[AI Extraction] Starting for ${truncatedText.length} characters...`);
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo',
@@ -67,47 +146,138 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
         },
         {
           role: 'user',
-          content: `Analyze this document and extract the key business and financial data:\n\n${truncatedText}`,
+          content: `Analyze this document and extract business/financial data with confidence scores:\n\n${truncatedText}`,
         },
       ],
       response_format: { type: 'json_object' },
-      temperature: 0.1, // Low temperature for more consistent extraction
-      max_tokens: 2000,
+      temperature: 0.1, // Very low for consistency
+      max_tokens: 3000,
     });
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      console.error('AI extraction failed: No response content');
+      console.error('[AI Extraction] Failed: No response content');
       return null;
     }
 
-    const extracted = JSON.parse(content) as ExtractedDealData;
+    const extracted = JSON.parse(content);
 
-    // Validate required fields have at least default values
+    // Build result with proper defaults
     const result: ExtractedDealData = {
-      companyName: extracted.companyName || null,
-      industry: extracted.industry || null,
-      description: extracted.description || 'No description available',
-      revenue: typeof extracted.revenue === 'number' ? extracted.revenue : null,
-      ebitda: typeof extracted.ebitda === 'number' ? extracted.ebitda : null,
-      ebitdaMargin: typeof extracted.ebitdaMargin === 'number' ? extracted.ebitdaMargin : null,
-      revenueGrowth: typeof extracted.revenueGrowth === 'number' ? extracted.revenueGrowth : null,
+      companyName: normalizeField(extracted.companyName, null),
+      industry: normalizeField(extracted.industry, null),
+      description: normalizeField(extracted.description, 'No description available'),
+      revenue: normalizeNumericField(extracted.revenue),
+      ebitda: normalizeNumericField(extracted.ebitda),
+      ebitdaMargin: normalizeNumericField(extracted.ebitdaMargin),
+      revenueGrowth: normalizeNumericField(extracted.revenueGrowth),
+      employees: normalizeNumericField(extracted.employees),
+      foundedYear: normalizeNumericField(extracted.foundedYear),
+      headquarters: normalizeField(extracted.headquarters, null),
       keyRisks: Array.isArray(extracted.keyRisks) ? extracted.keyRisks : [],
       investmentHighlights: Array.isArray(extracted.investmentHighlights) ? extracted.investmentHighlights : [],
       summary: extracted.summary || 'Unable to generate summary from document',
+      overallConfidence: 0,
+      needsReview: false,
+      reviewReasons: [],
     };
 
-    console.log('AI extraction completed successfully:', {
-      companyName: result.companyName,
-      industry: result.industry,
-      hasFinancials: result.revenue !== null || result.ebitda !== null,
-      risksCount: result.keyRisks.length,
-      highlightsCount: result.investmentHighlights.length,
+    // Calculate overall confidence and determine if review is needed
+    const confidenceScores: number[] = [];
+    const reviewReasons: string[] = [];
+
+    // Check critical fields
+    if (result.companyName.confidence < 70) {
+      reviewReasons.push(`Company name uncertain (${result.companyName.confidence}% confidence)`);
+    }
+    if (result.companyName.value) confidenceScores.push(result.companyName.confidence);
+
+    if (result.industry.confidence < 70) {
+      reviewReasons.push(`Industry uncertain (${result.industry.confidence}% confidence)`);
+    }
+    if (result.industry.value) confidenceScores.push(result.industry.confidence);
+
+    if (result.revenue.value !== null) {
+      if (result.revenue.confidence < 70) {
+        reviewReasons.push(`Revenue uncertain: $${result.revenue.value}M (${result.revenue.confidence}% confidence)`);
+      }
+      confidenceScores.push(result.revenue.confidence);
+    }
+
+    if (result.ebitda.value !== null) {
+      if (result.ebitda.confidence < 70) {
+        reviewReasons.push(`EBITDA uncertain: $${result.ebitda.value}M (${result.ebitda.confidence}% confidence)`);
+      }
+      confidenceScores.push(result.ebitda.confidence);
+    }
+
+    // Calculate average confidence
+    result.overallConfidence = confidenceScores.length > 0
+      ? Math.round(confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length)
+      : 0;
+
+    result.needsReview = reviewReasons.length > 0 || result.overallConfidence < 70;
+    result.reviewReasons = reviewReasons;
+
+    console.log('[AI Extraction] Completed:', {
+      companyName: result.companyName.value,
+      companyConfidence: result.companyName.confidence,
+      industry: result.industry.value,
+      industryConfidence: result.industry.confidence,
+      revenue: result.revenue.value,
+      revenueConfidence: result.revenue.confidence,
+      ebitda: result.ebitda.value,
+      ebitdaConfidence: result.ebitda.confidence,
+      overallConfidence: result.overallConfidence,
+      needsReview: result.needsReview,
+      reviewReasons: result.reviewReasons,
     });
 
     return result;
   } catch (error) {
-    console.error('AI extraction error:', error);
+    console.error('[AI Extraction] Error:', error);
     return null;
   }
+}
+
+/**
+ * Convert new format to legacy format for backward compatibility
+ */
+export function toLegacyFormat(data: ExtractedDealData): LegacyExtractedDealData {
+  return {
+    companyName: data.companyName.value,
+    industry: data.industry.value,
+    description: data.description.value,
+    revenue: data.revenue.value,
+    ebitda: data.ebitda.value,
+    ebitdaMargin: data.ebitdaMargin.value,
+    revenueGrowth: data.revenueGrowth.value,
+    keyRisks: data.keyRisks,
+    investmentHighlights: data.investmentHighlights,
+    summary: data.summary,
+  };
+}
+
+// Helper functions
+function normalizeField<T>(field: any, defaultValue: T): ExtractedField<T> {
+  if (!field || typeof field !== 'object') {
+    return { value: defaultValue, confidence: 0 };
+  }
+  return {
+    value: field.value ?? defaultValue,
+    confidence: typeof field.confidence === 'number' ? field.confidence : 0,
+    source: field.source,
+  };
+}
+
+function normalizeNumericField(field: any): ExtractedField<number | null> {
+  if (!field || typeof field !== 'object') {
+    return { value: null, confidence: 0 };
+  }
+  const value = typeof field.value === 'number' ? field.value : null;
+  return {
+    value,
+    confidence: typeof field.confidence === 'number' ? field.confidence : 0,
+    source: field.source,
+  };
 }

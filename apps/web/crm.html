@@ -505,6 +505,32 @@ function clearAllFilters() {
     loadDeals();
 }
 
+// Update industry filter dropdown dynamically based on deals data
+function updateIndustryFilter(deals) {
+    const industries = [...new Set(deals.map(d => d.industry).filter(Boolean))].sort();
+    const dropdown = document.getElementById('industry-dropdown');
+
+    dropdown.innerHTML = `
+        <button data-industry="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">All Industries</button>
+        ${industries.map(ind =>
+            `<button data-industry="${ind}" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">${ind}</button>`
+        ).join('')}
+    `;
+
+    // Re-attach click handlers
+    dropdown.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            filters.industry = btn.dataset.industry;
+            document.getElementById('industry-filter-text').textContent = filters.industry
+                ? `Industry: ${filters.industry}`
+                : 'Industry: All';
+            dropdown.classList.add('hidden');
+            updateClearFiltersButton();
+            loadDeals();
+        });
+    });
+}
+
 // Load deals from API
 async function loadDeals() {
     const grid = document.getElementById('deals-grid');
@@ -525,6 +551,9 @@ async function loadDeals() {
 
         const deals = await response.json();
         allDeals = deals; // Store for bulk operations
+
+        // Update industry filter with actual industries from deals
+        updateIndustryFilter(deals);
 
         // Update deal count
         const activeDeals = deals.filter(d => d.status !== 'PASSED').length;

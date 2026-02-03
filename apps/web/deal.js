@@ -16,6 +16,61 @@ const state = {
 };
 
 // ============================================================
+// Markdown Parser for AI Responses
+// ============================================================
+function parseMarkdown(text) {
+    if (!text) return '';
+
+    // Escape HTML first to prevent XSS
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // Bold: **text** or __text__
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
+
+    // Italic: *text* or _text_
+    html = html.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    html = html.replace(/_(.+?)_/g, '<em>$1</em>');
+
+    // Code: `text`
+    html = html.replace(/`(.+?)`/g, '<code class="bg-bg-tertiary px-1 py-0.5 rounded text-xs">$1</code>');
+
+    // Split into paragraphs
+    const paragraphs = html.split(/\n\n+/);
+
+    return paragraphs.map(para => {
+        // Check if it's a numbered list
+        const lines = para.split('\n');
+        const isNumberedList = lines.every(line => /^\d+\.\s/.test(line.trim()) || line.trim() === '');
+
+        if (isNumberedList && lines.some(line => /^\d+\.\s/.test(line.trim()))) {
+            const items = lines
+                .filter(line => /^\d+\.\s/.test(line.trim()))
+                .map(line => `<li class="ml-4">${line.replace(/^\d+\.\s/, '')}</li>`)
+                .join('');
+            return `<ol class="list-decimal list-inside space-y-1 my-2">${items}</ol>`;
+        }
+
+        // Check if it's a bullet list
+        const isBulletList = lines.every(line => /^[-•]\s/.test(line.trim()) || line.trim() === '');
+
+        if (isBulletList && lines.some(line => /^[-•]\s/.test(line.trim()))) {
+            const items = lines
+                .filter(line => /^[-•]\s/.test(line.trim()))
+                .map(line => `<li class="ml-4">${line.replace(/^[-•]\s/, '')}</li>`)
+                .join('');
+            return `<ul class="list-disc list-inside space-y-1 my-2">${items}</ul>`;
+        }
+
+        // Regular paragraph - convert single newlines to <br>
+        return `<p class="my-2">${para.replace(/\n/g, '<br>')}</p>`;
+    }).join('');
+}
+
+// ============================================================
 // API Functions
 // ============================================================
 function getDealIdFromUrl() {
@@ -782,6 +837,9 @@ function initChatInterface() {
 
     if (!textarea || !sendButton) return;
 
+    // Load chat history from database
+    loadChatHistory();
+
     // Auto-resize textarea
     textarea.addEventListener('input', function() {
         this.style.height = 'auto';
@@ -858,6 +916,85 @@ function initChatInterface() {
     }
 }
 
+// Load chat history from database
+async function loadChatHistory() {
+    if (!state.dealId) return;
+
+    try {
+        console.log('[Chat] Loading chat history...');
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/chat/history`);
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log(`[Chat] Loaded ${data.count} messages from history`);
+
+            if (data.messages && data.messages.length > 0) {
+                // Clear the default intro message
+                const chatContainer = document.getElementById('chat-messages');
+                const introMessage = chatContainer?.querySelector('.ai-intro-message');
+                if (introMessage) {
+                    introMessage.remove();
+                }
+
+                // Render each message
+                data.messages.forEach(msg => {
+                    if (msg.role === 'user') {
+                        addUserMessageFromHistory(msg.content);
+                    } else if (msg.role === 'assistant') {
+                        addAIResponseFromHistory(msg.content);
+                    }
+                    // Store in local state for context
+                    state.messages.push({ role: msg.role, content: msg.content });
+                });
+
+                scrollToBottom();
+            }
+        }
+    } catch (error) {
+        console.error('[Chat] Failed to load chat history:', error);
+    }
+}
+
+// Add user message from history (no animation)
+function addUserMessageFromHistory(content) {
+    const chatContainer = document.getElementById('chat-messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex gap-4 max-w-[80%] self-end flex-row-reverse';
+    messageDiv.innerHTML = `
+        <div class="size-8 rounded-full bg-border-subtle border border-white shrink-0 overflow-hidden shadow-sm">
+            <img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk"/>
+        </div>
+        <div class="flex flex-col gap-1 items-end">
+            <span class="text-xs font-bold text-text-muted mr-1">You</span>
+            <div class="bg-white text-text-main border border-border-subtle rounded-2xl rounded-tr-none p-4 text-sm shadow-sm">
+                <p>${escapeHtml(content)}</p>
+            </div>
+        </div>
+    `;
+    chatContainer.appendChild(messageDiv);
+}
+
+// Add AI response from history (no animation)
+function addAIResponseFromHistory(content) {
+    const chatContainer = document.getElementById('chat-messages');
+    const formattedResponse = parseMarkdown(content);
+
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex gap-4 max-w-[90%]';
+    messageDiv.innerHTML = `
+        <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
+            <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
+        </div>
+        <div class="flex flex-col gap-1">
+            <span class="text-xs font-bold text-text-muted ml-1">PE OS AI <span class="text-primary/60 font-normal">• GPT-4</span></span>
+            <div class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
+                ${formattedResponse}
+            </div>
+        </div>
+    `;
+    chatContainer.appendChild(messageDiv);
+}
+
 function addUserMessage(message) {
     const chatContainer = document.getElementById('chat-messages');
     const messageDiv = document.createElement('div');
@@ -925,10 +1062,10 @@ function addSystemMessage(message, icon = 'info') {
 function addAIResponseFromAPI(responseText) {
     const chatContainer = document.getElementById('chat-messages');
 
-    // Format the response (add paragraph tags if needed)
+    // Format the response with markdown parsing
     const formattedResponse = responseText.startsWith('<')
         ? responseText
-        : `<p>${responseText.replace(/\n\n/g, '</p><p>').replace(/\n/g, '<br>')}</p>`;
+        : parseMarkdown(responseText);
 
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex gap-4 max-w-[90%] animate-fadeIn';
