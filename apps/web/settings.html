@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Settings - PE OS</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <link href="https://fonts.googleapis.com" rel="preconnect">
+    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script id="tailwind-config">
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#003366",
+                        "primary-hover": "#002855",
+                        "primary-light": "#E6EEF5",
+                        "secondary": "#059669",
+                        "secondary-light": "#D1FAE5",
+                        "background-body": "#F8F9FA",
+                        "surface-card": "#FFFFFF",
+                        "border-subtle": "#E5E7EB",
+                        "border-focus": "#CBD5E1",
+                        "text-main": "#111827",
+                        "text-secondary": "#4B5563",
+                        "text-muted": "#9CA3AF",
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"],
+                        "display": ["Inter", "sans-serif"],
+                    },
+                    boxShadow: {
+                        "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                        "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.5rem",
+                        "md": "0.375rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+        body { font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased; }
+
+        /* Settings nav active state */
+        .settings-nav-item.active {
+            background: #E6EEF5;
+            color: #003366;
+            border-color: #003366;
+        }
+        .settings-nav-item.active .material-symbols-outlined {
+            font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        /* Slider styles */
+        .slider-container { position: relative; height: 24px; }
+        .slider-track { height: 6px; background: #E5E7EB; border-radius: 9999px; position: absolute; top: 50%; transform: translateY(-50%); width: 100%; }
+        .slider-fill { position: absolute; height: 6px; background: #003366; border-radius: 9999px; top: 50%; transform: translateY(-50%); }
+        .slider-thumb {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: white;
+            border: 3px solid #003366;
+            border-radius: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            transition: transform 0.1s ease;
+        }
+        .slider-thumb:hover { transform: translate(-50%, -50%) scale(1.1); }
+
+        /* Tag styles */
+        .sector-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            background: #F8F9FA;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #111827;
+        }
+        .sector-tag button { color: #9CA3AF; transition: color 0.15s; }
+        .sector-tag button:hover { color: #EF4444; }
+    </style>
+</head>
+<body class="bg-background-body text-text-main font-sans overflow-hidden">
+    <div class="flex h-screen w-full overflow-hidden">
+        <!-- Sidebar (injected by layout.js) -->
+        <div id="sidebar-root"></div>
+
+        <!-- Main Content -->
+        <main class="flex h-full flex-1 flex-col overflow-hidden bg-background-body">
+            <!-- Header (injected by layout.js) -->
+            <div id="header-root"></div>
+
+            <!-- Settings Content -->
+            <div class="flex-1 overflow-y-auto custom-scrollbar">
+                <div class="mx-auto max-w-[1400px] p-6">
+                    <!-- Page Header -->
+                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
+                        <div class="flex flex-col gap-1">
+                            <div class="flex items-center gap-2 text-sm text-text-muted mb-1">
+                                <a href="dashboard.html" class="hover:text-primary transition-colors">Dashboard</a>
+                                <span class="material-symbols-outlined text-[16px]">chevron_right</span>
+                                <span class="text-text-main font-medium">Settings</span>
+                            </div>
+                            <h1 class="text-2xl font-bold text-text-main tracking-tight">User Profile & Personalization</h1>
+                            <p class="text-text-secondary text-sm">Configure your professional identity and tune the platform's AI behavior.</p>
+                        </div>
+                        <div class="flex gap-3">
+                            <button id="cancel-btn" class="px-4 py-2.5 bg-white border border-border-subtle text-text-main text-sm font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-card">
+                                Cancel
+                            </button>
+                            <button id="save-btn" class="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-sm font-semibold rounded-lg shadow-card transition-colors flex items-center gap-2 disabled:opacity-50">
+                                <span class="material-symbols-outlined text-[18px] hidden animate-spin" id="save-spinner">sync</span>
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Settings Layout -->
+                    <div class="flex gap-6">
+                        <!-- Settings Sidebar -->
+                        <aside class="hidden lg:block w-56 shrink-0">
+                            <nav class="sticky top-6 flex flex-col gap-1">
+                                <a href="#general" data-section="general" class="settings-nav-item active flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">person</span>
+                                    <span class="text-sm font-medium">General</span>
+                                </a>
+                                <a href="#ai" data-section="ai" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">auto_awesome</span>
+                                    <span class="text-sm font-medium">AI Preferences</span>
+                                </a>
+                                <a href="#interface" data-section="interface" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">display_settings</span>
+                                    <span class="text-sm font-medium">Interface</span>
+                                </a>
+                                <a href="#security" data-section="security" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">shield</span>
+                                    <span class="text-sm font-medium">Security</span>
+                                </a>
+                                <a href="#notifications" data-section="notifications" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">notifications</span>
+                                    <span class="text-sm font-medium">Notifications</span>
+                                </a>
+                            </nav>
+                        </aside>
+
+                        <!-- Settings Content -->
+                        <div class="flex-1 flex flex-col gap-6 min-w-0">
+                            <!-- Profile Section -->
+                            <section id="section-general" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="p-6 border-b border-border-subtle bg-gradient-to-r from-white to-gray-50/50">
+                                    <div class="flex flex-col sm:flex-row items-center sm:items-start gap-6">
+                                        <!-- Avatar -->
+                                        <div class="relative group">
+                                            <div id="profile-avatar" class="w-24 h-24 rounded-full bg-cover bg-center border-4 border-white shadow-card-hover bg-primary flex items-center justify-center text-white text-2xl font-bold"></div>
+                                            <button id="avatar-upload-btn" class="absolute bottom-0 right-0 p-2 bg-primary text-white rounded-full shadow-lg hover:bg-primary-hover transition-colors border-2 border-white">
+                                                <span class="material-symbols-outlined text-[14px] block">photo_camera</span>
+                                            </button>
+                                            <input type="file" id="avatar-input" accept="image/*" class="hidden">
+                                        </div>
+                                        <!-- Info -->
+                                        <div class="flex-1 text-center sm:text-left">
+                                            <h3 id="profile-display-name" class="text-xl font-bold text-text-main">Loading...</h3>
+                                            <p id="profile-subtitle" class="text-text-secondary font-medium mb-3">-</p>
+                                            <div class="flex justify-center sm:justify-start gap-2 flex-wrap">
+                                                <span id="role-badge" class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-primary-light text-primary border border-primary/20">
+                                                    -
+                                                </span>
+                                                <span class="inline-flex items-center px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-secondary-light text-secondary border border-secondary/20">
+                                                    <span class="material-symbols-outlined text-[12px] mr-1">verified</span> Verified
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Form Fields -->
+                                <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Full Name</label>
+                                        <input id="input-name" type="text" class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm" placeholder="Your full name">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Email Address</label>
+                                        <input id="input-email" type="email" class="w-full rounded-lg border border-border-subtle bg-gray-50 text-text-muted text-sm font-medium h-11 px-4 cursor-not-allowed" readonly>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Role / Title</label>
+                                        <input id="input-title" type="text" class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm" placeholder="e.g. Senior Investment Analyst">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Firm Association</label>
+                                        <div class="flex items-center justify-between w-full rounded-lg border border-border-subtle bg-gray-50 text-text-muted text-sm font-medium h-11 px-4">
+                                            <span id="input-firm">-</span>
+                                            <span class="material-symbols-outlined text-[18px]">lock</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- AI Tailoring Section -->
+                            <section id="section-ai" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="px-6 py-5 border-b border-border-subtle flex items-center gap-3">
+                                    <div class="p-2 bg-secondary-light rounded-lg text-secondary border border-secondary/20">
+                                        <span class="material-symbols-outlined text-[20px] block">psychology</span>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-base font-bold text-text-main">AI Assistant Tailoring</h2>
+                                        <p class="text-xs text-text-muted">Configure how the AI prioritizes market signals and investment opportunities.</p>
+                                    </div>
+                                </div>
+                                <div class="p-6 space-y-8">
+                                    <!-- Investment Focus -->
+                                    <div>
+                                        <label class="text-xs font-bold text-text-secondary uppercase tracking-wider mb-3 block">Primary Investment Focus</label>
+                                        <div id="sectors-container" class="flex flex-wrap gap-2 mb-2">
+                                            <!-- Sectors rendered here -->
+                                        </div>
+                                        <p class="text-[11px] text-text-muted italic">These sectors will weight higher in the Market Intelligence Hub dashboard.</p>
+                                    </div>
+
+                                    <!-- Sourcing Sensitivity -->
+                                    <div>
+                                        <div class="flex justify-between items-center mb-4">
+                                            <label class="text-xs font-bold text-text-secondary uppercase tracking-wider">Sourcing Sensitivity</label>
+                                            <span id="sensitivity-label" class="text-[11px] font-bold text-primary bg-primary-light px-2.5 py-1 rounded-md uppercase tracking-wider border border-primary/20">Balanced</span>
+                                        </div>
+                                        <div class="slider-container">
+                                            <div class="slider-track"></div>
+                                            <div id="slider-fill" class="slider-fill" style="width: 50%"></div>
+                                            <div id="slider-thumb" class="slider-thumb" style="left: 50%"></div>
+                                        </div>
+                                        <div class="flex justify-between mt-3 text-[11px] text-text-muted font-semibold uppercase tracking-wider">
+                                            <span>Broad Market</span>
+                                            <span>High Precision</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Interface Customization -->
+                            <section id="section-interface" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="px-6 py-5 border-b border-border-subtle flex items-center gap-3">
+                                    <div class="p-2 bg-gray-100 rounded-lg text-text-secondary border border-border-subtle">
+                                        <span class="material-symbols-outlined text-[20px] block">display_settings</span>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-base font-bold text-text-main">Interface Customization</h2>
+                                        <p class="text-xs text-text-muted">Optimize the platform layout for your specific workflow requirements.</p>
+                                    </div>
+                                </div>
+                                <div class="p-6 space-y-6">
+                                    <!-- Typography -->
+                                    <div>
+                                        <label class="text-xs font-bold text-text-secondary uppercase tracking-wider mb-3 block">Typography Framework</label>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div id="typo-modern" class="typo-option cursor-pointer rounded-xl border-2 border-primary bg-primary-light/30 p-4 shadow-sm transition-all">
+                                                <div class="flex items-center justify-between mb-2">
+                                                    <span class="text-sm font-bold text-primary">Modern Sans</span>
+                                                    <span class="material-symbols-outlined text-primary text-[18px]" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+                                                </div>
+                                                <span class="text-xs text-text-muted block mb-3">Inter font optimized for dashboards and data grids.</span>
+                                                <div class="text-2xl font-bold text-text-main bg-white p-3 rounded-lg border border-primary/20 text-center">Ag</div>
+                                            </div>
+                                            <div id="typo-serif" class="typo-option cursor-pointer rounded-xl border border-border-subtle bg-white p-4 shadow-sm hover:border-gray-300 transition-all group">
+                                                <div class="flex items-center justify-between mb-2">
+                                                    <span class="text-sm font-semibold text-text-main">Institutional Serif</span>
+                                                    <span class="material-symbols-outlined text-gray-300 group-hover:text-gray-400 text-[18px]">circle</span>
+                                                </div>
+                                                <span class="text-xs text-text-muted block mb-3">Classic serif style for professional reports.</span>
+                                                <div class="text-2xl font-bold text-text-main bg-gray-50 p-3 rounded-lg border border-border-subtle text-center font-serif">Ag</div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="border-t border-border-subtle"></div>
+
+                                    <!-- Density -->
+                                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div>
+                                            <span class="text-xs font-bold text-text-secondary uppercase tracking-wider block">Information Density</span>
+                                            <span class="text-xs text-text-muted block mt-1">Adjust padding and font scaling for complex financial models.</span>
+                                        </div>
+                                        <div id="density-toggle" class="inline-flex bg-gray-100 p-1 rounded-lg border border-border-subtle">
+                                            <button data-density="compact" class="density-btn px-4 py-2 text-xs font-bold text-text-muted hover:text-text-main transition-colors rounded-md">Compact</button>
+                                            <button data-density="default" class="density-btn active px-4 py-2 bg-white text-xs font-bold text-primary shadow-sm rounded-md border border-border-subtle">Default</button>
+                                            <button data-density="relaxed" class="density-btn px-4 py-2 text-xs font-bold text-text-muted hover:text-text-main transition-colors rounded-md">Relaxed</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Security Section (Placeholder) -->
+                            <section id="section-security" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="px-6 py-5 border-b border-border-subtle flex items-center gap-3">
+                                    <div class="p-2 bg-gray-100 rounded-lg text-text-secondary border border-border-subtle">
+                                        <span class="material-symbols-outlined text-[20px] block">shield</span>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-base font-bold text-text-main">Security</h2>
+                                        <p class="text-xs text-text-muted">Manage your password and account security settings.</p>
+                                    </div>
+                                </div>
+                                <div class="p-6">
+                                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-border-subtle">
+                                        <div>
+                                            <p class="text-sm font-semibold text-text-main">Password</p>
+                                            <p class="text-xs text-text-muted">Last changed 30 days ago</p>
+                                        </div>
+                                        <button class="px-4 py-2 bg-white border border-border-subtle text-text-main text-sm font-medium rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">
+                                            Change Password
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Deactivate Account -->
+                            <div class="flex items-center justify-between p-5 bg-red-50 border border-red-200 rounded-xl">
+                                <div>
+                                    <h4 class="text-sm font-bold text-red-700">Deactivate Professional Account</h4>
+                                    <p class="text-xs text-red-600/80">Temporarily disable your analyst profile and data access.</p>
+                                </div>
+                                <button id="deactivate-btn" class="px-4 py-2 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50 transition-colors shadow-sm">
+                                    Deactivate
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add Sector Modal -->
+    <div id="add-sector-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-border-subtle">
+            <div class="px-6 py-4 border-b border-border-subtle flex items-center justify-between bg-gray-50">
+                <h3 class="font-bold text-text-main">Add Investment Sector</h3>
+                <button id="close-sector-modal" class="text-text-muted hover:text-text-main transition-colors p-1 hover:bg-gray-200 rounded">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+            <div class="p-6">
+                <input id="sector-input" type="text" class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 mb-4 shadow-sm" placeholder="e.g. Healthcare IT, FinTech, SaaS...">
+                <div class="flex gap-2 flex-wrap mb-4">
+                    <button class="preset-sector px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-primary-light hover:text-primary border border-border-subtle rounded-lg transition-colors">Healthcare IT</button>
+                    <button class="preset-sector px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-primary-light hover:text-primary border border-border-subtle rounded-lg transition-colors">SaaS</button>
+                    <button class="preset-sector px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-primary-light hover:text-primary border border-border-subtle rounded-lg transition-colors">FinTech</button>
+                    <button class="preset-sector px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-primary-light hover:text-primary border border-border-subtle rounded-lg transition-colors">Consumer</button>
+                    <button class="preset-sector px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-primary-light hover:text-primary border border-border-subtle rounded-lg transition-colors">Industrial</button>
+                    <button class="preset-sector px-3 py-1.5 text-xs font-medium bg-gray-100 hover:bg-primary-light hover:text-primary border border-border-subtle rounded-lg transition-colors">Real Estate</button>
+                </div>
+                <button id="add-sector-btn" class="w-full py-2.5 bg-primary hover:bg-primary-hover text-white text-sm font-semibold rounded-lg transition-colors shadow-card">
+                    Add Sector
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-white border border-border-subtle rounded-xl shadow-card-hover p-4 flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <span id="toast-icon" class="material-symbols-outlined text-secondary">check_circle</span>
+        <span id="toast-message" class="text-sm font-medium text-text-main">Changes saved successfully</span>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/layout.js"></script>
+    <script src="js/notificationCenter.js"></script>
+    <script src="js/globalSearch.js"></script>
+    <script>
+const API_BASE_URL = 'http://localhost:3001/api';
+
+// State
+let currentUser = null;
+let hasChanges = false;
+let investmentFocus = [];
+let sourcingSensitivity = 50;
+let typography = 'modern';
+let density = 'default';
+
+// Initialize
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        await PEAuth.initSupabase();
+        const auth = await PEAuth.checkAuth();
+        if (!auth) return;
+
+        // Initialize shared layout
+        PELayout.init('settings', { collapsible: true });
+
+        await loadUserProfile();
+        initializeEventListeners();
+        initializeSlider();
+    } catch (err) {
+        console.error('Initialization error:', err);
+    }
+});
+
+// Load user profile
+async function loadUserProfile() {
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/users/me`);
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMsg = errorData.error?.message || errorData.error || 'Failed to load profile';
+            throw new Error(errorMsg);
+        }
+
+        currentUser = await response.json();
+        console.log('Loaded user:', currentUser);
+
+        // Parse preferences if they exist (could be JSON string or object)
+        if (currentUser.preferences) {
+            const prefs = typeof currentUser.preferences === 'string'
+                ? JSON.parse(currentUser.preferences)
+                : currentUser.preferences;
+
+            investmentFocus = Array.isArray(prefs.investmentFocus) ? prefs.investmentFocus : [];
+            sourcingSensitivity = typeof prefs.sourcingSensitivity === 'number' ? prefs.sourcingSensitivity : 50;
+            typography = prefs.typography || 'modern';
+            density = prefs.density || 'default';
+        }
+
+        renderProfile();
+    } catch (error) {
+        console.error('Error loading profile:', error);
+        // Show error message as string
+        const message = typeof error === 'string' ? error : (error?.message || 'Failed to load profile');
+        showToast(message, 'error');
+
+        // Still try to render with whatever data we have
+        if (currentUser) renderProfile();
+    }
+}
+
+// Render profile data
+function renderProfile() {
+    if (!currentUser) {
+        console.warn('No user data to render');
+        return;
+    }
+
+    try {
+        // Profile header section
+        const displayName = document.getElementById('profile-display-name');
+        const subtitle = document.getElementById('profile-subtitle');
+        const roleBadge = document.getElementById('role-badge');
+
+        if (displayName) displayName.textContent = currentUser.name || 'User';
+        if (subtitle) {
+            const titlePart = currentUser.title || 'Team Member';
+            const firmPart = currentUser.firmName ? ` • ${currentUser.firmName}` : '';
+            subtitle.textContent = titlePart + firmPart;
+        }
+
+        setAvatar('profile-avatar', currentUser);
+
+        if (roleBadge) roleBadge.textContent = getRoleLabel(currentUser.role);
+
+        // Form fields
+        const nameInput = document.getElementById('input-name');
+        const emailInput = document.getElementById('input-email');
+        const titleInput = document.getElementById('input-title');
+        const firmDisplay = document.getElementById('input-firm');
+
+        if (nameInput) nameInput.value = currentUser.name || '';
+        if (emailInput) emailInput.value = currentUser.email || '';
+        if (titleInput) titleInput.value = currentUser.title || '';
+        if (firmDisplay) firmDisplay.textContent = currentUser.firmName || 'Not assigned';
+
+        // Investment focus tags
+        renderSectors();
+
+        // Sensitivity slider
+        updateSlider(sourcingSensitivity);
+
+        // Typography
+        updateTypography(typography);
+
+        // Density
+        updateDensity(density);
+
+        console.log('Profile rendered successfully');
+    } catch (err) {
+        console.error('Error in renderProfile:', err);
+    }
+}
+
+function setAvatar(elementId, user) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    if (user.avatar) {
+        el.style.backgroundImage = `url('${user.avatar}')`;
+        el.textContent = '';
+    } else {
+        el.style.backgroundImage = '';
+        const initials = (user.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        el.innerHTML = `<span class="text-2xl">${initials}</span>`;
+    }
+}
+
+function getRoleLabel(role) {
+    const labels = { ADMIN: 'Admin', MEMBER: 'Member', VIEWER: 'Analyst' };
+    return labels[role] || role || 'Member';
+}
+
+// Render sectors
+function renderSectors() {
+    const container = document.getElementById('sectors-container');
+    if (!container) return;
+
+    // Ensure investmentFocus is an array
+    const sectors = Array.isArray(investmentFocus) ? investmentFocus : [];
+
+    const sectorTags = sectors.map(sector => `
+        <div class="sector-tag">
+            ${escapeHtml(sector)}
+            <button onclick="removeSector('${escapeHtml(sector)}')">
+                <span class="material-symbols-outlined text-[14px]">close</span>
+            </button>
+        </div>
+    `).join('');
+
+    const addButton = `
+        <button onclick="openSectorModal()" class="inline-flex items-center bg-white hover:bg-primary-light border border-dashed border-gray-300 hover:border-primary rounded-lg px-3 py-1.5 text-sm font-semibold text-primary transition-colors">
+            <span class="material-symbols-outlined text-[16px] mr-1">add</span> Add Sector
+        </button>
+    `;
+
+    container.innerHTML = sectorTags + addButton;
+}
+
+// Helper to escape HTML
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+}
+
+function removeSector(sector) {
+    investmentFocus = investmentFocus.filter(s => s !== sector);
+    renderSectors();
+    markChanged();
+}
+
+function addSector(sector) {
+    if (sector && !investmentFocus.includes(sector)) {
+        investmentFocus.push(sector);
+        renderSectors();
+        markChanged();
+    }
+    closeSectorModal();
+}
+
+function openSectorModal() {
+    document.getElementById('add-sector-modal').classList.remove('hidden');
+    document.getElementById('add-sector-modal').classList.add('flex');
+    document.getElementById('sector-input').focus();
+}
+
+function closeSectorModal() {
+    document.getElementById('add-sector-modal').classList.add('hidden');
+    document.getElementById('add-sector-modal').classList.remove('flex');
+    document.getElementById('sector-input').value = '';
+}
+
+// Slider
+function initializeSlider() {
+    const thumb = document.getElementById('slider-thumb');
+    if (!thumb) return;
+
+    const container = thumb.parentElement;
+    if (!container) return;
+
+    let isDragging = false;
+
+    const updateValue = (clientX) => {
+        const rect = container.getBoundingClientRect();
+        let percent = ((clientX - rect.left) / rect.width) * 100;
+        percent = Math.max(0, Math.min(100, percent));
+
+        sourcingSensitivity = Math.round(percent);
+        updateSlider(sourcingSensitivity);
+        markChanged();
+    };
+
+    thumb.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (isDragging) updateValue(e.clientX);
+    });
+
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+    });
+
+    container.addEventListener('click', (e) => {
+        if (e.target !== thumb) updateValue(e.clientX);
+    });
+}
+
+function updateSlider(value) {
+    const fill = document.getElementById('slider-fill');
+    const thumb = document.getElementById('slider-thumb');
+    const label = document.getElementById('sensitivity-label');
+
+    if (fill) fill.style.width = `${value}%`;
+    if (thumb) thumb.style.left = `${value}%`;
+
+    if (label) {
+        if (value < 33) {
+            label.textContent = 'Broad Market';
+        } else if (value < 66) {
+            label.textContent = 'Balanced';
+        } else {
+            label.textContent = 'Thesis Specific';
+        }
+    }
+}
+
+// Typography
+function updateTypography(type) {
+    typography = type;
+    const modern = document.getElementById('typo-modern');
+    const serif = document.getElementById('typo-serif');
+
+    if (!modern || !serif) return;
+
+    const modernIcon = modern.querySelector('.material-symbols-outlined');
+    const serifIcon = serif.querySelector('.material-symbols-outlined');
+
+    if (type === 'modern') {
+        modern.classList.add('border-primary', 'bg-primary-light/30', 'border-2');
+        modern.classList.remove('border-border-subtle', 'border', 'bg-white');
+        if (modernIcon) {
+            modernIcon.style.fontVariationSettings = "'FILL' 1";
+            modernIcon.textContent = 'check_circle';
+            modernIcon.classList.add('text-primary');
+            modernIcon.classList.remove('text-gray-300');
+        }
+
+        serif.classList.remove('border-primary', 'bg-primary-light/30', 'border-2');
+        serif.classList.add('border-border-subtle', 'border', 'bg-white');
+        if (serifIcon) {
+            serifIcon.style.fontVariationSettings = "'FILL' 0";
+            serifIcon.textContent = 'circle';
+            serifIcon.classList.remove('text-primary');
+            serifIcon.classList.add('text-gray-300');
+        }
+    } else {
+        serif.classList.add('border-primary', 'bg-primary-light/30', 'border-2');
+        serif.classList.remove('border-border-subtle', 'border', 'bg-white');
+        if (serifIcon) {
+            serifIcon.style.fontVariationSettings = "'FILL' 1";
+            serifIcon.textContent = 'check_circle';
+            serifIcon.classList.add('text-primary');
+            serifIcon.classList.remove('text-gray-300');
+        }
+
+        modern.classList.remove('border-primary', 'bg-primary-light/30', 'border-2');
+        modern.classList.add('border-border-subtle', 'border', 'bg-white');
+        if (modernIcon) {
+            modernIcon.style.fontVariationSettings = "'FILL' 0";
+            modernIcon.textContent = 'circle';
+            modernIcon.classList.remove('text-primary');
+            modernIcon.classList.add('text-gray-300');
+        }
+    }
+}
+
+// Density
+function updateDensity(type) {
+    density = type;
+    document.querySelectorAll('.density-btn').forEach(btn => {
+        if (btn.dataset.density === type) {
+            btn.classList.add('active', 'bg-white', 'text-primary', 'shadow-sm', 'border', 'border-border-subtle');
+            btn.classList.remove('text-text-muted');
+        } else {
+            btn.classList.remove('active', 'bg-white', 'text-primary', 'shadow-sm', 'border', 'border-border-subtle');
+            btn.classList.add('text-text-muted');
+        }
+    });
+}
+
+// Event listeners
+function initializeEventListeners() {
+    // Settings nav
+    document.querySelectorAll('.settings-nav-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
+            e.currentTarget.classList.add('active');
+        });
+    });
+
+    // Form inputs
+    document.getElementById('input-name').addEventListener('input', markChanged);
+    document.getElementById('input-title').addEventListener('input', markChanged);
+
+    // Typography selection
+    document.getElementById('typo-modern').addEventListener('click', () => {
+        updateTypography('modern');
+        markChanged();
+    });
+    document.getElementById('typo-serif').addEventListener('click', () => {
+        updateTypography('serif');
+        markChanged();
+    });
+
+    // Density selection
+    document.querySelectorAll('.density-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            updateDensity(btn.dataset.density);
+            markChanged();
+        });
+    });
+
+    // Save button
+    document.getElementById('save-btn').addEventListener('click', saveProfile);
+
+    // Cancel button
+    document.getElementById('cancel-btn').addEventListener('click', () => {
+        if (hasChanges) {
+            if (confirm('Discard unsaved changes?')) {
+                loadUserProfile();
+                hasChanges = false;
+            }
+        } else {
+            window.location.href = 'dashboard.html';
+        }
+    });
+
+    // Sector modal
+    document.getElementById('close-sector-modal').addEventListener('click', closeSectorModal);
+    document.getElementById('add-sector-btn').addEventListener('click', () => {
+        const input = document.getElementById('sector-input');
+        addSector(input.value.trim());
+    });
+    document.getElementById('sector-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            addSector(e.target.value.trim());
+        }
+    });
+    document.querySelectorAll('.preset-sector').forEach(btn => {
+        btn.addEventListener('click', () => {
+            addSector(btn.textContent.trim());
+        });
+    });
+
+    // Close modal on backdrop click
+    document.getElementById('add-sector-modal').addEventListener('click', (e) => {
+        if (e.target === e.currentTarget) closeSectorModal();
+    });
+
+    // Avatar upload
+    document.getElementById('avatar-upload-btn').addEventListener('click', () => {
+        document.getElementById('avatar-input').click();
+    });
+    document.getElementById('avatar-input').addEventListener('change', handleAvatarUpload);
+
+    // Deactivate
+    document.getElementById('deactivate-btn').addEventListener('click', () => {
+        if (confirm('Are you sure you want to deactivate your account? You can reactivate it later by contacting an admin.')) {
+            showToast('Account deactivation is not available in this version', 'info');
+        }
+    });
+}
+
+function markChanged() {
+    hasChanges = true;
+}
+
+async function handleAvatarUpload(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    showToast('Avatar upload requires cloud storage setup', 'info');
+}
+
+// Save profile
+async function saveProfile() {
+    const saveBtn = document.getElementById('save-btn');
+    const spinner = document.getElementById('save-spinner');
+
+    if (saveBtn) saveBtn.disabled = true;
+    if (spinner) spinner.classList.remove('hidden');
+
+    try {
+        const payload = {
+            name: document.getElementById('input-name')?.value?.trim() || '',
+            title: document.getElementById('input-title')?.value?.trim() || '',
+            investmentFocus,
+            sourcingSensitivity,
+            typography,
+            density,
+        };
+
+        console.log('Saving profile:', payload);
+
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/users/me`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            const errorMsg = errorData.error?.message || errorData.error || 'Failed to save profile';
+            throw new Error(errorMsg);
+        }
+
+        currentUser = await response.json();
+        hasChanges = false;
+        showToast('Changes saved successfully', 'success');
+        renderProfile();
+    } catch (error) {
+        console.error('Error saving profile:', error);
+        const message = typeof error === 'string' ? error : (error?.message || 'Failed to save changes');
+        showToast(message, 'error');
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+        if (spinner) spinner.classList.add('hidden');
+    }
+}
+
+// Toast notification
+function showToast(message, type = 'success') {
+    const toast = document.getElementById('toast');
+    const icon = document.getElementById('toast-icon');
+    const msg = document.getElementById('toast-message');
+
+    if (!toast || !icon || !msg) {
+        console.log('Toast:', type, message);
+        return;
+    }
+
+    // Ensure message is a string
+    const displayMessage = typeof message === 'object' ? JSON.stringify(message) : String(message || 'Notification');
+    msg.textContent = displayMessage;
+
+    if (type === 'success') {
+        icon.textContent = 'check_circle';
+        icon.className = 'material-symbols-outlined text-secondary';
+    } else if (type === 'error') {
+        icon.textContent = 'error';
+        icon.className = 'material-symbols-outlined text-red-500';
+    } else {
+        icon.textContent = 'info';
+        icon.className = 'material-symbols-outlined text-primary';
+    }
+
+    toast.classList.remove('translate-y-20', 'opacity-0');
+
+    setTimeout(() => {
+        toast.classList.add('translate-y-20', 'opacity-0');
+    }, 3000);
+}
+    </script>
+</body>
+</html>
