@@ -4,6 +4,7 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Deals - PE OS</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
     <link href="https://fonts.googleapis.com" rel="preconnect"/>
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
@@ -74,6 +75,34 @@
                 opacity: 1;
                 transform: translateY(0) scale(1);
             }
+        }
+        /* Kanban styles */
+        .kanban-column {
+            min-width: 300px;
+            max-width: 300px;
+            flex-shrink: 0;
+        }
+        .kanban-card {
+            cursor: grab;
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .kanban-card:active {
+            cursor: grabbing;
+        }
+        .kanban-card.dragging {
+            opacity: 0.5;
+            transform: rotate(2deg) scale(1.02);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        .kanban-column.drag-over .kanban-dropzone {
+            background-color: rgba(0, 51, 102, 0.05);
+            border-color: rgba(0, 51, 102, 0.3);
+        }
+        .kanban-dropzone {
+            min-height: 100px;
+            border: 2px dashed transparent;
+            border-radius: 0.5rem;
+            transition: all 0.2s ease;
         }
     </style>
 </head>
@@ -233,6 +262,16 @@
                             Clear
                         </button>
                         <div class="flex-1"></div>
+                        <!-- View Toggle -->
+                        <div class="flex items-center gap-1">
+                            <button id="view-list-btn" class="p-2 rounded-md transition-all text-primary bg-primary/10" title="List View">
+                                <span class="material-symbols-outlined text-[20px]">view_list</span>
+                            </button>
+                            <button id="view-kanban-btn" class="p-2 rounded-md transition-all text-text-muted hover:text-text-secondary hover:bg-gray-100" title="Kanban View">
+                                <span class="material-symbols-outlined text-[20px]">view_kanban</span>
+                            </button>
+                        </div>
+                        <div class="h-6 w-px bg-border-subtle hidden sm:block"></div>
                         <div class="relative">
                             <button id="sort-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-primary-light transition-all">
                                 <span class="material-symbols-outlined text-text-muted text-[18px]">sort</span>
@@ -254,12 +293,19 @@
                         </div>
                     </div>
 
-                    <!-- Deals Grid -->
+                    <!-- Deals Grid (List View) -->
                     <div id="deals-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-6">
                         <!-- Loading state -->
                         <div id="loading-state" class="col-span-full flex flex-col items-center justify-center py-20">
                             <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
                             <p class="text-text-muted text-sm font-medium">Loading deals...</p>
+                        </div>
+                    </div>
+
+                    <!-- Kanban Board (Hidden by default) -->
+                    <div id="kanban-board" class="hidden pb-6">
+                        <div class="flex gap-4 overflow-x-auto custom-scrollbar pb-4" id="kanban-columns">
+                            <!-- Kanban columns will be rendered here -->
                         </div>
                     </div>
                 </div>
@@ -567,8 +613,16 @@ async function loadDeals() {
             return;
         }
 
-        // Render deal cards
-        grid.innerHTML = deals.map(deal => renderDealCard(deal)).join('') + renderUploadCard();
+        // Render based on current view
+        if (currentView === 'kanban') {
+            grid.classList.add('hidden');
+            document.getElementById('kanban-board').classList.remove('hidden');
+            renderKanbanBoard();
+        } else {
+            grid.classList.remove('hidden');
+            document.getElementById('kanban-board').classList.add('hidden');
+            grid.innerHTML = deals.map(deal => renderDealCard(deal)).join('') + renderUploadCard();
+        }
 
     } catch (error) {
         console.error('Error loading deals:', error);
@@ -1114,6 +1168,268 @@ function escapeCSV(value) {
     return str;
 }
 
+// ============================================================
+// Kanban View
+// ============================================================
+let currentView = localStorage.getItem('crm-view') || 'list'; // 'list' or 'kanban'
+
+// Kanban stage order (active pipeline stages)
+const kanbanStages = [
+    'INITIAL_REVIEW',
+    'DUE_DILIGENCE',
+    'IOI_SUBMITTED',
+    'LOI_SUBMITTED',
+    'NEGOTIATION',
+    'CLOSING'
+];
+
+// Toggle between list and kanban view
+function setView(view) {
+    currentView = view;
+    localStorage.setItem('crm-view', view);
+
+    const listBtn = document.getElementById('view-list-btn');
+    const kanbanBtn = document.getElementById('view-kanban-btn');
+    const dealsGrid = document.getElementById('deals-grid');
+    const kanbanBoard = document.getElementById('kanban-board');
+    const sortBtn = document.getElementById('sort-btn');
+
+    if (view === 'kanban') {
+        listBtn.classList.remove('text-primary', 'bg-primary/10');
+        listBtn.classList.add('text-text-muted', 'hover:text-text-secondary', 'hover:bg-gray-100');
+        kanbanBtn.classList.add('text-primary', 'bg-primary/10');
+        kanbanBtn.classList.remove('text-text-muted', 'hover:text-text-secondary', 'hover:bg-gray-100');
+        dealsGrid.classList.add('hidden');
+        kanbanBoard.classList.remove('hidden');
+        sortBtn.parentElement.classList.add('hidden'); // Hide sort in kanban view
+        renderKanbanBoard();
+    } else {
+        kanbanBtn.classList.remove('text-primary', 'bg-primary/10');
+        kanbanBtn.classList.add('text-text-muted', 'hover:text-text-secondary', 'hover:bg-gray-100');
+        listBtn.classList.add('text-primary', 'bg-primary/10');
+        listBtn.classList.remove('text-text-muted', 'hover:text-text-secondary', 'hover:bg-gray-100');
+        kanbanBoard.classList.add('hidden');
+        dealsGrid.classList.remove('hidden');
+        sortBtn.parentElement.classList.remove('hidden'); // Show sort in list view
+        renderDealsGrid();
+    }
+}
+
+// Render Kanban board
+function renderKanbanBoard() {
+    const columnsContainer = document.getElementById('kanban-columns');
+
+    if (allDeals.length === 0) {
+        columnsContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-20 w-full">
+                <span class="material-symbols-outlined text-text-muted text-4xl mb-4">view_kanban</span>
+                <p class="text-text-main font-medium mb-2">No deals to display</p>
+                <p class="text-text-muted text-sm">Upload documents to create deals</p>
+            </div>
+        `;
+        return;
+    }
+
+    // Group deals by stage
+    const dealsByStage = {};
+    kanbanStages.forEach(stage => {
+        dealsByStage[stage] = allDeals.filter(d => d.stage === stage);
+    });
+
+    // Render columns
+    columnsContainer.innerHTML = kanbanStages.map(stage => {
+        const style = stageStyles[stage];
+        const deals = dealsByStage[stage] || [];
+
+        return `
+            <div class="kanban-column" data-stage="${stage}">
+                <div class="bg-surface-card rounded-xl border border-border-subtle overflow-hidden h-full flex flex-col">
+                    <!-- Column Header -->
+                    <div class="px-4 py-3 border-b border-border-subtle ${style.bg}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="px-2 py-0.5 rounded ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider">${style.label}</span>
+                            </div>
+                            <span class="text-xs font-bold ${style.text} bg-white/60 px-2 py-0.5 rounded-full">${deals.length}</span>
+                        </div>
+                    </div>
+                    <!-- Column Content -->
+                    <div class="kanban-dropzone flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-320px)] custom-scrollbar"
+                         ondragover="handleDragOver(event)"
+                         ondragleave="handleDragLeave(event)"
+                         ondrop="handleDrop(event, '${stage}')">
+                        ${deals.map(deal => renderKanbanCard(deal)).join('')}
+                        ${deals.length === 0 ? `
+                            <div class="text-center py-8 text-text-muted text-sm">
+                                <span class="material-symbols-outlined text-2xl mb-2 block opacity-40">inbox</span>
+                                Drop deals here
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// Render a compact Kanban card
+function renderKanbanCard(deal) {
+    const momColor = deal.mom >= 3 ? 'text-secondary' : 'text-text-main';
+    const hasRiskFlag = deal.ebitda < 0 || deal.stage === 'PASSED';
+
+    return `
+        <div class="kanban-card bg-white rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
+             draggable="true"
+             data-deal-id="${deal.id}"
+             ondragstart="handleDragStart(event, '${deal.id}')"
+             ondragend="handleDragEnd(event)">
+            <a href="deal.html?id=${deal.id}" class="block">
+                <!-- Header -->
+                <div class="flex items-start gap-2 mb-2">
+                    <div class="size-8 rounded-md bg-primary-light border border-primary/10 flex items-center justify-center text-primary flex-shrink-0">
+                        <span class="material-symbols-outlined text-[16px]">${deal.icon || 'business_center'}</span>
+                    </div>
+                    <div class="min-w-0 flex-1">
+                        <h4 class="text-sm font-semibold text-text-main truncate hover:text-primary transition-colors">${deal.name}</h4>
+                        <p class="text-[11px] text-text-muted truncate">${deal.industry || 'N/A'}</p>
+                    </div>
+                </div>
+
+                <!-- Metrics Row -->
+                <div class="flex gap-3 mb-2">
+                    <div class="flex-1 bg-background-body rounded px-2 py-1.5">
+                        <span class="text-[9px] text-text-muted font-medium uppercase block">IRR</span>
+                        <span class="text-xs font-bold text-text-main">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : 'N/A'}</span>
+                    </div>
+                    <div class="flex-1 bg-background-body rounded px-2 py-1.5">
+                        <span class="text-[9px] text-text-muted font-medium uppercase block">MoM</span>
+                        <span class="text-xs font-bold ${momColor}">${deal.mom ? deal.mom.toFixed(1) + 'x' : 'N/A'}</span>
+                    </div>
+                    <div class="flex-1 bg-background-body rounded px-2 py-1.5">
+                        <span class="text-[9px] text-text-muted font-medium uppercase block">Size</span>
+                        <span class="text-xs font-bold text-text-main">${formatCurrency(deal.dealSize)}</span>
+                    </div>
+                </div>
+
+                <!-- AI Insight (truncated) -->
+                ${deal.aiThesis ? `
+                    <div class="flex items-start gap-1.5 pt-2 border-t border-border-subtle">
+                        <span class="material-symbols-outlined ${hasRiskFlag ? 'text-red-500' : 'text-secondary'} text-[12px] mt-0.5">${hasRiskFlag ? 'warning' : 'auto_awesome'}</span>
+                        <p class="text-[11px] text-text-secondary line-clamp-2 leading-relaxed">${deal.aiThesis}</p>
+                    </div>
+                ` : ''}
+            </a>
+        </div>
+    `;
+}
+
+// Drag and Drop Handlers
+let draggedDealId = null;
+
+function handleDragStart(event, dealId) {
+    draggedDealId = dealId;
+    event.target.classList.add('dragging');
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', dealId);
+
+    // Add visual feedback to all columns
+    document.querySelectorAll('.kanban-column').forEach(col => {
+        col.classList.add('drag-active');
+    });
+}
+
+function handleDragEnd(event) {
+    event.target.classList.remove('dragging');
+    draggedDealId = null;
+
+    // Remove visual feedback from all columns
+    document.querySelectorAll('.kanban-column').forEach(col => {
+        col.classList.remove('drag-active', 'drag-over');
+    });
+}
+
+function handleDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+
+    const column = event.target.closest('.kanban-column');
+    if (column) {
+        column.classList.add('drag-over');
+    }
+}
+
+function handleDragLeave(event) {
+    const column = event.target.closest('.kanban-column');
+    if (column && !column.contains(event.relatedTarget)) {
+        column.classList.remove('drag-over');
+    }
+}
+
+async function handleDrop(event, newStage) {
+    event.preventDefault();
+
+    const column = event.target.closest('.kanban-column');
+    if (column) {
+        column.classList.remove('drag-over');
+    }
+
+    const dealId = event.dataTransfer.getData('text/plain') || draggedDealId;
+    if (!dealId) return;
+
+    const deal = allDeals.find(d => d.id === dealId);
+    if (!deal || deal.stage === newStage) return;
+
+    const oldStage = deal.stage;
+    const stageLabel = stageStyles[newStage]?.label || newStage;
+
+    // Optimistically update UI
+    deal.stage = newStage;
+    renderKanbanBoard();
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ stage: newStage }),
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to update stage');
+        }
+
+        showNotification('Stage Updated', `"${deal.name}" moved to ${stageLabel}`, 'success');
+    } catch (error) {
+        console.error('Error updating deal stage:', error);
+        // Revert on error
+        deal.stage = oldStage;
+        renderKanbanBoard();
+        showNotification('Error', 'Failed to update deal stage', 'error');
+    }
+}
+
+// Render deals in grid view
+function renderDealsGrid() {
+    const grid = document.getElementById('deals-grid');
+
+    if (allDeals.length === 0) {
+        grid.innerHTML = renderEmpty();
+        return;
+    }
+
+    grid.innerHTML = allDeals.map(deal => renderDealCard(deal)).join('') + renderUploadCard();
+}
+
+// Initialize view toggle
+function initializeViewToggle() {
+    document.getElementById('view-list-btn')?.addEventListener('click', () => setView('list'));
+    document.getElementById('view-kanban-btn')?.addEventListener('click', () => setView('kanban'));
+
+    // Apply saved view preference on load
+    if (currentView === 'kanban') {
+        setView('kanban');
+    }
+}
+
 // Initialize bulk action handlers
 function initializeBulkActions() {
     // Clear selection button
@@ -1192,6 +1508,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     PELayout.init('deals', { collapsible: true });
 
     initializeFilters();
+    initializeViewToggle();
     loadDeals();
     initializeUploadModal();
     initializeUploadCard();

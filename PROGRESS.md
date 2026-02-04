@@ -4840,3 +4840,96 @@ Initially considered Railway but switched to Render because:
 4. Deploy
 
 ---
+
+## February 5, 2026
+
+### 10:30 AM - Kanban View for CRM Deal Pipeline
+
+#### Kanban Board Implementation
+- **Type:** New Feature (Major)
+- **Description:** Added a Kanban board view to the CRM page with drag-and-drop functionality for moving deals between pipeline stages
+- **File Modified:** `apps/web/crm.html`
+
+#### Features Implemented
+
+**1. View Toggle Button**
+- Added List/Kanban toggle beside "Sort by" filter
+- Icon-only minimal design with subtle active state
+- View preference persists in localStorage
+- Sort dropdown hidden in Kanban view (stages have fixed order)
+
+**2. Kanban Board Layout**
+- 6 columns for active pipeline stages:
+  - Initial Review
+  - Due Diligence
+  - IOI Submitted
+  - LOI Submitted
+  - Negotiation
+  - Closing
+- Horizontally scrollable with custom scrollbar
+- Stage-colored headers with deal count badges
+
+**3. Compact Kanban Cards**
+- Company icon and name
+- Industry label
+- Key metrics row (IRR, MoM, Deal Size)
+- Truncated AI thesis/risk flag
+- Clickable to navigate to deal detail page
+
+**4. Drag and Drop**
+- Native HTML5 drag-drop API
+- Visual feedback:
+  - Dragged card rotates slightly with shadow
+  - Drop zones highlight with dashed border
+- Optimistic UI update (instant feedback)
+- API call to persist stage change
+- Error handling with rollback on failure
+
+#### Technical Implementation
+
+**CSS Styles Added:**
+```css
+.kanban-column { min-width: 300px; max-width: 300px; }
+.kanban-card { cursor: grab; }
+.kanban-card.dragging { opacity: 0.5; transform: rotate(2deg); }
+.kanban-column.drag-over .kanban-dropzone { background-color: rgba(0,51,102,0.05); }
+```
+
+**JavaScript Functions:**
+| Function | Purpose |
+|----------|---------|
+| `setView(view)` | Toggle between 'list' and 'kanban' views |
+| `renderKanbanBoard()` | Render all stage columns with deal cards |
+| `renderKanbanCard(deal)` | Render compact card for Kanban view |
+| `handleDragStart(event, dealId)` | Start drag with visual feedback |
+| `handleDragEnd(event)` | Clean up drag state |
+| `handleDragOver(event)` | Allow drop and highlight column |
+| `handleDragLeave(event)` | Remove column highlight |
+| `handleDrop(event, newStage)` | Update deal stage via API |
+| `initializeViewToggle()` | Set up event listeners and restore saved view |
+
+**API Integration:**
+- Uses existing `PATCH /api/deals/:id` endpoint
+- Sends `{ stage: newStage }` in request body
+- Shows success/error notification after update
+
+#### UI Design Refinement
+
+**View Toggle Evolution:**
+- Initial: Solid primary color buttons with text labels
+- Refined: Icon-only buttons with subtle tint background
+- Active state: `text-primary bg-primary/10`
+- Inactive state: `text-text-muted hover:bg-gray-100`
+
+#### Testing Checklist
+- [x] View toggle switches between List and Kanban
+- [x] View preference persists across page reloads
+- [x] Cards display correct deal information
+- [x] Drag and drop works within and across columns
+- [x] Stage updates persist to database
+- [x] Cards link to deal detail page
+- [x] Empty columns show placeholder text
+- [x] Error notification shown if API fails
+
+---
+
