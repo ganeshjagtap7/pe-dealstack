@@ -548,6 +548,85 @@ function populateDealPage(deal) {
 
     // Update activity feed
     renderActivityFeed(deal.activities || []);
+
+    // Render team avatars in header
+    renderTeamAvatars(deal.teamMembers || []);
+}
+
+// Render team avatars in the header
+function renderTeamAvatars(teamMembers) {
+    const avatarStack = document.getElementById('team-avatar-stack');
+    const moreCount = document.getElementById('team-more-count');
+    const avatarContainer = document.getElementById('deal-team-avatars');
+
+    if (!avatarStack) return;
+
+    // Show up to 3 avatars, then show "+X" for the rest
+    const maxVisible = 3;
+    const visibleMembers = teamMembers.slice(0, maxVisible);
+    const remainingCount = Math.max(0, teamMembers.length - maxVisible);
+
+    if (teamMembers.length === 0) {
+        // Show empty state - just the add button
+        avatarStack.innerHTML = `
+            <div class="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-400 hover:bg-gray-200 transition-colors" title="Add team members">
+                <span class="material-symbols-outlined text-[16px]">group_add</span>
+            </div>
+        `;
+        moreCount.classList.add('hidden');
+        return;
+    }
+
+    // Render visible avatars
+    avatarStack.innerHTML = visibleMembers.map((member, index) => {
+        const user = member.user;
+        const zIndex = maxVisible - index;
+        if (user?.avatar) {
+            return `
+                <img
+                    src="${user.avatar}"
+                    alt="${user.name}"
+                    title="${user.name} (${member.role})"
+                    class="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm"
+                    style="z-index: ${zIndex};"
+                />
+            `;
+        } else {
+            const initials = user?.name ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?';
+            return `
+                <div
+                    class="w-8 h-8 rounded-full bg-primary/10 border-2 border-white flex items-center justify-center text-primary font-semibold text-xs shadow-sm"
+                    style="z-index: ${zIndex};"
+                    title="${user?.name || 'Unknown'} (${member.role})"
+                >${initials}</div>
+            `;
+        }
+    }).join('');
+
+    // Show "+X" count if there are more
+    if (remainingCount > 0) {
+        moreCount.textContent = `+${remainingCount}`;
+        moreCount.classList.remove('hidden');
+    } else {
+        moreCount.classList.add('hidden');
+    }
+}
+
+// Open share modal
+function openShareModal() {
+    const dealId = getDealIdFromUrl();
+    if (!dealId) {
+        showNotification('Error', 'No deal ID available', 'error');
+        return;
+    }
+
+    // Set callback to refresh avatars when modal closes
+    window.onShareModalClose = () => {
+        // Reload deal data to refresh team list
+        loadDealData();
+    };
+
+    ShareModal.open(dealId);
 }
 
 function updateDocumentsList(documents) {

@@ -25,17 +25,24 @@ const updateUserSchema = z.object({
   title: z.string().optional(),
   phone: z.string().optional(),
   isActive: z.boolean().optional(),
+  firmName: z.string().optional(),
 });
 
 // GET /api/users - List all users
+// Query params: role, department, isActive, search, firmName, excludeUserId
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { role, department, isActive, search } = req.query;
+    const { role, department, isActive, search, firmName, excludeUserId } = req.query;
 
     let query = supabase
       .from('User')
-      .select('*')
+      .select('id, email, name, avatar, role, department, title, phone, isActive, firmName')
       .order('name', { ascending: true });
+
+    // Filter by firm name (for team member selection)
+    if (firmName) {
+      query = query.eq('firmName', firmName);
+    }
 
     if (role) {
       query = query.eq('role', role);
@@ -47,10 +54,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (isActive !== undefined) {
       query = query.eq('isActive', isActive === 'true');
+    } else {
+      // Default to only active users
+      query = query.eq('isActive', true);
     }
 
     if (search) {
       query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    // Exclude a specific user (useful for share modal - exclude current user)
+    if (excludeUserId) {
+      query = query.neq('id', excludeUserId);
     }
 
     const { data: users, error } = await query;
@@ -58,6 +73,88 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (error) throw error;
 
     res.json(users || []);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/users/me - Get current user profile
+// Must be defined before /:id to avoid matching "me" as an id
+router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const { data: userData, error } = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      throw error;
+    }
+
+    res.json(userData);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// GET /api/users/me/team - Get team members from same firm as current user
+// Useful for share modals - returns users that can be added to deals/VDRs
+router.get('/me/team', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+    const { search, excludeSelf } = req.query;
+
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    // Get current user's firmName
+    const { data: currentUser, error: userError } = await supabase
+      .from('User')
+      .select('firmName')
+      .eq('id', user.id)
+      .single();
+
+    if (userError) throw userError;
+
+    // If user has no firm, return empty list
+    if (!currentUser?.firmName) {
+      return res.json([]);
+    }
+
+    // Get all users in the same firm
+    let query = supabase
+      .from('User')
+      .select('id, email, name, avatar, role, department, title')
+      .eq('firmName', currentUser.firmName)
+      .eq('isActive', true)
+      .order('name', { ascending: true });
+
+    // Optionally exclude current user
+    if (excludeSelf === 'true') {
+      query = query.neq('id', user.id);
+    }
+
+    // Search filter
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    const { data: teamMembers, error } = await query;
+
+    if (error) throw error;
+
+    res.json(teamMembers || []);
   } catch (error) {
     next(error);
   }

@@ -4,6 +4,7 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Deal Intelligence - PE OS</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -115,12 +116,20 @@
                 </nav>
             </div>
             <div class="flex items-center gap-4">
+                <!-- Team Avatar Group -->
+                <div id="deal-team-avatars" class="hidden md:flex items-center cursor-pointer hover:opacity-80 transition-opacity" onclick="openShareModal()">
+                    <div class="flex -space-x-2" id="team-avatar-stack">
+                        <!-- Avatars will be rendered here by JS -->
+                    </div>
+                    <span id="team-more-count" class="hidden ml-1 text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full">+0</span>
+                </div>
+
                 <button id="data-room-btn" class="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle" onclick="openDataRoom()">
                     <span class="material-symbols-outlined text-[18px]">folder_open</span>
                     Data Room
                 </button>
-                <button id="share-btn" class="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle">
-                    <span class="material-symbols-outlined text-[18px]">share</span>
+                <button id="share-btn" class="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle" onclick="openShareModal()">
+                    <span class="material-symbols-outlined text-[18px]">group_add</span>
                     Share
                 </button>
                 <button id="edit-deal-btn" class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
@@ -476,6 +485,7 @@
     <script src="js/docPreview.js"></script>
     <script src="js/notificationCenter.js"></script>
     <script src="js/globalSearch.js"></script>
+    <script src="js/shareModal.js"></script>
     <script src="deal.js"></script>
 </body>
 </html>
