@@ -5030,3 +5030,83 @@ Initially considered Railway but switched to Render because:
 
 ---
 
+### 2:30 PM - Team Member Invitation System
+
+#### Implementation Overview
+- **Type:** New Feature (Major)
+- **Description:** Complete email invitation system for firm-level team onboarding, allowing existing users to invite colleagues via email with role assignment
+- **Commit:** `d58ff7a` - feat: Implement team member invitation system
+
+#### Files Created
+
+| File | Purpose |
+|------|---------|
+| `apps/api/invitation-migration.sql` | Database schema for Invitation table |
+| `apps/api/src/routes/invitations.ts` | API endpoints for invitation management |
+| `apps/web/js/inviteModal.js` | Frontend modal component |
+| `apps/web/accept-invite.html` | Accept invitation page with account creation |
+
+#### API Endpoints
+
+| Endpoint | Method | Auth | Description |
+|----------|--------|------|-------------|
+| `/api/invitations` | GET | Yes | List pending invitations for user's firm |
+| `/api/invitations` | POST | Yes | Create and send new invitation |
+| `/api/invitations/bulk` | POST | Yes | Send up to 20 invitations at once |
+| `/api/invitations/verify/:token` | GET | No | Verify invitation token (public) |
+| `/api/invitations/accept/:token` | POST | No | Accept invitation and create account |
+| `/api/invitations/:id` | DELETE | Yes | Revoke pending invitation |
+| `/api/invitations/:id/resend` | POST | Yes | Resend invitation email |
+
+#### Database Schema
+
+```sql
+CREATE TABLE public."Invitation" (
+    id uuid PRIMARY KEY,
+    email text NOT NULL,
+    "firmName" text NOT NULL,
+    role text NOT NULL DEFAULT 'MEMBER',  -- ADMIN/MEMBER/VIEWER
+    "invitedBy" uuid REFERENCES public."User"(id),
+    status text NOT NULL DEFAULT 'PENDING',  -- PENDING/ACCEPTED/EXPIRED/REVOKED
+    token text NOT NULL UNIQUE,
+    "expiresAt" timestamp with time zone,  -- 7 days from creation
+    "createdAt" timestamp with time zone,
+    "acceptedAt" timestamp with time zone
+);
+```
+
+#### Features
+
+**1. Invite Modal (`inviteModal.js`)**
+- Email input with validation
+- Role dropdown (Admin/Member/Viewer)
+- Pending invitations list with count
+- Resend/revoke actions per invitation
+- Expiration countdown display
+
+**2. Accept Invitation Page**
+- Token verification on page load
+- Shows inviter info and firm name
+- Full name and password fields
+- Auto-creates User record on acceptance
+- Redirects to login on success
+
+**3. Sidebar Integration**
+- "Invite Team" button added to all pages
+- Located in sidebar above user profile
+- Green icon to indicate collaborative action
+
+**4. Email Integration**
+- SendGrid integration ready (env var: `SENDGRID_API_KEY`)
+- Fallback console logging for development
+- HTML email template with branded styling
+
+#### Security Considerations
+- Cryptographically random 64-character tokens
+- 7-day expiration with auto-cleanup
+- One pending invitation per email per firm
+- Only ADMINs can invite ADMIN role users
+- RLS policies for row-level security
+
+---
+
