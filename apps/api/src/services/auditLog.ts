@@ -50,6 +50,11 @@ export const AUDIT_ACTIONS = {
   AI_GENERATE: 'AI_GENERATE',
   AI_INGEST: 'AI_INGEST',
 
+  // Invitation operations
+  INVITATION_SENT: 'INVITATION_SENT',
+  INVITATION_ACCEPTED: 'INVITATION_ACCEPTED',
+  INVITATION_REVOKED: 'INVITATION_REVOKED',
+
   // System operations
   SETTINGS_CHANGED: 'SETTINGS_CHANGED',
   BULK_EXPORT: 'BULK_EXPORT',
@@ -69,6 +74,7 @@ export const RESOURCE_TYPES = {
   FOLDER: 'FOLDER',
   SETTINGS: 'SETTINGS',
   API_KEY: 'API_KEY',
+  INVITATION: 'INVITATION',
 } as const;
 
 export type ResourceType = typeof RESOURCE_TYPES[keyof typeof RESOURCE_TYPES];
@@ -391,5 +397,23 @@ export const AuditLog = {
       resourceId: memoId,
       resourceName: sectionName,
       description: `AI generated content for section: ${sectionName}`,
+    }),
+
+  // Generic log method for custom events
+  log: (req: Request, options: {
+    action: string;
+    resourceType?: string;
+    resourceId?: string;
+    userId?: string;
+    metadata?: Record<string, any>;
+    description?: string;
+    severity?: SeverityLevel;
+  }) =>
+    logFromRequest(req, options.action as AuditAction, {
+      resourceType: options.resourceType as ResourceType,
+      resourceId: options.resourceId,
+      description: options.description,
+      metadata: options.metadata,
+      severity: options.severity,
     }),
 };
