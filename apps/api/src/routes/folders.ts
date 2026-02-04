@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { supabase } from '../supabase';
+import { supabase } from '../supabase.js';
 
 const router = Router();
 

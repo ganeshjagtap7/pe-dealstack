@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { supabase } from '../supabase';
-import { openai, isAIEnabled } from '../openai';
+import { supabase } from '../supabase.js';
+import { openai, isAIEnabled } from '../openai.js';
 
 const router = Router();
 
