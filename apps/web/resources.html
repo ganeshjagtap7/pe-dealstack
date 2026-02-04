@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Resources - PE OS</title>
+    <meta name="description" content="Access PE OS documentation, API reference, help center, and support resources. Everything you need to get the most out of PE OS."/>
+    <meta property="og:title" content="Resources - PE OS"/>
+    <meta property="og:description" content="Documentation, API reference, and support resources for PE OS."/>
+    <meta property="og:type" content="website"/>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1269e2",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "sans": ["Manrope", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white font-display">
+    <!-- Navigation -->
+    <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#e5e7eb] dark:border-b-[#1e293b] bg-white dark:bg-[#101822] px-6 lg:px-10 py-3 sticky top-0 z-50">
+        <div class="flex items-center gap-4 text-[#111418] dark:text-white">
+            <div class="size-8 text-primary">
+                <svg class="w-full h-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+                </svg>
+            </div>
+            <a href="index.html" class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">PE OS</a>
+        </div>
+        <div class="hidden md:flex flex-1 justify-center">
+            <div class="flex items-center gap-9">
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="index.html">Platform</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="solutions.html">Solutions</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="pricing.html">Pricing</a>
+                <a class="text-primary text-sm font-medium leading-normal" href="resources.html">Resources</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="company.html">Company</a>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="login.html" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-transparent border border-[#d1d5db] dark:border-gray-600 text-[#111418] dark:text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <span class="truncate">Log In</span>
+            </a>
+            <a href="signup.html" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors shadow-sm">
+                <span class="truncate">Get Started</span>
+            </a>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="min-h-screen">
+        <!-- Hero Section -->
+        <div class="bg-gradient-to-br from-primary/5 to-blue-50 dark:from-primary/10 dark:to-background-dark py-20">
+            <div class="max-w-6xl mx-auto px-6 text-center">
+                <h1 class="text-4xl lg:text-5xl font-extrabold text-[#111418] dark:text-white mb-6">
+                    Resources & Learning Center
+                </h1>
+                <p class="text-lg text-[#64748b] dark:text-gray-400 max-w-3xl mx-auto">
+                    Everything you need to get the most out of PE OS. Guides, documentation, and best practices.
+                </p>
+            </div>
+        </div>
+
+        <!-- Resources Grid -->
+        <div class="max-w-6xl mx-auto px-6 py-20">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Documentation -->
+                <a href="#" class="group p-8 rounded-2xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                    <div class="size-14 rounded-xl bg-primary/10 flex items-center justify-center text-primary mb-6 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined text-3xl">menu_book</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-[#111418] dark:text-white mb-3">Documentation</h3>
+                    <p class="text-[#64748b] dark:text-gray-400 mb-4">
+                        Comprehensive guides to help you set up and configure PE OS for your firm.
+                    </p>
+                    <span class="text-primary font-semibold text-sm flex items-center gap-1">
+                        Browse Docs
+                        <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                    </span>
+                </a>
+
+                <!-- API Reference -->
+                <a href="#" class="group p-8 rounded-2xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                    <div class="size-14 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 mb-6 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined text-3xl">code</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-[#111418] dark:text-white mb-3">API Reference</h3>
+                    <p class="text-[#64748b] dark:text-gray-400 mb-4">
+                        Build custom integrations with our RESTful API. Full reference with examples.
+                    </p>
+                    <span class="text-emerald-600 font-semibold text-sm flex items-center gap-1">
+                        View API Docs
+                        <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                    </span>
+                </a>
+
+                <!-- Help Center -->
+                <a href="#" class="group p-8 rounded-2xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300">
+                    <div class="size-14 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-600 mb-6 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined text-3xl">help</span>
+                    </div>
+                    <h3 class="text-xl font-bold text-[#111418] dark:text-white mb-3">Help Center</h3>
+                    <p class="text-[#64748b] dark:text-gray-400 mb-4">
+                        Find answers to common questions and troubleshooting guides.
+                    </p>
+                    <span class="text-amber-600 font-semibold text-sm flex items-center gap-1">
+                        Get Help
+                        <span class="material-symbols-outlined text-lg">arrow_forward</span>
+                    </span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Getting Started Section -->
+        <div class="bg-white dark:bg-[#1e293b] py-20">
+            <div class="max-w-6xl mx-auto px-6">
+                <h2 class="text-3xl font-bold text-[#111418] dark:text-white text-center mb-4">Getting Started</h2>
+                <p class="text-[#64748b] dark:text-gray-400 text-center mb-12 max-w-2xl mx-auto">
+                    New to PE OS? Follow these guides to get up and running quickly.
+                </p>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Guide 1 -->
+                    <div class="flex gap-4 p-6 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 hover:bg-[#f1f5f9] dark:hover:bg-[#334155]/50 transition-colors">
+                        <div class="flex-shrink-0 size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">1</div>
+                        <div>
+                            <h3 class="font-bold text-[#111418] dark:text-white mb-1">Create Your Account</h3>
+                            <p class="text-sm text-[#64748b] dark:text-gray-400">Sign up and set up your firm profile with basic information.</p>
+                        </div>
+                    </div>
+
+                    <!-- Guide 2 -->
+                    <div class="flex gap-4 p-6 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 hover:bg-[#f1f5f9] dark:hover:bg-[#334155]/50 transition-colors">
+                        <div class="flex-shrink-0 size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">2</div>
+                        <div>
+                            <h3 class="font-bold text-[#111418] dark:text-white mb-1">Import Your First Deal</h3>
+                            <p class="text-sm text-[#64748b] dark:text-gray-400">Upload a CIM or teaser to see AI-powered data extraction in action.</p>
+                        </div>
+                    </div>
+
+                    <!-- Guide 3 -->
+                    <div class="flex gap-4 p-6 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 hover:bg-[#f1f5f9] dark:hover:bg-[#334155]/50 transition-colors">
+                        <div class="flex-shrink-0 size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">3</div>
+                        <div>
+                            <h3 class="font-bold text-[#111418] dark:text-white mb-1">Explore AI Features</h3>
+                            <p class="text-sm text-[#64748b] dark:text-gray-400">Chat with your deals, generate investment theses, and discover insights.</p>
+                        </div>
+                    </div>
+
+                    <!-- Guide 4 -->
+                    <div class="flex gap-4 p-6 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 hover:bg-[#f1f5f9] dark:hover:bg-[#334155]/50 transition-colors">
+                        <div class="flex-shrink-0 size-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">4</div>
+                        <div>
+                            <h3 class="font-bold text-[#111418] dark:text-white mb-1">Invite Your Team</h3>
+                            <p class="text-sm text-[#64748b] dark:text-gray-400">Add team members and set up permissions for collaboration.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- FAQ Section -->
+        <div class="max-w-4xl mx-auto px-6 py-20">
+            <h2 class="text-3xl font-bold text-[#111418] dark:text-white text-center mb-12">Frequently Asked Questions</h2>
+
+            <div class="space-y-4">
+                <!-- FAQ 1 -->
+                <details class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155]">
+                    <summary class="flex items-center justify-between cursor-pointer list-none font-bold text-[#111418] dark:text-white">
+                        How does the AI deal ingestion work?
+                        <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                    </summary>
+                    <p class="mt-4 text-[#64748b] dark:text-gray-400">
+                        Simply upload a PDF document (CIM, teaser, or NDA) and our AI will automatically extract key information including company name, financials, deal size, industry, and more. The entire process takes just seconds.
+                    </p>
+                </details>
+
+                <!-- FAQ 2 -->
+                <details class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155]">
+                    <summary class="flex items-center justify-between cursor-pointer list-none font-bold text-[#111418] dark:text-white">
+                        Is my data secure?
+                        <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                    </summary>
+                    <p class="mt-4 text-[#64748b] dark:text-gray-400">
+                        Yes. We use AES-256 encryption for data at rest and TLS 1.3 for data in transit. We are SOC 2 Type II compliant and conduct regular security audits. Your deal data is never used to train AI models.
+                    </p>
+                </details>
+
+                <!-- FAQ 3 -->
+                <details class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155]">
+                    <summary class="flex items-center justify-between cursor-pointer list-none font-bold text-[#111418] dark:text-white">
+                        Can I integrate PE OS with my existing tools?
+                        <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                    </summary>
+                    <p class="mt-4 text-[#64748b] dark:text-gray-400">
+                        Yes! PE OS offers a comprehensive REST API and integrations with popular tools like Outlook, Gmail, and leading data providers. Enterprise plans include custom integration support.
+                    </p>
+                </details>
+
+                <!-- FAQ 4 -->
+                <details class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155]">
+                    <summary class="flex items-center justify-between cursor-pointer list-none font-bold text-[#111418] dark:text-white">
+                        What's included in the free trial?
+                        <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                    </summary>
+                    <p class="mt-4 text-[#64748b] dark:text-gray-400">
+                        The 14-day free trial includes full access to all Mid-Market tier features. No credit card required. You can import deals, use AI features, and invite team members during the trial period.
+                    </p>
+                </details>
+            </div>
+        </div>
+
+        <!-- Contact Support -->
+        <div class="py-20 bg-white dark:bg-[#1e293b]">
+            <div class="max-w-4xl mx-auto px-6 text-center">
+                <h2 class="text-3xl font-bold text-[#111418] dark:text-white mb-4">Still have questions?</h2>
+                <p class="text-[#64748b] dark:text-gray-400 mb-8">
+                    Our support team is here to help. Reach out anytime.
+                </p>
+                <a href="mailto:hello@pocket-fund.com" class="inline-flex items-center gap-2 h-12 px-8 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 transition-colors">
+                    <span class="material-symbols-outlined">mail</span>
+                    Contact Support
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-solid border-t-[#e5e7eb] dark:border-t-[#1e293b] bg-white dark:bg-[#101822] py-12 px-10">
+        <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-3">
+                <div class="size-6 text-primary">
+                    <svg class="w-full h-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                        <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <span class="text-sm font-medium text-[#64748b] dark:text-gray-500">© 2026 PE OS. All rights reserved.</span>
+            </div>
+            <div class="flex gap-6">
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="privacy-policy.html">Privacy Policy</a>
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="terms-of-service.html">Terms of Service</a>
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="mailto:hello@pocket-fund.com">Contact</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
