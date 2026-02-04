@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import dealsRouter from './routes/deals.js';
 import companiesRouter from './routes/companies.js';
@@ -17,6 +19,10 @@ import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
 dotenv.config();
+
+// ES Module dirname equivalent
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -96,6 +102,37 @@ app.get('/api/ai/status', (req, res) => {
     model: 'gpt-4-turbo-preview',
   });
 });
+
+// ========================================
+// Static Files (Production - serve frontend)
+// ========================================
+if (process.env.NODE_ENV === 'production') {
+  // Serve static files from the web dist folder
+  // From apps/api/dist/, web dist is at ../../web/dist
+  const webPath = path.join(__dirname, '../../web/dist');
+  app.use(express.static(webPath));
+
+  // MPA fallback - serve specific HTML files or index.html
+  app.get('*', (req, res, next) => {
+    // Skip API routes
+    if (req.path.startsWith('/api') || req.path === '/health') {
+      return next();
+    }
+
+    // Try to serve the specific HTML file if it exists
+    const htmlFile = req.path.endsWith('.html')
+      ? req.path
+      : `${req.path.replace(/\/$/, '')}.html`;
+
+    const filePath = path.join(webPath, htmlFile);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        // Fallback to index.html
+        res.sendFile(path.join(webPath, 'index.html'));
+      }
+    });
+  });
+}
 
 // 404 handler for unmatched routes
 app.use(notFoundHandler);

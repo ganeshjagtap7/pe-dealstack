@@ -4704,3 +4704,139 @@ After fix #1, the search worked but the suggestions dropdown appeared BEHIND the
 - AI Portfolio Assistant modal displays correctly with real data
 
 ---
+
+### Production Deployment Setup - Render.com Configuration
+
+#### Time: ~17:10 IST
+
+#### Goal
+Configure the application for production deployment on Render.com (free tier, no credit card required).
+
+#### What Was Done
+
+**1. API Server - Static File Serving**
+
+Modified `apps/api/src/index.ts` to serve the frontend in production:
+
+```javascript
+// ========================================
+// Static Files (Production - serve frontend)
+// ========================================
+if (process.env.NODE_ENV === 'production') {
+  const webPath = path.join(__dirname, '../../web/dist');
+  app.use(express.static(webPath));
+
+  // MPA fallback - serve specific HTML files or index.html
+  app.get('*', (req, res, next) => {
+    if (req.path.startsWith('/api') || req.path === '/health') {
+      return next();
+    }
+    const htmlFile = req.path.endsWith('.html')
+      ? req.path
+      : `${req.path.replace(/\/$/, '')}.html`;
+    const filePath = path.join(webPath, htmlFile);
+    res.sendFile(filePath, (err) => {
+      if (err) {
+        res.sendFile(path.join(webPath, 'index.html'));
+      }
+    });
+  });
+}
+```
+
+**2. Vite Build Configuration**
+
+Updated `apps/web/vite.config.ts` to:
+- Include all HTML pages in the multi-page build
+- Copy static JS files (auth.js, layout.js, etc.) to dist folder
+- Copy standalone page scripts (dashboard.js, deal.js, memo-builder.js)
+
+```javascript
+// Plugin to copy static js files after build
+function copyStaticFiles() {
+  return {
+    name: 'copy-static-files',
+    closeBundle() {
+      // Copy js/ folder and standalone scripts to dist
+    }
+  }
+}
+```
+
+**3. Production Scripts**
+
+Updated root `package.json`:
+
+```json
+{
+  "scripts": {
+    "build:web": "npm run build --workspace=@ai-crm/web",
+    "build:api": "npm run build --workspace=@ai-crm/api",
+    "build:prod": "npm run build:web && npm run build:api",
+    "start:prod": "NODE_ENV=production node apps/api/dist/index.js"
+  }
+}
+```
+
+**4. Render Configuration**
+
+Created `render.yaml` (Render Blueprint):
+
+```yaml
+services:
+  - type: web
+    name: pe-os
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build:prod
+    startCommand: npm run start:prod
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+```
+
+**5. Environment Template**
+
+Created `.env.example` documenting all required environment variables.
+
+#### Files Created/Modified
+
+| File | Change |
+|------|--------|
+| `apps/api/src/index.ts` | Added static file serving for production |
+| `apps/web/vite.config.ts` | Added all HTML pages + static file copy plugin |
+| `package.json` | Added `build:prod` and `start:prod` scripts |
+| `render.yaml` | NEW - Render deployment blueprint |
+| `.env.example` | NEW - Environment variable template |
+
+#### Build Verified
+```bash
+npm run build:prod
+# Successfully builds both web (Vite) and api (TypeScript)
+# Web dist includes all HTML pages + js/ folder + standalone scripts
+# API dist includes compiled TypeScript
+```
+
+#### Deployment Platform Comparison
+
+Initially considered Railway but switched to Render because:
+- Railway requires credit card even for free tier
+- Render has truly free tier (750 hrs/month) with no credit card
+- Both support Node.js servers natively
+
+#### Next Steps
+1. Push to GitHub
+2. Connect repo to Render.com
+3. Set environment variables in Render Dashboard
+4. Deploy
+
+---

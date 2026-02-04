@@ -9,6 +9,10 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
+    "build:web": "npm run build --workspace=@ai-crm/web",
+    "build:api": "npm run build --workspace=@ai-crm/api",
+    "build:prod": "npm run build:web && npm run build:api",
+    "start:prod": "NODE_ENV=production node apps/api/dist/index.js",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
     "dev:web": "npm run dev --workspace=@ai-crm/web",
