@@ -8,7 +8,6 @@ services:
     runtime: node
     region: oregon
     plan: free
-    nodeVersion: "18"
     buildCommand: npm ci --include=dev && npm run build:prod
     startCommand: npm run start:prod
     healthCheckPath: /health
