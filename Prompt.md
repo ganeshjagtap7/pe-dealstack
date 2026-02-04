@@ -1,3 +1,3 @@
-update the progress.md file with deatils and push the code to git with proper comments.
+update the progress.md file with deatils and push the code to git  and commit with proper comments.
 moving on onwards always include timestamp in progress.md file and the goal for this is to keep track of my day to day work where i can visit back sometine and see all the things i done , it should be like a deatiled channelog also which i can share with my founders if they every ask what did i do these many days or what did i do in this specific daay.
 keep all original data as it is just add new lines to it dont make any changes to previous data in file.
