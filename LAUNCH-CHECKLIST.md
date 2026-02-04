@@ -4,7 +4,7 @@
 **Current Status:** Beta/MVP (5.8/10 readiness)
 **Target:** Closed Beta Launch
 **Created:** February 2, 2026
-**Last Updated:** February 3, 2026
+**Last Updated:** February 5, 2026
 
 ---
 
@@ -139,10 +139,13 @@
   - Demo data visualization ✓
   - File: `apps/web/src/vdr.tsx` ✓
 
-- [ ] **Implement deal stage transitions**
-  - Add UI to move deals through pipeline
-  - Log stage changes to Activity feed
-  - Send notifications on stage change
+- [x] **Implement deal stage transitions**
+  - Kanban board view with drag-and-drop ✓
+  - Optimistic UI updates ✓
+  - API: PATCH `/api/deals/:id` for stage changes ✓
+  - File: `apps/web/crm.html` (Kanban view) ✓
+  - TODO: Log stage changes to Activity feed
+  - TODO: Send notifications on stage change
 
 - [ ] **Add bulk operations**
   - Select multiple deals
@@ -207,9 +210,11 @@
   - Assigned user filter
   - Save filter presets
 
-- [ ] **Sort options**
-  - Sort by last updated, created date, deal size
-  - Remember user's sort preference
+- [x] **Sort options**
+  - Sort by last updated, created date, deal size ✓
+  - Sort dropdown in CRM header ✓
+  - File: `apps/web/crm.html` ✓
+  - TODO: Remember user's sort preference in localStorage
 
 ---
 
