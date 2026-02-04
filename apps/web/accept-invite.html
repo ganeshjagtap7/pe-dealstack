@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Accept Invitation - PE OS</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#003366",
+                        "background-light": "#f8f9fa",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "Noto Sans", "sans-serif"],
+                        "body": ["Manrope", "Noto Sans", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Manrope', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark min-h-screen flex flex-col font-display text-[#111418] dark:text-white transition-colors duration-200">
+    <!-- Header -->
+    <header class="w-full border-b border-[#e5e7eb] dark:border-gray-800 bg-white dark:bg-[#1a202c] sticky top-0 z-50">
+        <div class="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
+            <a href="index.html" class="flex items-center gap-3 text-[#111418] dark:text-white cursor-pointer select-none">
+                <div class="size-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+                    <span class="material-symbols-outlined text-2xl">bar_chart</span>
+                </div>
+                <h2 class="text-xl font-bold leading-tight tracking-tight">PE OS</h2>
+            </a>
+            <div class="flex items-center gap-4">
+                <span class="text-sm font-medium text-[#617289] dark:text-gray-400 hidden sm:block">Already have an account?</span>
+                <a href="login.html" class="text-primary hover:text-primary/80 font-bold text-sm transition-colors">
+                    Log in
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
+        <!-- Loading State -->
+        <div id="loading-state" class="w-full max-w-[520px] bg-white dark:bg-[#1a202c] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-[#e5e7eb] dark:border-gray-700 p-8 sm:p-10 text-center">
+            <div class="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+            <p class="text-[#617289] dark:text-gray-400">Verifying invitation...</p>
+        </div>
+
+        <!-- Error State (hidden by default) -->
+        <div id="error-state" class="hidden w-full max-w-[520px] bg-white dark:bg-[#1a202c] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-[#e5e7eb] dark:border-gray-700 p-8 sm:p-10 text-center">
+            <div class="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+                <span class="material-symbols-outlined text-red-500 text-3xl">error</span>
+            </div>
+            <h2 class="text-xl font-bold text-[#111418] dark:text-white mb-2">Invalid Invitation</h2>
+            <p id="error-message" class="text-[#617289] dark:text-gray-400 mb-6">This invitation link is invalid or has expired.</p>
+            <a href="login.html" class="inline-flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">login</span>
+                Go to Login
+            </a>
+        </div>
+
+        <!-- Accept Form (hidden by default) -->
+        <div id="accept-form-container" class="hidden w-full max-w-[520px] bg-white dark:bg-[#1a202c] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-[#e5e7eb] dark:border-gray-700 p-8 sm:p-10 relative overflow-hidden">
+            <!-- Top accent bar -->
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/80 to-primary"></div>
+
+            <!-- Header Section -->
+            <div class="mb-8 text-center">
+                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-400 text-xs font-semibold mb-4 border border-green-200 dark:border-green-800">
+                    <span class="material-symbols-outlined text-[14px]">check_circle</span>
+                    Valid Invitation
+                </div>
+                <h1 class="text-2xl sm:text-[28px] font-bold text-[#111418] dark:text-white leading-tight mb-3">
+                    You're Invited!
+                </h1>
+                <p class="text-[#617289] dark:text-gray-400 text-sm sm:text-base">
+                    <span id="inviter-name" class="font-semibold text-[#111418] dark:text-white"></span> has invited you to join <span id="firm-name" class="font-semibold text-[#111418] dark:text-white"></span>
+                </p>
+            </div>
+
+            <!-- Invitation Details -->
+            <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 mb-6">
+                <div class="flex items-center gap-4">
+                    <div id="inviter-avatar" class="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                        <span class="material-symbols-outlined">person</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm text-[#617289] dark:text-gray-400">Invited to join as</p>
+                        <p id="invite-role" class="text-lg font-semibold text-[#111418] dark:text-white">Member</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Account Form -->
+            <form id="accept-form" class="flex flex-col gap-5">
+                <!-- Email (readonly) -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="email">Email</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">mail</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-[#617289] dark:text-gray-400 pl-10 pr-3 py-3 text-sm cursor-not-allowed"
+                            id="email"
+                            name="email"
+                            type="email"
+                            readonly
+                        />
+                    </div>
+                </div>
+
+                <!-- Full Name -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="fullname">Full Name</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">person</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
+                            id="fullname"
+                            name="fullname"
+                            placeholder="Your full name"
+                            type="text"
+                            required
+                        />
+                    </div>
+                </div>
+
+                <!-- Password -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="password">Create Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">lock</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-10 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
+                            id="password"
+                            name="password"
+                            placeholder="••••••••"
+                            type="password"
+                            required
+                            minlength="8"
+                        />
+                        <button
+                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9ca3af] hover:text-[#617289] cursor-pointer"
+                            type="button"
+                            onclick="togglePasswordVisibility()"
+                        >
+                            <span id="password-toggle-icon" class="material-symbols-outlined text-[20px]">visibility</span>
+                        </button>
+                    </div>
+                    <p class="text-xs text-[#617289] dark:text-gray-500 mt-1">Min 8 characters</p>
+                </div>
+
+                <!-- Confirm Password -->
+                <div class="space-y-2">
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="confirmPassword">Confirm Password</label>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
+                            <span class="material-symbols-outlined text-[20px]">lock</span>
+                        </div>
+                        <input
+                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
+                            id="confirmPassword"
+                            name="confirmPassword"
+                            placeholder="••••••••"
+                            type="password"
+                            required
+                            minlength="8"
+                        />
+                    </div>
+                </div>
+
+                <!-- Error Message -->
+                <div id="form-error" class="hidden bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3">
+                    <p id="form-error-text" class="text-sm text-red-600 dark:text-red-400"></p>
+                </div>
+
+                <!-- Submit Button -->
+                <button
+                    type="submit"
+                    id="submit-btn"
+                    class="w-full bg-primary text-white py-3 px-4 rounded-lg text-sm font-semibold hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-all shadow-sm flex items-center justify-center gap-2"
+                >
+                    <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+                    Create Account & Join
+                </button>
+            </form>
+
+            <!-- Terms -->
+            <p class="text-xs text-center text-[#617289] dark:text-gray-500 mt-6">
+                By creating an account, you agree to our
+                <a href="terms-of-service.html" class="text-primary hover:underline">Terms of Service</a>
+                and
+                <a href="privacy-policy.html" class="text-primary hover:underline">Privacy Policy</a>.
+            </p>
+        </div>
+
+        <!-- Success State (hidden by default) -->
+        <div id="success-state" class="hidden w-full max-w-[520px] bg-white dark:bg-[#1a202c] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-[#e5e7eb] dark:border-gray-700 p-8 sm:p-10 text-center">
+            <div class="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+                <span class="material-symbols-outlined text-green-500 text-3xl">check_circle</span>
+            </div>
+            <h2 class="text-xl font-bold text-[#111418] dark:text-white mb-2">Welcome to the Team!</h2>
+            <p class="text-[#617289] dark:text-gray-400 mb-6">Your account has been created successfully. You can now log in.</p>
+            <a href="login.html" class="inline-flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors">
+                <span class="material-symbols-outlined text-[18px]">login</span>
+                Go to Login
+            </a>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-[#e5e7eb] dark:border-gray-800 py-6 bg-white dark:bg-[#1a202c]">
+        <div class="max-w-[1280px] mx-auto px-6 text-center text-sm text-[#617289] dark:text-gray-500">
+            &copy; 2026 PE OS. All rights reserved.
+        </div>
+    </footer>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3001/api';
+        let invitationToken = null;
+
+        // Get token from URL
+        function getTokenFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('token');
+        }
+
+        // Toggle password visibility
+        function togglePasswordVisibility() {
+            const passwordInput = document.getElementById('password');
+            const icon = document.getElementById('password-toggle-icon');
+
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.textContent = 'visibility_off';
+            } else {
+                passwordInput.type = 'password';
+                icon.textContent = 'visibility';
+            }
+        }
+
+        // Show error state
+        function showError(message) {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('accept-form-container').classList.add('hidden');
+            document.getElementById('success-state').classList.add('hidden');
+            document.getElementById('error-state').classList.remove('hidden');
+            document.getElementById('error-message').textContent = message;
+        }
+
+        // Show form
+        function showForm(data) {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('error-state').classList.add('hidden');
+            document.getElementById('success-state').classList.add('hidden');
+            document.getElementById('accept-form-container').classList.remove('hidden');
+
+            // Populate data
+            document.getElementById('email').value = data.email;
+            document.getElementById('firm-name').textContent = data.firmName;
+            document.getElementById('invite-role').textContent = data.role;
+
+            if (data.inviter) {
+                document.getElementById('inviter-name').textContent = data.inviter.name || 'A team member';
+
+                if (data.inviter.avatar) {
+                    document.getElementById('inviter-avatar').innerHTML = `
+                        <img src="${data.inviter.avatar}" class="w-12 h-12 rounded-full object-cover" alt="${data.inviter.name}" />
+                    `;
+                }
+            } else {
+                document.getElementById('inviter-name').textContent = 'A team member';
+            }
+
+            // Focus on name input
+            document.getElementById('fullname').focus();
+        }
+
+        // Show success
+        function showSuccess() {
+            document.getElementById('loading-state').classList.add('hidden');
+            document.getElementById('error-state').classList.add('hidden');
+            document.getElementById('accept-form-container').classList.add('hidden');
+            document.getElementById('success-state').classList.remove('hidden');
+        }
+
+        // Show form error
+        function showFormError(message) {
+            const errorEl = document.getElementById('form-error');
+            const errorText = document.getElementById('form-error-text');
+            errorEl.classList.remove('hidden');
+            errorText.textContent = message;
+        }
+
+        // Hide form error
+        function hideFormError() {
+            document.getElementById('form-error').classList.add('hidden');
+        }
+
+        // Verify invitation
+        async function verifyInvitation(token) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/invitations/verify/${token}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    showError(data.error || 'Invalid invitation');
+                    return;
+                }
+
+                showForm(data);
+            } catch (error) {
+                console.error('Verification error:', error);
+                showError('Unable to verify invitation. Please try again later.');
+            }
+        }
+
+        // Accept invitation
+        async function acceptInvitation(e) {
+            e.preventDefault();
+            hideFormError();
+
+            const fullName = document.getElementById('fullname').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            const submitBtn = document.getElementById('submit-btn');
+
+            // Validation
+            if (!fullName) {
+                showFormError('Please enter your full name');
+                return;
+            }
+
+            if (password.length < 8) {
+                showFormError('Password must be at least 8 characters');
+                return;
+            }
+
+            if (password !== confirmPassword) {
+                showFormError('Passwords do not match');
+                return;
+            }
+
+            // Disable button
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `
+                <div class="animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full"></div>
+                Creating account...
+            `;
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/invitations/accept/${invitationToken}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password, fullName }),
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to create account');
+                }
+
+                // Success!
+                showSuccess();
+
+                // If session is returned (auto-confirmed), redirect to CRM
+                if (data.session) {
+                    setTimeout(() => {
+                        window.location.href = '/crm.html';
+                    }, 2000);
+                }
+            } catch (error) {
+                console.error('Accept error:', error);
+                showFormError(error.message);
+
+                // Re-enable button
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = `
+                    <span class="material-symbols-outlined text-[20px]">how_to_reg</span>
+                    Create Account & Join
+                `;
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            invitationToken = getTokenFromUrl();
+
+            if (!invitationToken) {
+                showError('No invitation token provided. Please use the link from your invitation email.');
+                return;
+            }
+
+            // Set up form handler
+            document.getElementById('accept-form').addEventListener('submit', acceptInvitation);
+
+            // Verify the invitation
+            verifyInvitation(invitationToken);
+        });
+    </script>
+</body>
+</html>

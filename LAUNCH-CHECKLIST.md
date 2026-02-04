@@ -168,10 +168,16 @@
   - File: `apps/web/js/shareModal.js` ✓
   - Schema: `apps/api/team-sharing-migration.sql` ✓
 
-- [ ] **Invite team members (Firm-level)**
-  - Email invitation flow
-  - Accept invitation page
-  - Assign roles on invite
+- [x] **Invite team members (Firm-level)**
+  - Email invitation flow ✓
+  - Accept invitation page ✓
+  - Assign roles on invite (ADMIN/MEMBER/VIEWER) ✓
+  - Bulk invite support (up to 20 emails) ✓
+  - Resend/revoke invitation functionality ✓
+  - API: `/api/invitations` (CRUD + verify/accept) ✓
+  - File: `apps/web/js/inviteModal.js` ✓
+  - File: `apps/web/accept-invite.html` ✓
+  - Schema: `apps/api/invitation-migration.sql` ✓
 
 - [ ] **Activity feed per deal**
   - Show who did what and when

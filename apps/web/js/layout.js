@@ -144,6 +144,16 @@ function generateSidebar(activePage, options = {}) {
                 <nav class="flex flex-col gap-1">
                     ${navItems}
                 </nav>
+                <div class="sidebar-actions flex flex-col gap-2 mt-4 pt-4" style="border-top: 1px solid ${PE_COLORS.borderSubtle};">
+                    <button id="invite-team-btn" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm"
+                            style="color: ${PE_COLORS.textSecondary};"
+                            onmouseover="this.style.backgroundColor='${PE_COLORS.secondaryLight}';this.style.color='${PE_COLORS.secondary}';"
+                            onmouseout="this.style.backgroundColor='';this.style.color='${PE_COLORS.textSecondary}';"
+                            title="Invite Team Members">
+                        <span class="material-symbols-outlined text-[20px]" style="color: ${PE_COLORS.secondary};">person_add</span>
+                        <span class="nav-label font-medium">Invite Team</span>
+                    </button>
+                </div>
                 <div class="user-profile flex flex-col gap-3 mt-4">
                     <div class="flex items-center gap-3 p-2.5 rounded-lg" style="border: 1px solid ${PE_COLORS.borderSubtle}; background-color: rgba(248, 249, 250, 0.5);">
                         <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 shrink-0 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
@@ -252,7 +262,8 @@ function generateStyles() {
             #pe-sidebar.collapsed .nav-label,
             #pe-sidebar.collapsed .logo-text,
             #pe-sidebar.collapsed .user-info,
-            #pe-sidebar.collapsed .sidebar-divider {
+            #pe-sidebar.collapsed .sidebar-divider,
+            #pe-sidebar.collapsed .sidebar-actions {
                 display: none;
             }
             #pe-sidebar.collapsed .nav-item {
@@ -317,6 +328,18 @@ function initPELayout(activePage, options = {}) {
                 localStorage.setItem('pe-sidebar-collapsed', nowCollapsed.toString());
             });
         }
+    }
+
+    // Setup invite team button
+    const inviteTeamBtn = document.getElementById('invite-team-btn');
+    if (inviteTeamBtn) {
+        inviteTeamBtn.addEventListener('click', () => {
+            if (typeof window.InviteModal !== 'undefined') {
+                window.InviteModal.open();
+            } else {
+                console.warn('InviteModal not loaded. Include inviteModal.js in your page.');
+            }
+        });
     }
 
     // Setup keyboard shortcuts

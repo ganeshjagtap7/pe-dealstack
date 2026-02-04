@@ -14,6 +14,7 @@ import chatRouter from './routes/chat.js';
 import notificationsRouter from './routes/notifications.js';
 import ingestRouter from './routes/ingest.js';
 import memosRouter from './routes/memos.js';
+import invitationsRouter from './routes/invitations.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -67,6 +68,7 @@ app.get('/api', (req, res) => {
       users: '/api/users',
       conversations: '/api/conversations',
       notifications: '/api/notifications',
+      invitations: '/api/invitations',
       ai: '/api/ai',
       ingest: '/api/ingest',
       health: '/health',
@@ -87,6 +89,13 @@ app.use('/api', authMiddleware, chatRouter);
 app.use('/api/notifications', authMiddleware, notificationsRouter);
 app.use('/api/ingest', authMiddleware, ingestRouter);
 app.use('/api/memos', authMiddleware, memosRouter);
+app.use('/api/invitations', authMiddleware, invitationsRouter);
+
+// ========================================
+// Public Invitation Routes (no auth for verify/accept)
+// ========================================
+app.get('/api/invitations/verify/:token', invitationsRouter);
+app.post('/api/invitations/accept/:token', invitationsRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
@@ -156,12 +165,15 @@ app.listen(PORT, () => {
   console.log(`  🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
   console.log(`  📥 Ingest API: http://localhost:${PORT}/api/ingest`);
   console.log(`  📝 Memos API: http://localhost:${PORT}/api/memos`);
+  console.log(`  ✉️  Invitations API: http://localhost:${PORT}/api/invitations`);
   console.log(`  🤖 AI Ingest: http://localhost:${PORT}/api/ai/ingest`);
   console.log(`  🤖 AI Extract: http://localhost:${PORT}/api/ai/extract`);
   console.log(`  🤖 Deal Chat: http://localhost:${PORT}/api/deals/:dealId/chat`);
   console.log('');
   console.log('Public routes (no auth required):');
   console.log(`  🤖 AI Status: http://localhost:${PORT}/api/ai/status`);
+  console.log(`  ✉️  Verify Invite: http://localhost:${PORT}/api/invitations/verify/:token`);
+  console.log(`  ✉️  Accept Invite: http://localhost:${PORT}/api/invitations/accept/:token`);
   console.log(`  ❤️  Health check: http://localhost:${PORT}/health`);
 });
 
