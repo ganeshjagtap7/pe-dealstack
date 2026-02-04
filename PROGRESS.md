@@ -5297,3 +5297,107 @@ Also added improvements:
 
 ---
 
+
+### Timestamp: 05:30 AM IST
+
+---
+
+### User Profile & Settings Page - Complete Implementation
+
+#### Overview
+- **Type:** New Feature
+- **Description:** Implemented a full User Profile & Personalization settings page with AI preferences, interface customization, and navigation integration
+
+#### Backend Changes
+
+**File Modified:** `apps/api/src/routes/users.ts`
+
+1. Added new validation schema for self-update:
+```typescript
+const updateSelfSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  avatar: z.string().url().optional().nullable(),
+  title: z.string().max(255).optional(),
+  phone: z.string().max(50).optional(),
+  investmentFocus: z.array(z.string()).optional(),
+  sourcingSensitivity: z.number().min(0).max(100).optional(),
+  typography: z.enum(['modern', 'serif']).optional(),
+  density: z.enum(['compact', 'default', 'relaxed']).optional(),
+});
+```
+
+2. Added `PATCH /api/users/me` endpoint:
+   - Allows users to update their own profile without special permissions
+   - Stores AI preferences in JSONB `preferences` column
+   - Gracefully handles missing preferences column (retries without it)
+   - Returns updated user data
+
+**File Created:** `apps/api/user-preferences-migration.sql`
+
+Database migration to add preferences JSONB column:
+```sql
+ALTER TABLE public."User"
+ADD COLUMN IF NOT EXISTS preferences JSONB DEFAULT '{}'::jsonb;
+CREATE INDEX IF NOT EXISTS idx_user_preferences ON public."User" USING gin (preferences);
+```
+
+#### Frontend Changes
+
+**File Modified:** `apps/web/settings.html`
+
+Complete settings page with:
+- **Profile Section:** Avatar display, name, email (read-only), title, firm
+- **AI Assistant Tailoring:**
+  - Investment focus sectors with tag-based UI (Healthcare, Technology, SaaS, etc.)
+  - Sourcing sensitivity slider (0-100 with Conservative/Moderate/Aggressive labels)
+- **Interface Customization:**
+  - Typography selection (Modern Sans/Classic Serif)
+  - Information density toggle (Compact/Default/Relaxed)
+- **Security Section:** Password change, 2FA setup (placeholder)
+- **Account Deactivation:** With confirmation modal
+
+Key Features:
+- Integrated with shared layout system (layout.js)
+- PE OS design system colors (#003366 primary, #059669 secondary)
+- Comprehensive null checks on all DOM elements
+- Robust error handling for various API response formats
+- Toast notifications for success/error states
+
+**File Modified:** `apps/web/js/layout.js`
+
+Navigation integration:
+1. Added Settings link to sidebar actions section:
+```javascript
+<a href="/settings.html" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm">
+    <span class="material-symbols-outlined text-[20px]">settings</span>
+    <span class="nav-label font-medium">Settings</span>
+</a>
+```
+
+2. Made sidebar user profile clickable (navigates to /settings.html)
+3. Changed header user menu from button to anchor link
+
+**File Modified:** `LAUNCH-CHECKLIST.md`
+
+Added new section "9. User Profile & Settings" with completed items:
+- [x] Settings page with profile editing
+- [x] AI preferences (investment focus, sensitivity)
+- [x] Interface customization (typography, density)
+- [x] Navigation from header and sidebar
+
+#### Bug Fixes During Implementation
+
+1. **"[object Object]" error in toast:** Fixed by properly extracting error messages from nested API response formats
+2. **"Loading..." stuck state:** Added comprehensive null checks for all getElementById calls
+3. **Navigation not working:** Made profile areas clickable with proper anchor tags
+
+#### Files Changed Summary
+| File | Type | Description |
+|------|------|-------------|
+| `apps/api/src/routes/users.ts` | Modified | Added PATCH /api/users/me endpoint |
+| `apps/api/user-preferences-migration.sql` | Created | Migration for preferences column |
+| `apps/web/settings.html` | Modified | Complete settings page implementation |
+| `apps/web/js/layout.js` | Modified | Navigation links to settings |
+| `LAUNCH-CHECKLIST.md` | Modified | Added settings section |
+
+---

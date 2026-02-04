@@ -226,7 +226,28 @@
 
 ## P2 - NICE TO HAVE (Polish for Launch)
 
-### 9. UX Polish
+### 9. User Profile & Settings
+
+- [x] **User profile page**
+  - View and edit profile information ✓
+  - Avatar display (upload requires cloud storage) ✓
+  - Name, title, email, firm display ✓
+  - File: `apps/web/settings.html` ✓
+  - API: PATCH `/api/users/me` for self-update ✓
+
+- [x] **AI personalization settings**
+  - Investment focus sectors (tag-based) ✓
+  - Sourcing sensitivity slider ✓
+  - Typography preference (Modern/Serif) ✓
+  - Information density setting ✓
+  - Schema: `apps/api/user-preferences-migration.sql` ✓
+
+- [ ] **Additional settings sections**
+  - Security (change password, 2FA)
+  - Notifications (email preferences)
+  - Integrations (connected apps)
+
+### 10. UX Polish
 
 - [ ] **Consistent color scheme**
   - Currently mixing `#003366` and `#1269e2`
@@ -254,7 +275,7 @@
   - Complete dark mode implementation
   - Toggle in settings/header
 
-### 10. Landing Page & Marketing
+### 11. Landing Page & Marketing
 
 - [ ] **Fix placeholder links**
   - "Platform" dropdown → product tour
@@ -270,7 +291,7 @@
   - Beta user quotes
   - Logos of pilot customers
 
-### 11. Documentation
+### 12. Documentation
 
 - [ ] **API documentation**
   - Document all endpoints
@@ -288,7 +309,7 @@
   - Role permissions explained
   - Data export procedures
 
-### 12. Analytics & Monitoring
+### 13. Analytics & Monitoring
 
 - [ ] **Add error tracking**
   - Integration: Sentry

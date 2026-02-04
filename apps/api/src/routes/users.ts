@@ -160,6 +160,90 @@ router.get('/me/team', async (req: Request, res: Response, next: NextFunction) =
   }
 });
 
+// PATCH /api/users/me - Update current user's own profile
+// No special permission needed - users can always update their own profile
+const updateSelfSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+  avatar: z.string().url().optional().nullable(),
+  title: z.string().max(255).optional(),
+  phone: z.string().max(50).optional(),
+  // AI preferences (stored as JSON or separate fields)
+  investmentFocus: z.array(z.string()).optional(),
+  sourcingSensitivity: z.number().min(0).max(100).optional(),
+  typography: z.enum(['modern', 'serif']).optional(),
+  density: z.enum(['compact', 'default', 'relaxed']).optional(),
+});
+
+router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = (req as any).user;
+
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const validation = updateSelfSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: validation.error.errors
+      });
+    }
+
+    // Build update object - only include fields that were provided
+    const updateData: Record<string, any> = {
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (validation.data.name !== undefined) updateData.name = validation.data.name;
+    if (validation.data.avatar !== undefined) updateData.avatar = validation.data.avatar;
+    if (validation.data.title !== undefined) updateData.title = validation.data.title;
+    if (validation.data.phone !== undefined) updateData.phone = validation.data.phone;
+
+    // Store AI preferences as JSON in a preferences field or as separate columns
+    // For now, we'll store them as separate columns if they exist in the schema
+    // or as a JSON preferences field
+    const preferences: Record<string, any> = {};
+    if (validation.data.investmentFocus !== undefined) preferences.investmentFocus = validation.data.investmentFocus;
+    if (validation.data.sourcingSensitivity !== undefined) preferences.sourcingSensitivity = validation.data.sourcingSensitivity;
+    if (validation.data.typography !== undefined) preferences.typography = validation.data.typography;
+    if (validation.data.density !== undefined) preferences.density = validation.data.density;
+
+    if (Object.keys(preferences).length > 0) {
+      updateData.preferences = preferences;
+    }
+
+    const { data: updatedUser, error } = await supabase
+      .from('User')
+      .update(updateData)
+      .eq('id', user.id)
+      .select()
+      .single();
+
+    if (error) {
+      // If preferences column doesn't exist, try without it
+      if (error.message?.includes('preferences')) {
+        delete updateData.preferences;
+        const { data: retryUser, error: retryError } = await supabase
+          .from('User')
+          .update(updateData)
+          .eq('id', user.id)
+          .select()
+          .single();
+
+        if (retryError) throw retryError;
+        return res.json(retryUser);
+      }
+      throw error;
+    }
+
+    res.json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+});
+
 // GET /api/users/:id - Get a single user
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {

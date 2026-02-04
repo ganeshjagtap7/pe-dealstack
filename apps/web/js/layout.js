@@ -153,15 +153,27 @@ function generateSidebar(activePage, options = {}) {
                         <span class="material-symbols-outlined text-[20px]" style="color: ${PE_COLORS.secondary};">person_add</span>
                         <span class="nav-label font-medium">Invite Team</span>
                     </button>
+                    <a href="/settings.html" class="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm"
+                       style="color: ${PE_COLORS.textSecondary};"
+                       onmouseover="this.style.backgroundColor='${PE_COLORS.primaryLight}';this.style.color='${PE_COLORS.primary}';"
+                       onmouseout="this.style.backgroundColor='';this.style.color='${PE_COLORS.textSecondary}';"
+                       title="Settings & Profile">
+                        <span class="material-symbols-outlined text-[20px]">settings</span>
+                        <span class="nav-label font-medium">Settings</span>
+                    </a>
                 </div>
                 <div class="user-profile flex flex-col gap-3 mt-4">
-                    <div class="flex items-center gap-3 p-2.5 rounded-lg" style="border: 1px solid ${PE_COLORS.borderSubtle}; background-color: rgba(248, 249, 250, 0.5);">
+                    <a href="/settings.html" class="flex items-center gap-3 p-2.5 rounded-lg transition-all hover:shadow-sm"
+                       style="border: 1px solid ${PE_COLORS.borderSubtle}; background-color: rgba(248, 249, 250, 0.5);"
+                       onmouseover="this.style.borderColor='${PE_COLORS.primary}';this.style.backgroundColor='${PE_COLORS.primaryLight}';"
+                       onmouseout="this.style.borderColor='${PE_COLORS.borderSubtle}';this.style.backgroundColor='rgba(248, 249, 250, 0.5)';"
+                       title="View Profile & Settings">
                         <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 shrink-0 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
                         <div class="user-info flex flex-col overflow-hidden">
                             <h1 class="text-xs font-bold truncate" style="color: ${PE_COLORS.textMain};">${USER.name}</h1>
                             <p class="text-[10px] font-normal truncate" style="color: ${PE_COLORS.textSecondary};">${USER.role}</p>
                         </div>
-                    </div>
+                    </a>
                 </div>
             </div>
         </aside>
@@ -211,11 +223,11 @@ function generateHeader(options = {}) {
                     <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
                 </button>
                 <div class="h-6 w-px bg-border-subtle"></div>
-                <button class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors" id="user-menu-btn">
+                <a href="/settings.html" class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors" id="user-menu-btn" title="Profile & Settings">
                     <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
                     <span class="hidden md:inline">${USER.name}</span>
-                    <span class="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
-                </button>
+                    <span class="material-symbols-outlined text-[18px] text-text-muted">chevron_right</span>
+                </a>
             </div>
         </header>
     `;
