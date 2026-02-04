@@ -424,7 +424,15 @@ async function loadUserProfile() {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMsg = errorData.error?.message || errorData.error || 'Failed to load profile';
+            // Handle various error response formats
+            let errorMsg = 'Failed to load profile';
+            if (typeof errorData.error === 'string') {
+                errorMsg = errorData.error;
+            } else if (errorData.error?.message) {
+                errorMsg = errorData.error.message;
+            } else if (errorData.message) {
+                errorMsg = errorData.message;
+            }
             throw new Error(errorMsg);
         }
 
@@ -577,15 +585,23 @@ function addSector(sector) {
 }
 
 function openSectorModal() {
-    document.getElementById('add-sector-modal').classList.remove('hidden');
-    document.getElementById('add-sector-modal').classList.add('flex');
-    document.getElementById('sector-input').focus();
+    const modal = document.getElementById('add-sector-modal');
+    const input = document.getElementById('sector-input');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+    if (input) input.focus();
 }
 
 function closeSectorModal() {
-    document.getElementById('add-sector-modal').classList.add('hidden');
-    document.getElementById('add-sector-modal').classList.remove('flex');
-    document.getElementById('sector-input').value = '';
+    const modal = document.getElementById('add-sector-modal');
+    const input = document.getElementById('sector-input');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+    if (input) input.value = '';
 }
 
 // Slider
@@ -719,19 +735,17 @@ function initializeEventListeners() {
         });
     });
 
-    // Form inputs
-    document.getElementById('input-name').addEventListener('input', markChanged);
-    document.getElementById('input-title').addEventListener('input', markChanged);
+    // Form inputs - with null checks
+    const nameInput = document.getElementById('input-name');
+    const titleInput = document.getElementById('input-title');
+    if (nameInput) nameInput.addEventListener('input', markChanged);
+    if (titleInput) titleInput.addEventListener('input', markChanged);
 
     // Typography selection
-    document.getElementById('typo-modern').addEventListener('click', () => {
-        updateTypography('modern');
-        markChanged();
-    });
-    document.getElementById('typo-serif').addEventListener('click', () => {
-        updateTypography('serif');
-        markChanged();
-    });
+    const typoModern = document.getElementById('typo-modern');
+    const typoSerif = document.getElementById('typo-serif');
+    if (typoModern) typoModern.addEventListener('click', () => { updateTypography('modern'); markChanged(); });
+    if (typoSerif) typoSerif.addEventListener('click', () => { updateTypography('serif'); markChanged(); });
 
     // Density selection
     document.querySelectorAll('.density-btn').forEach(btn => {
@@ -742,54 +756,70 @@ function initializeEventListeners() {
     });
 
     // Save button
-    document.getElementById('save-btn').addEventListener('click', saveProfile);
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) saveBtn.addEventListener('click', saveProfile);
 
     // Cancel button
-    document.getElementById('cancel-btn').addEventListener('click', () => {
-        if (hasChanges) {
-            if (confirm('Discard unsaved changes?')) {
-                loadUserProfile();
-                hasChanges = false;
+    const cancelBtn = document.getElementById('cancel-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            if (hasChanges) {
+                if (confirm('Discard unsaved changes?')) {
+                    loadUserProfile();
+                    hasChanges = false;
+                }
+            } else {
+                window.location.href = 'dashboard.html';
             }
-        } else {
-            window.location.href = 'dashboard.html';
-        }
-    });
+        });
+    }
 
     // Sector modal
-    document.getElementById('close-sector-modal').addEventListener('click', closeSectorModal);
-    document.getElementById('add-sector-btn').addEventListener('click', () => {
-        const input = document.getElementById('sector-input');
-        addSector(input.value.trim());
-    });
-    document.getElementById('sector-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            addSector(e.target.value.trim());
-        }
-    });
-    document.querySelectorAll('.preset-sector').forEach(btn => {
-        btn.addEventListener('click', () => {
-            addSector(btn.textContent.trim());
+    const closeSectorBtn = document.getElementById('close-sector-modal');
+    const addSectorBtn = document.getElementById('add-sector-btn');
+    const sectorInput = document.getElementById('sector-input');
+    const addSectorModal = document.getElementById('add-sector-modal');
+
+    if (closeSectorBtn) closeSectorBtn.addEventListener('click', closeSectorModal);
+    if (addSectorBtn) {
+        addSectorBtn.addEventListener('click', () => {
+            const input = document.getElementById('sector-input');
+            if (input) addSector(input.value.trim());
         });
+    }
+    if (sectorInput) {
+        sectorInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') addSector(e.target.value.trim());
+        });
+    }
+    document.querySelectorAll('.preset-sector').forEach(btn => {
+        btn.addEventListener('click', () => addSector(btn.textContent.trim()));
     });
 
     // Close modal on backdrop click
-    document.getElementById('add-sector-modal').addEventListener('click', (e) => {
-        if (e.target === e.currentTarget) closeSectorModal();
-    });
+    if (addSectorModal) {
+        addSectorModal.addEventListener('click', (e) => {
+            if (e.target === e.currentTarget) closeSectorModal();
+        });
+    }
 
     // Avatar upload
-    document.getElementById('avatar-upload-btn').addEventListener('click', () => {
-        document.getElementById('avatar-input').click();
-    });
-    document.getElementById('avatar-input').addEventListener('change', handleAvatarUpload);
+    const avatarUploadBtn = document.getElementById('avatar-upload-btn');
+    const avatarInput = document.getElementById('avatar-input');
+    if (avatarUploadBtn && avatarInput) {
+        avatarUploadBtn.addEventListener('click', () => avatarInput.click());
+        avatarInput.addEventListener('change', handleAvatarUpload);
+    }
 
     // Deactivate
-    document.getElementById('deactivate-btn').addEventListener('click', () => {
-        if (confirm('Are you sure you want to deactivate your account? You can reactivate it later by contacting an admin.')) {
-            showToast('Account deactivation is not available in this version', 'info');
-        }
-    });
+    const deactivateBtn = document.getElementById('deactivate-btn');
+    if (deactivateBtn) {
+        deactivateBtn.addEventListener('click', () => {
+            if (confirm('Are you sure you want to deactivate your account?')) {
+                showToast('Account deactivation is not available in this version', 'info');
+            }
+        });
+    }
 }
 
 function markChanged() {
@@ -830,7 +860,14 @@ async function saveProfile() {
 
         if (!response.ok) {
             const errorData = await response.json().catch(() => ({}));
-            const errorMsg = errorData.error?.message || errorData.error || 'Failed to save profile';
+            let errorMsg = 'Failed to save profile';
+            if (typeof errorData.error === 'string') {
+                errorMsg = errorData.error;
+            } else if (errorData.error?.message) {
+                errorMsg = errorData.error.message;
+            } else if (errorData.message) {
+                errorMsg = errorData.message;
+            }
             throw new Error(errorMsg);
         }
 

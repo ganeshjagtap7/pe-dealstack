@@ -5110,3 +5110,190 @@ CREATE TABLE public."Invitation" (
 
 ---
 
+
+
+---
+
+## February 5, 2026
+
+### Quick Wins - Website Polish & SEO Improvements
+
+#### Favicon Implementation (All Pages)
+- **Type:** Enhancement
+- **Description:** Added favicon.svg to all internal application pages that were missing it
+- **Files Modified:**
+  - `apps/web/dashboard.html`
+  - `apps/web/crm.html`
+  - `apps/web/crm-dynamic.html`
+  - `apps/web/memo-builder.html`
+  - `apps/web/deal.html`
+  - `apps/web/vdr.html`
+  - `apps/web/forgot-password.html`
+  - `apps/web/verify-email.html`
+  - `apps/web/reset-password.html`
+- **Change:** Added `<link rel="icon" type="image/svg+xml" href="favicon.svg"/>` after `<title>` tag
+
+#### SEO Meta Descriptions & Open Graph Tags
+- **Type:** SEO Enhancement
+- **Description:** Added SEO-friendly meta descriptions and Open Graph tags to all main pages
+- **Files Modified:**
+  - `apps/web/index.html` - Added description, og:title, og:description, og:type
+  - `apps/web/pricing.html` - Added description, og:title, og:description, og:type
+  - `apps/web/company.html` - Added description, og:title, og:description, og:type
+  - `apps/web/solutions.html` - Added description, og:title, og:description, og:type
+  - `apps/web/resources.html` - Added description, og:title, og:description, og:type
+  - `apps/web/privacy-policy.html` - Added meta description
+  - `apps/web/terms-of-service.html` - Added meta description
+
+#### Email Standardization
+- **Type:** Content Update
+- **Description:** Standardized all contact emails across the website
+- **Changes:**
+  - General contact: `hello@pocket-fund.com` (used in all footers, contact sections)
+  - Developer/Careers: `ganesh@pocketfund.org` (used in company.html careers section)
+- **Files Modified:** 7 files updated with consistent email addresses
+
+#### Developer Credit
+- **Type:** Enhancement
+- **Description:** Added subtle developer credit in company page footer
+- **File Modified:** `apps/web/company.html`
+- **Change:** Added "Built with ❤️ by Ganesh" with LinkedIn profile link
+- **Styling:** `text-xs text-[#94a3b8]` for subtle appearance
+
+#### Navigation Fix - Pricing Page
+- **Type:** Bug Fix
+- **Description:** Fixed non-functional navigation buttons on pricing page
+- **File Modified:** `apps/web/pricing.html`
+- **Issue:** "Log In" and "Get Started" were `<button>` elements with no functionality
+- **Fix:** Changed to proper `<a>` anchor tags linking to login.html and signup.html
+
+#### Remaining Quick Wins (Identified)
+The following items were identified for future work:
+- [ ] Fix broken `href="#"` placeholder links (15+ in footers)
+- [ ] Remove console.log statements from JS files (20+ debug statements)
+- [ ] Fix non-functional CTA buttons ("View Documentation", "Talk to Sales")
+- [ ] Remove duplicate Material Symbols font import in index.html (line 17-18)
+- [ ] Add mobile menu toggle functionality
+
+---
+
+## February 5, 2026 - Evening Session
+
+### Timestamp: 04:30 AM IST
+
+---
+
+### Render Deployment Fix - TypeScript Build Error
+
+#### Issue
+- **Type:** Critical Bug Fix
+- **Description:** Render deployment failing with TypeScript compilation errors
+- **Error:** `Property 'log' does not exist on type '{ loginSuccess: ... }'` at lines 257, 512, 573 in `invitations.ts`
+
+#### Root Cause
+The `AuditLog` service object in `auditLog.ts` didn't have a generic `log()` method. The invitations routes were calling `AuditLog.log()` which didn't exist - only specific methods like `loginSuccess`, `dealCreated`, etc. were available.
+
+#### Solution
+Added missing audit log infrastructure:
+
+**File Modified:** `apps/api/src/services/auditLog.ts`
+1. Added invitation-related audit action types:
+   - `INVITATION_SENT`
+   - `INVITATION_ACCEPTED`
+   - `INVITATION_REVOKED`
+2. Added `INVITATION` to `RESOURCE_TYPES`
+3. Added generic `log()` method to the `AuditLog` object for custom events
+
+#### Commits
+- `605cba4` - fix: Add missing log method and invitation audit types to AuditLog
+
+---
+
+### Timestamp: 04:45 AM IST
+
+---
+
+### Vite Build Configuration Fix - Missing HTML Pages
+
+#### Issue
+- **Type:** Bug Fix
+- **Description:** Production pages (solutions.html, resources.html, company.html, etc.) showing the landing page instead of their actual content
+- **Root Cause:** Vite config had a fixed list of HTML files in `rollupOptions.input`, and newer pages weren't included
+
+#### Solution
+**File Modified:** `apps/web/vite.config.ts`
+
+Added missing HTML pages to Vite build input:
+- `solutions.html`
+- `resources.html`
+- `company.html`
+- `privacy-policy.html`
+- `terms-of-service.html`
+- `accept-invite.html`
+- `settings.html`
+
+#### Commits
+- `669ea15` - fix: Add missing HTML pages to Vite build config
+
+---
+
+### Timestamp: 05:00 AM IST
+
+---
+
+### Settings Page Error Toast Fix
+
+#### Issue
+- **Type:** Bug Fix
+- **Description:** Settings page showing `[object Object]` in error toasts instead of actual error messages
+
+#### Root Cause
+The API returns errors in format: `{ "success": false, "error": { "code": "...", "message": "..." } }`
+
+But the frontend was using `errorData.error` directly instead of `errorData.error.message`, causing the object to be coerced to string `[object Object]`.
+
+#### Solution
+**File Modified:** `apps/web/settings.html`
+
+Updated error handling in `loadUserProfile()` and `saveProfile()` functions:
+```javascript
+// Before
+throw new Error(errorData.error || 'Failed to load profile');
+
+// After  
+let errorMsg = 'Failed to load profile';
+if (typeof errorData.error === 'string') {
+    errorMsg = errorData.error;
+} else if (errorData.error?.message) {
+    errorMsg = errorData.error.message;
+} else if (errorData.message) {
+    errorMsg = errorData.message;
+}
+throw new Error(errorMsg);
+```
+
+Also added improvements:
+- HTML escaping helper function for sector tags (XSS prevention)
+- Null checks for DOM elements throughout
+- Better error message extraction supporting multiple API response formats
+
+#### Commits
+- `56d9e0a` - fix: Handle API error response format in settings page
+
+---
+
+### Summary of Today's Evening Session
+
+| Time | Task | Type | Status |
+|------|------|------|--------|
+| 04:30 AM | AuditLog TypeScript fix | Bug Fix | ✅ Deployed |
+| 04:45 AM | Vite build config for missing pages | Bug Fix | ✅ Deployed |
+| 05:00 AM | Settings page error handling | Bug Fix | ✅ Deployed |
+
+#### Key Learnings
+1. Always verify Vite build config includes all HTML pages when adding new pages
+2. API error responses should be consistently handled - check for both `error.message` and `error` string formats
+3. Generic audit log methods are useful for custom events beyond pre-defined actions
+
+---
+
