@@ -216,6 +216,24 @@ async function updatePassword(newPassword) {
 }
 
 /**
+ * Resend verification email
+ * Used when user didn't receive the email or link expired
+ */
+async function resendVerificationEmail(email) {
+  const client = await initSupabase();
+
+  const { error } = await client.auth.resend({
+    type: 'signup',
+    email: email,
+    options: {
+      emailRedirectTo: `${window.location.origin}/verify-email.html`,
+    }
+  });
+
+  return { error };
+}
+
+/**
  * Make an authenticated API request
  * Automatically includes the Authorization header
  */
@@ -250,6 +268,7 @@ window.PEAuth = {
   onAuthStateChange,
   resetPassword,
   updatePassword,
+  resendVerificationEmail,
   authFetch,
   SUPABASE_URL,
 };

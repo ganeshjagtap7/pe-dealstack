@@ -4,6 +4,7 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Email Verified - PE OS</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
@@ -95,15 +96,46 @@
 
             <!-- Error Message -->
             <h1 class="text-2xl font-bold text-[#111418] mb-2">Verification Failed</h1>
-            <p id="errorMessage" class="text-gray-500 text-sm mb-6">
+            <p id="errorMessage" class="text-gray-500 text-sm mb-4">
                 This verification link is invalid or has expired.
             </p>
+
+            <!-- Resend Email Form -->
+            <div id="resendForm" class="mb-4">
+                <p class="text-gray-600 text-sm mb-3">Enter your email to receive a new verification link:</p>
+                <div class="flex gap-2">
+                    <input
+                        type="email"
+                        id="resendEmail"
+                        placeholder="your@email.com"
+                        class="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    <button
+                        id="resendBtn"
+                        onclick="resendVerification()"
+                        class="bg-primary hover:bg-primary-hover text-white font-medium rounded-lg px-4 py-2 text-sm transition-all duration-200 disabled:opacity-50"
+                    >
+                        Resend
+                    </button>
+                </div>
+                <p id="resendMessage" class="text-sm mt-2 hidden"></p>
+            </div>
+
+            <!-- Divider -->
+            <div class="relative my-4">
+                <div class="absolute inset-0 flex items-center">
+                    <div class="w-full border-t border-gray-200"></div>
+                </div>
+                <div class="relative flex justify-center text-xs">
+                    <span class="bg-white px-2 text-gray-400">or</span>
+                </div>
+            </div>
 
             <!-- Action Buttons -->
             <div class="flex flex-col gap-3">
                 <a
                     href="signup.html"
-                    class="inline-flex items-center justify-center gap-2 w-full bg-primary hover:bg-primary-hover text-white font-medium rounded-lg h-12 transition-all duration-200"
+                    class="inline-flex items-center justify-center gap-2 w-full bg-white hover:bg-gray-50 text-[#111418] border border-gray-200 font-medium rounded-lg h-12 transition-all duration-200"
                 >
                     <span>Sign Up Again</span>
                 </a>
@@ -132,7 +164,7 @@
 
     <!-- Footer -->
     <footer class="w-full py-6 text-center text-xs text-gray-400">
-        © 2024 PE OS Inc. All rights reserved.
+        © 2026 PE OS. All rights reserved.
     </footer>
 
     <!-- Supabase Client -->
@@ -178,6 +210,56 @@
             }
         }
 
+        // Resend verification email
+        async function resendVerification() {
+            const emailInput = document.getElementById('resendEmail');
+            const resendBtn = document.getElementById('resendBtn');
+            const resendMessage = document.getElementById('resendMessage');
+            const email = emailInput.value.trim();
+
+            if (!email) {
+                resendMessage.textContent = 'Please enter your email address.';
+                resendMessage.className = 'text-sm mt-2 text-red-500';
+                resendMessage.classList.remove('hidden');
+                return;
+            }
+
+            // Validate email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(email)) {
+                resendMessage.textContent = 'Please enter a valid email address.';
+                resendMessage.className = 'text-sm mt-2 text-red-500';
+                resendMessage.classList.remove('hidden');
+                return;
+            }
+
+            // Show loading state
+            resendBtn.disabled = true;
+            resendBtn.textContent = 'Sending...';
+            resendMessage.classList.add('hidden');
+
+            try {
+                const { error } = await PEAuth.resendVerificationEmail(email);
+
+                if (error) {
+                    resendMessage.textContent = error.message || 'Failed to send verification email.';
+                    resendMessage.className = 'text-sm mt-2 text-red-500';
+                } else {
+                    resendMessage.textContent = 'Verification email sent! Check your inbox.';
+                    resendMessage.className = 'text-sm mt-2 text-green-600';
+                    emailInput.value = '';
+                }
+                resendMessage.classList.remove('hidden');
+            } catch (err) {
+                resendMessage.textContent = 'An error occurred. Please try again.';
+                resendMessage.className = 'text-sm mt-2 text-red-500';
+                resendMessage.classList.remove('hidden');
+            } finally {
+                resendBtn.disabled = false;
+                resendBtn.textContent = 'Resend';
+            }
+        }
+
         // Check verification status on page load
         document.addEventListener('DOMContentLoaded', async function() {
             // Show loading state initially
@@ -186,20 +268,52 @@
             loadingState.classList.remove('hidden');
 
             try {
-                await PEAuth.initSupabase();
+                const client = await PEAuth.initSupabase();
 
-                // Supabase automatically handles the verification when the page loads
-                // Check if there's an error in the URL hash
+                // Check for errors in URL (hash or query params)
                 const hashParams = new URLSearchParams(window.location.hash.substring(1));
-                const error = hashParams.get('error');
-                const errorDescription = hashParams.get('error_description');
+                const queryParams = new URLSearchParams(window.location.search);
+
+                const error = hashParams.get('error') || queryParams.get('error');
+                const errorDescription = hashParams.get('error_description') || queryParams.get('error_description');
 
                 if (error) {
                     showError(errorDescription || 'Email verification failed. Please try again.');
                     return;
                 }
 
-                // Check for successful verification
+                // Check for token_hash (email verification link format)
+                const tokenHash = queryParams.get('token_hash');
+                const type = queryParams.get('type');
+
+                if (tokenHash && type === 'email') {
+                    // Verify the OTP token
+                    const { data, error: verifyError } = await client.auth.verifyOtp({
+                        token_hash: tokenHash,
+                        type: 'email',
+                    });
+
+                    if (verifyError) {
+                        console.error('Verification error:', verifyError);
+                        showError(verifyError.message || 'Email verification failed. The link may have expired.');
+                        return;
+                    }
+
+                    if (data.user) {
+                        showSuccess();
+                        return;
+                    }
+                }
+
+                // Check for access_token in hash (implicit flow)
+                const accessToken = hashParams.get('access_token');
+                if (accessToken) {
+                    // Token is automatically handled by Supabase client
+                    // Wait a moment for the session to be established
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+
+                // Check current user status
                 const { user, session } = await PEAuth.getUser();
 
                 if (user && user.email_confirmed_at) {
@@ -208,7 +322,7 @@
                     // User exists but email not confirmed
                     showError('Email verification is still pending. Please check your inbox.');
                 } else {
-                    // No user - probably an invalid link
+                    // No user and no tokens - invalid link
                     showError('This verification link is invalid or has expired.');
                 }
 
