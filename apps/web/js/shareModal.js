@@ -6,6 +6,14 @@
 const ShareModal = (function() {
   const API_BASE_URL = 'http://localhost:3001/api';
 
+  // XSS prevention - escape HTML entities
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+  }
+
   // State
   let isOpen = false;
   let currentDealId = null;
@@ -219,18 +227,18 @@ const ShareModal = (function() {
         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg group hover:bg-gray-100 transition-colors">
           <div class="flex items-center gap-3">
             ${user.avatar
-              ? `<img src="${user.avatar}" class="w-9 h-9 rounded-full object-cover border border-gray-200" alt="${user.name}" />`
-              : `<div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">${getInitials(user.name)}</div>`
+              ? `<img src="${escapeHtml(user.avatar)}" class="w-9 h-9 rounded-full object-cover border border-gray-200" alt="${escapeHtml(user.name)}" />`
+              : `<div class="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-semibold text-sm">${escapeHtml(getInitials(user.name))}</div>`
             }
             <div>
-              <div class="font-medium text-gray-900 text-sm">${user.name}</div>
-              <div class="text-xs text-gray-500">${user.title || user.email}</div>
+              <div class="font-medium text-gray-900 text-sm">${escapeHtml(user.name)}</div>
+              <div class="text-xs text-gray-500">${escapeHtml(user.title || user.email)}</div>
             </div>
           </div>
           <div class="flex items-center gap-2">
-            <span class="text-xs px-2 py-1 rounded-full ${getRoleBadgeClass(member.role)}">${member.role}</span>
+            <span class="text-xs px-2 py-1 rounded-full ${getRoleBadgeClass(member.role)}">${escapeHtml(member.role)}</span>
             <button
-              onclick="ShareModal.removeMember('${member.id}')"
+              onclick="ShareModal.removeMember('${escapeHtml(member.id)}')"
               class="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
               title="Remove from team"
             >
@@ -278,15 +286,15 @@ const ShareModal = (function() {
     allAddedEl.classList.add('hidden');
 
     listEl.innerHTML = filtered.map(user => `
-      <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer" onclick="ShareModal.addMember('${user.id}')">
+      <div class="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:border-primary/50 hover:bg-primary/5 transition-all cursor-pointer" onclick="ShareModal.addMember('${escapeHtml(user.id)}')">
         <div class="flex items-center gap-3">
           ${user.avatar
-            ? `<img src="${user.avatar}" class="w-9 h-9 rounded-full object-cover border border-gray-200" alt="${user.name}" />`
-            : `<div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm">${getInitials(user.name)}</div>`
+            ? `<img src="${escapeHtml(user.avatar)}" class="w-9 h-9 rounded-full object-cover border border-gray-200" alt="${escapeHtml(user.name)}" />`
+            : `<div class="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center text-gray-600 font-semibold text-sm">${escapeHtml(getInitials(user.name))}</div>`
           }
           <div>
-            <div class="font-medium text-gray-900 text-sm">${user.name}</div>
-            <div class="text-xs text-gray-500">${user.title || user.email}</div>
+            <div class="font-medium text-gray-900 text-sm">${escapeHtml(user.name)}</div>
+            <div class="text-xs text-gray-500">${escapeHtml(user.title || user.email)}</div>
           </div>
         </div>
         <button class="p-2 text-primary hover:bg-primary/10 rounded-lg transition-colors">

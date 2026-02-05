@@ -5,6 +5,15 @@
 
 window.PENotifications = (function() {
     const API_BASE_URL = 'http://localhost:3001/api';
+
+    // XSS prevention - escape HTML entities
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+    }
+
     let unreadCount = 0;
     let notifications = [];
     let isOpen = false;
@@ -196,21 +205,21 @@ window.PENotifications = (function() {
             const isUnread = !notification.isRead;
 
             return `
-                <div class="notification-item flex items-start gap-3 p-4 hover:bg-gray-50 border-b border-gray-100 cursor-pointer transition-colors ${isUnread ? 'bg-primary-light/30' : ''}" data-id="${notification.id}" data-deal-id="${notification.dealId || ''}">
+                <div class="notification-item flex items-start gap-3 p-4 hover:bg-gray-50 border-b border-gray-100 cursor-pointer transition-colors ${isUnread ? 'bg-primary-light/30' : ''}" data-id="${escapeHtml(notification.id)}" data-deal-id="${escapeHtml(notification.dealId || '')}">
                     <div class="size-10 rounded-full ${bg} flex items-center justify-center shrink-0">
                         <span class="material-symbols-outlined ${color}">${icon}</span>
                     </div>
                     <div class="flex-1 min-w-0">
                         <div class="flex items-start justify-between gap-2">
-                            <p class="text-sm ${isUnread ? 'font-bold' : 'font-medium'} text-gray-900 leading-tight">${notification.title}</p>
+                            <p class="text-sm ${isUnread ? 'font-bold' : 'font-medium'} text-gray-900 leading-tight">${escapeHtml(notification.title)}</p>
                             ${isUnread ? '<div class="size-2 rounded-full bg-primary shrink-0 mt-1.5"></div>' : ''}
                         </div>
-                        ${notification.message ? `<p class="text-xs text-gray-500 mt-0.5 line-clamp-2">${notification.message}</p>` : ''}
+                        ${notification.message ? `<p class="text-xs text-gray-500 mt-0.5 line-clamp-2">${escapeHtml(notification.message)}</p>` : ''}
                         <div class="flex items-center gap-2 mt-1">
                             <span class="text-[10px] text-gray-400">${timeAgo}</span>
                             ${notification.Deal?.name ? `
                                 <span class="text-[10px] text-gray-400">•</span>
-                                <span class="text-[10px] text-primary font-medium">${notification.Deal.name}</span>
+                                <span class="text-[10px] text-primary font-medium">${escapeHtml(notification.Deal.name)}</span>
                             ` : ''}
                         </div>
                     </div>
@@ -308,8 +317,8 @@ window.PENotifications = (function() {
         toast.innerHTML = `
             <span class="material-symbols-outlined text-white">${type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info'}</span>
             <div class="flex-1">
-                <p class="font-bold text-sm">${title}</p>
-                <p class="text-sm opacity-90">${message}</p>
+                <p class="font-bold text-sm">${escapeHtml(title)}</p>
+                <p class="text-sm opacity-90">${escapeHtml(message)}</p>
             </div>
             <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white">
                 <span class="material-symbols-outlined text-sm">close</span>

@@ -5,6 +5,15 @@
 
 window.PEGlobalSearch = (function() {
     const API_BASE_URL = 'http://localhost:3001/api';
+
+    // XSS prevention - escape HTML entities
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+    }
+
     let isOpen = false;
     let searchTimeout = null;
     let selectedIndex = 0;
@@ -184,7 +193,7 @@ window.PEGlobalSearch = (function() {
             container.innerHTML = `
                 <div class="flex flex-col items-center justify-center py-8 text-gray-400">
                     <span class="material-symbols-outlined text-3xl mb-2">search_off</span>
-                    <p class="text-sm font-medium">No results found for "${query}"</p>
+                    <p class="text-sm font-medium">No results found for "${escapeHtml(query)}"</p>
                     <p class="text-xs mt-1">Try a different search term</p>
                 </div>
             `;
@@ -210,7 +219,7 @@ window.PEGlobalSearch = (function() {
                         </div>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm font-medium text-gray-800 truncate">${highlightMatch(deal.name, query)}</p>
-                            <p class="text-xs text-gray-500 truncate">${deal.industry || 'No industry'} • ${formatStage(deal.stage)}</p>
+                            <p class="text-xs text-gray-500 truncate">${escapeHtml(deal.industry) || 'No industry'} • ${formatStage(deal.stage)}</p>
                         </div>
                         ${deal.dealSize ? `<span class="text-xs font-bold text-gray-500">$${deal.dealSize}M</span>` : ''}
                     </div>
@@ -243,11 +252,14 @@ window.PEGlobalSearch = (function() {
         addResultClickHandlers();
     }
 
-    // Highlight matching text
+    // Highlight matching text (with XSS protection)
     function highlightMatch(text, query) {
-        if (!query) return text;
-        const regex = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-        return text.replace(regex, '<mark class="bg-amber-200 px-0.5 rounded">$1</mark>');
+        if (!text) return '';
+        const escaped = escapeHtml(text);
+        if (!query) return escaped;
+        const escapedQuery = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`(${escapedQuery})`, 'gi');
+        return escaped.replace(regex, '<mark class="bg-amber-200 px-0.5 rounded">$1</mark>');
     }
 
     // Format stage label

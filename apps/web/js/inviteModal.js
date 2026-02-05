@@ -7,6 +7,14 @@
 const InviteModal = (function() {
   const API_BASE_URL = 'http://localhost:3001/api';
 
+  // XSS prevention - escape HTML entities
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[char]));
+  }
+
   // State
   let isOpen = false;
   let inviteRows = [];
@@ -135,8 +143,8 @@ const InviteModal = (function() {
 
     const dealTags = row.deals.map(deal => `
       <div class="invite-tag bg-[#1269e2]/10 border border-[#1269e2]/20 text-[#1269e2] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs">
-        <span>${deal.name}</span>
-        <button onclick="InviteModal.removeDealFromRow(${row.id}, '${deal.id}')" class="hover:text-[#1269e2]/70 text-[#1269e2]/50">
+        <span>${escapeHtml(deal.name)}</span>
+        <button onclick="InviteModal.removeDealFromRow(${row.id}, '${escapeHtml(deal.id)}')" class="hover:text-[#1269e2]/70 text-[#1269e2]/50">
           <span class="material-symbols-outlined text-[14px]">close</span>
         </button>
       </div>
@@ -281,9 +289,9 @@ const InviteModal = (function() {
       dropdown.innerHTML = available.map(deal => `
         <button
           class="w-full text-left px-4 py-2 text-sm hover:bg-[#1269e2]/5 text-[#343A40] transition-colors"
-          onclick="InviteModal.addDealToRow(${rowId}, '${deal.id}', '${deal.name}')"
+          onclick="InviteModal.addDealToRow(${rowId}, '${escapeHtml(deal.id)}', '${escapeHtml(deal.name)}')"
         >
-          ${deal.name}
+          ${escapeHtml(deal.name)}
         </button>
       `).join('');
     }
@@ -310,9 +318,9 @@ const InviteModal = (function() {
       dropdown.innerHTML = filtered.map(deal => `
         <button
           class="w-full text-left px-4 py-2 text-sm hover:bg-[#1269e2]/5 text-[#343A40] transition-colors"
-          onclick="InviteModal.addDealToRow(${rowId}, '${deal.id}', '${deal.name}')"
+          onclick="InviteModal.addDealToRow(${rowId}, '${escapeHtml(deal.id)}', '${escapeHtml(deal.name)}')"
         >
-          ${deal.name}
+          ${escapeHtml(deal.name)}
         </button>
       `).join('');
     }

@@ -4,6 +4,14 @@
  */
 
 window.PEDocPreview = (function() {
+    // XSS prevention - escape HTML entities
+    function escapeHtml(str) {
+        if (!str) return '';
+        return String(str).replace(/[&<>"']/g, char => ({
+            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+        }[char]));
+    }
+
     // PDF.js library URL
     const PDF_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
     const PDF_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -100,8 +108,8 @@ window.PEDocPreview = (function() {
                             <span class="material-symbols-outlined">${icon}</span>
                         </div>
                         <div>
-                            <h3 class="font-bold text-gray-900 text-sm">${title || filename}</h3>
-                            <p class="text-xs text-gray-500">${filename}</p>
+                            <h3 class="font-bold text-gray-900 text-sm">${escapeHtml(title || filename)}</h3>
+                            <p class="text-xs text-gray-500">${escapeHtml(filename)}</p>
                         </div>
                     </div>
                     <div class="flex items-center gap-2">
@@ -167,7 +175,7 @@ window.PEDocPreview = (function() {
                 <div class="flex flex-col items-center justify-center h-full text-center p-8">
                     <span class="material-symbols-outlined text-red-500 text-4xl mb-3">error</span>
                     <p class="text-gray-900 font-medium mb-1">Preview Not Available</p>
-                    <p class="text-gray-500 text-sm">${message}</p>
+                    <p class="text-gray-500 text-sm">${escapeHtml(message)}</p>
                 </div>
             `;
         }
@@ -301,8 +309,8 @@ window.PEDocPreview = (function() {
                 tabsHtml = `
                     <div class="flex gap-1 mb-4 overflow-x-auto pb-2">
                         ${workbook.SheetNames.map((name, i) => `
-                            <button class="sheet-tab px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${i === 0 ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}" data-sheet="${name}">
-                                ${name}
+                            <button class="sheet-tab px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${i === 0 ? 'bg-primary text-white' : 'bg-white text-gray-600 hover:bg-gray-100'}" data-sheet="${escapeHtml(name)}">
+                                ${escapeHtml(name)}
                             </button>
                         `).join('')}
                     </div>
@@ -320,13 +328,13 @@ window.PEDocPreview = (function() {
                             <table class="w-full text-sm">
                                 <thead>
                                     <tr class="bg-gray-50 border-b border-gray-200">
-                                        ${headers.map(h => `<th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">${h || ''}</th>`).join('')}
+                                        ${headers.map(h => `<th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">${escapeHtml(h) || ''}</th>`).join('')}
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-gray-100">
                                     ${rows.slice(0, 100).map(row => `
                                         <tr class="hover:bg-gray-50">
-                                            ${headers.map((_, i) => `<td class="px-4 py-2.5 text-gray-600 whitespace-nowrap">${row[i] ?? ''}</td>`).join('')}
+                                            ${headers.map((_, i) => `<td class="px-4 py-2.5 text-gray-600 whitespace-nowrap">${escapeHtml(row[i]) ?? ''}</td>`).join('')}
                                         </tr>
                                     `).join('')}
                                 </tbody>
@@ -418,13 +426,13 @@ window.PEDocPreview = (function() {
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="bg-gray-50 border-b border-gray-200">
-                                    ${headers.map(h => `<th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">${h}</th>`).join('')}
+                                    ${headers.map(h => `<th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">${escapeHtml(h)}</th>`).join('')}
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-100">
                                 ${dataRows.slice(0, 100).map(row => `
                                     <tr class="hover:bg-gray-50">
-                                        ${headers.map((_, i) => `<td class="px-4 py-2.5 text-gray-600 whitespace-nowrap">${row[i] || ''}</td>`).join('')}
+                                        ${headers.map((_, i) => `<td class="px-4 py-2.5 text-gray-600 whitespace-nowrap">${escapeHtml(row[i]) || ''}</td>`).join('')}
                                     </tr>
                                 `).join('')}
                             </tbody>
