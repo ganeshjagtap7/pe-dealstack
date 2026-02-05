@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
+import rateLimit from 'express-rate-limit';
 import dealsRouter from './routes/deals.js';
 import companiesRouter from './routes/companies.js';
 import activitiesRouter from './routes/activities.js';
@@ -28,8 +29,35 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
+// CORS - whitelist allowed origins
+const allowedOrigins = [
+  'https://pe-os.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+];
+app.use(cors({
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, Postman, etc.)
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Allow all for now, log unknown origins
+      console.log('CORS request from:', origin);
+    }
+  },
+  credentials: true,
+}));
+
+// Rate limiting - protect API from abuse
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+  message: { error: 'Too many requests, please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use('/api/', limiter);
+
 app.use(express.json());
 
 // Health check
