@@ -166,7 +166,12 @@ router.post('/', async (req, res) => {
       .single();
 
     // Audit log
-    await AuditLog.log(req, 'TEMPLATE_CREATED', 'MemoTemplate', template.id, null, { name: template.name });
+    await AuditLog.log(req, {
+      action: 'TEMPLATE_CREATED',
+      resourceType: 'MemoTemplate',
+      resourceId: template.id,
+      metadata: { name: template.name },
+    });
 
     res.status(201).json(fullTemplate);
   } catch (error) {
@@ -226,7 +231,12 @@ router.delete('/:id', requirePermission(PERMISSIONS.MEMO_DELETE), async (req, re
     if (error) throw error;
 
     // Audit log
-    await AuditLog.log(req, 'TEMPLATE_DELETED', 'MemoTemplate', id, null, { name: template?.name });
+    await AuditLog.log(req, {
+      action: 'TEMPLATE_DELETED',
+      resourceType: 'MemoTemplate',
+      resourceId: id,
+      metadata: { name: template?.name },
+    });
 
     res.json({ success: true });
   } catch (error) {
