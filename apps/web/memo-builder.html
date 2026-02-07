@@ -203,7 +203,21 @@
                     Add Section
                 </button>
             </div>
-            <div class="p-4 shrink-0">
+            <div class="p-4 shrink-0 space-y-3">
+                <!-- Template Settings Card -->
+                <a href="/templates.html" id="template-settings-card" class="block bg-white rounded-lg p-3 border border-slate-200 hover:border-primary/50 hover:shadow-sm transition-all group">
+                    <div class="flex items-center gap-2 text-slate-700 group-hover:text-primary font-semibold text-xs mb-1">
+                        <span class="material-symbols-outlined text-[16px]">description</span>
+                        <span>Memo Templates</span>
+                    </div>
+                    <p class="text-[11px] text-slate-500 mb-2">Using: <span id="current-template-name" class="font-medium text-slate-700">Standard IC Memo</span></p>
+                    <div class="flex items-center gap-1 text-[10px] text-primary font-medium group-hover:underline">
+                        <span>Change Template</span>
+                        <span class="material-symbols-outlined text-[12px]">chevron_right</span>
+                    </div>
+                </a>
+
+                <!-- Compliance Check Card -->
                 <div id="compliance-badge" class="bg-primary-light rounded-lg p-3 border border-primary/20">
                     <div class="flex items-center gap-2 text-primary font-semibold text-xs mb-1">
                         <span class="material-symbols-outlined text-[16px]">verified_user</span>

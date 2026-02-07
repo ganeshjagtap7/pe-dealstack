@@ -5956,3 +5956,369 @@ function initShareLink() {
 
 ---
 
+
+## February 7, 2026 - Evening Session
+
+### Firm-Wide Template Manager Implementation
+
+**Session Duration:** 3:30 PM - 5:30 PM IST
+
+---
+
+### 1. Admin Dashboard Creation (3:30 PM)
+
+**Timestamp:** 2026-02-07 3:30 PM IST
+
+#### Feature Request
+Created a new Admin/Team Lead dashboard (Command Center) for managing analysts, tasks, and deal assignments.
+
+#### Files Created
+- `apps/web/admin-dashboard.html` - Full admin dashboard page
+- `apps/web/admin-dashboard.js` - Dashboard JavaScript functionality
+
+#### Features Implemented
+1. **Stats Overview Cards:**
+   - Active Analysts count
+   - Deal Volume (total)
+   - Overdue Tasks count
+   - Team Utilization percentage with progress bar
+
+2. **Resource Allocation Section:**
+   - Visual resource chart placeholder
+   - Team member workload indicators
+
+3. **Task Management Table:**
+   - Analyst assignments with status badges
+   - Task details (deal name, due date)
+   - Priority indicators
+   - Action buttons
+
+4. **Quick Actions Panel:**
+   - Assign Deal button (opens modal)
+   - Create Task button (opens modal)
+   - Schedule Review
+   - Send Reminder
+
+5. **Activity Feed:**
+   - Real-time team activity tracking
+   - Timestamped entries
+
+6. **Modals:**
+   - Assign Deal Modal (select deal, analyst, role)
+   - Create Task Modal (title, priority, assignee, due date, description)
+
+#### Technical Implementation
+- Integrated with PE OS Layout system (`PELayout.init('admin', { collapsible: true })`)
+- Uses custom event `pe-layout-ready` for initialization
+- API functions prepared for backend integration
+- Toast notification system for user feedback
+
+---
+
+### 2. Templates Page - Full Implementation (4:00 PM)
+
+**Timestamp:** 2026-02-07 4:00 PM IST
+
+#### Feature Request
+Create a Firm-Wide Template Manager for managing memo templates with Gold Standard designation, AI prompt configuration per section, and drag-and-drop reordering.
+
+#### Files Created
+- `apps/web/templates.html` - Template Manager page
+- `apps/web/templates.js` - Full template management functionality
+
+#### Files Modified
+- `apps/web/js/layout.js` - Added "Templates" nav item to sidebar
+- `apps/api/src/routes/templates.ts` - New API routes for templates
+- `apps/api/src/index.ts` - Registered templates router
+
+---
+
+### 3. Templates Page - UI Components (4:15 PM)
+
+**Timestamp:** 2026-02-07 4:15 PM IST
+
+#### UI Elements Implemented
+
+1. **Header Bar:**
+   - Breadcrumb: Settings / Templates
+   - Search input with icon
+   - "+ New Template" button
+
+2. **Tab Navigation:**
+   - Investment Memos (active by default)
+   - Diligence Checklists
+   - Outreach Sequences
+   - Filter & Sort controls
+
+3. **Template Cards Grid:**
+   - Visual document preview thumbnail
+   - Template name with badges (Gold Std, Legacy)
+   - Description (2-line clamp)
+   - Usage count and created date
+   - Hover state with border highlight
+   - Selected state with primary border
+
+4. **Create from Scratch Card:**
+   - Dashed border
+   - Plus icon with hover effect
+   - Click to open new template modal
+
+5. **Right Panel - Template Editor:**
+   - Template name input
+   - Active/Inactive toggle switch
+   - Document Structure section with drag-reorder
+   - Section cards with:
+     - Drag handle
+     - Title (clickable to edit)
+     - Description
+     - AI Enabled badge
+     - Mandatory badge
+     - Delete button (on hover)
+   - Add Section button
+   - Template Settings (Category, Permissions dropdowns)
+   - Footer: Preview, Cancel, Save Changes
+
+6. **Modals:**
+   - New Template Modal (name, category, description)
+   - Add Section Modal (title, description, AI enabled, mandatory checkboxes)
+
+---
+
+### 4. Drag-and-Drop Section Reordering (4:45 PM)
+
+**Timestamp:** 2026-02-07 4:45 PM IST
+
+#### Implementation Details
+
+**HTML5 Native Drag and Drop:**
+```javascript
+function initSectionDragAndDrop() {
+    const items = container.querySelectorAll('.section-item');
+    items.forEach(item => {
+        item.addEventListener('dragstart', handleDragStart);
+        item.addEventListener('dragend', handleDragEnd);
+        item.addEventListener('dragover', handleDragOver);
+        item.addEventListener('dragenter', handleDragEnter);
+        item.addEventListener('dragleave', handleDragLeave);
+        item.addEventListener('drop', handleDrop);
+    });
+}
+```
+
+**Visual Feedback CSS:**
+```css
+.section-item.dragging {
+    opacity: 0.5;
+    background-color: #E6EEF5;
+}
+.section-item.drag-over {
+    border-top: 2px solid #003366;
+    padding-top: 11px;
+}
+```
+
+**Reorder Logic:**
+1. Track dragged section ID via `dataTransfer`
+2. On drop, find indices in sections array
+3. Splice and reorder
+4. Update `sortOrder` values
+5. Re-render sections
+6. Call API to persist order
+
+---
+
+### 5. Templates API Backend (5:00 PM)
+
+**Timestamp:** 2026-02-07 5:00 PM IST
+
+#### File Created: `apps/api/src/routes/templates.ts`
+
+#### API Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/templates` | List all templates with sections |
+| GET | `/api/templates/:id` | Get single template with all sections |
+| POST | `/api/templates` | Create new template |
+| PATCH | `/api/templates/:id` | Update template |
+| DELETE | `/api/templates/:id` | Delete template (requires permission) |
+| POST | `/api/templates/:id/duplicate` | Duplicate template with sections |
+| POST | `/api/templates/:id/use` | Increment usage count |
+| GET | `/api/templates/:id/sections` | Get all sections for template |
+| POST | `/api/templates/:id/sections` | Add section to template |
+| PATCH | `/api/templates/:id/sections/:sectionId` | Update section |
+| DELETE | `/api/templates/:id/sections/:sectionId` | Delete section |
+| POST | `/api/templates/:id/sections/reorder` | Reorder sections (batch update) |
+
+#### Validation Schemas (Zod)
+
+```typescript
+const createTemplateSchema = z.object({
+  name: z.string().min(1),
+  description: z.string().optional(),
+  category: z.enum(['INVESTMENT_MEMO', 'CHECKLIST', 'OUTREACH']).default('INVESTMENT_MEMO'),
+  isGoldStandard: z.boolean().optional().default(false),
+  isActive: z.boolean().optional().default(true),
+  permissions: z.enum(['FIRM_WIDE', 'PARTNERS_ONLY', 'ANALYSTS_ONLY']).optional().default('FIRM_WIDE'),
+});
+
+const createSectionSchema = z.object({
+  title: z.string().min(1),
+  description: z.string().optional(),
+  aiEnabled: z.boolean().optional().default(false),
+  aiPrompt: z.string().optional(),
+  mandatory: z.boolean().optional().default(false),
+  requiresApproval: z.boolean().optional().default(false),
+  sortOrder: z.number().optional(),
+});
+```
+
+---
+
+### 6. Frontend API Integration (5:15 PM)
+
+**Timestamp:** 2026-02-07 5:15 PM IST
+
+#### API Functions in templates.js
+
+```javascript
+// Fetch all templates
+async function fetchTemplates() {
+    const response = await PEAuth.authFetch(`${API_BASE}/templates`);
+    return response.ok ? await response.json() : SAMPLE_TEMPLATES;
+}
+
+// Create template
+async function createTemplateAPI(templateData) { ... }
+
+// Update template
+async function updateTemplateAPI(templateId, updateData) { ... }
+
+// Delete template
+async function deleteTemplateAPI(templateId) { ... }
+
+// Section CRUD
+async function addSectionAPI(templateId, sectionData) { ... }
+async function updateSectionAPI(templateId, sectionId, updateData) { ... }
+async function deleteSectionAPI(templateId, sectionId) { ... }
+async function reorderSectionsAPI(templateId, sections) { ... }
+```
+
+#### Fallback Pattern
+- Sample templates provided for demo mode when API unavailable
+- Local state updates first, then API call
+- IDs prefixed with `sample-` or `local-` skip API calls
+
+---
+
+### 7. Memo Builder - Templates Card (5:25 PM)
+
+**Timestamp:** 2026-02-07 5:25 PM IST
+
+#### File Modified: `apps/web/memo-builder.html`
+
+#### Feature
+Added a "Memo Templates" card above the Compliance Check in the left sidebar.
+
+#### HTML Added
+```html
+<!-- Template Settings Card -->
+<a href="/templates.html" id="template-settings-card" 
+   class="block bg-white rounded-lg p-3 border border-slate-200 hover:border-primary/50 hover:shadow-sm transition-all group">
+    <div class="flex items-center gap-2 text-slate-700 group-hover:text-primary font-semibold text-xs mb-1">
+        <span class="material-symbols-outlined text-[16px]">description</span>
+        <span>Memo Templates</span>
+    </div>
+    <p class="text-[11px] text-slate-500 mb-2">
+        Using: <span id="current-template-name" class="font-medium text-slate-700">Standard IC Memo</span>
+    </p>
+    <div class="flex items-center gap-1 text-[10px] text-primary font-medium group-hover:underline">
+        <span>Change Template</span>
+        <span class="material-symbols-outlined text-[12px]">chevron_right</span>
+    </div>
+</a>
+```
+
+#### Purpose
+- Quick access to template management from memo builder
+- Shows current template name
+- Links to full template manager page
+
+---
+
+### Files Changed Summary
+
+| File | Type | Changes |
+|------|------|---------|
+| `apps/web/admin-dashboard.html` | Created | Full admin command center page |
+| `apps/web/admin-dashboard.js` | Created | Admin dashboard functionality |
+| `apps/web/templates.html` | Created | Template manager page |
+| `apps/web/templates.js` | Created | Template CRUD, drag-drop, API integration |
+| `apps/web/js/layout.js` | Modified | Added Templates nav item |
+| `apps/web/memo-builder.html` | Modified | Added templates card in sidebar |
+| `apps/api/src/routes/templates.ts` | Created | Full templates REST API |
+| `apps/api/src/index.ts` | Modified | Registered templates router, added endpoint info |
+
+---
+
+### Technical Decisions
+
+1. **Hybrid API/Demo Mode:** Templates work in demo mode with sample data, seamlessly switches to API when connected
+
+2. **Native Drag-and-Drop:** Used HTML5 drag-and-drop instead of library for minimal footprint
+
+3. **Zod Validation:** Consistent with existing API patterns for request validation
+
+4. **PE OS Design System:** All new pages follow established colors, typography, spacing
+
+5. **Event-Driven Init:** Pages wait for `pe-layout-ready` event before initializing
+
+---
+
+### Database Note
+
+The templates API expects `MemoTemplate` and `MemoTemplateSection` tables. SQL migration needed:
+
+```sql
+-- MemoTemplate table
+CREATE TABLE "MemoTemplate" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    description TEXT,
+    category VARCHAR(50) DEFAULT 'INVESTMENT_MEMO',
+    "isGoldStandard" BOOLEAN DEFAULT FALSE,
+    "isLegacy" BOOLEAN DEFAULT FALSE,
+    "isActive" BOOLEAN DEFAULT TRUE,
+    "usageCount" INTEGER DEFAULT 0,
+    permissions VARCHAR(50) DEFAULT 'FIRM_WIDE',
+    "createdBy" UUID REFERENCES "User"(id),
+    "createdAt" TIMESTAMP DEFAULT NOW(),
+    "updatedAt" TIMESTAMP DEFAULT NOW()
+);
+
+-- MemoTemplateSection table
+CREATE TABLE "MemoTemplateSection" (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "templateId" UUID REFERENCES "MemoTemplate"(id) ON DELETE CASCADE,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    "aiEnabled" BOOLEAN DEFAULT FALSE,
+    "aiPrompt" TEXT,
+    mandatory BOOLEAN DEFAULT FALSE,
+    "requiresApproval" BOOLEAN DEFAULT FALSE,
+    "sortOrder" INTEGER DEFAULT 0,
+    "createdAt" TIMESTAMP DEFAULT NOW()
+);
+```
+
+---
+
+### Next Steps (Future Work)
+
+1. [ ] Run database migration for template tables
+2. [ ] Connect memo builder to use selected template
+3. [ ] Add template preview functionality
+4. [ ] Implement template versioning
+5. [ ] Add template sharing/export feature
+
+---

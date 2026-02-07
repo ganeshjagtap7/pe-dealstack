@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Template Manager - PE OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#003366",
+                        "primary-hover": "#002855",
+                        "primary-light": "#E6EEF5",
+                        "secondary": "#059669",
+                        "secondary-light": "#D1FAE5",
+                        "background-body": "#F8F9FA",
+                        "surface-card": "#FFFFFF",
+                        "border-subtle": "#E5E7EB",
+                        "border-focus": "#CBD5E1",
+                        "text-main": "#111827",
+                        "text-secondary": "#4B5563",
+                        "text-muted": "#9CA3AF",
+                        "accent-warning": "#F59E0B",
+                        "accent-danger": "#EF4444",
+                    },
+                    fontFamily: {
+                        "sans": ["Inter", "sans-serif"],
+                    },
+                    boxShadow: {
+                        "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                        "float": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            font-feature-settings: "cv11", "ss01";
+            -webkit-font-smoothing: antialiased;
+        }
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #D1D5DB;
+            border-radius: 3px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #9CA3AF;
+        }
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body class="bg-background-body text-text-main overflow-hidden h-screen">
+    <div class="flex h-full">
+        <!-- Sidebar placeholder - will be injected by layout.js -->
+        <div id="sidebar-root"></div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 flex flex-col h-full overflow-hidden">
+            <!-- Header placeholder - will be injected by layout.js -->
+            <div id="header-root"></div>
+
+            <!-- Page Header / Breadcrumb -->
+            <div class="h-14 border-b border-border-subtle bg-surface-card flex items-center justify-between px-6 shrink-0">
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="text-text-muted font-medium">Settings</span>
+                    <span class="text-text-muted">/</span>
+                    <span class="text-text-main font-semibold">Templates</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="relative">
+                        <span class="material-symbols-outlined absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted text-[20px]">search</span>
+                        <input class="pl-9 pr-4 py-1.5 text-sm bg-background-body border border-border-subtle rounded-md w-64 focus:ring-1 focus:ring-primary focus:border-primary text-text-main placeholder-text-muted" placeholder="Search templates..." type="text" id="template-search"/>
+                    </div>
+                    <button id="new-template-btn" class="bg-primary hover:bg-primary-hover text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-sm">
+                        <span class="material-symbols-outlined text-[18px]">add</span>
+                        New Template
+                    </button>
+                </div>
+            </div>
+
+            <!-- Workspace Container -->
+            <div class="flex flex-1 overflow-hidden">
+                <!-- Left Panel: Template Library -->
+                <div class="flex-1 flex flex-col h-full overflow-hidden">
+                    <!-- Page Title & Tabs -->
+                    <div class="px-8 pt-6 pb-4 shrink-0 bg-surface-card">
+                        <h1 class="text-2xl font-bold text-text-main tracking-tight mb-6">Firm-Wide Template Manager</h1>
+                        <div class="flex items-center justify-between border-b border-border-subtle">
+                            <div class="flex gap-8">
+                                <button class="template-tab pb-3 border-b-2 border-primary text-primary font-semibold text-sm px-1" data-tab="investment-memos">Investment Memos</button>
+                                <button class="template-tab pb-3 border-b-2 border-transparent text-text-muted hover:text-text-secondary font-medium text-sm px-1 transition-colors" data-tab="diligence-checklists">Diligence Checklists</button>
+                                <button class="template-tab pb-3 border-b-2 border-transparent text-text-muted hover:text-text-secondary font-medium text-sm px-1 transition-colors" data-tab="outreach-sequences">Outreach Sequences</button>
+                            </div>
+                            <div class="flex items-center gap-3 pb-2">
+                                <button class="flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">filter_list</span>
+                                    Filter
+                                </button>
+                                <button class="flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">sort</span>
+                                    Sort by Usage
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Grid Content -->
+                    <div class="flex-1 overflow-y-auto p-8 pt-6 bg-background-body custom-scrollbar">
+                        <div id="templates-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-20">
+                            <!-- Template cards will be rendered here by JavaScript -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Panel: Template Editor (Drawer) -->
+                <div id="template-editor" class="w-[480px] bg-surface-card border-l border-border-subtle flex-col shadow-float hidden lg:flex shrink-0">
+                    <!-- Drawer Header -->
+                    <div class="px-6 py-5 border-b border-border-subtle flex items-start justify-between bg-background-body/50">
+                        <div class="flex-1 mr-4">
+                            <label class="block text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">Template Name</label>
+                            <input id="editor-template-name" class="w-full bg-transparent border-none p-0 text-lg font-bold text-text-main focus:ring-0 placeholder-text-muted" type="text" value=""/>
+                        </div>
+                        <div class="flex flex-col items-end gap-2">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-text-muted font-medium">Active</span>
+                                <button id="template-active-toggle" class="relative inline-flex h-5 w-9 items-center rounded-full bg-secondary cursor-pointer transition-colors">
+                                    <span class="translate-x-5 inline-block h-3.5 w-3.5 transform rounded-full bg-white transition shadow-sm"></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Drawer Content -->
+                    <div class="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+                        <!-- Section List -->
+                        <div>
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-bold text-text-main uppercase tracking-wide">Document Structure</h3>
+                                <button id="add-section-btn" class="text-xs text-primary font-medium hover:underline flex items-center gap-1">
+                                    <span class="material-symbols-outlined text-[14px]">add</span> Add Section
+                                </button>
+                            </div>
+                            <div id="sections-list" class="space-y-3">
+                                <!-- Sections will be rendered here by JavaScript -->
+                            </div>
+                        </div>
+
+                        <!-- Meta Info -->
+                        <div class="pt-6 border-t border-border-subtle">
+                            <h3 class="text-sm font-bold text-text-main uppercase tracking-wide mb-4">Template Settings</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-text-muted mb-1">Category</label>
+                                    <select id="template-category" class="w-full text-sm border-border-subtle rounded-md shadow-sm focus:border-primary focus:ring-primary bg-surface-card text-text-main py-1.5">
+                                        <option>Investment Memo</option>
+                                        <option>Checklist</option>
+                                        <option>Email Sequence</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-text-muted mb-1">Permissions</label>
+                                    <select id="template-permissions" class="w-full text-sm border-border-subtle rounded-md shadow-sm focus:border-primary focus:ring-primary bg-surface-card text-text-main py-1.5">
+                                        <option>Firm-Wide (All)</option>
+                                        <option>Partners Only</option>
+                                        <option>Analysts Only</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Drawer Footer -->
+                    <div class="p-4 border-t border-border-subtle bg-background-body/50 flex items-center justify-between gap-4">
+                        <button id="preview-template-btn" class="px-4 py-2 border border-border-subtle rounded-lg text-sm font-medium text-text-secondary hover:bg-background-body transition-colors">
+                            Preview
+                        </button>
+                        <div class="flex gap-3">
+                            <button id="cancel-edit-btn" class="px-4 py-2 text-sm font-medium text-text-muted hover:text-text-secondary transition-colors">
+                                Cancel
+                            </button>
+                            <button id="save-template-btn" class="px-6 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-bold shadow-sm transition-colors flex items-center gap-2">
+                                <span class="material-symbols-outlined text-[18px]">save</span>
+                                Save Changes
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- New Template Modal -->
+    <div id="new-template-modal" class="hidden fixed inset-0 z-50">
+        <div id="new-template-backdrop" class="absolute inset-0 bg-black/50"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-surface-card rounded-xl shadow-float w-full max-w-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold text-text-main">Create New Template</h2>
+                    <button id="close-new-template-modal" class="p-1 hover:bg-background-body rounded-lg transition-colors">
+                        <span class="material-symbols-outlined text-text-muted">close</span>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-1">Template Name</label>
+                        <input id="new-template-name" type="text" class="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g., SaaS Growth Equity Memo"/>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-1">Category</label>
+                        <select id="new-template-category" class="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-1 focus:ring-primary focus:border-primary">
+                            <option value="investment-memo">Investment Memo</option>
+                            <option value="checklist">Diligence Checklist</option>
+                            <option value="outreach">Outreach Sequence</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-1">Description</label>
+                        <textarea id="new-template-description" class="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-1 focus:ring-primary focus:border-primary resize-none" rows="3" placeholder="Brief description of when to use this template..."></textarea>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button id="cancel-new-template" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main transition-colors">Cancel</button>
+                    <button id="create-template-btn" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors">Create Template</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Section Modal -->
+    <div id="add-section-modal" class="hidden fixed inset-0 z-50">
+        <div id="add-section-backdrop" class="absolute inset-0 bg-black/50"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-surface-card rounded-xl shadow-float w-full max-w-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-lg font-bold text-text-main">Add New Section</h2>
+                    <button id="close-add-section-modal" class="p-1 hover:bg-background-body rounded-lg transition-colors">
+                        <span class="material-symbols-outlined text-text-muted">close</span>
+                    </button>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-1">Section Title</label>
+                        <input id="new-section-title" type="text" class="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-1 focus:ring-primary focus:border-primary" placeholder="e.g., Financial Analysis"/>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-1">Description</label>
+                        <input id="new-section-description" type="text" class="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-1 focus:ring-primary focus:border-primary" placeholder="Brief description of this section"/>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <label class="inline-flex items-center">
+                            <input id="new-section-ai" type="checkbox" class="rounded border-border-subtle text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-4 w-4"/>
+                            <span class="ml-2 text-sm text-text-secondary">AI Enabled</span>
+                        </label>
+                        <label class="inline-flex items-center">
+                            <input id="new-section-mandatory" type="checkbox" class="rounded border-border-subtle text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 h-4 w-4"/>
+                            <span class="ml-2 text-sm text-text-secondary">Mandatory</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-3 mt-6">
+                    <button id="cancel-add-section" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main transition-colors">Cancel</button>
+                    <button id="confirm-add-section" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors">Add Section</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/layout.js"></script>
+    <script src="js/inviteModal.js"></script>
+    <script>
+        // Initialize PE OS Layout
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Initialize auth and check if user is logged in
+            await PEAuth.initSupabase();
+            const auth = await PEAuth.checkAuth();
+            if (!auth) return; // Will redirect to login
+
+            PELayout.init('templates', { collapsible: true });
+        });
+    </script>
+    <script src="templates.js"></script>
+</body>
+</html>

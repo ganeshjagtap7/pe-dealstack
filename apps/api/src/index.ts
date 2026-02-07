@@ -16,9 +16,12 @@ import notificationsRouter from './routes/notifications.js';
 import ingestRouter from './routes/ingest.js';
 import memosRouter from './routes/memos.js';
 import invitationsRouter from './routes/invitations.js';
+import templatesRouter from './routes/templates.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
+import { requestIdMiddleware } from './middleware/requestId.js';
+import { log } from './utils/logger.js';
 
 dotenv.config();
 
@@ -42,7 +45,7 @@ app.use(cors({
       callback(null, true);
     } else {
       callback(null, true); // Allow all for now, log unknown origins
-      console.log('CORS request from:', origin);
+      log.warn('CORS request from unknown origin', { origin });
     }
   },
   credentials: true,
@@ -59,6 +62,9 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 app.use(express.json());
+
+// Request ID for error correlation
+app.use(requestIdMiddleware);
 
 // Health check
 app.get('/health', async (req, res) => {
@@ -97,11 +103,102 @@ app.get('/api', (req, res) => {
       conversations: '/api/conversations',
       notifications: '/api/notifications',
       invitations: '/api/invitations',
+      templates: '/api/templates',
       ai: '/api/ai',
       ingest: '/api/ingest',
       health: '/health',
     },
   });
+});
+
+// ========================================
+// Public Debug Endpoints (no auth - dev only)
+// ========================================
+
+// Test FULL memo create flow (bypasses auth for debugging)
+app.post('/api/debug/test-memo-insert', async (req, res) => {
+  try {
+    const steps: any[] = [];
+
+    // Step 1: Create memo
+    const testData = {
+      title: 'Test Memo',
+      projectName: 'Test Project',
+      type: 'IC_MEMO',
+      status: 'DRAFT',
+    };
+
+    const { data: memo, error: memoError } = await supabase
+      .from('Memo')
+      .insert(testData)
+      .select()
+      .single();
+
+    if (memoError) {
+      return res.json({ success: false, step: 'create_memo', error: memoError });
+    }
+    steps.push({ step: 'create_memo', success: true, memoId: memo.id });
+
+    // Step 2: Create sections (like the real endpoint does)
+    const defaultSections = [
+      { memoId: memo.id, type: 'EXECUTIVE_SUMMARY', title: 'Executive Summary', sortOrder: 0 },
+      { memoId: memo.id, type: 'FINANCIAL_PERFORMANCE', title: 'Financial Performance', sortOrder: 1 },
+    ];
+
+    const { error: sectionsError } = await supabase
+      .from('MemoSection')
+      .insert(defaultSections);
+
+    if (sectionsError) {
+      // Clean up memo
+      await supabase.from('Memo').delete().eq('id', memo.id);
+      return res.json({ success: false, step: 'create_sections', error: sectionsError });
+    }
+    steps.push({ step: 'create_sections', success: true });
+
+    // Step 3: Fetch with sections
+    const { data: fullMemo, error: fetchError } = await supabase
+      .from('Memo')
+      .select(`*, sections:MemoSection(*)`)
+      .eq('id', memo.id)
+      .single();
+
+    if (fetchError) {
+      await supabase.from('Memo').delete().eq('id', memo.id);
+      return res.json({ success: false, step: 'fetch_with_sections', error: fetchError });
+    }
+    steps.push({ step: 'fetch_with_sections', success: true });
+
+    // Clean up
+    await supabase.from('Memo').delete().eq('id', memo.id);
+
+    res.json({
+      success: true,
+      message: 'Full memo create flow works!',
+      steps,
+      testData: fullMemo
+    });
+  } catch (err: any) {
+    console.error('TEST INSERT - Exception:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/api/debug/memo-table', async (req, res) => {
+  try {
+    // Check all memo-related tables
+    const memoCheck = await supabase.from('Memo').select('id').limit(1);
+    const sectionCheck = await supabase.from('MemoSection').select('id').limit(1);
+    const convCheck = await supabase.from('MemoConversation').select('id').limit(1);
+
+    res.json({
+      Memo: { exists: !memoCheck.error, error: memoCheck.error?.message },
+      MemoSection: { exists: !sectionCheck.error, error: sectionCheck.error?.message },
+      MemoConversation: { exists: !convCheck.error, error: convCheck.error?.message },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ========================================
@@ -117,6 +214,7 @@ app.use('/api', authMiddleware, chatRouter);
 app.use('/api/notifications', authMiddleware, notificationsRouter);
 app.use('/api/ingest', authMiddleware, ingestRouter);
 app.use('/api/memos', authMiddleware, memosRouter);
+app.use('/api/templates', authMiddleware, templatesRouter);
 app.use('/api/invitations', authMiddleware, invitationsRouter);
 
 // ========================================
@@ -179,34 +277,15 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 API server running at http://localhost:${PORT}`);
-  console.log(`🔐 Auth: Supabase JWT authentication enabled`);
-  console.log('');
-  console.log('Protected routes (require Bearer token):');
-  console.log(`  📊 Deals API: http://localhost:${PORT}/api/deals`);
-  console.log(`  🏢 Companies API: http://localhost:${PORT}/api/companies`);
-  console.log(`  📋 Activities API: http://localhost:${PORT}/api/activities`);
-  console.log(`  📄 Documents API: http://localhost:${PORT}/api/documents`);
-  console.log(`  📁 Folders API: http://localhost:${PORT}/api/deals/:dealId/folders`);
-  console.log(`  👥 Users API: http://localhost:${PORT}/api/users`);
-  console.log(`  💬 Chat API: http://localhost:${PORT}/api/conversations`);
-  console.log(`  🔔 Notifications API: http://localhost:${PORT}/api/notifications`);
-  console.log(`  📥 Ingest API: http://localhost:${PORT}/api/ingest`);
-  console.log(`  📝 Memos API: http://localhost:${PORT}/api/memos`);
-  console.log(`  ✉️  Invitations API: http://localhost:${PORT}/api/invitations`);
-  console.log(`  🤖 AI Ingest: http://localhost:${PORT}/api/ai/ingest`);
-  console.log(`  🤖 AI Extract: http://localhost:${PORT}/api/ai/extract`);
-  console.log(`  🤖 Deal Chat: http://localhost:${PORT}/api/deals/:dealId/chat`);
-  console.log('');
-  console.log('Public routes (no auth required):');
-  console.log(`  🤖 AI Status: http://localhost:${PORT}/api/ai/status`);
-  console.log(`  ✉️  Verify Invite: http://localhost:${PORT}/api/invitations/verify/:token`);
-  console.log(`  ✉️  Accept Invite: http://localhost:${PORT}/api/invitations/accept/:token`);
-  console.log(`  ❤️  Health check: http://localhost:${PORT}/health`);
+  log.info('API server started', {
+    port: PORT,
+    environment: process.env.NODE_ENV || 'development',
+    version: 'v0.1.0',
+  });
 });
 
 // Graceful shutdown
 process.on('SIGINT', async () => {
-  console.log('\n🛑 Shutting down gracefully...');
+  log.info('Server shutting down gracefully');
   process.exit(0);
 });

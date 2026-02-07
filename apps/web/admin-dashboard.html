@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Command Center - PE OS</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    "primary": "#003366",
+                    "primary-hover": "#002855",
+                    "primary-light": "#E6EEF5",
+                    "secondary": "#059669",
+                    "secondary-light": "#D1FAE5",
+                    "background-body": "#F8F9FA",
+                    "surface-card": "#FFFFFF",
+                    "border-subtle": "#E5E7EB",
+                    "border-focus": "#CBD5E1",
+                    "text-main": "#111827",
+                    "text-secondary": "#4B5563",
+                    "text-muted": "#9CA3AF",
+                    "accent-warning": "#f59e0b",
+                    "accent-danger": "#ef4444",
+                    "accent-teal": "#10b981",
+                },
+                fontFamily: {
+                    "sans": ["Inter", "sans-serif"],
+                    "display": ["Inter", "sans-serif"],
+                },
+                boxShadow: {
+                    "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+                    "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                    "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
+                },
+                borderRadius: {
+                    "DEFAULT": "0.5rem",
+                    "md": "0.375rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                }
+            },
+        },
+    }
+</script>
+<style>
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+    .activity-timeline::before {
+        content: '';
+        position: absolute;
+        left: 17px;
+        top: 24px;
+        bottom: 24px;
+        width: 2px;
+        background: #E5E7EB;
+    }
+</style>
+</head>
+<body class="bg-background-body text-text-main font-sans overflow-hidden">
+<div class="flex h-screen w-full overflow-hidden">
+<!-- Sidebar (injected by layout.js) -->
+<div id="sidebar-root"></div>
+
+<!-- Main Content -->
+<main class="flex h-full flex-1 flex-col overflow-hidden bg-background-body">
+<!-- Header (injected by layout.js) -->
+<div id="header-root"></div>
+
+<!-- Dashboard Content -->
+<div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+<div class="mx-auto max-w-[1600px] flex flex-col gap-6">
+
+<!-- Command Center Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div>
+        <h1 class="text-2xl font-bold text-text-main tracking-tight font-display">Command Center</h1>
+        <p class="text-text-secondary text-sm mt-1">Overview of team performance and active deal flow.</p>
+    </div>
+    <div class="flex items-center gap-3">
+        <span class="text-xs font-medium bg-secondary-light text-secondary px-3 py-1.5 rounded-full flex items-center gap-1.5 border border-secondary/20">
+            <span class="w-2 h-2 bg-secondary rounded-full animate-pulse"></span>
+            System Operational
+        </span>
+        <span class="text-xs text-text-muted">Last updated: <span id="last-updated">Just now</span></span>
+    </div>
+</div>
+
+<!-- Quick Actions Bar -->
+<div class="flex flex-wrap items-center gap-3">
+    <button id="assign-deal-btn" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg shadow-sm transition-all">
+        <span class="material-symbols-outlined text-[18px]">add</span>
+        Assign Deal
+    </button>
+    <button id="create-task-btn" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary bg-primary-light hover:bg-primary/10 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[18px]">add_task</span>
+        Create Task
+    </button>
+    <button class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-gray-100 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[18px]">calendar_month</span>
+        Schedule Review
+    </button>
+    <button class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-gray-100 rounded-lg transition-all">
+        <span class="material-symbols-outlined text-[18px]">notifications_active</span>
+        Send Reminder
+    </button>
+</div>
+
+<!-- Stats Cards Row -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+    <!-- Active Analysts Card -->
+    <div class="relative flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+        <div class="flex items-center justify-between">
+            <div class="p-2 bg-primary-light rounded-lg">
+                <span class="material-symbols-outlined text-primary text-[22px]">groups</span>
+            </div>
+            <div class="flex -space-x-2">
+                <div class="w-7 h-7 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center border-2 border-white">MR</div>
+                <div class="w-7 h-7 rounded-full bg-secondary text-white text-xs font-medium flex items-center justify-center border-2 border-white">RZ</div>
+                <div class="w-7 h-7 rounded-full bg-accent-warning text-white text-xs font-medium flex items-center justify-center border-2 border-white">HS</div>
+                <div class="w-7 h-7 rounded-full bg-gray-200 text-gray-600 text-[10px] font-medium flex items-center justify-center border-2 border-white">+2</div>
+            </div>
+        </div>
+        <h3 class="text-3xl font-bold text-text-main mt-3" id="analyst-count">8</h3>
+        <p class="text-sm text-text-secondary font-medium">Active Analysts</p>
+    </div>
+
+    <!-- Deal Volume Card -->
+    <div class="relative flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-secondary/30 transition-all">
+        <div class="flex items-center justify-between">
+            <div class="p-2 bg-secondary-light rounded-lg">
+                <span class="material-symbols-outlined text-secondary text-[22px]">payments</span>
+            </div>
+            <span class="text-xs font-medium text-secondary bg-secondary-light px-2 py-1 rounded">+12% vs Q3</span>
+        </div>
+        <h3 class="text-3xl font-bold text-text-main mt-3" id="deal-volume">$485M</h3>
+        <p class="text-sm text-text-secondary font-medium">Deal Volume (Pipeline)</p>
+    </div>
+
+    <!-- Critical Tasks Card -->
+    <div class="relative flex flex-col gap-1 rounded-xl border border-accent-danger/30 bg-surface-card p-5 shadow-card hover:shadow-card-hover transition-all overflow-hidden">
+        <div class="absolute top-0 right-0 w-20 h-20 bg-accent-danger/5 rounded-bl-full -mr-4 -mt-4"></div>
+        <div class="flex items-center justify-between relative z-10">
+            <div class="p-2 bg-red-50 rounded-lg">
+                <span class="material-symbols-outlined text-accent-danger text-[22px]">warning</span>
+            </div>
+            <span class="text-xs font-medium text-accent-danger bg-red-50 px-2 py-1 rounded">Needs Action</span>
+        </div>
+        <h3 class="text-3xl font-bold text-text-main mt-3 relative z-10" id="overdue-tasks">3</h3>
+        <p class="text-sm text-text-secondary font-medium relative z-10">Critical Tasks Overdue</p>
+    </div>
+
+    <!-- Utilization Card -->
+    <div class="relative flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-accent-warning/30 transition-all">
+        <div class="flex items-center justify-between">
+            <div class="p-2 bg-amber-50 rounded-lg">
+                <span class="material-symbols-outlined text-accent-warning text-[22px]">speed</span>
+            </div>
+        </div>
+        <div class="flex items-end gap-2 mt-3">
+            <h3 class="text-3xl font-bold text-text-main" id="utilization">82%</h3>
+            <span class="text-sm text-text-secondary mb-1">Utilization</span>
+        </div>
+        <div class="w-full bg-gray-100 h-2 mt-2 rounded-full overflow-hidden">
+            <div class="bg-accent-warning h-full rounded-full transition-all" style="width: 82%"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
+    <!-- Left Column (2/3) -->
+    <div class="xl:col-span-2 space-y-6">
+
+        <!-- Resource Allocation Card -->
+        <div class="bg-surface-card rounded-xl border border-border-subtle shadow-card">
+            <div class="p-5 border-b border-border-subtle flex justify-between items-center">
+                <h2 class="text-base font-semibold text-text-main flex items-center gap-2">
+                    <span class="material-symbols-outlined text-text-muted text-[20px]">pie_chart</span>
+                    Resource Allocation
+                </h2>
+                <button class="text-sm text-primary font-medium hover:text-primary-hover transition-colors">View Detailed Report</button>
+            </div>
+            <div class="p-5 space-y-5" id="resource-allocation">
+                <!-- Analyst Row 1 -->
+                <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">MR</div>
+                    <div class="w-28 flex-shrink-0">
+                        <p class="text-sm font-medium text-text-main">Mike Ross</p>
+                        <p class="text-xs text-text-muted">Senior Analyst</p>
+                    </div>
+                    <div class="flex-1 grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-xs text-text-muted mb-1.5">Active Deals</p>
+                            <div class="flex gap-1 flex-wrap">
+                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">TechCorp</span>
+                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">Nebula</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-text-muted mb-1.5">Capacity (95%)</p>
+                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div class="bg-accent-danger h-full rounded-full" style="width: 95%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right w-14 flex-shrink-0">
+                        <span class="block text-lg font-bold text-text-main">5</span>
+                        <span class="text-xs text-text-muted">Tasks</span>
+                    </div>
+                </div>
+
+                <!-- Analyst Row 2 -->
+                <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="w-10 h-10 rounded-full bg-secondary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">RZ</div>
+                    <div class="w-28 flex-shrink-0">
+                        <p class="text-sm font-medium text-text-main">Rachel Zane</p>
+                        <p class="text-xs text-text-muted">Associate</p>
+                    </div>
+                    <div class="flex-1 grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-xs text-text-muted mb-1.5">Active Deals</p>
+                            <div class="flex gap-1 flex-wrap">
+                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">Apex Log</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-text-muted mb-1.5">Capacity (45%)</p>
+                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div class="bg-secondary h-full rounded-full" style="width: 45%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right w-14 flex-shrink-0">
+                        <span class="block text-lg font-bold text-text-main">2</span>
+                        <span class="text-xs text-text-muted">Tasks</span>
+                    </div>
+                </div>
+
+                <!-- Analyst Row 3 -->
+                <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
+                    <div class="w-10 h-10 rounded-full bg-accent-warning text-white text-sm font-medium flex items-center justify-center flex-shrink-0">HS</div>
+                    <div class="w-28 flex-shrink-0">
+                        <p class="text-sm font-medium text-text-main">Harvey S.</p>
+                        <p class="text-xs text-text-muted">Analyst</p>
+                    </div>
+                    <div class="flex-1 grid grid-cols-2 gap-4">
+                        <div>
+                            <p class="text-xs text-text-muted mb-1.5">Active Deals</p>
+                            <div class="flex gap-1 flex-wrap">
+                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">MediCare</span>
+                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">Clay</span>
+                            </div>
+                        </div>
+                        <div>
+                            <p class="text-xs text-text-muted mb-1.5">Capacity (70%)</p>
+                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
+                                <div class="bg-accent-warning h-full rounded-full" style="width: 70%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-right w-14 flex-shrink-0">
+                        <span class="block text-lg font-bold text-text-main">4</span>
+                        <span class="text-xs text-text-muted">Tasks</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Global Task Management Card -->
+        <div class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+            <div class="p-5 border-b border-border-subtle flex justify-between items-center bg-gray-50/50">
+                <div class="flex items-center gap-3">
+                    <h2 class="text-base font-semibold text-text-main flex items-center gap-2">
+                        <span class="material-symbols-outlined text-text-muted text-[20px]">task_alt</span>
+                        Global Task Management
+                    </h2>
+                    <span class="bg-gray-200 text-text-secondary text-xs px-2 py-0.5 rounded-full font-medium" id="pending-count">12 Pending</span>
+                </div>
+                <div class="flex gap-2">
+                    <button class="p-1.5 text-text-muted hover:text-primary hover:bg-gray-100 rounded transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">filter_list</span>
+                    </button>
+                    <button class="p-1.5 text-text-muted hover:text-primary hover:bg-gray-100 rounded transition-colors">
+                        <span class="material-symbols-outlined text-[20px]">sort</span>
+                    </button>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-sm">
+                    <thead class="bg-gray-50 text-text-muted font-medium border-b border-border-subtle">
+                        <tr>
+                            <th class="px-5 py-3">Task Name</th>
+                            <th class="px-5 py-3">Priority</th>
+                            <th class="px-5 py-3">Due Date</th>
+                            <th class="px-5 py-3">Analyst</th>
+                            <th class="px-5 py-3">Linked Deal</th>
+                            <th class="px-5 py-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-border-subtle" id="task-table-body">
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-5 py-4 font-medium text-text-main">Finalize LBO Model</td>
+                            <td class="px-5 py-4">
+                                <span class="inline-flex items-center gap-1 bg-red-50 text-accent-danger text-xs px-2.5 py-1 rounded-full font-medium border border-red-100">High</span>
+                            </td>
+                            <td class="px-5 py-4 text-text-main">Today, 5:00 PM</td>
+                            <td class="px-5 py-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">MR</div>
+                                    <span class="text-text-secondary">Mike R.</span>
+                                </div>
+                            </td>
+                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">TechCorp SaaS</td>
+                            <td class="px-5 py-4">
+                                <span class="text-accent-warning flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-accent-warning"></span> In Progress
+                                </span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-5 py-4 font-medium text-text-main">Review Legal DD</td>
+                            <td class="px-5 py-4">
+                                <span class="inline-flex items-center gap-1 bg-amber-50 text-amber-600 text-xs px-2.5 py-1 rounded-full font-medium border border-amber-100">Med</span>
+                            </td>
+                            <td class="px-5 py-4 text-text-main">Tomorrow</td>
+                            <td class="px-5 py-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-secondary text-white text-[10px] font-medium flex items-center justify-center">RZ</div>
+                                    <span class="text-text-secondary">Rachel Z.</span>
+                                </div>
+                            </td>
+                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">Apex Logistics</td>
+                            <td class="px-5 py-4">
+                                <span class="text-text-muted flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Pending
+                                </span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 transition-colors">
+                            <td class="px-5 py-4 font-medium text-text-main">Competitor Analysis</td>
+                            <td class="px-5 py-4">
+                                <span class="inline-flex items-center gap-1 bg-secondary-light text-secondary text-xs px-2.5 py-1 rounded-full font-medium border border-secondary/20">Low</span>
+                            </td>
+                            <td class="px-5 py-4 text-text-main">Feb 10</td>
+                            <td class="px-5 py-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-accent-warning text-white text-[10px] font-medium flex items-center justify-center">HS</div>
+                                    <span class="text-text-secondary">Harvey S.</span>
+                                </div>
+                            </td>
+                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">MediCare Plus</td>
+                            <td class="px-5 py-4">
+                                <span class="text-secondary flex items-center gap-1.5">
+                                    <span class="material-symbols-outlined text-[16px]">check_circle</span> Completed
+                                </span>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 transition-colors bg-red-50/30">
+                            <td class="px-5 py-4 font-medium text-text-main">Prepare IC Deck</td>
+                            <td class="px-5 py-4">
+                                <span class="inline-flex items-center gap-1 bg-red-50 text-accent-danger text-xs px-2.5 py-1 rounded-full font-medium border border-red-100">High</span>
+                            </td>
+                            <td class="px-5 py-4 text-accent-danger font-medium">Overdue (2h)</td>
+                            <td class="px-5 py-4">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">MR</div>
+                                    <span class="text-text-secondary">Mike R.</span>
+                                </div>
+                            </td>
+                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">TechCorp SaaS</td>
+                            <td class="px-5 py-4">
+                                <span class="text-accent-danger flex items-center gap-1.5 font-medium">
+                                    <span class="material-symbols-outlined text-[16px]">error</span> Stuck
+                                </span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-4 border-t border-border-subtle flex justify-center bg-gray-50/30">
+                <button class="text-sm font-medium text-text-secondary hover:text-primary flex items-center gap-1 transition-colors">
+                    View all tasks <span class="material-symbols-outlined text-[16px]">arrow_forward</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column (1/3) -->
+    <div class="xl:col-span-1 space-y-6">
+
+        <!-- Team Activity Feed -->
+        <div class="bg-surface-card rounded-xl border border-border-subtle shadow-card flex flex-col" style="height: 420px;">
+            <div class="p-5 border-b border-border-subtle">
+                <h2 class="text-base font-semibold text-text-main flex items-center gap-2">
+                    <span class="material-symbols-outlined text-text-muted text-[20px]">rss_feed</span>
+                    Team Activity
+                </h2>
+            </div>
+            <div class="flex-1 overflow-y-auto p-5 relative activity-timeline custom-scrollbar">
+                <div class="space-y-5 relative">
+                    <!-- Activity 1 -->
+                    <div class="flex gap-3 relative z-10">
+                        <div class="relative flex-shrink-0">
+                            <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">MR</div>
+                            <div class="absolute -bottom-0.5 -right-0.5 bg-blue-500 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                                <span class="material-symbols-outlined text-white text-[10px]">upload_file</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 pt-0.5">
+                            <p class="text-sm text-text-main">
+                                <span class="font-semibold">Mike Ross</span> uploaded V2 model for <span class="text-primary font-medium cursor-pointer hover:underline">TechCorp SaaS</span>.
+                            </p>
+                            <p class="text-xs text-text-muted mt-1">12 mins ago</p>
+                        </div>
+                    </div>
+
+                    <!-- Activity 2 - AI Flag -->
+                    <div class="flex gap-3 relative z-10">
+                        <div class="relative flex-shrink-0">
+                            <div class="w-9 h-9 rounded-full bg-secondary text-white text-xs font-medium flex items-center justify-center">
+                                <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+                            </div>
+                            <div class="absolute -bottom-0.5 -right-0.5 bg-secondary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                                <span class="material-symbols-outlined text-white text-[10px]">priority_high</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 pt-0.5">
+                            <p class="text-sm text-text-main">
+                                <span class="font-semibold text-secondary">PE OS AI</span> flagged a revenue anomaly in <span class="text-primary font-medium cursor-pointer hover:underline">Nebula Systems</span>.
+                            </p>
+                            <p class="text-xs text-text-muted mt-1">45 mins ago</p>
+                            <div class="mt-2 bg-red-50 border border-red-100 p-2 rounded text-xs text-accent-danger">
+                                Warning: Q4 growth mismatch (-15%)
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Activity 3 -->
+                    <div class="flex gap-3 relative z-10">
+                        <div class="relative flex-shrink-0">
+                            <div class="w-9 h-9 rounded-full bg-secondary text-white text-xs font-medium flex items-center justify-center">RZ</div>
+                            <div class="absolute -bottom-0.5 -right-0.5 bg-purple-500 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                                <span class="material-symbols-outlined text-white text-[10px]">chat</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 pt-0.5">
+                            <p class="text-sm text-text-main">
+                                <span class="font-semibold">Rachel Zane</span> commented on the Legal DD checklist.
+                            </p>
+                            <p class="text-xs text-text-muted mt-1">1h ago</p>
+                        </div>
+                    </div>
+
+                    <!-- Activity 4 -->
+                    <div class="flex gap-3 relative z-10">
+                        <div class="relative flex-shrink-0">
+                            <div class="w-9 h-9 rounded-full bg-gray-500 text-white text-xs font-medium flex items-center justify-center">LL</div>
+                            <div class="absolute -bottom-0.5 -right-0.5 bg-accent-warning rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                                <span class="material-symbols-outlined text-white text-[10px]">arrow_forward</span>
+                            </div>
+                        </div>
+                        <div class="flex-1 pt-0.5">
+                            <p class="text-sm text-text-main">
+                                <span class="font-semibold">Louis Litt</span> moved <span class="text-primary font-medium cursor-pointer hover:underline">Titan Freight</span> to 'Due Diligence'.
+                            </p>
+                            <p class="text-xs text-text-muted mt-1">2h ago</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-3 border-t border-border-subtle text-center">
+                <button class="text-xs text-text-muted hover:text-primary font-medium uppercase tracking-wide transition-colors">View full history</button>
+            </div>
+        </div>
+
+        <!-- Upcoming Review Card -->
+        <div class="bg-gradient-to-br from-primary to-primary-hover rounded-xl shadow-lg p-5 text-white relative overflow-hidden">
+            <div class="absolute top-0 right-0 p-3 opacity-10">
+                <span class="material-symbols-outlined text-[80px]">event_available</span>
+            </div>
+            <h3 class="font-bold text-lg mb-1 relative z-10">Upcoming Review</h3>
+            <p class="text-blue-200 text-sm mb-4 relative z-10">Investment Committee - TechCorp</p>
+            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white/10 relative z-10">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white text-primary rounded-lg px-2.5 py-1.5 text-center min-w-[50px]">
+                        <span class="block text-[10px] font-bold uppercase tracking-wide">Feb</span>
+                        <span class="block text-xl font-bold leading-none">08</span>
+                    </div>
+                    <div>
+                        <p class="font-medium text-sm">Thursday, 2:00 PM</p>
+                        <p class="text-xs text-blue-200">Main Conference Room</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex gap-2 relative z-10">
+                <button class="flex-1 bg-white text-primary text-sm font-semibold py-2 rounded-lg hover:bg-gray-100 transition-colors">
+                    View Deck
+                </button>
+                <button class="flex-1 bg-white/10 text-white text-sm font-semibold py-2 rounded-lg hover:bg-white/20 transition-colors border border-white/20">
+                    Reschedule
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+</div>
+</div>
+</main>
+</div>
+
+<!-- Assign Deal Modal -->
+<div id="assign-deal-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/50 transition-opacity" id="assign-modal-backdrop"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
+            <div class="p-6 border-b border-border-subtle">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-text-main">Assign Deal to Analyst</h3>
+                    <button id="close-assign-modal" class="p-1 text-text-muted hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Select Deal</label>
+                    <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <option value="">Choose a deal...</option>
+                        <option value="1">TechCorp SaaS - $125M</option>
+                        <option value="2">Nebula Systems - $85M</option>
+                        <option value="3">MediCare Plus - $200M</option>
+                        <option value="4">Apex Logistics - $65M</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Assign To</label>
+                    <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <option value="">Choose an analyst...</option>
+                        <option value="1">Mike Ross - Senior Analyst</option>
+                        <option value="2">Rachel Zane - Associate</option>
+                        <option value="3">Harvey Specter - Analyst</option>
+                        <option value="4">Louis Litt - Analyst</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Role</label>
+                    <div class="flex gap-3">
+                        <label class="flex-1 flex items-center gap-2 p-3 border border-border-subtle rounded-lg cursor-pointer hover:border-primary/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-light">
+                            <input type="radio" name="role" value="lead" class="text-primary focus:ring-primary">
+                            <span class="text-sm font-medium">Lead Partner</span>
+                        </label>
+                        <label class="flex-1 flex items-center gap-2 p-3 border border-border-subtle rounded-lg cursor-pointer hover:border-primary/50 transition-colors has-[:checked]:border-primary has-[:checked]:bg-primary-light">
+                            <input type="radio" name="role" value="analyst" class="text-primary focus:ring-primary" checked>
+                            <span class="text-sm font-medium">Analyst</span>
+                        </label>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Notes (Optional)</label>
+                    <textarea rows="3" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" placeholder="Add any context or instructions..."></textarea>
+                </div>
+            </div>
+            <div class="p-6 border-t border-border-subtle bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button id="cancel-assign" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Assign Deal</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Task Modal -->
+<div id="create-task-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/50 transition-opacity" id="task-modal-backdrop"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
+            <div class="p-6 border-b border-border-subtle">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-text-main">Create New Task</h3>
+                    <button id="close-task-modal" class="p-1 text-text-muted hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Task Title</label>
+                    <input type="text" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Enter task title...">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Assign To</label>
+                        <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="">Choose analyst...</option>
+                            <option value="1">Mike Ross</option>
+                            <option value="2">Rachel Zane</option>
+                            <option value="3">Harvey Specter</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Related Deal</label>
+                        <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="">Choose deal...</option>
+                            <option value="1">TechCorp SaaS</option>
+                            <option value="2">Nebula Systems</option>
+                            <option value="3">MediCare Plus</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Due Date</label>
+                        <input type="date" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Priority</label>
+                        <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="high">High</option>
+                            <option value="medium" selected>Medium</option>
+                            <option value="low">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Description (Optional)</label>
+                    <textarea rows="3" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" placeholder="Add task details..."></textarea>
+                </div>
+            </div>
+            <div class="p-6 border-t border-border-subtle bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button id="cancel-task" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Create Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script src="js/inviteModal.js"></script>
+<script>
+    // Initialize PE OS Layout with collapsible sidebar
+    document.addEventListener('DOMContentLoaded', async function() {
+        // Initialize auth and check if user is logged in
+        await PEAuth.initSupabase();
+        const auth = await PEAuth.checkAuth();
+        if (!auth) return; // Will redirect to login
+
+        PELayout.init('admin', { collapsible: true });
+    });
+</script>
+<script src="admin-dashboard.js"></script>
+</body>
+</html>
