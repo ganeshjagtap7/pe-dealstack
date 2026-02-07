@@ -1,10 +1,13 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { AuditLog } from '../services/auditLog.js';
 import { searchDocumentChunks, buildRAGContext } from '../rag.js';
 import { isGeminiEnabled } from '../gemini.js';
+import { log } from '../utils/logger.js';
+import { NotFoundError } from '../middleware/errorHandler.js';
+import type { OpenAIMessage, SortableByDate } from '../types/index.js';
 
 const router = Router();
 
@@ -72,7 +75,7 @@ router.get('/stats/summary', async (req, res) => {
       byStage: Object.entries(byStage || {}).map(([stage, count]) => ({ stage, count })),
     });
   } catch (error) {
-    console.error('Error fetching stats:', error);
+    log.error('Error fetching stats', error);
     res.status(500).json({ error: 'Failed to fetch statistics' });
   }
 });
@@ -125,13 +128,13 @@ router.get('/', async (req, res) => {
 
     res.json(data || []);
   } catch (error) {
-    console.error('Error fetching deals:', error);
+    log.error('Error fetching deals', error);
     res.status(500).json({ error: 'Failed to fetch deals' });
   }
 });
 
 // GET /api/deals/:id - Get single deal
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
 
@@ -176,22 +179,21 @@ router.get('/:id', async (req, res) => {
 
     if (error) {
       if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'Deal not found' });
+        throw new NotFoundError('Deal');
       }
       throw error;
     }
 
     // Sort activities by date (most recent first)
     if (data?.activities) {
-      data.activities.sort((a: any, b: any) =>
+      data.activities.sort((a: SortableByDate, b: SortableByDate) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
     }
 
     res.json(data);
   } catch (error) {
-    console.error('Error fetching deal:', error);
-    res.status(500).json({ error: 'Failed to fetch deal' });
+    next(error);
   }
 });
 
@@ -268,7 +270,7 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) =>
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error creating deal:', error);
+    log.error('Error creating deal', error);
     res.status(500).json({ error: 'Failed to create deal' });
   }
 });
@@ -326,7 +328,7 @@ router.patch('/:id', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error updating deal:', error);
+    log.error('Error updating deal', error);
     res.status(500).json({ error: 'Failed to update deal' });
   }
 });
@@ -355,7 +357,7 @@ router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, re
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting deal:', error);
+    log.error('Error deleting deal', error);
     res.status(500).json({ error: 'Failed to delete deal' });
   }
 });
@@ -384,7 +386,7 @@ router.get('/:id/team', async (req, res) => {
 
     res.json(data || []);
   } catch (error) {
-    console.error('Error fetching team members:', error);
+    log.error('Error fetching team members', error);
     res.status(500).json({ error: 'Failed to fetch team members' });
   }
 });
@@ -438,7 +440,7 @@ router.post('/:id/team', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error adding team member:', error);
+    log.error('Error adding team member', error);
     res.status(500).json({ error: 'Failed to add team member' });
   }
 });
@@ -475,7 +477,7 @@ router.patch('/:dealId/team/:memberId', async (req, res) => {
 
     res.json(member);
   } catch (error) {
-    console.error('Error updating team member:', error);
+    log.error('Error updating team member', error);
     res.status(500).json({ error: 'Failed to update team member' });
   }
 });
@@ -495,7 +497,7 @@ router.delete('/:dealId/team/:memberId', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error removing team member:', error);
+    log.error('Error removing team member', error);
     res.status(500).json({ error: 'Failed to remove team member' });
   }
 });
@@ -524,12 +526,44 @@ When answering questions:
 - Cite which document the information comes from (e.g., "According to the Teaser Deck...")
 - If information isn't in the documents, say so clearly
 
+**DEAL UPDATES**: You can help users update deal fields. When a user asks to change the lead partner, analyst, deal source, or other deal fields, use the update_deal_field function. Available team members and their roles are provided in the context.
+
 Guidelines:
 - Be concise but thorough
 - Use specific numbers and data from documents when available
 - Highlight both opportunities and risks
 - Use professional financial terminology
 - Format responses with clear structure (bullet points, sections)`;
+
+// OpenAI tools for deal updates
+const DEAL_UPDATE_TOOLS = [
+  {
+    type: 'function' as const,
+    function: {
+      name: 'update_deal_field',
+      description: 'Update a field on the current deal. Use this when the user asks to change lead partner, analyst, deal source, or other deal properties.',
+      parameters: {
+        type: 'object',
+        properties: {
+          field: {
+            type: 'string',
+            enum: ['leadPartner', 'analyst', 'source', 'priority', 'industry', 'description'],
+            description: 'The field to update'
+          },
+          value: {
+            type: 'string',
+            description: 'The new value for the field. For leadPartner/analyst, use the user ID.'
+          },
+          userName: {
+            type: 'string',
+            description: 'For leadPartner/analyst updates, the name of the user being assigned (for confirmation message)'
+          }
+        },
+        required: ['field', 'value']
+      }
+    }
+  }
+];
 
 // Helper: Extract keywords from a question for document relevance scoring
 function extractKeywords(text: string): string[] {
@@ -551,8 +585,20 @@ function extractKeywords(text: string): string[] {
     .filter(word => word.length > 2 && !stopWords.has(word));
 }
 
+// Minimal document type for keyword context building
+interface DocumentForContext {
+  name: string;
+  type: string;
+  extractedText?: string | null;
+}
+
+// Type for scored document
+interface ScoredDoc extends DocumentForContext {
+  relevanceScore: number;
+}
+
 // Helper: Score document relevance based on question keywords
-function scoreDocumentRelevance(doc: any, keywords: string[]): number {
+function scoreDocumentRelevance(doc: DocumentForContext, keywords: string[]): number {
   if (!doc.extractedText && !doc.name) return 0;
 
   const docText = `${doc.name || ''} ${doc.extractedText || ''}`.toLowerCase();
@@ -579,18 +625,18 @@ function scoreDocumentRelevance(doc: any, keywords: string[]): number {
 }
 
 // Helper: Build context using keyword-based relevance (fallback when RAG not available)
-function buildKeywordContext(message: string, documents: any[]): string {
+function buildKeywordContext(message: string, documents: DocumentForContext[]): string {
   const keywords = extractKeywords(message);
 
   // Score and sort documents by relevance to the question
-  const scoredDocs = documents.map((doc: any) => ({
+  const scoredDocs: ScoredDoc[] = documents.map((doc) => ({
     ...doc,
     relevanceScore: scoreDocumentRelevance(doc, keywords)
-  })).sort((a: any, b: any) => b.relevanceScore - a.relevanceScore);
+  })).sort((a, b) => b.relevanceScore - a.relevanceScore);
 
   // Separate highly relevant docs from others
-  const relevantDocs = scoredDocs.filter((d: any) => d.relevanceScore > 0);
-  const otherDocs = scoredDocs.filter((d: any) => d.relevanceScore === 0);
+  const relevantDocs = scoredDocs.filter((d) => d.relevanceScore > 0);
+  const otherDocs = scoredDocs.filter((d) => d.relevanceScore === 0);
 
   const parts: string[] = [];
   parts.push(`(${documents.length} documents available)`);
@@ -598,7 +644,7 @@ function buildKeywordContext(message: string, documents: any[]): string {
   // Add relevant documents first with more context (3000 chars each)
   if (relevantDocs.length > 0) {
     parts.push(`\n[MOST RELEVANT TO YOUR QUESTION]`);
-    relevantDocs.forEach((doc: any) => {
+    relevantDocs.forEach((doc) => {
       parts.push(`\n### ${doc.name} (${doc.type})`);
       if (doc.extractedText) {
         const textLength = Math.min(doc.extractedText.length, 3000);
@@ -615,7 +661,7 @@ function buildKeywordContext(message: string, documents: any[]): string {
   // Add other documents with less context (1000 chars each)
   if (otherDocs.length > 0) {
     parts.push(`\n[OTHER AVAILABLE DOCUMENTS]`);
-    otherDocs.forEach((doc: any) => {
+    otherDocs.forEach((doc) => {
       parts.push(`\n### ${doc.name} (${doc.type})`);
       if (doc.extractedText) {
         const textLength = Math.min(doc.extractedText.length, 1000);
@@ -634,28 +680,32 @@ function buildKeywordContext(message: string, documents: any[]): string {
 
 // POST /api/deals/:dealId/chat - Send a message to AI about this deal
 router.post('/:dealId/chat', async (req, res) => {
-  console.log(`[CHAT] Received chat request for deal ${req.params.dealId}`);
-  console.log(`[CHAT] OpenAI enabled: ${isAIEnabled()}, openai client: ${!!openai}`);
+  log.debug('Chat request received', { dealId: req.params.dealId, aiEnabled: isAIEnabled() });
 
   try {
     const { dealId } = req.params;
     const { message, history = [] } = req.body;
-    const user = (req as any).user;
+    const user = req.user;
 
-    console.log(`[CHAT] Message: "${message?.substring(0, 50)}..."`);
+    log.debug('Chat message', { messagePreview: message?.substring(0, 50) });
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
     }
 
-    // Get deal with context
+    // Get deal with context including team members
     const { data: deal, error: dealError } = await supabase
       .from('Deal')
       .select(`
         id, name, stage, status, industry, dealSize, revenue, ebitda,
-        irrProjected, mom, aiThesis, description,
+        irrProjected, mom, aiThesis, description, source,
         company:Company(id, name, description, industry),
-        documents:Document(id, name, type, extractedText, embeddingStatus)
+        documents:Document(id, name, type, extractedText, embeddingStatus),
+        teamMembers:DealTeamMember(
+          id,
+          role,
+          user:User(id, name, email, title)
+        )
       `)
       .eq('id', dealId)
       .single();
@@ -667,6 +717,12 @@ router.post('/:dealId/chat', async (req, res) => {
       throw dealError;
     }
 
+    // Fetch available users for assignment
+    const { data: availableUsers } = await supabase
+      .from('User')
+      .select('id, name, email, title, role')
+      .order('name');
+
     // Build deal context
     const contextParts = [`Deal: ${deal.name}`];
     contextParts.push(`Stage: ${deal.stage}`);
@@ -676,7 +732,32 @@ router.post('/:dealId/chat', async (req, res) => {
     if (deal.ebitda) contextParts.push(`EBITDA: $${deal.ebitda}M`);
     if (deal.irrProjected) contextParts.push(`Projected IRR: ${deal.irrProjected}%`);
     if (deal.mom) contextParts.push(`MoM: ${deal.mom}x`);
+    if (deal.source) contextParts.push(`Deal Source: ${deal.source}`);
     if (deal.aiThesis) contextParts.push(`\nInvestment Thesis: ${deal.aiThesis}`);
+
+    // Add current team members
+    const teamMembers = deal.teamMembers as any[];
+    if (teamMembers && teamMembers.length > 0) {
+      contextParts.push(`\n--- CURRENT TEAM ---`);
+      const leadPartner = teamMembers.find((m: any) => m.role === 'LEAD');
+      const analysts = teamMembers.filter((m: any) => m.role === 'MEMBER');
+      if (leadPartner?.user) {
+        contextParts.push(`Lead Partner: ${leadPartner.user.name} (ID: ${leadPartner.user.id})`);
+      }
+      if (analysts.length > 0) {
+        analysts.forEach((a: any) => {
+          if (a.user) contextParts.push(`Analyst: ${a.user.name} (ID: ${a.user.id})`);
+        });
+      }
+    }
+
+    // Add available users for assignment
+    if (availableUsers && availableUsers.length > 0) {
+      contextParts.push(`\n--- AVAILABLE TEAM MEMBERS ---`);
+      availableUsers.forEach((u: any) => {
+        contextParts.push(`- ${u.name} (ID: ${u.id}, ${u.title || u.role || 'Team Member'})`);
+      });
+    }
 
     const company = deal.company as any;
     if (company) {
@@ -689,15 +770,15 @@ router.post('/:dealId/chat', async (req, res) => {
     if (deal.documents?.length > 0) {
       if (isGeminiEnabled()) {
         // Use RAG: semantic search over document chunks
-        console.log(`[RAG] Searching document chunks for deal ${dealId}...`);
+        log.debug('RAG searching document chunks', { dealId });
         const searchResults = await searchDocumentChunks(message, dealId, 10, 0.4);
 
         if (searchResults.length > 0) {
-          console.log(`[RAG] Found ${searchResults.length} relevant chunks`);
+          log.debug('RAG found relevant chunks', { count: searchResults.length });
           documentContext = buildRAGContext(searchResults, deal.documents);
         } else {
           // Fallback to keyword-based if no semantic matches
-          console.log(`[RAG] No semantic matches, falling back to keyword search`);
+          log.debug('RAG no semantic matches, falling back to keyword search');
           documentContext = buildKeywordContext(message, deal.documents);
         }
       } else {
@@ -723,30 +804,186 @@ router.post('/:dealId/chat', async (req, res) => {
     }
 
     // Build messages for OpenAI
-    const messages: any[] = [
+    const messages: OpenAIMessage[] = [
       { role: 'system', content: DEAL_ANALYST_PROMPT },
       { role: 'system', content: `Current Deal Context:\n${dealContext}` },
     ];
 
     // Add conversation history (last 10 messages)
-    history.slice(-10).forEach((msg: any) => {
+    history.slice(-10).forEach((msg: OpenAIMessage) => {
       messages.push({ role: msg.role, content: msg.content });
     });
 
     // Add current message
     messages.push({ role: 'user', content: message });
 
-    // Call OpenAI
-    console.log(`[CHAT] Calling OpenAI with ${messages.length} messages...`);
+    // Call OpenAI with function calling
+    log.debug('Calling OpenAI', { messageCount: messages.length });
     const completion = await openai.chat.completions.create({
       model: 'gpt-4-turbo-preview',
       messages,
+      tools: DEAL_UPDATE_TOOLS,
+      tool_choice: 'auto',
       max_tokens: 1500,
       temperature: 0.7,
     });
 
-    console.log(`[CHAT] OpenAI response received`);
-    const aiResponse = completion.choices[0]?.message?.content || 'I apologize, I was unable to generate a response.';
+    log.debug('OpenAI response received');
+    const responseMessage = completion.choices[0]?.message;
+
+    // Check if AI wants to call a function
+    let updatedFields: any[] = [];
+    if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
+      for (const toolCall of responseMessage.tool_calls) {
+        if (toolCall.function.name === 'update_deal_field') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments);
+            const { field, value, userName } = args;
+
+            log.debug('Processing deal update', { field, value, userName });
+
+            // Handle team member updates (leadPartner, analyst)
+            if (field === 'leadPartner' || field === 'analyst') {
+              const role = field === 'leadPartner' ? 'LEAD' : 'MEMBER';
+
+              // Check if user is already a team member
+              const { data: existingMember } = await supabase
+                .from('DealTeamMember')
+                .select('id')
+                .eq('dealId', dealId)
+                .eq('userId', value)
+                .single();
+
+              if (existingMember) {
+                // Update their role
+                await supabase
+                  .from('DealTeamMember')
+                  .update({ role })
+                  .eq('id', existingMember.id);
+              } else {
+                // Add as new team member
+                await supabase
+                  .from('DealTeamMember')
+                  .insert({
+                    dealId,
+                    userId: value,
+                    role,
+                  });
+              }
+
+              // Update Deal's updatedAt timestamp
+              await supabase
+                .from('Deal')
+                .update({ updatedAt: new Date().toISOString() })
+                .eq('id', dealId);
+
+              // Log activity
+              await supabase.from('Activity').insert({
+                dealId,
+                type: 'TEAM_MEMBER_ADDED',
+                title: `${field === 'leadPartner' ? 'Lead Partner' : 'Analyst'} Updated`,
+                description: `${userName || 'Team member'} assigned as ${field === 'leadPartner' ? 'Lead Partner' : 'Analyst'}`,
+              });
+
+              updatedFields.push({ field, value, userName, success: true });
+            } else {
+              // Handle other field updates (source, priority, industry, description)
+              const updateData: any = {};
+              updateData[field] = value;
+              updateData.updatedAt = new Date().toISOString();
+
+              await supabase
+                .from('Deal')
+                .update(updateData)
+                .eq('id', dealId);
+
+              // Log activity
+              await supabase.from('Activity').insert({
+                dealId,
+                type: 'STATUS_UPDATED',
+                title: `${field.charAt(0).toUpperCase() + field.slice(1)} Updated`,
+                description: `Changed to: ${value}`,
+              });
+
+              updatedFields.push({ field, value, success: true });
+            }
+          } catch (parseError) {
+            log.error('Error processing tool call', parseError);
+            updatedFields.push({ field: 'unknown', success: false, error: 'Failed to process update' });
+          }
+        }
+      }
+
+      // Get a follow-up response from AI confirming the update
+      messages.push({
+        role: 'assistant',
+        content: responseMessage.content || '',
+        tool_calls: responseMessage.tool_calls as any,
+      } as any);
+
+      // Add tool results
+      for (const toolCall of responseMessage.tool_calls) {
+        const update = updatedFields.find(u => u.field === JSON.parse(toolCall.function.arguments).field);
+        messages.push({
+          role: 'tool',
+          tool_call_id: toolCall.id,
+          content: JSON.stringify(update || { success: true }),
+        } as any);
+      }
+
+      // Get final response
+      const followUp = await openai.chat.completions.create({
+        model: 'gpt-4-turbo-preview',
+        messages,
+        max_tokens: 500,
+        temperature: 0.7,
+      });
+
+      const aiResponse = followUp.choices[0]?.message?.content || 'Update completed successfully.';
+
+      // Save messages to database for history
+      const userId = req.user?.id || null;
+      await supabase.from('ChatMessage').insert({
+        dealId,
+        userId,
+        role: 'user',
+        content: message,
+      });
+      await supabase.from('ChatMessage').insert({
+        dealId,
+        userId,
+        role: 'assistant',
+        content: aiResponse,
+        metadata: { model: 'gpt-4-turbo-preview', updates: updatedFields },
+      });
+
+      // Log AI chat activity
+      await AuditLog.aiChat(req, `Deal: ${deal.name} (with updates)`);
+
+      return res.json({
+        response: aiResponse,
+        model: 'gpt-4-turbo-preview',
+        updates: updatedFields,
+      });
+    }
+
+    const aiResponse = responseMessage?.content || 'I apologize, I was unable to generate a response.';
+
+    // Save messages to database for history
+    const userId = req.user?.id || null;
+    await supabase.from('ChatMessage').insert({
+      dealId,
+      userId,
+      role: 'user',
+      content: message,
+    });
+    await supabase.from('ChatMessage').insert({
+      dealId,
+      userId,
+      role: 'assistant',
+      content: aiResponse,
+      metadata: { model: 'gpt-4-turbo-preview' },
+    });
 
     // Log AI chat activity
     await AuditLog.aiChat(req, `Deal: ${deal.name}`);
@@ -756,8 +993,54 @@ router.post('/:dealId/chat', async (req, res) => {
       model: 'gpt-4-turbo-preview',
     });
   } catch (error) {
-    console.error('Error in deal chat:', error);
+    log.error('Error in deal chat', error);
     res.status(500).json({ error: 'Failed to process chat message' });
+  }
+});
+
+// GET /api/deals/:dealId/chat/history - Get chat history for a deal
+router.get('/:dealId/chat/history', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+    const limit = parseInt(req.query.limit as string) || 50;
+    const offset = parseInt(req.query.offset as string) || 0;
+
+    const { data: messages, error } = await supabase
+      .from('ChatMessage')
+      .select('id, role, content, metadata, createdAt')
+      .eq('dealId', dealId)
+      .order('createdAt', { ascending: true })
+      .range(offset, offset + limit - 1);
+
+    if (error) throw error;
+
+    res.json({
+      messages: messages || [],
+      dealId,
+      count: messages?.length || 0,
+    });
+  } catch (error) {
+    log.error('Error fetching chat history', error);
+    res.status(500).json({ error: 'Failed to fetch chat history' });
+  }
+});
+
+// DELETE /api/deals/:dealId/chat/history - Clear chat history for a deal
+router.delete('/:dealId/chat/history', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+
+    const { error } = await supabase
+      .from('ChatMessage')
+      .delete()
+      .eq('dealId', dealId);
+
+    if (error) throw error;
+
+    res.json({ success: true, message: 'Chat history cleared' });
+  } catch (error) {
+    log.error('Error clearing chat history', error);
+    res.status(500).json({ error: 'Failed to clear chat history' });
   }
 });
 

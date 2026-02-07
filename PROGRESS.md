@@ -5401,3 +5401,192 @@ Added new section "9. User Profile & Settings" with completed items:
 | `LAUNCH-CHECKLIST.md` | Modified | Added settings section |
 
 ---
+
+
+## February 7, 2026 - Deal Page Enhancements & AI-Powered Field Updates
+
+### Session Timeline
+- **Start Time:** ~10:00 AM
+- **End Time:** ~2:30 PM
+- **Duration:** ~4.5 hours
+
+---
+
+### 1. Close Deal Modal Redesign (10:00 AM - 10:45 AM)
+
+#### Problem
+The "Close Deal" modal (triggered by "Change Stage" button) had a generic, AI-generated look that didn't match the PE OS design system.
+
+#### Solution
+Redesigned the modal with three iterations:
+1. **First iteration:** Added gradient header, large icons with shadows - user feedback: "too poppy/flashy"
+2. **Second iteration:** Made it subtle - white header, smaller icons (36px), minimal hover effects
+3. **Final iteration:** Added glassmorphism effect with `backdrop-blur-sm` and semi-transparent background
+
+#### Final Design Features
+- Clean white header with deal name subtitle
+- Subtle glass effect: `bg-white/80 backdrop-blur-md`
+- 36px icons with color fill on hover
+- Three options: Closed Won (green), Closed Lost (red), Passed (gray)
+- Simple text-only Cancel button
+
+**File Modified:** `apps/web/deal.js` - `showTerminalStageModal()` function
+
+---
+
+### 2. AI Chat-Based Deal Field Updates (10:45 AM - 12:30 PM)
+
+#### Feature Overview
+Enabled users to update deal fields (Lead Partner, Analyst, Deal Source, etc.) directly through the AI chat interface using natural language.
+
+#### Implementation Details
+
+**Backend Changes (`apps/api/src/routes/deals.ts`):**
+
+1. **Added OpenAI Function Calling Tools:**
+```typescript
+const DEAL_UPDATE_TOOLS = [
+  {
+    type: 'function',
+    function: {
+      name: 'update_deal_field',
+      description: 'Update a field on the current deal',
+      parameters: {
+        properties: {
+          field: { enum: ['leadPartner', 'analyst', 'source', 'priority', 'industry', 'description'] },
+          value: { type: 'string' },
+          userName: { type: 'string' }
+        }
+      }
+    }
+  }
+];
+```
+
+2. **Enhanced Chat Context:**
+   - Added current team members to AI context (Lead Partner, Analysts with IDs)
+   - Added available users list for assignment
+   - AI can now match user names to IDs
+
+3. **Tool Call Processing:**
+   - Detects when AI wants to update a field
+   - For `leadPartner`/`analyst`: Updates `DealTeamMember` table with appropriate role (LEAD/MEMBER)
+   - For other fields: Updates `Deal` table directly
+   - Logs activity for audit trail
+   - Updates `updatedAt` timestamp on Deal
+
+4. **Follow-up Response:**
+   - After executing tool call, gets confirmation message from AI
+   - Returns both response and updates array to frontend
+
+**Frontend Changes (`apps/web/deal.js`):**
+
+1. **Dynamic Field Updates:**
+   - Made Lead Partner, Analyst, Deal Source fields dynamic (removed hardcoded values)
+   - Added IDs: `#lead-partner-name`, `#analyst-name`, `#deal-source`
+   - Populated from `deal.teamMembers` array
+
+2. **Auto-Refresh on Updates:**
+   - When chat response includes `updates` array, automatically calls `loadDealData()`
+   - Shows "Deal Updated" notification
+
+3. **Analyst Selection Fix:**
+   - Changed from `find()` to sorting by `addedAt` descending
+   - Shows most recently added analyst instead of first one found
+
+**File Modified:** `apps/web/deal.html` - Added dynamic IDs to team fields
+
+#### Usage Examples
+- "Change the analyst to Ganesh Jagtap"
+- "Set Sarah Chen as lead partner"
+- "Update deal source to Inbound"
+
+---
+
+### 3. Chat History Persistence (12:30 PM - 1:30 PM)
+
+#### Problem
+Chat messages disappeared on page refresh - no persistence.
+
+#### Solution
+
+**Backend (`apps/api/src/routes/deals.ts`):**
+
+1. **Save Messages to Database:**
+```typescript
+await supabase.from('ChatMessage').insert({
+  dealId,
+  userId,
+  role: 'user',
+  content: message,
+});
+await supabase.from('ChatMessage').insert({
+  dealId,
+  userId,
+  role: 'assistant',
+  content: aiResponse,
+  metadata: { model: 'gpt-4-turbo-preview' },
+});
+```
+
+2. **Added Chat History Endpoints:**
+   - `GET /:dealId/chat/history` - Retrieve messages with pagination
+   - `DELETE /:dealId/chat/history` - Clear chat history
+
+**Frontend (`apps/web/deal.js`):**
+
+1. **Fixed Race Condition:**
+   - Changed `loadDealData(); initializeFeatures();` to `await loadDealData(); initializeFeatures();`
+   - Ensures `state.dealId` is set before `loadChatHistory()` runs
+
+2. **Load History on Page Load:**
+   - `loadChatHistory()` fetches from API and renders messages
+   - Messages stored in `state.messages` for conversation context
+
+---
+
+### 4. Last Updated Field Fix (1:30 PM - 2:00 PM)
+
+#### Problem
+"Last Updated" showed static "14 days ago" even after making changes via chat.
+
+#### Solution
+Added explicit `updatedAt` timestamp updates:
+
+```typescript
+// For team member changes
+await supabase
+  .from('Deal')
+  .update({ updatedAt: new Date().toISOString() })
+  .eq('id', dealId);
+
+// For other field changes
+updateData.updatedAt = new Date().toISOString();
+```
+
+Now "Last Updated" reflects real-time changes.
+
+---
+
+### Files Changed Summary
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/routes/deals.ts` | Added function calling, chat history endpoints, message persistence, updatedAt fixes |
+| `apps/web/deal.js` | Modal redesign, dynamic fields, auto-refresh, chat history loading, race condition fix |
+| `apps/web/deal.html` | Added IDs for dynamic team fields |
+
+---
+
+### Technical Debt / Known Issues
+1. Multiple analysts can exist - UI shows most recent one, but older analysts remain in team
+2. Debug console.log statements added for troubleshooting (can be removed in production)
+
+---
+
+### Next Steps (Planned)
+- Add ability to remove team members via chat
+- Add chat history clear button in UI
+- Consider adding typing indicators during AI processing
+
+---

@@ -403,55 +403,65 @@ async function confirmStageChange(newStage, note) {
 
 function showTerminalStageModal() {
     const currentStage = state.dealData?.stage;
+    const dealName = state.dealData?.name || 'this deal';
 
     const modal = document.createElement('div');
-    modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
+    modal.className = 'fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4';
     modal.innerHTML = `
-        <div class="bg-white rounded-xl shadow-2xl max-w-md w-full animate-fadeIn">
-            <div class="p-6 border-b border-slate-200">
+        <div class="bg-white/80 backdrop-blur-md rounded-xl shadow-lg max-w-md w-full animate-fadeIn border border-white/50">
+            <!-- Header -->
+            <div class="px-5 py-4 border-b border-border-subtle">
                 <div class="flex items-center justify-between">
-                    <h3 class="font-bold text-slate-900 text-lg">Close Deal</h3>
-                    <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-slate-600">
-                        <span class="material-symbols-outlined">close</span>
+                    <div>
+                        <h3 class="font-semibold text-text-main">Close Deal</h3>
+                        <p class="text-xs text-text-muted mt-0.5">${dealName}</p>
+                    </div>
+                    <button onclick="this.closest('.fixed').remove()" class="size-8 rounded-lg text-text-muted hover:text-text-main hover:bg-background-body flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined text-xl">close</span>
                     </button>
                 </div>
             </div>
-            <div class="p-6">
-                <p class="text-sm text-slate-600 mb-4">Select the final outcome for this deal:</p>
 
-                <div class="space-y-3 mb-6">
-                    <button onclick="confirmStageChange('CLOSED_WON', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-green-200 bg-green-50 hover:border-green-400 transition-colors group">
-                        <div class="size-10 rounded-full bg-green-500 text-white flex items-center justify-center">
-                            <span class="material-symbols-outlined">celebration</span>
+            <!-- Body -->
+            <div class="p-5">
+                <p class="text-sm text-text-secondary mb-4">Select the final outcome:</p>
+
+                <div class="space-y-2">
+                    <!-- Closed Won -->
+                    <button onclick="confirmStageChange('CLOSED_WON', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 px-3 py-3 rounded-lg border border-border-subtle bg-white hover:border-secondary/50 hover:bg-secondary-light/20 transition-all group">
+                        <div class="size-9 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center group-hover:bg-secondary group-hover:text-white transition-colors">
+                            <span class="material-symbols-outlined text-xl">check_circle</span>
                         </div>
-                        <div class="text-left">
-                            <div class="font-bold text-green-700">Closed Won</div>
-                            <div class="text-xs text-green-600">Deal successfully completed</div>
+                        <div class="text-left flex-1">
+                            <div class="font-medium text-text-main text-sm">Closed Won</div>
+                            <div class="text-xs text-text-muted">Deal successfully completed</div>
                         </div>
                     </button>
 
-                    <button onclick="confirmStageChange('CLOSED_LOST', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-red-200 bg-red-50 hover:border-red-400 transition-colors group">
-                        <div class="size-10 rounded-full bg-red-500 text-white flex items-center justify-center">
-                            <span class="material-symbols-outlined">cancel</span>
+                    <!-- Closed Lost -->
+                    <button onclick="confirmStageChange('CLOSED_LOST', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 px-3 py-3 rounded-lg border border-border-subtle bg-white hover:border-red-300 hover:bg-red-50/30 transition-all group">
+                        <div class="size-9 rounded-lg bg-red-50 text-red-500 flex items-center justify-center group-hover:bg-red-500 group-hover:text-white transition-colors">
+                            <span class="material-symbols-outlined text-xl">cancel</span>
                         </div>
-                        <div class="text-left">
-                            <div class="font-bold text-red-700">Closed Lost</div>
-                            <div class="text-xs text-red-600">Deal not completed</div>
+                        <div class="text-left flex-1">
+                            <div class="font-medium text-text-main text-sm">Closed Lost</div>
+                            <div class="text-xs text-text-muted">Deal not completed</div>
                         </div>
                     </button>
 
-                    <button onclick="confirmStageChange('PASSED', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 p-3 rounded-lg border-2 border-gray-200 bg-gray-50 hover:border-gray-400 transition-colors group">
-                        <div class="size-10 rounded-full bg-gray-500 text-white flex items-center justify-center">
-                            <span class="material-symbols-outlined">block</span>
+                    <!-- Passed -->
+                    <button onclick="confirmStageChange('PASSED', ''); this.closest('.fixed').remove();" class="w-full flex items-center gap-3 px-3 py-3 rounded-lg border border-border-subtle bg-white hover:border-gray-300 hover:bg-gray-50/50 transition-all group">
+                        <div class="size-9 rounded-lg bg-gray-100 text-text-muted flex items-center justify-center group-hover:bg-gray-500 group-hover:text-white transition-colors">
+                            <span class="material-symbols-outlined text-xl">do_not_disturb_on</span>
                         </div>
-                        <div class="text-left">
-                            <div class="font-bold text-gray-700">Passed</div>
-                            <div class="text-xs text-gray-600">Decided not to pursue</div>
+                        <div class="text-left flex-1">
+                            <div class="font-medium text-text-main text-sm">Passed</div>
+                            <div class="text-xs text-text-muted">Decided not to pursue</div>
                         </div>
                     </button>
                 </div>
 
-                <button onclick="this.closest('.fixed').remove()" class="w-full px-4 py-2 border border-slate-200 rounded-lg font-medium hover:bg-slate-50 transition-colors">
+                <button onclick="this.closest('.fixed').remove()" class="w-full mt-4 px-4 py-2 text-sm text-text-muted hover:text-text-secondary transition-colors">
                     Cancel
                 </button>
             </div>
@@ -533,6 +543,32 @@ function populateDealPage(deal) {
     // Update last updated
     const lastUpdated = document.getElementById('deal-updated');
     if (lastUpdated) lastUpdated.textContent = formatRelativeTime(deal.updatedAt);
+
+    // Update deal source
+    const dealSource = document.getElementById('deal-source');
+    if (dealSource) dealSource.textContent = deal.source || 'Proprietary';
+
+    // Update lead partner and analyst from team members
+    const teamMembers = deal.teamMembers || [];
+    console.log('[Deal] Team members:', teamMembers);
+
+    const leadPartner = teamMembers.find(m => m.role === 'LEAD');
+    // Get the most recently added analyst (MEMBER role) - sort by addedAt descending
+    const analysts = teamMembers.filter(m => m.role === 'MEMBER');
+    const analyst = analysts.sort((a, b) => new Date(b.addedAt) - new Date(a.addedAt))[0];
+
+    console.log('[Deal] Lead Partner:', leadPartner?.user?.name);
+    console.log('[Deal] Analyst:', analyst?.user?.name);
+
+    const leadPartnerName = document.getElementById('lead-partner-name');
+    if (leadPartnerName) {
+        leadPartnerName.textContent = leadPartner?.user?.name || '—';
+    }
+
+    const analystName = document.getElementById('analyst-name');
+    if (analystName) {
+        analystName.textContent = analyst?.user?.name || '—';
+    }
 
     // Update AI Thesis in chat intro
     const aiIntro = document.getElementById('ai-intro');
@@ -872,7 +908,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     // Initialize shared layout with collapsible sidebar
     PELayout.init('deals', { collapsible: true });
 
-    loadDealData();
+    // Load deal data first (sets state.dealId needed by chat)
+    await loadDealData();
     initializeFeatures();
 });
 
@@ -887,6 +924,60 @@ function initializeFeatures() {
     initAIResponseActions();
     initContextSettings();
     initBreadcrumbNavigation();
+    initShareLink();
+}
+
+// ============================================================
+// Share Link
+// ============================================================
+function initShareLink() {
+    const shareLinkBtn = document.getElementById('share-link-btn');
+    const shareLinkPopup = document.getElementById('share-link-popup');
+    const shareLinkInput = document.getElementById('share-link-input');
+    const copyLinkBtn = document.getElementById('copy-link-btn');
+
+    if (!shareLinkBtn || !shareLinkPopup) return;
+
+    // Set the current URL as the share link
+    if (shareLinkInput) {
+        shareLinkInput.value = window.location.href;
+    }
+
+    // Toggle popup on button click
+    shareLinkBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        shareLinkPopup.classList.toggle('hidden');
+    });
+
+    // Copy link functionality
+    if (copyLinkBtn && shareLinkInput) {
+        copyLinkBtn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(shareLinkInput.value);
+                copyLinkBtn.innerHTML = '<span class="material-symbols-outlined text-[14px]">check</span> Copied!';
+                copyLinkBtn.classList.remove('bg-primary', 'hover:bg-primary-hover');
+                copyLinkBtn.classList.add('bg-secondary');
+                setTimeout(() => {
+                    copyLinkBtn.innerHTML = '<span class="material-symbols-outlined text-[14px]">content_copy</span> Copy';
+                    copyLinkBtn.classList.add('bg-primary', 'hover:bg-primary-hover');
+                    copyLinkBtn.classList.remove('bg-secondary');
+                    shareLinkPopup.classList.add('hidden');
+                }, 1500);
+            } catch (err) {
+                // Fallback for older browsers
+                shareLinkInput.select();
+                shareLinkInput.setSelectionRange(0, 99999);
+                navigator.clipboard.writeText(shareLinkInput.value);
+            }
+        });
+    }
+
+    // Close popup when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!shareLinkPopup.contains(e.target) && !shareLinkBtn.contains(e.target)) {
+            shareLinkPopup.classList.add('hidden');
+        }
+    });
 }
 
 // ============================================================
@@ -975,6 +1066,19 @@ function initChatInterface() {
                     // Store message in history
                     state.messages.push({ role: 'user', content: message });
                     state.messages.push({ role: 'assistant', content: data.response });
+
+                    // If there were updates, refresh the deal data
+                    if (data.updates && data.updates.length > 0) {
+                        console.log('[Chat] Deal updates detected:', data.updates);
+                        showNotification('Deal Updated', 'Changes have been applied', 'success');
+                        // Refresh deal data to show updated values
+                        try {
+                            await loadDealData();
+                            console.log('[Chat] Deal data refreshed successfully');
+                        } catch (refreshError) {
+                            console.error('[Chat] Failed to refresh deal data:', refreshError);
+                        }
+                    }
                     return;
                 } else {
                     // Log the error response
