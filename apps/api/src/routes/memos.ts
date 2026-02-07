@@ -4,6 +4,7 @@ import { openai, isAIEnabled } from '../openai.js';
 import { z } from 'zod';
 import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { AuditLog } from '../services/auditLog.js';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -14,7 +15,7 @@ const router = Router();
 const createMemoSchema = z.object({
   title: z.string().min(1),
   projectName: z.string().optional(),
-  dealId: z.string().uuid().optional(),
+  dealId: z.string().uuid().nullable().optional(),
   type: z.enum(['IC_MEMO', 'TEASER', 'SUMMARY', 'CUSTOM']).default('IC_MEMO'),
   status: z.enum(['DRAFT', 'REVIEW', 'FINAL', 'ARCHIVED']).default('DRAFT'),
   sponsor: z.string().optional(),
@@ -65,11 +66,46 @@ const chatMessageSchema = z.object({
 // Memo CRUD Routes
 // ============================================================
 
+// GET /api/memos/debug - Check if Memo table exists (dev only)
+router.get('/debug', async (req, res) => {
+  try {
+    // Try a simple select
+    const { data, error } = await supabase
+      .from('Memo')
+      .select('id')
+      .limit(1);
+
+    if (error) {
+      return res.json({
+        tableExists: false,
+        error: {
+          message: error.message,
+          code: error.code,
+          details: error.details,
+          hint: error.hint,
+        },
+        solution: 'Run the SQL migration in Supabase: apps/api/prisma/migrations/add_memo_tables.sql'
+      });
+    }
+
+    res.json({
+      tableExists: true,
+      rowCount: data?.length || 0,
+      message: 'Memo table is accessible'
+    });
+  } catch (err: any) {
+    res.status(500).json({
+      tableExists: false,
+      error: err.message,
+    });
+  }
+});
+
 // GET /api/memos - List all memos
 router.get('/', async (req, res) => {
   try {
     const { dealId, status, type, limit = 50, offset = 0 } = req.query;
-    const user = (req as any).user;
+    const user = req.user;
 
     let query = supabase
       .from('Memo')
@@ -92,7 +128,7 @@ router.get('/', async (req, res) => {
 
     res.json(memos || []);
   } catch (error) {
-    console.error('Error fetching memos:', error);
+    log.error('Error fetching memos', error);
     res.status(500).json({ error: 'Failed to fetch memos' });
   }
 });
@@ -146,7 +182,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(memo);
   } catch (error) {
-    console.error('Error fetching memo:', error);
+    log.error('Error fetching memo', error);
     res.status(500).json({ error: 'Failed to fetch memo' });
   }
 });
@@ -154,12 +190,19 @@ router.get('/:id', async (req, res) => {
 // POST /api/memos - Create new memo
 router.post('/', async (req, res) => {
   try {
-    const user = (req as any).user;
+    console.log('=== MEMO CREATE START ===');
+    console.log('Request body:', JSON.stringify(req.body, null, 2));
+
+    const user = req.user;
+    console.log('User:', user?.id, user?.email);
+
     const validation = createMemoSchema.safeParse(req.body);
 
     if (!validation.success) {
+      console.log('Validation failed:', validation.error.errors);
       return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
     }
+    console.log('Validation passed');
 
     const memoData = {
       ...validation.data,
@@ -167,16 +210,23 @@ router.post('/', async (req, res) => {
       lastEditedBy: user?.id,
     };
 
+    console.log('MEMO DATA TO INSERT:', JSON.stringify(memoData, null, 2));
+
     const { data: memo, error } = await supabase
       .from('Memo')
       .insert(memoData)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.log('INSERT ERROR:', error);
+      throw error;
+    }
+    console.log('Memo created:', memo.id);
 
     // Create default sections if IC_MEMO type
     if (memo.type === 'IC_MEMO') {
+      console.log('Creating default sections...');
       const defaultSections = [
         { memoId: memo.id, type: 'EXECUTIVE_SUMMARY', title: 'Executive Summary', sortOrder: 0 },
         { memoId: memo.id, type: 'FINANCIAL_PERFORMANCE', title: 'Financial Performance', sortOrder: 1 },
@@ -185,23 +235,49 @@ router.post('/', async (req, res) => {
         { memoId: memo.id, type: 'DEAL_STRUCTURE', title: 'Deal Structure', sortOrder: 4 },
       ];
 
-      await supabase.from('MemoSection').insert(defaultSections);
+      const { error: sectionsError } = await supabase.from('MemoSection').insert(defaultSections);
+      if (sectionsError) {
+        console.log('SECTIONS ERROR:', sectionsError);
+        throw sectionsError;
+      }
+      console.log('Sections created');
     }
 
     // Fetch the memo with sections
-    const { data: fullMemo } = await supabase
+    console.log('Fetching full memo...');
+    const { data: fullMemo, error: fetchError } = await supabase
       .from('Memo')
       .select(`*, sections:MemoSection(*)`)
       .eq('id', memo.id)
       .single();
 
+    if (fetchError) {
+      console.log('FETCH ERROR:', fetchError);
+      throw fetchError;
+    }
+    console.log('Full memo fetched');
+
     // Audit log
+    console.log('Creating audit log...');
     await AuditLog.memoCreated(req, memo.id, memo.title);
+    console.log('=== MEMO CREATE SUCCESS ===');
 
     res.status(201).json(fullMemo);
-  } catch (error) {
-    console.error('Error creating memo:', error);
-    res.status(500).json({ error: 'Failed to create memo' });
+  } catch (error: any) {
+    log.error('Error creating memo', error);
+    // Return detailed error in development for debugging
+    const errorMessage = error?.message || 'Unknown error';
+    const errorDetails = {
+      message: errorMessage,
+      code: error?.code,
+      details: error?.details,
+      hint: error?.hint,
+    };
+    console.error('MEMO CREATE ERROR:', JSON.stringify(errorDetails, null, 2));
+    res.status(500).json({
+      error: `Failed to create memo: ${errorMessage}`,
+      debug: errorDetails
+    });
   }
 });
 
@@ -209,7 +285,7 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const user = (req as any).user;
+    const user = req.user;
     const validation = updateMemoSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -233,7 +309,7 @@ router.patch('/:id', async (req, res) => {
 
     res.json(memo);
   } catch (error) {
-    console.error('Error updating memo:', error);
+    log.error('Error updating memo', error);
     res.status(500).json({ error: 'Failed to update memo' });
   }
 });
@@ -262,7 +338,7 @@ router.delete('/:id', requirePermission(PERMISSIONS.MEMO_DELETE), async (req, re
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deleting memo:', error);
+    log.error('Error deleting memo', error);
     res.status(500).json({ error: 'Failed to delete memo' });
   }
 });
@@ -286,7 +362,7 @@ router.get('/:id/sections', async (req, res) => {
 
     res.json(sections || []);
   } catch (error) {
-    console.error('Error fetching sections:', error);
+    log.error('Error fetching sections', error);
     res.status(500).json({ error: 'Failed to fetch sections' });
   }
 });
@@ -327,7 +403,7 @@ router.post('/:id/sections', async (req, res) => {
 
     res.status(201).json(section);
   } catch (error) {
-    console.error('Error creating section:', error);
+    log.error('Error creating section', error);
     res.status(500).json({ error: 'Failed to create section' });
   }
 });
@@ -353,7 +429,7 @@ router.patch('/:id/sections/:sectionId', async (req, res) => {
 
     res.json(section);
   } catch (error) {
-    console.error('Error updating section:', error);
+    log.error('Error updating section', error);
     res.status(500).json({ error: 'Failed to update section' });
   }
 });
@@ -372,7 +448,7 @@ router.delete('/:id/sections/:sectionId', async (req, res) => {
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Error deleting section:', error);
+    log.error('Error deleting section', error);
     res.status(500).json({ error: 'Failed to delete section' });
   }
 });
@@ -406,7 +482,7 @@ router.post('/:id/sections/reorder', async (req, res) => {
 
     res.json(sections);
   } catch (error) {
-    console.error('Error reordering sections:', error);
+    log.error('Error reordering sections', error);
     res.status(500).json({ error: 'Failed to reorder sections' });
   }
 });
@@ -549,7 +625,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 
     res.json(updatedSection);
   } catch (error) {
-    console.error('Error generating section:', error);
+    log.error('Error generating section', error);
     res.status(500).json({ error: 'Failed to generate section content' });
   }
 });
@@ -562,7 +638,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 router.post('/:id/chat', async (req, res) => {
   try {
     const { id } = req.params;
-    const user = (req as any).user;
+    const user = req.user;
     const validation = chatMessageSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -710,7 +786,7 @@ router.post('/:id/chat', async (req, res) => {
       timestamp: aiMessage.createdAt,
     });
   } catch (error) {
-    console.error('Error in chat:', error);
+    log.error('Error in chat', error);
     res.status(500).json({ error: 'Failed to process chat message' });
   }
 });
@@ -719,7 +795,7 @@ router.post('/:id/chat', async (req, res) => {
 router.get('/:id/conversations', async (req, res) => {
   try {
     const { id } = req.params;
-    const user = (req as any).user;
+    const user = req.user;
 
     const { data: conversations, error } = await supabase
       .from('MemoConversation')
@@ -745,7 +821,7 @@ router.get('/:id/conversations', async (req, res) => {
 
     res.json(conversations || []);
   } catch (error) {
-    console.error('Error fetching conversations:', error);
+    log.error('Error fetching conversations', error);
     res.status(500).json({ error: 'Failed to fetch conversations' });
   }
 });

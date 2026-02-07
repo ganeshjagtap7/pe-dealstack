@@ -3,6 +3,9 @@ import { supabase } from '../supabase.js';
 // Cache TTL in hours - cached AI responses are valid for this duration
 const CACHE_TTL_HOURS = 24;
 
+// In-memory cache for non-deal-specific data (market sentiment, etc.)
+const memoryCache = new Map<string, { data: any; expiresAt: number }>();
+
 export interface CachedAnalysis {
   thesis?: string;
   risks?: any[];
@@ -183,6 +186,31 @@ export const AICache = {
       console.error('[AICache] Error getting stats:', error);
       return { hasThesis: false, hasRisks: false, cacheAge: null, isValid: false };
     }
+  },
+
+  /**
+   * Generic in-memory cache get (for non-deal-specific data)
+   */
+  async get(key: string): Promise<any | null> {
+    const cached = memoryCache.get(key);
+    if (!cached) return null;
+    if (Date.now() > cached.expiresAt) {
+      memoryCache.delete(key);
+      return null;
+    }
+    console.log(`[AICache] Memory HIT for key: ${key}`);
+    return cached.data;
+  },
+
+  /**
+   * Generic in-memory cache set (for non-deal-specific data)
+   */
+  async set(key: string, data: any, ttlMs: number = 5 * 60 * 1000): Promise<void> {
+    memoryCache.set(key, {
+      data,
+      expiresAt: Date.now() + ttlMs,
+    });
+    console.log(`[AICache] Memory STORED for key: ${key} (TTL: ${ttlMs / 1000}s)`);
   },
 };
 

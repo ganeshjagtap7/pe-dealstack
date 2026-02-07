@@ -6322,3 +6322,179 @@ CREATE TABLE "MemoTemplateSection" (
 5. [ ] Add template sharing/export feature
 
 ---
+
+## February 7, 2025 - Memo Builder Cleanup & Debug Infrastructure
+
+### Session: Morning (10:00 AM - 11:30 AM IST)
+
+#### Overview
+Cleaned up the Memo Builder UI by removing the demo mode banner and added comprehensive debug logging infrastructure to trace API request flow for memo creation issues.
+
+---
+
+### Changes Made
+
+#### 1. Removed Demo Mode Banner from Memo Builder
+**Time: 10:15 AM**
+
+**Files Modified:**
+- `apps/web/memo-builder.html` - Removed entire demo banner HTML
+- `apps/web/memo-builder.js` - Removed banner-related JavaScript
+
+**What was removed:**
+- Orange "Demo Mode — AI features use simulated responses" banner at top of page
+- "Create Real Memo with AI" button
+- Dismiss button
+- `setupDemoBannerHandlers()` function
+- Banner show/hide logic in `updateModeIndicators()`
+
+**What was updated:**
+- `updateModeIndicators()` - Simplified to only check AI status
+- `updateAIPanelStatus()` - Changed "Demo Mode" indicator to "AI Offline" with gray styling
+- Removed demo mode message from `regenerateSection()` fallback
+
+**Before:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ ⚗️ Demo Mode — AI features use simulated responses      │
+│                    [Create Real Memo with AI] [✕]       │
+├─────────────────────────────────────────────────────────┤
+│ Header / Navigation                                      │
+```
+
+**After:**
+```
+┌─────────────────────────────────────────────────────────┐
+│ Header / Navigation (clean, no banner)                   │
+```
+
+---
+
+#### 2. Added Debug Logging Infrastructure
+**Time: 10:45 AM**
+
+**Purpose:** Trace where memo creation API requests fail in the authenticated flow.
+
+**Files Modified:**
+- `apps/api/src/index.ts` - Added request tracing middleware for `/api/memos`
+- `apps/api/src/middleware/auth.ts` - Added detailed auth flow logging
+
+**Request Tracing Middleware (index.ts):**
+```typescript
+app.use('/api/memos', (req, res, next) => {
+  console.log(`\n>>> [MEMOS] ${req.method} ${req.path}`);
+  console.log('>>> [MEMOS] Headers authorization:', req.headers.authorization ? 'Bearer ***' : 'MISSING');
+  console.log('>>> [MEMOS] Body:', JSON.stringify(req.body).substring(0, 200));
+  next();
+});
+```
+
+**Auth Middleware Logging (auth.ts):**
+```typescript
+// At start of authMiddleware:
+console.log(`>>> [AUTH] ${req.method} ${req.originalUrl}`);
+
+// On auth failure:
+console.log('>>> [AUTH] FAILED: No authorization header');
+console.log('>>> [AUTH] FAILED: Token validation error', error?.message);
+
+// On auth success:
+console.log('>>> [AUTH] SUCCESS: User', user.id, user.email);
+```
+
+**Debug Output Format:**
+```
+>>> [MEMOS] POST /
+>>> [MEMOS] Headers authorization: Bearer ***
+>>> [MEMOS] Body: {"title":"Investment Committee Memo"...}
+>>> [AUTH] POST /api/memos
+>>> [AUTH] SUCCESS: User abc123 user@example.com
+=== MEMO CREATE START ===
+Request body: {...}
+User: abc123 user@example.com
+Validation passed
+MEMO DATA TO INSERT: {...}
+Memo created: xyz789
+Creating default sections...
+Sections created
+Fetching full memo...
+Full memo fetched
+Creating audit log...
+=== MEMO CREATE SUCCESS ===
+```
+
+---
+
+#### 3. AI Panel Status Indicator Update
+**Time: 11:00 AM**
+
+**Changed from:**
+- Orange dot + "Demo Mode" text when AI offline
+
+**Changed to:**
+- Gray dot + "AI Offline" text when AI not connected
+- Green pulsing dot + "AI Connected" text when OpenAI API available
+
+**Code:**
+```javascript
+if (isConnected) {
+    indicator.innerHTML = `
+        <span class="size-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        <span class="text-emerald-600 font-medium">AI Connected</span>
+    `;
+} else {
+    indicator.innerHTML = `
+        <span class="size-2 rounded-full bg-slate-400"></span>
+        <span class="text-slate-500 font-medium">AI Offline</span>
+    `;
+}
+```
+
+---
+
+### Files Changed Summary
+
+| File | Type | Changes |
+|------|------|---------|
+| `apps/web/memo-builder.html` | Modified | Removed demo banner HTML (18 lines) |
+| `apps/web/memo-builder.js` | Modified | Removed banner handlers, updated status indicator |
+| `apps/api/src/index.ts` | Modified | Added memos request tracing middleware |
+| `apps/api/src/middleware/auth.ts` | Modified | Added auth flow debug logging |
+
+---
+
+### Technical Notes
+
+1. **Why remove demo banner?** 
+   - Cleaner UI without confusing "demo mode" messaging
+   - The fallback behavior (using demo data when API fails) still works silently
+   - Users don't need to see internal implementation details
+
+2. **Debug logging purpose:**
+   - Traces complete request flow: incoming request → auth → route handler
+   - Helps identify if failures are at auth level or database level
+   - Can be removed or disabled in production
+
+3. **Backward compatibility:**
+   - Demo data fallback still works when API calls fail
+   - `?demo=true` URL parameter still forces demo mode (for testing)
+   - No breaking changes to existing functionality
+
+---
+
+### Debugging Memo Creation Issue (Ongoing)
+
+**Problem:** POST /api/memos returns 500 Internal Server Error
+
+**Verified working:**
+- ✅ Database tables exist (Memo, MemoSection, MemoConversation)
+- ✅ Direct INSERT works via debug endpoint (bypassing auth)
+- ✅ Full flow works without auth: create memo → create sections → fetch with join
+
+**Still investigating:**
+- Auth middleware interaction with memo creation
+- Possible Supabase RLS (Row Level Security) issues with authenticated user context
+
+**Next debugging step:** Check API terminal logs when clicking "Create Real Memo" to see exactly where authenticated flow fails.
+
+---

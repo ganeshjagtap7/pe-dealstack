@@ -1,16 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../supabase.js';
+import { log } from '../utils/logger.js';
+
+// User type for authenticated requests
+export interface AuthUser {
+  id: string;
+  email: string;
+  name?: string;
+  firmName?: string;
+  role: string;
+  user_metadata?: Record<string, unknown>;
+}
 
 // Extend Express Request to include user
 declare global {
   namespace Express {
     interface Request {
-      user?: {
-        id: string;
-        email: string;
-        role?: string;
-        user_metadata?: Record<string, any>;
-      };
+      user?: AuthUser;
     }
   }
 }
@@ -25,10 +31,14 @@ export async function authMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
+    // Debug logging
+    console.log(`>>> [AUTH] ${req.method} ${req.originalUrl}`);
+
     // Get the Authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
+      console.log('>>> [AUTH] FAILED: No authorization header');
       res.status(401).json({
         error: 'Unauthorized',
         message: 'No authorization header provided',
@@ -60,7 +70,8 @@ export async function authMiddleware(
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      console.error('Auth error:', error?.message || 'User not found');
+      console.log('>>> [AUTH] FAILED: Token validation error', error?.message || 'User not found');
+      log.warn('Auth token validation failed', { error: error?.message || 'User not found' });
       res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid or expired token',
@@ -68,18 +79,22 @@ export async function authMiddleware(
       return;
     }
 
+    console.log('>>> [AUTH] SUCCESS: User', user.id, user.email);
+
     // Attach user to request
     // Default to 'analyst' role if no role is set in user_metadata
     req.user = {
       id: user.id,
       email: user.email || '',
-      role: user.user_metadata?.role || 'analyst',
-      user_metadata: user.user_metadata,
+      name: user.user_metadata?.name as string | undefined,
+      firmName: user.user_metadata?.firm_name as string | undefined,
+      role: (user.user_metadata?.role as string) || 'analyst',
+      user_metadata: user.user_metadata as Record<string, unknown> | undefined,
     };
 
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    log.error('Auth middleware error', error);
     res.status(500).json({
       error: 'Internal Server Error',
       message: 'Authentication failed',
@@ -109,8 +124,10 @@ export async function optionalAuthMiddleware(
           req.user = {
             id: user.id,
             email: user.email || '',
-            role: user.user_metadata?.role || 'analyst',
-            user_metadata: user.user_metadata,
+            name: user.user_metadata?.name as string | undefined,
+            firmName: user.user_metadata?.firm_name as string | undefined,
+            role: (user.user_metadata?.role as string) || 'analyst',
+            user_metadata: user.user_metadata as Record<string, unknown> | undefined,
           };
         }
       }

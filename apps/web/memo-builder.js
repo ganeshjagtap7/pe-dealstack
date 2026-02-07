@@ -3,7 +3,10 @@
  * Main JavaScript file for memo editing, AI chat, and document management
  */
 
-const API_BASE_URL = 'http://localhost:3001/api';
+// Dynamic API URL - works in both development and production
+const API_BASE_URL = window.location.hostname === 'localhost'
+    ? 'http://localhost:3001/api'
+    : '/api';
 
 // ============================================================
 // Demo Data (Project Apollo)
@@ -168,6 +171,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const createNew = urlParams.get('new') === 'true';
     const dealId = urlParams.get('dealId');
     const projectName = urlParams.get('project');
+    const demoMode = urlParams.get('demo') === 'true';
 
     if (memoId) {
         // Try to load memo from API
@@ -177,21 +181,43 @@ document.addEventListener('DOMContentLoaded', async function() {
             console.log('Failed to load memo from API, using demo data');
             loadDemoData();
         }
-    } else if (createNew) {
-        // Create a new memo
+    } else if (demoMode) {
+        // Explicitly requested demo mode
+        loadDemoData();
+    } else if (createNew || !dealId) {
+        // Create a new memo automatically for new projects
         console.log('Creating new memo...');
+        showLoadingState('Creating your memo...');
         const created = await createNewMemo({
             dealId: dealId || undefined,
-            projectName: projectName || (dealId ? undefined : 'New Project'),
+            projectName: projectName || 'New Investment Memo',
         });
+        hideLoadingState();
         if (!created) {
             console.log('Failed to create memo, using demo data');
             loadDemoData();
         }
     } else {
-        // No ID or action provided, use demo data
-        // In production, you might want to show a memo selector instead
-        loadDemoData();
+        // Has dealId but no memo ID - find or create memo for deal
+        console.log('Looking for existing memo for deal:', dealId);
+        showLoadingState('Loading memo...');
+        const memos = await listMemosAPI({ dealId });
+        if (memos.length > 0) {
+            // Load existing memo for this deal
+            const loaded = await loadMemoFromAPI(memos[0].id);
+            if (loaded) {
+                updateURLWithMemoId(memos[0].id);
+            } else {
+                loadDemoData();
+            }
+        } else {
+            // Create new memo for this deal
+            const created = await createNewMemo({ dealId });
+            if (!created) {
+                loadDemoData();
+            }
+        }
+        hideLoadingState();
     }
 
     // Render UI
@@ -203,9 +229,33 @@ document.addEventListener('DOMContentLoaded', async function() {
     setupEventHandlers();
     setupDragDrop();
 
-    // Show/hide demo banner and update AI status
+    // Update AI status indicator
     updateModeIndicators();
 });
+
+/**
+ * Show a loading state overlay
+ */
+function showLoadingState(message = 'Loading...') {
+    const overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.className = 'fixed inset-0 bg-white/90 z-50 flex items-center justify-center';
+    overlay.innerHTML = `
+        <div class="flex flex-col items-center gap-4">
+            <div class="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <p class="text-slate-600 font-medium">${message}</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+/**
+ * Hide the loading state overlay
+ */
+function hideLoadingState() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.remove();
+}
 
 // ============================================================
 // API Integration
@@ -224,7 +274,7 @@ async function createMemoAPI(options = {}) {
             body: JSON.stringify({
                 title: options.title || 'Investment Committee Memo',
                 projectName: options.projectName || 'New Project',
-                dealId: options.dealId || null,
+                ...(options.dealId ? { dealId: options.dealId } : {}),
                 type: options.type || 'IC_MEMO',
                 status: 'DRAFT',
                 sponsor: options.sponsor || '',
@@ -232,8 +282,14 @@ async function createMemoAPI(options = {}) {
         });
 
         if (!response.ok) {
-            const error = await response.json();
+            const error = await response.json().catch(() => ({ error: 'Unknown error' }));
             console.error('Failed to create memo:', error);
+
+            // Check if the error is because the table doesn't exist
+            if (error.error?.includes('relation') || error.error?.includes('does not exist')) {
+                console.warn('Memo tables not found. Please run the SQL migration.');
+                showDatabaseSetupNotice();
+            }
             return null;
         }
 
@@ -242,6 +298,34 @@ async function createMemoAPI(options = {}) {
         console.error('Error creating memo:', error);
         return null;
     }
+}
+
+/**
+ * Show a notice when database tables are missing
+ */
+function showDatabaseSetupNotice() {
+    // Only show once
+    if (document.getElementById('db-setup-notice')) return;
+
+    const notice = document.createElement('div');
+    notice.id = 'db-setup-notice';
+    notice.className = 'fixed bottom-4 right-4 max-w-md bg-amber-50 border border-amber-200 rounded-lg p-4 shadow-lg z-50';
+    notice.innerHTML = `
+        <div class="flex gap-3">
+            <span class="material-symbols-outlined text-amber-600 shrink-0">database</span>
+            <div class="flex-1">
+                <h4 class="font-bold text-amber-800 mb-1">Database Setup Required</h4>
+                <p class="text-sm text-amber-700 mb-2">
+                    Memo tables not found. Run the migration script in Supabase SQL Editor.
+                </p>
+                <p class="text-xs text-amber-600">
+                    File: <code class="bg-amber-100 px-1 rounded">add_memo_tables.sql</code>
+                </p>
+                <button onclick="this.closest('#db-setup-notice').remove()" class="mt-2 text-xs text-amber-600 hover:text-amber-800 underline">Dismiss</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(notice);
 }
 
 /**
@@ -341,20 +425,20 @@ async function loadMemoFromAPI(memoId) {
                 timestamp: formatTime(new Date(m.createdAt)),
             }));
         } else {
-            // Add welcome message for real AI
+            // Add welcome message - AI status will be checked and updated later
             state.messages = [{
                 id: 'welcome',
                 role: 'assistant',
-                content: `<p class="font-medium text-emerald-700">AI Analyst Connected</p>
-                <p class="mt-2">I'm ready to help you build this investment memo for <strong>${state.memo.projectName}</strong>.</p>
-                <p class="mt-2">Try asking me to:</p>
-                <ul class="mt-1 list-disc pl-5 text-slate-600">
-                    <li>Generate content for any section</li>
-                    <li>Analyze financial metrics</li>
-                    <li>Identify risks and opportunities</li>
-                    <li>Compare against market benchmarks</li>
+                content: `<p class="font-medium text-primary">Welcome to the Memo Builder</p>
+                <p class="mt-2">I'm your AI Analyst, ready to help you create an investment memo for <strong>${state.memo.projectName}</strong>.</p>
+                <p class="mt-2">Here's what I can help with:</p>
+                <ul class="mt-1 list-disc pl-5 text-slate-600 text-sm">
+                    <li><strong>Generate content</strong> - Click the refresh icon on any section</li>
+                    <li><strong>Analyze data</strong> - Ask questions about financials or market dynamics</li>
+                    <li><strong>Write sections</strong> - Request specific content like executive summaries or risk assessments</li>
+                    <li><strong>Edit & refine</strong> - Ask me to rewrite for tone or add more detail</li>
                 </ul>
-                <p class="mt-2 text-xs text-slate-500">Click "Regenerate" on any section to generate AI content, or type a question below.</p>`,
+                <p class="mt-3 text-xs text-slate-500">Type a message below or use the quick prompts to get started.</p>`,
                 timestamp: formatTime(new Date()),
             }];
         }
@@ -475,6 +559,15 @@ async function sendChatMessageAPI(content) {
 
         if (!response.ok) {
             const error = await response.json();
+            // Handle specific error cases
+            if (response.status === 503) {
+                // AI not enabled - show friendly message
+                return {
+                    role: 'assistant',
+                    content: `<p class="text-amber-600">AI features are not available. Please ensure OPENAI_API_KEY is configured in your environment.</p>`,
+                    timestamp: new Date().toISOString(),
+                };
+            }
             throw new Error(error.error || 'Failed to send message');
         }
 
@@ -482,6 +575,22 @@ async function sendChatMessageAPI(content) {
     } catch (error) {
         console.error('Error sending chat message:', error);
         return null;
+    }
+}
+
+/**
+ * Check if AI is enabled on the server
+ */
+async function checkAIStatus() {
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/ai/status`);
+        if (response.ok) {
+            const data = await response.json();
+            return data.enabled;
+        }
+        return false;
+    } catch {
+        return false;
     }
 }
 
@@ -1250,63 +1359,25 @@ function getDragAfterElement(container, y) {
 }
 
 // ============================================================
-// Mode Indicators (Demo vs Real)
+// Mode Indicators (AI Status)
 // ============================================================
-function updateModeIndicators() {
-    const isDemo = state.memo?.id?.startsWith('demo-');
-    const demoBanner = document.getElementById('demo-banner');
+async function updateModeIndicators() {
+    // Check real AI connectivity
+    const aiEnabled = await checkAIStatus();
+    updateAIPanelStatus(aiEnabled);
 
-    if (isDemo) {
-        demoBanner?.classList.remove('hidden');
-        setupDemoBannerHandlers();
-    } else {
-        demoBanner?.classList.add('hidden');
-    }
-
-    // Update AI panel header to show connection status
-    updateAIPanelStatus(!isDemo);
-}
-
-function setupDemoBannerHandlers() {
-    const createBtn = document.getElementById('create-real-memo-btn');
-    const dismissBtn = document.getElementById('dismiss-demo-banner');
-
-    createBtn?.addEventListener('click', async () => {
-        createBtn.innerHTML = `
-            <span class="material-symbols-outlined text-[16px] animate-spin">sync</span>
-            Creating...
-        `;
-        createBtn.disabled = true;
-
-        // Prompt for project name
-        const projectName = prompt('Enter a project name for your new memo:', 'New Project');
-        if (!projectName) {
-            createBtn.innerHTML = `
-                <span class="material-symbols-outlined text-[16px]">add</span>
-                Create Real Memo with AI
-            `;
-            createBtn.disabled = false;
-            return;
-        }
-
-        const created = await createNewMemo({
-            projectName: projectName,
-            title: 'Investment Committee Memo',
+    // If AI is not enabled, show a notice in chat
+    if (!aiEnabled && state.messages.length === 0) {
+        state.messages.push({
+            id: 'ai-notice',
+            role: 'assistant',
+            content: `<p class="text-amber-600 font-medium">AI Not Connected</p>
+            <p class="mt-2 text-amber-700">OpenAI API key is not configured. Chat responses will be simulated.</p>
+            <p class="mt-2 text-xs text-slate-500">To enable AI, set OPENAI_API_KEY in your .env file.</p>`,
+            timestamp: formatTime(new Date()),
         });
-
-        if (!created) {
-            alert('Failed to create memo. Please try again.');
-            createBtn.innerHTML = `
-                <span class="material-symbols-outlined text-[16px]">add</span>
-                Create Real Memo with AI
-            `;
-            createBtn.disabled = false;
-        }
-    });
-
-    dismissBtn?.addEventListener('click', () => {
-        document.getElementById('demo-banner')?.classList.add('hidden');
-    });
+        renderMessages();
+    }
 }
 
 function updateAIPanelStatus(isConnected) {
@@ -1329,8 +1400,8 @@ function updateAIPanelStatus(isConnected) {
         `;
     } else {
         indicator.innerHTML = `
-            <span class="size-2 rounded-full bg-amber-500"></span>
-            <span class="text-amber-600 font-medium">Demo Mode</span>
+            <span class="size-2 rounded-full bg-slate-400"></span>
+            <span class="text-slate-500 font-medium">AI Offline</span>
         `;
     }
 
@@ -1402,8 +1473,7 @@ async function regenerateSection(sectionId) {
         state.messages.push({
             id: `m${Date.now()}`,
             role: 'assistant',
-            content: `<p>I've regenerated the <strong>${section.title}</strong> section with updated analysis.</p>
-            <p class="mt-2 text-xs text-amber-600">Note: Running in demo mode. Connect to API for real AI generation.</p>`,
+            content: `<p>I've regenerated the <strong>${section.title}</strong> section with updated analysis.</p>`,
             timestamp: 'Just now'
         });
         renderMessages();

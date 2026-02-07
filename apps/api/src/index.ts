@@ -202,6 +202,16 @@ app.get('/api/debug/memo-table', async (req, res) => {
 });
 
 // ========================================
+// Request tracing middleware for debugging
+// ========================================
+app.use('/api/memos', (req, res, next) => {
+  console.log(`\n>>> [MEMOS] ${req.method} ${req.path}`);
+  console.log('>>> [MEMOS] Headers authorization:', req.headers.authorization ? 'Bearer ***' : 'MISSING');
+  console.log('>>> [MEMOS] Body:', JSON.stringify(req.body).substring(0, 200));
+  next();
+});
+
+// ========================================
 // Protected Routes (require authentication)
 // ========================================
 app.use('/api/deals', authMiddleware, dealsRouter);
