@@ -22,7 +22,7 @@ function copyStaticFiles() {
       }
 
       // Also copy standalone JS files from root
-      const rootFiles = ['dashboard.js', 'deal.js', 'memo-builder.js']
+      const rootFiles = ['dashboard.js', 'deal.js', 'memo-builder.js', 'admin-dashboard.js']
       rootFiles.forEach(file => {
         const src = resolve(__dirname, file)
         if (existsSync(src)) {
@@ -66,6 +66,7 @@ export default defineConfig({
         'memo-builder': resolve(__dirname, 'memo-builder.html'),
         vdr: resolve(__dirname, 'vdr.html'),
         settings: resolve(__dirname, 'settings.html'),
+        'admin-dashboard': resolve(__dirname, 'admin-dashboard.html'),
       },
     },
   },
