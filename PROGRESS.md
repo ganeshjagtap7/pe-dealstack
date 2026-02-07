@@ -5590,3 +5590,369 @@ Now "Last Updated" reflects real-time changes.
 - Consider adding typing indicators during AI processing
 
 ---
+
+## February 7, 2026
+
+### Session - UI/UX Improvements & Bug Fixes
+
+---
+
+### 1. Dashboard Greeting Personalization (10:00 AM)
+
+**Timestamp:** 2026-02-07 10:00 AM IST
+
+#### Problem
+Dashboard displayed hardcoded "Good Morning, Alex" instead of the actual logged-in user's first name.
+
+#### Solution
+
+**Files Modified:**
+- `apps/web/dashboard.html` - Changed default greeting from "Good Morning, Alex" to "Good Morning"
+- `apps/web/dashboard.js` - Updated `updateGreeting()` function to use actual user data
+- `apps/web/js/layout.js` - Added `pe-user-loaded` custom event dispatch
+
+**Implementation Details:**
+
+1. **Added Custom Event in layout.js:**
+```javascript
+// Dispatch event when user data is loaded
+window.dispatchEvent(new CustomEvent('pe-user-loaded', { detail: { user: USER } }));
+```
+
+2. **Updated updateGreeting() in dashboard.js:**
+```javascript
+function updateGreeting() {
+    const hour = new Date().getHours();
+    const greetingEl = document.getElementById('greeting');
+    if (greetingEl) {
+        let greeting = 'Good Morning';
+        if (hour >= 12 && hour < 17) greeting = 'Good Afternoon';
+        else if (hour >= 17) greeting = 'Good Evening';
+        const userName = (typeof USER !== 'undefined' && USER.name && USER.name !== 'Loading...')
+            ? USER.name.split(' ')[0]
+            : 'User';
+        greetingEl.textContent = `${greeting}, ${userName}`;
+    }
+}
+```
+
+3. **Added Event Listener:**
+```javascript
+window.addEventListener('pe-user-loaded', () => {
+    updateGreeting();
+});
+```
+
+**Result:** Dashboard now displays personalized greeting with actual user's first name (e.g., "Good Afternoon, Ganesh")
+
+---
+
+### 2. Notification Icon Bug Fix (10:30 AM)
+
+**Timestamp:** 2026-02-07 10:30 AM IST
+
+#### Problem
+Notification icon/bell on CRM pages was not working - clicking did nothing.
+
+#### Root Cause
+The `getSession()` method returns `{ session }` object structure, but code was accessing it incorrectly.
+
+#### Solution
+
+**File Modified:** `apps/web/js/notificationCenter.js`
+
+**Before (Bug):**
+```javascript
+const session = await window.PEAuth?.getSession?.();
+currentUserId = session?.user?.id;
+```
+
+**After (Fixed):**
+```javascript
+const result = await window.PEAuth?.getSession?.();
+currentUserId = result?.session?.user?.id;
+```
+
+**Result:** Notification bell icon now properly loads user session and functions correctly.
+
+---
+
+### 3. Dashboard Widget Management System (11:00 AM - 12:30 PM)
+
+**Timestamp:** 2026-02-07 11:00 AM - 12:30 PM IST
+
+#### Feature Request
+Users needed ability to customize dashboard by adding/removing widgets.
+
+#### Implementation
+
+**Files Modified:**
+- `apps/web/dashboard.html` - Added widget attributes, remove buttons, modal HTML, customize button
+- `apps/web/dashboard.js` - Added complete widget management system
+
+**Widget Configuration (19 widgets in 5 categories):**
+
+```javascript
+const WIDGET_CONFIG = {
+    // Current Widgets
+    'portfolio-summary': { name: 'Portfolio Summary', category: 'Portfolio' },
+    'active-deals': { name: 'Active Deals', category: 'Deals' },
+    'ai-recommendations': { name: 'AI Recommendations', category: 'AI' },
+    'recent-activities': { name: 'Recent Activities', category: 'Activity' },
+    'deal-pipeline': { name: 'Deal Pipeline', category: 'Deals' },
+    'calendar': { name: 'Upcoming Tasks', category: 'Activity' },
+    'recent-documents': { name: 'Recent Documents', category: 'Documents' },
+    'team-activity': { name: 'Team Activity', category: 'Team' },
+    'ai-insights': { name: 'AI Insights', category: 'AI' },
+    // Additional Widgets
+    'fund-performance': { name: 'Fund Performance', category: 'Portfolio', comingSoon: true },
+    'deal-velocity': { name: 'Deal Velocity Metrics', category: 'Deals', comingSoon: true },
+    'market-news': { name: 'Market News Feed', category: 'AI', comingSoon: true },
+    'lp-communications': { name: 'LP Communications', category: 'Team', comingSoon: true },
+    'compliance-tracker': { name: 'Compliance Tracker', category: 'Documents', comingSoon: true },
+    'meeting-notes': { name: 'Meeting Notes', category: 'Activity', comingSoon: true },
+    'valuation-trends': { name: 'Valuation Trends', category: 'Portfolio', comingSoon: true },
+    'sector-analysis': { name: 'Sector Analysis', category: 'AI', comingSoon: true },
+    'key-contacts': { name: 'Key Contacts', category: 'Team', comingSoon: true },
+    'deadline-tracker': { name: 'Deadline Tracker', category: 'Activity', comingSoon: true }
+};
+```
+
+**Features Implemented:**
+
+1. **Widget Preferences Storage:**
+   - Uses localStorage for persistence
+   - Key: `pe_dashboard_widgets`
+   - Stores array of enabled widget IDs
+
+2. **Widget Management Functions:**
+   - `getWidgetPreferences()` - Retrieve saved preferences
+   - `saveWidgetPreferences()` - Save to localStorage
+   - `applyWidgetPreferences()` - Show/hide widgets based on preferences
+   - `removeWidget(widgetId)` - Remove widget with animation
+   - `addWidget(widgetId)` - Add widget back
+   - `openWidgetModal()` / `closeWidgetModal()` - Modal controls
+   - `saveWidgetSelection()` - Save modal selections
+   - `initWidgetManagement()` - Initialize on page load
+
+3. **UI Components Added:**
+   - "Customize Dashboard" button in header
+   - Remove (×) button on each widget (hover to reveal)
+   - Add Widget modal with checkboxes by category
+   - "Coming Soon" badges for future widgets
+
+**HTML Additions:**
+```html
+<!-- Customize Button -->
+<button id="customize-dashboard-btn" class="...">
+    <span class="material-symbols-outlined">dashboard_customize</span>
+    Customize
+</button>
+
+<!-- Widget Container with data attributes -->
+<div class="widget-container" data-widget="portfolio-summary">
+    <button class="widget-remove-btn">×</button>
+    <!-- widget content -->
+</div>
+
+<!-- Add Widget Modal -->
+<div id="add-widget-modal" class="hidden fixed inset-0 z-50...">
+    <!-- Modal with category-organized checkboxes -->
+</div>
+```
+
+**Result:** Full dashboard customization - users can remove any widget and add it back via modal.
+
+---
+
+### 4. Sidebar Profile Photo Alignment Fix (1:00 PM)
+
+**Timestamp:** 2026-02-07 1:00 PM IST
+
+#### Problem
+When sidebar is collapsed, the user profile photo was not centered/aligned properly.
+
+#### Solution
+
+**File Modified:** `apps/web/js/layout.js`
+
+**CSS Added:**
+```css
+#pe-sidebar.collapsed .user-profile {
+    padding: 0;
+    display: flex;
+    justify-content: center;
+}
+#pe-sidebar.collapsed .user-profile > a {
+    justify-content: center;
+    padding: 0.625rem;
+    border: none !important;
+    background: transparent !important;
+    width: auto;
+}
+#pe-sidebar.collapsed .user-info {
+    display: none;
+}
+```
+
+**Result:** Profile photo now centers perfectly when sidebar is in collapsed state.
+
+---
+
+### 5. Deal Page Financial Metrics Alignment (1:30 PM)
+
+**Timestamp:** 2026-02-07 1:30 PM IST
+
+#### Problem
+Financial metrics cards (Deal Size, Enterprise Value, Revenue, EBITDA) were misaligned due to varying label text lengths causing wrapping.
+
+#### Solution
+
+**File Modified:** `apps/web/deal.html`
+
+**Implementation:**
+- Added fixed heights for consistent alignment:
+  - Label row: `h-4` with `whitespace-nowrap`
+  - Value row: `h-9`
+  - Subtext row: `h-10`
+
+```html
+<div class="h-4 flex items-center">
+    <span class="text-xs text-text-secondary whitespace-nowrap">Deal Size</span>
+</div>
+<div class="h-9 flex items-baseline gap-1">
+    <span class="text-2xl font-bold text-text-primary">$75M</span>
+</div>
+<div class="h-10">
+    <span class="text-xs text-text-secondary">Target: $50M - $100M</span>
+</div>
+```
+
+**Result:** All four financial metric cards now align perfectly with consistent row heights.
+
+---
+
+### 6. Share Button Simplification (2:00 PM)
+
+**Timestamp:** 2026-02-07 2:00 PM IST
+
+#### Feature Request
+- Share button should only show share link (not full team modal)
+- Make button smaller/more subtle - just a link icon
+
+#### Solution
+
+**Files Modified:**
+- `apps/web/deal.html` - New share button and popup at body level
+- `apps/web/deal.js` - Added `initShareLink()` function
+
+**HTML Changes:**
+
+1. **New Minimal Share Button:**
+```html
+<button id="share-link-btn" 
+    class="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors" 
+    title="Copy share link">
+    <span class="material-symbols-outlined text-[20px]">link</span>
+</button>
+```
+
+2. **Share Link Popup (at body level for proper positioning):**
+```html
+<div id="share-link-popup" 
+    class="hidden fixed bg-white rounded-xl shadow-2xl border border-border-subtle p-4 z-[100] w-72" 
+    style="top: 0; left: auto;">
+    <div class="flex items-center justify-between mb-3">
+        <span class="text-sm font-semibold text-text-primary">Share Link</span>
+        <button id="close-share-popup" class="...">×</button>
+    </div>
+    <div class="flex items-center gap-2">
+        <input type="text" id="share-link-input" readonly class="..." value="">
+        <button id="copy-share-link" class="...">
+            <span class="material-symbols-outlined">content_copy</span>
+        </button>
+    </div>
+</div>
+```
+
+**JavaScript - initShareLink():**
+```javascript
+function initShareLink() {
+    const shareLinkBtn = document.getElementById('share-link-btn');
+    const shareLinkPopup = document.getElementById('share-link-popup');
+    const shareLinkInput = document.getElementById('share-link-input');
+    const copyBtn = document.getElementById('copy-share-link');
+    const closeBtn = document.getElementById('close-share-popup');
+
+    if (!shareLinkBtn || !shareLinkPopup) return;
+
+    // Toggle popup with dynamic positioning
+    shareLinkBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!shareLinkPopup.classList.contains('hidden')) {
+            shareLinkPopup.classList.add('hidden');
+            return;
+        }
+        // Position popup below button, aligned to right
+        const btnRect = shareLinkBtn.getBoundingClientRect();
+        shareLinkPopup.style.top = (btnRect.bottom + 8) + 'px';
+        shareLinkPopup.style.right = (window.innerWidth - btnRect.right) + 'px';
+        shareLinkPopup.classList.remove('hidden');
+        shareLinkInput.value = window.location.href;
+    });
+
+    // Copy functionality
+    copyBtn.addEventListener('click', async () => {
+        await navigator.clipboard.writeText(shareLinkInput.value);
+        copyBtn.innerHTML = '<span class="material-symbols-outlined text-green-600">check</span>';
+        setTimeout(() => {
+            copyBtn.innerHTML = '<span class="material-symbols-outlined">content_copy</span>';
+        }, 2000);
+    });
+
+    // Close handlers
+    closeBtn.addEventListener('click', () => shareLinkPopup.classList.add('hidden'));
+    document.addEventListener('click', (e) => {
+        if (!shareLinkPopup.contains(e.target) && e.target !== shareLinkBtn) {
+            shareLinkPopup.classList.add('hidden');
+        }
+    });
+}
+```
+
+**Key Technical Decision:** Used `fixed` positioning with `getBoundingClientRect()` for popup placement instead of `absolute` positioning, which was causing the popup to appear in wrong locations due to parent element constraints.
+
+**Result:** Clean, minimal link icon button that shows a small popup with copy-to-clipboard functionality.
+
+---
+
+### Files Changed Summary
+
+| File | Changes |
+|------|---------|
+| `apps/web/dashboard.html` | Removed hardcoded "Alex", added widget management UI, customize button, modal |
+| `apps/web/dashboard.js` | Added `updateGreeting()` improvements, full widget management system |
+| `apps/web/js/layout.js` | Added `pe-user-loaded` event, collapsed sidebar CSS fixes |
+| `apps/web/js/notificationCenter.js` | Fixed `getSession()` response structure access |
+| `apps/web/deal.html` | Fixed financial metrics alignment, new share link button/popup |
+| `apps/web/deal.js` | Added `initShareLink()` function |
+
+---
+
+### Technical Notes
+
+1. **Custom Events Pattern:** Used `pe-user-loaded` custom event to communicate user data availability across modules - useful pattern for decoupled JavaScript modules.
+
+2. **localStorage for Preferences:** Widget preferences stored in localStorage with key `pe_dashboard_widgets` - simple, effective for user customization without backend changes.
+
+3. **Fixed Positioning for Popups:** When popups need to appear near buttons but break out of overflow containers, use `fixed` positioning with `getBoundingClientRect()` for accurate placement.
+
+---
+
+### Known Issues / Technical Debt
+
+1. **Notification System:** Database table and triggers need to be created for full notification functionality
+2. **Coming Soon Widgets:** 10 placeholder widgets marked as "Coming Soon" - can be implemented in future sprints
+
+---
+

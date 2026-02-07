@@ -16,12 +16,94 @@ const NAV_ITEMS = [
     { id: 'ai-reports', label: 'AI Reports', icon: 'auto_awesome', href: '#', isAI: true },
 ];
 
-// User data (in real app, this would come from auth)
-const USER = {
-    name: 'Alex Morgan',
-    role: 'Senior Analyst',
-    avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk'
+// User data - will be loaded from API
+let USER = {
+    name: 'Loading...',
+    role: '',
+    avatar: ''
 };
+
+// Load user data from API
+async function loadUserData() {
+    try {
+        if (typeof PEAuth !== 'undefined' && PEAuth.authFetch) {
+            const API_BASE = window.location.hostname === 'localhost'
+                ? 'http://localhost:3001/api'
+                : '/api';
+            const response = await PEAuth.authFetch(`${API_BASE}/users/me`);
+            if (response.ok) {
+                const userData = await response.json();
+                USER = {
+                    name: userData.name || userData.email?.split('@')[0] || 'User',
+                    role: userData.title || getRoleLabel(userData.role) || 'Team Member',
+                    avatar: userData.avatar || ''
+                };
+                updateUserDisplay();
+                // Dispatch event so other components can update when user data is loaded
+                window.dispatchEvent(new CustomEvent('pe-user-loaded', { detail: { user: USER } }));
+            }
+        }
+    } catch (error) {
+        console.warn('Could not load user data for layout:', error);
+    }
+}
+
+function getRoleLabel(role) {
+    const labels = { ADMIN: 'Admin', MEMBER: 'Team Member', VIEWER: 'Analyst', OPS: 'Operations' };
+    return labels[role] || role || 'Team Member';
+}
+
+// Update user display in header and sidebar after data loads
+function updateUserDisplay() {
+    // Update header user name
+    const headerUserName = document.querySelector('#user-menu-btn span.hidden');
+    if (headerUserName) {
+        headerUserName.textContent = USER.name;
+    }
+
+    // Update header avatar
+    const headerAvatar = document.querySelector('#user-menu-btn > div');
+    if (headerAvatar) {
+        if (USER.avatar) {
+            headerAvatar.style.backgroundImage = `url('${USER.avatar}')`;
+        } else {
+            const initials = USER.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            headerAvatar.style.backgroundImage = '';
+            headerAvatar.style.backgroundColor = PE_COLORS.primary;
+            headerAvatar.style.display = 'flex';
+            headerAvatar.style.alignItems = 'center';
+            headerAvatar.style.justifyContent = 'center';
+            headerAvatar.style.color = 'white';
+            headerAvatar.style.fontSize = '12px';
+            headerAvatar.style.fontWeight = 'bold';
+            headerAvatar.innerHTML = initials;
+        }
+    }
+
+    // Update sidebar user info
+    const sidebarUserName = document.querySelector('.user-profile .user-info h1');
+    const sidebarUserRole = document.querySelector('.user-profile .user-info p');
+    const sidebarAvatar = document.querySelector('.user-profile > a > div:first-child');
+
+    if (sidebarUserName) sidebarUserName.textContent = USER.name;
+    if (sidebarUserRole) sidebarUserRole.textContent = USER.role;
+    if (sidebarAvatar) {
+        if (USER.avatar) {
+            sidebarAvatar.style.backgroundImage = `url('${USER.avatar}')`;
+        } else {
+            const initials = USER.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            sidebarAvatar.style.backgroundImage = '';
+            sidebarAvatar.style.backgroundColor = PE_COLORS.primary;
+            sidebarAvatar.style.display = 'flex';
+            sidebarAvatar.style.alignItems = 'center';
+            sidebarAvatar.style.justifyContent = 'center';
+            sidebarAvatar.style.color = 'white';
+            sidebarAvatar.style.fontSize = '12px';
+            sidebarAvatar.style.fontWeight = 'bold';
+            sidebarAvatar.innerHTML = initials;
+        }
+    }
+}
 
 // PE OS Logo SVG
 const LOGO_SVG = `<svg fill="currentColor" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
@@ -283,9 +365,29 @@ function generateStyles() {
                 padding-left: 0;
                 padding-right: 0;
             }
-            #pe-sidebar.collapsed .user-profile > div {
+            #pe-sidebar.collapsed .user-profile {
+                padding: 0;
+                display: flex;
                 justify-content: center;
-                padding: 0.5rem;
+            }
+            #pe-sidebar.collapsed .user-profile > a {
+                justify-content: center;
+                padding: 0.625rem;
+                border: none !important;
+                background: transparent !important;
+                width: auto;
+            }
+            #pe-sidebar.collapsed .user-profile > a:hover {
+                background: rgba(0, 51, 102, 0.05) !important;
+                border-radius: 0.5rem;
+            }
+            #pe-sidebar.collapsed .user-profile .user-info {
+                display: none;
+            }
+            #pe-sidebar.collapsed .user-profile > a > div:first-child {
+                width: 2.25rem;
+                height: 2.25rem;
+                margin: 0;
             }
             #pe-sidebar.collapsed .collapse-icon {
                 transform: rotate(180deg);
@@ -365,6 +467,9 @@ function initPELayout(activePage, options = {}) {
     });
 
     console.log('PE OS Layout initialized for:', activePage);
+
+    // Load user data from API and update display
+    loadUserData();
 
     // Dispatch custom event to signal layout is ready
     window.dispatchEvent(new CustomEvent('pe-layout-ready', { detail: { activePage } }));

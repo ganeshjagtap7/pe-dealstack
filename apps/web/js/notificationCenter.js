@@ -52,9 +52,9 @@ window.PENotifications = (function() {
 
     // Initialize notification center
     async function init() {
-        // Get current user
-        const session = await window.PEAuth?.getSession?.();
-        currentUserId = session?.user?.id;
+        // Get current user - getSession returns { session } object
+        const result = await window.PEAuth?.getSession?.();
+        currentUserId = result?.session?.user?.id;
 
         if (!currentUserId) {
             console.warn('No user ID for notifications');

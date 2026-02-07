@@ -943,10 +943,20 @@ function initShareLink() {
         shareLinkInput.value = window.location.href;
     }
 
-    // Toggle popup on button click
+    // Position and toggle popup on button click
     shareLinkBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        shareLinkPopup.classList.toggle('hidden');
+
+        if (!shareLinkPopup.classList.contains('hidden')) {
+            shareLinkPopup.classList.add('hidden');
+            return;
+        }
+
+        // Position popup below the button, aligned to the right
+        const btnRect = shareLinkBtn.getBoundingClientRect();
+        shareLinkPopup.style.top = (btnRect.bottom + 8) + 'px';
+        shareLinkPopup.style.right = (window.innerWidth - btnRect.right) + 'px';
+        shareLinkPopup.classList.remove('hidden');
     });
 
     // Copy link functionality
