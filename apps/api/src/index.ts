@@ -66,10 +66,17 @@ app.use(express.json());
 // Request ID for error correlation
 app.use(requestIdMiddleware);
 
-// Health check
-app.get('/health', async (req, res) => {
+// Health check - fast response for Render deployment (no DB query)
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+  });
+});
+
+// Deep health check - includes database connectivity
+app.get('/health/deep', async (req, res) => {
   try {
-    // Test Supabase connection
     const { error } = await supabase.from('Company').select('count', { count: 'exact', head: true });
 
     if (error) throw error;
