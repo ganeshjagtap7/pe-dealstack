@@ -8,7 +8,6 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
 }
 
 // Enums for type safety
@@ -96,6 +95,7 @@ model Deal {
   company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
   documents       Document[]
   activities      Activity[]
+  memos           Memo[]
 
   @@index([companyId])
   @@index([stage])
@@ -136,6 +136,135 @@ model Activity {
   createdAt   DateTime     @default(now())
 
   deal        Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+
+  @@index([dealId])
+  @@index([createdAt])
+}
+
+// Investment Memo Related Models
+
+enum MemoType {
+  IC_MEMO
+  TEASER
+  SUMMARY
+  CUSTOM
+}
+
+enum MemoStatus {
+  DRAFT
+  REVIEW
+  FINAL
+  ARCHIVED
+}
+
+enum MemoSectionType {
+  EXECUTIVE_SUMMARY
+  COMPANY_OVERVIEW
+  FINANCIAL_PERFORMANCE
+  MARKET_DYNAMICS
+  COMPETITIVE_LANDSCAPE
+  RISK_ASSESSMENT
+  DEAL_STRUCTURE
+  VALUE_CREATION
+  EXIT_STRATEGY
+  RECOMMENDATION
+  APPENDIX
+  CUSTOM
+}
+
+model Memo {
+  id            String      @id @default(uuid())
+  title         String
+  projectName   String?
+  dealId        String?
+  type          MemoType    @default(IC_MEMO)
+  status        MemoStatus  @default(DRAFT)
+  sponsor       String?
+  memoDate      DateTime?
+
+  createdBy     String?
+  lastEditedBy  String?
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  deal          Deal?       @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  sections      MemoSection[]
+  conversations MemoConversation[]
+
+  @@index([dealId])
+  @@index([status])
+  @@index([updatedAt])
+}
+
+model MemoSection {
+  id          String          @id @default(uuid())
+  memoId      String
+  type        MemoSectionType
+  title       String
+  content     String?
+  sortOrder   Int             @default(0)
+
+  // AI metadata
+  aiGenerated Boolean         @default(false)
+  aiModel     String?
+  aiPrompt    String?
+
+  // Rich content
+  tableData   Json?
+  chartConfig Json?
+  citations   Json?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  memo        Memo            @relation(fields: [memoId], references: [id], onDelete: Cascade)
+
+  @@index([memoId])
+  @@index([sortOrder])
+}
+
+model MemoConversation {
+  id        String    @id @default(uuid())
+  memoId    String
+  userId    String?
+  title     String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  memo      Memo      @relation(fields: [memoId], references: [id], onDelete: Cascade)
+  messages  MemoChatMessage[]
+
+  @@index([memoId])
+  @@index([userId])
+}
+
+model MemoChatMessage {
+  id             String           @id @default(uuid())
+  conversationId String
+  role           String           // 'user' or 'assistant'
+  content        String
+  metadata       Json?
+
+  createdAt      DateTime         @default(now())
+
+  conversation   MemoConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId])
+  @@index([createdAt])
+}
+
+// Chat messages for deal conversations (existing feature)
+model ChatMessage {
+  id        String    @id @default(uuid())
+  dealId    String?
+  userId    String?
+  role      String    // 'user' or 'assistant'
+  content   String
+  metadata  Json?
+
+  createdAt DateTime  @default(now())
 
   @@index([dealId])
   @@index([createdAt])

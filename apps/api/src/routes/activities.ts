@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -42,7 +43,7 @@ router.get('/deals/:dealId/activities', async (req, res) => {
       offset: Number(offset),
     });
   } catch (error) {
-    console.error('Error fetching activities:', error);
+    log.error('Error fetching activities', error);
     res.status(500).json({ error: 'Failed to fetch activities' });
   }
 });
@@ -83,7 +84,7 @@ router.post('/deals/:dealId/activities', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error creating activity:', error);
+    log.error('Error creating activity', error);
     res.status(500).json({ error: 'Failed to create activity' });
   }
 });
@@ -108,7 +109,7 @@ router.get('/activities/:id', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Error fetching activity:', error);
+    log.error('Error fetching activity', error);
     res.status(500).json({ error: 'Failed to fetch activity' });
   }
 });
@@ -127,7 +128,7 @@ router.delete('/activities/:id', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting activity:', error);
+    log.error('Error deleting activity', error);
     res.status(500).json({ error: 'Failed to delete activity' });
   }
 });
@@ -150,7 +151,7 @@ router.get('/activities/recent', async (req, res) => {
 
     res.json(data || []);
   } catch (error) {
-    console.error('Error fetching recent activities:', error);
+    log.error('Error fetching recent activities', error);
     res.status(500).json({ error: 'Failed to fetch recent activities' });
   }
 });

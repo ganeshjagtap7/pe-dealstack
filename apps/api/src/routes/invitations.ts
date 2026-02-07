@@ -3,6 +3,7 @@ import { z } from 'zod';
 import crypto from 'crypto';
 import { supabase } from '../supabase.js';
 import { AuditLog } from '../services/auditLog.js';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -45,10 +46,7 @@ async function sendInvitationEmail(
     const inviteUrl = `${baseUrl}/accept-invite.html?token=${token}`;
 
     // Log the invitation URL for development
-    console.log(`📧 Invitation email to ${email}:`);
-    console.log(`   From: ${inviterName} at ${firmName}`);
-    console.log(`   Role: ${role}`);
-    console.log(`   Accept URL: ${inviteUrl}`);
+    log.info('Invitation email prepared', { email, inviterName, firmName, role, inviteUrl });
 
     // If SendGrid is configured, send actual email
     if (process.env.SENDGRID_API_KEY) {
@@ -93,14 +91,14 @@ async function sendInvitationEmail(
       });
 
       if (!response.ok) {
-        console.error('SendGrid error:', await response.text());
+        log.error('SendGrid error', new Error(await response.text()));
         return { success: false, error: 'Failed to send email' };
       }
     }
 
     return { success: true };
   } catch (error) {
-    console.error('Email send error:', error);
+    log.error('Email send error', error);
     return { success: false, error: 'Failed to send invitation email' };
   }
 }
@@ -108,7 +106,7 @@ async function sendInvitationEmail(
 // GET /api/invitations - List invitations for current user's firm
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     const { status } = req.query;
 
     if (!user?.id) {
@@ -161,7 +159,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 // POST /api/invitations - Create and send invitation
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     const validation = createInvitationSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -250,7 +248,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     );
 
     if (!emailResult.success) {
-      console.warn('Email send failed but invitation created:', emailResult.error);
+      log.warn('Email send failed but invitation created', { error: emailResult.error });
     }
 
     // Audit log
@@ -273,7 +271,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 // POST /api/invitations/bulk - Send multiple invitations
 router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     const validation = bulkInviteSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -476,7 +474,7 @@ router.post('/accept/:token', async (req: Request, res: Response, next: NextFunc
     });
 
     if (authError) {
-      console.error('Auth signup error:', authError);
+      log.error('Auth signup error', authError);
       return res.status(400).json({ error: authError.message });
     }
 
@@ -495,7 +493,7 @@ router.post('/accept/:token', async (req: Request, res: Response, next: NextFunc
       .single();
 
     if (userError) {
-      console.error('User creation error:', userError);
+      log.error('User creation error', userError);
       // Don't fail completely - auth user was created
     }
 
@@ -532,7 +530,7 @@ router.post('/accept/:token', async (req: Request, res: Response, next: NextFunc
 // DELETE /api/invitations/:id - Revoke invitation
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     const { id } = req.params;
 
     if (!user?.id) {
@@ -586,7 +584,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 // POST /api/invitations/:id/resend - Resend invitation email
 router.post('/:id/resend', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     const { id } = req.params;
 
     if (!user?.id) {

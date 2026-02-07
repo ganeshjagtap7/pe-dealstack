@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { openai, isAIEnabled } from '../openai.js';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -289,7 +290,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
 
         aiResponseContent = completion.choices[0]?.message?.content || 'I apologize, I was unable to generate a response.';
       } catch (aiError) {
-        console.error('OpenAI error:', aiError);
+        log.error('OpenAI error', aiError);
         aiResponseContent = 'I apologize, there was an error processing your request. Please try again.';
       }
     } else {

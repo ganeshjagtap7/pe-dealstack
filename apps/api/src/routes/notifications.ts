@@ -1,6 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -252,7 +253,7 @@ export async function createNotification(data: {
     .single();
 
   if (error) {
-    console.error('Failed to create notification:', error);
+    log.error('Failed to create notification', error);
     return null;
   }
 
@@ -274,7 +275,7 @@ export async function notifyDealTeam(
     .eq('dealId', dealId);
 
   if (error || !teamMembers) {
-    console.error('Failed to get deal team members:', error);
+    log.error('Failed to get deal team members', error);
     return;
   }
 
@@ -295,7 +296,7 @@ export async function notifyDealTeam(
       .insert(notifications);
 
     if (insertError) {
-      console.error('Failed to create team notifications:', insertError);
+      log.error('Failed to create team notifications', insertError);
     }
   }
 }

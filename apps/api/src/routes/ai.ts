@@ -8,6 +8,7 @@ import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtrac
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES } from '../services/fileValidator.js';
 import { AuditLog } from '../services/auditLog.js';
 import { AICache } from '../services/aiCache.js';
+import { log } from '../utils/logger.js';
 
 // Use createRequire to load CommonJS pdf-parse module
 const require = createRequire(import.meta.url);
@@ -100,7 +101,7 @@ router.post('/deals/:dealId/chat', async (req, res) => {
     });
 
     // Save messages to database
-    const userId = (req as any).user?.id || null;
+    const userId = req.user?.id || null;
 
     // Save user message
     await supabase.from('ChatMessage').insert({
@@ -128,7 +129,7 @@ router.post('/deals/:dealId/chat', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error in AI chat:', error);
+    log.error('Error in AI chat', error);
     res.status(500).json({ error: 'Failed to process AI chat' });
   }
 });
@@ -155,7 +156,7 @@ router.get('/deals/:dealId/chat/history', async (req, res) => {
       count: messages?.length || 0,
     });
   } catch (error) {
-    console.error('Error fetching chat history:', error);
+    log.error('Error fetching chat history', error);
     res.status(500).json({ error: 'Failed to fetch chat history' });
   }
 });
@@ -174,7 +175,7 @@ router.delete('/deals/:dealId/chat/history', async (req, res) => {
 
     res.json({ success: true, message: 'Chat history cleared' });
   } catch (error) {
-    console.error('Error clearing chat history:', error);
+    log.error('Error clearing chat history', error);
     res.status(500).json({ error: 'Failed to clear chat history' });
   }
 });
@@ -197,7 +198,7 @@ router.post('/deals/:dealId/generate-thesis', async (req, res) => {
     if (!forceRefresh) {
       const cached = await AICache.getThesis(dealId);
       if (cached.hit && cached.data) {
-        console.log(`[AI] Thesis served from cache for deal ${dealId}`);
+        log.debug('Thesis served from cache', { dealId });
         return res.json({
           thesis: cached.data,
           dealId,
@@ -230,7 +231,7 @@ ${generateDealContext(deal)}
 
 Generate a professional investment thesis that a PE analyst would write. Be specific about the opportunity and any flags that need attention.`;
 
-    console.log(`[AI] Generating thesis for deal ${dealId} (cache miss or refresh)`);
+    log.info('Generating thesis for deal', { dealId, forceRefresh });
 
     const completion = await openai!.chat.completions.create({
       model: 'gpt-4-turbo-preview',
@@ -262,7 +263,7 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
       cached: false,
     });
   } catch (error) {
-    console.error('Error generating thesis:', error);
+    log.error('Error generating thesis', error);
     res.status(500).json({ error: 'Failed to generate thesis' });
   }
 });
@@ -285,7 +286,7 @@ router.post('/deals/:dealId/analyze-risks', async (req, res) => {
     if (!forceRefresh) {
       const cached = await AICache.getRisks(dealId);
       if (cached.hit && cached.data) {
-        console.log(`[AI] Risks served from cache for deal ${dealId}`);
+        log.debug('Risks served from cache', { dealId });
         return res.json({
           risks: cached.data,
           dealId,
@@ -318,7 +319,7 @@ ${generateDealContext(deal)}
 
 Format your response as a JSON array of risk objects with fields: title, description, severity, mitigation`;
 
-    console.log(`[AI] Analyzing risks for deal ${dealId} (cache miss or refresh)`);
+    log.info('Analyzing risks for deal', { dealId, forceRefresh });
 
     const completion = await openai!.chat.completions.create({
       model: 'gpt-4-turbo-preview',
@@ -349,7 +350,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
       cached: false,
     });
   } catch (error) {
-    console.error('Error analyzing risks:', error);
+    log.error('Error analyzing risks', error);
     res.status(500).json({ error: 'Failed to analyze risks' });
   }
 });
@@ -369,7 +370,7 @@ router.get('/deals/:dealId/ai-cache', async (req, res) => {
     const stats = await AICache.getStats(dealId);
     res.json(stats);
   } catch (error) {
-    console.error('Error getting cache stats:', error);
+    log.error('Error getting cache stats', error);
     res.status(500).json({ error: 'Failed to get cache stats' });
   }
 });
@@ -381,7 +382,7 @@ router.delete('/deals/:dealId/ai-cache', async (req, res) => {
     await AICache.invalidate(dealId);
     res.json({ success: true, message: 'Cache invalidated' });
   } catch (error) {
-    console.error('Error invalidating cache:', error);
+    log.error('Error invalidating cache', error);
     res.status(500).json({ error: 'Failed to invalidate cache' });
   }
 });
@@ -413,7 +414,7 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
     }
 
     const safeName = validation.sanitizedFilename || sanitizeFilename(file.originalname);
-    console.log(`AI Ingest: Processing file ${safeName} (${file.mimetype})`);
+    log.info('AI Ingest processing file', { filename: safeName, mimeType: file.mimetype });
 
     // Extract text from PDF
     let extractedText = '';
@@ -424,9 +425,9 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
         const pdfData = await pdfParse(file.buffer);
         extractedText = pdfData.text?.replace(/\u0000/g, '') || '';
         numPages = pdfData.numpages || 1;
-        console.log(`Extracted ${extractedText.length} chars from ${numPages} pages`);
+        log.info('PDF text extracted', { textLength: extractedText.length, numPages });
       } catch (pdfError) {
-        console.error('PDF extraction error:', pdfError);
+        log.error('PDF extraction error', pdfError);
         return res.status(400).json({ error: 'Failed to extract text from PDF' });
       }
     } else {
@@ -444,7 +445,7 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
     }
 
     // Extract deal data using AI
-    console.log('Starting AI extraction...');
+    log.info('Starting AI extraction');
     const extractedData = await extractDealDataFromText(extractedText);
 
     if (!extractedData) {
@@ -485,7 +486,7 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
           .single();
 
         if (companyError) {
-          console.error('Error creating company:', companyError);
+          log.error('Error creating company', companyError);
         } else {
           companyId = newCompany.id;
         }
@@ -523,7 +524,7 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
       .single();
 
     if (dealError) {
-      console.error('Error creating deal:', dealError);
+      log.error('Error creating deal', dealError);
       return res.status(500).json({ error: 'Failed to create deal from extracted data' });
     }
 
@@ -589,7 +590,7 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
     // Audit log
     await AuditLog.aiIngest(req, safeName, deal.id);
 
-    console.log(`AI Ingest complete: Created deal ${deal.id} from ${safeName} (${extractedData.overallConfidence}% confidence)`);
+    log.info('AI Ingest complete', { dealId: deal.id, filename: safeName, confidence: extractedData.overallConfidence });
 
     res.status(201).json({
       success: true,
@@ -621,7 +622,7 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('AI Ingest error:', error);
+    log.error('AI Ingest error', error);
     res.status(500).json({ error: 'Failed to process AI ingestion' });
   }
 });
@@ -674,7 +675,7 @@ router.post('/ai/extract', upload.single('file'), async (req, res) => {
       extracted: extractedData,
     });
   } catch (error) {
-    console.error('AI Extract error:', error);
+    log.error('AI Extract error', error);
     res.status(500).json({ error: 'Failed to extract data' });
   }
 });
@@ -744,7 +745,7 @@ Be concise but insightful. Use specific numbers from the data when relevant. If 
 
 Today's date: ${new Date().toLocaleDateString()}`;
 
-    console.log(`[Portfolio AI] Query: "${message.substring(0, 50)}..."`);
+    log.info('Portfolio AI query', { query: message.substring(0, 50) });
 
     const completion = await openai!.chat.completions.create({
       model: 'gpt-4-turbo-preview',
@@ -779,8 +780,130 @@ Today's date: ${new Date().toLocaleDateString()}`;
       })),
     });
   } catch (error) {
-    console.error('Portfolio chat error:', error);
+    log.error('Portfolio chat error', error);
     res.status(500).json({ error: 'Failed to process portfolio query' });
+  }
+});
+
+// GET /api/ai/market-sentiment - AI-powered market sentiment based on user's deal sectors
+router.get('/ai/market-sentiment', async (req, res) => {
+  try {
+    if (!isAIEnabled()) {
+      return res.status(503).json({
+        error: 'AI service unavailable',
+        message: 'OpenAI API key not configured',
+      });
+    }
+
+    // Check cache first (cache for 5 minutes)
+    const cacheKey = 'market-sentiment';
+    const cached = await AICache.get(cacheKey);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    // Fetch user's active deals to understand their focus sectors
+    const { data: deals } = await supabase
+      .from('Deal')
+      .select('id, name, industry, stage, status, dealSize')
+      .neq('status', 'PASSED')
+      .order('updatedAt', { ascending: false })
+      .limit(20);
+
+    // Extract unique industries from deals
+    const industries = [...new Set(deals?.map(d => d.industry).filter(Boolean) || [])];
+
+    // If no deals, use default sectors
+    const focusSectors = industries.length > 0
+      ? industries.slice(0, 5)
+      : ['Technology', 'Healthcare', 'Financial Services', 'Consumer', 'Industrial'];
+
+    // Build context about the portfolio
+    const activeDeals = deals?.filter(d => d.status !== 'PASSED') || [];
+    const dealsByStage: Record<string, number> = {};
+    activeDeals.forEach(d => {
+      dealsByStage[d.stage] = (dealsByStage[d.stage] || 0) + 1;
+    });
+
+    const portfolioContext = `
+Current Portfolio:
+- ${activeDeals.length} active deals
+- Focus sectors: ${focusSectors.join(', ')}
+- Pipeline breakdown: ${Object.entries(dealsByStage).map(([k, v]) => `${k}: ${v}`).join(', ')}
+`;
+
+    // Generate market sentiment using OpenAI
+    const completion = await openai!.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: `You are a private equity market analyst. Generate a brief, actionable market sentiment analysis for a PE firm focused on specific sectors. Be concise and data-driven. Current date: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.
+
+Return a JSON object with this exact structure:
+{
+  "headline": "One sentence market headline (max 100 chars)",
+  "analysis": "2-3 sentences of market analysis mentioning specific sectors",
+  "sentiment": "BULLISH" | "NEUTRAL" | "BEARISH",
+  "confidenceScore": 0-100,
+  "recommendation": "One specific actionable recommendation",
+  "indicators": [
+    { "name": "indicator name", "trend": "up" | "down" | "stable", "detail": "short detail" }
+  ],
+  "topSector": "The most promising sector right now",
+  "riskFactor": "One key risk to watch"
+}`
+        },
+        {
+          role: 'user',
+          content: `Generate market sentiment analysis for a PE firm with this portfolio focus:
+${portfolioContext}
+
+Focus your analysis on these sectors: ${focusSectors.join(', ')}
+
+Consider current market conditions, M&A activity, valuation trends, and macro factors. Make it specific and actionable.`
+        }
+      ],
+      temperature: 0.7,
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
+    });
+
+    const responseText = completion.choices[0]?.message?.content || '{}';
+    let sentimentData;
+
+    try {
+      sentimentData = JSON.parse(responseText);
+    } catch {
+      log.error('Failed to parse market sentiment JSON', { response: responseText });
+      sentimentData = {
+        headline: 'Market analysis temporarily unavailable',
+        analysis: 'Unable to generate analysis at this time.',
+        sentiment: 'NEUTRAL',
+        confidenceScore: 50,
+        recommendation: 'Review your pipeline and prioritize active deals.',
+        indicators: [],
+        topSector: focusSectors[0] || 'Technology',
+        riskFactor: 'Market volatility',
+      };
+    }
+
+    // Add metadata
+    const result = {
+      ...sentimentData,
+      generatedAt: new Date().toISOString(),
+      focusSectors,
+      activeDealsCount: activeDeals.length,
+    };
+
+    // Cache for 5 minutes
+    await AICache.set(cacheKey, result, 5 * 60 * 1000);
+
+    log.info('Market sentiment generated', { sectors: focusSectors, sentiment: sentimentData.sentiment });
+    res.json(result);
+  } catch (error) {
+    log.error('Market sentiment error', error);
+    res.status(500).json({ error: 'Failed to generate market sentiment' });
   }
 });
 

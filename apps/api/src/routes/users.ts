@@ -1,8 +1,27 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import multer from 'multer';
 import { supabase } from '../supabase.js';
 import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { AuditLog } from '../services/auditLog.js';
+import { log } from '../utils/logger.js';
+
+// Configure multer for avatar uploads (images only, max 5MB)
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB max
+    files: 1,
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.'));
+    }
+  },
+});
 
 const router = Router();
 
@@ -78,29 +97,60 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// Helper to find user by authId or id, or create if not exists
+async function findOrCreateUser(authUser: { id: string; email: string; name?: string; firmName?: string; role: string }) {
+  // Try to find by authId first
+  let { data: userData, error } = await supabase
+    .from('User')
+    .select('*')
+    .eq('authId', authUser.id)
+    .single();
+
+  // If not found by authId, try by id (legacy users)
+  if (error?.code === 'PGRST116') {
+    const result = await supabase
+      .from('User')
+      .select('*')
+      .eq('id', authUser.id)
+      .single();
+    userData = result.data;
+    error = result.error;
+  }
+
+  // If still not found, create the user
+  if (error?.code === 'PGRST116') {
+    const { data: newUser, error: createError } = await supabase
+      .from('User')
+      .insert({
+        authId: authUser.id,
+        email: authUser.email,
+        name: authUser.name || authUser.email?.split('@')[0] || 'User',
+        role: authUser.role || 'MEMBER',
+        firmName: authUser.firmName || null,
+        isActive: true,
+      })
+      .select()
+      .single();
+
+    if (createError) throw createError;
+    return newUser;
+  }
+
+  if (error) throw error;
+  return userData;
+}
+
 // GET /api/users/me - Get current user profile
 // Must be defined before /:id to avoid matching "me" as an id
 router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
 
     if (!user?.id) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    const { data: userData, error } = await supabase
-      .from('User')
-      .select('*')
-      .eq('id', user.id)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return res.status(404).json({ error: 'User not found' });
-      }
-      throw error;
-    }
-
+    const userData = await findOrCreateUser(user);
     res.json(userData);
   } catch (error) {
     next(error);
@@ -111,21 +161,15 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
 // Useful for share modals - returns users that can be added to deals/VDRs
 router.get('/me/team', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
     const { search, excludeSelf } = req.query;
 
     if (!user?.id) {
       return res.status(401).json({ error: 'Not authenticated' });
     }
 
-    // Get current user's firmName
-    const { data: currentUser, error: userError } = await supabase
-      .from('User')
-      .select('firmName')
-      .eq('id', user.id)
-      .single();
-
-    if (userError) throw userError;
+    // Get current user (will auto-create if needed)
+    const currentUser = await findOrCreateUser(user);
 
     // If user has no firm, return empty list
     if (!currentUser?.firmName) {
@@ -176,7 +220,7 @@ const updateSelfSchema = z.object({
 
 router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = (req as any).user;
+    const user = req.user;
 
     if (!user?.id) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -191,6 +235,9 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
       });
     }
 
+    // First, find the user to get the actual User table id
+    const existingUser = await findOrCreateUser(user);
+
     // Build update object - only include fields that were provided
     const updateData: Record<string, any> = {
       updatedAt: new Date().toISOString(),
@@ -202,8 +249,6 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
     if (validation.data.phone !== undefined) updateData.phone = validation.data.phone;
 
     // Store AI preferences as JSON in a preferences field or as separate columns
-    // For now, we'll store them as separate columns if they exist in the schema
-    // or as a JSON preferences field
     const preferences: Record<string, any> = {};
     if (validation.data.investmentFocus !== undefined) preferences.investmentFocus = validation.data.investmentFocus;
     if (validation.data.sourcingSensitivity !== undefined) preferences.sourcingSensitivity = validation.data.sourcingSensitivity;
@@ -214,10 +259,11 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
       updateData.preferences = preferences;
     }
 
+    // Update by the actual User table id (not auth id)
     const { data: updatedUser, error } = await supabase
       .from('User')
       .update(updateData)
-      .eq('id', user.id)
+      .eq('id', existingUser.id)
       .select()
       .single();
 
@@ -228,7 +274,7 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
         const { data: retryUser, error: retryError } = await supabase
           .from('User')
           .update(updateData)
-          .eq('id', user.id)
+          .eq('id', existingUser.id)
           .select()
           .single();
 
@@ -238,6 +284,75 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
       throw error;
     }
 
+    res.json(updatedUser);
+  } catch (error) {
+    next(error);
+  }
+});
+
+// POST /api/users/me/avatar - Upload avatar for current user
+router.post('/me/avatar', avatarUpload.single('avatar'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = req.user;
+
+    if (!user?.id) {
+      return res.status(401).json({ error: 'Not authenticated' });
+    }
+
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Get or create the user record
+    const existingUser = await findOrCreateUser(user);
+
+    // Generate unique filename
+    const timestamp = Date.now();
+    const ext = file.originalname.split('.').pop() || 'jpg';
+    const filePath = `avatars/${existingUser.id}/${timestamp}.${ext}`;
+
+    // Upload to Supabase Storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('documents')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      log.error('Avatar upload error', uploadError);
+      return res.status(500).json({ error: 'Failed to upload avatar' });
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('documents')
+      .getPublicUrl(filePath);
+
+    const avatarUrl = urlData?.publicUrl;
+
+    if (!avatarUrl) {
+      return res.status(500).json({ error: 'Failed to get avatar URL' });
+    }
+
+    // Update user record with new avatar URL
+    const { data: updatedUser, error: updateError } = await supabase
+      .from('User')
+      .update({
+        avatar: avatarUrl,
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', existingUser.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      log.error('Failed to update user avatar', updateError);
+      return res.status(500).json({ error: 'Failed to update profile with avatar' });
+    }
+
+    log.info('Avatar uploaded successfully', { userId: existingUser.id, avatarUrl });
     res.json(updatedUser);
   } catch (error) {
     next(error);

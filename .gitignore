@@ -41,3 +41,17 @@ coverage/
 
 # Misc
 *.pem
+
+# AI Agent Skills
+.agents/
+.claude/skills/
+
+# Project Documentation (local only)
+compact.md
+progress.md
+prompt.md
+skill.md
+LAUNCH-CHECKLIST.md
+QA_CHECKLIST.md
+YC-APPLICATION-PLAN.md
+docs/

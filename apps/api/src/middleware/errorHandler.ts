@@ -5,6 +5,7 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { ZodError } from 'zod';
+import { log } from '../utils/logger.js';
 
 // Custom error classes for different error types
 export class AppError extends Error {
@@ -63,6 +64,18 @@ export class RateLimitError extends AppError {
 export class ServiceUnavailableError extends AppError {
   constructor(service: string = 'Service') {
     super(`${service} is currently unavailable`, 503, 'SERVICE_UNAVAILABLE');
+  }
+}
+
+export class BadRequestError extends AppError {
+  constructor(message: string = 'Invalid request') {
+    super(message, 400, 'BAD_REQUEST');
+  }
+}
+
+export class DatabaseError extends AppError {
+  constructor(message: string = 'Database operation failed') {
+    super(message, 500, 'DATABASE_ERROR');
   }
 }
 
@@ -149,29 +162,22 @@ function handleDatabaseError(err: any): AppError {
  * Log error for monitoring
  */
 function logError(err: any, req: Request): void {
-  const errorLog = {
-    timestamp: new Date().toISOString(),
+  const errorContext = {
     method: req.method,
     path: req.path,
-    requestId: req.headers['x-request-id'],
-    userId: (req as any).user?.id,
-    error: {
-      name: err.name,
-      message: err.message,
-      code: err.code,
-      statusCode: err.statusCode,
-      stack: err.stack,
-    },
-    query: req.query,
-    // Don't log request body in production (may contain sensitive data)
-    body: process.env.NODE_ENV === 'development' ? req.body : undefined,
+    requestId: req.headers['x-request-id'] || (req as any).requestId,
+    userId: req.user?.id,
+    errorCode: err.code,
+    statusCode: err.statusCode,
+    query: Object.keys(req.query).length > 0 ? req.query : undefined,
+    isOperational: err.isOperational,
   };
 
   // Log at appropriate level
   if (err.statusCode >= 500) {
-    console.error('Server Error:', JSON.stringify(errorLog, null, 2));
+    log.error('Server error', err, errorContext);
   } else if (err.statusCode >= 400) {
-    console.warn('Client Error:', JSON.stringify(errorLog));
+    log.warn('Client error', { ...errorContext, message: err.message });
   }
 }
 
@@ -260,4 +266,6 @@ export default {
   ConflictError,
   RateLimitError,
   ServiceUnavailableError,
+  BadRequestError,
+  DatabaseError,
 };

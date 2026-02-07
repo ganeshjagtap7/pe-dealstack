@@ -1069,13 +1069,15 @@ function initChatInterface() {
 
                 if (response.ok) {
                     const data = await response.json();
-                    console.log('[Chat] AI response received:', data.model);
+                    console.log('[Chat] AI response received:', data.model, data.action ? '(with action)' : '');
                     removeTypingIndicator();
-                    addAIResponseFromAPI(data.response);
+
+                    // Pass action to the render function if present
+                    addAIResponseFromAPI(data.response, data.action);
 
                     // Store message in history
                     state.messages.push({ role: 'user', content: message });
-                    state.messages.push({ role: 'assistant', content: data.response });
+                    state.messages.push({ role: 'assistant', content: data.response, action: data.action });
 
                     // If there were updates, refresh the deal data
                     if (data.updates && data.updates.length > 0) {
@@ -1111,15 +1113,19 @@ function initChatInterface() {
 
 // Load chat history from database
 async function loadChatHistory() {
-    if (!state.dealId) return;
+    if (!state.dealId) {
+        console.log('[Chat] No dealId, skipping chat history load');
+        return;
+    }
 
     try {
-        console.log('[Chat] Loading chat history...');
+        console.log('[Chat] Loading chat history for deal:', state.dealId);
         const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/chat/history`);
+        console.log('[Chat] History response status:', response.status);
 
         if (response.ok) {
             const data = await response.json();
-            console.log(`[Chat] Loaded ${data.count} messages from history`);
+            console.log(`[Chat] Loaded ${data.count} messages from history`, data);
 
             if (data.messages && data.messages.length > 0) {
                 // Clear the default intro message
@@ -1141,7 +1147,12 @@ async function loadChatHistory() {
                 });
 
                 scrollToBottom();
+            } else {
+                console.log('[Chat] No messages in history');
             }
+        } else {
+            const errorData = await response.json().catch(() => ({}));
+            console.error('[Chat] Failed to load history:', response.status, errorData);
         }
     } catch (error) {
         console.error('[Chat] Failed to load chat history:', error);
@@ -1252,13 +1263,37 @@ function addSystemMessage(message, icon = 'info') {
     scrollToBottom();
 }
 
-function addAIResponseFromAPI(responseText) {
+function addAIResponseFromAPI(responseText, action = null) {
     const chatContainer = document.getElementById('chat-messages');
 
     // Format the response with markdown parsing
     const formattedResponse = responseText.startsWith('<')
         ? responseText
         : parseMarkdown(responseText);
+
+    // Build action button HTML if action is present
+    let actionButtonHtml = '';
+    if (action && action.url && action.label) {
+        const iconMap = {
+            'create_memo': 'edit_note',
+            'open_data_room': 'folder_open',
+            'upload_document': 'upload_file',
+            'view_financials': 'analytics',
+            'change_stage': 'swap_horiz',
+        };
+        const icon = iconMap[action.type] || 'arrow_forward';
+
+        actionButtonHtml = `
+            <div class="mt-3 pt-3 border-t border-border-subtle/50">
+                <a href="${action.url}" class="ai-action-btn inline-flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary to-primary-hover text-white text-sm font-semibold rounded-lg hover:shadow-lg hover:shadow-primary/25 transition-all group">
+                    <span class="material-symbols-outlined text-lg">${icon}</span>
+                    ${escapeHtml(action.label)}
+                    <span class="material-symbols-outlined text-lg group-hover:translate-x-0.5 transition-transform">arrow_forward</span>
+                </a>
+                ${action.description ? `<p class="text-xs text-text-muted mt-1.5 ml-1">${escapeHtml(action.description)}</p>` : ''}
+            </div>
+        `;
+    }
 
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex gap-4 max-w-[90%] animate-fadeIn';
@@ -1270,6 +1305,7 @@ function addAIResponseFromAPI(responseText) {
             <span class="text-xs font-bold text-text-muted ml-1">PE OS AI <span class="text-primary/60 font-normal">• GPT-4</span></span>
             <div class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
                 ${formattedResponse}
+                ${actionButtonHtml}
             </div>
             <div class="flex gap-2 ml-1 mt-1">
                 <button class="ai-helpful-btn text-[10px] text-text-muted hover:text-primary flex items-center gap-1 transition-colors font-medium">

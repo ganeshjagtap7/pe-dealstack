@@ -8,6 +8,7 @@ import { AuditLog } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES, FILE_SIZE_LIMITS } from '../services/fileValidator.js';
 import { embedDocument } from '../rag.js';
 import { AICache } from '../services/aiCache.js';
+import { log } from '../utils/logger.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -25,7 +26,7 @@ async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string; numPa
       numPages: data.numpages || 1,
     };
   } catch (error) {
-    console.error('PDF extraction error:', error);
+    log.error('PDF extraction error', error);
     return null;
   }
 }
@@ -117,7 +118,7 @@ router.get('/deals/:dealId/documents', async (req, res) => {
 
     res.json(filteredData);
   } catch (error) {
-    console.error('Error fetching documents:', error);
+    log.error('Error fetching documents', error);
     res.status(500).json({ error: 'Failed to fetch documents' });
   }
 });
@@ -151,7 +152,7 @@ router.get('/folders/:folderId/documents', async (req, res) => {
 
     res.json(data || []);
   } catch (error) {
-    console.error('Error fetching folder documents:', error);
+    log.error('Error fetching folder documents', error);
     res.status(500).json({ error: 'Failed to fetch documents' });
   }
 });
@@ -183,7 +184,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       // Deep file validation with magic bytes verification
       const validation = validateFile(file.buffer, file.originalname, file.mimetype);
       if (!validation.isValid) {
-        console.warn(`File validation failed for ${file.originalname}: ${validation.error}`);
+        log.warn('File validation failed', { filename: file.originalname, error: validation.error });
         return res.status(400).json({
           error: 'File validation failed',
           details: validation.error,
@@ -192,7 +193,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
 
       // Additional check for potentially dangerous content
       if (isPotentiallyDangerous(file.buffer, file.originalname)) {
-        console.warn(`Potentially dangerous file detected: ${file.originalname}`);
+        log.warn('Potentially dangerous file detected', { filename: file.originalname });
         return res.status(400).json({
           error: 'File validation failed',
           details: 'File appears to contain executable or script content',
@@ -218,7 +219,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         });
 
       if (uploadError) {
-        console.error('Storage upload error:', uploadError);
+        log.error('Storage upload error', uploadError);
         // Continue without file URL if storage fails (bucket might not exist)
       } else {
         // Get public URL
@@ -269,7 +270,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
 
     if (file && mimeType === 'application/pdf') {
       extractionStatus = 'processing';
-      console.log(`Starting PDF extraction for: ${documentName}`);
+      log.info('Starting PDF extraction', { documentName });
 
       const extraction = await extractTextFromPDF(file.buffer);
       if (extraction) {
@@ -277,29 +278,26 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         extractedText = extraction.text.replace(/\u0000/g, '');
         numPages = extraction.numPages;
         extractionStatus = 'completed';
-        console.log(`PDF extraction completed: ${numPages} pages, ${extractedText.length} chars`);
+        log.info('PDF extraction completed', { numPages, textLength: extractedText.length });
 
         // Run AI extraction on the extracted text
         try {
-          console.log(`Starting AI data extraction for: ${documentName}`);
+          log.info('Starting AI data extraction', { documentName });
           const aiData = await extractDealDataFromText(extractedText);
           if (aiData) {
             aiExtractedData = aiData;
             extractionStatus = 'analyzed';
-            console.log(`AI extraction completed for: ${documentName}`, {
-              companyName: aiData.companyName,
-              industry: aiData.industry,
-            });
+            log.info('AI extraction completed', { documentName, companyName: aiData.companyName, industry: aiData.industry });
           } else {
-            console.log(`AI extraction returned no data for: ${documentName}`);
+            log.info('AI extraction returned no data', { documentName });
           }
         } catch (aiError) {
           // Log AI error but don't fail the upload - text extraction still worked
-          console.error(`AI extraction failed for ${documentName}:`, aiError);
+          log.error('AI extraction failed', aiError, { documentName });
         }
       } else {
         extractionStatus = 'failed';
-        console.log(`PDF extraction failed for: ${documentName}`);
+        log.warn('PDF extraction failed', { documentName });
       }
     } else if (file) {
       // Non-PDF files don't need text extraction
@@ -376,21 +374,21 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     // Invalidate AI cache since new document was uploaded
     // This ensures next thesis/risk analysis uses fresh data
     await AICache.invalidate(dealId);
-    console.log(`[AICache] Invalidated cache for deal ${dealId} due to document upload`);
+    log.debug('AICache invalidated for deal due to document upload', { dealId });
 
     // Trigger RAG embedding in background (don't block response)
     if (extractedText && extractedText.length > 0) {
-      console.log(`[RAG] Starting document embedding for: ${documentName}`);
+      log.info('RAG starting document embedding', { documentName });
       embedDocument(document.id, dealId, extractedText)
         .then(result => {
           if (result.success) {
-            console.log(`[RAG] Embedded document ${documentName}: ${result.chunkCount} chunks`);
+            log.info('RAG embedded document successfully', { documentName, chunkCount: result.chunkCount });
           } else {
-            console.error(`[RAG] Failed to embed document ${documentName}:`, result.error);
+            log.error('RAG failed to embed document', result.error, { documentName });
           }
         })
         .catch(err => {
-          console.error(`[RAG] Embedding error for ${documentName}:`, err);
+          log.error('RAG embedding error', err, { documentName });
         });
     }
 
@@ -399,7 +397,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error uploading document:', error);
+    log.error('Error uploading document', error);
     res.status(500).json({ error: 'Failed to upload document' });
   }
 });
@@ -427,7 +425,7 @@ router.get('/documents/:id', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Error fetching document:', error);
+    log.error('Error fetching document', error);
     res.status(500).json({ error: 'Failed to fetch document' });
   }
 });
@@ -472,7 +470,7 @@ router.patch('/documents/:id', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error updating document:', error);
+    log.error('Error updating document', error);
     res.status(500).json({ error: 'Failed to update document' });
   }
 });
@@ -506,7 +504,7 @@ router.delete('/documents/:id', async (req, res) => {
           await supabase.storage.from('documents').remove([pathMatch[1]]);
         }
       } catch (storageError) {
-        console.error('Error deleting from storage:', storageError);
+        log.error('Error deleting from storage', storageError);
         // Continue even if storage deletion fails
       }
     }
@@ -524,7 +522,7 @@ router.delete('/documents/:id', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting document:', error);
+    log.error('Error deleting document', error);
     res.status(500).json({ error: 'Failed to delete document' });
   }
 });
@@ -555,7 +553,7 @@ router.get('/documents/:id/download', async (req, res) => {
       name: doc.name,
     });
   } catch (error) {
-    console.error('Error getting download URL:', error);
+    log.error('Error getting download URL', error);
     res.status(500).json({ error: 'Failed to get download URL' });
   }
 });

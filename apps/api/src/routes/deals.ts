@@ -528,6 +528,12 @@ When answering questions:
 
 **DEAL UPDATES**: You can help users update deal fields. When a user asks to change the lead partner, analyst, deal source, or other deal fields, use the update_deal_field function. Available team members and their roles are provided in the context.
 
+**ACTIONS**: When a user wants to perform an action that requires navigation, use the suggest_action function:
+- "create memo", "write memo", "draft IC memo", "start memo" → use suggest_action with action_type: "create_memo"
+- "open data room", "view documents", "see files" → use suggest_action with action_type: "open_data_room"
+- "upload a document", "add a file" → use suggest_action with action_type: "upload_document"
+Always provide a helpful response explaining what you'll help them do, then call the suggest_action function to show an action button.
+
 Guidelines:
 - Be concise but thorough
 - Use specific numbers and data from documents when available
@@ -535,7 +541,7 @@ Guidelines:
 - Use professional financial terminology
 - Format responses with clear structure (bullet points, sections)`;
 
-// OpenAI tools for deal updates
+// OpenAI tools for deal updates and actions
 const DEAL_UPDATE_TOOLS = [
   {
     type: 'function' as const,
@@ -560,6 +566,32 @@ const DEAL_UPDATE_TOOLS = [
           }
         },
         required: ['field', 'value']
+      }
+    }
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'suggest_action',
+      description: 'Suggest a navigation or action when the user wants to create something, go to another page, or perform an action. Use this for: creating memos, opening data room, uploading documents, viewing specific pages.',
+      parameters: {
+        type: 'object',
+        properties: {
+          action_type: {
+            type: 'string',
+            enum: ['create_memo', 'open_data_room', 'upload_document', 'view_financials', 'change_stage'],
+            description: 'The type of action to suggest'
+          },
+          label: {
+            type: 'string',
+            description: 'The button label text (e.g., "Create Investment Memo", "Open Data Room")'
+          },
+          description: {
+            type: 'string',
+            description: 'A brief explanation of what will happen when the user clicks the button'
+          }
+        },
+        required: ['action_type', 'label']
       }
     }
   }
@@ -833,8 +865,51 @@ router.post('/:dealId/chat', async (req, res) => {
 
     // Check if AI wants to call a function
     let updatedFields: any[] = [];
+    let suggestedAction: any = null;
+
     if (responseMessage?.tool_calls && responseMessage.tool_calls.length > 0) {
       for (const toolCall of responseMessage.tool_calls) {
+        // Skip if not a function call (type guard for TypeScript)
+        if (!('function' in toolCall) || !toolCall.function) continue;
+
+        // Handle suggest_action tool
+        if (toolCall.function.name === 'suggest_action') {
+          try {
+            const args = JSON.parse(toolCall.function.arguments);
+            log.debug('Processing suggest_action', args);
+
+            // Build the action URL based on action_type
+            let url = '';
+            switch (args.action_type) {
+              case 'create_memo':
+                url = `/memo-builder.html?dealId=${dealId}&project=${encodeURIComponent(deal.name)}`;
+                break;
+              case 'open_data_room':
+                url = `/vdr.html?dealId=${dealId}`;
+                break;
+              case 'upload_document':
+                url = `/vdr.html?dealId=${dealId}&action=upload`;
+                break;
+              case 'view_financials':
+                url = `/deal.html?id=${dealId}#financials`;
+                break;
+              case 'change_stage':
+                url = `/deal.html?id=${dealId}&action=change_stage`;
+                break;
+            }
+
+            suggestedAction = {
+              type: args.action_type,
+              label: args.label,
+              description: args.description,
+              url,
+            };
+          } catch (parseError) {
+            log.error('Error processing suggest_action', parseError);
+          }
+          continue; // Skip the rest for this tool call
+        }
+
         if (toolCall.function.name === 'update_deal_field') {
           try {
             const args = JSON.parse(toolCall.function.arguments);
@@ -923,6 +998,8 @@ router.post('/:dealId/chat', async (req, res) => {
 
       // Add tool results
       for (const toolCall of responseMessage.tool_calls) {
+        // Skip if not a function call
+        if (!('function' in toolCall) || !toolCall.function) continue;
         const update = updatedFields.find(u => u.field === JSON.parse(toolCall.function.arguments).field);
         messages.push({
           role: 'tool',
@@ -943,19 +1020,28 @@ router.post('/:dealId/chat', async (req, res) => {
 
       // Save messages to database for history
       const userId = req.user?.id || null;
-      await supabase.from('ChatMessage').insert({
+      log.debug('Saving chat messages (with updates) to database', { dealId, userId });
+
+      const { error: userMsgError } = await supabase.from('ChatMessage').insert({
         dealId,
         userId,
         role: 'user',
         content: message,
       });
-      await supabase.from('ChatMessage').insert({
+      if (userMsgError) {
+        log.error('Failed to save user message (with updates)', userMsgError);
+      }
+
+      const { error: aiMsgError } = await supabase.from('ChatMessage').insert({
         dealId,
         userId,
         role: 'assistant',
         content: aiResponse,
         metadata: { model: 'gpt-4-turbo-preview', updates: updatedFields },
       });
+      if (aiMsgError) {
+        log.error('Failed to save AI message (with updates)', aiMsgError);
+      }
 
       // Log AI chat activity
       await AuditLog.aiChat(req, `Deal: ${deal.name} (with updates)`);
@@ -964,6 +1050,45 @@ router.post('/:dealId/chat', async (req, res) => {
         response: aiResponse,
         model: 'gpt-4-turbo-preview',
         updates: updatedFields,
+        ...(suggestedAction && { action: suggestedAction }),
+      });
+    }
+
+    // If only suggest_action was called (no field updates), return the AI's message with the action
+    if (suggestedAction && updatedFields.length === 0) {
+      const aiResponse = responseMessage?.content || 'Here\'s what I can help you with:';
+
+      // Save messages to database
+      const userId = req.user?.id || null;
+      log.debug('Saving chat messages (with action) to database', { dealId, userId });
+
+      const { error: userMsgError } = await supabase.from('ChatMessage').insert({
+        dealId,
+        userId,
+        role: 'user',
+        content: message,
+      });
+      if (userMsgError) {
+        log.error('Failed to save user message (with action)', userMsgError);
+      }
+
+      const { error: aiMsgError } = await supabase.from('ChatMessage').insert({
+        dealId,
+        userId,
+        role: 'assistant',
+        content: aiResponse,
+        metadata: { model: 'gpt-4-turbo-preview', action: suggestedAction },
+      });
+      if (aiMsgError) {
+        log.error('Failed to save AI message (with action)', aiMsgError);
+      }
+
+      await AuditLog.aiChat(req, `Deal: ${deal.name} (with action)`);
+
+      return res.json({
+        response: aiResponse,
+        model: 'gpt-4-turbo-preview',
+        action: suggestedAction,
       });
     }
 
@@ -971,19 +1096,28 @@ router.post('/:dealId/chat', async (req, res) => {
 
     // Save messages to database for history
     const userId = req.user?.id || null;
-    await supabase.from('ChatMessage').insert({
+    log.debug('Saving chat messages to database', { dealId, userId });
+
+    const { error: userMsgError } = await supabase.from('ChatMessage').insert({
       dealId,
       userId,
       role: 'user',
       content: message,
     });
-    await supabase.from('ChatMessage').insert({
+    if (userMsgError) {
+      log.error('Failed to save user message', userMsgError);
+    }
+
+    const { error: aiMsgError } = await supabase.from('ChatMessage').insert({
       dealId,
       userId,
       role: 'assistant',
       content: aiResponse,
       metadata: { model: 'gpt-4-turbo-preview' },
     });
+    if (aiMsgError) {
+      log.error('Failed to save AI message', aiMsgError);
+    }
 
     // Log AI chat activity
     await AuditLog.aiChat(req, `Deal: ${deal.name}`);
@@ -991,6 +1125,7 @@ router.post('/:dealId/chat', async (req, res) => {
     res.json({
       response: aiResponse,
       model: 'gpt-4-turbo-preview',
+      ...(suggestedAction && { action: suggestedAction }),
     });
   } catch (error) {
     log.error('Error in deal chat', error);
@@ -1005,6 +1140,8 @@ router.get('/:dealId/chat/history', async (req, res) => {
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = parseInt(req.query.offset as string) || 0;
 
+    log.debug('Fetching chat history', { dealId, limit, offset });
+
     const { data: messages, error } = await supabase
       .from('ChatMessage')
       .select('id, role, content, metadata, createdAt')
@@ -1012,7 +1149,12 @@ router.get('/:dealId/chat/history', async (req, res) => {
       .order('createdAt', { ascending: true })
       .range(offset, offset + limit - 1);
 
-    if (error) throw error;
+    if (error) {
+      log.error('Database error fetching chat history', { error, dealId });
+      throw error;
+    }
+
+    log.debug('Chat history fetched', { dealId, count: messages?.length || 0 });
 
     res.json({
       messages: messages || [],

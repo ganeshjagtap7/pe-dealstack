@@ -829,7 +829,54 @@ function markChanged() {
 async function handleAvatarUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
-    showToast('Avatar upload requires cloud storage setup', 'info');
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+        showToast('Image must be less than 5MB', 'error');
+        return;
+    }
+
+    // Validate file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+        showToast('Only JPEG, PNG, GIF, and WebP images are allowed', 'error');
+        return;
+    }
+
+    // Show loading state on avatar
+    const avatarEl = document.getElementById('profile-avatar');
+    const originalContent = avatarEl.innerHTML;
+    avatarEl.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>';
+
+    try {
+        const formData = new FormData();
+        formData.append('avatar', file);
+
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/users/me/avatar`, {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(errorData.error || 'Failed to upload avatar');
+        }
+
+        const updatedUser = await response.json();
+        currentUser = updatedUser;
+
+        // Update avatar display
+        if (updatedUser.avatar) {
+            avatarEl.style.backgroundImage = `url(${updatedUser.avatar})`;
+            avatarEl.innerHTML = '';
+        }
+
+        showToast('Avatar updated successfully', 'success');
+    } catch (error) {
+        console.error('Avatar upload error:', error);
+        avatarEl.innerHTML = originalContent;
+        showToast(error.message || 'Failed to upload avatar', 'error');
+    }
 }
 
 // Save profile

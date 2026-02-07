@@ -5,6 +5,7 @@ import { createRequire } from 'module';
 import { extractDealDataFromText, toLegacyFormat, ExtractedDealData } from '../services/aiExtractor.js';
 import { z } from 'zod';
 import { embedDocument } from '../rag.js';
+import { log } from '../utils/logger.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -21,7 +22,7 @@ async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string; numPa
       numPages: data.numpages || 1,
     };
   } catch (error) {
-    console.error('PDF extraction error:', error);
+    log.error('PDF extraction error', error);
     return null;
   }
 }
@@ -101,19 +102,19 @@ router.post('/', upload.single('file'), async (req, res) => {
     const mimeType = file.mimetype;
     const documentName = file.originalname;
 
-    console.log(`\n=== INGEST: Starting for ${documentName} ===`);
+    log.info('Ingest starting', { documentName });
 
     // Step 1: Extract text from PDF
     let extractedText: string | null = null;
     let numPages: number | null = null;
 
     if (mimeType === 'application/pdf') {
-      console.log('Step 1: Extracting text from PDF...');
+      log.debug('Step 1: Extracting text from PDF');
       const extraction = await extractTextFromPDF(file.buffer);
       if (extraction) {
         extractedText = extraction.text.replace(/\u0000/g, '');
         numPages = extraction.numPages;
-        console.log(`  -> Extracted ${numPages} pages, ${extractedText.length} chars`);
+        log.debug('PDF extracted', { numPages, charCount: extractedText.length });
       } else {
         return res.status(400).json({ error: 'Failed to extract text from PDF' });
       }
@@ -122,28 +123,23 @@ router.post('/', upload.single('file'), async (req, res) => {
     }
 
     // Step 2: Run AI extraction with confidence scores
-    console.log('Step 2: Running AI data extraction with confidence scoring...');
+    log.debug('Step 2: Running AI data extraction');
     const aiData = await extractDealDataFromText(extractedText);
 
     if (!aiData) {
       return res.status(400).json({ error: 'AI could not extract deal data from document' });
     }
 
-    console.log('  -> AI extraction completed:', {
+    log.debug('AI extraction completed', {
       companyName: aiData.companyName.value,
       companyConfidence: aiData.companyName.confidence,
       industry: aiData.industry.value,
-      industryConfidence: aiData.industry.confidence,
-      revenue: aiData.revenue.value,
-      revenueConfidence: aiData.revenue.confidence,
-      ebitda: aiData.ebitda.value,
-      ebitdaConfidence: aiData.ebitda.confidence,
       overallConfidence: aiData.overallConfidence,
       needsReview: aiData.needsReview,
     });
 
     // Step 3: Create or find company
-    console.log('Step 3: Creating/finding company...');
+    log.debug('Step 3: Creating/finding company');
     const companyName = aiData.companyName.value || `Company from ${documentName}`;
 
     // Check if company exists
@@ -156,7 +152,7 @@ router.post('/', upload.single('file'), async (req, res) => {
     let company;
     if (existingCompany) {
       company = existingCompany;
-      console.log(`  -> Found existing company: ${company.name} (${company.id})`);
+      log.debug('Found existing company', { name: company.name, id: company.id });
     } else {
       // Create new company
       const { data: newCompany, error: companyError } = await supabase
@@ -170,15 +166,15 @@ router.post('/', upload.single('file'), async (req, res) => {
         .single();
 
       if (companyError) {
-        console.error('Company creation error:', companyError);
+        log.error('Company creation error', companyError);
         throw companyError;
       }
       company = newCompany;
-      console.log(`  -> Created new company: ${company.name} (${company.id})`);
+      log.debug('Created new company', { name: company.name, id: company.id });
     }
 
     // Step 4: Create deal with review status
-    console.log('Step 4: Creating deal...');
+    log.debug('Step 4: Creating deal');
     const dealIcon = getIconForIndustry(aiData.industry.value);
 
     // Determine deal status based on confidence
@@ -209,13 +205,13 @@ router.post('/', upload.single('file'), async (req, res) => {
       .single();
 
     if (dealError) {
-      console.error('Deal creation error:', dealError);
+      log.error('Deal creation error', dealError);
       throw dealError;
     }
-    console.log(`  -> Created deal: ${deal.name} (${deal.id}) - Status: ${dealStatus}`);
+    log.info('Deal created', { name: deal.name, id: deal.id, status: dealStatus });
 
     // Step 5: Upload file to storage
-    console.log('Step 5: Uploading file to storage...');
+    log.debug('Step 5: Uploading file to storage');
     let fileUrl = null;
 
     const timestamp = Date.now();
@@ -230,17 +226,17 @@ router.post('/', upload.single('file'), async (req, res) => {
       });
 
     if (uploadError) {
-      console.warn('Storage upload warning:', uploadError.message);
+      log.warn('Storage upload warning', { error: uploadError.message });
     } else {
       const { data: urlData } = supabase.storage
         .from('documents')
         .getPublicUrl(filePath);
       fileUrl = urlData?.publicUrl;
-      console.log(`  -> File uploaded to: ${fileUrl}`);
+      log.debug('File uploaded', { fileUrl });
     }
 
     // Step 6: Create document record with confidence data
-    console.log('Step 6: Creating document record...');
+    log.debug('Step 6: Creating document record');
 
     // Determine document type from filename
     let docType = 'OTHER';
@@ -288,24 +284,24 @@ router.post('/', upload.single('file'), async (req, res) => {
       .single();
 
     if (docError) {
-      console.error('Document creation error:', docError);
+      log.error('Document creation error', docError);
       throw docError;
     }
-    console.log(`  -> Created document: ${document.name} (${document.id})`);
+    log.debug('Created document', { name: document.name, id: document.id });
 
     // Step 7: Trigger RAG embedding in background
     if (extractedText && extractedText.length > 0) {
-      console.log('Step 7: Triggering RAG embedding...');
+      log.debug('Step 7: Triggering RAG embedding');
       embedDocument(document.id, deal.id, extractedText)
         .then(result => {
           if (result.success) {
-            console.log(`  -> RAG embedding complete: ${result.chunkCount} chunks`);
+            log.debug('RAG embedding complete', { chunkCount: result.chunkCount });
           } else {
-            console.error(`  -> RAG embedding failed:`, result.error);
+            log.error('RAG embedding failed', result.error);
           }
         })
         .catch(err => {
-          console.error('  -> RAG embedding error:', err);
+          log.error('RAG embedding error', err);
         });
     }
 
@@ -334,7 +330,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       },
     });
 
-    console.log(`=== INGEST: Complete! Deal ID: ${deal.id} ===\n`);
+    log.info('Ingest complete', { dealId: deal.id });
 
     // Return the created deal with extraction confidence data
     res.status(201).json({
@@ -355,7 +351,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('Ingest error:', error);
+    log.error('Ingest error', error);
     res.status(500).json({ error: 'Failed to process document' });
   }
 });
@@ -382,7 +378,7 @@ router.get('/pending-review', async (req, res) => {
       deals: deals || [],
     });
   } catch (error) {
-    console.error('Error fetching pending reviews:', error);
+    log.error('Error fetching pending reviews', error);
     res.status(500).json({ error: 'Failed to fetch pending reviews' });
   }
 });
@@ -482,7 +478,7 @@ router.post('/:dealId/review', async (req, res) => {
       deal: updatedDeal,
     });
   } catch (error) {
-    console.error('Review error:', error);
+    log.error('Review error', error);
     res.status(500).json({ error: 'Failed to process review' });
   }
 });
@@ -511,7 +507,7 @@ router.get('/:dealId/extraction', async (req, res) => {
       documents: documents || [],
     });
   } catch (error) {
-    console.error('Error fetching extraction:', error);
+    log.error('Error fetching extraction', error);
     res.status(500).json({ error: 'Failed to fetch extraction details' });
   }
 });

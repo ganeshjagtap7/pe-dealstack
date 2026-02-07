@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
+import { log } from '../utils/logger.js';
 
 const router = Router();
 
@@ -28,7 +29,7 @@ router.get('/', async (req, res) => {
 
     res.json(data || []);
   } catch (error) {
-    console.error('Error fetching companies:', error);
+    log.error('Error fetching companies', error);
     res.status(500).json({ error: 'Failed to fetch companies' });
   }
 });
@@ -60,7 +61,7 @@ router.get('/:id', async (req, res) => {
 
     res.json(data);
   } catch (error) {
-    console.error('Error fetching company:', error);
+    log.error('Error fetching company', error);
     res.status(500).json({ error: 'Failed to fetch company' });
   }
 });
@@ -83,7 +84,7 @@ router.post('/', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error creating company:', error);
+    log.error('Error creating company', error);
     res.status(500).json({ error: 'Failed to create company' });
   }
 });
@@ -116,7 +117,7 @@ router.patch('/:id', async (req, res) => {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
-    console.error('Error updating company:', error);
+    log.error('Error updating company', error);
     res.status(500).json({ error: 'Failed to update company' });
   }
 });
@@ -135,7 +136,7 @@ router.delete('/:id', async (req, res) => {
 
     res.status(204).send();
   } catch (error) {
-    console.error('Error deleting company:', error);
+    log.error('Error deleting company', error);
     res.status(500).json({ error: 'Failed to delete company' });
   }
 });
