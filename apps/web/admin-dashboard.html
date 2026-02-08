@@ -118,60 +118,62 @@
 <!-- Stats Cards Row -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
     <!-- Active Analysts Card -->
-    <div class="relative flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
         <div class="flex items-center justify-between">
-            <div class="p-2 bg-primary-light rounded-lg">
-                <span class="material-symbols-outlined text-primary text-[22px]">groups</span>
-            </div>
-            <div class="flex -space-x-2">
-                <div class="w-7 h-7 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center border-2 border-white">MR</div>
-                <div class="w-7 h-7 rounded-full bg-slate-600 text-white text-xs font-medium flex items-center justify-center border-2 border-white">RZ</div>
-                <div class="w-7 h-7 rounded-full bg-slate-500 text-white text-xs font-medium flex items-center justify-center border-2 border-white">HS</div>
-                <div class="w-7 h-7 rounded-full bg-slate-200 text-slate-600 text-[10px] font-medium flex items-center justify-center border-2 border-white">+2</div>
-            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Team</span>
+            <span class="material-symbols-outlined text-text-muted text-[20px]">groups</span>
         </div>
-        <h3 class="text-3xl font-bold text-text-main mt-3" id="analyst-count">8</h3>
-        <p class="text-sm text-text-secondary font-medium">Active Analysts</p>
+        <div class="flex items-end gap-2 mt-3">
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="analyst-count">8</h3>
+            <span class="text-xs text-text-secondary mb-1.5">Active analysts</span>
+        </div>
+        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+            <div class="bg-primary h-1.5 rounded-full" style="width: 80%"></div>
+        </div>
     </div>
 
     <!-- Deal Volume Card -->
-    <div class="relative flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
         <div class="flex items-center justify-between">
-            <div class="p-2 bg-primary-light rounded-lg">
-                <span class="material-symbols-outlined text-primary text-[22px]">payments</span>
-            </div>
-            <span class="text-xs font-medium text-primary bg-primary-light px-2 py-1 rounded">+12% vs Q3</span>
+            <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Deal Volume</span>
+            <span class="material-symbols-outlined text-text-muted text-[20px]">payments</span>
         </div>
-        <h3 class="text-3xl font-bold text-text-main mt-3" id="deal-volume">$485M</h3>
-        <p class="text-sm text-text-secondary font-medium">Deal Volume (Pipeline)</p>
+        <div class="flex items-end gap-2 mt-3">
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="deal-volume">$485M</h3>
+            <span class="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">+12% vs Q3</span>
+        </div>
+        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+            <div class="bg-primary h-1.5 rounded-full" style="width: 75%"></div>
+        </div>
     </div>
 
     <!-- Critical Tasks Card -->
-    <div class="relative flex flex-col gap-1 rounded-xl border border-slate-300 bg-surface-card p-5 shadow-card hover:shadow-card-hover transition-all overflow-hidden">
-        <div class="absolute top-0 right-0 w-20 h-20 bg-slate-100 rounded-bl-full -mr-4 -mt-4"></div>
-        <div class="flex items-center justify-between relative z-10">
-            <div class="p-2 bg-slate-100 rounded-lg">
-                <span class="material-symbols-outlined text-slate-600 text-[22px]">warning</span>
-            </div>
-            <span class="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded">Needs Action</span>
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+        <div class="flex items-center justify-between">
+            <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Overdue</span>
+            <span class="material-symbols-outlined text-text-muted text-[20px]">pending_actions</span>
         </div>
-        <h3 class="text-3xl font-bold text-text-main mt-3 relative z-10" id="overdue-tasks">3</h3>
-        <p class="text-sm text-text-secondary font-medium relative z-10">Critical Tasks Overdue</p>
+        <div class="flex items-end gap-2 mt-3">
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="overdue-tasks">3</h3>
+            <span class="text-xs text-text-secondary mb-1.5">Tasks pending</span>
+        </div>
+        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+            <div class="bg-orange-400 h-1.5 rounded-full" style="width: 30%"></div>
+        </div>
     </div>
 
     <!-- Utilization Card -->
-    <div class="relative flex flex-col gap-1 rounded-xl border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
         <div class="flex items-center justify-between">
-            <div class="p-2 bg-primary-light rounded-lg">
-                <span class="material-symbols-outlined text-primary text-[22px]">speed</span>
-            </div>
+            <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Utilization</span>
+            <span class="material-symbols-outlined text-text-muted text-[20px]">speed</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
-            <h3 class="text-3xl font-bold text-text-main" id="utilization">82%</h3>
-            <span class="text-sm text-text-secondary mb-1">Utilization</span>
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="utilization">82%</h3>
+            <span class="text-xs text-text-secondary mb-1.5">Capacity used</span>
         </div>
-        <div class="w-full bg-gray-100 h-2 mt-2 rounded-full overflow-hidden">
-            <div class="bg-primary h-full rounded-full transition-all" style="width: 82%"></div>
+        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+            <div class="bg-secondary h-1.5 rounded-full" style="width: 82%"></div>
         </div>
     </div>
 </div>
@@ -221,7 +223,7 @@
 
                 <!-- Analyst Row 2 -->
                 <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div class="w-10 h-10 rounded-full bg-slate-600 text-white text-sm font-medium flex items-center justify-center flex-shrink-0">RZ</div>
+                    <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">RZ</div>
                     <div class="w-28 flex-shrink-0">
                         <p class="text-sm font-medium text-text-main">Rachel Zane</p>
                         <p class="text-xs text-text-muted">Associate</p>
@@ -236,7 +238,7 @@
                         <div>
                             <p class="text-xs text-text-muted mb-1.5">Capacity (45%)</p>
                             <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                <div class="bg-slate-400 h-full rounded-full" style="width: 45%"></div>
+                                <div class="bg-primary h-full rounded-full" style="width: 45%"></div>
                             </div>
                         </div>
                     </div>
@@ -248,7 +250,7 @@
 
                 <!-- Analyst Row 3 -->
                 <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div class="w-10 h-10 rounded-full bg-slate-500 text-white text-sm font-medium flex items-center justify-center flex-shrink-0">HS</div>
+                    <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">HS</div>
                     <div class="w-28 flex-shrink-0">
                         <p class="text-sm font-medium text-text-main">Harvey S.</p>
                         <p class="text-xs text-text-muted">Analyst</p>
@@ -264,7 +266,7 @@
                         <div>
                             <p class="text-xs text-text-muted mb-1.5">Capacity (70%)</p>
                             <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                <div class="bg-slate-500 h-full rounded-full" style="width: 70%"></div>
+                                <div class="bg-primary h-full rounded-full" style="width: 70%"></div>
                             </div>
                         </div>
                     </div>
@@ -335,7 +337,7 @@
                             <td class="px-5 py-4 text-text-main">Tomorrow</td>
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-slate-600 text-white text-[10px] font-medium flex items-center justify-center">RZ</div>
+                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">RZ</div>
                                     <span class="text-text-secondary">Rachel Z.</span>
                                 </div>
                             </td>
@@ -354,7 +356,7 @@
                             <td class="px-5 py-4 text-text-main">Feb 10</td>
                             <td class="px-5 py-4">
                                 <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-slate-500 text-white text-[10px] font-medium flex items-center justify-center">HS</div>
+                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">HS</div>
                                     <span class="text-text-secondary">Harvey S.</span>
                                 </div>
                             </td>
@@ -412,7 +414,7 @@
                     <div class="flex gap-3 relative z-10">
                         <div class="relative flex-shrink-0">
                             <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">MR</div>
-                            <div class="absolute -bottom-0.5 -right-0.5 bg-slate-500 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                            <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
                                 <span class="material-symbols-outlined text-white text-[10px]">upload_file</span>
                             </div>
                         </div>
@@ -448,8 +450,8 @@
                     <!-- Activity 3 -->
                     <div class="flex gap-3 relative z-10">
                         <div class="relative flex-shrink-0">
-                            <div class="w-9 h-9 rounded-full bg-slate-600 text-white text-xs font-medium flex items-center justify-center">RZ</div>
-                            <div class="absolute -bottom-0.5 -right-0.5 bg-slate-400 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                            <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">RZ</div>
+                            <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
                                 <span class="material-symbols-outlined text-white text-[10px]">chat</span>
                             </div>
                         </div>
@@ -464,8 +466,8 @@
                     <!-- Activity 4 -->
                     <div class="flex gap-3 relative z-10">
                         <div class="relative flex-shrink-0">
-                            <div class="w-9 h-9 rounded-full bg-slate-500 text-white text-xs font-medium flex items-center justify-center">LL</div>
-                            <div class="absolute -bottom-0.5 -right-0.5 bg-slate-400 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
+                            <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">LL</div>
+                            <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
                                 <span class="material-symbols-outlined text-white text-[10px]">arrow_forward</span>
                             </div>
                         </div>

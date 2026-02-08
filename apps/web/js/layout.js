@@ -306,11 +306,35 @@ function generateHeader(options = {}) {
                     <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
                 </button>
                 <div class="h-6 w-px bg-border-subtle"></div>
-                <a href="/settings.html" class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors" id="user-menu-btn" title="Profile & Settings">
-                    <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
-                    <span class="hidden md:inline">${USER.name}</span>
-                    <span class="material-symbols-outlined text-[18px] text-text-muted">chevron_right</span>
-                </a>
+                <div class="relative" id="user-menu-container">
+                    <button class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors" id="user-menu-btn" title="Profile & Settings">
+                        <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm" style="background-image: url('${USER.avatar}');"></div>
+                        <span class="hidden md:inline">${USER.name}</span>
+                        <span class="material-symbols-outlined text-[18px] text-text-muted user-menu-chevron transition-transform duration-200">expand_more</span>
+                    </button>
+                    <div id="user-dropdown" class="user-dropdown hidden absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50" style="background-color: ${PE_COLORS.surfaceCard}; border: 1px solid ${PE_COLORS.borderSubtle};">
+                        <div class="px-4 py-3 border-b" style="border-color: ${PE_COLORS.borderSubtle};">
+                            <p class="text-sm font-medium" style="color: ${PE_COLORS.textMain};">${USER.name}</p>
+                            <p class="text-xs truncate" style="color: ${PE_COLORS.textMuted};">${USER.role}</p>
+                        </div>
+                        <div class="py-1">
+                            <a href="/settings.html" class="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm transition-colors" style="color: ${PE_COLORS.textSecondary};">
+                                <span class="material-symbols-outlined text-[18px]">person</span>
+                                Profile
+                            </a>
+                            <a href="/settings.html" class="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm transition-colors" style="color: ${PE_COLORS.textSecondary};">
+                                <span class="material-symbols-outlined text-[18px]">settings</span>
+                                Settings
+                            </a>
+                        </div>
+                        <div class="border-t py-1" style="border-color: ${PE_COLORS.borderSubtle};">
+                            <button id="logout-btn" class="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm w-full text-left transition-colors" style="color: #DC2626;">
+                                <span class="material-symbols-outlined text-[18px]">logout</span>
+                                Log out
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
     `;
@@ -395,6 +419,31 @@ function generateStyles() {
             }
             #pe-sidebar .collapse-icon {
                 transition: transform 0.3s ease;
+            }
+            /* User Dropdown Styles */
+            .user-dropdown {
+                animation: dropdownSlideIn 0.15s ease-out;
+            }
+            @keyframes dropdownSlideIn {
+                from {
+                    opacity: 0;
+                    transform: translateY(-8px);
+                }
+                to {
+                    opacity: 1;
+                    transform: translateY(0);
+                }
+            }
+            .user-dropdown-item:hover {
+                background-color: ${PE_COLORS.primaryLight};
+                color: ${PE_COLORS.primary} !important;
+            }
+            #logout-btn:hover {
+                background-color: #FEF2F2 !important;
+                color: #DC2626 !important;
+            }
+            .user-menu-chevron.open {
+                transform: rotate(180deg);
             }
         </style>
     `;
