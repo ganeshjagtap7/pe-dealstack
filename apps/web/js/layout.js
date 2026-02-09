@@ -4,23 +4,25 @@
  */
 
 // Navigation items configuration
+// adminOnly: true = only visible to ADMIN role
+// memberOnly: true = visible to ADMIN and MEMBER (hidden from VIEWER)
 const NAV_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard.html' },
     { id: 'deals', label: 'Deals', icon: 'work', href: '/crm.html' },
     { id: 'data-room', label: 'Data Room', icon: 'folder_open', href: '/vdr.html' },
-    { id: 'crm', label: 'CRM', icon: 'groups', href: '#' },
-    { id: 'portfolio', label: 'Portfolio', icon: 'pie_chart', href: '#' },
-    { id: 'admin', label: 'Admin', icon: 'admin_panel_settings', href: '/admin-dashboard.html' },
-    { id: 'templates', label: 'Templates', icon: 'description', href: '/templates.html' },
+    { id: 'crm', label: 'CRM', icon: 'groups', href: '/coming-soon.html?feature=crm', memberOnly: true },
+    { id: 'portfolio', label: 'Portfolio', icon: 'pie_chart', href: '/coming-soon.html?feature=portfolio', memberOnly: true },
+    { id: 'admin', label: 'Admin', icon: 'admin_panel_settings', href: '/admin-dashboard.html', adminOnly: true },
+    { id: 'templates', label: 'Templates', icon: 'description', href: '/templates.html', memberOnly: true },
     { divider: true },
-    { id: 'memo-builder', label: 'Memo Builder', icon: 'edit_document', href: '/memo-builder.html', isAI: true },
-    { id: 'ai-reports', label: 'AI Reports', icon: 'auto_awesome', href: '#', isAI: true },
+    { id: 'ai-reports', label: 'AI Reports', icon: 'auto_awesome', href: '/memo-builder.html', isAI: true, memberOnly: true },
 ];
 
 // User data - will be loaded from API
 let USER = {
     name: 'Loading...',
-    role: '',
+    role: '',           // Display role/title
+    systemRole: '',     // System role for permissions (ADMIN, MEMBER, VIEWER)
     avatar: ''
 };
 
@@ -37,9 +39,11 @@ async function loadUserData() {
                 USER = {
                     name: userData.name || userData.email?.split('@')[0] || 'User',
                     role: userData.title || getRoleLabel(userData.role) || 'Team Member',
+                    systemRole: userData.role || 'MEMBER',  // ADMIN, MEMBER, or VIEWER
                     avatar: userData.avatar || ''
                 };
                 updateUserDisplay();
+                updateSidebarForRole();  // Filter sidebar based on role
                 // Dispatch event so other components can update when user data is loaded
                 window.dispatchEvent(new CustomEvent('pe-user-loaded', { detail: { user: USER } }));
             }
@@ -56,7 +60,7 @@ function getRoleLabel(role) {
 
 // Update user display in header and sidebar after data loads
 function updateUserDisplay() {
-    // Update header user name
+    // Update header user name (in the button)
     const headerUserName = document.querySelector('#user-menu-btn span.hidden');
     if (headerUserName) {
         headerUserName.textContent = USER.name;
@@ -81,6 +85,12 @@ function updateUserDisplay() {
         }
     }
 
+    // Update user dropdown info
+    const dropdownName = document.querySelector('#user-dropdown > div:first-child > p:first-child');
+    const dropdownRole = document.querySelector('#user-dropdown > div:first-child > p:last-child');
+    if (dropdownName) dropdownName.textContent = USER.name;
+    if (dropdownRole) dropdownRole.textContent = USER.role;
+
     // Update sidebar user info
     const sidebarUserName = document.querySelector('.user-profile .user-info h1');
     const sidebarUserRole = document.querySelector('.user-profile .user-info p');
@@ -104,6 +114,23 @@ function updateUserDisplay() {
             sidebarAvatar.innerHTML = initials;
         }
     }
+}
+
+// Update sidebar visibility based on user role
+function updateSidebarForRole() {
+    const role = USER.systemRole;
+    const isAdmin = role === 'ADMIN';
+    const isMember = role === 'ADMIN' || role === 'MEMBER';
+
+    // Hide admin-only items for non-admins
+    document.querySelectorAll('[data-admin-only="true"]').forEach(el => {
+        el.style.display = isAdmin ? '' : 'none';
+    });
+
+    // Hide member-only items for viewers
+    document.querySelectorAll('[data-member-only="true"]').forEach(el => {
+        el.style.display = isMember ? '' : 'none';
+    });
 }
 
 // PE OS Logo SVG
@@ -185,16 +212,19 @@ function generateSidebar(activePage, options = {}) {
         const inactiveStyle = `color: ${PE_COLORS.textSecondary};`;
         const aiIconStyle = item.isAI && !isActive ? `color: ${PE_COLORS.secondary};` : '';
 
+        // Role-based visibility attributes
+        const roleAttr = item.adminOnly ? 'data-admin-only="true"' : (item.memberOnly ? 'data-member-only="true"' : '');
+
         if (isActive) {
             return `
-                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${activeStyle}" data-active="true">
+                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${activeStyle}" data-active="true" ${roleAttr}>
                     <span class="material-symbols-outlined text-[20px]">${item.icon}</span>
                     <span class="nav-label text-sm font-medium">${item.label}</span>
                 </a>
             `;
         } else {
             return `
-                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${inactiveStyle}"
+                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${inactiveStyle}" ${roleAttr}
                    onmouseover="this.style.backgroundColor='${item.isAI ? PE_COLORS.secondaryLight : PE_COLORS.primaryLight}';this.style.color='${item.isAI ? PE_COLORS.secondary : PE_COLORS.primary}';"
                    onmouseout="this.style.backgroundColor='';this.style.color='${PE_COLORS.textSecondary}';">
                     <span class="material-symbols-outlined text-[20px]" style="${aiIconStyle}">${item.icon}</span>
@@ -514,7 +544,53 @@ function initPELayout(activePage, options = {}) {
             const searchInput = document.getElementById('global-search');
             if (searchInput) searchInput.focus();
         }
+        // Escape to close dropdown
+        if (e.key === 'Escape') {
+            const dropdown = document.getElementById('user-dropdown');
+            const chevron = document.querySelector('.user-menu-chevron');
+            if (dropdown && !dropdown.classList.contains('hidden')) {
+                dropdown.classList.add('hidden');
+                if (chevron) chevron.classList.remove('open');
+            }
+        }
     });
+
+    // Setup user menu dropdown
+    const userMenuBtn = document.getElementById('user-menu-btn');
+    const userDropdown = document.getElementById('user-dropdown');
+    const userMenuChevron = document.querySelector('.user-menu-chevron');
+
+    if (userMenuBtn && userDropdown) {
+        userMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isHidden = userDropdown.classList.toggle('hidden');
+            if (userMenuChevron) {
+                userMenuChevron.classList.toggle('open', !isHidden);
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!userDropdown.classList.contains('hidden') && !e.target.closest('#user-menu-container')) {
+                userDropdown.classList.add('hidden');
+                if (userMenuChevron) userMenuChevron.classList.remove('open');
+            }
+        });
+    }
+
+    // Setup logout button
+    const logoutBtn = document.getElementById('logout-btn');
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', async () => {
+            if (typeof PEAuth !== 'undefined' && PEAuth.signOut) {
+                await PEAuth.signOut();
+            } else {
+                // Fallback if PEAuth not available
+                localStorage.clear();
+                window.location.href = '/login.html';
+            }
+        });
+    }
 
     console.log('PE OS Layout initialized for:', activePage);
 

@@ -6498,3 +6498,161 @@ if (isConnected) {
 **Next debugging step:** Check API terminal logs when clicking "Create Real Memo" to see exactly where authenticated flow fails.
 
 ---
+
+
+---
+
+## February 9, 2026 (Sunday)
+
+### Session Summary
+**Duration:** Evening session  
+**Focus:** Bug fixes, UI improvements, and navigation updates
+
+---
+
+### Changes Made
+
+#### 1. CRM & Portfolio Navigation - "Coming Soon" Page
+**Time: ~6:00 PM**
+
+**Problem:** CRM and Portfolio sidebar buttons had `href="#"` (did nothing when clicked)
+
+**Solution:** Created a "Coming Soon" page and updated navigation links
+
+**Files Created:**
+- `apps/web/coming-soon.html` - New placeholder page for upcoming features
+
+**Files Modified:**
+- `apps/web/js/layout.js` (lines 13-14) - Updated nav links:
+```javascript
+// Before:
+{ id: 'crm', label: 'CRM', icon: 'groups', href: '#', memberOnly: true },
+{ id: 'portfolio', label: 'Portfolio', icon: 'pie_chart', href: '#', memberOnly: true },
+
+// After:
+{ id: 'crm', label: 'CRM', icon: 'groups', href: '/coming-soon.html?feature=crm', memberOnly: true },
+{ id: 'portfolio', label: 'Portfolio', icon: 'pie_chart', href: '/coming-soon.html?feature=portfolio', memberOnly: true },
+```
+
+- `apps/web/vite.config.ts` - Added coming-soon.html to build inputs
+
+**Features:**
+- Dynamic page title/icon based on `?feature=` URL parameter
+- Shows feature name, description, and "In Development" badge
+- Back to Dashboard button
+- Consistent sidebar layout
+
+---
+
+#### 2. Login Page Flickering Fix
+**Time: ~6:30 PM**
+
+**Problem:** Login page was flickering/flashing before showing content due to auth check timing
+
+**Solution:** Added loading screen that hides until auth check completes
+
+**Files Modified:**
+- `apps/web/login.html`:
+  - Added loading spinner overlay
+  - Content hidden (`opacity: 0`) until `checkNotAuth()` confirms user is NOT logged in
+  - If user IS logged in, redirect happens without showing login form (no flicker)
+
+- `apps/web/signup.html`:
+  - Same loading screen pattern applied
+
+**Code Added:**
+```html
+<!-- Loading Screen -->
+<div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+    <div class="flex flex-col items-center gap-3">
+        <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <span class="text-sm text-gray-500">Loading...</span>
+    </div>
+</div>
+```
+
+---
+
+#### 3. Coming Soon Page - Auth Loop Fix
+**Time: ~7:00 PM**
+
+**Problem:** Clicking CRM/Portfolio caused redirect loop between login.html and coming-soon.html
+
+**Root Cause Analysis:**
+1. `coming-soon.html` called `checkAuth()` without initializing Supabase first
+2. Without Supabase init, `getUser()` returned null
+3. `checkAuth` thought user wasn't authenticated → redirected to login
+4. `login.html` properly initialized Supabase, saw user WAS authenticated → redirected back
+5. Loop continued
+
+**Solution (3 fixes):**
+1. Added `await PEAuth.initSupabase()` before `checkAuth()`
+2. Added Supabase CDN script to coming-soon.html
+3. Changed redirect target to `/dashboard.html` instead of storing coming-soon.html (breaks loop)
+
+**Code:**
+```html
+<!-- Added Supabase library -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+```
+
+```javascript
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize Supabase first (THIS WAS MISSING!)
+    await PEAuth.initSupabase();
+
+    // Redirect to dashboard (not back here) if not authenticated
+    const auth = await PEAuth.checkAuth('/dashboard.html');
+    if (!auth) return;
+    // ...
+});
+```
+
+---
+
+### Files Changed Summary
+
+| File | Type | Changes |
+|------|------|---------|
+| `apps/web/coming-soon.html` | **Created** | New "Coming Soon" placeholder page |
+| `apps/web/js/layout.js` | Modified | CRM/Portfolio nav links point to coming-soon |
+| `apps/web/vite.config.ts` | Modified | Added coming-soon.html to build |
+| `apps/web/login.html` | Modified | Added loading screen to prevent flicker |
+| `apps/web/signup.html` | Modified | Added loading screen to prevent flicker |
+
+---
+
+### Technical Learnings
+
+1. **Auth Initialization Order Matters:**
+   - Always call `PEAuth.initSupabase()` before any auth checks
+   - Without init, Supabase client doesn't exist → all auth checks fail
+
+2. **Preventing Auth Redirect Loops:**
+   - Don't store "Coming Soon" or placeholder pages as redirect targets
+   - Use explicit redirect target: `checkAuth('/dashboard.html')`
+   - Loading screens prevent visual flicker during async auth checks
+
+3. **Consistent Page Pattern:**
+   - All protected pages should follow: Load Supabase → Init → Check Auth → Show Content
+   - Loading screen hides content until auth is confirmed
+
+---
+
+### What's Working Now
+
+- ✅ CRM button → Shows "CRM - Coming Soon!" page with sidebar
+- ✅ Portfolio button → Shows "Portfolio - Coming Soon!" page with sidebar
+- ✅ Login page loads without flickering
+- ✅ Signup page loads without flickering
+- ✅ No more redirect loops on coming-soon pages
+
+---
+
+### Next Steps / TODO
+
+- [ ] Build actual CRM page (Contact/Relationship Management)
+- [ ] Build actual Portfolio page (Portfolio Company Tracking)
+- [ ] Investigate memo creation 500 error (from previous session)
+
+---

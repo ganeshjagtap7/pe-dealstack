@@ -67,6 +67,7 @@ export default defineConfig({
         vdr: resolve(__dirname, 'vdr.html'),
         settings: resolve(__dirname, 'settings.html'),
         'admin-dashboard': resolve(__dirname, 'admin-dashboard.html'),
+        'coming-soon': resolve(__dirname, 'coming-soon.html'),
       },
     },
   },

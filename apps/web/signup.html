@@ -37,6 +37,14 @@
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark min-h-screen flex flex-col font-display text-[#111418] dark:text-white transition-colors duration-200">
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="flex flex-col items-center gap-3">
+            <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-sm text-gray-500">Loading...</span>
+        </div>
+    </div>
+
     <!-- Header -->
     <header class="w-full border-b border-[#e5e7eb] dark:border-gray-800 bg-white dark:bg-[#1a202c] sticky top-0 z-50">
         <div class="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
@@ -188,20 +196,20 @@
                     </div>
                 </div>
 
-                <!-- Role -->
+                <!-- Title -->
                 <div class="space-y-2">
-                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="role">Role</label>
+                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="title">Your Title</label>
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
                             <span class="material-symbols-outlined text-[20px]">badge</span>
                         </div>
                         <select
                             class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-10 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm appearance-none cursor-pointer"
-                            id="role"
-                            name="role"
+                            id="title"
+                            name="title"
                             required
                         >
-                            <option disabled selected value="">Select your role</option>
+                            <option disabled selected value="">Select your title</option>
                             <option value="partner">Partner / Managing Director</option>
                             <option value="principal">Principal</option>
                             <option value="vp">Vice President</option>
@@ -213,6 +221,7 @@
                             <span class="material-symbols-outlined text-[20px]">expand_more</span>
                         </div>
                     </div>
+                    <p class="text-xs text-[#617289] dark:text-gray-500 mt-1">You'll be the workspace admin. You can invite teammates later.</p>
                 </div>
 
                 <!-- Error Message -->
@@ -361,7 +370,7 @@
             const password = passwordInput.value;
             const confirmPass = confirmPassword.value;
             const firmname = document.getElementById('firmname').value.trim();
-            const role = document.getElementById('role').value;
+            const title = document.getElementById('title').value;
 
             // Validate
             errorMessage.classList.add('hidden');
@@ -385,8 +394,8 @@
                 return;
             }
 
-            if (!role) {
-                errorMessage.textContent = 'Please select your role.';
+            if (!title) {
+                errorMessage.textContent = 'Please select your title.';
                 errorMessage.classList.remove('hidden');
                 return;
             }
@@ -397,11 +406,11 @@
             submitSpinner.classList.remove('hidden');
 
             try {
-                // Sign up with Supabase
+                // Sign up with Supabase (workspace creator = auto ADMIN)
                 const { user, session, error } = await PEAuth.signUp(email, password, {
                     fullName: fullname,
                     firmName: firmname,
-                    role: role,
+                    title: title,  // Display title (Partner, Analyst, etc.) - role is auto-assigned as ADMIN
                 });
 
                 if (error) {
@@ -463,7 +472,12 @@
             // Initialize auth and check if already logged in
             await PEAuth.initSupabase();
             const notAuth = await PEAuth.checkNotAuth();
-            // If user is authenticated, checkNotAuth will redirect to CRM
+
+            // If user is NOT authenticated, show the signup form
+            if (notAuth) {
+                document.getElementById('loadingScreen').style.display = 'none';
+            }
+            // If user is authenticated, checkNotAuth will redirect - don't show anything
         });
     </script>
 </body>

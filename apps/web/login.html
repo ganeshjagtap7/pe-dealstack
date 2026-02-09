@@ -50,7 +50,15 @@
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#121417] dark:text-white font-display overflow-hidden">
-    <div class="flex h-screen w-full">
+    <!-- Loading Screen -->
+    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
+        <div class="flex flex-col items-center gap-3">
+            <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+            <span class="text-sm text-gray-500">Loading...</span>
+        </div>
+    </div>
+
+    <div id="mainContent" class="flex h-screen w-full opacity-0 transition-opacity duration-300">
         <!-- Left Panel - Branding -->
         <div class="hidden lg:flex w-1/2 relative bg-navy-custom items-center justify-center overflow-hidden">
             <!-- Dot pattern background -->
@@ -298,7 +306,13 @@
             // Initialize auth and check if already logged in
             await PEAuth.initSupabase();
             const notAuth = await PEAuth.checkNotAuth();
-            // If user is authenticated, checkNotAuth will redirect to CRM
+
+            // If user is NOT authenticated, show the login form
+            if (notAuth) {
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('mainContent').style.opacity = '1';
+            }
+            // If user is authenticated, checkNotAuth will redirect - don't show anything
         });
     </script>
 </body>
