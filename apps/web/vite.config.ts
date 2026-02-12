@@ -90,6 +90,7 @@ export default defineConfig({
         crm: resolve(__dirname, 'crm.html'),
         'crm-dynamic': resolve(__dirname, 'crm-dynamic.html'),
         deal: resolve(__dirname, 'deal.html'),
+        'deal-intake': resolve(__dirname, 'deal-intake.html'),
         'memo-builder': resolve(__dirname, 'memo-builder.html'),
         vdr: resolve(__dirname, 'vdr.html'),
         settings: resolve(__dirname, 'settings.html'),

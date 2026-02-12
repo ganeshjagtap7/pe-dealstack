@@ -9,6 +9,7 @@
 const NAV_ITEMS = [
     { id: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/dashboard.html' },
     { id: 'deals', label: 'Deals', icon: 'work', href: '/crm.html' },
+    { id: 'deal-intake', label: 'Deal Intake', icon: 'upload_file', href: '/deal-intake.html', memberOnly: true },
     { id: 'data-room', label: 'Data Room', icon: 'folder_open', href: '/vdr.html' },
     { id: 'crm', label: 'CRM', icon: 'groups', href: '/coming-soon.html?feature=crm', memberOnly: true },
     { id: 'portfolio', label: 'Portfolio', icon: 'pie_chart', href: '/coming-soon.html?feature=portfolio', memberOnly: true },

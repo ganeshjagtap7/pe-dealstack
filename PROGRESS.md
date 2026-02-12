@@ -7076,3 +7076,137 @@ All limiters use `standardHeaders: true` (RateLimit-* headers) and `legacyHeader
 **Remaining from TODO list:** B4 (LangExtract Python microservice), B5 (URL scraping), B6 (Frontend intake UI)
 
 ---
+
+#### B4. Add LangExtract Python Microservice — ~3:22 AM
+
+**Goal:** Add a Python Flask microservice for deep extraction of long CIM documents (50-200+ pages). Current system truncates at 20,000 chars — LangExtract handles full documents with chunking, multi-pass extraction, and source grounding. Node.js API auto-routes long documents to this service with graceful fallback.
+
+**What was done:**
+- Created `apps/extractor/` Python Flask microservice:
+  - `GET /health` — health check endpoint
+  - `POST /extract` — accepts text, runs LangExtract with PE-specific prompt, returns structured deal data
+  - `transform_to_deal_schema()` — maps raw LangExtract entities to deal fields (company, industry, revenue, EBITDA, employees, risks, highlights, etc.)
+  - Supports Gemini (default) and OpenAI models
+- Created `langExtractClient.ts` TypeScript HTTP client:
+  - `deepExtract(text)` — calls Python service with 60s timeout, returns `DeepExtractionResult`
+  - `isDeepExtractionAvailable()` — checks if `EXTRACTOR_URL` env var is set
+  - `isExtractorHealthy()` — health check with 5s timeout
+- Added smart routing in `ingest.ts`:
+  - Documents >50,000 chars automatically route to deep extraction (if `EXTRACTOR_URL` is set)
+  - `transformDeepResultToExtractedDealData()` — converts deep extraction result into `ExtractedDealData` format
+  - Graceful fallback: if Python service is down/fails → falls back to standard GPT-4 extraction
+- Added `EXTRACTOR_URL` to `.env.example`
+- Wrote 15 new tests (client availability, graceful failure, routing logic, interface contracts, service contracts)
+
+**Files modified/created:**
+
+| File | Action | Description |
+|------|--------|-------------|
+| `apps/extractor/server.py` | **Created** | Python Flask service — `/health` + `/extract` endpoints, PE extraction prompt, entity-to-deal-schema transformer |
+| `apps/extractor/requirements.txt` | **Created** | Python deps: flask, gunicorn, langextract |
+| `apps/api/src/services/langExtractClient.ts` | **Created** | TypeScript HTTP client — `deepExtract()`, `isDeepExtractionAvailable()`, `isExtractorHealthy()` |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added import for langExtractClient, added `transformDeepResultToExtractedDealData()`, added smart routing logic (>50k chars → deep extraction with fallback) |
+| `apps/api/.env.example` | **Modified** | Added `EXTRACTOR_URL=http://localhost:5050` config |
+| `apps/api/tests/langextract.test.ts` | **Created** | 15 tests — client availability (3), graceful failure (2), routing logic (4), interface shape (2), service contracts (4) |
+
+**Test results:** 242/242 passing (15 new)
+
+---
+
+#### B5. Add Website URL Scraping — ~3:29 AM
+
+**Goal:** Allow users to submit a company website URL and automatically scrape content, extract deal data via AI, and create a deal — no file upload needed.
+
+**What was done:**
+- Created `webScraper.ts` service:
+  - `scrapeWebsite(url)` — fetches URL with 10s timeout, custom User-Agent
+  - Strips HTML: removes `<script>`, `<style>`, `<nav>`, `<header>`, `<footer>`, all remaining tags
+  - Decodes HTML entities (`&amp;`, `&lt;`, `&gt;`, `&quot;`, `&#39;`, `&nbsp;`)
+  - Normalizes whitespace, limits output to 15,000 chars
+- Added `POST /api/ingest/url` endpoint:
+  - Zod validation: requires valid URL, optional `companyName` override
+  - Scrapes website → AI extraction → company dedup → deal creation → document record → activity log → RAG embedding
+  - If user provides `companyName`, overrides AI extraction with 100% confidence
+  - Full pipeline same as B1 (company/deal/document/activity/RAG)
+- Wrote 19 new tests:
+  - 3 scraper unit tests (export, unreachable URL, invalid URL)
+  - 8 HTML stripping tests (tags, script, style, nav, header/footer, entities, whitespace, length limit)
+  - 8 endpoint tests (valid URL, invalid URL, missing URL, empty content, no deal data, company override, confidence scores, document mimeType)
+
+**Files modified/created:**
+
+| File | Action | Description |
+|------|--------|-------------|
+| `apps/api/src/services/webScraper.ts` | **Created** | `scrapeWebsite(url)` — 10s timeout, HTML stripping, entity decoding, 15k char limit |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added import for `scrapeWebsite`, added `urlIngestSchema` Zod schema, added `POST /api/ingest/url` route (~170 lines) with full deal creation pipeline |
+| `apps/api/tests/ingest-url.test.ts` | **Created** | 19 tests — scraper unit tests, HTML stripping logic, endpoint validation and response structure |
+
+**Test results:** 261/261 passing (19 new)
+
+---
+
+#### B6. Build Frontend Intake UI — ~3:33 AM
+
+**Goal:** Build a unified deal intake page with three tabs (Upload File, Paste Text, Enter URL) that connects to all the backend endpoints built in B1-B5. Show extraction preview with confidence scores before redirecting to the deal.
+
+**What was done:**
+- Created `deal-intake.html` page:
+  - **Upload File tab** — drag-and-drop zone accepting PDF, Word, Excel, Text (auto-routes Excel/CSV to `/bulk`, others to main `/ingest`)
+  - **Paste Text tab** — textarea with character counter (min 50), source type dropdown (email/note/slack/whatsapp/other)
+  - **Enter URL tab** — URL input with live validation, optional company name override field
+  - **Extraction preview** — shows Company Name, Industry, Revenue, EBITDA, Overall Confidence with color-coded bars (green >80%, yellow 60-80%, red <60%)
+  - **Review badge** — yellow "Needs Review" badge with expandable review reasons
+  - **Bulk import result** — shows imported/failed/total counts for Excel uploads, redirects to CRM page
+  - Loading spinner with AI animation, error display with dismiss, "View Deal" / "Add Another" buttons
+  - Auth check on page load (redirects to login if not authenticated)
+  - Matches existing PE OS design system (Tailwind, Inter font, Material Symbols, card shadows, color palette)
+- Created `deal-intake.js` with functions:
+  - `switchTab()` — tab navigation with active state styling
+  - `uploadFile()` — FormData upload, auto-routes Excel vs other formats
+  - `extractFromText()` — sends text + sourceType to `/ingest/text`
+  - `extractFromURL()` — sends URL + optional companyName to `/ingest/url`
+  - `showExtractionPreview()` — renders confidence bars with color coding
+  - `showBulkImportResult()` — renders bulk import summary
+  - `goToDeal()` — redirects to `deal.html?id=DEAL_ID`
+  - Drag-and-drop event handlers, file info display, form reset
+- Added "Deal Intake" to sidebar navigation in `layout.js` (visible to ADMIN/MEMBER, icon: `upload_file`)
+- Added `deal-intake` to Vite build config in `vite.config.ts`
+
+**Files modified/created:**
+
+| File | Action | Description |
+|------|--------|-------------|
+| `apps/web/deal-intake.html` | **Created** | Full intake page — 3-tab UI, drag-and-drop, extraction preview with confidence bars, review badges, loading/error states |
+| `apps/web/js/deal-intake.js` | **Created** | Page logic — `uploadFile()`, `extractFromText()`, `extractFromURL()`, `showExtractionPreview()`, tab switching, drag-and-drop handlers |
+| `apps/web/js/layout.js` | **Modified** | Added "Deal Intake" nav item with `upload_file` icon (memberOnly: true, between Deals and Data Room) |
+| `apps/web/vite.config.ts` | **Modified** | Added `'deal-intake': resolve(__dirname, 'deal-intake.html')` to rollup build inputs |
+
+**Test results:** 261/261 passing (no new backend tests — frontend page)
+**Vite build:** Passes — `deal-intake.html` and `js/deal-intake.js` included in `dist/`
+
+---
+
+#### Summary — Session 3 (Feb 13, 2026)
+
+| # | Task | Status | Tests Added | Key Files |
+|---|------|--------|-------------|-----------|
+| B4 | LangExtract Python Microservice | ✅ Done | 15 | `extractor/server.py`, `langExtractClient.ts`, `ingest.ts` |
+| B5 | Website URL Scraping | ✅ Done | 19 | `webScraper.ts`, `ingest.ts`, `ingest-url.test.ts` |
+| B6 | Frontend Intake UI | ✅ Done | — | `deal-intake.html`, `deal-intake.js`, `layout.js`, `vite.config.ts` |
+
+**New endpoints added:**
+- `POST /api/ingest/url` — Create deal from company website URL (scrape → AI extract → deal)
+- Smart routing in `POST /api/ingest` — Documents >50k chars auto-route to LangExtract deep extraction
+
+**New services:**
+- `apps/extractor/` — Python Flask microservice for deep extraction (optional, graceful fallback)
+- `webScraper.ts` — HTML scraping + stripping service
+- `langExtractClient.ts` — TypeScript client for Python service
+
+**New frontend page:** `/deal-intake.html` — unified intake UI with 3 tabs (upload/paste/URL)
+
+**Total test count:** 261/261 passing (+34 new tests this session)
+
+**Section B complete!** All 6 feature development tasks (B1-B6) are now implemented. The full deal ingestion pipeline supports: PDF, Word, Excel/CSV bulk, plain text, and website URL scraping — all with AI extraction, confidence scores, review flagging, and RAG embedding.
+
+---

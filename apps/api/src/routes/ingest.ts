@@ -8,6 +8,32 @@ import { embedDocument } from '../rag.js';
 import { log } from '../utils/logger.js';
 import { extractTextFromWord } from '../services/documentParser.js';
 import { parseExcelToDealRows } from '../services/excelParser.js';
+import { deepExtract, isDeepExtractionAvailable, DeepExtractionResult } from '../services/langExtractClient.js';
+import { scrapeWebsite } from '../services/webScraper.js';
+
+// Transform deep extraction result into ExtractedDealData format
+function transformDeepResultToExtractedDealData(result: DeepExtractionResult): ExtractedDealData {
+  const d = result.dealData;
+  const highConf = 85; // Deep extraction yields high confidence
+  return {
+    companyName: { value: d.companyName, confidence: d.companyName ? highConf : 0 },
+    industry: { value: d.industry, confidence: d.industry ? highConf : 0 },
+    description: { value: [d.companyName, d.industry].filter(Boolean).join(' — ') || 'Extracted via deep analysis', confidence: highConf },
+    revenue: { value: d.revenue, confidence: d.revenue != null ? highConf : 0 },
+    ebitda: { value: d.ebitda, confidence: d.ebitda != null ? highConf : 0 },
+    ebitdaMargin: { value: d.ebitdaMargin, confidence: d.ebitdaMargin != null ? highConf : 0 },
+    revenueGrowth: { value: d.revenueGrowth, confidence: d.revenueGrowth != null ? highConf : 0 },
+    employees: { value: d.employees, confidence: d.employees != null ? highConf : 0 },
+    foundedYear: { value: null, confidence: 0 },
+    headquarters: { value: d.headquarters, confidence: d.headquarters ? highConf : 0 },
+    keyRisks: d.keyRisks || [],
+    investmentHighlights: d.investmentHighlights || [],
+    summary: `Deep extraction found ${result.extractionCount} data points`,
+    overallConfidence: highConf,
+    needsReview: !d.companyName,
+    reviewReasons: !d.companyName ? ['Company name not found in deep extraction'] : [],
+  };
+}
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -145,8 +171,27 @@ router.post('/', upload.single('file'), async (req, res) => {
     }
 
     // Step 2: Run AI extraction with confidence scores
-    log.debug('Step 2: Running AI data extraction');
-    const aiData = await extractDealDataFromText(extractedText);
+    // Smart routing: use deep extraction for long documents (>50k chars) if available
+    const shouldUseDeepExtraction =
+      extractedText.length > 50000 && isDeepExtractionAvailable();
+
+    let aiData: ExtractedDealData | null = null;
+
+    if (shouldUseDeepExtraction) {
+      log.info('Using deep extraction for long document', { textLength: extractedText.length });
+      const deepResult = await deepExtract(extractedText);
+
+      if (deepResult?.success) {
+        aiData = transformDeepResultToExtractedDealData(deepResult);
+        log.info('Deep extraction succeeded', { extractionCount: deepResult.extractionCount });
+      } else {
+        log.warn('Deep extraction failed, falling back to standard extraction');
+        aiData = await extractDealDataFromText(extractedText);
+      }
+    } else {
+      log.debug('Step 2: Running AI data extraction');
+      aiData = await extractDealDataFromText(extractedText);
+    }
 
     if (!aiData) {
       return res.status(400).json({ error: 'AI could not extract deal data from document' });
@@ -693,6 +738,182 @@ router.post('/text', async (req, res) => {
   } catch (error) {
     log.error('Text ingest error', error);
     res.status(500).json({ error: 'Failed to process text input' });
+  }
+});
+
+// ─── Website URL Scraping ─────────────────────────────────────
+
+const urlIngestSchema = z.object({
+  url: z.string().url('Must be a valid URL'),
+  companyName: z.string().optional(),
+});
+
+// POST /api/ingest/url — Create deal from company website
+router.post('/url', async (req, res) => {
+  try {
+    const validation = urlIngestSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
+    }
+
+    const { url, companyName: userCompanyName } = validation.data;
+    log.info('URL ingest starting', { url });
+
+    // Step 1: Scrape the website
+    const scrapedText = await scrapeWebsite(url);
+    if (!scrapedText || scrapedText.length < 100) {
+      return res.status(400).json({ error: 'Could not extract enough content from this website' });
+    }
+
+    log.debug('Scraped website', { url, charCount: scrapedText.length });
+
+    // Step 2: AI extraction
+    const aiData = await extractDealDataFromText(scrapedText);
+    if (!aiData) {
+      return res.status(400).json({ error: 'Could not extract deal data from website content' });
+    }
+
+    // Override company name if user provided one
+    if (userCompanyName) {
+      aiData.companyName.value = userCompanyName;
+      aiData.companyName.confidence = 100;
+    }
+
+    // Step 3: Create or find company
+    const companyName = aiData.companyName.value || 'Unknown Company';
+    const { data: existingCompany } = await supabase
+      .from('Company')
+      .select('id, name')
+      .ilike('name', companyName)
+      .single();
+
+    let company;
+    if (existingCompany) {
+      company = existingCompany;
+      log.debug('Found existing company', { name: company.name });
+    } else {
+      const { data: newCompany, error: companyError } = await supabase
+        .from('Company')
+        .insert({
+          name: companyName,
+          industry: aiData.industry.value,
+          description: aiData.description.value,
+        })
+        .select()
+        .single();
+      if (companyError) throw companyError;
+      company = newCompany;
+      log.debug('Created company', { name: company.name });
+    }
+
+    // Step 4: Create deal
+    const dealIcon = getIconForIndustry(aiData.industry.value);
+    const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
+
+    const { data: deal, error: dealError } = await supabase
+      .from('Deal')
+      .insert({
+        name: companyName,
+        companyId: company.id,
+        stage: 'INITIAL_REVIEW',
+        status: dealStatus,
+        industry: aiData.industry.value,
+        description: aiData.description.value,
+        revenue: aiData.revenue.value,
+        ebitda: aiData.ebitda.value,
+        dealSize: aiData.revenue.value,
+        aiThesis: aiData.summary,
+        icon: dealIcon,
+        extractionConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+      })
+      .select()
+      .single();
+
+    if (dealError) throw dealError;
+
+    // Step 5: Create document record
+    const { data: document } = await supabase
+      .from('Document')
+      .insert({
+        dealId: deal.id,
+        name: `Website scrape — ${url}`,
+        type: 'OTHER',
+        extractedText: scrapedText,
+        extractedData: {
+          companyName: aiData.companyName,
+          industry: aiData.industry,
+          description: aiData.description,
+          revenue: aiData.revenue,
+          ebitda: aiData.ebitda,
+          ebitdaMargin: aiData.ebitdaMargin,
+          revenueGrowth: aiData.revenueGrowth,
+          employees: aiData.employees,
+          foundedYear: aiData.foundedYear,
+          headquarters: aiData.headquarters,
+          keyRisks: aiData.keyRisks,
+          investmentHighlights: aiData.investmentHighlights,
+          summary: aiData.summary,
+          overallConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+        },
+        status: aiData.needsReview ? 'pending_review' : 'analyzed',
+        confidence: aiData.overallConfidence / 100,
+        aiAnalyzedAt: new Date().toISOString(),
+        mimeType: 'text/html',
+      })
+      .select()
+      .single();
+
+    // Step 6: Log activity
+    await supabase.from('Activity').insert({
+      dealId: deal.id,
+      type: 'DEAL_CREATED',
+      title: 'Deal created from website scrape',
+      description: aiData.needsReview
+        ? `"${companyName}" extracted from ${url} with ${aiData.overallConfidence}% confidence — NEEDS REVIEW`
+        : `"${companyName}" auto-created from ${url} with ${aiData.overallConfidence}% confidence`,
+      metadata: {
+        sourceType: 'web_scrape',
+        url,
+        overallConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+      },
+    });
+
+    // Step 7: Trigger RAG embedding in background
+    if (scrapedText.length > 100) {
+      embedDocument(document?.id || deal.id, deal.id, scrapedText)
+        .then(result => {
+          if (result.success) log.debug('RAG embedding complete', { chunkCount: result.chunkCount });
+          else log.error('RAG embedding failed', result.error);
+        })
+        .catch(err => log.error('RAG embedding error', err));
+    }
+
+    log.info('URL ingest complete', { dealId: deal.id, url });
+
+    res.status(201).json({
+      success: true,
+      deal: { ...deal, company },
+      document,
+      extraction: {
+        companyName: aiData.companyName,
+        industry: aiData.industry,
+        revenue: aiData.revenue,
+        ebitda: aiData.ebitda,
+        overallConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+      },
+      source: { type: 'web_scrape', url },
+    });
+  } catch (error) {
+    log.error('URL ingest error', error);
+    res.status(500).json({ error: 'Failed to process URL' });
   }
 });
 
