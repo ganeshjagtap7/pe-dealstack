@@ -62,6 +62,18 @@ const chatMessageSchema = z.object({
   sectionId: z.string().uuid().optional(),
 });
 
+const memosQuerySchema = z.object({
+  dealId: z.string().uuid().optional(),
+  status: z.enum(['DRAFT', 'REVIEW', 'FINAL', 'ARCHIVED']).optional(),
+  type: z.enum(['IC_MEMO', 'TEASER', 'SUMMARY', 'CUSTOM']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+const generateSectionSchema = z.object({
+  customPrompt: z.string().max(2000).optional(),
+});
+
 // ============================================================
 // Memo CRUD Routes
 // ============================================================
@@ -104,7 +116,7 @@ router.get('/debug', async (req, res) => {
 // GET /api/memos - List all memos
 router.get('/', async (req, res) => {
   try {
-    const { dealId, status, type, limit = 50, offset = 0 } = req.query;
+    const params = memosQuerySchema.parse(req.query);
     const user = req.user;
 
     let query = supabase
@@ -115,12 +127,12 @@ router.get('/', async (req, res) => {
         deal:Deal(id, name, company:Company(name))
       `)
       .order('updatedAt', { ascending: false })
-      .range(Number(offset), Number(offset) + Number(limit) - 1);
+      .range(params.offset, params.offset + params.limit - 1);
 
     // Apply filters
-    if (dealId) query = query.eq('dealId', dealId);
-    if (status) query = query.eq('status', status);
-    if (type) query = query.eq('type', type);
+    if (params.dealId) query = query.eq('dealId', params.dealId);
+    if (params.status) query = query.eq('status', params.status);
+    if (params.type) query = query.eq('type', params.type);
 
     const { data: memos, error } = await query;
 
@@ -190,27 +202,21 @@ router.get('/:id', async (req, res) => {
 // POST /api/memos - Create new memo
 router.post('/', async (req, res) => {
   try {
-    console.log('=== MEMO CREATE START ===');
-    console.log('Request body:', JSON.stringify(req.body, null, 2));
-
     const user = req.user;
-    console.log('User:', user?.id, user?.email);
+    log.debug('Memo create started', { userId: user?.id });
 
     const validation = createMemoSchema.safeParse(req.body);
 
     if (!validation.success) {
-      console.log('Validation failed:', validation.error.errors);
+      log.debug('Memo validation failed', { errors: validation.error.errors });
       return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
     }
-    console.log('Validation passed');
 
     const memoData = {
       ...validation.data,
       createdBy: user?.id,
       lastEditedBy: user?.id,
     };
-
-    console.log('MEMO DATA TO INSERT:', JSON.stringify(memoData, null, 2));
 
     const { data: memo, error } = await supabase
       .from('Memo')
@@ -219,14 +225,12 @@ router.post('/', async (req, res) => {
       .single();
 
     if (error) {
-      console.log('INSERT ERROR:', error);
       throw error;
     }
-    console.log('Memo created:', memo.id);
+    log.debug('Memo created', { memoId: memo.id });
 
     // Create default sections if IC_MEMO type
     if (memo.type === 'IC_MEMO') {
-      console.log('Creating default sections...');
       const defaultSections = [
         { memoId: memo.id, type: 'EXECUTIVE_SUMMARY', title: 'Executive Summary', sortOrder: 0 },
         { memoId: memo.id, type: 'FINANCIAL_PERFORMANCE', title: 'Financial Performance', sortOrder: 1 },
@@ -237,14 +241,11 @@ router.post('/', async (req, res) => {
 
       const { error: sectionsError } = await supabase.from('MemoSection').insert(defaultSections);
       if (sectionsError) {
-        console.log('SECTIONS ERROR:', sectionsError);
         throw sectionsError;
       }
-      console.log('Sections created');
     }
 
     // Fetch the memo with sections
-    console.log('Fetching full memo...');
     const { data: fullMemo, error: fetchError } = await supabase
       .from('Memo')
       .select(`*, sections:MemoSection(*)`)
@@ -252,15 +253,12 @@ router.post('/', async (req, res) => {
       .single();
 
     if (fetchError) {
-      console.log('FETCH ERROR:', fetchError);
       throw fetchError;
     }
-    console.log('Full memo fetched');
 
     // Audit log
-    console.log('Creating audit log...');
     await AuditLog.memoCreated(req, memo.id, memo.title);
-    console.log('=== MEMO CREATE SUCCESS ===');
+    log.debug('Memo created successfully', { memoId: memo.id });
 
     res.status(201).json(fullMemo);
   } catch (error: any) {
@@ -273,7 +271,7 @@ router.post('/', async (req, res) => {
       details: error?.details,
       hint: error?.hint,
     };
-    console.error('MEMO CREATE ERROR:', JSON.stringify(errorDetails, null, 2));
+    log.error('Memo create error', undefined, errorDetails);
     res.status(500).json({
       error: `Failed to create memo: ${errorMessage}`,
       debug: errorDetails
@@ -515,7 +513,7 @@ Include citation placeholders like [Source: CIM p.XX] for data points.`;
 router.post('/:id/sections/:sectionId/generate', async (req, res) => {
   try {
     const { id, sectionId } = req.params;
-    const { customPrompt } = req.body;
+    const { customPrompt } = generateSectionSchema.parse(req.body);
 
     if (!isAIEnabled()) {
       return res.status(503).json({ error: 'AI features are not enabled' });

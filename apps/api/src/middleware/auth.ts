@@ -31,14 +31,11 @@ export async function authMiddleware(
   next: NextFunction
 ): Promise<void> {
   try {
-    // Debug logging
-    console.log(`>>> [AUTH] ${req.method} ${req.originalUrl}`);
-
     // Get the Authorization header
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-      console.log('>>> [AUTH] FAILED: No authorization header');
+      log.debug('Auth failed: no authorization header', { method: req.method, url: req.originalUrl });
       res.status(401).json({
         error: 'Unauthorized',
         message: 'No authorization header provided',
@@ -70,7 +67,6 @@ export async function authMiddleware(
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      console.log('>>> [AUTH] FAILED: Token validation error', error?.message || 'User not found');
       log.warn('Auth token validation failed', { error: error?.message || 'User not found' });
       res.status(401).json({
         error: 'Unauthorized',
@@ -78,8 +74,6 @@ export async function authMiddleware(
       });
       return;
     }
-
-    console.log('>>> [AUTH] SUCCESS: User', user.id, user.email);
 
     // Attach user to request
     // Default to 'MEMBER' role if no role is set in user_metadata

@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { log } from '../utils/logger.js';
 
 /**
  * Role-Based Access Control (RBAC) System
@@ -191,14 +192,6 @@ export function isRoleAtLeast(userRole: UserRole | string | undefined, minimumRo
  */
 export function requirePermission(...permissions: Permission[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
-    // Debug logging
-    console.log('[RBAC] Checking permissions:', {
-      userId: req.user?.id,
-      userRole: req.user?.role,
-      requiredPermissions: permissions,
-      hasUser: !!req.user,
-    });
-
     if (!req.user) {
       res.status(401).json({
         error: 'Unauthorized',
@@ -210,15 +203,8 @@ export function requirePermission(...permissions: Permission[]) {
     const userRole = req.user.role;
     const hasPerms = hasAnyPermission(userRole, permissions);
 
-    // Debug logging
-    console.log('[RBAC] Permission check result:', {
-      userRole,
-      permissions,
-      hasPermission: hasPerms,
-      rolePermissions: userRole ? ROLE_PERMISSIONS[userRole.toLowerCase() as UserRole] : null,
-    });
-
     if (!hasPerms) {
+      log.debug('RBAC permission denied', { userId: req.user.id, userRole, permissions });
       res.status(403).json({
         error: 'Forbidden',
         message: `Insufficient permissions. Required: ${permissions.join(' or ')}`,

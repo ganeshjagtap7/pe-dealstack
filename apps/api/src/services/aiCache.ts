@@ -1,4 +1,5 @@
 import { supabase } from '../supabase.js';
+import { log } from '../utils/logger.js';
 
 // Cache TTL in hours - cached AI responses are valid for this duration
 const CACHE_TTL_HOURS = 24;
@@ -42,15 +43,15 @@ export const AICache = {
       if (deal.aiCacheUpdatedAt) {
         const cacheAge = getAgeInHours(deal.aiCacheUpdatedAt);
         if (cacheAge < CACHE_TTL_HOURS) {
-          console.log(`[AICache] Thesis HIT for deal ${dealId} (${cacheAge.toFixed(1)}h old)`);
+          log.debug('AICache thesis hit', { dealId, ageHours: cacheAge.toFixed(1) });
           return { hit: true, data: deal.aiThesis, age: cacheAge };
         }
-        console.log(`[AICache] Thesis STALE for deal ${dealId} (${cacheAge.toFixed(1)}h old)`);
+        log.debug('AICache thesis stale', { dealId, ageHours: cacheAge.toFixed(1) });
       }
 
       return { hit: false, data: null };
     } catch (error) {
-      console.error('[AICache] Error checking thesis cache:', error);
+      log.error('AICache error checking thesis cache', error);
       return { hit: false, data: null };
     }
   },
@@ -69,10 +70,10 @@ export const AICache = {
         .eq('id', dealId);
 
       if (error) throw error;
-      console.log(`[AICache] Thesis STORED for deal ${dealId}`);
+      log.debug('AICache thesis stored', { dealId });
       return true;
     } catch (error) {
-      console.error('[AICache] Error storing thesis:', error);
+      log.error('AICache error storing thesis', error);
       return false;
     }
   },
@@ -96,15 +97,15 @@ export const AICache = {
       if (deal.aiCacheUpdatedAt) {
         const cacheAge = getAgeInHours(deal.aiCacheUpdatedAt);
         if (cacheAge < CACHE_TTL_HOURS) {
-          console.log(`[AICache] Risks HIT for deal ${dealId} (${cacheAge.toFixed(1)}h old)`);
+          log.debug('AICache risks hit', { dealId, ageHours: cacheAge.toFixed(1) });
           return { hit: true, data: deal.aiRisks, age: cacheAge };
         }
-        console.log(`[AICache] Risks STALE for deal ${dealId} (${cacheAge.toFixed(1)}h old)`);
+        log.debug('AICache risks stale', { dealId, ageHours: cacheAge.toFixed(1) });
       }
 
       return { hit: false, data: null };
     } catch (error) {
-      console.error('[AICache] Error checking risks cache:', error);
+      log.error('AICache error checking risks cache', error);
       return { hit: false, data: null };
     }
   },
@@ -123,10 +124,10 @@ export const AICache = {
         .eq('id', dealId);
 
       if (error) throw error;
-      console.log(`[AICache] Risks STORED for deal ${dealId}`);
+      log.debug('AICache risks stored', { dealId });
       return true;
     } catch (error) {
-      console.error('[AICache] Error storing risks:', error);
+      log.error('AICache error storing risks', error);
       return false;
     }
   },
@@ -145,10 +146,10 @@ export const AICache = {
         .eq('id', dealId);
 
       if (error) throw error;
-      console.log(`[AICache] Cache INVALIDATED for deal ${dealId}`);
+      log.debug('AICache invalidated', { dealId });
       return true;
     } catch (error) {
-      console.error('[AICache] Error invalidating cache:', error);
+      log.error('AICache error invalidating cache', error);
       return false;
     }
   },
@@ -183,7 +184,7 @@ export const AICache = {
         isValid,
       };
     } catch (error) {
-      console.error('[AICache] Error getting stats:', error);
+      log.error('AICache error getting stats', error);
       return { hasThesis: false, hasRisks: false, cacheAge: null, isValid: false };
     }
   },
@@ -198,7 +199,7 @@ export const AICache = {
       memoryCache.delete(key);
       return null;
     }
-    console.log(`[AICache] Memory HIT for key: ${key}`);
+    log.debug('AICache memory hit', { key });
     return cached.data;
   },
 
@@ -210,7 +211,7 @@ export const AICache = {
       data,
       expiresAt: Date.now() + ttlMs,
     });
-    console.log(`[AICache] Memory STORED for key: ${key} (TTL: ${ttlMs / 1000}s)`);
+    log.debug('AICache memory stored', { key, ttlSeconds: ttlMs / 1000 });
   },
 };
 

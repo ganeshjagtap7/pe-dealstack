@@ -16,6 +16,7 @@
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
+    "@sentry/node": "^10.38.0",
     "@supabase/supabase-js": "^2.91.1",
     "@types/multer": "^2.0.0",
     "cors": "^2.8.5",

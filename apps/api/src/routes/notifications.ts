@@ -19,14 +19,28 @@ const updateNotificationSchema = z.object({
   isRead: z.boolean(),
 });
 
+const notificationsQuerySchema = z.object({
+  userId: z.string().uuid(),
+  type: z.enum(['DEAL_UPDATE', 'DOCUMENT_UPLOADED', 'MENTION', 'AI_INSIGHT', 'TASK_ASSIGNED', 'COMMENT', 'SYSTEM']).optional(),
+  isRead: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+const markAllReadSchema = z.object({
+  userId: z.string().uuid(),
+});
+
+const deleteNotificationsQuerySchema = z.object({
+  userId: z.string().uuid(),
+  readOnly: z.enum(['true', 'false']).optional(),
+});
+
 // GET /api/notifications - List notifications for a user
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId, type, isRead, limit, offset } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
+    const params = notificationsQuerySchema.parse(req.query);
+    const { userId } = params;
 
     let query = supabase
       .from('Notification')
@@ -40,22 +54,21 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
       .eq('userId', userId)
       .order('createdAt', { ascending: false });
 
-    if (type) {
-      query = query.eq('type', type);
+    if (params.type) {
+      query = query.eq('type', params.type);
     }
 
-    if (isRead !== undefined) {
-      query = query.eq('isRead', isRead === 'true');
+    if (params.isRead !== undefined) {
+      query = query.eq('isRead', params.isRead === 'true');
     }
 
-    if (limit) {
-      query = query.limit(parseInt(limit as string, 10));
+    if (params.limit) {
+      query = query.limit(params.limit);
     }
 
-    if (offset) {
-      const limitNum = parseInt(limit as string || '50', 10);
-      const offsetNum = parseInt(offset as string, 10);
-      query = query.range(offsetNum, offsetNum + limitNum - 1);
+    if (params.offset) {
+      const limitNum = params.limit || 50;
+      query = query.range(params.offset, params.offset + limitNum - 1);
     }
 
     const { data: notifications, error } = await query;
@@ -171,11 +184,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
 // POST /api/notifications/mark-all-read - Mark all notifications as read for a user
 router.post('/mark-all-read', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId } = req.body;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
+    const { userId } = markAllReadSchema.parse(req.body);
 
     const { error } = await supabase
       .from('Notification')
@@ -212,18 +221,14 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 // DELETE /api/notifications - Delete all notifications for a user
 router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { userId, readOnly } = req.query;
-
-    if (!userId) {
-      return res.status(400).json({ error: 'userId is required' });
-    }
+    const params = deleteNotificationsQuerySchema.parse(req.query);
 
     let query = supabase
       .from('Notification')
       .delete()
-      .eq('userId', userId);
+      .eq('userId', params.userId);
 
-    if (readOnly === 'true') {
+    if (params.readOnly === 'true') {
       query = query.eq('isRead', true);
     }
 

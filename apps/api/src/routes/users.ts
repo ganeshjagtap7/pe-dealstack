@@ -25,6 +25,26 @@ const avatarUpload = multer({
 
 const router = Router();
 
+// Query parameter schemas
+const usersQuerySchema = z.object({
+  role: z.enum(['ADMIN', 'MEMBER', 'VIEWER']).optional(),
+  department: z.string().max(100).optional(),
+  isActive: z.enum(['true', 'false']).optional(),
+  search: z.string().max(200).optional(),
+  firmName: z.string().max(255).optional(),
+  excludeUserId: z.string().uuid().optional(),
+});
+
+const teamQuerySchema = z.object({
+  search: z.string().max(200).optional(),
+  excludeSelf: z.enum(['true', 'false']).optional(),
+});
+
+const userNotificationsQuerySchema = z.object({
+  unreadOnly: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
 // Validation schemas
 const createUserSchema = z.object({
   email: z.string().email(),
@@ -51,40 +71,37 @@ const updateUserSchema = z.object({
 // Query params: role, department, isActive, search, firmName, excludeUserId
 router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { role, department, isActive, search, firmName, excludeUserId } = req.query;
+    const params = usersQuerySchema.parse(req.query);
 
     let query = supabase
       .from('User')
       .select('id, email, name, avatar, role, department, title, phone, isActive, firmName')
       .order('name', { ascending: true });
 
-    // Filter by firm name (for team member selection)
-    if (firmName) {
-      query = query.eq('firmName', firmName);
+    if (params.firmName) {
+      query = query.eq('firmName', params.firmName);
     }
 
-    if (role) {
-      query = query.eq('role', role);
+    if (params.role) {
+      query = query.eq('role', params.role);
     }
 
-    if (department) {
-      query = query.eq('department', department);
+    if (params.department) {
+      query = query.eq('department', params.department);
     }
 
-    if (isActive !== undefined) {
-      query = query.eq('isActive', isActive === 'true');
+    if (params.isActive !== undefined) {
+      query = query.eq('isActive', params.isActive === 'true');
     } else {
-      // Default to only active users
       query = query.eq('isActive', true);
     }
 
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    if (params.search) {
+      query = query.or(`name.ilike.%${params.search}%,email.ilike.%${params.search}%`);
     }
 
-    // Exclude a specific user (useful for share modal - exclude current user)
-    if (excludeUserId) {
-      query = query.neq('id', excludeUserId);
+    if (params.excludeUserId) {
+      query = query.neq('id', params.excludeUserId);
     }
 
     const { data: users, error } = await query;
@@ -173,7 +190,7 @@ router.get('/me', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/me/team', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = req.user;
-    const { search, excludeSelf } = req.query;
+    const params = teamQuerySchema.parse(req.query);
 
     if (!user?.id) {
       return res.status(401).json({ error: 'Not authenticated' });
@@ -196,13 +213,13 @@ router.get('/me/team', async (req: Request, res: Response, next: NextFunction) =
       .order('name', { ascending: true });
 
     // Optionally exclude current user
-    if (excludeSelf === 'true') {
+    if (params.excludeSelf === 'true') {
       query = query.neq('id', user.id);
     }
 
     // Search filter
-    if (search) {
-      query = query.or(`name.ilike.%${search}%,email.ilike.%${search}%`);
+    if (params.search) {
+      query = query.or(`name.ilike.%${params.search}%,email.ilike.%${params.search}%`);
     }
 
     const { data: teamMembers, error } = await query;
@@ -570,7 +587,7 @@ router.get('/:id/deals', async (req: Request, res: Response, next: NextFunction)
 router.get('/:id/notifications', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
-    const { unreadOnly, limit } = req.query;
+    const params = userNotificationsQuerySchema.parse(req.query);
 
     let query = supabase
       .from('Notification')
@@ -578,12 +595,12 @@ router.get('/:id/notifications', async (req: Request, res: Response, next: NextF
       .eq('userId', id)
       .order('createdAt', { ascending: false });
 
-    if (unreadOnly === 'true') {
+    if (params.unreadOnly === 'true') {
       query = query.eq('isRead', false);
     }
 
-    if (limit) {
-      query = query.limit(parseInt(limit as string, 10));
+    if (params.limit) {
+      query = query.limit(params.limit);
     }
 
     const { data: notifications, error } = await query;

@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
@@ -25,6 +26,31 @@ import { log } from './utils/logger.js';
 
 dotenv.config();
 
+// Validate required environment variables at startup
+const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_ANON_KEY'];
+const optionalEnvVars = ['OPENAI_API_KEY', 'GEMINI_API_KEY'];
+
+const missingRequired = requiredEnvVars.filter(key => !process.env[key]);
+if (missingRequired.length > 0) {
+  log.error('Missing required environment variables', undefined, { missing: missingRequired });
+  process.exit(1);
+}
+
+const missingOptional = optionalEnvVars.filter(key => !process.env[key]);
+if (missingOptional.length > 0) {
+  log.warn('Optional environment variables not set (some features disabled)', { missing: missingOptional });
+}
+
+// Initialize Sentry for error tracking (production only)
+if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV,
+    tracesSampleRate: 0.1,
+  });
+  log.info('Sentry error tracking initialized');
+}
+
 // ES Module dirname equivalent
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -44,22 +70,43 @@ app.use(cors({
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(null, true); // Allow all for now, log unknown origins
-      log.warn('CORS request from unknown origin', { origin });
+      log.warn('CORS request rejected', { origin });
+      callback(new Error('Not allowed by CORS'));
     }
   },
   credentials: true,
 }));
 
 // Rate limiting - protect API from abuse
-const limiter = rateLimit({
+const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 200, // 200 requests per 15 min for general API
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
-app.use('/api/', limiter);
+
+const aiLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10, // 10 AI requests per minute (expensive calls)
+  message: { error: 'Too many AI requests, please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const writeLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 30, // 30 writes per minute
+  message: { error: 'Too many write operations, please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use('/api/', generalLimiter);
+app.use('/api/ai', aiLimiter);
+app.use('/api/memos/*/chat', aiLimiter);
+app.use('/api/memos/*/sections/*/generate', aiLimiter);
+app.use('/api/ingest', writeLimiter);
 
 app.use(express.json());
 
@@ -74,25 +121,43 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Deep health check - includes database connectivity
-app.get('/health/deep', async (req, res) => {
+// Readiness check - comprehensive service health
+app.get('/health/ready', async (_req, res) => {
+  const checks: { timestamp: string; status: string; services: Record<string, { ok: boolean; latencyMs?: number; configured?: boolean }> } = {
+    timestamp: new Date().toISOString(),
+    status: 'checking',
+    services: {},
+  };
+
   try {
-    const { error } = await supabase.from('Company').select('count', { count: 'exact', head: true });
+    const dbStart = Date.now();
+    const { error: dbError } = await supabase
+      .from('Deal')
+      .select('count', { count: 'exact', head: true });
+    checks.services.database = { ok: !dbError, latencyMs: Date.now() - dbStart };
 
-    if (error) throw error;
+    checks.services.openai = {
+      ok: !!process.env.OPENAI_API_KEY,
+      configured: !!process.env.OPENAI_API_KEY,
+    };
 
-    res.json({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-      database: 'connected',
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: 'error',
-      timestamp: new Date().toISOString(),
-      database: 'disconnected',
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    checks.services.gemini = {
+      ok: !!process.env.GEMINI_API_KEY,
+      configured: !!process.env.GEMINI_API_KEY,
+    };
+
+    checks.services.sentry = {
+      ok: !!process.env.SENTRY_DSN,
+      configured: !!process.env.SENTRY_DSN,
+    };
+
+    const allHealthy = Object.values(checks.services).every(s => s.ok);
+    checks.status = allHealthy ? 'healthy' : 'degraded';
+
+    res.status(allHealthy ? 200 : 503).json(checks);
+  } catch (err) {
+    checks.status = 'unhealthy';
+    res.status(503).json(checks);
   }
 });
 
@@ -116,106 +181,6 @@ app.get('/api', (req, res) => {
       health: '/health',
     },
   });
-});
-
-// ========================================
-// Public Debug Endpoints (no auth - dev only)
-// ========================================
-
-// Test FULL memo create flow (bypasses auth for debugging)
-app.post('/api/debug/test-memo-insert', async (req, res) => {
-  try {
-    const steps: any[] = [];
-
-    // Step 1: Create memo
-    const testData = {
-      title: 'Test Memo',
-      projectName: 'Test Project',
-      type: 'IC_MEMO',
-      status: 'DRAFT',
-    };
-
-    const { data: memo, error: memoError } = await supabase
-      .from('Memo')
-      .insert(testData)
-      .select()
-      .single();
-
-    if (memoError) {
-      return res.json({ success: false, step: 'create_memo', error: memoError });
-    }
-    steps.push({ step: 'create_memo', success: true, memoId: memo.id });
-
-    // Step 2: Create sections (like the real endpoint does)
-    const defaultSections = [
-      { memoId: memo.id, type: 'EXECUTIVE_SUMMARY', title: 'Executive Summary', sortOrder: 0 },
-      { memoId: memo.id, type: 'FINANCIAL_PERFORMANCE', title: 'Financial Performance', sortOrder: 1 },
-    ];
-
-    const { error: sectionsError } = await supabase
-      .from('MemoSection')
-      .insert(defaultSections);
-
-    if (sectionsError) {
-      // Clean up memo
-      await supabase.from('Memo').delete().eq('id', memo.id);
-      return res.json({ success: false, step: 'create_sections', error: sectionsError });
-    }
-    steps.push({ step: 'create_sections', success: true });
-
-    // Step 3: Fetch with sections
-    const { data: fullMemo, error: fetchError } = await supabase
-      .from('Memo')
-      .select(`*, sections:MemoSection(*)`)
-      .eq('id', memo.id)
-      .single();
-
-    if (fetchError) {
-      await supabase.from('Memo').delete().eq('id', memo.id);
-      return res.json({ success: false, step: 'fetch_with_sections', error: fetchError });
-    }
-    steps.push({ step: 'fetch_with_sections', success: true });
-
-    // Clean up
-    await supabase.from('Memo').delete().eq('id', memo.id);
-
-    res.json({
-      success: true,
-      message: 'Full memo create flow works!',
-      steps,
-      testData: fullMemo
-    });
-  } catch (err: any) {
-    console.error('TEST INSERT - Exception:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-app.get('/api/debug/memo-table', async (req, res) => {
-  try {
-    // Check all memo-related tables
-    const memoCheck = await supabase.from('Memo').select('id').limit(1);
-    const sectionCheck = await supabase.from('MemoSection').select('id').limit(1);
-    const convCheck = await supabase.from('MemoConversation').select('id').limit(1);
-
-    res.json({
-      Memo: { exists: !memoCheck.error, error: memoCheck.error?.message },
-      MemoSection: { exists: !sectionCheck.error, error: sectionCheck.error?.message },
-      MemoConversation: { exists: !convCheck.error, error: convCheck.error?.message },
-    });
-  } catch (err: any) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ========================================
-// Request tracing middleware for debugging
-// ========================================
-app.use('/api/memos', (req, res, next) => {
-  console.log(`\n>>> [MEMOS] ${req.method} ${req.path}`);
-  console.log('>>> [MEMOS] Headers authorization:', req.headers.authorization ? 'Bearer ***' : 'MISSING');
-  console.log('>>> [MEMOS] Body:', JSON.stringify(req.body).substring(0, 200));
-  next();
 });
 
 // ========================================
@@ -284,6 +249,11 @@ if (process.env.NODE_ENV === 'production') {
       }
     });
   });
+}
+
+// Sentry error handler (must be before custom error handler)
+if (process.env.SENTRY_DSN) {
+  Sentry.setupExpressErrorHandler(app);
 }
 
 // 404 handler for unmatched routes

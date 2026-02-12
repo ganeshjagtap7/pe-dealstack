@@ -1,5 +1,6 @@
 import { Request } from 'express';
 import { supabase } from '../supabase.js';
+import { log } from '../utils/logger.js';
 
 /**
  * Audit Log Service
@@ -146,11 +147,11 @@ export async function logAuditEvent(entry: AuditLogEntry, req?: Request): Promis
 
     if (error) {
       // Don't throw - audit logging should not break main functionality
-      console.error('Audit log error:', error);
+      log.error('Audit log error', error);
     }
   } catch (err) {
     // Silently log errors - audit logging should never break the main operation
-    console.error('Audit log exception:', err);
+    log.error('Audit log exception', err);
   }
 }
 

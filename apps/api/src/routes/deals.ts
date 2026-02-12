@@ -41,6 +41,29 @@ const addTeamMemberSchema = z.object({
   role: z.enum(['LEAD', 'MEMBER', 'VIEWER']).optional().default('MEMBER'),
 });
 
+// Query parameter schemas
+const dealsQuerySchema = z.object({
+  stage: z.enum(['INITIAL_REVIEW', 'DUE_DILIGENCE', 'IOI_SUBMITTED',
+    'LOI_SUBMITTED', 'NEGOTIATION', 'CLOSING', 'PASSED',
+    'CLOSED_WON', 'CLOSED_LOST']).optional(),
+  status: z.enum(['ACTIVE', 'PROCESSING', 'PASSED', 'ARCHIVED']).optional(),
+  industry: z.string().max(100).optional(),
+  search: z.string().max(200).optional(),
+  sortBy: z.enum(['updatedAt', 'createdAt', 'dealSize', 'irrProjected', 'revenue', 'ebitda', 'name', 'priority']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
+  minDealSize: z.coerce.number().positive().optional(),
+  maxDealSize: z.coerce.number().positive().optional(),
+  assignedTo: z.string().uuid().optional(),
+  priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional(),
+});
+
+const paginationSchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+const chatHistoryQuerySchema = paginationSchema;
+
 // GET /api/deals/stats/summary - Get deal statistics (must be before :id route)
 router.get('/stats/summary', async (req, res) => {
   try {
@@ -83,7 +106,7 @@ router.get('/stats/summary', async (req, res) => {
 // GET /api/deals - Get all deals with company info
 router.get('/', async (req, res) => {
   try {
-    const { stage, status, industry, search, sortBy, sortOrder, minDealSize, maxDealSize, assignedTo, priority } = req.query;
+    const params = dealsQuerySchema.parse(req.query);
 
     let query = supabase
       .from('Deal')
@@ -100,26 +123,25 @@ router.get('/', async (req, res) => {
       `);
 
     // Apply filters
-    if (stage) query = query.eq('stage', stage);
-    if (status) query = query.eq('status', status);
-    if (industry) query = query.ilike('industry', `%${industry}%`);
-    if (assignedTo) query = query.eq('assignedTo', assignedTo);
-    if (priority) query = query.eq('priority', priority);
+    if (params.stage) query = query.eq('stage', params.stage);
+    if (params.status) query = query.eq('status', params.status);
+    if (params.industry) query = query.ilike('industry', `%${params.industry}%`);
+    if (params.assignedTo) query = query.eq('assignedTo', params.assignedTo);
+    if (params.priority) query = query.eq('priority', params.priority);
 
     // Deal size range filters
-    if (minDealSize) query = query.gte('dealSize', Number(minDealSize));
-    if (maxDealSize) query = query.lte('dealSize', Number(maxDealSize));
+    if (params.minDealSize) query = query.gte('dealSize', params.minDealSize);
+    if (params.maxDealSize) query = query.lte('dealSize', params.maxDealSize);
 
     // Text search across multiple fields
-    if (search) {
-      const searchTerm = `%${search}%`;
+    if (params.search) {
+      const searchTerm = `%${params.search}%`;
       query = query.or(`name.ilike.${searchTerm},industry.ilike.${searchTerm},aiThesis.ilike.${searchTerm}`);
     }
 
     // Sorting
-    const validSortFields = ['updatedAt', 'createdAt', 'dealSize', 'irrProjected', 'revenue', 'ebitda', 'name', 'priority'];
-    const sortField = validSortFields.includes(sortBy as string) ? (sortBy as string) : 'updatedAt';
-    const ascending = sortOrder === 'asc';
+    const sortField = params.sortBy || 'updatedAt';
+    const ascending = params.sortOrder === 'asc';
     query = query.order(sortField, { ascending, nullsFirst: false });
 
     const { data, error } = await query;
@@ -128,6 +150,9 @@ router.get('/', async (req, res) => {
 
     res.json(data || []);
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Invalid query parameters', details: error.errors });
+    }
     log.error('Error fetching deals', error);
     res.status(500).json({ error: 'Failed to fetch deals' });
   }
@@ -1137,8 +1162,7 @@ router.post('/:dealId/chat', async (req, res) => {
 router.get('/:dealId/chat/history', async (req, res) => {
   try {
     const { dealId } = req.params;
-    const limit = parseInt(req.query.limit as string) || 50;
-    const offset = parseInt(req.query.offset as string) || 0;
+    const { limit = 50, offset = 0 } = chatHistoryQuerySchema.parse(req.query);
 
     log.debug('Fetching chat history', { dealId, limit, offset });
 

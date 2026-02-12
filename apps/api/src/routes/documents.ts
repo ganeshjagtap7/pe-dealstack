@@ -71,11 +71,18 @@ const createDocumentSchema = z.object({
 
 const updateDocumentSchema = createDocumentSchema.partial();
 
+const documentsQuerySchema = z.object({
+  type: z.enum(documentTypes).optional(),
+  folderId: z.string().optional(),
+  tags: z.string().max(500).optional(),
+  search: z.string().max(200).optional(),
+});
+
 // GET /api/deals/:dealId/documents - List documents for a deal
 router.get('/deals/:dealId/documents', async (req, res) => {
   try {
     const { dealId } = req.params;
-    const { type, folderId, tags, search } = req.query;
+    const { type, folderId, tags, search } = documentsQuerySchema.parse(req.query);
 
     let query = supabase
       .from('Document')

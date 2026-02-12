@@ -6761,3 +6761,203 @@ This means an "Analyst" can be an ADMIN (if they created the workspace), and a "
 - [ ] Investigate memo creation 500 error (from previous session)
 
 ---
+
+## February 13, 2026
+
+### Production Hardening Sprint — Items 6 through 12
+
+Focus: Systematically working through the production-readiness checklist to harden the app before launch. Covered error tracking, health checks, input validation, rate limiting, testing, and documentation.
+
+---
+
+#### 6. Sentry Error Tracking Setup — `~10:00 AM`
+
+**Goal:** Add error tracking for both backend and frontend so we catch production bugs in real-time.
+
+**What was done:**
+- Backend already had `@sentry/node` v10.38 installed with basic init — added `Sentry.setupExpressErrorHandler(app)` before the custom error handler in `apps/api/src/index.ts`
+- Frontend uses vanilla JS (no module bundler for Sentry), so used the **Sentry CDN bundle** approach:
+  - Updated `apps/web/vite.config.ts` to inject Sentry CDN script (`v8.48.0`) and init code via Vite's `transformIndexHtml` plugin
+  - DSN is read from `window.__ENV.SENTRY_DSN` which is injected at build time
+- Added `SENTRY_DSN` to `apps/api/.env` and `apps/api/.env.example`
+- Added `VITE_SENTRY_DSN` to `apps/web/.env` and created `apps/web/.env.example`
+- Installed `@sentry/browser` as a dependency in `apps/web/package.json` (for type reference, CDN bundle is used at runtime)
+
+**Sentry DSNs configured:**
+- Backend (Render env var): `SENTRY_DSN` — only this one needs to be set in Render
+- Frontend: `VITE_SENTRY_DSN` — baked into the build at compile time by Vite, no Render env var needed
+
+**Files modified:**
+| File | Change |
+|------|--------|
+| `apps/api/src/index.ts` | Added `Sentry.setupExpressErrorHandler(app)` |
+| `apps/web/vite.config.ts` | Added Sentry CDN injection + `window.__ENV` config |
+| `apps/api/.env.example` | Added `SENTRY_DSN=` |
+| `apps/web/.env.example` | Created with `VITE_SENTRY_DSN=` |
+| `apps/web/package.json` | Added `@sentry/browser` dependency |
+
+---
+
+#### 7. Database Backup Setup — `~10:30 AM`
+
+**Goal:** Ensure database backups are configured.
+
+**Result:** No code changes needed. We're on Supabase **Free tier** which already provides:
+- Automatic daily backups
+- 7-day retention
+- Accessible from Supabase Dashboard → Database → Backups
+
+---
+
+#### 8. Health Check Improvements — `~11:00 AM`
+
+**Goal:** Add a comprehensive readiness endpoint that checks all external services.
+
+**What was done:**
+- Replaced the old `/health/deep` endpoint with `/health/ready` in `apps/api/src/index.ts`
+- New endpoint checks:
+  - **Database** connectivity (Supabase query) with latency measurement in ms
+  - **OpenAI** configuration status
+  - **Gemini** configuration status
+  - **Sentry** configuration status
+- Returns `200` with `status: "healthy"` if all services are OK
+- Returns `503` with `status: "degraded"` or `"unhealthy"` if any service is down
+- The existing fast `/health` endpoint (no DB query) remains for Render's health check
+
+**Example response:**
+```json
+{
+  "timestamp": "2026-02-13T00:00:00.000Z",
+  "status": "healthy",
+  "services": {
+    "database": { "ok": true, "latencyMs": 45 },
+    "openai": { "ok": true, "configured": true },
+    "gemini": { "ok": true, "configured": true },
+    "sentry": { "ok": true, "configured": true }
+  }
+}
+```
+
+**Files modified:**
+| File | Change |
+|------|--------|
+| `apps/api/src/index.ts` | Replaced `/health/deep` with `/health/ready` |
+
+---
+
+#### 9. Input Validation for All Query Parameters — `~12:00 PM`
+
+**Goal:** Add Zod schema validation to every API route's query parameters to prevent injection and malformed input.
+
+**What was done:**
+Added Zod validation schemas across **7 route files** and applied `.parse(req.query)` to all GET endpoints:
+
+| Route File | Schemas Added |
+|-----------|---------------|
+| `routes/deals.ts` | `dealsQuerySchema` (stage, status, industry, search, sortBy, sortOrder, minDealSize, maxDealSize, assignedTo, priority enums), `paginationSchema`, `chatHistoryQuerySchema` |
+| `routes/notifications.ts` | `notificationsQuerySchema` (userId UUID, type enum, isRead, limit, offset), `markAllReadSchema`, `deleteNotificationsQuerySchema` |
+| `routes/activities.ts` | `activitiesQuerySchema` (limit 1-100, offset), `recentActivitiesQuerySchema` |
+| `routes/memos.ts` | `memosQuerySchema` (dealId UUID, status/type enums, pagination), `generateSectionSchema` (customPrompt max 2000 chars) |
+| `routes/templates.ts` | `templatesQuerySchema` (category enum, isActive, pagination), `duplicateTemplateSchema` |
+| `routes/users.ts` | `usersQuerySchema` (role enum, search max 200, firmName max 255, excludeUserId UUID), `teamQuerySchema`, `userNotificationsQuerySchema` |
+| `routes/documents.ts` | `documentsQuerySchema` (type enum, search max 200) |
+
+**Key validation patterns used:**
+- `z.coerce.number()` for query params that come as strings
+- `z.enum([...])` for constrained values (stages, statuses, roles)
+- `z.string().max(N)` for search/text inputs to prevent oversized queries
+- `z.string().uuid()` for ID parameters
+
+**File upload validation** was already robust via `services/fileValidator.ts` (magic bytes verification, size limits per type, dangerous file detection, filename sanitization).
+
+---
+
+#### 10. Rate Limiting Improvements — `~1:00 PM`
+
+**Goal:** Replace the single global rate limiter with tiered limits appropriate for different endpoint types.
+
+**What was done:**
+Replaced the single rate limiter with **3 tiers** in `apps/api/src/index.ts`:
+
+| Tier | Scope | Limit | Rationale |
+|------|-------|-------|-----------|
+| General | All `/api/` routes | 200 req / 15 min | Standard API protection |
+| AI | `/api/ai`, `/api/memos/*/chat`, `/api/memos/*/sections/*/generate` | 10 req / 1 min | AI calls are expensive (GPT-4) |
+| Write | `/api/ingest` | 30 req / 1 min | Protect write-heavy endpoints |
+
+All limiters use `standardHeaders: true` (RateLimit-* headers) and `legacyHeaders: false`.
+
+**Files modified:**
+| File | Change |
+|------|--------|
+| `apps/api/src/index.ts` | Replaced single `rateLimit()` with `generalLimiter`, `aiLimiter`, `writeLimiter` |
+
+---
+
+#### 11. Add Basic Tests — `~2:00 PM`
+
+**Goal:** Fix failing tests and add critical flow tests for document upload, AI chat, and deal lifecycle.
+
+**Starting state:** 157/159 tests passing, 2 failures in `auth.test.ts`
+
+**Fixes:**
+- `auth.test.ts` line 123: Changed mock `user_metadata.name` → `user_metadata.full_name` to match the updated auth middleware (which reads `full_name`)
+- `auth.test.ts` line 166: Changed expected default role from `'analyst'` → `'MEMBER'` to match the middleware default
+
+**New test file:** `apps/api/tests/critical-flows.test.ts` — 29 new tests covering:
+
+| Test Suite | Tests | What's Covered |
+|-----------|-------|---------------|
+| Document Upload Flow | 13 | PDF/XLSX/CSV validation, magic bytes mismatch detection, size limit enforcement, path traversal rejection, executable detection, script injection, filename sanitization, MIME type mapping |
+| Document Upload API | 4 | Upload endpoint, metadata update, download URL, 404 handling |
+| AI Chat Flow | 7 | Send/receive messages, empty/missing/too-long input validation, AI field updates, chat history, AI status endpoint |
+| Deal Lifecycle Flow | 5 | Full create→update→add team member flow, complete 7-stage pipeline progression |
+
+**Final state:** 188/188 tests passing
+
+**Coverage report (tested source files):**
+| File | Statements | Branches | Functions | Lines |
+|------|-----------|----------|-----------|-------|
+| `middleware/auth.ts` | 100% | 88.9% | 100% | 100% |
+| `services/fileValidator.ts` | 100% | 94.2% | 100% | 100% |
+
+**Files modified/created:**
+| File | Change |
+|------|--------|
+| `apps/api/tests/auth.test.ts` | Fixed 2 stale assertions |
+| `apps/api/tests/critical-flows.test.ts` | **Created** — 29 new critical flow tests |
+
+---
+
+#### 12. Documentation Updates — `~3:00 PM`
+
+**Goal:** Update all project documentation to reflect the current state of the codebase.
+
+**What was done:**
+
+| File | Action | Description |
+|------|--------|-------------|
+| `README.md` | **Rewritten** | Updated tech stack (Supabase not Prisma), accurate project structure, correct ports (3000/3001), current features list (memos, RBAC, Sentry, rate limiting), scripts table, removed stale roadmap |
+| `docs/DEPLOYMENT.md` | **Rewritten** | Fixed build command (`npm ci --include=dev && npm run build:prod`), added `/health/ready` docs, updated rate limits (200/15min), added Sentry monitoring, Supabase scaling info |
+| `docs/ENVIRONMENT_SETUP.md` | **Created** | Complete reference for all env vars (backend, frontend, Render), explains auth flow, AI detection, and Sentry integration |
+| `docs/TROUBLESHOOTING.md` | **Created** | 15+ common issues organized by category: local dev, auth, AI features, document upload, deployment, rate limiting, database, Sentry |
+| `render.yaml` | **Updated** | Added `SENTRY_DSN` env var |
+| `.env.example` files | **Verified** | Both already have all required variables |
+
+---
+
+#### Summary of All Changes Today (Feb 13, 2026)
+
+| # | Task | Status | Key Files |
+|---|------|--------|-----------|
+| 6 | Sentry Error Tracking | ✅ Done | `index.ts`, `vite.config.ts`, `.env.example` files |
+| 7 | Database Backup Setup | ✅ Done | No code changes (Supabase auto-backups) |
+| 8 | Health Check Improvements | ✅ Done | `index.ts` — `/health/ready` endpoint |
+| 9 | Input Validation | ✅ Done | 7 route files — Zod schemas for all query params |
+| 10 | Rate Limiting | ✅ Done | `index.ts` — 3-tier rate limiting |
+| 11 | Basic Tests | ✅ Done | `auth.test.ts` fixed, `critical-flows.test.ts` created (188/188 pass) |
+| 12 | Documentation | ✅ Done | `README.md`, `DEPLOYMENT.md`, `ENVIRONMENT_SETUP.md`, `TROUBLESHOOTING.md` |
+
+**Total files changed:** 25 files, +1,419 lines / -550 lines
+
+---

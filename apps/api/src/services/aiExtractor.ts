@@ -1,4 +1,5 @@
 import { openai, isAIEnabled } from '../openai.js';
+import { log } from '../utils/logger.js';
 
 // Schema for extracted deal data with confidence scores
 export interface ExtractedField<T> {
@@ -122,12 +123,12 @@ FINANCIAL CONVERSION:
  */
 export async function extractDealDataFromText(text: string): Promise<ExtractedDealData | null> {
   if (!isAIEnabled() || !openai) {
-    console.warn('AI extraction skipped: OpenAI not configured');
+    log.warn('AI extraction skipped: OpenAI not configured');
     return null;
   }
 
   if (!text || text.trim().length < 100) {
-    console.warn('AI extraction skipped: Text too short for meaningful analysis');
+    log.warn('AI extraction skipped: text too short');
     return null;
   }
 
@@ -135,7 +136,7 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     // Use more text for better extraction (up to 20,000 chars)
     const truncatedText = text.slice(0, 20000);
 
-    console.log(`[AI Extraction] Starting for ${truncatedText.length} characters...`);
+    log.debug('AI extraction starting', { textLength: truncatedText.length });
 
     const response = await openai.chat.completions.create({
       model: 'gpt-4-turbo',
@@ -156,7 +157,7 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      console.error('[AI Extraction] Failed: No response content');
+      log.error('AI extraction failed: no response content');
       return null;
     }
 
@@ -219,23 +220,15 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     result.needsReview = reviewReasons.length > 0 || result.overallConfidence < 70;
     result.reviewReasons = reviewReasons;
 
-    console.log('[AI Extraction] Completed:', {
+    log.debug('AI extraction completed', {
       companyName: result.companyName.value,
-      companyConfidence: result.companyName.confidence,
-      industry: result.industry.value,
-      industryConfidence: result.industry.confidence,
-      revenue: result.revenue.value,
-      revenueConfidence: result.revenue.confidence,
-      ebitda: result.ebitda.value,
-      ebitdaConfidence: result.ebitda.confidence,
       overallConfidence: result.overallConfidence,
       needsReview: result.needsReview,
-      reviewReasons: result.reviewReasons,
     });
 
     return result;
   } catch (error) {
-    console.error('[AI Extraction] Error:', error);
+    log.error('AI extraction error', error);
     return null;
   }
 }

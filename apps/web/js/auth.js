@@ -6,9 +6,9 @@
 // Define PEAuth immediately to avoid "not defined" errors
 window.PEAuth = {};
 
-// Supabase configuration - these are public keys, safe to expose
-const SUPABASE_URL = 'https://rnipkfubpvyvskswsekk.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJuaXBrZnVicHZ5dnNrc3dzZWtrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjkxNTg3NzIsImV4cCI6MjA4NDczNDc3Mn0.pKfsdlS89jXo4nXf5YKPYovAUehJkbEfh9epju2yFRE';
+// Supabase configuration - loaded from environment via Vite plugin (window.__ENV)
+const SUPABASE_URL = window.__ENV?.SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = window.__ENV?.SUPABASE_ANON_KEY || '';
 
 // Initialize Supabase client
 let supabaseClient = null;

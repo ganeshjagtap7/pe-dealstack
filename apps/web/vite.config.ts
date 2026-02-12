@@ -1,7 +1,34 @@
-import { defineConfig } from 'vite'
+import { defineConfig, loadEnv, Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
 import { copyFileSync, mkdirSync, readdirSync, existsSync } from 'fs'
+
+// Plugin to inject environment variables into all HTML pages
+// This allows plain <script> files (like auth.js) to access env config via window.__ENV
+function injectEnvConfig(): Plugin {
+  let envConfig: string
+  return {
+    name: 'inject-env-config',
+    configResolved(config) {
+      const env = loadEnv(config.mode, config.root, 'VITE_')
+      envConfig = JSON.stringify({
+        SUPABASE_URL: env.VITE_SUPABASE_URL || '',
+        SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY || '',
+        API_URL: env.VITE_API_URL || '',
+        SENTRY_DSN: env.VITE_SENTRY_DSN || '',
+      })
+    },
+    transformIndexHtml(html) {
+      const sentryScript = `<script src="https://browser.sentry-cdn.com/8.48.0/bundle.min.js" crossorigin="anonymous"></script>
+  <script>
+    if (window.__ENV && window.__ENV.SENTRY_DSN) {
+      Sentry.init({ dsn: window.__ENV.SENTRY_DSN, environment: window.location.hostname === 'localhost' ? 'development' : 'production', tracesSampleRate: 0.1 });
+    }
+  </script>`
+      return html.replace('</head>', `  <script>window.__ENV=${envConfig}</script>\n  ${sentryScript}\n</head>`)
+    },
+  }
+}
 
 // Plugin to copy static js files after build
 function copyStaticFiles() {
@@ -35,7 +62,7 @@ function copyStaticFiles() {
 }
 
 export default defineConfig({
-  plugins: [react(), copyStaticFiles()],
+  plugins: [injectEnvConfig(), react(), copyStaticFiles()],
   root: '.',
   server: {
     port: 3000,

@@ -1,12 +1,13 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import dotenv from 'dotenv';
+import { log } from './utils/logger.js';
 
 dotenv.config();
 
 const apiKey = process.env.GEMINI_API_KEY;
 
 if (!apiKey) {
-  console.warn('Warning: GEMINI_API_KEY not set. RAG features will be disabled.');
+  log.warn('GEMINI_API_KEY not set, RAG features disabled');
 }
 
 // Initialize Gemini client
@@ -26,7 +27,7 @@ export const isGeminiEnabled = () => !!genAI;
  */
 export async function generateEmbedding(text: string): Promise<number[] | null> {
   if (!embeddingModel) {
-    console.warn('Gemini embedding model not available');
+    log.warn('Gemini embedding model not available');
     return null;
   }
 
@@ -34,7 +35,7 @@ export async function generateEmbedding(text: string): Promise<number[] | null> 
     const result = await embeddingModel.embedContent(text);
     return result.embedding.values;
   } catch (error) {
-    console.error('Error generating embedding:', error);
+    log.error('Error generating embedding', error);
     return null;
   }
 }
@@ -53,7 +54,7 @@ export async function generateEmbeddings(texts: string[]): Promise<(number[] | n
     );
     return results;
   } catch (error) {
-    console.error('Error generating batch embeddings:', error);
+    log.error('Error generating batch embeddings', error);
     return texts.map(() => null);
   }
 }
@@ -100,9 +101,9 @@ User: ${userMessage}`;
     const result = await chat.sendMessage(fullPrompt);
     return result.response.text();
   } catch (error) {
-    console.error('Error chatting with Gemini:', error);
+    log.error('Error chatting with Gemini', error);
     throw error;
   }
 }
 
-console.log(`Gemini AI: ${isGeminiEnabled() ? 'Enabled' : 'Disabled (no API key)'}`);
+log.info('Gemini AI status', { enabled: isGeminiEnabled() });

@@ -120,7 +120,7 @@ describe('Auth Middleware', () => {
         id: 'user-123',
         email: 'test@example.com',
         user_metadata: {
-          name: 'Test User',
+          full_name: 'Test User',
           firm_name: 'Test Firm',
           role: 'ADMIN',
         },
@@ -144,7 +144,7 @@ describe('Auth Middleware', () => {
       expect(next).toHaveBeenCalled();
     });
 
-    it('should default to analyst role when not specified', async () => {
+    it('should default to MEMBER role when not specified', async () => {
       const { req, res, next } = createMockContext();
       req.headers.authorization = 'Bearer valid_token';
 
@@ -152,7 +152,7 @@ describe('Auth Middleware', () => {
         id: 'user-123',
         email: 'test@example.com',
         user_metadata: {
-          name: 'Test User',
+          full_name: 'Test User',
         },
       };
 
@@ -163,7 +163,7 @@ describe('Auth Middleware', () => {
 
       await authMiddleware(req, res, next);
 
-      expect(req.user?.role).toBe('analyst');
+      expect(req.user?.role).toBe('MEMBER');
       expect(next).toHaveBeenCalled();
     });
 

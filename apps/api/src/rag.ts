@@ -1,5 +1,6 @@
 import { supabase } from './supabase.js';
 import { generateEmbedding, generateEmbeddings, isGeminiEnabled } from './gemini.js';
+import { log } from './utils/logger.js';
 
 // ============================================================
 // Text Chunking
@@ -141,7 +142,7 @@ export async function embedDocument(
         .insert(batch);
 
       if (error) {
-        console.error('Error inserting chunks:', error);
+        log.error('Error inserting chunks', error);
         throw error;
       }
     }
@@ -156,11 +157,11 @@ export async function embedDocument(
       })
       .eq('id', documentId);
 
-    console.log(`Embedded document ${documentId}: ${chunks.length} chunks`);
+    log.debug('Document embedded', { documentId, chunkCount: chunks.length });
     return { success: true, chunkCount: chunks.length };
 
   } catch (error: any) {
-    console.error('Error embedding document:', error);
+    log.error('Error embedding document', error);
 
     await supabase
       .from('Document')
@@ -194,7 +195,7 @@ export async function searchDocumentChunks(
   threshold: number = 0.5
 ): Promise<SearchResult[]> {
   if (!isGeminiEnabled()) {
-    console.warn('Gemini not enabled, cannot perform semantic search');
+    log.warn('Gemini not enabled, cannot perform semantic search');
     return [];
   }
 
@@ -203,7 +204,7 @@ export async function searchDocumentChunks(
     const queryEmbedding = await generateEmbedding(query);
 
     if (!queryEmbedding) {
-      console.error('Failed to generate query embedding');
+      log.error('Failed to generate query embedding');
       return [];
     }
 
@@ -219,7 +220,7 @@ export async function searchDocumentChunks(
     });
 
     if (error) {
-      console.error('Error searching chunks:', error);
+      log.error('Error searching chunks', error);
       return [];
     }
 
@@ -233,7 +234,7 @@ export async function searchDocumentChunks(
     }));
 
   } catch (error) {
-    console.error('Error in semantic search:', error);
+    log.error('Error in semantic search', error);
     return [];
   }
 }
@@ -291,7 +292,7 @@ export async function embedPendingDocuments(dealId: string): Promise<number> {
     .not('extractedText', 'is', null);
 
   if (error || !documents) {
-    console.error('Error fetching pending documents:', error);
+    log.error('Error fetching pending documents', error);
     return 0;
   }
 

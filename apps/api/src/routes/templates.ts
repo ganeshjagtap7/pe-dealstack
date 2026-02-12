@@ -41,6 +41,17 @@ const reorderSectionsSchema = z.object({
   })),
 });
 
+const templatesQuerySchema = z.object({
+  category: z.enum(['INVESTMENT_MEMO', 'CHECKLIST', 'OUTREACH']).optional(),
+  isActive: z.enum(['true', 'false']).optional(),
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+const duplicateTemplateSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+});
+
 // ============================================================
 // Template CRUD Routes
 // ============================================================
@@ -48,7 +59,7 @@ const reorderSectionsSchema = z.object({
 // GET /api/templates - List all templates
 router.get('/', async (req, res) => {
   try {
-    const { category, isActive, limit = 50, offset = 0 } = req.query;
+    const params = templatesQuerySchema.parse(req.query);
 
     let query = supabase
       .from('MemoTemplate')
@@ -58,11 +69,11 @@ router.get('/', async (req, res) => {
         createdByUser:User!MemoTemplate_createdBy_fkey(name, email)
       `)
       .order('usageCount', { ascending: false })
-      .range(Number(offset), Number(offset) + Number(limit) - 1);
+      .range(params.offset, params.offset + params.limit - 1);
 
     // Apply filters
-    if (category) query = query.eq('category', category);
-    if (isActive !== undefined) query = query.eq('isActive', isActive === 'true');
+    if (params.category) query = query.eq('category', params.category);
+    if (params.isActive !== undefined) query = query.eq('isActive', params.isActive === 'true');
 
     const { data: templates, error } = await query;
 
@@ -250,7 +261,7 @@ router.post('/:id/duplicate', async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user;
-    const { name } = req.body;
+    const { name } = duplicateTemplateSchema.parse(req.body);
 
     // Get original template with sections
     const { data: original, error: fetchError } = await supabase

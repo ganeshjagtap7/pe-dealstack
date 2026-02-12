@@ -5,6 +5,16 @@ import { log } from '../utils/logger.js';
 
 const router = Router();
 
+// Query parameter schemas
+const activitiesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+  offset: z.coerce.number().int().min(0).default(0),
+});
+
+const recentActivitiesQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).default(20),
+});
+
 // Validation schemas
 const createActivitySchema = z.object({
   type: z.enum([
@@ -25,22 +35,22 @@ const createActivitySchema = z.object({
 router.get('/deals/:dealId/activities', async (req, res) => {
   try {
     const { dealId } = req.params;
-    const { limit = 50, offset = 0 } = req.query;
+    const { limit, offset } = activitiesQuerySchema.parse(req.query);
 
     const { data, error, count } = await supabase
       .from('Activity')
       .select('*', { count: 'exact' })
       .eq('dealId', dealId)
       .order('createdAt', { ascending: false })
-      .range(Number(offset), Number(offset) + Number(limit) - 1);
+      .range(offset, offset + limit - 1);
 
     if (error) throw error;
 
     res.json({
       data: data || [],
       total: count || 0,
-      limit: Number(limit),
-      offset: Number(offset),
+      limit,
+      offset,
     });
   } catch (error) {
     log.error('Error fetching activities', error);
@@ -136,7 +146,7 @@ router.delete('/activities/:id', async (req, res) => {
 // GET /api/activities/recent - Get recent activities across all deals
 router.get('/activities/recent', async (req, res) => {
   try {
-    const { limit = 20 } = req.query;
+    const { limit } = recentActivitiesQuerySchema.parse(req.query);
 
     const { data, error } = await supabase
       .from('Activity')
@@ -145,7 +155,7 @@ router.get('/activities/recent', async (req, res) => {
         deal:Deal(id, name, icon, industry)
       `)
       .order('createdAt', { ascending: false })
-      .limit(Number(limit));
+      .limit(limit);
 
     if (error) throw error;
 
