@@ -82,13 +82,13 @@ export async function authMiddleware(
     console.log('>>> [AUTH] SUCCESS: User', user.id, user.email);
 
     // Attach user to request
-    // Default to 'analyst' role if no role is set in user_metadata
+    // Default to 'MEMBER' role if no role is set in user_metadata
     req.user = {
       id: user.id,
       email: user.email || '',
-      name: user.user_metadata?.name as string | undefined,
+      name: user.user_metadata?.full_name as string | undefined,
       firmName: user.user_metadata?.firm_name as string | undefined,
-      role: (user.user_metadata?.role as string) || 'analyst',
+      role: (user.user_metadata?.role as string) || 'MEMBER',
       user_metadata: user.user_metadata as Record<string, unknown> | undefined,
     };
 
@@ -124,9 +124,9 @@ export async function optionalAuthMiddleware(
           req.user = {
             id: user.id,
             email: user.email || '',
-            name: user.user_metadata?.name as string | undefined,
+            name: user.user_metadata?.full_name as string | undefined,
             firmName: user.user_metadata?.firm_name as string | undefined,
-            role: (user.user_metadata?.role as string) || 'analyst',
+            role: (user.user_metadata?.role as string) || 'MEMBER',
             user_metadata: user.user_metadata as Record<string, unknown> | undefined,
           };
         }

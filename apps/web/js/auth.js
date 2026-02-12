@@ -34,9 +34,21 @@ async function initSupabase() {
 
 /**
  * Sign up a new user with email and password
+ * Workspace creators are always assigned ADMIN role
+ * The "title" field is for display (Partner, Analyst, etc.)
  */
 async function signUp(email, password, metadata = {}) {
   const client = await initSupabase();
+
+  // Map title values to display names
+  const titleLabels = {
+    'partner': 'Partner / Managing Director',
+    'principal': 'Principal',
+    'vp': 'Vice President',
+    'associate': 'Associate',
+    'analyst': 'Analyst',
+    'ops': 'Operations / Admin',
+  };
 
   const { data, error } = await client.auth.signUp({
     email,
@@ -46,7 +58,10 @@ async function signUp(email, password, metadata = {}) {
       data: {
         full_name: metadata.fullName || '',
         firm_name: metadata.firmName || '',
-        role: metadata.role || '',
+        // Workspace creator is always ADMIN
+        role: 'ADMIN',
+        // Title is for display purposes (Partner, Analyst, etc.)
+        title: titleLabels[metadata.title] || metadata.title || '',
       }
     }
   });

@@ -98,7 +98,14 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // Helper to find user by authId or id, or create if not exists
-async function findOrCreateUser(authUser: { id: string; email: string; name?: string; firmName?: string; role: string }) {
+async function findOrCreateUser(authUser: {
+  id: string;
+  email: string;
+  name?: string;
+  firmName?: string;
+  role: string;
+  user_metadata?: Record<string, unknown>;
+}) {
   // Try to find by authId first
   let { data: userData, error } = await supabase
     .from('User')
@@ -119,13 +126,17 @@ async function findOrCreateUser(authUser: { id: string; email: string; name?: st
 
   // If still not found, create the user
   if (error?.code === 'PGRST116') {
+    // Get title from user_metadata if available
+    const title = authUser.user_metadata?.title as string | undefined;
+
     const { data: newUser, error: createError } = await supabase
       .from('User')
       .insert({
         authId: authUser.id,
         email: authUser.email,
         name: authUser.name || authUser.email?.split('@')[0] || 'User',
-        role: authUser.role || 'MEMBER',
+        role: authUser.role || 'MEMBER',  // System role: ADMIN, MEMBER, VIEWER
+        title: title || null,              // Display title: Partner, Analyst, etc.
         firmName: authUser.firmName || null,
         isActive: true,
       })

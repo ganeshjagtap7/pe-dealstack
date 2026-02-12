@@ -6656,3 +6656,108 @@ document.addEventListener('DOMContentLoaded', async () => {
 - [ ] Investigate memo creation 500 error (from previous session)
 
 ---
+
+## February 13, 2026
+
+### Session Start — Role & Title System Refactor
+
+> **Goal:** Fix the role system so workspace creators are always ADMIN, and separate system roles (ADMIN, MEMBER, VIEWER) from display titles (Partner, Analyst, etc.)
+
+---
+
+#### 🕐 Timestamp: Feb 13, 2026
+
+#### 1. Auth Middleware — Role & Name Defaults Fix
+- **Type:** Bug Fix / Refactor
+- **Files Modified:** `apps/api/src/middleware/auth.ts`
+- **What Changed:**
+  - Changed default role from `'analyst'` → `'MEMBER'` (consistent with new role system)
+  - Changed user name field from `user_metadata.name` → `user_metadata.full_name` (matches what signup actually stores)
+  - Applied same fix in both `authMiddleware` and `optionalAuthMiddleware`
+- **Why:**
+  - The old code used `'analyst'` as default role, but that's a *display title*, not a *system role*
+  - Name field was reading `name` but signup stores it as `full_name` — caused user names to show as undefined
+
+#### 2. User Creation — Title Field Support
+- **Type:** Enhancement
+- **Files Modified:** `apps/api/src/routes/users.ts`
+- **What Changed:**
+  - Added `user_metadata` to the `findOrCreateUser` function signature
+  - When creating a new user in the database, now extracts `title` from `user_metadata`
+  - `role` field = system role (`ADMIN`, `MEMBER`, `VIEWER`) — controls permissions
+  - `title` field = display title (`Partner / Managing Director`, `Analyst`, etc.) — for UI display
+- **Why:**
+  - Previously, role and title were conflated — a user could be an "Analyst" role but that doesn't define their *permissions*
+  - Now cleanly separated: role = what you can do, title = what you're called
+
+#### 3. Signup Auth — Workspace Creator Always Gets ADMIN
+- **Type:** Bug Fix / Security Enhancement
+- **Files Modified:** `apps/web/js/auth.js`
+- **What Changed:**
+  - Workspace creators are now **always assigned `ADMIN` role** regardless of their selected title
+  - Added title label mapping that converts short codes to full display names:
+    - `'partner'` → `'Partner / Managing Director'`
+    - `'principal'` → `'Principal'`
+    - `'vp'` → `'Vice President'`
+    - `'associate'` → `'Associate'`
+    - `'analyst'` → `'Analyst'`
+    - `'ops'` → `'Operations / Admin'`
+  - `role` in `user_metadata` is now always `'ADMIN'` for signup (workspace creator)
+  - `title` in `user_metadata` stores the display-friendly title string
+- **Why:**
+  - Previously, if someone signed up and selected "Analyst" as their title, they'd get `role: 'analyst'` — which meant they had limited permissions on their own workspace
+  - The person creating the workspace should **always** be the admin
+  - Invited team members will get their roles assigned separately via the invite system
+
+---
+
+#### Summary of Changes
+
+| File | Action | Description |
+|------|--------|-------------|
+| `apps/api/src/middleware/auth.ts` | Modified | Fixed default role to `MEMBER`, fixed name field to `full_name` |
+| `apps/api/src/routes/users.ts` | Modified | Added title field support in user creation, accepts user_metadata |
+| `apps/web/js/auth.js` | Modified | Workspace creators always ADMIN, added title label mapping |
+
+---
+
+#### Key Architecture Decision: Role vs Title Separation
+
+```
+SYSTEM ROLES (controls permissions):
+  - ADMIN    → Full access, manage team, settings
+  - MEMBER   → Standard access, create/edit deals & memos
+  - VIEWER   → Read-only access
+
+DISPLAY TITLES (for UI/profile):
+  - Partner / Managing Director
+  - Principal
+  - Vice President
+  - Associate
+  - Analyst
+  - Operations / Admin
+```
+
+This means an "Analyst" can be an ADMIN (if they created the workspace), and a "Partner" can be a MEMBER (if they were invited). Role ≠ Title.
+
+---
+
+### What's Working Now
+
+- ✅ New signups always get ADMIN role (workspace creator)
+- ✅ User names properly read from `full_name` metadata
+- ✅ Title stored separately from role in user_metadata
+- ✅ Title mapped to full display names in database
+- ✅ Default role is `MEMBER` (not `analyst`) for consistency
+
+---
+
+### Next Steps / TODO
+
+- [ ] Build actual CRM page (Contact/Relationship Management)
+- [ ] Build actual Portfolio page (Portfolio Company Tracking)
+- [ ] Update invite flow to assign proper roles (MEMBER/VIEWER) to invited users
+- [ ] Add role-based UI controls (show/hide features based on ADMIN/MEMBER/VIEWER)
+- [ ] Investigate memo creation 500 error (from previous session)
+
+---
