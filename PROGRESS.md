@@ -6961,3 +6961,118 @@ All limiters use `standardHeaders: true` (RateLimit-* headers) and `legacyHeader
 **Total files changed:** 25 files, +1,419 lines / -550 lines
 
 ---
+
+### February 13, 2026 — Session 2 (Feature Development: Smart Deal Data Extraction)
+
+**Context:** Moving from production-readiness (Section A) to feature development (Section B) from the developer TODO list. Building out multi-format deal ingestion — allowing users to create deals from text, Word docs, and Excel bulk imports.
+
+---
+
+#### B1. Add Plain Text Ingestion Endpoint — ~3:10 AM
+
+**Goal:** Allow users to paste raw text (from emails, Slack, WhatsApp, notes) and auto-extract deal data with AI.
+
+**What was done:**
+- Added `POST /api/ingest/text` endpoint to `ingest.ts`
+- Zod validation schema: `text` (min 50 chars required), optional `sourceName`, optional `sourceType` enum (email/note/slack/whatsapp/other)
+- Uses existing `extractDealDataFromText()` GPT-4 Turbo extraction with confidence scores
+- Company deduplication via case-insensitive name matching
+- Creates Deal with confidence-based status (ACTIVE if ≥70%, PENDING_REVIEW if <70%)
+- Creates Document record with `mimeType: 'text/plain'` and full extraction metadata
+- Logs Activity for audit trail
+- Triggers RAG embedding in background (Gemini) for documents >100 chars
+- Wrote 13 new tests covering validation, response structure, confidence scoring, and schema validation
+
+**Files modified/created:**
+
+| File | Action | Description |
+|------|--------|-------------|
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added `POST /api/ingest/text` route (~130 lines) with Zod schema, AI extraction, company dedup, deal/document creation, activity logging, RAG embedding |
+| `apps/api/tests/ingest-text.test.ts` | **Created** | 13 tests — rejects short text, rejects missing text, rejects invalid sourceType, validates successful extraction with deal/document/confidence, tests all 5 sourceType values, default document naming, low-confidence review flagging, company in response, confidence score structure |
+
+**Test results:** 201/201 passing (13 new)
+
+---
+
+#### B2. Add Word Document Support — ~3:15 AM
+
+**Goal:** Expand `POST /api/ingest` to accept Word (.docx/.doc) and plain text (.txt) files for auto-deal creation, not just PDFs.
+
+**What was done:**
+- Installed `mammoth` npm package for Word document text extraction
+- Created `documentParser.ts` service with `extractTextFromWord()` function
+- Modified the `POST /api/ingest` handler to support 3 formats:
+  - **PDF** — existing `pdf-parse` extraction (unchanged)
+  - **Word (.docx/.doc)** — new `mammoth` extraction
+  - **Text (.txt)** — direct UTF-8 buffer read (min 50 chars)
+- Updated multer `fileFilter` to accept `text/plain` MIME type
+- Unsupported types now return a helpful error listing supported formats
+- Wrote 11 new tests covering the document parser and multi-format endpoint
+
+**Files modified/created:**
+
+| File | Action | Description |
+|------|--------|-------------|
+| `apps/api/src/services/documentParser.ts` | **Created** | `extractTextFromWord(buffer)` — mammoth-based Word text extraction, returns null for empty/invalid docs |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added import for `extractTextFromWord`, added `text/plain` to multer allowed types, replaced PDF-only extraction with multi-format if/else chain (PDF → Word → Text → unsupported error) |
+| `apps/api/tests/ingest-word.test.ts` | **Created** | 11 tests — documentParser unit tests (export check, empty buffer, invalid bytes), multi-format endpoint tests (PDF, .docx, .doc, .txt acceptance, short text rejection, unsupported MIME rejection, no file, supported formats in error message) |
+| `apps/api/package.json` | **Modified** | Added `mammoth` dependency |
+
+**Test results:** 212/212 passing (11 new)
+
+---
+
+#### B3. Add Excel/CSV Bulk Import — ~3:18 AM
+
+**Goal:** Allow users to upload an Excel/CSV file with a deal pipeline spreadsheet and bulk-import all deals at once.
+
+**What was done:**
+- Installed `xlsx` npm package for Excel/CSV parsing
+- Created `excelParser.ts` service with smart column mapping:
+  - Maps 7 field types with 30+ column name aliases (e.g., "Company"/"Target"/"Entity" → companyName, "Revenue"/"Sales"/"TTM Revenue" → revenue)
+  - Case-insensitive header matching
+  - Strips `$` and commas from financial values (e.g., "$1,500" → 1500)
+  - Skips rows without a company name
+  - Gracefully handles non-numeric values (returns undefined instead of NaN)
+- Added `POST /api/ingest/bulk` endpoint:
+  - Accepts Excel (.xlsx) and CSV files via multipart upload
+  - Validates MIME type (spreadsheet/excel/csv)
+  - Max 500 deals per import
+  - Per-row company deduplication (case-insensitive)
+  - Creates Deal with `extractionConfidence: 100` (manual import = high confidence)
+  - Returns detailed summary: total, imported, failed counts + deal IDs and error details
+- Wrote 15 new tests (9 parser unit tests + 6 endpoint tests)
+
+**Files modified/created:**
+
+| File | Action | Description |
+|------|--------|-------------|
+| `apps/api/src/services/excelParser.ts` | **Created** | `parseExcelToDealRows(buffer)` — smart column mapping with 30+ aliases, financial value parsing, row filtering |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added import for `parseExcelToDealRows`, added `POST /api/ingest/bulk` route (~110 lines) with MIME validation, row limit, company dedup loop, deal creation, summary response |
+| `apps/api/tests/ingest-bulk.test.ts` | **Created** | 15 tests — parser: standard columns, alternative names, $+comma handling, empty rows skipped, non-numeric graceful, empty file, unrecognized columns, case-insensitive; endpoint: valid import, reject non-Excel, reject no deals, no file, alt column names, summary structure |
+| `apps/api/package.json` | **Modified** | Added `xlsx` dependency |
+
+**Test results:** 227/227 passing (15 new)
+
+---
+
+#### Summary — Session 2 (Feb 13, 2026)
+
+| # | Task | Status | Tests Added | Key Files |
+|---|------|--------|-------------|-----------|
+| B1 | Plain Text Ingestion | ✅ Done | 13 | `ingest.ts`, `ingest-text.test.ts` |
+| B2 | Word Document Support | ✅ Done | 11 | `documentParser.ts`, `ingest.ts`, `ingest-word.test.ts` |
+| B3 | Excel/CSV Bulk Import | ✅ Done | 15 | `excelParser.ts`, `ingest.ts`, `ingest-bulk.test.ts` |
+
+**New endpoints added:**
+- `POST /api/ingest/text` — Create deal from pasted text (email, Slack, notes)
+- `POST /api/ingest/bulk` — Bulk import deals from Excel/CSV spreadsheet
+- `POST /api/ingest` — Now supports PDF + Word (.docx/.doc) + Text (.txt)
+
+**New dependencies:** `mammoth` (Word parsing), `xlsx` (Excel/CSV parsing)
+
+**Total test count:** 227/227 passing (+39 new tests this session)
+
+**Remaining from TODO list:** B4 (LangExtract Python microservice), B5 (URL scraping), B6 (Frontend intake UI)
+
+---

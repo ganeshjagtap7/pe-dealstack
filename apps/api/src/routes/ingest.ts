@@ -6,6 +6,8 @@ import { extractDealDataFromText, toLegacyFormat, ExtractedDealData } from '../s
 import { z } from 'zod';
 import { embedDocument } from '../rag.js';
 import { log } from '../utils/logger.js';
+import { extractTextFromWord } from '../services/documentParser.js';
+import { parseExcelToDealRows } from '../services/excelParser.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -40,11 +42,12 @@ const upload = multer({
       'application/vnd.ms-excel',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'text/plain',
     ];
     if (allowedTypes.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Allowed: PDF, Excel, Word'));
+      cb(new Error('Invalid file type. Allowed: PDF, Excel, Word, Text'));
     }
   },
 });
@@ -104,7 +107,7 @@ router.post('/', upload.single('file'), async (req, res) => {
 
     log.info('Ingest starting', { documentName });
 
-    // Step 1: Extract text from PDF
+    // Step 1: Extract text from document
     let extractedText: string | null = null;
     let numPages: number | null = null;
 
@@ -118,8 +121,27 @@ router.post('/', upload.single('file'), async (req, res) => {
       } else {
         return res.status(400).json({ error: 'Failed to extract text from PDF' });
       }
+    } else if (
+      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimeType === 'application/msword'
+    ) {
+      log.debug('Step 1: Extracting text from Word document');
+      extractedText = await extractTextFromWord(file.buffer);
+      if (!extractedText) {
+        return res.status(400).json({ error: 'Failed to extract text from Word document' });
+      }
+      log.debug('Word extracted', { charCount: extractedText.length });
+    } else if (mimeType === 'text/plain') {
+      log.debug('Step 1: Reading plain text file');
+      extractedText = file.buffer.toString('utf-8');
+      if (!extractedText || extractedText.trim().length < 50) {
+        return res.status(400).json({ error: 'Text file is too short or empty' });
+      }
     } else {
-      return res.status(400).json({ error: 'Only PDF files are supported for auto-deal creation' });
+      return res.status(400).json({
+        error: 'Unsupported file type for auto-deal creation',
+        supported: ['PDF (.pdf)', 'Word (.docx, .doc)', 'Text (.txt)'],
+      });
     }
 
     // Step 2: Run AI extraction with confidence scores
@@ -509,6 +531,278 @@ router.get('/:dealId/extraction', async (req, res) => {
   } catch (error) {
     log.error('Error fetching extraction', error);
     res.status(500).json({ error: 'Failed to fetch extraction details' });
+  }
+});
+
+// ─── Text Ingestion ───────────────────────────────────────────
+
+const textIngestSchema = z.object({
+  text: z.string().min(50, 'Text must be at least 50 characters'),
+  sourceName: z.string().optional(),
+  sourceType: z.enum(['email', 'note', 'slack', 'whatsapp', 'other']).optional(),
+});
+
+// POST /api/ingest/text — Create deal from raw pasted text
+router.post('/text', async (req, res) => {
+  try {
+    const validation = textIngestSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
+    }
+
+    const { text, sourceName, sourceType } = validation.data;
+    log.info('Text ingest starting', { textLength: text.length, sourceType });
+
+    // Step 1: Extract data using existing AI extractor
+    const aiData = await extractDealDataFromText(text);
+    if (!aiData) {
+      return res.status(400).json({ error: 'Could not extract deal data from text. Try providing more detail.' });
+    }
+
+    // Step 2: Create or find company
+    const companyName = aiData.companyName.value || 'Unknown Company';
+    const { data: existingCompany } = await supabase
+      .from('Company')
+      .select('id, name')
+      .ilike('name', companyName)
+      .single();
+
+    let company;
+    if (existingCompany) {
+      company = existingCompany;
+      log.debug('Found existing company', { name: company.name });
+    } else {
+      const { data: newCompany, error: companyError } = await supabase
+        .from('Company')
+        .insert({
+          name: companyName,
+          industry: aiData.industry.value,
+          description: aiData.description.value,
+        })
+        .select()
+        .single();
+      if (companyError) throw companyError;
+      company = newCompany;
+      log.debug('Created company', { name: company.name });
+    }
+
+    // Step 3: Create deal
+    const dealIcon = getIconForIndustry(aiData.industry.value);
+    const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
+
+    const { data: deal, error: dealError } = await supabase
+      .from('Deal')
+      .insert({
+        name: companyName,
+        companyId: company.id,
+        stage: 'INITIAL_REVIEW',
+        status: dealStatus,
+        industry: aiData.industry.value,
+        description: aiData.description.value,
+        revenue: aiData.revenue.value,
+        ebitda: aiData.ebitda.value,
+        dealSize: aiData.revenue.value,
+        aiThesis: aiData.summary,
+        icon: dealIcon,
+        extractionConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+      })
+      .select()
+      .single();
+
+    if (dealError) throw dealError;
+
+    // Step 4: Create document record for text source
+    const { data: document } = await supabase
+      .from('Document')
+      .insert({
+        dealId: deal.id,
+        name: sourceName || `${sourceType || 'Text'} input - ${new Date().toLocaleDateString()}`,
+        type: 'OTHER',
+        extractedText: text,
+        extractedData: {
+          companyName: aiData.companyName,
+          industry: aiData.industry,
+          description: aiData.description,
+          revenue: aiData.revenue,
+          ebitda: aiData.ebitda,
+          ebitdaMargin: aiData.ebitdaMargin,
+          revenueGrowth: aiData.revenueGrowth,
+          employees: aiData.employees,
+          foundedYear: aiData.foundedYear,
+          headquarters: aiData.headquarters,
+          keyRisks: aiData.keyRisks,
+          investmentHighlights: aiData.investmentHighlights,
+          summary: aiData.summary,
+          overallConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+        },
+        status: aiData.needsReview ? 'pending_review' : 'analyzed',
+        confidence: aiData.overallConfidence / 100,
+        aiAnalyzedAt: new Date().toISOString(),
+        mimeType: 'text/plain',
+      })
+      .select()
+      .single();
+
+    // Step 5: Log activity
+    await supabase.from('Activity').insert({
+      dealId: deal.id,
+      type: 'DEAL_CREATED',
+      title: `Deal created from ${sourceType || 'text'} input`,
+      description: aiData.needsReview
+        ? `"${companyName}" extracted with ${aiData.overallConfidence}% confidence — NEEDS REVIEW`
+        : `"${companyName}" auto-created with ${aiData.overallConfidence}% confidence`,
+      metadata: {
+        sourceType,
+        sourceName,
+        overallConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+      },
+    });
+
+    // Step 6: Trigger RAG embedding in background
+    if (text.length > 100) {
+      embedDocument(document?.id || deal.id, deal.id, text)
+        .then(result => {
+          if (result.success) log.debug('RAG embedding complete', { chunkCount: result.chunkCount });
+          else log.error('RAG embedding failed', result.error);
+        })
+        .catch(err => log.error('RAG embedding error', err));
+    }
+
+    log.info('Text ingest complete', { dealId: deal.id, confidence: aiData.overallConfidence });
+
+    res.status(201).json({
+      success: true,
+      deal: { ...deal, company },
+      document,
+      extraction: {
+        companyName: aiData.companyName,
+        industry: aiData.industry,
+        revenue: aiData.revenue,
+        ebitda: aiData.ebitda,
+        overallConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+      },
+    });
+  } catch (error) {
+    log.error('Text ingest error', error);
+    res.status(500).json({ error: 'Failed to process text input' });
+  }
+});
+
+// ─── Excel/CSV Bulk Import ────────────────────────────────────
+
+// POST /api/ingest/bulk — Import deals from Excel/CSV
+router.post('/bulk', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file provided' });
+
+    if (
+      !file.mimetype.includes('spreadsheet') &&
+      !file.mimetype.includes('excel') &&
+      !file.mimetype.includes('csv')
+    ) {
+      return res.status(400).json({ error: 'File must be Excel (.xlsx) or CSV (.csv)' });
+    }
+
+    log.info('Bulk ingest starting', { filename: file.originalname });
+
+    const dealRows = parseExcelToDealRows(file.buffer);
+    if (dealRows.length === 0) {
+      return res.status(400).json({
+        error: 'No valid deals found in file. Ensure you have a column named "Company" or "Company Name".',
+        hint: 'Supported columns: Company Name, Industry, Revenue, EBITDA, Stage, Description, Notes',
+      });
+    }
+
+    if (dealRows.length > 500) {
+      return res.status(400).json({ error: 'Maximum 500 deals per import. Split your file.' });
+    }
+
+    const results: { success: any[]; failed: any[]; total: number } = {
+      success: [],
+      failed: [],
+      total: dealRows.length,
+    };
+
+    for (const row of dealRows) {
+      try {
+        // Deduplicate company
+        const { data: existing } = await supabase
+          .from('Company')
+          .select('id, name')
+          .ilike('name', row.companyName)
+          .single();
+
+        let company;
+        if (existing) {
+          company = existing;
+        } else {
+          const { data: newCo, error } = await supabase
+            .from('Company')
+            .insert({
+              name: row.companyName,
+              industry: row.industry,
+              description: row.description,
+            })
+            .select()
+            .single();
+          if (error) throw error;
+          company = newCo;
+        }
+
+        // Create deal
+        const { data: deal, error: dealErr } = await supabase
+          .from('Deal')
+          .insert({
+            name: row.companyName,
+            companyId: company.id,
+            stage: row.stage || 'INITIAL_REVIEW',
+            status: 'ACTIVE',
+            industry: row.industry,
+            description: row.description || row.notes,
+            revenue: row.revenue,
+            ebitda: row.ebitda,
+            icon: getIconForIndustry(row.industry || null),
+            extractionConfidence: 100, // Manual import = high confidence
+          })
+          .select()
+          .single();
+
+        if (dealErr) throw dealErr;
+        results.success.push({ companyName: row.companyName, dealId: deal.id });
+      } catch (err) {
+        log.warn('Row import failed', { companyName: row.companyName, error: (err as any).message });
+        results.failed.push({ companyName: row.companyName, error: (err as any).message });
+      }
+    }
+
+    log.info('Bulk ingest complete', {
+      total: results.total,
+      success: results.success.length,
+      failed: results.failed.length,
+    });
+
+    res.status(201).json({
+      success: true,
+      summary: {
+        total: results.total,
+        imported: results.success.length,
+        failed: results.failed.length,
+        deals: results.success,
+        errors: results.failed,
+      },
+    });
+  } catch (error) {
+    log.error('Bulk ingest error', error);
+    res.status(500).json({ error: 'Failed to process file' });
   }
 });
 
