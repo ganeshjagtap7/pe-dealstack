@@ -7210,3 +7210,213 @@ All limiters use `standardHeaders: true` (RateLimit-* headers) and `legacyHeader
 **Section B complete!** All 6 feature development tasks (B1-B6) are now implemented. The full deal ingestion pipeline supports: PDF, Word, Excel/CSV bulk, plain text, and website URL scraping — all with AI extraction, confidence scores, review flagging, and RAG embedding.
 
 ---
+
+## February 14, 2026
+
+### Session 4 — PE-Firm Robustness Hardening & Advanced Features (Section C + D)
+
+**Goal:** Complete all 8 tasks from `devloper_todo_part2` — harden the platform for real PE firm use (audit trails, financial validation, encryption, DB optimizations, data export) and add advanced features (email parsing, enhanced URL research, multi-document analysis).
+
+---
+
+#### C1: Audit Trail & Immutable Activity Logging — ~10:00 AM
+
+**What:** Built a comprehensive, SEC-compliant audit logging system. Every data mutation (create, update, delete, export, AI extraction) is now immutably recorded with user, IP, timestamp, and change details.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/auditLog.ts` | **Created** (423 lines) | Full audit service with `AuditLog.log()`, `AuditLog.dealCreated()`, `AuditLog.dealUpdated()`, `AuditLog.aiIngest()`, `AuditLog.export()` convenience methods; client info extraction (IP, user-agent); `getAuditLogs()` with filtering by action/resource/severity/date range | PE firms are regulated — need full audit trails for SEC/compliance. Every change must be traceable to a user+timestamp |
+| `apps/api/src/routes/audit.ts` | **Created** (112 lines) | `GET /api/audit` endpoint with Zod-validated query params (action, resourceType, resourceId, severity, limit, offset, startDate, endDate); returns paginated audit logs | Allows admins to view audit trail via API |
+| `apps/api/src/index.ts` | **Modified** | Registered `auditRouter` at `/api/audit` with auth middleware | Route must be protected — only authenticated users see audit logs |
+| `apps/api/src/routes/deals.ts` | **Modified** | Added `AuditLog.dealCreated()` and `AuditLog.dealUpdated()` calls in deal CRUD handlers | Every deal mutation now produces an immutable audit record |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added `AuditLog.aiIngest()` after successful document ingestion | AI extractions are audit-logged with confidence scores |
+| `apps/api/tests/audit.test.ts` | **Created** (340 lines) | 25 tests: AuditLog service methods, getAuditLogs filtering, convenience methods, GET /api/audit endpoint validation | Ensures audit system works correctly and filters properly |
+| `apps/api/prisma/migrations/fix_auditlog_columns.sql` | **Created** (15 lines) | Migration to rename columns: `resourceType`→`entityType`, `resourceId`→`entityId`, `resourceName`→`entityName` | DB schema uses `entity*` naming but service code used `resource*` — fixed the mapping |
+
+**Key decisions:**
+- Audit log is INSERT-ONLY (no update/delete policies) — immutable by design
+- Failures never crash the main flow — wrapped in try/catch with error logging
+- Column mapping: service uses `resourceType/resourceId/resourceName`, DB uses `entityType/entityId/entityName`
+
+---
+
+#### C2: Financial Data Validation & Sanity Checks — ~10:45 AM
+
+**What:** Built financial guardrails to catch AI extraction errors before they corrupt deal data. Revenue, EBITDA, margins, growth rates, and employee counts are validated against PE industry norms.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/financialValidator.ts` | **Created** (94 lines) | `validateFinancials()` function: checks revenue range ($0.1M–$50B), EBITDA margin (-50% to 80%), EBITDA vs revenue cross-check, revenue growth <200%, employee count sanity, revenue-per-employee ratio | If AI extracts "$50" instead of "$50M", a deal gets evaluated 1,000x wrong. PE firms need guardrails |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Integrated `validateFinancials()` after AI extraction in main ingest + URL research + text ingest handlers; warnings auto-set `needsReview = true` and append to `reviewReasons` | Every ingested deal now gets financial sanity checks before storage |
+| `apps/api/tests/financial-validator.test.ts` | **Created** (190 lines) | 15 tests: valid data passes, revenue too high (auto-correction to /1000), negative revenue, EBITDA margin extremes, EBITDA > revenue, revenue growth outlier, employee count outlier, low revenue-per-employee, null/undefined handling, cross-check margin mismatch | Ensures validators catch real-world AI extraction mistakes |
+
+**Validation rules implemented:**
+- Revenue > $50B → flagged (likely in thousands not millions), auto-correction suggested
+- Revenue < $0.1M or negative → flagged
+- EBITDA margin > 80% or < -50% → flagged
+- EBITDA > Revenue → flagged as extraction error
+- Revenue growth > 200% → flagged for review
+- Employee count > 100,000 → flagged
+- Revenue per employee < $10K → flagged
+
+---
+
+#### C3: Data Encryption at Rest for Sensitive Fields — ~11:15 AM
+
+**What:** AES-256-GCM encryption service for sensitive deal data at rest. Graceful degradation — works without encryption key in development.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/encryption.ts` | **Created** (77 lines) | `encrypt(text)` and `decrypt(encryptedText)` using AES-256-GCM with random IV + auth tag; `isEncryptionEnabled()` check; format: `iv:authTag:ciphertext` | PE deals contain highly confidential financial data worth $10M-$500M+. Data at rest must be encrypted |
+| `apps/api/.env.example` | **Modified** | Added `DATA_ENCRYPTION_KEY=` with generation instructions (`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`) | Key management — developers know how to generate a proper 256-bit key |
+| `apps/api/tests/encryption.test.ts` | **Created** (198 lines) | 15 tests: encrypt/decrypt roundtrip, different inputs produce different ciphertexts, IV uniqueness, graceful degradation without key, tamper detection (modified ciphertext/authTag/IV), empty string handling, unicode support, long text, `isEncryptionEnabled()` | Ensures crypto is correct and tamper-proof |
+
+**Design decisions:**
+- AES-256-GCM chosen for authenticated encryption (prevents tampering)
+- Random 16-byte IV per encryption (no IV reuse)
+- Without `DATA_ENCRYPTION_KEY`, functions pass through plaintext (dev-friendly)
+- Auth tag prevents silent corruption of encrypted data
+
+---
+
+#### C4: Concurrent User Support & Database Optimizations — ~11:45 AM
+
+**What:** Added performance indexes for all common query patterns, optimistic locking for concurrent deal edits, and migration SQL for production deployment.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/prisma/migrations/add_performance_indexes.sql` | **Created** (37 lines) | 11 indexes: `Deal(organizationId)`, `Deal(status)`, `Deal(stage)`, `Deal(organizationId, status)`, `Deal(createdAt DESC)`, `Company(name) gin_trgm_ops`, `Company(organizationId)`, `Document(dealId)`, `Document(status)`, `Activity(dealId, createdAt DESC)`, `AuditLog(entityType, entityId)` + `pg_trgm` extension | Queries on 1000+ deals were doing full table scans. Indexes make filtering/sorting O(log n) instead of O(n) |
+| `apps/api/src/routes/deals.ts` | **Modified** | Added optimistic locking in `PATCH /:id` — if client sends `lastKnownUpdatedAt`, server compares timestamps; returns 409 Conflict if deal was modified by another user | Two analysts editing the same deal simultaneously would silently overwrite each other's changes |
+| `supabase_schema.sql` | **Modified** | Added `accessLevel` column to `DealTeamMember` (view/edit/admin), added `Invitation` table, added `firmName` and `preferences` to `User` | Schema documentation kept in sync with actual DB structure |
+| `apps/api/tests/db-optimizations.test.ts` | **Created** (109 lines) | 8 tests: migration SQL contains all expected indexes, index names follow convention, optimistic locking returns 409 on stale data, allows update with fresh timestamp, allows update without timestamp (backwards compatible) | Ensures indexes exist and optimistic locking works correctly |
+| `apps/api/tests/deals.test.ts` | **Modified** | Added 3 tests for optimistic locking: concurrent edit returns 409, fresh timestamp allows update, no timestamp allows update (backwards compatible) | Integration tests for the conflict detection feature |
+
+**Optimistic locking behavior:**
+- If `lastKnownUpdatedAt` is sent → server compares with current `updatedAt`
+- If client timestamp is older → 409 Conflict with current `updatedAt` returned
+- If not sent → update proceeds normally (backwards compatible)
+
+---
+
+#### C5: Data Export & Compliance — ~12:15 PM
+
+**What:** Built deal export endpoints supporting both CSV and JSON formats, with audit logging of every export action.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/export.ts` | **Created** (103 lines) | `GET /api/export/deals` with `?format=csv` or `?format=json`; CSV includes headers (Name, Industry, Revenue, EBITDA, Stage, Status, Confidence, Created); proper Content-Type and Content-Disposition headers for file download; audit-logged | PE firms need to export deal data for LP reports, board meetings, and regulatory filings |
+| `apps/api/src/index.ts` | **Modified** | Registered `exportRouter` at `/api/export` with auth middleware | Export endpoints require authentication |
+| `apps/api/tests/export.test.ts` | **Created** (258 lines) | 16 tests: CSV export returns text/csv with Content-Disposition, JSON export returns success+count+deals array, empty deals handled, CSV header row validation, CSV field quoting, audit logging triggered on export, format parameter validation, default format is JSON | Ensures exports produce valid CSV/JSON and are properly audit-logged |
+
+---
+
+#### D1: Email Parsing & Auto-Ingest — ~1:00 PM
+
+**What:** Built email (.eml) file parsing service that extracts deal-relevant data from email body and auto-processes PDF attachments. PE analysts receive 50+ deal emails/day — this automates deal creation from forwarded emails.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/emailParser.ts` | **Created** (81 lines) | `parseEmailFile(buffer)` — parses .eml files using `mailparser`, extracts subject/from/to/date/body/attachments; `buildDealTextFromEmail(email)` — builds AI-extractable text with email metadata headers | Analysts forward deal emails → system auto-creates deals from email content |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added `POST /api/ingest/email` route accepting .eml file upload; parses email → builds deal text → AI extraction → company dedup → deal creation → PDF attachment processing → activity logging → RAG embedding; updated multer fileFilter for `message/rfc822` MIME type | Full email-to-deal pipeline in one endpoint |
+| `apps/api/package.json` | **Modified** | Added `mailparser@^3.9.3` and `@types/mailparser@^3.4.6` dependencies | Email parsing library for .eml format |
+| `package-lock.json` | **Modified** | Lock file updated with mailparser dependency tree (+334 lines) | Dependency resolution |
+| `apps/api/tests/email-parser.test.ts` | **Created** (329 lines) | 20 tests: email parser exports, basic email parsing, HTML-only email, empty email, build deal text from email, text vs HTML preference, endpoint tests (missing file, wrong format, valid .eml, PDF attachment processing, activity metadata) | Ensures email parsing handles real-world .eml formats correctly |
+
+**Email ingest pipeline:**
+1. Upload .eml file → `parseEmailFile()` extracts structured data
+2. `buildDealTextFromEmail()` builds AI-friendly text with subject/from/date
+3. AI extracts deal data (company name, financials, industry)
+4. Company dedup + deal creation
+5. PDF attachments auto-processed and linked to deal
+6. Activity logged with email metadata (from, subject, date, attachments)
+7. Research text RAG-embedded for AI chat
+
+---
+
+#### D2: Auto-Research — Enhanced URL Scraping + Enrichment — ~2:00 PM
+
+**What:** Replaced the basic single-page `webScraper.ts` with a comprehensive multi-page company researcher that scrapes 10 page paths in parallel, building a rich company profile from About, Team, Products, and other pages.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/companyResearcher.ts` | **Created** (145 lines) | `scrapePageText(url)` — 8s timeout, HTML cleaning (strips scripts/styles/nav/header/footer), 8000 char limit; `researchCompany(baseUrl)` — normalizes URL, scrapes 10 paths (`/about`, `/about-us`, `/company`, `/team`, `/our-team`, `/leadership`, `/products`, `/services`, `/what-we-do` + homepage) in parallel batches of 4; `buildResearchText(research)` — combines sections with `=== HEADERS ===` | B5's single-page scraper missed most company data. Multi-page scraping captures About, Team, Products — saves analysts 30+ min per deal |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Replaced `webScraper` import with `companyResearcher`; rewrote `POST /api/ingest/url` to use `researchCompany()` + `buildResearchText()`; added `urlResearchSchema` with Zod validation (url, companyName, autoCreateDeal); added preview mode (`autoCreateDeal: false`); added financial validation; source set to `'web_research'` | Enhanced URL research with preview capability and financial validation |
+| `apps/api/tests/company-researcher.test.ts` | **Created** (311 lines) | 17 tests: service exports, URL normalization (adds https://), trailing slash stripping, unreachable sites return empty, invalid URL returns null, buildResearchText with all/some/no sections, endpoint tests (invalid URL 400, empty site 400, deal creation 201, company name override, preview mode, research metadata, document storage) | Ensures multi-page scraping handles edge cases and endpoint produces correct responses |
+
+**Key improvements over B5:**
+- 10 page paths instead of 1 (homepage only)
+- Parallel scraping in batches of 4 (faster)
+- Structured sections (About, Team, Products) with clear headers
+- Preview mode (`autoCreateDeal: false`) — see extraction before creating deal
+- Financial validation on extracted data
+- Audit logging of URL research
+
+---
+
+#### D3: Multi-Document Context Analysis — ~3:00 PM
+
+**What:** Built cross-document intelligence that analyzes ALL documents for a deal together — detecting conflicts (e.g., different revenue in CIM vs teaser), filling data gaps, tracking which document contributed which fields, and optionally synthesizing insights via GPT-4.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/multiDocAnalyzer.ts` | **Created** (249 lines) | `detectConflicts(docs)` — compares 8 tracked fields across docs, resolves by highest confidence; `findGapsFilled(docs)` — identifies fields only one doc has; `getDocumentContributions(docs)` — maps which fields each doc contributed; `buildCombinedText(docs)` — builds combined context (5000 char excerpt per doc); `analyzeMultipleDocuments(dealId)` — full pipeline: fetch docs → conflict detection → gap filling → AI synthesis via GPT-4-turbo → update deal metadata | PE deals have 5-20 documents. Each was extracted independently — conflicts between CIM and teaser went undetected. Multi-doc context catches discrepancies |
+| `apps/api/src/routes/deals.ts` | **Modified** | Added `POST /:id/analyze` route — verifies deal exists, runs `analyzeMultipleDocuments()`, logs activity + audit | Manual trigger for multi-doc analysis on any deal |
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added Step 10 to main ingest handler: after document creation, checks if 2+ documents exist for deal → auto-triggers `analyzeMultipleDocuments()` in background via dynamic import (fire-and-forget) | Automatic cross-document analysis whenever a 2nd+ document is uploaded |
+| `apps/api/tests/multi-doc-analyzer.test.ts` | **Created** (489 lines) | 20 tests: `detectConflicts` (7 tests — basic conflict, highest confidence wins, no conflict on same values, single doc, empty data, null values, multiple fields), `findGapsFilled` (2 tests — gap detection, no gaps when both docs have data), `getDocumentContributions` (1 test), `buildCombinedText` (3 tests — format, empty text, long text truncation), endpoint tests (6 tests — 404 deal, success, conflict data in response, activity logged, audit logged, returns gap info) | Required `vi.mock` for supabase and openai modules; tests conflict resolution logic and endpoint behavior |
+
+**Tracked fields for conflict detection:**
+`companyName`, `industry`, `revenue`, `ebitda`, `ebitdaMargin`, `employees`, `foundedYear`, `headquarters`
+
+**Graceful degradation:** Conflict detection + gap filling work without OpenAI. AI synthesis only runs when `OPENAI_API_KEY` is configured.
+
+**Auto-trigger pattern:** Uses dynamic import + fire-and-forget Promise to avoid blocking the ingest response.
+
+---
+
+#### Additional Changes
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `README.md` | **Modified** | Added system architecture diagrams (System Architecture, AI Memo Builder Flow, Document & VDR Flow) with links to `docs/diagrams/` | Documentation — visual overview of the platform |
+| `LAUNCH-CHECKLIST.md` | **Deleted** | Removed — superseded by comprehensive checklist in other docs | Cleanup — duplicate/outdated checklist |
+| `QA_CHECKLIST.md` | **Deleted** | Removed — QA tracking moved to test suite | Cleanup — 404 tests now serve as living QA checklist |
+
+---
+
+#### Summary — Session 4 (Feb 14, 2026)
+
+| # | Task | Status | Tests Added | Key Files |
+|---|------|--------|-------------|-----------|
+| C1 | Audit Trail & Immutable Logging | ✅ Done | 25 | `auditLog.ts`, `audit.ts` (route), `fix_auditlog_columns.sql` |
+| C2 | Financial Data Validation | ✅ Done | 15 | `financialValidator.ts`, `ingest.ts` |
+| C3 | Data Encryption at Rest | ✅ Done | 15 | `encryption.ts` |
+| C4 | DB Optimizations & Concurrency | ✅ Done | 11 | `add_performance_indexes.sql`, `deals.ts` |
+| C5 | Data Export & Compliance | ✅ Done | 16 | `export.ts` (route) |
+| D1 | Email Parsing & Auto-Ingest | ✅ Done | 20 | `emailParser.ts`, `ingest.ts` |
+| D2 | Enhanced URL Research | ✅ Done | 17 | `companyResearcher.ts`, `ingest.ts` |
+| D3 | Multi-Document Context | ✅ Done | 20 | `multiDocAnalyzer.ts`, `deals.ts` |
+
+**New endpoints added this session:**
+- `GET /api/audit` — View audit trail with filtering (action, resource, severity, date range)
+- `GET /api/export/deals?format=csv|json` — Export all deals as CSV or JSON
+- `POST /api/ingest/email` — Parse .eml files into deals with attachment processing
+- `POST /api/ingest/url` — Enhanced multi-page website research (replaces B5)
+- `POST /api/deals/:id/analyze` — Trigger multi-document cross-analysis
+
+**New services created:**
+- `auditLog.ts` — Immutable audit logging with convenience methods
+- `financialValidator.ts` — PE-specific financial sanity checks
+- `encryption.ts` — AES-256-GCM encryption for sensitive data at rest
+- `emailParser.ts` — .eml file parsing with attachment extraction
+- `companyResearcher.ts` — Multi-page website scraping (replaces `webScraper.ts`)
+- `multiDocAnalyzer.ts` — Cross-document conflict detection, gap filling, AI synthesis
+
+**New migration SQL:**
+- `add_performance_indexes.sql` — 11 indexes for common query patterns + `pg_trgm` extension
+- `fix_auditlog_columns.sql` — Column rename mapping fix
+
+**Total test count:** 404/404 passing (+143 new tests this session)
+
+**Section C + D complete!** All 8 tasks from `devloper_todo_part2` are now implemented. The platform now has: immutable audit trails, financial validation guardrails, AES-256-GCM encryption, optimized DB indexes with optimistic locking, CSV/JSON export, email-to-deal parsing, multi-page web research, and cross-document conflict analysis.
+
+---

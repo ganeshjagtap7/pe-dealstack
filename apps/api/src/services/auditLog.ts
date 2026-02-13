@@ -129,14 +129,17 @@ export async function logAuditEvent(entry: AuditLogEntry, req?: Request): Promis
   try {
     const clientInfo = getClientInfo(req);
 
+    // Map service fields to actual DB column names
+    // DB uses: entityType, entityId, entityName, changes
+    // Service uses: resourceType, resourceId, resourceName, metadata
     const { error } = await supabase.from('AuditLog').insert({
       userId: entry.userId,
       userEmail: entry.userEmail,
       userRole: entry.userRole,
       action: entry.action,
-      resourceType: entry.resourceType,
-      resourceId: entry.resourceId,
-      resourceName: entry.resourceName,
+      entityType: entry.resourceType,
+      entityId: entry.resourceId,
+      entityName: entry.resourceName,
       description: entry.description,
       metadata: entry.metadata || {},
       ipAddress: entry.ipAddress || clientInfo.ipAddress,
@@ -207,11 +210,11 @@ export async function getAuditLogs(options: {
   }
 
   if (options.resourceType) {
-    query = query.eq('resourceType', options.resourceType);
+    query = query.eq('entityType', options.resourceType);
   }
 
   if (options.resourceId) {
-    query = query.eq('resourceId', options.resourceId);
+    query = query.eq('entityId', options.resourceId);
   }
 
   if (options.severity) {

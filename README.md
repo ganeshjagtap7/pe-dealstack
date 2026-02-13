@@ -4,6 +4,27 @@ A modern, AI-powered CRM for Private Equity firms to manage deal flow, track opp
 
 **Production:** https://pe-os.onrender.com
 
+---
+
+### System Architecture
+<p align="center">
+  <img src="docs/diagrams/08-system-architecture.png" alt="System Architecture" width="100%"/>
+</p>
+
+### AI Memo Builder Flow
+<p align="center">
+  <img src="docs/diagrams/04-memo-builder-flow.png" alt="Memo Builder Flow" width="100%"/>
+</p>
+
+### Document & Virtual Data Room Flow
+<p align="center">
+  <img src="docs/diagrams/03-document-vdr-flow.png" alt="Document & VDR Flow" width="100%"/>
+</p>
+
+> See all 10 diagrams in [`docs/diagrams/`](docs/diagrams/) — includes Auth Flow, Deal Lifecycle, ER Diagram, Role Matrix, User Journeys, and Navigation Flow.
+
+---
+
 ## Documentation
 
 | Guide | Description |

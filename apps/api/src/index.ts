@@ -18,6 +18,8 @@ import ingestRouter from './routes/ingest.js';
 import memosRouter from './routes/memos.js';
 import invitationsRouter from './routes/invitations.js';
 import templatesRouter from './routes/templates.js';
+import auditRouter from './routes/audit.js';
+import exportRouter from './routes/export.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -198,6 +200,8 @@ app.use('/api/ingest', authMiddleware, ingestRouter);
 app.use('/api/memos', authMiddleware, memosRouter);
 app.use('/api/templates', authMiddleware, templatesRouter);
 app.use('/api/invitations', authMiddleware, invitationsRouter);
+app.use('/api/audit', authMiddleware, auditRouter);
+app.use('/api/export', authMiddleware, exportRouter);
 
 // ========================================
 // Public Invitation Routes (no auth for verify/accept)

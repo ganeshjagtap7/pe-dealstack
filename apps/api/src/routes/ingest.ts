@@ -9,7 +9,10 @@ import { log } from '../utils/logger.js';
 import { extractTextFromWord } from '../services/documentParser.js';
 import { parseExcelToDealRows } from '../services/excelParser.js';
 import { deepExtract, isDeepExtractionAvailable, DeepExtractionResult } from '../services/langExtractClient.js';
-import { scrapeWebsite } from '../services/webScraper.js';
+import { researchCompany, buildResearchText } from '../services/companyResearcher.js';
+import { AuditLog } from '../services/auditLog.js';
+import { validateFinancials } from '../services/financialValidator.js';
+import { parseEmailFile, buildDealTextFromEmail } from '../services/emailParser.js';
 
 // Transform deep extraction result into ExtractedDealData format
 function transformDeepResultToExtractedDealData(result: DeepExtractionResult): ExtractedDealData {
@@ -70,10 +73,12 @@ const upload = multer({
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
     ];
-    if (allowedTypes.includes(file.mimetype)) {
+    if (allowedTypes.includes(file.mimetype) ||
+        file.originalname.endsWith('.eml') ||
+        file.mimetype === 'message/rfc822') {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Allowed: PDF, Excel, Word, Text'));
+      cb(new Error('Invalid file type. Allowed: PDF, Excel, Word, Text, Email (.eml)'));
     }
   },
 });
@@ -204,6 +209,19 @@ router.post('/', upload.single('file'), async (req, res) => {
       overallConfidence: aiData.overallConfidence,
       needsReview: aiData.needsReview,
     });
+
+    // Financial validation
+    const financialCheck = validateFinancials({
+      revenue: aiData.revenue.value,
+      ebitda: aiData.ebitda.value,
+      ebitdaMargin: aiData.ebitdaMargin?.value,
+      revenueGrowth: aiData.revenueGrowth?.value,
+      employees: aiData.employees?.value,
+    });
+    if (!financialCheck.isValid) {
+      aiData.needsReview = true;
+      aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
+    }
 
     // Step 3: Create or find company
     log.debug('Step 3: Creating/finding company');
@@ -397,6 +415,26 @@ router.post('/', upload.single('file'), async (req, res) => {
       },
     });
 
+    // Step 9: Audit log
+    await AuditLog.aiIngest(req, documentName, deal.id);
+
+    // Step 10: Auto-trigger multi-doc analysis if 2+ documents exist
+    const { count: docCount } = await supabase
+      .from('Document')
+      .select('id', { count: 'exact', head: true })
+      .eq('dealId', deal.id);
+
+    if (docCount && docCount >= 2) {
+      import('../services/multiDocAnalyzer.js')
+        .then(({ analyzeMultipleDocuments }) =>
+          analyzeMultipleDocuments(deal.id)
+        )
+        .then(result => {
+          if (result) log.info('Auto multi-doc analysis complete', { dealId: deal.id, conflicts: result.conflicts.length });
+        })
+        .catch(err => log.error('Auto multi-doc analysis failed', err));
+    }
+
     log.info('Ingest complete', { dealId: deal.id });
 
     // Return the created deal with extraction confidence data
@@ -540,6 +578,13 @@ router.post('/:dealId/review', async (req, res) => {
       },
     });
 
+    // Audit log
+    await AuditLog.dealUpdated(req, dealId, updatedDeal.name || deal.name, {
+      action: approved ? 'APPROVED' : 'REJECTED',
+      previousValues: { name: deal.name, industry: deal.industry, revenue: deal.revenue, ebitda: deal.ebitda },
+      newValues: updates,
+    });
+
     res.json({
       success: true,
       deal: updatedDeal,
@@ -602,6 +647,19 @@ router.post('/text', async (req, res) => {
     const aiData = await extractDealDataFromText(text);
     if (!aiData) {
       return res.status(400).json({ error: 'Could not extract deal data from text. Try providing more detail.' });
+    }
+
+    // Financial validation
+    const financialCheck = validateFinancials({
+      revenue: aiData.revenue.value,
+      ebitda: aiData.ebitda.value,
+      ebitdaMargin: aiData.ebitdaMargin?.value,
+      revenueGrowth: aiData.revenueGrowth?.value,
+      employees: aiData.employees?.value,
+    });
+    if (!financialCheck.isValid) {
+      aiData.needsReview = true;
+      aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
     }
 
     // Step 2: Create or find company
@@ -719,6 +777,9 @@ router.post('/text', async (req, res) => {
         .catch(err => log.error('RAG embedding error', err));
     }
 
+    // Audit log
+    await AuditLog.aiIngest(req, sourceName || `${sourceType || 'text'} input`, deal.id);
+
     log.info('Text ingest complete', { dealId: deal.id, confidence: aiData.overallConfidence });
 
     res.status(201).json({
@@ -741,36 +802,46 @@ router.post('/text', async (req, res) => {
   }
 });
 
-// ─── Website URL Scraping ─────────────────────────────────────
+// ─── Website URL Research (Multi-Page Scraping) ──────────────
 
-const urlIngestSchema = z.object({
+const urlResearchSchema = z.object({
   url: z.string().url('Must be a valid URL'),
   companyName: z.string().optional(),
+  autoCreateDeal: z.boolean().optional().default(true),
 });
 
-// POST /api/ingest/url — Create deal from company website
+// POST /api/ingest/url — Research company from website URL (scrapes multiple pages)
 router.post('/url', async (req, res) => {
   try {
-    const validation = urlIngestSchema.safeParse(req.body);
+    const validation = urlResearchSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
     }
 
-    const { url, companyName: userCompanyName } = validation.data;
-    log.info('URL ingest starting', { url });
+    const { url, companyName: userCompanyName, autoCreateDeal } = validation.data;
+    log.info('URL research starting', { url });
 
-    // Step 1: Scrape the website
-    const scrapedText = await scrapeWebsite(url);
-    if (!scrapedText || scrapedText.length < 100) {
-      return res.status(400).json({ error: 'Could not extract enough content from this website' });
+    // Step 1: Research company (scrapes multiple pages in parallel)
+    const research = await researchCompany(url);
+    const researchText = buildResearchText(research);
+
+    if (researchText.length < 100) {
+      return res.status(400).json({
+        error: 'Could not extract enough content from website',
+        pagesAttempted: research.companyWebsite.scrapedPages.length,
+      });
     }
 
-    log.debug('Scraped website', { url, charCount: scrapedText.length });
+    log.debug('Company research complete', {
+      url,
+      pagesScraped: research.companyWebsite.scrapedPages.length,
+      charCount: researchText.length,
+    });
 
-    // Step 2: AI extraction
-    const aiData = await extractDealDataFromText(scrapedText);
+    // Step 2: AI extraction from combined research text
+    const aiData = await extractDealDataFromText(researchText);
     if (!aiData) {
-      return res.status(400).json({ error: 'Could not extract deal data from website content' });
+      return res.status(400).json({ error: 'AI could not extract deal data from website content' });
     }
 
     // Override company name if user provided one
@@ -779,8 +850,41 @@ router.post('/url', async (req, res) => {
       aiData.companyName.confidence = 100;
     }
 
+    // Financial validation
+    const financialCheck = validateFinancials({
+      revenue: aiData.revenue.value,
+      ebitda: aiData.ebitda.value,
+      ebitdaMargin: aiData.ebitdaMargin?.value,
+      revenueGrowth: aiData.revenueGrowth?.value,
+      employees: aiData.employees?.value,
+    });
+    if (!financialCheck.isValid) {
+      aiData.needsReview = true;
+      aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
+    }
+
+    // If preview-only mode, return extraction without creating deal
+    if (!autoCreateDeal) {
+      return res.json({
+        success: true,
+        extraction: {
+          companyName: aiData.companyName,
+          industry: aiData.industry,
+          revenue: aiData.revenue,
+          ebitda: aiData.ebitda,
+          overallConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+        },
+        research: {
+          pagesScraped: research.companyWebsite.scrapedPages,
+          textLength: researchText.length,
+        },
+      });
+    }
+
     // Step 3: Create or find company
-    const companyName = aiData.companyName.value || 'Unknown Company';
+    const companyName = aiData.companyName.value || userCompanyName || 'Unknown Company';
     const { data: existingCompany } = await supabase
       .from('Company')
       .select('id, name')
@@ -827,20 +931,21 @@ router.post('/url', async (req, res) => {
         extractionConfidence: aiData.overallConfidence,
         needsReview: aiData.needsReview,
         reviewReasons: aiData.reviewReasons,
+        source: 'web_research',
       })
       .select()
       .single();
 
     if (dealError) throw dealError;
 
-    // Step 5: Create document record
+    // Step 5: Store research as document record
     const { data: document } = await supabase
       .from('Document')
       .insert({
         dealId: deal.id,
-        name: `Website scrape — ${url}`,
+        name: `Web Research — ${companyName}`,
         type: 'OTHER',
-        extractedText: scrapedText,
+        extractedText: researchText,
         extractedData: {
           companyName: aiData.companyName,
           industry: aiData.industry,
@@ -863,6 +968,10 @@ router.post('/url', async (req, res) => {
         confidence: aiData.overallConfidence / 100,
         aiAnalyzedAt: new Date().toISOString(),
         mimeType: 'text/html',
+        metadata: {
+          sourceUrl: url,
+          pagesScraped: research.companyWebsite.scrapedPages,
+        },
       })
       .select()
       .single();
@@ -871,30 +980,38 @@ router.post('/url', async (req, res) => {
     await supabase.from('Activity').insert({
       dealId: deal.id,
       type: 'DEAL_CREATED',
-      title: 'Deal created from website scrape',
+      title: 'Deal created from web research',
       description: aiData.needsReview
-        ? `"${companyName}" extracted from ${url} with ${aiData.overallConfidence}% confidence — NEEDS REVIEW`
-        : `"${companyName}" auto-created from ${url} with ${aiData.overallConfidence}% confidence`,
+        ? `"${companyName}" researched from ${url} (${research.companyWebsite.scrapedPages.length} pages) with ${aiData.overallConfidence}% confidence — NEEDS REVIEW`
+        : `"${companyName}" auto-created from ${url} (${research.companyWebsite.scrapedPages.length} pages) with ${aiData.overallConfidence}% confidence`,
       metadata: {
-        sourceType: 'web_scrape',
+        sourceType: 'web_research',
         url,
+        pagesScraped: research.companyWebsite.scrapedPages,
         overallConfidence: aiData.overallConfidence,
         needsReview: aiData.needsReview,
         reviewReasons: aiData.reviewReasons,
       },
     });
 
-    // Step 7: Trigger RAG embedding in background
-    if (scrapedText.length > 100) {
-      embedDocument(document?.id || deal.id, deal.id, scrapedText)
+    // Step 7: RAG embed research text in background
+    if (researchText.length > 100) {
+      embedDocument(document?.id || deal.id, deal.id, researchText)
         .then(result => {
-          if (result.success) log.debug('RAG embedding complete', { chunkCount: result.chunkCount });
-          else log.error('RAG embedding failed', result.error);
+          if (result.success) log.debug('Research RAG embedding complete', { chunkCount: result.chunkCount });
+          else log.error('Research RAG embedding failed', result.error);
         })
-        .catch(err => log.error('RAG embedding error', err));
+        .catch(err => log.error('Research RAG embedding error', err));
     }
 
-    log.info('URL ingest complete', { dealId: deal.id, url });
+    // Audit log
+    await AuditLog.aiIngest(req, `Web Research — ${url}`, deal.id);
+
+    log.info('URL research ingest complete', {
+      dealId: deal.id,
+      url,
+      pagesScraped: research.companyWebsite.scrapedPages.length,
+    });
 
     res.status(201).json({
       success: true,
@@ -909,11 +1026,217 @@ router.post('/url', async (req, res) => {
         needsReview: aiData.needsReview,
         reviewReasons: aiData.reviewReasons,
       },
-      source: { type: 'web_scrape', url },
+      research: {
+        pagesScraped: research.companyWebsite.scrapedPages,
+        textLength: researchText.length,
+      },
     });
   } catch (error) {
-    log.error('URL ingest error', error);
-    res.status(500).json({ error: 'Failed to process URL' });
+    log.error('URL research error', error);
+    res.status(500).json({ error: 'Failed to research company' });
+  }
+});
+
+// ─── Email Parsing & Auto-Ingest ──────────────────────────────
+
+// POST /api/ingest/email — Parse uploaded .eml file into a deal
+router.post('/email', upload.single('file'), async (req: any, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No email file provided' });
+
+    if (!file.originalname.endsWith('.eml') && file.mimetype !== 'message/rfc822') {
+      return res.status(400).json({ error: 'File must be .eml format' });
+    }
+
+    log.info('Email ingest starting', { filename: file.originalname });
+
+    // Step 1: Parse email
+    const emailData = await parseEmailFile(file.buffer);
+    if (!emailData) {
+      return res.status(400).json({ error: 'Failed to parse email file' });
+    }
+
+    // Step 2: Build text for AI extraction
+    const dealText = buildDealTextFromEmail(emailData);
+    if (dealText.length < 100) {
+      return res.status(400).json({ error: 'Email has insufficient content for deal extraction' });
+    }
+
+    // Step 3: AI extraction
+    const aiData = await extractDealDataFromText(dealText);
+    if (!aiData) {
+      return res.status(400).json({ error: 'Could not extract deal data from email' });
+    }
+
+    // Step 4: Financial validation
+    const financialCheck = validateFinancials({
+      revenue: aiData.revenue.value,
+      ebitda: aiData.ebitda.value,
+      ebitdaMargin: aiData.ebitdaMargin?.value,
+      revenueGrowth: aiData.revenueGrowth?.value,
+      employees: aiData.employees?.value,
+    });
+    if (!financialCheck.isValid) {
+      aiData.needsReview = true;
+      aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
+    }
+
+    // Step 5: Create or find company
+    const companyName = aiData.companyName.value || emailData.subject;
+    const { data: existingCompany } = await supabase
+      .from('Company')
+      .select('id, name')
+      .ilike('name', companyName)
+      .single();
+
+    let company;
+    if (existingCompany) {
+      company = existingCompany;
+    } else {
+      const { data: newCompany, error: companyError } = await supabase
+        .from('Company')
+        .insert({
+          name: companyName,
+          industry: aiData.industry.value,
+          description: aiData.description.value,
+        })
+        .select()
+        .single();
+      if (companyError) throw companyError;
+      company = newCompany;
+    }
+
+    // Step 6: Create deal
+    const dealIcon = getIconForIndustry(aiData.industry.value);
+    const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
+
+    const { data: deal, error: dealError } = await supabase
+      .from('Deal')
+      .insert({
+        name: companyName,
+        companyId: company.id,
+        stage: 'INITIAL_REVIEW',
+        status: dealStatus,
+        industry: aiData.industry.value,
+        description: aiData.description.value,
+        revenue: aiData.revenue.value,
+        ebitda: aiData.ebitda.value,
+        dealSize: aiData.revenue.value,
+        aiThesis: aiData.summary,
+        icon: dealIcon,
+        extractionConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+        source: 'email',
+      })
+      .select()
+      .single();
+
+    if (dealError) throw dealError;
+
+    // Step 7: Create document record for email body
+    const { data: document } = await supabase
+      .from('Document')
+      .insert({
+        dealId: deal.id,
+        name: `Email — ${emailData.subject}`,
+        type: 'OTHER',
+        extractedText: dealText,
+        extractedData: {
+          companyName: aiData.companyName,
+          industry: aiData.industry,
+          description: aiData.description,
+          revenue: aiData.revenue,
+          ebitda: aiData.ebitda,
+          ebitdaMargin: aiData.ebitdaMargin,
+          revenueGrowth: aiData.revenueGrowth,
+          employees: aiData.employees,
+          summary: aiData.summary,
+          overallConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+        },
+        status: aiData.needsReview ? 'pending_review' : 'analyzed',
+        confidence: aiData.overallConfidence / 100,
+        aiAnalyzedAt: new Date().toISOString(),
+        mimeType: 'message/rfc822',
+      })
+      .select()
+      .single();
+
+    // Step 8: Process PDF attachments
+    const processedAttachments: string[] = [];
+    for (const att of emailData.attachments) {
+      if (att.contentType === 'application/pdf' && att.size < 50 * 1024 * 1024) {
+        try {
+          const pdfData = await extractTextFromPDF(att.content);
+          if (pdfData?.text) {
+            await supabase.from('Document').insert({
+              dealId: deal.id,
+              name: att.filename,
+              type: 'OTHER',
+              extractedText: pdfData.text,
+              mimeType: 'application/pdf',
+              status: 'pending_analysis',
+            });
+            processedAttachments.push(att.filename);
+
+            // RAG embed the attachment in background
+            embedDocument(deal.id + '-' + att.filename, deal.id, pdfData.text)
+              .catch(err => log.error('Attachment RAG error', err));
+          }
+        } catch (err) {
+          log.warn('Attachment processing failed', { filename: att.filename, error: err });
+        }
+      }
+    }
+
+    // Step 9: Log activity
+    await supabase.from('Activity').insert({
+      dealId: deal.id,
+      type: 'DEAL_CREATED',
+      title: 'Deal created from email',
+      description: `From: ${emailData.from}\nSubject: ${emailData.subject}`,
+      metadata: {
+        emailFrom: emailData.from,
+        emailSubject: emailData.subject,
+        emailDate: emailData.date,
+        attachmentsProcessed: processedAttachments,
+      },
+    });
+
+    // Step 10: RAG embed email body in background
+    if (dealText.length > 100) {
+      embedDocument(document?.id || deal.id, deal.id, dealText)
+        .catch(err => log.error('Email RAG embedding error', err));
+    }
+
+    // Step 11: Audit log
+    await AuditLog.aiIngest(req, `Email — ${emailData.subject}`, deal.id);
+
+    log.info('Email ingest complete', {
+      dealId: deal.id,
+      companyName,
+      confidence: aiData.overallConfidence,
+      attachments: processedAttachments.length,
+    });
+
+    res.status(201).json({
+      success: true,
+      deal,
+      extraction: aiData,
+      email: {
+        subject: emailData.subject,
+        from: emailData.from,
+        date: emailData.date,
+        attachmentsProcessed: processedAttachments.length,
+        attachmentNames: processedAttachments,
+      },
+    });
+  } catch (error) {
+    log.error('Email ingest error', error);
+    res.status(500).json({ error: 'Failed to process email' });
   }
 });
 
@@ -1004,6 +1327,20 @@ router.post('/bulk', upload.single('file'), async (req, res) => {
         results.failed.push({ companyName: row.companyName, error: (err as any).message });
       }
     }
+
+    // Audit log for bulk import
+    await AuditLog.log(req, {
+      action: 'AI_INGEST',
+      resourceType: 'DEAL',
+      description: `Bulk import: ${results.success.length} deals imported, ${results.failed.length} failed`,
+      metadata: {
+        source: 'bulk_import',
+        filename: file.originalname,
+        total: results.total,
+        imported: results.success.length,
+        failed: results.failed.length,
+      },
+    });
 
     log.info('Bulk ingest complete', {
       total: results.total,

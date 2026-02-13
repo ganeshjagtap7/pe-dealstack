@@ -125,6 +125,7 @@ CREATE TABLE public.DealTeamMember (
   userId uuid NOT NULL,
   role text NOT NULL DEFAULT 'MEMBER'::text,
   addedAt timestamp with time zone DEFAULT now(),
+  accessLevel text DEFAULT 'view'::text CHECK ("accessLevel" = ANY (ARRAY['view'::text, 'edit'::text, 'admin'::text])),
   CONSTRAINT DealTeamMember_pkey PRIMARY KEY (id),
   CONSTRAINT DealTeamMember_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id),
   CONSTRAINT DealTeamMember_userId_fkey FOREIGN KEY (userId) REFERENCES public.User(id)
@@ -199,6 +200,20 @@ CREATE TABLE public.FolderInsight (
   generatedAt timestamp with time zone DEFAULT now(),
   CONSTRAINT FolderInsight_pkey PRIMARY KEY (id),
   CONSTRAINT FolderInsight_folderId_fkey FOREIGN KEY (folderId) REFERENCES public.Folder(id)
+);
+CREATE TABLE public.Invitation (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  firmName text NOT NULL,
+  role text NOT NULL DEFAULT 'MEMBER'::text CHECK (role = ANY (ARRAY['ADMIN'::text, 'MEMBER'::text, 'VIEWER'::text])),
+  invitedBy uuid NOT NULL,
+  status text NOT NULL DEFAULT 'PENDING'::text CHECK (status = ANY (ARRAY['PENDING'::text, 'ACCEPTED'::text, 'EXPIRED'::text, 'REVOKED'::text])),
+  token text NOT NULL UNIQUE,
+  expiresAt timestamp with time zone NOT NULL,
+  createdAt timestamp with time zone DEFAULT now(),
+  acceptedAt timestamp with time zone,
+  CONSTRAINT Invitation_pkey PRIMARY KEY (id),
+  CONSTRAINT Invitation_invitedBy_fkey FOREIGN KEY (invitedBy) REFERENCES public.User(id)
 );
 CREATE TABLE public.Memo (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -291,5 +306,7 @@ CREATE TABLE public.User (
   lastLoginAt timestamp with time zone,
   createdAt timestamp with time zone DEFAULT now(),
   updatedAt timestamp with time zone DEFAULT now(),
+  firmName text,
+  preferences jsonb DEFAULT '{}'::jsonb,
   CONSTRAINT User_pkey PRIMARY KEY (id)
 );

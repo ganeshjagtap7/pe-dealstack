@@ -20,6 +20,7 @@ const mockDeals = [
     ebitda: 12.4,
     irrProjected: 24.5,
     mom: 3.5,
+    updatedAt: '2026-02-13T10:00:00Z',
     company: { id: 'company-1', name: 'Apex Logistics Corp' },
   },
   {
@@ -33,6 +34,7 @@ const mockDeals = [
     ebitda: 45,
     irrProjected: 18.2,
     mom: 2.1,
+    updatedAt: '2026-02-13T10:00:00Z',
     company: { id: 'company-2', name: 'MediCare Plus Inc' },
   },
 ];
@@ -153,13 +155,25 @@ const createTestApp = () => {
     }
   });
 
-  // PATCH /api/deals/:id
+  // PATCH /api/deals/:id (with optimistic locking)
   app.patch('/api/deals/:id', async (req, res) => {
     const { id } = req.params;
-    const deal = mockDeals.find((d) => d.id === id);
+    const deal = mockDeals.find((d) => d.id === id) as any;
 
     if (!deal) {
       return res.status(404).json({ error: 'Deal not found' });
+    }
+
+    // Optimistic locking: if client sends lastKnownUpdatedAt, verify no concurrent edit
+    if (req.body.lastKnownUpdatedAt) {
+      const clientTimestamp = new Date(req.body.lastKnownUpdatedAt).getTime();
+      const serverTimestamp = new Date(deal.updatedAt || '2026-02-13T10:00:00Z').getTime();
+      if (clientTimestamp < serverTimestamp) {
+        return res.status(409).json({
+          error: 'Deal was modified by another user. Please refresh and try again.',
+          updatedAt: deal.updatedAt,
+        });
+      }
     }
 
     const updatedDeal = { ...deal, ...req.body, updatedAt: new Date().toISOString() };
@@ -317,6 +331,51 @@ describe('Deals API Endpoints', () => {
         .send({ stage: 'LOI_SUBMITTED' });
 
       expect(response.status).toBe(404);
+    });
+
+    it('should return 409 when lastKnownUpdatedAt is stale (optimistic lock)', async () => {
+      const response = await request(app)
+        .patch('/api/deals/550e8400-e29b-41d4-a716-446655440001')
+        .send({
+          stage: 'LOI_SUBMITTED',
+          lastKnownUpdatedAt: '2026-02-13T09:00:00Z', // Before server's 10:00:00Z
+        });
+
+      expect(response.status).toBe(409);
+      expect(response.body.error).toContain('modified by another user');
+    });
+
+    it('should allow update when lastKnownUpdatedAt matches server', async () => {
+      const response = await request(app)
+        .patch('/api/deals/550e8400-e29b-41d4-a716-446655440001')
+        .send({
+          stage: 'LOI_SUBMITTED',
+          lastKnownUpdatedAt: '2026-02-13T10:00:00Z', // Matches server
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.stage).toBe('LOI_SUBMITTED');
+    });
+
+    it('should allow update when lastKnownUpdatedAt is newer than server', async () => {
+      const response = await request(app)
+        .patch('/api/deals/550e8400-e29b-41d4-a716-446655440001')
+        .send({
+          stage: 'NEGOTIATION',
+          lastKnownUpdatedAt: '2026-02-13T11:00:00Z', // After server timestamp
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.stage).toBe('NEGOTIATION');
+    });
+
+    it('should skip optimistic lock check when lastKnownUpdatedAt is not sent', async () => {
+      const response = await request(app)
+        .patch('/api/deals/550e8400-e29b-41d4-a716-446655440001')
+        .send({ stage: 'CLOSING' });
+
+      expect(response.status).toBe(200);
+      expect(response.body.stage).toBe('CLOSING');
     });
   });
 
