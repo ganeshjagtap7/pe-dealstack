@@ -74,6 +74,7 @@ describe('buildResearchText', () => {
     const { buildResearchText } = await getModule();
     const text = buildResearchText({
       companyWebsite: {
+        homepageText: null,
         aboutText: 'We are a SaaS company founded in 2015.',
         teamText: null,
         productText: null,
@@ -90,6 +91,7 @@ describe('buildResearchText', () => {
     const { buildResearchText } = await getModule();
     const text = buildResearchText({
       companyWebsite: {
+        homepageText: null,
         aboutText: 'About text here',
         teamText: 'CEO: John Smith, CTO: Jane Doe',
         productText: 'Our platform serves enterprise clients',
@@ -114,6 +116,7 @@ describe('buildResearchText', () => {
     const { buildResearchText } = await getModule();
     const text = buildResearchText({
       companyWebsite: {
+        homepageText: null,
         aboutText: null,
         teamText: null,
         productText: null,
@@ -129,6 +132,7 @@ describe('buildResearchText', () => {
     const { buildResearchText } = await getModule();
     const text = buildResearchText({
       companyWebsite: {
+        homepageText: null,
         aboutText: 'About us info',
         teamText: null,
         productText: 'Product info',
@@ -174,6 +178,7 @@ describe('POST /api/ingest/url', () => {
 
       const mockResearch = {
         companyWebsite: {
+          homepageText: url.includes('empty') ? null : 'Welcome to our company. We provide enterprise solutions.',
           aboutText: url.includes('empty') ? null : 'We are a leading SaaS company with $200M revenue and 500 employees. Founded in 2010, we serve enterprise customers globally.',
           teamText: url.includes('empty') ? null : 'CEO: John Smith, CTO: Jane Doe, CFO: Bob Wilson',
           productText: url.includes('empty') ? null : 'Our cloud platform enables digital transformation for Fortune 500 companies.',

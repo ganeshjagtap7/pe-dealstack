@@ -2,6 +2,7 @@ import { log } from '../utils/logger.js';
 
 export interface ResearchResult {
   companyWebsite: {
+    homepageText: string | null;
     aboutText: string | null;
     teamText: string | null;
     productText: string | null;
@@ -113,6 +114,7 @@ export async function researchCompany(baseUrl: string): Promise<ResearchResult> 
 
   return {
     companyWebsite: {
+      homepageText: results['/'] || null,
       aboutText: results['/about'] || results['/about-us'] || results['/company'] || null,
       teamText: results['/team'] || results['/our-team'] || results['/leadership'] || null,
       productText: results['/products'] || results['/services'] || results['/what-we-do'] || null,
@@ -131,6 +133,10 @@ export async function researchCompany(baseUrl: string): Promise<ResearchResult> 
 export function buildResearchText(research: ResearchResult): string {
   let text = '';
 
+  // Always include homepage — many sites put all content on the main page
+  if (research.companyWebsite.homepageText) {
+    text += `=== HOMEPAGE ===\n${research.companyWebsite.homepageText}\n\n`;
+  }
   if (research.companyWebsite.aboutText) {
     text += `=== ABOUT THE COMPANY ===\n${research.companyWebsite.aboutText}\n\n`;
   }

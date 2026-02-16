@@ -285,6 +285,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         extractionConfidence: aiData.overallConfidence,
         needsReview: aiData.needsReview,
         reviewReasons: aiData.reviewReasons,
+        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
       })
       .select()
       .single();
@@ -415,10 +416,19 @@ router.post('/', upload.single('file'), async (req, res) => {
       },
     });
 
-    // Step 9: Audit log
+    // Step 9: Auto-assign creator as analyst
+    if (req.user?.id) {
+      await supabase.from('DealTeamMember').insert({
+        dealId: deal.id,
+        userId: req.user.id,
+        role: 'MEMBER',
+      });
+    }
+
+    // Step 10: Audit log
     await AuditLog.aiIngest(req, documentName, deal.id);
 
-    // Step 10: Auto-trigger multi-doc analysis if 2+ documents exist
+    // Step 11: Auto-trigger multi-doc analysis if 2+ documents exist
     const { count: docCount } = await supabase
       .from('Document')
       .select('id', { count: 'exact', head: true })
@@ -710,6 +720,7 @@ router.post('/text', async (req, res) => {
         extractionConfidence: aiData.overallConfidence,
         needsReview: aiData.needsReview,
         reviewReasons: aiData.reviewReasons,
+        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
       })
       .select()
       .single();
@@ -767,7 +778,16 @@ router.post('/text', async (req, res) => {
       },
     });
 
-    // Step 6: Trigger RAG embedding in background
+    // Step 6: Auto-assign creator as analyst
+    if (req.user?.id) {
+      await supabase.from('DealTeamMember').insert({
+        dealId: deal.id,
+        userId: req.user.id,
+        role: 'MEMBER',
+      });
+    }
+
+    // Step 7: Trigger RAG embedding in background
     if (text.length > 100) {
       embedDocument(document?.id || deal.id, deal.id, text)
         .then(result => {
@@ -931,6 +951,7 @@ router.post('/url', async (req, res) => {
         extractionConfidence: aiData.overallConfidence,
         needsReview: aiData.needsReview,
         reviewReasons: aiData.reviewReasons,
+        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
         source: 'web_research',
       })
       .select()
@@ -938,13 +959,58 @@ router.post('/url', async (req, res) => {
 
     if (dealError) throw dealError;
 
-    // Step 5: Store research as document record
+    // Step 5: Generate formatted Deal Overview and store as document
+    const overviewSections: string[] = [];
+    overviewSections.push(`# Deal Overview: ${companyName}\n`);
+
+    if (aiData.description.value) {
+      overviewSections.push(`## Company Profile`);
+      overviewSections.push(aiData.description.value);
+    }
+
+    const details: string[] = [];
+    if (aiData.industry.value) details.push(`- **Industry:** ${aiData.industry.value}`);
+    if (aiData.headquarters?.value) details.push(`- **Headquarters:** ${aiData.headquarters.value}`);
+    if (aiData.foundedYear?.value) details.push(`- **Founded:** ${aiData.foundedYear.value}`);
+    if (aiData.employees?.value) details.push(`- **Employees:** ~${aiData.employees.value.toLocaleString()}`);
+    details.push(`- **Website:** ${url}`);
+    if (details.length > 1) {
+      overviewSections.push(`\n## Key Details\n${details.join('\n')}`);
+    }
+
+    if (aiData.summary) {
+      overviewSections.push(`\n## Investment Thesis\n${aiData.summary}`);
+    }
+
+    const financials: string[] = [];
+    if (aiData.revenue.value != null) financials.push(`- **Revenue:** $${aiData.revenue.value}M`);
+    if (aiData.ebitda.value != null) financials.push(`- **EBITDA:** $${aiData.ebitda.value}M`);
+    if (aiData.ebitdaMargin?.value != null) financials.push(`- **EBITDA Margin:** ${aiData.ebitdaMargin.value}%`);
+    if (aiData.revenueGrowth?.value != null) financials.push(`- **Revenue Growth:** ${aiData.revenueGrowth.value}% YoY`);
+    if (financials.length > 0) {
+      overviewSections.push(`\n## Financial Highlights\n${financials.join('\n')}`);
+    }
+
+    if (aiData.investmentHighlights?.length > 0) {
+      overviewSections.push(`\n## Investment Highlights\n${aiData.investmentHighlights.map((h: string, i: number) => `${i + 1}. ${h}`).join('\n')}`);
+    }
+
+    if (aiData.keyRisks?.length > 0) {
+      overviewSections.push(`\n## Key Risks\n${aiData.keyRisks.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n')}`);
+    }
+
+    overviewSections.push(`\n---\n*Generated from web research of ${url}*`);
+    overviewSections.push(`*${research.companyWebsite.scrapedPages.length} pages analyzed · ${aiData.overallConfidence}% confidence*`);
+
+    const overviewText = overviewSections.join('\n');
+
     const { data: document } = await supabase
       .from('Document')
       .insert({
         dealId: deal.id,
-        name: `Web Research — ${companyName}`,
+        name: `Deal Overview — ${companyName}.md`,
         type: 'OTHER',
+        fileSize: Buffer.byteLength(overviewText, 'utf8'),
         extractedText: researchText,
         extractedData: {
           companyName: aiData.companyName,
@@ -964,10 +1030,11 @@ router.post('/url', async (req, res) => {
           needsReview: aiData.needsReview,
           reviewReasons: aiData.reviewReasons,
         },
+        aiAnalysis: overviewText,
         status: aiData.needsReview ? 'pending_review' : 'analyzed',
         confidence: aiData.overallConfidence / 100,
         aiAnalyzedAt: new Date().toISOString(),
-        mimeType: 'text/html',
+        mimeType: 'text/markdown',
         metadata: {
           sourceUrl: url,
           pagesScraped: research.companyWebsite.scrapedPages,
@@ -994,7 +1061,16 @@ router.post('/url', async (req, res) => {
       },
     });
 
-    // Step 7: RAG embed research text in background
+    // Step 7: Auto-assign creator as analyst
+    if (req.user?.id) {
+      await supabase.from('DealTeamMember').insert({
+        dealId: deal.id,
+        userId: req.user.id,
+        role: 'MEMBER',
+      });
+    }
+
+    // Step 8: RAG embed research text in background
     if (researchText.length > 100) {
       embedDocument(document?.id || deal.id, deal.id, researchText)
         .then(result => {
@@ -1128,6 +1204,7 @@ router.post('/email', upload.single('file'), async (req: any, res) => {
         extractionConfidence: aiData.overallConfidence,
         needsReview: aiData.needsReview,
         reviewReasons: aiData.reviewReasons,
+        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
         source: 'email',
       })
       .select()
@@ -1206,7 +1283,16 @@ router.post('/email', upload.single('file'), async (req: any, res) => {
       },
     });
 
-    // Step 10: RAG embed email body in background
+    // Step 10: Auto-assign creator as analyst
+    if (req.user?.id) {
+      await supabase.from('DealTeamMember').insert({
+        dealId: deal.id,
+        userId: req.user.id,
+        role: 'MEMBER',
+      });
+    }
+
+    // Step 11: RAG embed email body in background
     if (dealText.length > 100) {
       embedDocument(document?.id || deal.id, deal.id, dealText)
         .catch(err => log.error('Email RAG embedding error', err));

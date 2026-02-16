@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Help Center - PE OS</title>
+    <meta name="description" content="Find answers to common questions about PE OS. FAQs on account setup, deal management, AI features, security, billing, and troubleshooting."/>
+    <meta property="og:title" content="Help Center - PE OS"/>
+    <meta property="og:description" content="FAQs and troubleshooting for PE OS."/>
+    <meta property="og:type" content="website"/>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1269e2",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "sans": ["Manrope", "sans-serif"]
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white font-display">
+    <!-- Navigation -->
+    <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#e5e7eb] dark:border-b-[#1e293b] bg-white dark:bg-[#101822] px-6 lg:px-10 py-3 sticky top-0 z-50">
+        <div class="flex items-center gap-4 text-[#111418] dark:text-white">
+            <div class="size-8 text-primary">
+                <svg class="w-full h-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+                </svg>
+            </div>
+            <a href="index.html" class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">PE OS</a>
+        </div>
+        <div class="hidden md:flex flex-1 justify-center">
+            <div class="flex items-center gap-9">
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="index.html">Platform</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="solutions.html">Solutions</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="pricing.html">Pricing</a>
+                <a class="text-primary text-sm font-medium leading-normal" href="resources.html">Resources</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="company.html">Company</a>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="login.html" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-transparent border border-[#d1d5db] dark:border-gray-600 text-[#111418] dark:text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <span class="truncate">Log In</span>
+            </a>
+            <a href="signup.html" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors shadow-sm">
+                <span class="truncate">Get Started</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="min-h-screen">
+        <!-- Hero -->
+        <div class="bg-gradient-to-br from-amber-500/5 to-orange-50 dark:from-amber-500/10 dark:to-background-dark py-20">
+            <div class="max-w-6xl mx-auto px-6 text-center">
+                <nav class="flex items-center justify-center gap-2 text-sm text-[#64748b] dark:text-gray-400 mb-6">
+                    <a href="resources.html" class="hover:text-primary transition-colors">Resources</a>
+                    <span class="material-symbols-outlined text-base">chevron_right</span>
+                    <span class="text-[#111418] dark:text-white font-medium">Help Center</span>
+                </nav>
+                <h1 class="text-4xl lg:text-5xl font-extrabold text-[#111418] dark:text-white mb-6">Help Center</h1>
+                <p class="text-lg text-[#64748b] dark:text-gray-400 max-w-3xl mx-auto">
+                    Find answers to common questions and troubleshooting guides.
+                </p>
+            </div>
+        </div>
+
+        <!-- Category Cards -->
+        <div class="max-w-6xl mx-auto px-6 py-16">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+                <a href="#account" class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    <div class="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 mb-4 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined">person</span>
+                    </div>
+                    <h3 class="font-bold text-[#111418] dark:text-white mb-1">Account & Setup</h3>
+                    <p class="text-sm text-[#64748b] dark:text-gray-400">Registration, login, profile, team setup</p>
+                </a>
+                <a href="#deals" class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    <div class="size-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 mb-4 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined">handshake</span>
+                    </div>
+                    <h3 class="font-bold text-[#111418] dark:text-white mb-1">Deal Management</h3>
+                    <p class="text-sm text-[#64748b] dark:text-gray-400">Importing, editing, tracking deals</p>
+                </a>
+                <a href="#ai" class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    <div class="size-10 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-600 mb-4 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined">psychology</span>
+                    </div>
+                    <h3 class="font-bold text-[#111418] dark:text-white mb-1">AI Features</h3>
+                    <p class="text-sm text-[#64748b] dark:text-gray-400">Extraction, chat, memo generation</p>
+                </a>
+                <a href="#security" class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    <div class="size-10 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-600 mb-4 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined">shield</span>
+                    </div>
+                    <h3 class="font-bold text-[#111418] dark:text-white mb-1">Security & Privacy</h3>
+                    <p class="text-sm text-[#64748b] dark:text-gray-400">Encryption, compliance, data protection</p>
+                </a>
+                <a href="#billing" class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    <div class="size-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 mb-4 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined">payments</span>
+                    </div>
+                    <h3 class="font-bold text-[#111418] dark:text-white mb-1">Billing & Plans</h3>
+                    <p class="text-sm text-[#64748b] dark:text-gray-400">Pricing, trials, upgrades, invoices</p>
+                </a>
+                <a href="#troubleshooting" class="group p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm hover:shadow-lg hover:-translate-y-0.5 transition-all">
+                    <div class="size-10 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 mb-4 group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined">build</span>
+                    </div>
+                    <h3 class="font-bold text-[#111418] dark:text-white mb-1">Troubleshooting</h3>
+                    <p class="text-sm text-[#64748b] dark:text-gray-400">Common issues and how to fix them</p>
+                </a>
+            </div>
+        </div>
+
+        <!-- FAQ Sections -->
+        <div class="bg-white dark:bg-[#1e293b] py-16">
+            <div class="max-w-4xl mx-auto px-6">
+
+                <!-- Account & Setup -->
+                <div id="account" class="mb-12 scroll-mt-24">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="size-8 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600">
+                            <span class="material-symbols-outlined text-xl">person</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-[#111418] dark:text-white">Account & Setup</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                How do I create an account?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Click "Get Started" on the homepage or visit the <a href="signup.html" class="text-primary hover:underline">sign up page</a>. Enter your email, full name, firm name, and password. You'll receive a verification email — click the link to activate your account. The first user in a workspace automatically gets the Admin role.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                How do I invite team members?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Go to <strong>Settings</strong> from the sidebar, then click "Invite Team Member." Enter the person's email and select their role (Admin, Member, or Viewer). They'll receive an email invitation with a link to join your workspace. Invitations expire after 7 days.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                What are the different user roles?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                <strong>Admin</strong> — full access including user management, audit logs, data export, and all deal operations. <strong>Member</strong> — standard access to create, edit, and view deals, upload documents, and use AI features. <strong>Viewer</strong> — read-only access to view deals and documents. Display titles (MD, VP, Associate, Analyst) are separate and don't affect permissions.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                I forgot my password. How do I reset it?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Click "Forgot Password" on the login page, enter your email, and we'll send a reset link. The link is valid for 1 hour. If you don't receive the email, check your spam folder or contact support.
+                            </p>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Deal Management -->
+                <div id="deals" class="mb-12 scroll-mt-24">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="size-8 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600">
+                            <span class="material-symbols-outlined text-xl">handshake</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-[#111418] dark:text-white">Deal Management</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                What file types can I upload?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                PE OS supports PDF, Word (.docx), Excel (.xlsx, .csv), plain text (.txt), and email (.eml) files. Maximum file size is 50MB. Excel files with multiple rows are processed as bulk imports, creating one deal per row.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                How do deal stages work?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Deals progress through stages: <strong>Initial Review</strong> (first look), <strong>Due Diligence</strong> (detailed analysis), <strong>LOI</strong> (letter of intent), <strong>Closing</strong> (final negotiation), <strong>Closed</strong> (deal done), or <strong>Passed</strong> (declined). Change the stage from the deal detail page or CRM list view.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                Can I import deals from a company website URL?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Yes. Go to Deal Intake, select the "Enter URL" tab, and paste the company's website. PE OS scrapes multiple pages (About, Team, Products, etc.) and uses AI to extract deal-relevant information. You can preview the extraction before creating the deal.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                How do I export my deal data?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Admins can export all deal data via the API: <code class="bg-[#e2e8f0] dark:bg-[#475569] px-1.5 py-0.5 rounded text-xs font-mono">GET /api/export/deals?format=csv</code> for CSV or <code class="bg-[#e2e8f0] dark:bg-[#475569] px-1.5 py-0.5 rounded text-xs font-mono">format=json</code> for JSON. Every export is audit-logged for compliance.
+                            </p>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- AI Features -->
+                <div id="ai" class="mb-12 scroll-mt-24">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="size-8 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-600">
+                            <span class="material-symbols-outlined text-xl">psychology</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-[#111418] dark:text-white">AI Features</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                How does AI data extraction work?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                When you upload a document, PE OS extracts the text content, then sends it to GPT-4 with a specialized prompt for PE deal analysis. The AI identifies company name, industry, revenue, EBITDA, margins, employee count, and more. Each field gets a confidence score (0-100%). Fields below 60% are flagged for manual review. Financial data is also validated against PE industry norms.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                What is "Chat with Deals"?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Chat with Deals lets you ask natural language questions about any deal. The AI searches across all documents uploaded for that deal using RAG (Retrieval-Augmented Generation) and provides answers with context. Try questions like: "What's the revenue trend?", "Who are the key executives?", or "Summarize the competitive landscape."
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                What does multi-document analysis do?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                When a deal has 2 or more documents, PE OS can cross-reference them to detect conflicts (e.g., different revenue figures in the CIM vs teaser), fill data gaps (one doc has info the other doesn't), and synthesize insights across all sources. This runs automatically when you upload additional documents, or you can trigger it manually.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                Is my data used to train AI models?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                No. Your deal data is never used to train AI models. We use the OpenAI API with data processing agreements that explicitly prohibit using customer data for model training. Your confidential deal information stays confidential.
+                            </p>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Security & Privacy -->
+                <div id="security" class="mb-12 scroll-mt-24">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="size-8 rounded-lg bg-teal-500/10 flex items-center justify-center text-teal-600">
+                            <span class="material-symbols-outlined text-xl">shield</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-[#111418] dark:text-white">Security & Privacy</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                How is my data encrypted?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                PE OS uses AES-256-GCM encryption for sensitive deal data at rest, with unique initialization vectors per encryption. All data in transit is protected with TLS 1.3. Database connections use SSL. Encryption keys are managed server-side and never exposed to clients.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                What is the audit trail?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Every action in PE OS is logged to an immutable audit trail — deal creation, edits, deletions, document uploads, AI extractions, exports, and login events. Audit logs cannot be modified or deleted (INSERT-ONLY), meeting SEC/regulatory requirements. Admins can filter logs by date, action type, resource, and severity.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                Can I export or delete all my data?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Yes. You can export all deal data at any time in CSV or JSON format. For account deletion, contact our support team and we'll permanently delete all your data within 30 days, in compliance with data protection regulations.
+                            </p>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Billing & Plans -->
+                <div id="billing" class="mb-12 scroll-mt-24">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="size-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
+                            <span class="material-symbols-outlined text-xl">payments</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-[#111418] dark:text-white">Billing & Plans</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                Is there a free trial?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Yes. PE OS offers a 14-day free trial with full access to Mid-Market tier features. No credit card required. You can import deals, use AI features, invite team members, and evaluate the platform risk-free.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                What plans are available?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Visit our <a href="pricing.html" class="text-primary hover:underline">pricing page</a> for current plans and features. We offer tiers for emerging funds, mid-market firms, and enterprise PE firms. All plans include core AI features, deal tracking, and document management.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                How do I upgrade or change my plan?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Contact our sales team at <a href="mailto:hello@pocket-fund.com" class="text-primary hover:underline">hello@pocket-fund.com</a> to discuss plan changes. Upgrades take effect immediately, and we'll prorate any billing differences.
+                            </p>
+                        </details>
+                    </div>
+                </div>
+
+                <!-- Troubleshooting -->
+                <div id="troubleshooting" class="mb-12 scroll-mt-24">
+                    <div class="flex items-center gap-3 mb-6">
+                        <div class="size-8 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600">
+                            <span class="material-symbols-outlined text-xl">build</span>
+                        </div>
+                        <h2 class="text-xl font-bold text-[#111418] dark:text-white">Troubleshooting</h2>
+                    </div>
+                    <div class="space-y-3">
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                My document upload failed. What should I do?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Check that your file is under 50MB and in a supported format (PDF, Word, Excel, CSV, TXT, EML). If the file is password-protected, remove the password first. For scanned PDFs without searchable text, try using a PDF with OCR text layer. If the issue persists, contact support with the file details.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                The AI extraction has low confidence scores. Why?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Low confidence usually means the document doesn't contain clear financial or company data. This is common with early-stage teasers, NDAs, or heavily redacted documents. You can manually edit the extracted fields on the deal page. Uploading additional documents (CIM, financial model) will improve data quality through multi-document analysis.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                The page is loading slowly. What can I do?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                PE OS is hosted on Render's free tier, which may experience a cold start delay of up to 50 seconds after periods of inactivity. Once warmed up, subsequent requests are fast. For production use, we recommend upgrading to a paid tier for always-on performance.
+                            </p>
+                        </details>
+                        <details class="group p-5 rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155]">
+                            <summary class="flex items-center justify-between cursor-pointer list-none font-semibold text-[#111418] dark:text-white text-sm">
+                                I'm getting a "session expired" error. What do I do?
+                                <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform text-lg">expand_more</span>
+                            </summary>
+                            <p class="mt-3 text-sm text-[#64748b] dark:text-gray-400">
+                                Authentication tokens expire after 1 hour for security. Simply refresh the page or log in again. If you're being logged out frequently, make sure your browser isn't blocking cookies or local storage for the PE OS domain.
+                            </p>
+                        </details>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contact Support -->
+        <div class="py-16">
+            <div class="max-w-4xl mx-auto px-6 text-center">
+                <h2 class="text-2xl font-bold text-[#111418] dark:text-white mb-4">Still have questions?</h2>
+                <p class="text-[#64748b] dark:text-gray-400 mb-8">
+                    Our support team is here to help. Reach out anytime.
+                </p>
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <a href="mailto:hello@pocket-fund.com" class="inline-flex items-center justify-center gap-2 h-12 px-8 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 transition-colors">
+                        <span class="material-symbols-outlined">mail</span>
+                        Email Support
+                    </a>
+                    <a href="documentation.html" class="inline-flex items-center justify-center gap-2 h-12 px-8 rounded-lg bg-[#f1f5f9] dark:bg-[#334155] text-[#111418] dark:text-white font-bold hover:bg-[#e2e8f0] dark:hover:bg-[#475569] transition-colors">
+                        <span class="material-symbols-outlined">menu_book</span>
+                        Browse Documentation
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-solid border-t-[#e5e7eb] dark:border-t-[#1e293b] bg-white dark:bg-[#101822] py-12 px-10">
+        <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-3">
+                <div class="size-6 text-primary">
+                    <svg class="w-full h-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                        <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <span class="text-sm font-medium text-[#64748b] dark:text-gray-500">&copy; 2026 PE OS. All rights reserved.</span>
+            </div>
+            <div class="flex gap-6">
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="privacy-policy.html">Privacy Policy</a>
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="terms-of-service.html">Terms of Service</a>
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="mailto:hello@pocket-fund.com">Contact</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

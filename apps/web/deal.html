@@ -221,17 +221,12 @@
                         <div class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all"></div>
                         <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">Revenue (LTM)</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-revenue" class="text-2xl font-bold text-text-main leading-none">$120M</span>
-                            <span class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center">
-                                <span class="material-symbols-outlined text-[12px]">arrow_upward</span>15%
+                            <span id="deal-revenue" class="text-lg font-bold text-text-muted leading-none">Not available</span>
+                            <span id="revenue-growth-badge" class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">
+                                <span class="material-symbols-outlined text-[12px]">arrow_upward</span><span id="revenue-growth-value"></span>
                             </span>
                         </div>
-                        <div class="h-10 mt-3 w-full flex items-end gap-1 opacity-80">
-                            <div class="flex-1 bg-secondary/60 h-[40%] rounded-t-sm"></div>
-                            <div class="flex-1 bg-secondary/60 h-[50%] rounded-t-sm"></div>
-                            <div class="flex-1 bg-secondary/60 h-[45%] rounded-t-sm"></div>
-                            <div class="flex-1 bg-secondary/60 h-[60%] rounded-t-sm"></div>
-                            <div class="flex-1 bg-secondary h-[80%] rounded-t-sm"></div>
+                        <div id="revenue-chart" class="h-10 mt-3 w-full flex items-end gap-1 opacity-80">
                         </div>
                     </div>
                     <!-- EBITDA Card -->
@@ -239,14 +234,12 @@
                         <div class="absolute -right-4 -top-4 size-20 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-all"></div>
                         <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">EBITDA Margin</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-ebitda" class="text-2xl font-bold text-text-main leading-none">22%</span>
-                            <span class="text-[10px] font-bold text-text-muted bg-background-body border border-border-subtle px-1.5 py-0.5 rounded inline-flex items-center">
-                                Flat
-                            </span>
+                            <span id="deal-ebitda" class="text-lg font-bold text-text-muted leading-none">Not available</span>
+                            <span id="ebitda-trend-badge" class="text-[10px] font-bold text-text-muted bg-background-body border border-border-subtle px-1.5 py-0.5 rounded inline-flex items-center hidden"></span>
                         </div>
                         <div class="h-10 mt-3 w-full flex items-center">
                             <div class="w-full h-2 bg-border-subtle rounded-full overflow-hidden">
-                                <div class="h-full bg-primary rounded-full transition-all" style="width: 22%"></div>
+                                <div id="ebitda-bar" class="h-full bg-primary rounded-full transition-all" style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
@@ -255,10 +248,10 @@
                         <div class="absolute -right-4 -top-4 size-20 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition-all"></div>
                         <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">Deal Size</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-size" class="text-2xl font-bold text-text-main leading-none">$450M</span>
+                            <span id="deal-size" class="text-lg font-bold text-text-muted leading-none">Not available</span>
                         </div>
                         <div class="h-10 mt-3 flex items-center">
-                            <p id="deal-multiple" class="text-xs text-text-muted font-medium leading-tight">~17x EBITDA Multiple</p>
+                            <p id="deal-multiple" class="text-xs text-text-muted font-medium leading-tight italic opacity-50">Add via Edit Deal</p>
                         </div>
                     </div>
                     <!-- IRR Card -->
@@ -266,12 +259,12 @@
                         <div class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all"></div>
                         <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">Projected IRR</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-irr" class="text-2xl font-bold text-text-main leading-none">24%</span>
-                            <span class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center">Target</span>
+                            <span id="deal-irr" class="text-lg font-bold text-text-muted leading-none">Not available</span>
+                            <span id="irr-target-badge" class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">Target</span>
                         </div>
                         <div class="h-10 mt-3 flex items-center gap-2">
                             <span class="text-xs text-text-muted font-medium">MoM:</span>
-                            <span id="deal-mom" class="text-sm font-bold text-text-main">3.5x</span>
+                            <span id="deal-mom" class="text-sm font-bold text-text-main">&mdash;</span>
                         </div>
                     </div>
                 </div>
@@ -283,42 +276,8 @@
                             <span class="material-symbols-outlined text-primary text-lg">flag</span>
                             Deal Progress
                         </h3>
-                        <div class="relative pl-2">
-                            <div class="absolute left-[11px] top-2 bottom-2 w-0.5 bg-border-subtle"></div>
-                            <div class="flex gap-4 mb-6 relative">
-                                <div class="size-6 rounded-full bg-secondary border-4 border-white z-10 shrink-0 flex items-center justify-center shadow-sm">
-                                    <span class="material-symbols-outlined text-[14px] text-white font-bold">check</span>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-bold text-text-main">NDA Signed</h4>
-                                    <p class="text-xs text-text-muted mt-0.5 font-medium">Sep 12, 2023</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-4 mb-6 relative">
-                                <div class="size-6 rounded-full bg-secondary border-4 border-white z-10 shrink-0 flex items-center justify-center shadow-sm">
-                                    <span class="material-symbols-outlined text-[14px] text-white font-bold">check</span>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-bold text-text-main">Management Meeting</h4>
-                                    <p class="text-xs text-text-muted mt-0.5 font-medium">Oct 04, 2023 - Positive feedback</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-4 mb-6 relative">
-                                <div class="size-6 rounded-full bg-primary border-4 border-primary-light outline outline-2 outline-primary/20 z-10 shrink-0 flex items-center justify-center shadow-[0_0_10px_rgba(0,51,102,0.3)]">
-                                    <div class="size-2 bg-white rounded-full animate-pulse"></div>
-                                </div>
-                                <div>
-                                    <h4 class="text-sm font-bold text-primary">Commercial Due Diligence</h4>
-                                    <p class="text-xs text-text-muted mt-0.5 font-medium">In Progress - Expected Nov 20</p>
-                                </div>
-                            </div>
-                            <div class="flex gap-4 relative opacity-40">
-                                <div class="size-6 rounded-full bg-background-body border-4 border-white border border-border-subtle z-10 shrink-0"></div>
-                                <div>
-                                    <h4 class="text-sm font-bold text-text-muted">Investment Committee</h4>
-                                    <p class="text-xs text-text-muted mt-0.5">Scheduled: Nov 28, 2023</p>
-                                </div>
-                            </div>
+                        <div id="deal-progress-items" class="relative pl-2">
+                            <p class="text-sm text-text-muted py-4">Loading progress...</p>
                         </div>
                     </div>
                     <div class="flex flex-col gap-4">
@@ -327,26 +286,9 @@
                                 <span class="material-symbols-outlined text-amber-500 text-lg">warning</span>
                                 Key Risks
                             </h3>
-                            <ul class="space-y-3">
-                                <li class="bg-amber-50 border border-amber-200 p-3 rounded-lg">
-                                    <div class="flex items-start gap-2">
-                                        <span class="material-symbols-outlined text-amber-500 text-sm mt-0.5">error</span>
-                                        <div>
-                                            <p class="text-sm text-text-main font-bold">Customer Concentration</p>
-                                            <p class="text-xs text-text-secondary mt-1">Top 3 clients account for 45% of recurring revenue.</p>
-                                        </div>
-                                    </div>
-                                </li>
-                                <li class="bg-white border border-border-subtle p-3 rounded-lg hover:border-primary/30 transition-colors shadow-sm">
-                                    <div class="flex items-start gap-2">
-                                        <span class="material-symbols-outlined text-text-muted text-sm mt-0.5">info</span>
-                                        <div>
-                                            <p class="text-sm text-text-main font-bold">Legacy Tech Debt</p>
-                                            <p class="text-xs text-text-secondary mt-1">Platform rewrite required for scalability.</p>
-                                        </div>
-                                    </div>
-                                </li>
-                            </ul>
+                            <div id="key-risks-list">
+                                <p class="text-sm text-text-muted py-4">Loading risks...</p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -390,24 +332,7 @@
                 <div class="mt-auto pt-6 border-t border-border-subtle">
                     <h3 class="text-sm font-bold text-text-main mb-3">Recent Documents</h3>
                     <div id="documents-list" class="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-                        <div class="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-primary-light/30 cursor-pointer transition-colors group shadow-sm">
-                            <div class="size-10 bg-red-50 rounded flex items-center justify-center text-red-500 group-hover:bg-red-100 transition-colors">
-                                <span class="material-symbols-outlined">picture_as_pdf</span>
-                            </div>
-                            <div class="flex flex-col">
-                                <span class="text-sm font-bold text-text-main">IM_Deck_Final.pdf</span>
-                                <span class="text-xs text-text-muted">2.4 MB - Added yesterday</span>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-primary-light/30 cursor-pointer transition-colors group shadow-sm">
-                            <div class="size-10 bg-secondary-light rounded flex items-center justify-center text-secondary group-hover:bg-secondary/20 transition-colors">
-                                <span class="material-symbols-outlined">table_view</span>
-                            </div>
-                            <div class="flex flex-col">
-                                <span class="text-sm font-bold text-text-main">Q3_Financials.xlsx</span>
-                                <span class="text-xs text-text-muted">850 KB - Added today</span>
-                            </div>
-                        </div>
+                        <p class="text-sm text-text-muted py-2">No documents uploaded yet.</p>
                     </div>
                 </div>
             </section>

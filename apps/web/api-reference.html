@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html class="light" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>API Reference - PE OS</title>
+    <meta name="description" content="PE OS REST API reference. Build custom integrations with authentication, deals, ingestion, documents, memos, export, and audit endpoints."/>
+    <meta property="og:title" content="API Reference - PE OS"/>
+    <meta property="og:description" content="Full REST API reference with examples for PE OS."/>
+    <meta property="og:type" content="website"/>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#1269e2",
+                        "background-light": "#f8fafc",
+                        "background-dark": "#101822",
+                    },
+                    fontFamily: {
+                        "display": ["Manrope", "sans-serif"],
+                        "sans": ["Manrope", "sans-serif"],
+                        "mono": ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        .method-get { background: #dcfce7; color: #166534; }
+        .method-post { background: #dbeafe; color: #1e40af; }
+        .method-patch { background: #fef3c7; color: #92400e; }
+        .method-delete { background: #fee2e2; color: #991b1b; }
+        .dark .method-get { background: #166534; color: #bbf7d0; }
+        .dark .method-post { background: #1e3a5f; color: #93c5fd; }
+        .dark .method-patch { background: #78350f; color: #fde68a; }
+        .dark .method-delete { background: #7f1d1d; color: #fecaca; }
+        pre code { font-size: 13px; line-height: 1.6; }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white font-display">
+    <!-- Navigation -->
+    <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-b-[#e5e7eb] dark:border-b-[#1e293b] bg-white dark:bg-[#101822] px-6 lg:px-10 py-3 sticky top-0 z-50">
+        <div class="flex items-center gap-4 text-[#111418] dark:text-white">
+            <div class="size-8 text-primary">
+                <svg class="w-full h-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                    <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+                </svg>
+            </div>
+            <a href="index.html" class="text-[#111418] dark:text-white text-lg font-bold leading-tight tracking-[-0.015em]">PE OS</a>
+        </div>
+        <div class="hidden md:flex flex-1 justify-center">
+            <div class="flex items-center gap-9">
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="index.html">Platform</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="solutions.html">Solutions</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="pricing.html">Pricing</a>
+                <a class="text-primary text-sm font-medium leading-normal" href="resources.html">Resources</a>
+                <a class="text-[#111418] dark:text-gray-300 text-sm font-medium leading-normal hover:text-primary transition-colors" href="company.html">Company</a>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <a href="login.html" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-transparent border border-[#d1d5db] dark:border-gray-600 text-[#111418] dark:text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                <span class="truncate">Log In</span>
+            </a>
+            <a href="signup.html" class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-9 px-4 bg-primary text-white text-sm font-bold leading-normal tracking-[0.015em] hover:bg-primary/90 transition-colors shadow-sm">
+                <span class="truncate">Get Started</span>
+            </a>
+        </div>
+    </header>
+
+    <main class="min-h-screen">
+        <!-- Hero -->
+        <div class="bg-gradient-to-br from-emerald-500/5 to-green-50 dark:from-emerald-500/10 dark:to-background-dark py-20">
+            <div class="max-w-6xl mx-auto px-6 text-center">
+                <nav class="flex items-center justify-center gap-2 text-sm text-[#64748b] dark:text-gray-400 mb-6">
+                    <a href="resources.html" class="hover:text-primary transition-colors">Resources</a>
+                    <span class="material-symbols-outlined text-base">chevron_right</span>
+                    <span class="text-[#111418] dark:text-white font-medium">API Reference</span>
+                </nav>
+                <h1 class="text-4xl lg:text-5xl font-extrabold text-[#111418] dark:text-white mb-6">API Reference</h1>
+                <p class="text-lg text-[#64748b] dark:text-gray-400 max-w-3xl mx-auto mb-8">
+                    Build custom integrations with the PE OS REST API. All endpoints require authentication via Bearer token.
+                </p>
+                <div class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white dark:bg-[#334155] border border-[#e2e8f0] dark:border-[#475569] font-mono text-sm">
+                    <span class="text-[#64748b] dark:text-gray-400">Base URL:</span>
+                    <span class="text-primary font-semibold">https://pe-os.onrender.com/api</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Authentication -->
+        <div class="max-w-6xl mx-auto px-6 py-16">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="size-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600">
+                    <span class="material-symbols-outlined">key</span>
+                </div>
+                <h2 class="text-2xl font-bold text-[#111418] dark:text-white">Authentication</h2>
+            </div>
+            <div class="p-6 rounded-xl bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#334155] shadow-sm mb-6">
+                <p class="text-[#64748b] dark:text-gray-400 mb-4">
+                    PE OS uses <strong class="text-[#111418] dark:text-white">Supabase Auth</strong> with JWT tokens. Obtain a token by signing in through the Supabase Auth API, then include it as a Bearer token in all requests.
+                </p>
+                <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-4 overflow-x-auto"><code class="text-gray-300 font-mono">// Include in all API requests
+Authorization: Bearer YOUR_SUPABASE_JWT_TOKEN</code></pre>
+            </div>
+            <div class="p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-sm text-amber-800 dark:text-amber-200">
+                <strong>Note:</strong> Tokens expire after 1 hour. Use the Supabase refresh token flow to obtain new access tokens without re-authenticating.
+            </div>
+        </div>
+
+        <!-- API Endpoints -->
+        <div class="bg-white dark:bg-[#1e293b] py-16">
+            <div class="max-w-6xl mx-auto px-6">
+                <h2 class="text-2xl font-bold text-[#111418] dark:text-white mb-10">Endpoints</h2>
+
+                <div class="space-y-4">
+                    <!-- Deals -->
+                    <details class="group rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155] overflow-hidden" open>
+                        <summary class="flex items-center gap-4 p-6 cursor-pointer list-none">
+                            <div class="size-10 rounded-lg bg-blue-500/10 flex items-center justify-center text-blue-600 flex-shrink-0">
+                                <span class="material-symbols-outlined">handshake</span>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-[#111418] dark:text-white">Deals</h3>
+                                <p class="text-sm text-[#64748b] dark:text-gray-400">Create, read, update, and delete deals in your pipeline</p>
+                            </div>
+                            <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                        </summary>
+                        <div class="px-6 pb-6 pt-2 border-t border-[#e2e8f0] dark:border-[#334155]">
+                            <div class="space-y-4">
+                                <!-- GET /deals -->
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-get px-2 py-0.5 rounded text-xs font-bold font-mono">GET</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/deals</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400 mb-3">List all deals for the authenticated user's organization. Supports filtering and pagination.</p>
+                                    <div class="text-xs font-mono text-[#64748b] dark:text-gray-400">
+                                        <span class="font-semibold text-[#111418] dark:text-white">Query params:</span>
+                                        <span class="ml-2">status, stage, search, sortBy, sortOrder, limit, offset</span>
+                                    </div>
+                                </div>
+
+                                <!-- GET /deals/:id -->
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-get px-2 py-0.5 rounded text-xs font-bold font-mono">GET</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/deals/:id</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Get a single deal with all details including company, documents, activities, and team members.</p>
+                                </div>
+
+                                <!-- POST /deals -->
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/deals</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400 mb-3">Create a new deal manually.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs"><code class="text-gray-300 font-mono">{
+  "name": "Acme Corp Acquisition",
+  "industry": "Manufacturing",
+  "stage": "INITIAL_REVIEW",
+  "dealSize": 50,
+  "revenue": 25,
+  "ebitda": 8
+}</code></pre>
+                                </div>
+
+                                <!-- PATCH /deals/:id -->
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-patch px-2 py-0.5 rounded text-xs font-bold font-mono">PATCH</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/deals/:id</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Update deal fields. Supports optimistic locking via <code class="bg-[#f1f5f9] dark:bg-[#334155] px-1 rounded text-xs">lastKnownUpdatedAt</code> to prevent concurrent edit conflicts (returns 409 if stale).</p>
+                                </div>
+
+                                <!-- DELETE /deals/:id -->
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-delete px-2 py-0.5 rounded text-xs font-bold font-mono">DELETE</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/deals/:id</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Delete a deal and all associated data (documents, activities, memos). Admin or deal creator only.</p>
+                                </div>
+
+                                <!-- POST /deals/:id/analyze -->
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/deals/:id/analyze</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Trigger multi-document analysis. Requires 2+ documents. Detects conflicts, fills gaps, and synthesizes insights across all documents.</p>
+                                </div>
+
+                                <!-- POST /deals/:id/chat -->
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/deals/:id/chat</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Chat with a deal using AI. Sends a question and receives an AI-generated answer based on all deal documents (RAG).</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">{ "message": "What is the company's revenue growth trend?" }</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Ingestion -->
+                    <details class="group rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155] overflow-hidden">
+                        <summary class="flex items-center gap-4 p-6 cursor-pointer list-none">
+                            <div class="size-10 rounded-lg bg-violet-500/10 flex items-center justify-center text-violet-600 flex-shrink-0">
+                                <span class="material-symbols-outlined">upload_file</span>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-[#111418] dark:text-white">Deal Ingestion</h3>
+                                <p class="text-sm text-[#64748b] dark:text-gray-400">Import deals from files, text, URLs, or emails</p>
+                            </div>
+                            <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                        </summary>
+                        <div class="px-6 pb-6 pt-2 border-t border-[#e2e8f0] dark:border-[#334155]">
+                            <div class="space-y-4">
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/ingest</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Upload a document file (PDF, Word, Excel, CSV, text). Uses multipart form data. Excel/CSV files are auto-routed to bulk import.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">Content-Type: multipart/form-data
+Body: file (binary)</code></pre>
+                                </div>
+
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/ingest/text</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Create a deal from pasted text content.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">{
+  "text": "Deal content text...",
+  "sourceType": "email"  // email | note | slack | whatsapp | other
+}</code></pre>
+                                </div>
+
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/ingest/url</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Research a company from its website URL. Scrapes multiple pages and extracts deal data.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">{
+  "url": "https://acme.com",
+  "companyName": "Acme Corp",       // optional override
+  "autoCreateDeal": true            // false = preview only
+}</code></pre>
+                                </div>
+
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/ingest/email</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Upload a .eml email file. Parses email body for deal data and auto-processes PDF attachments.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">Content-Type: multipart/form-data
+Body: file (.eml)</code></pre>
+                                </div>
+
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/ingest/bulk</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Bulk import deals from an Excel or CSV file. Each row creates a separate deal. Returns imported/failed/total counts.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Memos -->
+                    <details class="group rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155] overflow-hidden">
+                        <summary class="flex items-center gap-4 p-6 cursor-pointer list-none">
+                            <div class="size-10 rounded-lg bg-emerald-500/10 flex items-center justify-center text-emerald-600 flex-shrink-0">
+                                <span class="material-symbols-outlined">description</span>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-[#111418] dark:text-white">Memos</h3>
+                                <p class="text-sm text-[#64748b] dark:text-gray-400">Create and manage investment memos with AI assistance</p>
+                            </div>
+                            <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                        </summary>
+                        <div class="px-6 pb-6 pt-2 border-t border-[#e2e8f0] dark:border-[#334155]">
+                            <div class="space-y-4">
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-get px-2 py-0.5 rounded text-xs font-bold font-mono">GET</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/memos?dealId=:dealId</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">List all memos for a deal.</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/memos</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Create a new investment memo for a deal.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">{
+  "dealId": "uuid",
+  "title": "Investment Memo - Acme Corp",
+  "templateId": "standard"   // optional: use a memo template
+}</code></pre>
+                                </div>
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/memos/:id/generate</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">AI-generate content for a specific memo section.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">{ "section": "executive_summary" }</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Export & Audit -->
+                    <details class="group rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155] overflow-hidden">
+                        <summary class="flex items-center gap-4 p-6 cursor-pointer list-none">
+                            <div class="size-10 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-600 flex-shrink-0">
+                                <span class="material-symbols-outlined">download</span>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-[#111418] dark:text-white">Export & Audit</h3>
+                                <p class="text-sm text-[#64748b] dark:text-gray-400">Export data and view audit trails</p>
+                            </div>
+                            <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                        </summary>
+                        <div class="px-6 pb-6 pt-2 border-t border-[#e2e8f0] dark:border-[#334155]">
+                            <div class="space-y-4">
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-get px-2 py-0.5 rounded text-xs font-bold font-mono">GET</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/export/deals?format=csv</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Export all deals as CSV or JSON. Supported formats: <code class="bg-[#f1f5f9] dark:bg-[#334155] px-1 rounded text-xs">csv</code>, <code class="bg-[#f1f5f9] dark:bg-[#334155] px-1 rounded text-xs">json</code>. CSV includes headers: Name, Industry, Revenue, EBITDA, Stage, Status, Confidence, Created.</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-get px-2 py-0.5 rounded text-xs font-bold font-mono">GET</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/audit</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">View audit log entries. Filter by action, resourceType, resourceId, severity, date range. Paginated with limit/offset.</p>
+                                    <div class="text-xs font-mono text-[#64748b] dark:text-gray-400 mt-2">
+                                        <span class="font-semibold text-[#111418] dark:text-white">Query params:</span>
+                                        <span class="ml-2">action, resourceType, resourceId, severity, startDate, endDate, limit, offset</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Users & Invitations -->
+                    <details class="group rounded-xl bg-[#f8fafc] dark:bg-[#334155]/30 border border-[#e2e8f0] dark:border-[#334155] overflow-hidden">
+                        <summary class="flex items-center gap-4 p-6 cursor-pointer list-none">
+                            <div class="size-10 rounded-lg bg-rose-500/10 flex items-center justify-center text-rose-600 flex-shrink-0">
+                                <span class="material-symbols-outlined">group</span>
+                            </div>
+                            <div class="flex-1">
+                                <h3 class="font-bold text-[#111418] dark:text-white">Users & Invitations</h3>
+                                <p class="text-sm text-[#64748b] dark:text-gray-400">Manage team members and workspace invitations</p>
+                            </div>
+                            <span class="material-symbols-outlined text-[#64748b] group-open:rotate-180 transition-transform">expand_more</span>
+                        </summary>
+                        <div class="px-6 pb-6 pt-2 border-t border-[#e2e8f0] dark:border-[#334155]">
+                            <div class="space-y-4">
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-get px-2 py-0.5 rounded text-xs font-bold font-mono">GET</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/users/me</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Get the authenticated user's profile, role, organization, and preferences.</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-get px-2 py-0.5 rounded text-xs font-bold font-mono">GET</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/users/team</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">List all team members in the user's organization.</p>
+                                </div>
+                                <div class="p-4 rounded-lg bg-white dark:bg-[#1e293b] border border-[#e2e8f0] dark:border-[#475569]">
+                                    <div class="flex items-center gap-3 mb-3">
+                                        <span class="method-post px-2 py-0.5 rounded text-xs font-bold font-mono">POST</span>
+                                        <code class="text-sm font-mono text-[#111418] dark:text-white">/api/invitations</code>
+                                    </div>
+                                    <p class="text-sm text-[#64748b] dark:text-gray-400">Invite a new team member. Admin only.</p>
+                                    <pre class="bg-[#1e293b] dark:bg-[#0f172a] rounded-lg p-3 overflow-x-auto text-xs mt-3"><code class="text-gray-300 font-mono">{
+  "email": "analyst@firm.com",
+  "role": "MEMBER"   // ADMIN | MEMBER | VIEWER
+}</code></pre>
+                                </div>
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rate Limits -->
+        <div class="max-w-6xl mx-auto px-6 py-16">
+            <h2 class="text-2xl font-bold text-[#111418] dark:text-white mb-6">Rate Limits</h2>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm border-collapse">
+                    <thead>
+                        <tr class="border-b border-[#e2e8f0] dark:border-[#334155]">
+                            <th class="text-left py-3 px-4 font-semibold text-[#111418] dark:text-white">Tier</th>
+                            <th class="text-left py-3 px-4 font-semibold text-[#111418] dark:text-white">Limit</th>
+                            <th class="text-left py-3 px-4 font-semibold text-[#111418] dark:text-white">Window</th>
+                            <th class="text-left py-3 px-4 font-semibold text-[#111418] dark:text-white">Applies To</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-[#64748b] dark:text-gray-400">
+                        <tr class="border-b border-[#e2e8f0] dark:border-[#334155]">
+                            <td class="py-3 px-4 font-medium text-[#111418] dark:text-white">General</td>
+                            <td class="py-3 px-4">200 requests</td>
+                            <td class="py-3 px-4">15 minutes</td>
+                            <td class="py-3 px-4">All GET endpoints</td>
+                        </tr>
+                        <tr class="border-b border-[#e2e8f0] dark:border-[#334155]">
+                            <td class="py-3 px-4 font-medium text-[#111418] dark:text-white">Write</td>
+                            <td class="py-3 px-4">30 requests</td>
+                            <td class="py-3 px-4">1 minute</td>
+                            <td class="py-3 px-4">POST, PATCH, DELETE endpoints</td>
+                        </tr>
+                        <tr>
+                            <td class="py-3 px-4 font-medium text-[#111418] dark:text-white">AI</td>
+                            <td class="py-3 px-4">10 requests</td>
+                            <td class="py-3 px-4">1 minute</td>
+                            <td class="py-3 px-4">Chat, ingestion, memo generation</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="py-16 bg-white dark:bg-[#1e293b]">
+            <div class="max-w-4xl mx-auto px-6 text-center">
+                <h2 class="text-2xl font-bold text-[#111418] dark:text-white mb-4">Need help with integrations?</h2>
+                <p class="text-[#64748b] dark:text-gray-400 mb-8">
+                    Contact our team for guidance on building custom integrations with PE OS.
+                </p>
+                <a href="mailto:hello@pocket-fund.com" class="inline-flex items-center gap-2 h-12 px-8 rounded-lg bg-primary text-white font-bold hover:bg-primary/90 transition-colors">
+                    <span class="material-symbols-outlined">mail</span>
+                    Contact Support
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-solid border-t-[#e5e7eb] dark:border-t-[#1e293b] bg-white dark:bg-[#101822] py-12 px-10">
+        <div class="max-w-[1200px] mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-3">
+                <div class="size-6 text-primary">
+                    <svg class="w-full h-full" fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                        <path clip-rule="evenodd" d="M39.475 21.6262C40.358 21.4363 40.6863 21.5589 40.7581 21.5934C40.7876 21.655 40.8547 21.857 40.8082 22.3336C40.7408 23.0255 40.4502 24.0046 39.8572 25.2301C38.6799 27.6631 36.5085 30.6631 33.5858 33.5858C30.6631 36.5085 27.6632 38.6799 25.2301 39.8572C24.0046 40.4502 23.0255 40.7407 22.3336 40.8082C21.8571 40.8547 21.6551 40.7875 21.5934 40.7581C21.5589 40.6863 21.4363 40.358 21.6262 39.475C21.8562 38.4054 22.4689 36.9657 23.5038 35.2817C24.7575 33.2417 26.5497 30.9744 28.7621 28.762C30.9744 26.5497 33.2417 24.7574 35.2817 23.5037C36.9657 22.4689 38.4054 21.8562 39.475 21.6262ZM4.41189 29.2403L18.7597 43.5881C19.8813 44.7097 21.4027 44.9179 22.7217 44.7893C24.0585 44.659 25.5148 44.1631 26.9723 43.4579C29.9052 42.0387 33.2618 39.5667 36.4142 36.4142C39.5667 33.2618 42.0387 29.9052 43.4579 26.9723C44.1631 25.5148 44.659 24.0585 44.7893 22.7217C44.9179 21.4027 44.7097 19.8813 43.5881 18.7597L29.2403 4.41187C27.8527 3.02428 25.8765 3.02573 24.2861 3.36776C22.6081 3.72863 20.7334 4.58419 18.8396 5.74801C16.4978 7.18716 13.9881 9.18353 11.5858 11.5858C9.18354 13.988 7.18717 16.4978 5.74802 18.8396C4.58421 20.7334 3.72865 22.6081 3.36778 24.2861C3.02574 25.8765 3.02429 27.8527 4.41189 29.2403Z" fill="currentColor" fill-rule="evenodd"></path>
+                    </svg>
+                </div>
+                <span class="text-sm font-medium text-[#64748b] dark:text-gray-500">&copy; 2026 PE OS. All rights reserved.</span>
+            </div>
+            <div class="flex gap-6">
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="privacy-policy.html">Privacy Policy</a>
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="terms-of-service.html">Terms of Service</a>
+                <a class="text-sm text-[#64748b] dark:text-gray-500 hover:text-primary" href="mailto:hello@pocket-fund.com">Contact</a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

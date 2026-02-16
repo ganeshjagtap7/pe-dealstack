@@ -7420,3 +7420,119 @@ All limiters use `standardHeaders: true` (RateLimit-* headers) and `legacyHeader
 **Section C + D complete!** All 8 tasks from `devloper_todo_part2` are now implemented. The platform now has: immutable audit trails, financial validation guardrails, AES-256-GCM encryption, optimized DB indexes with optimistic locking, CSV/JSON export, email-to-deal parsing, multi-page web research, and cross-document conflict analysis.
 
 ---
+
+## February 16, 2026
+
+### Session 5 — Bug Fixes, Deal Page Real Data, Documentation Pages, UI Polish
+
+---
+
+#### Fix: Pricing Page Toggle — ~7:00 PM
+
+Fixed the pricing page annual/monthly toggle that wasn't working properly.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/pricing.html` | **Modified** | Fixed the billing toggle JS — monthly/annual price switching now works correctly with proper class toggling | Toggle was broken; users couldn't see annual pricing discounts |
+
+---
+
+#### Fix: Company Researcher Homepage Scraping — ~7:15 PM
+
+The URL scraping ingestion wasn't capturing homepage text because `buildResearchText()` was missing the homepage section.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/companyResearcher.ts` | **Modified** | Added homepage text inclusion in `buildResearchText()` — homepage is now always included as the first section (`=== HOMEPAGE ===`) | Many company websites put all content on the main page; skipping it meant AI extraction had no data for single-page sites |
+| `apps/api/tests/company-researcher.test.ts` | **Modified** | Added test coverage for homepage text inclusion | Regression prevention |
+
+---
+
+#### Fix: Resources Page Link — ~7:20 PM
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/resources.html` | **Modified** | Fixed broken navigation links | Links were pointing to wrong paths |
+
+---
+
+#### New: Documentation, API Reference & Help Center Pages — ~7:30 PM
+
+Created three new informational pages for the platform.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/documentation.html` | **Created** | Full documentation page with getting started guide, feature docs, and integration guides | Platform needs user-facing docs for onboarding |
+| `apps/web/api-reference.html` | **Created** | API reference page documenting all REST endpoints (Deals, Documents, AI Chat, Ingest, Export, Audit) with request/response examples | Developers need API documentation |
+| `apps/web/help-center.html` | **Created** | Help center with searchable FAQ, categorized help topics, and support contact options | Users need self-service support |
+| `apps/web/vite.config.ts` | **Modified** | Added `documentation`, `api-reference`, and `help-center` to Vite's rollup input entries | New HTML pages need to be included in the build |
+
+---
+
+#### Deal Page: Replace Hardcoded Demo Data with Real Data — ~8:00 PM
+
+**Problem:** The deal detail page showed hardcoded fake data for financial metrics ($120M revenue, 22% EBITDA, $450M deal size, 24% IRR, 3.5x MoM), static milestone dates, hardcoded risks (Customer Concentration, Legacy Tech Debt), and demo documents — regardless of what data was actually extracted during ingestion.
+
+**Root causes identified:**
+1. JS only updated metrics conditionally (`if (deal.ebitda)`) — when null, hardcoded HTML defaults stayed visible
+2. Deal Progress and Key Risks sections were entirely static HTML with no JS rendering
+3. AI-extracted `keyRisks` and `investmentHighlights` were saved to `Document.extractedData` but never written to the Deal record's `aiRisks` JSONB column
+4. Recent Documents section had hardcoded demo docs that weren't cleared on load
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added `aiRisks: { keyRisks, investmentHighlights }` to all 4 Deal insert statements (file upload, text, URL, email) | `aiRisks` JSONB column existed but was never populated — key risks and investment highlights were lost |
+| `apps/web/deal.html` | **Modified** | Neutralized all hardcoded defaults: Revenue `$120M` → `Not available`, EBITDA `22%` → `Not available`, Deal Size `$450M` → `Not available`, IRR `24%` → `Not available`, MoM `3.5x` → `—`. Replaced static Deal Progress milestones with empty `<div id="deal-progress-items">`. Replaced static Key Risks with empty `<div id="key-risks-list">`. Removed demo documents. All growth/trend badges hidden by default. | Prevents fake data from showing when real data isn't available |
+| `apps/web/deal.js` | **Modified** | (1) Made all financial metric updates unconditional — always runs, shows styled "Not available" when null, upgrades to bold values when present. (2) Added `renderDealProgress(deal)` function — renders pipeline timeline from `DEAL_STAGES` array with green checks (completed), blue pulse (current), gray (future), terminal stage handling. (3) Added `renderKeyRisks(deal)` — reads `deal.aiRisks`, renders risks with amber warning icons + highlights with green check icons, empty state with shield icon. (4) Fixed `updateDocumentsList()` empty state — shows "No documents uploaded yet" instead of leaving demo docs. (5) Added AI doc recognition — `.md` and "Deal Overview" docs get purple icon + "AI" badge. (6) Added `fetchAndShowAnalysis()` modal for viewing AI-generated overview docs. | Deal page now shows real extracted data or clean empty states, never fake demo values |
+
+**Graceful handling details:**
+- `renderDealProgress`: Guards against `!deal`, defaults `deal.stage` to `INITIAL_REVIEW`, handles unrecognized stages with `safeIndex`
+- `renderKeyRisks`: Guards against `!deal`, handles missing/empty `aiRisks` object
+- `updateDocumentsList`: Guards against undefined `documents` array
+- All empty states have dark mode support (`dark:bg-amber-950/30`, `dark:bg-emerald-950/30`, `dark:bg-white/5`)
+- Financial metrics: Empty values show "Not available" in `text-lg text-text-muted`, populated values upgrade to `text-2xl text-text-main`
+
+---
+
+#### Deal Overview Document Generation — ~8:20 PM
+
+**Problem:** When a deal is created via URL scraping, the system created a raw "Web Research" document with unformatted scraped text — not useful for users.
+
+**Solution:** Replaced with a formatted "Deal Overview" markdown document.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/ingest.ts` | **Modified** | URL ingestion now generates a structured `Deal Overview — {Company}.md` document with sections: Company Profile, Key Details (industry, HQ, founded, employees), Investment Thesis, Financial Highlights, Investment Highlights, Key Risks. Stored in `aiAnalysis` field with proper `fileSize` and `mimeType: 'text/markdown'` | Gives users an immediately useful AI-generated overview instead of raw scraped HTML text |
+| `apps/web/deal.js` | **Modified** | Added document icon/color recognition for `.md` files and "Deal Overview" docs (purple icon + "AI" badge). Added `fetchAndShowAnalysis()` function that opens a modal overlay to display the overview content when clicked | AI-generated docs are visually distinct and viewable inline |
+
+---
+
+#### Auto-Assign Deal Creator as Analyst — ~8:45 PM
+
+**Problem:** The Analyst field on the deal page always showed "—" because no `DealTeamMember` record was created during ingestion.
+
+**Solution:** Auto-insert the authenticated user as a `DealTeamMember` with role `MEMBER` immediately after deal creation.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/ingest.ts` | **Modified** | Added `DealTeamMember` insert (`{ dealId, userId: req.user.id, role: 'MEMBER' }`) to all 4 ingestion paths: file upload, text input, URL scraping, and email parsing | Deal creator should automatically appear as analyst; user can edit later if needed |
+
+---
+
+#### Summary — Session 5 (Feb 16, 2026)
+
+| # | Task | Status | Key Files |
+|---|------|--------|-----------|
+| 1 | Pricing toggle fix | ✅ Done | `pricing.html` |
+| 2 | Homepage scraping fix | ✅ Done | `companyResearcher.ts` |
+| 3 | Resources page link fix | ✅ Done | `resources.html` |
+| 4 | Documentation pages (3 new) | ✅ Done | `documentation.html`, `api-reference.html`, `help-center.html`, `vite.config.ts` |
+| 5 | Deal page — real data + graceful empty states | ✅ Done | `deal.html`, `deal.js`, `ingest.ts` |
+| 6 | Deal Overview document generation | ✅ Done | `ingest.ts`, `deal.js` |
+| 7 | Auto-assign creator as analyst | ✅ Done | `ingest.ts` |
+
+**Files modified:** 8 existing files changed (409 insertions, 127 deletions), 3 new files created
+
+**Key outcome:** Deal pages now show real AI-extracted data or clean empty states — no more fake demo values. URL-scraped deals get a formatted Deal Overview document. Deal creators are automatically assigned as analysts.
+
+---

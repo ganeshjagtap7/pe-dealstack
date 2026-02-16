@@ -110,7 +110,7 @@
 <p class="text-[#64748b] dark:text-gray-400 text-sm h-10">Perfect for solo analysts and small partnerships.</p>
 </div>
 <div class="mb-8 flex items-baseline gap-1">
-<span class="text-[#111418] dark:text-white text-4xl font-extrabold tracking-tight">$249</span>
+<span class="price-amount text-[#111418] dark:text-white text-4xl font-extrabold tracking-tight" data-monthly="$249" data-annual="$199">$199</span>
 <span class="text-[#64748b] dark:text-gray-500 text-sm font-medium">/user/mo</span>
 </div>
 <button class="w-full rounded-lg bg-[#f1f5f9] dark:bg-[#334155] text-[#111418] dark:text-white h-12 px-4 text-sm font-bold hover:bg-[#e2e8f0] dark:hover:bg-[#475569] transition-colors mb-8">
@@ -148,7 +148,7 @@
 <p class="text-[#64748b] dark:text-gray-400 text-sm h-10">For growing investment teams and deal flow.</p>
 </div>
 <div class="mb-8 flex items-baseline gap-1">
-<span class="text-[#111418] dark:text-white text-4xl font-extrabold tracking-tight">$599</span>
+<span class="price-amount text-[#111418] dark:text-white text-4xl font-extrabold tracking-tight" data-monthly="$599" data-annual="$479">$479</span>
 <span class="text-[#64748b] dark:text-gray-500 text-sm font-medium">/user/mo</span>
 </div>
 <button class="w-full rounded-lg bg-primary text-white h-12 px-4 text-sm font-bold hover:bg-primary/90 transition-colors shadow-md mb-8">
@@ -353,4 +353,20 @@
 </footer>
 </div>
 </div>
+<script>
+    const monthlyRadio = document.getElementById('billing-monthly');
+    const annualRadio = document.getElementById('billing-annual');
+    const priceEls = document.querySelectorAll('.price-amount');
+
+    function updatePrices() {
+        const isAnnual = annualRadio.checked;
+        priceEls.forEach(el => {
+            el.textContent = isAnnual ? el.dataset.annual : el.dataset.monthly;
+        });
+    }
+
+    monthlyRadio.addEventListener('change', updatePrices);
+    annualRadio.addEventListener('change', updatePrices);
+    updatePrices();
+</script>
 </body></html>

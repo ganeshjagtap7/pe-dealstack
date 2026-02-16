@@ -133,6 +133,8 @@ function getDocIcon(name) {
     if (ext === 'xlsx' || ext === 'xls') return 'table_chart';
     if (ext === 'csv') return 'table_view';
     if (ext === 'msg' || ext === 'eml') return 'mail';
+    if (ext === 'md') return 'summarize';
+    if (name.startsWith('Deal Overview')) return 'summarize';
     return 'description';
 }
 
@@ -142,6 +144,8 @@ function getDocColor(name) {
     if (ext === 'pdf') return 'red';
     if (ext === 'xlsx' || ext === 'xls') return 'emerald';
     if (ext === 'csv') return 'blue';
+    if (ext === 'md') return 'purple';
+    if (name.startsWith('Deal Overview')) return 'purple';
     return 'slate';
 }
 
@@ -508,36 +512,94 @@ function populateDealPage(deal) {
         industryBadge.textContent = deal.industry;
     }
 
-    // Update financial metrics
+    // Update financial metrics with graceful empty states
     const revenueEl = document.getElementById('deal-revenue');
-    if (revenueEl) revenueEl.textContent = formatCurrency(deal.revenue);
+    if (revenueEl) {
+        if (deal.revenue != null) {
+            revenueEl.textContent = formatCurrency(deal.revenue);
+            revenueEl.classList.remove('text-text-muted', 'text-lg');
+            revenueEl.classList.add('text-text-main', 'text-2xl');
+        } else {
+            revenueEl.textContent = 'Not available';
+            revenueEl.classList.remove('text-text-main', 'text-2xl');
+            revenueEl.classList.add('text-text-muted', 'text-lg');
+        }
+    }
+    // Revenue chart placeholder
+    const revenueChart = document.getElementById('revenue-chart');
+    if (revenueChart) {
+        if (deal.revenue != null) {
+            revenueChart.innerHTML = '<div class="flex-1 bg-secondary/60 h-[40%] rounded-t-sm"></div><div class="flex-1 bg-secondary/60 h-[50%] rounded-t-sm"></div><div class="flex-1 bg-secondary/60 h-[45%] rounded-t-sm"></div><div class="flex-1 bg-secondary/60 h-[60%] rounded-t-sm"></div><div class="flex-1 bg-secondary h-[80%] rounded-t-sm"></div>';
+        } else {
+            revenueChart.innerHTML = '<p class="text-[10px] text-text-muted/50 italic self-center">Add via Edit Deal</p>';
+        }
+    }
 
     const ebitdaEl = document.getElementById('deal-ebitda');
-    if (ebitdaEl && deal.ebitda) {
-        const margin = deal.revenue ? ((deal.ebitda / deal.revenue) * 100).toFixed(0) : 'N/A';
-        ebitdaEl.textContent = margin + '%';
+    if (ebitdaEl) {
+        if (deal.ebitda && deal.revenue) {
+            const margin = ((deal.ebitda / deal.revenue) * 100).toFixed(0);
+            ebitdaEl.textContent = margin + '%';
+            ebitdaEl.classList.remove('text-text-muted', 'text-lg');
+            ebitdaEl.classList.add('text-text-main', 'text-2xl');
+            const ebitdaBar = document.getElementById('ebitda-bar');
+            if (ebitdaBar) ebitdaBar.style.width = Math.min(parseInt(margin), 100) + '%';
+        } else {
+            ebitdaEl.textContent = 'Not available';
+            ebitdaEl.classList.remove('text-text-main', 'text-2xl');
+            ebitdaEl.classList.add('text-text-muted', 'text-lg');
+        }
     }
 
     const dealSizeEl = document.getElementById('deal-size');
-    if (dealSizeEl) dealSizeEl.textContent = formatCurrency(deal.dealSize);
+    if (dealSizeEl) {
+        if (deal.dealSize != null) {
+            dealSizeEl.textContent = formatCurrency(deal.dealSize);
+            dealSizeEl.classList.remove('text-text-muted', 'text-lg');
+            dealSizeEl.classList.add('text-text-main', 'text-2xl');
+        } else {
+            dealSizeEl.textContent = 'Not available';
+            dealSizeEl.classList.remove('text-text-main', 'text-2xl');
+            dealSizeEl.classList.add('text-text-muted', 'text-lg');
+        }
+    }
 
     // Update EBITDA multiple
     const multipleEl = document.getElementById('deal-multiple');
-    if (multipleEl && deal.dealSize && deal.ebitda) {
-        const multiple = (deal.dealSize / deal.ebitda).toFixed(1);
-        multipleEl.textContent = `~${multiple}x EBITDA Multiple`;
+    if (multipleEl) {
+        if (deal.dealSize && deal.ebitda) {
+            const multiple = (deal.dealSize / deal.ebitda).toFixed(1);
+            multipleEl.textContent = `~${multiple}x EBITDA Multiple`;
+        } else {
+            multipleEl.textContent = 'Add via Edit Deal';
+            multipleEl.classList.add('italic', 'opacity-50');
+        }
     }
 
     // Update IRR
     const irrEl = document.getElementById('deal-irr');
-    if (irrEl && deal.irrProjected) {
-        irrEl.textContent = deal.irrProjected.toFixed(1) + '%';
+    if (irrEl) {
+        if (deal.irrProjected) {
+            irrEl.textContent = deal.irrProjected.toFixed(1) + '%';
+            irrEl.classList.remove('text-text-muted', 'text-lg');
+            irrEl.classList.add('text-text-main', 'text-2xl');
+            const irrBadge = document.getElementById('irr-target-badge');
+            if (irrBadge) irrBadge.classList.remove('hidden');
+        } else {
+            irrEl.textContent = 'Not available';
+            irrEl.classList.remove('text-text-main', 'text-2xl');
+            irrEl.classList.add('text-text-muted', 'text-lg');
+        }
     }
 
     // Update MoM
     const momEl = document.getElementById('deal-mom');
-    if (momEl && deal.mom) {
-        momEl.textContent = deal.mom.toFixed(1) + 'x';
+    if (momEl) {
+        if (deal.mom) {
+            momEl.textContent = deal.mom.toFixed(1) + 'x';
+        } else {
+            momEl.textContent = '\u2014';
+        }
     }
 
     // Update last updated
@@ -585,8 +647,143 @@ function populateDealPage(deal) {
     // Update activity feed
     renderActivityFeed(deal.activities || []);
 
+    // Render deal progress timeline
+    renderDealProgress(deal);
+
+    // Render key risks from AI extraction
+    renderKeyRisks(deal);
+
     // Render team avatars in header
     renderTeamAvatars(deal.teamMembers || []);
+}
+
+// Render deal progress timeline based on actual pipeline stage
+function renderDealProgress(deal) {
+    const container = document.getElementById('deal-progress-items');
+    if (!container || !deal) return;
+
+    const currentStage = deal.stage || 'INITIAL_REVIEW';
+    const currentIndex = getStageIndex(currentStage);
+    const isTerminal = isTerminalStage(currentStage);
+
+    // If stage not recognized, default to first stage
+    const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+
+    let html = '<div class="absolute left-[11px] top-2 bottom-2 w-0.5 bg-border-subtle"></div>';
+
+    DEAL_STAGES.forEach((stage, index) => {
+        const isPast = isTerminal ? true : index < safeIndex;
+        const isCurrent = !isTerminal && index === safeIndex;
+        const isFuture = !isTerminal && index > safeIndex;
+
+        let dotHtml, titleClass, subtitle;
+
+        if (isPast) {
+            dotHtml = `<div class="size-6 rounded-full bg-secondary border-4 border-white z-10 shrink-0 flex items-center justify-center shadow-sm">
+                <span class="material-symbols-outlined text-[14px] text-white font-bold">check</span>
+            </div>`;
+            titleClass = 'text-sm font-bold text-text-main';
+            subtitle = '';
+        } else if (isCurrent) {
+            dotHtml = `<div class="size-6 rounded-full bg-primary border-4 border-primary-light outline outline-2 outline-primary/20 z-10 shrink-0 flex items-center justify-center shadow-[0_0_10px_rgba(0,51,102,0.3)]">
+                <div class="size-2 bg-white rounded-full animate-pulse"></div>
+            </div>`;
+            titleClass = 'text-sm font-bold text-primary';
+            subtitle = 'In Progress';
+        } else {
+            dotHtml = `<div class="size-6 rounded-full bg-background-body border-2 border-border-subtle z-10 shrink-0"></div>`;
+            titleClass = 'text-sm font-bold text-text-muted';
+            subtitle = '';
+        }
+
+        const opacity = isFuture ? 'opacity-40' : '';
+        const marginClass = index < DEAL_STAGES.length - 1 ? 'mb-6' : '';
+
+        html += `
+            <div class="flex gap-4 ${marginClass} relative ${opacity}">
+                ${dotHtml}
+                <div>
+                    <h4 class="${titleClass}">${stage.label}</h4>
+                    ${subtitle ? `<p class="text-xs text-text-muted mt-0.5 font-medium">${subtitle}</p>` : ''}
+                </div>
+            </div>
+        `;
+    });
+
+    // Add terminal stage if applicable
+    if (isTerminal) {
+        const terminalStage = TERMINAL_STAGES.find(s => s.key === currentStage);
+        if (terminalStage) {
+            const bgColor = currentStage === 'CLOSED_WON' ? 'bg-secondary' :
+                            currentStage === 'CLOSED_LOST' ? 'bg-red-500' : 'bg-gray-400';
+            html += `
+                <div class="flex gap-4 mt-6 relative">
+                    ${`<div class="size-6 rounded-full ${bgColor} border-4 border-white z-10 shrink-0 flex items-center justify-center shadow-sm">
+                        <span class="material-symbols-outlined text-[14px] text-white font-bold">${terminalStage.icon}</span>
+                    </div>`}
+                    <div>
+                        <h4 class="text-sm font-bold text-text-main">${terminalStage.label}</h4>
+                        ${deal.actualCloseDate ? `<p class="text-xs text-text-muted mt-0.5 font-medium">${new Date(deal.actualCloseDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+    }
+
+    container.innerHTML = html;
+}
+
+// Render key risks and investment highlights from AI extraction
+function renderKeyRisks(deal) {
+    const container = document.getElementById('key-risks-list');
+    if (!container || !deal) return;
+
+    const aiRisks = deal.aiRisks;
+    const risks = aiRisks?.keyRisks || [];
+    const highlights = aiRisks?.investmentHighlights || [];
+
+    if (risks.length === 0 && highlights.length === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-6 text-text-muted">
+                <span class="material-symbols-outlined text-2xl mb-2">shield</span>
+                <p class="text-sm">No risks identified yet</p>
+                <p class="text-xs mt-1">Upload documents or use AI chat to analyze risks</p>
+            </div>
+        `;
+        return;
+    }
+
+    let html = '<ul class="space-y-3">';
+
+    risks.forEach((risk, i) => {
+        const bgClass = i === 0
+            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
+            : 'bg-white dark:bg-white/5 border-border-subtle hover:border-primary/30';
+        const iconClass = i === 0 ? 'text-amber-500' : 'text-text-muted';
+        const icon = i === 0 ? 'error' : 'info';
+        html += `
+            <li class="${bgClass} border p-3 rounded-lg transition-colors shadow-sm">
+                <div class="flex items-start gap-2">
+                    <span class="material-symbols-outlined ${iconClass} text-sm mt-0.5">${icon}</span>
+                    <p class="text-sm text-text-main font-bold">${escapeHtml(risk)}</p>
+                </div>
+            </li>
+        `;
+    });
+
+    highlights.forEach(highlight => {
+        html += `
+            <li class="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 rounded-lg transition-colors shadow-sm">
+                <div class="flex items-start gap-2">
+                    <span class="material-symbols-outlined text-secondary text-sm mt-0.5">check_circle</span>
+                    <p class="text-sm text-text-main font-bold">${escapeHtml(highlight)}</p>
+                </div>
+            </li>
+        `;
+    });
+
+    html += '</ul>';
+    container.innerHTML = html;
 }
 
 // Render team avatars in the header
@@ -667,19 +864,25 @@ function openShareModal() {
 
 function updateDocumentsList(documents) {
     const docsContainer = document.getElementById('documents-list');
-    if (!docsContainer || documents.length === 0) return;
+    if (!docsContainer) return;
+    if (!documents || documents.length === 0) {
+        docsContainer.innerHTML = '<p class="text-sm text-text-muted py-2">No documents uploaded yet.</p>';
+        return;
+    }
 
     docsContainer.innerHTML = documents.map(doc => {
         const color = getDocColor(doc.name);
-        const colorClass = color === 'emerald' ? 'secondary' : color;
+        const sizeText = doc.fileSize ? formatFileSize(doc.fileSize) : 'AI Generated';
+        const isGenerated = !doc.fileUrl && (doc.name.includes('Deal Overview') || doc.name.includes('Web Research'));
+        const badge = isGenerated ? '<span class="text-[9px] font-bold text-purple-600 bg-purple-50 dark:bg-purple-950/30 px-1.5 py-0.5 rounded ml-1">AI</span>' : '';
         return `
-        <div class="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-primary-light/30 cursor-pointer transition-colors group shadow-sm doc-preview-item" data-doc-id="${doc.id}" data-doc-name="${doc.name}" data-doc-url="${doc.fileUrl || ''}">
-            <div class="size-10 bg-${color}-50 rounded flex items-center justify-center text-${color}-500 group-hover:bg-${color}-100 transition-colors">
+        <div class="flex items-center gap-3 p-2 pr-4 bg-white dark:bg-white/5 rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-primary-light/30 cursor-pointer transition-colors group shadow-sm doc-preview-item" data-doc-id="${doc.id}" data-doc-name="${doc.name}" data-doc-url="${doc.fileUrl || ''}" data-doc-analysis="${doc.aiAnalysis ? 'true' : ''}">
+            <div class="size-10 bg-${color}-50 dark:bg-${color}-950/30 rounded flex items-center justify-center text-${color}-500 group-hover:bg-${color}-100 dark:group-hover:bg-${color}-900/30 transition-colors">
                 <span class="material-symbols-outlined">${getDocIcon(doc.name)}</span>
             </div>
             <div class="flex flex-col">
-                <span class="text-sm font-bold text-text-main">${doc.name}</span>
-                <span class="text-xs text-text-muted">${formatFileSize(doc.fileSize)} - Added ${formatRelativeTime(doc.createdAt)}</span>
+                <span class="text-sm font-bold text-text-main flex items-center">${doc.name}${badge}</span>
+                <span class="text-xs text-text-muted">${sizeText} - Added ${formatRelativeTime(doc.createdAt)}</span>
             </div>
         </div>
     `}).join('');
@@ -691,17 +894,55 @@ function updateDocumentsList(documents) {
             const docName = item.dataset.docName;
             const docUrl = item.dataset.docUrl;
             const docId = item.dataset.docId;
+            const hasAnalysis = item.dataset.docAnalysis === 'true';
 
             if (docUrl && window.PEDocPreview) {
                 window.PEDocPreview.preview(docUrl, docName);
+            } else if (hasAnalysis || docName.includes('Deal Overview')) {
+                // AI-generated doc — fetch and show analysis text
+                fetchAndShowAnalysis(docId, docName);
             } else if (docId) {
-                // Fetch document URL from API if not available
                 fetchAndPreviewDocument(docId, docName);
             } else {
-                showNotification('Error', 'Document URL not available', 'error');
+                showNotification('Info', 'This is an AI-generated document', 'info');
             }
         });
     });
+}
+
+async function fetchAndShowAnalysis(docId, docName) {
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/documents/${docId}`);
+        if (!response.ok) throw new Error('Failed to fetch document');
+        const doc = await response.json();
+        const text = doc.aiAnalysis || doc.extractedText || 'No content available';
+
+        // Show in a simple modal overlay
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-6';
+        overlay.innerHTML = `
+            <div class="bg-white dark:bg-[#1e293b] rounded-2xl shadow-2xl max-w-2xl w-full max-h-[80vh] flex flex-col">
+                <div class="flex items-center justify-between p-5 border-b border-border-subtle">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-purple-500">summarize</span>
+                        <h3 class="text-lg font-bold text-text-main">${escapeHtml(docName)}</h3>
+                    </div>
+                    <button class="close-modal size-8 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 flex items-center justify-center transition-colors">
+                        <span class="material-symbols-outlined text-text-muted">close</span>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto custom-scrollbar">
+                    <div class="prose dark:prose-invert max-w-none text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">${escapeHtml(text)}</div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('.close-modal').addEventListener('click', () => overlay.remove());
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+    } catch (error) {
+        console.error('Error fetching analysis:', error);
+        showNotification('Error', 'Failed to load document', 'error');
+    }
 }
 
 async function fetchAndPreviewDocument(docId, docName) {
