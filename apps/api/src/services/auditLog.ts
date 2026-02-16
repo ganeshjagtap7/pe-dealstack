@@ -408,6 +408,7 @@ export const AuditLog = {
     action: string;
     resourceType?: string;
     resourceId?: string;
+    resourceName?: string;
     userId?: string;
     metadata?: Record<string, any>;
     description?: string;
@@ -416,6 +417,7 @@ export const AuditLog = {
     logFromRequest(req, options.action as AuditAction, {
       resourceType: options.resourceType as ResourceType,
       resourceId: options.resourceId,
+      resourceName: options.resourceName,
       description: options.description,
       metadata: options.metadata,
       severity: options.severity,
