@@ -7651,3 +7651,33 @@ Created three new informational pages for the platform.
 **Key outcome:** CRM Contacts page is fully functional with card-based UI, CRUD operations, interaction tracking, deal linking, and three intelligence features (timeline feed, duplicate detection, stale contact reminders). Strategic roadmap positions PE OS to compete with Affinity/DealCloud at 1/10th the price by layering AI-powered relationship intelligence, auto-enrichment, and meeting prep onto the CRM foundation.
 
 ---
+
+#### Word Document (.docx) Preview Support — ~5:15 PM
+
+**Problem:** Clicking a `.docx` file on the deal page showed "Preview Not Available — Preview is not available for .docx files. Click Download to view the file." Users had to download every Word document to read it, breaking their workflow.
+
+**Solution:** Added `.docx` rendering using `mammoth.js` (client-side .docx → HTML converter), following the same lazy-load pattern as the existing PDF.js and SheetJS integrations.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/js/docPreview.js` | **Enhanced** (+74 lines) | Added `mammoth.js` CDN URL (`v1.6.0`), `mammothLoaded` flag, `loadMammoth()` lazy loader, and `renderDocx()` function that fetches the .docx as ArrayBuffer, converts to HTML via `mammoth.convertToHtml()`, and renders with styled typography (headings, tables, lists, images, bold, links). Added `.doc`/`.docx` cases to the preview switch statement. Includes custom CSS for `.docx-content` class with proper heading sizes, table borders, list indentation, and PE OS brand color for links | Users can now preview Word documents inline without downloading. Mammoth.js is loaded on-demand only when a .docx is opened (no impact on page load for other file types). Consistent with how PDF.js and SheetJS are already loaded |
+
+**Supported file previews now:** PDF, Excel (.xlsx/.xls), CSV, Word (.doc/.docx)
+
+---
+
+#### Updated Summary — Session 6 (Feb 17, 2026)
+
+| # | Task | Status | Key Files |
+|---|------|--------|-----------|
+| 1 | Contacts page SyntaxError fix | ✅ Done | `contacts.html` |
+| 2 | LinkedIn URL validation fix | ✅ Done | `contacts.html`, `contacts.ts` |
+| 3 | Foreign key constraint fix | ✅ Done | `contacts.ts`, Supabase SQL |
+| 4 | Contacts route registration | ✅ Done | `index.ts` |
+| 5 | Contact Timeline Feed | ✅ Done | `contacts.ts`, `contacts.html` |
+| 6 | Duplicate Detection | ✅ Done | `contacts.ts`, `contacts.html` |
+| 7 | Interaction Reminders (Stale Contacts) | ✅ Done | `contacts.ts`, `contacts.html` |
+| 8 | CRM Feature Roadmap | ✅ Done | `contacts_crm_todo.md` |
+| 9 | Word (.docx) document preview | ✅ Done | `docPreview.js` |
+
+---

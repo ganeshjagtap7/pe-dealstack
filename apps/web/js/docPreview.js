@@ -19,8 +19,12 @@ window.PEDocPreview = (function() {
     // SheetJS for Excel
     const XLSX_URL = 'https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js';
 
+    // Mammoth.js for Word docs
+    const MAMMOTH_URL = 'https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js';
+
     let pdfLoaded = false;
     let xlsxLoaded = false;
+    let mammothLoaded = false;
 
     // Dynamically load script
     function loadScript(url) {
@@ -50,6 +54,13 @@ window.PEDocPreview = (function() {
         if (xlsxLoaded) return;
         await loadScript(XLSX_URL);
         xlsxLoaded = true;
+    }
+
+    // Load Mammoth.js library
+    async function loadMammoth() {
+        if (mammothLoaded) return;
+        await loadScript(MAMMOTH_URL);
+        mammothLoaded = true;
     }
 
     // Get file extension
@@ -383,6 +394,65 @@ window.PEDocPreview = (function() {
         }
     }
 
+    // Render Word Document (.docx)
+    async function renderDocx(url, filename) {
+        const modal = createModal('Word Document', filename);
+        const content = document.getElementById('doc-preview-content');
+
+        try {
+            await loadMammoth();
+
+            const response = await fetch(url);
+            const arrayBuffer = await response.arrayBuffer();
+            const result = await window.mammoth.convertToHtml({ arrayBuffer });
+
+            const html = result.value;
+            const warnings = result.messages.filter(m => m.type === 'warning');
+
+            if (!html || html.trim() === '') {
+                showError('The document appears to be empty.');
+                return;
+            }
+
+            content.innerHTML = `
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="docx-content p-8 md:p-12 max-w-4xl mx-auto prose prose-sm prose-gray" style="
+                        font-family: 'Inter', 'Segoe UI', sans-serif;
+                        line-height: 1.7;
+                        color: #374151;
+                    ">${html}</div>
+                </div>
+                <style>
+                    .docx-content h1 { font-size: 1.5rem; font-weight: 700; color: #111827; margin: 1.5rem 0 0.75rem; }
+                    .docx-content h2 { font-size: 1.25rem; font-weight: 700; color: #1f2937; margin: 1.25rem 0 0.5rem; }
+                    .docx-content h3 { font-size: 1.1rem; font-weight: 600; color: #374151; margin: 1rem 0 0.5rem; }
+                    .docx-content p { margin: 0.5rem 0; }
+                    .docx-content table { width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.875rem; }
+                    .docx-content th, .docx-content td { border: 1px solid #e5e7eb; padding: 0.5rem 0.75rem; text-align: left; }
+                    .docx-content th { background: #f9fafb; font-weight: 600; color: #374151; }
+                    .docx-content tr:hover td { background: #f9fafb; }
+                    .docx-content ul, .docx-content ol { margin: 0.5rem 0; padding-left: 1.5rem; }
+                    .docx-content li { margin: 0.25rem 0; }
+                    .docx-content img { max-width: 100%; height: auto; border-radius: 0.375rem; margin: 1rem 0; }
+                    .docx-content strong { font-weight: 600; color: #111827; }
+                    .docx-content a { color: #003366; text-decoration: underline; }
+                </style>
+            `;
+
+            // Download handler
+            document.getElementById('doc-download-btn')?.addEventListener('click', () => {
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = filename;
+                link.click();
+            });
+
+        } catch (error) {
+            console.error('DOCX render error:', error);
+            showError('Unable to load Word document. The file may be corrupted or inaccessible.');
+        }
+    }
+
     // Render CSV
     async function renderCsv(url, filename) {
         const modal = createModal('CSV File', filename);
@@ -479,6 +549,10 @@ window.PEDocPreview = (function() {
                 break;
             case 'csv':
                 await renderCsv(url, filename);
+                break;
+            case 'doc':
+            case 'docx':
+                await renderDocx(url, filename);
                 break;
             default:
                 createModal('Document', filename);
