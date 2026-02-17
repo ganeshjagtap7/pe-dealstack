@@ -19,6 +19,7 @@ import memosRouter from './routes/memos.js';
 import invitationsRouter from './routes/invitations.js';
 import templatesRouter from './routes/templates.js';
 import auditRouter from './routes/audit.js';
+import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, optionalAuthMiddleware } from './middleware/auth.js';
@@ -202,6 +203,7 @@ app.use('/api/templates', authMiddleware, templatesRouter);
 app.use('/api/invitations', authMiddleware, invitationsRouter);
 app.use('/api/audit', authMiddleware, auditRouter);
 app.use('/api/export', authMiddleware, exportRouter);
+app.use('/api/contacts', authMiddleware, contactsRouter);
 
 // ========================================
 // Public Invitation Routes (no auth for verify/accept)

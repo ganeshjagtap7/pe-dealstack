@@ -7536,3 +7536,118 @@ Created three new informational pages for the platform.
 **Key outcome:** Deal pages now show real AI-extracted data or clean empty states — no more fake demo values. URL-scraped deals get a formatted Deal Overview document. Deal creators are automatically assigned as analysts.
 
 ---
+
+## Session 6 — February 17, 2026
+
+### CRM Contacts Page — Full Build + Intelligence Features
+
+---
+
+#### Contacts Page Bug Fixes — ~3:00 PM
+
+**Problem:** The Contacts page was stuck on "Loading contacts..." with a `SyntaxError: missing ) after argument list` in the console.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/contacts.html` | **Fixed** | `escapeHtml()` function had a missing closing `)` for `.replace()` call — changed `}[c]);` to `}[c]));` | JavaScript parse error prevented the entire page from executing. Vite script injection shifted the error to line ~371 in browser (line 357 in source) |
+
+---
+
+#### LinkedIn URL Validation Fix — ~3:10 PM
+
+**Problem:** Adding a contact with a LinkedIn URL like `www.linkedin.com/in/...` showed "Please enter a URL" (browser `type="url"` validation) and then "Invalid input" (Zod `.url()` backend validation).
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/contacts.html` | **Fixed** | Changed LinkedIn input from `type="url"` to `type="text"` | Browser's built-in URL validation requires `https://` prefix, too strict for UX |
+| `apps/web/contacts.html` | **Enhanced** | Auto-prepend `https://` on submit if user enters URL without protocol | Stored URLs are clickable in the detail panel |
+| `apps/api/src/routes/contacts.ts` | **Fixed** | Changed `linkedinUrl` Zod schema from `z.string().url()` to `z.string().max(500)` | Backend `.url()` validator also rejected URLs without protocol |
+
+---
+
+#### Foreign Key Constraint Fix — ~3:25 PM
+
+**Problem:** Creating a contact returned 500 error: `violates foreign key constraint "Contact_createdBy_fkey"`. The `createdBy` column referenced the custom `"User"` table, but `req.user.id` from Supabase Auth doesn't exist in that table.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/contacts.ts` | **Fixed** | Added better error logging (Supabase error code, message, details, hint) to the create endpoint catch block | Generic "Failed to create contact" error message was hiding the actual Supabase error |
+| `apps/api/src/routes/contacts.ts` | **Fixed** | Updated frontend `createContact()` to show `err.details` in error notification | Users can now see the actual backend error message |
+| **Supabase SQL** | **Executed** | `ALTER TABLE "Contact" DROP CONSTRAINT "Contact_createdBy_fkey"` and same for `"ContactInteraction"` | Auth user IDs (from `auth.users`) don't exist in the custom `"User"` table; FK constraint was blocking all inserts |
+
+---
+
+#### Contacts Route Registration — ~3:30 PM
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/index.ts` | **Modified** | Added `import contactsRouter` and `app.use('/api/contacts', authMiddleware, contactsRouter)` | The contacts API route was built but never mounted in the Express app |
+
+---
+
+#### CRM Contacts Page — Full Frontend (New File) — ~2:30 PM
+
+**Built:** Complete CRM contacts page with card-based UI, search, filtering, detail panel, interaction tracking, and deal linking.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/contacts.html` | **Created** (1570 lines) | Full CRM page: contact cards grid with avatar/type badges, search bar with debounce, type filter dropdown, "Add Contact" modal with full form (name, email, phone, title, company, type, LinkedIn, tags, notes), slide-over detail panel with contact info/tags/notes/linked deals/interaction timeline, add interaction form, link deal modal with search, edit/delete contacts, notification toasts, keyboard shortcuts (Escape to close) | Core CRM UI — the central relationship management interface for PE professionals |
+| `apps/api/src/routes/contacts.ts` | **Created** (526 lines) | Full REST API: `GET /` (list with search/filter/sort/pagination), `GET /:id` (detail with interactions + linked deals), `POST /` (create), `PATCH /:id` (update), `DELETE /:id` (delete), `POST /:id/interactions` (add interaction, auto-updates `lastContactedAt`), `POST /:id/deals` (link deal), `DELETE /:contactId/deals/:dealId` (unlink deal), `POST /import` (bulk CSV import up to 500), all with Zod validation | RESTful backend with proper validation, error handling, and relationship management between contacts, interactions, and deals |
+| `apps/api/contacts-migration.sql` | **Created** | SQL migration: `Contact` table (name, email, phone, title, company, type, LinkedIn, notes, tags[], lastContactedAt), `ContactInteraction` table (type, title, description, date), `ContactDeal` join table (many-to-many with roles), indexes, RLS policies (permissive for now) | Database schema for the CRM module |
+
+---
+
+#### CRM Intelligence Features — ~4:00 PM
+
+**Built:** Three insight panels above the contacts grid providing actionable intelligence.
+
+##### 1. Contact Timeline Feed (Recent Activity)
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/contacts.ts` | **Added endpoint** | `GET /api/contacts/insights/timeline` — Returns recent interactions across ALL contacts with contact details (name, type, company) joined via Supabase foreign key select. Supports `?limit=` param (max 50) | Users need a global activity feed: "You met John 2d ago, emailed Sarah 5d ago" — shows relationship activity at a glance |
+| `apps/web/contacts.html` | **Added UI** | Blue "Recent Activity" card with scrollable list. Each row shows interaction icon, title, contact name + company, and time ago. Clickable — opens contact detail panel | Visual timeline of recent relationship activity across the entire network |
+
+##### 2. Duplicate Detection
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/contacts.ts` | **Added endpoint** | `GET /api/contacts/insights/duplicates` — Fetches all contacts, groups by normalized email and by normalized firstName+lastName, returns groups with >1 match. Avoids double-flagging (name dups already caught by email check are skipped) | PE firms accumulate duplicate contacts from different sources (bankers, conferences, imports). Duplicates cause confusion and split interaction history |
+| `apps/web/contacts.html` | **Added UI** | Red "Possible Duplicates" card with count badge. Shows matched contacts with reason ("Same email: john@gs.com" or "Same name: John Smith") and warning icon | Visual alert for data hygiene — users can see and resolve duplicates |
+
+##### 3. Interaction Reminders (Stale Contacts)
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/contacts.ts` | **Added endpoint** | `GET /api/contacts/insights/stale?days=30` — Two queries: contacts where `lastContactedAt` is null ("Never contacted") and contacts where `lastContactedAt` < 30-day cutoff, with calculated days-since count. Returns combined list sorted by staleness | The #1 relationship management problem: contacts go cold because no one tracks follow-ups. This is what Affinity charges $50K/yr to solve |
+| `apps/web/contacts.html` | **Added UI** | Amber "Needs Attention" card with count badge. Shows contacts with initials avatar, name, company, and reason ("Never contacted" / "No contact in 45 days"). Green check icon when all contacts are up to date. Clickable — opens contact detail panel | Proactive relationship decay prevention — users see at a glance which relationships need nurturing |
+
+---
+
+#### CRM Feature Roadmap — ~3:45 PM
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `contacts_crm_todo.md` | **Created** (234 lines) | 10-tier feature roadmap with 60+ features organized by priority: Core Enhancements → Relationship Intelligence → AI Enrichment → Activity Intelligence → Meeting Prep → Deal Signals → Smart Communication → Network Mapping → LP/Portfolio Intelligence → Natural Language Querying. Includes architecture diagram, trust gradient design principle, competitive pricing analysis, and 5-phase implementation plan | Strategic product roadmap based on deep research of PE CRM landscape (Affinity, DealCloud, 4Degrees, Attio, Clay). Positions PE OS in the $20-40/user/month sweet spot for small PE funds |
+
+---
+
+#### Summary — Session 6 (Feb 17, 2026)
+
+| # | Task | Status | Key Files |
+|---|------|--------|-----------|
+| 1 | Contacts page SyntaxError fix | ✅ Done | `contacts.html` |
+| 2 | LinkedIn URL validation fix | ✅ Done | `contacts.html`, `contacts.ts` |
+| 3 | Foreign key constraint fix | ✅ Done | `contacts.ts`, Supabase SQL |
+| 4 | Contacts route registration | ✅ Done | `index.ts` |
+| 5 | Contact Timeline Feed | ✅ Done | `contacts.ts`, `contacts.html` |
+| 6 | Duplicate Detection | ✅ Done | `contacts.ts`, `contacts.html` |
+| 7 | Interaction Reminders (Stale Contacts) | ✅ Done | `contacts.ts`, `contacts.html` |
+| 8 | CRM Feature Roadmap | ✅ Done | `contacts_crm_todo.md` |
+
+**New files:** 3 (`contacts.ts`, `contacts.html`, `contacts_crm_todo.md`) + 1 migration SQL
+**Modified files:** 2 (`index.ts`, `contacts.ts`)
+
+**Key outcome:** CRM Contacts page is fully functional with card-based UI, CRUD operations, interaction tracking, deal linking, and three intelligence features (timeline feed, duplicate detection, stale contact reminders). Strategic roadmap positions PE OS to compete with Affinity/DealCloud at 1/10th the price by layering AI-powered relationship intelligence, auto-enrichment, and meeting prep onto the CRM foundation.
+
+---

@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>CRM - PE OS</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script id="tailwind-config">
+    tailwind.config = {
+        theme: {
+            extend: {
+                colors: {
+                    "primary": "#003366",
+                    "primary-hover": "#002855",
+                    "primary-light": "#E6EEF5",
+                    "secondary": "#059669",
+                    "secondary-light": "#D1FAE5",
+                    "background-body": "#F8F9FA",
+                    "surface-card": "#FFFFFF",
+                    "border-subtle": "#E5E7EB",
+                    "border-focus": "#CBD5E1",
+                    "text-main": "#111827",
+                    "text-secondary": "#4B5563",
+                    "text-muted": "#9CA3AF",
+                },
+                fontFamily: {
+                    "sans": ["Inter", "sans-serif"],
+                    "display": ["Inter", "sans-serif"],
+                },
+                boxShadow: {
+                    "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
+                    "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
+                    "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
+                },
+                borderRadius: {
+                    "DEFAULT": "0.5rem",
+                    "md": "0.375rem",
+                    "lg": "0.5rem",
+                    "xl": "0.75rem",
+                }
+            },
+        },
+    }
+</script>
+<style>
+    .slide-over-enter { animation: slideOverIn 0.3s ease-out; }
+    .slide-over-leave { animation: slideOverOut 0.2s ease-in forwards; }
+    @keyframes slideOverIn {
+        from { transform: translateX(100%); opacity: 0; }
+        to { transform: translateX(0); opacity: 1; }
+    }
+    @keyframes slideOverOut {
+        from { transform: translateX(0); opacity: 1; }
+        to { transform: translateX(100%); opacity: 0; }
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+    .backdrop-enter { animation: fadeIn 0.2s ease-out; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+    body { font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased; }
+</style>
+</head>
+<body class="bg-background-body text-text-main font-sans overflow-hidden">
+<div class="flex h-screen w-full overflow-hidden">
+<div id="sidebar-root"></div>
+<main class="flex h-full flex-1 flex-col overflow-hidden bg-background-body">
+<div id="header-root"></div>
+
+<!-- Page Content -->
+<div class="flex-1 overflow-y-auto p-6 custom-scrollbar">
+<div class="mx-auto max-w-[1600px] flex flex-col gap-6">
+
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div class="flex flex-col gap-1">
+        <div class="flex items-center gap-3">
+            <h1 class="text-2xl font-bold text-text-main tracking-tight font-display">Contacts</h1>
+            <span id="contact-count-badge" class="hidden px-2.5 py-0.5 rounded-full bg-primary-light text-primary text-xs font-bold">0</span>
+        </div>
+        <p id="contact-subtitle" class="text-text-secondary text-sm flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(5,150,105,0.4)]"></span>
+            Loading contacts...
+        </p>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+        <!-- Search -->
+        <div class="relative group">
+            <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                <span class="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[18px]">search</span>
+            </div>
+            <input id="contact-search" type="text" placeholder="Search contacts..."
+                class="block w-64 rounded-lg border border-border-subtle bg-surface-card py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm" />
+        </div>
+        <!-- Type Filter -->
+        <div class="relative">
+            <button id="type-filter-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                <p id="type-filter-text" class="text-text-secondary group-hover:text-text-main text-sm font-medium">All Types</p>
+                <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+            </button>
+            <div id="type-dropdown" class="hidden absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+                <button data-type="" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium">All Types</button>
+                <button data-type="BANKER" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Banker</button>
+                <button data-type="ADVISOR" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Advisor</button>
+                <button data-type="EXECUTIVE" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Executive</button>
+                <button data-type="LP" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">LP</button>
+                <button data-type="LEGAL" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Legal</button>
+                <button data-type="OTHER" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Other</button>
+            </div>
+        </div>
+        <!-- Add Contact Button -->
+        <button id="add-contact-btn" class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
+            <span class="material-symbols-outlined text-[18px]">person_add</span>
+            Add Contact
+        </button>
+    </div>
+</div>
+
+<!-- Insights Bar -->
+<div id="insights-bar" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    <!-- Stale Contacts / Reminders -->
+    <div id="stale-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-amber-50/50">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-amber-600 text-[18px]">notifications_active</span>
+                <h3 class="text-sm font-bold text-text-main">Needs Attention</h3>
+            </div>
+            <span id="stale-count" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">0</span>
+        </div>
+        <div id="stale-list" class="max-h-[200px] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-center py-6">
+                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Timeline -->
+    <div id="timeline-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-primary-light/50">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[18px]">history</span>
+                <h3 class="text-sm font-bold text-text-main">Recent Activity</h3>
+            </div>
+        </div>
+        <div id="timeline-list" class="max-h-[200px] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-center py-6">
+                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Duplicates -->
+    <div id="duplicates-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-red-50/50">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-red-500 text-[18px]">content_copy</span>
+                <h3 class="text-sm font-bold text-text-main">Possible Duplicates</h3>
+            </div>
+            <span id="dup-count" class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">0</span>
+        </div>
+        <div id="dup-list" class="max-h-[200px] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-center py-6">
+                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Contacts Grid -->
+<div id="contacts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-6">
+    <!-- Loading state -->
+    <div id="loading-state" class="col-span-full flex flex-col items-center justify-center py-20">
+        <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
+        <p class="text-text-muted text-sm font-medium">Loading contacts...</p>
+    </div>
+</div>
+
+</div>
+</div>
+
+<!-- Detail Slide-Over Panel -->
+<div id="detail-backdrop" class="hidden fixed inset-0 bg-black/30 z-40" onclick="closeDetail()"></div>
+<div id="detail-panel" class="hidden fixed top-0 right-0 h-full w-[450px] max-w-full bg-surface-card shadow-2xl z-50 flex flex-col border-l border-border-subtle">
+    <!-- Detail Header -->
+    <div class="flex items-center justify-between px-6 py-4 border-b border-border-subtle shrink-0">
+        <h2 class="text-lg font-bold text-text-main">Contact Details</h2>
+        <button onclick="closeDetail()" class="p-1.5 rounded-lg hover:bg-gray-100 text-text-muted hover:text-text-main transition-colors">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+        </button>
+    </div>
+    <!-- Detail Body -->
+    <div id="detail-body" class="flex-1 overflow-y-auto custom-scrollbar p-6">
+        <!-- Content injected by JS -->
+    </div>
+    <!-- Detail Actions -->
+    <div id="detail-actions" class="shrink-0 border-t border-border-subtle px-6 py-4 flex items-center gap-2 flex-wrap">
+        <button id="action-add-note" onclick="showAddInteraction()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+            <span class="material-symbols-outlined text-[16px]">edit_note</span>
+            Add Note
+        </button>
+        <button id="action-link-deal" onclick="showLinkDealModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+            <span class="material-symbols-outlined text-[16px]">link</span>
+            Link Deal
+        </button>
+        <button id="action-edit" onclick="editCurrentContact()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+            <span class="material-symbols-outlined text-[16px]">edit</span>
+            Edit
+        </button>
+        <button id="action-delete" onclick="deleteCurrentContact()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-all ml-auto">
+            <span class="material-symbols-outlined text-[16px]">delete</span>
+            Delete
+        </button>
+    </div>
+</div>
+
+<!-- Add/Edit Contact Modal -->
+<div id="contact-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface-card rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto animate-[slideIn_0.2s_ease-out]">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-border-subtle sticky top-0 bg-surface-card z-10">
+            <h3 id="modal-title" class="text-lg font-bold text-text-main">Add Contact</h3>
+            <button onclick="closeContactModal()" class="p-1.5 rounded-lg hover:bg-gray-100 text-text-muted hover:text-text-main transition-colors">
+                <span class="material-symbols-outlined text-[20px]">close</span>
+            </button>
+        </div>
+        <form id="contact-form" class="p-6 flex flex-col gap-4" onsubmit="handleContactSubmit(event)">
+            <input type="hidden" id="form-contact-id" value="" />
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">First Name <span class="text-red-500">*</span></label>
+                    <input type="text" id="form-firstName" required
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                        placeholder="John" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">Last Name <span class="text-red-500">*</span></label>
+                    <input type="text" id="form-lastName" required
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                        placeholder="Doe" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">Email</label>
+                    <input type="email" id="form-email"
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                        placeholder="john@example.com" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">Phone</label>
+                    <input type="tel" id="form-phone"
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                        placeholder="+1 (555) 123-4567" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">Title</label>
+                    <input type="text" id="form-title"
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                        placeholder="Managing Director" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">Company</label>
+                    <input type="text" id="form-company"
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                        placeholder="Goldman Sachs" />
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">Type <span class="text-red-500">*</span></label>
+                    <select id="form-type" required
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
+                        <option value="">Select type...</option>
+                        <option value="BANKER">Banker</option>
+                        <option value="ADVISOR">Advisor</option>
+                        <option value="EXECUTIVE">Executive</option>
+                        <option value="LP">LP</option>
+                        <option value="LEGAL">Legal</option>
+                        <option value="OTHER">Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-1.5">LinkedIn URL</label>
+                    <input type="text" id="form-linkedinUrl"
+                        class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                        placeholder="https://linkedin.com/in/..." />
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-text-main mb-1.5">Tags <span class="text-text-muted font-normal">(comma-separated)</span></label>
+                <input type="text" id="form-tags"
+                    class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+                    placeholder="healthcare, m&a, midwest" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-text-main mb-1.5">Notes</label>
+                <textarea id="form-notes" rows="3"
+                    class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors resize-none"
+                    placeholder="Any additional notes about this contact..."></textarea>
+            </div>
+            <div class="flex justify-end gap-3 pt-2">
+                <button type="button" onclick="closeContactModal()"
+                    class="px-4 py-2 rounded-lg border border-border-subtle text-text-secondary text-sm font-medium hover:bg-gray-50 transition-colors">
+                    Cancel
+                </button>
+                <button type="submit" id="form-submit-btn"
+                    class="px-5 py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed">
+                    <span id="form-submit-text">Save Contact</span>
+                    <span id="form-submit-spinner" class="hidden material-symbols-outlined text-[18px] animate-spin">progress_activity</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Link Deal Modal -->
+<div id="link-deal-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div class="bg-surface-card rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col animate-[slideIn_0.2s_ease-out]">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-border-subtle shrink-0">
+            <h3 class="text-lg font-bold text-text-main">Link Deal</h3>
+            <button onclick="closeLinkDealModal()" class="p-1.5 rounded-lg hover:bg-gray-100 text-text-muted hover:text-text-main transition-colors">
+                <span class="material-symbols-outlined text-[20px]">close</span>
+            </button>
+        </div>
+        <div class="p-4 border-b border-border-subtle shrink-0">
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <span class="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[18px]">search</span>
+                </div>
+                <input id="deal-search-input" type="text" placeholder="Search deals..."
+                    class="block w-full rounded-lg border border-border-subtle bg-background-body py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all" />
+            </div>
+        </div>
+        <div id="deal-search-results" class="flex-1 overflow-y-auto custom-scrollbar p-2 min-h-[200px]">
+            <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+                <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search</span>
+                Type to search for deals...
+            </div>
+        </div>
+        <div id="link-deal-form" class="hidden shrink-0 border-t border-border-subtle p-4">
+            <div class="flex items-center gap-3 mb-3 p-3 bg-primary-light/50 rounded-lg border border-primary/10">
+                <span class="material-symbols-outlined text-primary text-[20px]">work</span>
+                <span id="selected-deal-name" class="text-sm font-medium text-text-main truncate"></span>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-text-main mb-1.5">Role</label>
+                <select id="link-deal-role"
+                    class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
+                    <option value="">No specific role</option>
+                    <option value="Banker">Banker</option>
+                    <option value="Advisor">Advisor</option>
+                    <option value="Board Member">Board Member</option>
+                    <option value="Management">Management</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <button id="link-deal-submit" onclick="submitLinkDeal()"
+                class="w-full py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">link</span>
+                Link Deal
+            </button>
+        </div>
+    </div>
+</div>
+
+</main>
+</div>
+
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/layout.js"></script>
+<script>
+// ============================================================
+// CRM Contacts Page — PE OS
+// ============================================================
+
+const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
+
+// State
+let contacts = [];
+let totalContacts = 0;
+let currentContact = null;
+let currentFilter = { search: '', type: '' };
+let searchTimeout = null;
+let selectedDealId = null;
+
+// ============================================================
+// Utility Functions
+// ============================================================
+
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function timeAgo(date) {
+    if (!date) return 'Never';
+    const seconds = Math.floor((Date.now() - new Date(date).getTime()) / 1000);
+    if (seconds < 60) return 'Just now';
+    if (seconds < 3600) return `${Math.floor(seconds/60)}m ago`;
+    if (seconds < 86400) return `${Math.floor(seconds/3600)}h ago`;
+    if (seconds < 604800) return `${Math.floor(seconds/86400)}d ago`;
+    return new Date(date).toLocaleDateString();
+}
+
+function debounce(func, wait) {
+    let timeout;
+    return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+}
+
+// Contact type config
+const TYPE_CONFIG = {
+    BANKER:    { label: 'Banker',    bg: 'bg-blue-100',    text: 'text-blue-700',    avatarBg: '#DBEAFE', avatarText: '#1D4ED8' },
+    ADVISOR:   { label: 'Advisor',   bg: 'bg-purple-100',  text: 'text-purple-700',  avatarBg: '#EDE9FE', avatarText: '#6D28D9' },
+    EXECUTIVE: { label: 'Executive', bg: 'bg-emerald-100', text: 'text-emerald-700', avatarBg: '#D1FAE5', avatarText: '#047857' },
+    LP:        { label: 'LP',        bg: 'bg-amber-100',   text: 'text-amber-700',   avatarBg: '#FEF3C7', avatarText: '#B45309' },
+    LEGAL:     { label: 'Legal',     bg: 'bg-slate-100',   text: 'text-slate-700',   avatarBg: '#F1F5F9', avatarText: '#334155' },
+    OTHER:     { label: 'Other',     bg: 'bg-gray-100',    text: 'text-gray-700',    avatarBg: '#F3F4F6', avatarText: '#374151' },
+};
+
+// Interaction type config
+const INTERACTION_ICONS = {
+    NOTE:    'edit_note',
+    MEETING: 'groups',
+    CALL:    'call',
+    EMAIL:   'mail',
+    OTHER:   'more_horiz',
+};
+
+// Deal stage styles (for linked deals)
+const STAGE_STYLES = {
+    'INITIAL_REVIEW': { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Initial Review' },
+    'DUE_DILIGENCE':  { bg: 'bg-primary-light', text: 'text-primary', label: 'Due Diligence' },
+    'IOI_SUBMITTED':  { bg: 'bg-amber-50', text: 'text-amber-700', label: 'IOI Submitted' },
+    'LOI_SUBMITTED':  { bg: 'bg-purple-50', text: 'text-purple-700', label: 'LOI Submitted' },
+    'NEGOTIATION':    { bg: 'bg-orange-50', text: 'text-orange-700', label: 'Negotiation' },
+    'CLOSING':        { bg: 'bg-teal-50', text: 'text-teal-700', label: 'Closing' },
+    'PASSED':         { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Passed' },
+    'CLOSED_WON':     { bg: 'bg-secondary-light', text: 'text-secondary', label: 'Closed Won' },
+    'CLOSED_LOST':    { bg: 'bg-red-50', text: 'text-red-700', label: 'Closed Lost' },
+};
+
+function getInitials(firstName, lastName) {
+    const f = (firstName || '').trim();
+    const l = (lastName || '').trim();
+    return ((f[0] || '') + (l[0] || '')).toUpperCase() || '?';
+}
+
+// ============================================================
+// API Calls
+// ============================================================
+
+async function fetchContacts() {
+    const params = new URLSearchParams();
+    if (currentFilter.search) params.set('search', currentFilter.search);
+    if (currentFilter.type) params.set('type', currentFilter.type);
+    params.set('sortBy', 'createdAt');
+    params.set('sortOrder', 'desc');
+    params.set('limit', '100');
+    params.set('offset', '0');
+
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts?${params.toString()}`);
+    if (!res.ok) throw new Error(`Failed to load contacts (${res.status})`);
+    const data = await res.json();
+    return data;
+}
+
+async function fetchContactDetail(id) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${id}`);
+    if (!res.ok) throw new Error(`Failed to load contact (${res.status})`);
+    return await res.json();
+}
+
+async function createContact(body) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.details || err.error || `Failed to create contact (${res.status})`);
+    }
+    return await res.json();
+}
+
+async function updateContact(id, body) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to update contact (${res.status})`);
+    }
+    return await res.json();
+}
+
+async function deleteContact(id) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${id}`, { method: 'DELETE' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to delete contact (${res.status})`);
+    }
+    return true;
+}
+
+async function addInteraction(contactId, body) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${contactId}/interactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to add interaction (${res.status})`);
+    }
+    return await res.json();
+}
+
+async function linkDeal(contactId, dealId, role) {
+    const body = { dealId };
+    if (role) body.role = role;
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${contactId}/deals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to link deal (${res.status})`);
+    }
+    return await res.json();
+}
+
+async function unlinkDeal(contactId, dealId) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${contactId}/deals/${dealId}`, { method: 'DELETE' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to unlink deal (${res.status})`);
+    }
+    return true;
+}
+
+async function searchDeals(query) {
+    const params = new URLSearchParams();
+    if (query) params.set('search', query);
+    params.set('limit', '20');
+    const res = await PEAuth.authFetch(`${API_BASE}/deals?${params.toString()}`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.deals || []);
+}
+
+// ============================================================
+// Rendering — Contact Cards
+// ============================================================
+
+function renderContactCard(contact) {
+    const tc = TYPE_CONFIG[contact.type] || TYPE_CONFIG.OTHER;
+    const initials = getInitials(contact.firstName, contact.lastName);
+    const fullName = escapeHtml((contact.firstName || '') + ' ' + (contact.lastName || ''));
+    const title = escapeHtml(contact.title || '');
+    const company = escapeHtml(contact.company || '');
+    const email = escapeHtml(contact.email || '');
+    const phone = escapeHtml(contact.phone || '');
+    const tags = (contact.tags || []).slice(0, 4);
+    const linkedDealsCount = contact.linkedDeals ? contact.linkedDeals.length : (contact._linkedDealsCount || 0);
+
+    // Find last interaction date
+    let lastContactedText = 'Never contacted';
+    if (contact.interactions && contact.interactions.length > 0) {
+        const sorted = [...contact.interactions].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+        lastContactedText = 'Contacted ' + timeAgo(sorted[0].date || sorted[0].createdAt);
+    } else if (contact.lastInteractionAt) {
+        lastContactedText = 'Contacted ' + timeAgo(contact.lastInteractionAt);
+    }
+
+    return `
+        <div class="contact-card cursor-pointer" data-contact-id="${escapeHtml(contact.id)}" onclick="openDetail('${escapeHtml(contact.id)}')">
+            <article class="bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden group">
+                <!-- Top Row: Avatar + Name + Type badge -->
+                <div class="flex items-start gap-3.5 mb-4">
+                    <div class="size-11 rounded-full flex items-center justify-center shrink-0 text-sm font-bold shadow-sm" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">
+                        ${escapeHtml(initials)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <h3 class="text-text-main font-bold text-[15px] leading-tight group-hover:text-primary transition-colors truncate">${fullName}</h3>
+                        ${title ? `<p class="text-text-secondary text-xs mt-0.5 truncate">${title}</p>` : ''}
+                    </div>
+                    <span class="px-2 py-0.5 rounded-md ${tc.bg} ${tc.text} text-[10px] font-bold uppercase tracking-wider shrink-0">${escapeHtml(tc.label)}</span>
+                </div>
+
+                <!-- Company -->
+                ${company ? `
+                <div class="flex items-center gap-1.5 mb-3">
+                    <span class="material-symbols-outlined text-text-muted text-[16px]">business</span>
+                    <span class="text-sm text-text-secondary truncate">${company}</span>
+                </div>
+                ` : ''}
+
+                <!-- Contact info -->
+                <div class="flex flex-col gap-1.5 mb-3">
+                    ${email ? `
+                    <a href="mailto:${email}" onclick="event.stopPropagation();" class="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary transition-colors truncate">
+                        <span class="material-symbols-outlined text-[14px]">mail</span>
+                        <span class="truncate">${email}</span>
+                    </a>
+                    ` : ''}
+                    ${phone ? `
+                    <a href="tel:${phone}" onclick="event.stopPropagation();" class="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-[14px]">call</span>
+                        ${phone}
+                    </a>
+                    ` : ''}
+                </div>
+
+                <!-- Tags -->
+                ${tags.length > 0 ? `
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                    ${tags.map(t => `<span class="px-2 py-0.5 rounded-full bg-background-body text-text-muted text-[10px] font-medium border border-border-subtle">${escapeHtml(t)}</span>`).join('')}
+                    ${(contact.tags || []).length > 4 ? `<span class="text-[10px] text-text-muted">+${(contact.tags.length - 4)}</span>` : ''}
+                </div>
+                ` : ''}
+
+                <!-- Footer: Last contacted + Deals count -->
+                <div class="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
+                    <span class="text-[11px] text-text-muted font-medium">${escapeHtml(lastContactedText)}</span>
+                    ${linkedDealsCount > 0 ? `
+                    <span class="flex items-center gap-1 text-[11px] text-text-muted font-medium">
+                        <span class="material-symbols-outlined text-[14px]">work</span>
+                        ${linkedDealsCount} deal${linkedDealsCount !== 1 ? 's' : ''}
+                    </span>
+                    ` : ''}
+                </div>
+            </article>
+        </div>
+    `;
+}
+
+function renderEmptyState() {
+    return `
+        <div class="col-span-full flex flex-col items-center justify-center py-20">
+            <div class="size-20 rounded-full bg-primary-light/60 flex items-center justify-center mb-5">
+                <span class="material-symbols-outlined text-primary text-4xl">groups</span>
+            </div>
+            <h3 class="text-lg font-bold text-text-main mb-2">Start building your network</h3>
+            <p class="text-text-muted text-sm mb-6 text-center max-w-xs">Add contacts to track relationships with bankers, advisors, executives, and LPs.</p>
+            <button onclick="openContactModal()" class="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
+                <span class="material-symbols-outlined text-[18px]">person_add</span>
+                Add Your First Contact
+            </button>
+        </div>
+    `;
+}
+
+function renderLoadingState() {
+    return `
+        <div class="col-span-full flex flex-col items-center justify-center py-20">
+            <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
+            <p class="text-text-muted text-sm font-medium">Loading contacts...</p>
+        </div>
+    `;
+}
+
+function renderErrorState(message) {
+    return `
+        <div class="col-span-full flex flex-col items-center justify-center py-20">
+            <span class="material-symbols-outlined text-red-500 text-4xl mb-4">error</span>
+            <p class="text-text-main font-medium mb-2">Failed to load contacts</p>
+            <p class="text-text-muted text-sm mb-4">${escapeHtml(message)}</p>
+            <button onclick="loadContacts()" class="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary-hover transition-colors">
+                Try Again
+            </button>
+        </div>
+    `;
+}
+
+// ============================================================
+// Load & Render Contacts
+// ============================================================
+
+async function loadContacts() {
+    const grid = document.getElementById('contacts-grid');
+    grid.innerHTML = renderLoadingState();
+
+    try {
+        const data = await fetchContacts();
+        contacts = data.contacts || data || [];
+        totalContacts = data.total || contacts.length;
+
+        // Update header counts
+        const badge = document.getElementById('contact-count-badge');
+        const subtitle = document.getElementById('contact-subtitle');
+        badge.textContent = totalContacts;
+        badge.classList.remove('hidden');
+        subtitle.innerHTML = `<span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(5,150,105,0.4)]"></span> ${totalContacts} contact${totalContacts !== 1 ? 's' : ''} in your network`;
+
+        if (contacts.length === 0) {
+            grid.innerHTML = currentFilter.search || currentFilter.type
+                ? `<div class="col-span-full flex flex-col items-center justify-center py-20">
+                    <span class="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
+                    <p class="text-text-main font-medium mb-2">No contacts found</p>
+                    <p class="text-text-muted text-sm">Try adjusting your search or filters</p>
+                   </div>`
+                : renderEmptyState();
+            return;
+        }
+
+        grid.innerHTML = contacts.map(c => renderContactCard(c)).join('');
+    } catch (err) {
+        console.error('Error loading contacts:', err);
+        grid.innerHTML = renderErrorState(err.message);
+    }
+}
+
+// ============================================================
+// Detail Slide-Over Panel
+// ============================================================
+
+async function openDetail(contactId) {
+    const backdrop = document.getElementById('detail-backdrop');
+    const panel = document.getElementById('detail-panel');
+    const body = document.getElementById('detail-body');
+
+    // Show loading in panel
+    backdrop.classList.remove('hidden');
+    backdrop.classList.add('backdrop-enter');
+    panel.classList.remove('hidden');
+    panel.classList.add('slide-over-enter');
+    panel.classList.remove('slide-over-leave');
+
+    body.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-16">
+            <span class="material-symbols-outlined text-primary text-3xl animate-spin mb-3">sync</span>
+            <p class="text-text-muted text-sm">Loading contact details...</p>
+        </div>
+    `;
+
+    try {
+        const contact = await fetchContactDetail(contactId);
+        currentContact = contact;
+        renderDetailPanel(contact);
+    } catch (err) {
+        console.error('Error loading contact detail:', err);
+        body.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-16">
+                <span class="material-symbols-outlined text-red-500 text-3xl mb-3">error</span>
+                <p class="text-text-main font-medium mb-1">Failed to load contact</p>
+                <p class="text-text-muted text-sm">${escapeHtml(err.message)}</p>
+            </div>
+        `;
+    }
+}
+
+function renderDetailPanel(contact) {
+    const body = document.getElementById('detail-body');
+    const tc = TYPE_CONFIG[contact.type] || TYPE_CONFIG.OTHER;
+    const initials = getInitials(contact.firstName, contact.lastName);
+    const fullName = escapeHtml((contact.firstName || '') + ' ' + (contact.lastName || ''));
+    const title = escapeHtml(contact.title || '');
+    const company = escapeHtml(contact.company || '');
+    const email = escapeHtml(contact.email || '');
+    const phone = escapeHtml(contact.phone || '');
+    const linkedin = escapeHtml(contact.linkedinUrl || '');
+    const notes = escapeHtml(contact.notes || '');
+    const tags = contact.tags || [];
+    const linkedDeals = contact.linkedDeals || [];
+    const interactions = contact.interactions || [];
+
+    // Sort interactions by date desc
+    const sortedInteractions = [...interactions].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+
+    let html = '';
+
+    // Avatar + Name + Title + Company
+    html += `
+        <div class="flex items-start gap-4 mb-6">
+            <div class="size-14 rounded-full flex items-center justify-center shrink-0 text-lg font-bold shadow-sm" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">
+                ${escapeHtml(initials)}
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="text-xl font-bold text-text-main leading-tight">${fullName}</h3>
+                ${title ? `<p class="text-text-secondary text-sm mt-0.5">${title}</p>` : ''}
+                ${company ? `<p class="text-text-muted text-sm flex items-center gap-1 mt-0.5"><span class="material-symbols-outlined text-[14px]">business</span>${company}</p>` : ''}
+                <span class="inline-block mt-2 px-2.5 py-0.5 rounded-md ${tc.bg} ${tc.text} text-[10px] font-bold uppercase tracking-wider">${escapeHtml(tc.label)}</span>
+            </div>
+        </div>
+    `;
+
+    // Contact Info Section
+    html += `<div class="mb-6">`;
+    html += `<h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Contact Information</h4>`;
+    html += `<div class="flex flex-col gap-2">`;
+    if (email) {
+        html += `
+            <a href="mailto:${email}" class="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary-light/50">
+                <span class="material-symbols-outlined text-[18px] text-text-muted">mail</span>
+                ${email}
+            </a>
+        `;
+    }
+    if (phone) {
+        html += `
+            <a href="tel:${phone}" class="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary-light/50">
+                <span class="material-symbols-outlined text-[18px] text-text-muted">call</span>
+                ${phone}
+            </a>
+        `;
+    }
+    if (linkedin) {
+        html += `
+            <a href="${linkedin}" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary-light/50">
+                <span class="material-symbols-outlined text-[18px] text-text-muted">open_in_new</span>
+                LinkedIn Profile
+            </a>
+        `;
+    }
+    if (!email && !phone && !linkedin) {
+        html += `<p class="text-text-muted text-sm italic p-2">No contact information added</p>`;
+    }
+    html += `</div></div>`;
+
+    // Tags
+    if (tags.length > 0) {
+        html += `<div class="mb-6">`;
+        html += `<h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Tags</h4>`;
+        html += `<div class="flex flex-wrap gap-1.5">`;
+        tags.forEach(t => {
+            html += `<span class="px-2.5 py-1 rounded-full bg-background-body text-text-secondary text-xs font-medium border border-border-subtle">${escapeHtml(t)}</span>`;
+        });
+        html += `</div></div>`;
+    }
+
+    // Notes
+    if (notes) {
+        html += `<div class="mb-6">`;
+        html += `<h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Notes</h4>`;
+        html += `<div class="p-3 bg-background-body rounded-lg border border-border-subtle text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">${notes}</div>`;
+        html += `</div>`;
+    }
+
+    // Linked Deals
+    html += `<div class="mb-6">`;
+    html += `<h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Linked Deals <span class="text-text-muted">(${linkedDeals.length})</span></h4>`;
+    if (linkedDeals.length === 0) {
+        html += `<p class="text-text-muted text-sm italic">No linked deals</p>`;
+    } else {
+        html += `<div class="flex flex-col gap-2">`;
+        linkedDeals.forEach(d => {
+            const deal = d.deal || d;
+            const dealId = deal.id || d.dealId;
+            const dealName = escapeHtml(deal.name || 'Unknown Deal');
+            const dealStage = deal.stage || '';
+            const ss = STAGE_STYLES[dealStage] || { bg: 'bg-gray-100', text: 'text-gray-600', label: dealStage };
+            const role = escapeHtml(d.role || '');
+
+            html += `
+                <div class="flex items-center justify-between p-3 rounded-lg border border-border-subtle hover:border-primary/30 hover:bg-primary-light/30 transition-all group">
+                    <a href="deal.html?id=${escapeHtml(dealId)}" class="flex items-center gap-2.5 flex-1 min-w-0">
+                        <span class="material-symbols-outlined text-text-muted text-[18px] group-hover:text-primary">work</span>
+                        <span class="text-sm font-medium text-text-main group-hover:text-primary truncate">${dealName}</span>
+                        ${dealStage ? `<span class="px-2 py-0.5 rounded-md ${ss.bg} ${ss.text} text-[9px] font-bold uppercase tracking-wider shrink-0">${escapeHtml(ss.label)}</span>` : ''}
+                    </a>
+                    <div class="flex items-center gap-2 shrink-0 ml-2">
+                        ${role ? `<span class="text-[10px] text-text-muted">${role}</span>` : ''}
+                        <button onclick="handleUnlinkDeal('${escapeHtml(dealId)}')" class="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100" title="Unlink deal">
+                            <span class="material-symbols-outlined text-[16px]">link_off</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+    html += `</div>`;
+
+    // Interaction Timeline
+    html += `<div class="mb-2">`;
+    html += `<h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Interaction Timeline <span class="text-text-muted">(${sortedInteractions.length})</span></h4>`;
+
+    // Inline add interaction form (hidden by default)
+    html += `
+        <div id="add-interaction-form" class="hidden mb-4 p-4 rounded-lg border border-primary/20 bg-primary-light/20">
+            <div class="flex items-center justify-between mb-3">
+                <h5 class="text-sm font-semibold text-text-main">New Interaction</h5>
+                <button onclick="hideAddInteraction()" class="p-1 rounded hover:bg-white text-text-muted hover:text-text-main transition-colors">
+                    <span class="material-symbols-outlined text-[16px]">close</span>
+                </button>
+            </div>
+            <div class="flex flex-col gap-3">
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">Type</label>
+                        <select id="interaction-type"
+                            class="w-full rounded-md border border-border-subtle bg-white px-2.5 py-1.5 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
+                            <option value="NOTE">Note</option>
+                            <option value="MEETING">Meeting</option>
+                            <option value="CALL">Call</option>
+                            <option value="EMAIL">Email</option>
+                            <option value="OTHER">Other</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-text-secondary mb-1">Date</label>
+                        <input type="date" id="interaction-date" value="${new Date().toISOString().split('T')[0]}"
+                            class="w-full rounded-md border border-border-subtle bg-white px-2.5 py-1.5 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" />
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-text-secondary mb-1">Title</label>
+                    <input type="text" id="interaction-title" placeholder="Brief summary..."
+                        class="w-full rounded-md border border-border-subtle bg-white px-2.5 py-1.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" />
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-text-secondary mb-1">Description</label>
+                    <textarea id="interaction-description" rows="3" placeholder="Details about this interaction..."
+                        class="w-full rounded-md border border-border-subtle bg-white px-2.5 py-1.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors resize-none"></textarea>
+                </div>
+                <button onclick="submitInteraction()" class="self-end px-4 py-1.5 rounded-md bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors flex items-center gap-1.5">
+                    <span class="material-symbols-outlined text-[16px]">save</span>
+                    Save
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (sortedInteractions.length === 0) {
+        html += `<p class="text-text-muted text-sm italic">No interactions recorded</p>`;
+    } else {
+        html += `<div class="flex flex-col gap-0">`;
+        sortedInteractions.forEach((inter, idx) => {
+            const icon = INTERACTION_ICONS[inter.type] || INTERACTION_ICONS.OTHER;
+            const interTitle = escapeHtml(inter.title || inter.type || 'Interaction');
+            const interDesc = escapeHtml(inter.description || '');
+            const interDate = inter.date || inter.createdAt;
+            const isLast = idx === sortedInteractions.length - 1;
+
+            html += `
+                <div class="flex gap-3 relative">
+                    <!-- Timeline line -->
+                    ${!isLast ? `<div class="absolute left-[15px] top-[32px] bottom-0 w-px bg-border-subtle"></div>` : ''}
+                    <!-- Icon circle -->
+                    <div class="size-[30px] rounded-full bg-background-body border border-border-subtle flex items-center justify-center shrink-0 z-10">
+                        <span class="material-symbols-outlined text-text-muted text-[16px]">${icon}</span>
+                    </div>
+                    <!-- Content -->
+                    <div class="flex-1 pb-4 min-w-0">
+                        <div class="flex items-center justify-between gap-2">
+                            <p class="text-sm font-medium text-text-main truncate">${interTitle}</p>
+                            <span class="text-[11px] text-text-muted shrink-0">${escapeHtml(timeAgo(interDate))}</span>
+                        </div>
+                        ${interDesc ? `<p class="text-xs text-text-secondary mt-1 leading-relaxed">${interDesc}</p>` : ''}
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div>`;
+    }
+    html += `</div>`;
+
+    body.innerHTML = html;
+}
+
+function closeDetail() {
+    const backdrop = document.getElementById('detail-backdrop');
+    const panel = document.getElementById('detail-panel');
+
+    panel.classList.add('slide-over-leave');
+    panel.classList.remove('slide-over-enter');
+
+    setTimeout(() => {
+        backdrop.classList.add('hidden');
+        backdrop.classList.remove('backdrop-enter');
+        panel.classList.add('hidden');
+        panel.classList.remove('slide-over-leave');
+        currentContact = null;
+    }, 200);
+}
+
+// ============================================================
+// Add / Edit Contact Modal
+// ============================================================
+
+function openContactModal(contact) {
+    const modal = document.getElementById('contact-modal');
+    const modalTitle = document.getElementById('modal-title');
+    const submitText = document.getElementById('form-submit-text');
+
+    // Reset form
+    document.getElementById('contact-form').reset();
+    document.getElementById('form-contact-id').value = '';
+
+    if (contact) {
+        modalTitle.textContent = 'Edit Contact';
+        submitText.textContent = 'Update Contact';
+        document.getElementById('form-contact-id').value = contact.id || '';
+        document.getElementById('form-firstName').value = contact.firstName || '';
+        document.getElementById('form-lastName').value = contact.lastName || '';
+        document.getElementById('form-email').value = contact.email || '';
+        document.getElementById('form-phone').value = contact.phone || '';
+        document.getElementById('form-title').value = contact.title || '';
+        document.getElementById('form-company').value = contact.company || '';
+        document.getElementById('form-type').value = contact.type || '';
+        document.getElementById('form-linkedinUrl').value = contact.linkedinUrl || '';
+        document.getElementById('form-tags').value = (contact.tags || []).join(', ');
+        document.getElementById('form-notes').value = contact.notes || '';
+    } else {
+        modalTitle.textContent = 'Add Contact';
+        submitText.textContent = 'Save Contact';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeContactModal() {
+    document.getElementById('contact-modal').classList.add('hidden');
+}
+
+async function handleContactSubmit(event) {
+    event.preventDefault();
+
+    const submitBtn = document.getElementById('form-submit-btn');
+    const submitText = document.getElementById('form-submit-text');
+    const spinner = document.getElementById('form-submit-spinner');
+
+    submitBtn.disabled = true;
+    spinner.classList.remove('hidden');
+
+    const contactId = document.getElementById('form-contact-id').value;
+    const tagsRaw = document.getElementById('form-tags').value;
+    const tags = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : [];
+
+    const body = {
+        firstName: document.getElementById('form-firstName').value.trim(),
+        lastName: document.getElementById('form-lastName').value.trim(),
+        email: document.getElementById('form-email').value.trim() || undefined,
+        phone: document.getElementById('form-phone').value.trim() || undefined,
+        title: document.getElementById('form-title').value.trim() || undefined,
+        company: document.getElementById('form-company').value.trim() || undefined,
+        type: document.getElementById('form-type').value,
+        linkedinUrl: (() => { const v = document.getElementById('form-linkedinUrl').value.trim(); return v && !v.startsWith('http') ? 'https://' + v : v || undefined; })(),
+        tags: tags.length > 0 ? tags : undefined,
+        notes: document.getElementById('form-notes').value.trim() || undefined,
+    };
+
+    // Remove undefined keys
+    Object.keys(body).forEach(key => body[key] === undefined && delete body[key]);
+
+    try {
+        if (contactId) {
+            await updateContact(contactId, body);
+            showNotification('Contact Updated', `${escapeHtml(body.firstName)} ${escapeHtml(body.lastName)} has been updated.`, 'success');
+        } else {
+            await createContact(body);
+            showNotification('Contact Created', `${escapeHtml(body.firstName)} ${escapeHtml(body.lastName)} has been added.`, 'success');
+        }
+
+        closeContactModal();
+        await loadContacts();
+
+        // If detail panel is open for this contact, refresh it
+        if (currentContact && currentContact.id === contactId) {
+            await openDetail(contactId);
+        }
+    } catch (err) {
+        console.error('Error saving contact:', err);
+        showNotification('Error', err.message, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        spinner.classList.add('hidden');
+    }
+}
+
+function editCurrentContact() {
+    if (!currentContact) return;
+    openContactModal(currentContact);
+}
+
+async function deleteCurrentContact() {
+    if (!currentContact) return;
+    const fullName = (currentContact.firstName || '') + ' ' + (currentContact.lastName || '');
+    if (!confirm(`Are you sure you want to delete ${fullName.trim()}? This action cannot be undone.`)) return;
+
+    try {
+        await deleteContact(currentContact.id);
+        showNotification('Contact Deleted', `${escapeHtml(fullName.trim())} has been removed.`, 'success');
+        closeDetail();
+        await loadContacts();
+    } catch (err) {
+        console.error('Error deleting contact:', err);
+        showNotification('Error', err.message, 'error');
+    }
+}
+
+// ============================================================
+// Add Interaction (inline form in detail panel)
+// ============================================================
+
+function showAddInteraction() {
+    const form = document.getElementById('add-interaction-form');
+    if (form) {
+        form.classList.remove('hidden');
+        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        document.getElementById('interaction-title')?.focus();
+    }
+}
+
+function hideAddInteraction() {
+    const form = document.getElementById('add-interaction-form');
+    if (form) form.classList.add('hidden');
+}
+
+async function submitInteraction() {
+    if (!currentContact) return;
+
+    const type = document.getElementById('interaction-type').value;
+    const title = document.getElementById('interaction-title').value.trim();
+    const description = document.getElementById('interaction-description').value.trim();
+    const date = document.getElementById('interaction-date').value;
+
+    if (!title && !description) {
+        showNotification('Error', 'Please enter a title or description.', 'error');
+        return;
+    }
+
+    const body = { type };
+    if (title) body.title = title;
+    if (description) body.description = description;
+    if (date) body.date = date;
+
+    try {
+        await addInteraction(currentContact.id, body);
+        showNotification('Interaction Added', `${type.charAt(0) + type.slice(1).toLowerCase()} logged successfully.`, 'success');
+        // Refresh detail panel
+        await openDetail(currentContact.id);
+        // Also refresh the contacts grid to update "last contacted"
+        await loadContacts();
+    } catch (err) {
+        console.error('Error adding interaction:', err);
+        showNotification('Error', err.message, 'error');
+    }
+}
+
+// ============================================================
+// Link Deal Modal
+// ============================================================
+
+function showLinkDealModal() {
+    if (!currentContact) return;
+    selectedDealId = null;
+
+    const modal = document.getElementById('link-deal-modal');
+    const results = document.getElementById('deal-search-results');
+    const form = document.getElementById('link-deal-form');
+    const searchInput = document.getElementById('deal-search-input');
+
+    results.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+            <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search</span>
+            Type to search for deals...
+        </div>
+    `;
+    form.classList.add('hidden');
+    searchInput.value = '';
+    document.getElementById('link-deal-role').value = '';
+
+    modal.classList.remove('hidden');
+    setTimeout(() => searchInput.focus(), 100);
+}
+
+function closeLinkDealModal() {
+    document.getElementById('link-deal-modal').classList.add('hidden');
+    selectedDealId = null;
+}
+
+async function handleDealSearch(query) {
+    const results = document.getElementById('deal-search-results');
+    const form = document.getElementById('link-deal-form');
+
+    if (!query || query.length < 2) {
+        results.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+                <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search</span>
+                Type to search for deals...
+            </div>
+        `;
+        form.classList.add('hidden');
+        selectedDealId = null;
+        return;
+    }
+
+    results.innerHTML = `
+        <div class="flex items-center justify-center py-6">
+            <span class="material-symbols-outlined text-primary animate-spin text-xl">sync</span>
+        </div>
+    `;
+
+    try {
+        const deals = await searchDeals(query);
+
+        // Filter out already linked deals
+        const linkedIds = new Set((currentContact?.linkedDeals || []).map(d => (d.deal || d).id || d.dealId));
+        const available = deals.filter(d => !linkedIds.has(d.id));
+
+        if (available.length === 0) {
+            results.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+                    <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search_off</span>
+                    No matching deals found
+                </div>
+            `;
+            return;
+        }
+
+        results.innerHTML = available.map(deal => {
+            const ss = STAGE_STYLES[deal.stage] || { bg: 'bg-gray-100', text: 'text-gray-600', label: deal.stage || 'Unknown' };
+            return `
+                <button class="deal-search-result w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-primary-light/50 transition-colors" data-deal-id="${escapeHtml(deal.id)}" data-deal-name="${escapeHtml(deal.name || '')}">
+                    <span class="material-symbols-outlined text-text-muted text-[20px]">work</span>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-text-main truncate">${escapeHtml(deal.name || 'Unnamed Deal')}</p>
+                        <p class="text-xs text-text-muted">${escapeHtml(deal.industry || '')}</p>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-md ${ss.bg} ${ss.text} text-[9px] font-bold uppercase tracking-wider shrink-0">${escapeHtml(ss.label)}</span>
+                </button>
+            `;
+        }).join('');
+
+        // Attach click handlers to results
+        results.querySelectorAll('.deal-search-result').forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedDealId = btn.dataset.dealId;
+                document.getElementById('selected-deal-name').textContent = btn.dataset.dealName;
+                form.classList.remove('hidden');
+
+                // Highlight selected
+                results.querySelectorAll('.deal-search-result').forEach(b => b.classList.remove('bg-primary-light/50', 'ring-1', 'ring-primary/30'));
+                btn.classList.add('bg-primary-light/50', 'ring-1', 'ring-primary/30');
+            });
+        });
+    } catch (err) {
+        console.error('Error searching deals:', err);
+        results.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 text-red-500 text-sm">
+                <span class="material-symbols-outlined text-3xl mb-2">error</span>
+                Failed to search deals
+            </div>
+        `;
+    }
+}
+
+async function submitLinkDeal() {
+    if (!currentContact || !selectedDealId) return;
+
+    const role = document.getElementById('link-deal-role').value;
+
+    try {
+        await linkDeal(currentContact.id, selectedDealId, role);
+        showNotification('Deal Linked', 'Deal has been linked to this contact.', 'success');
+        closeLinkDealModal();
+        // Refresh detail
+        await openDetail(currentContact.id);
+        await loadContacts();
+    } catch (err) {
+        console.error('Error linking deal:', err);
+        showNotification('Error', err.message, 'error');
+    }
+}
+
+async function handleUnlinkDeal(dealId) {
+    if (!currentContact) return;
+    if (!confirm('Remove this deal link?')) return;
+
+    try {
+        await unlinkDeal(currentContact.id, dealId);
+        showNotification('Deal Unlinked', 'Deal has been removed from this contact.', 'success');
+        await openDetail(currentContact.id);
+        await loadContacts();
+    } catch (err) {
+        console.error('Error unlinking deal:', err);
+        showNotification('Error', err.message, 'error');
+    }
+}
+
+// ============================================================
+// Notifications
+// ============================================================
+
+function showNotification(title, message, type) {
+    const bgColor = type === 'success' ? 'bg-secondary' : type === 'error' ? 'bg-red-500' : 'bg-primary';
+    const icon = type === 'success' ? 'check_circle' : type === 'error' ? 'error' : 'info';
+    const notification = document.createElement('div');
+    notification.className = `fixed bottom-4 right-4 ${bgColor} text-white px-4 py-3 rounded-lg shadow-lg z-[100] flex items-center gap-3 animate-[slideIn_0.3s_ease-out] max-w-sm`;
+    notification.innerHTML = `
+        <span class="material-symbols-outlined text-white">${icon}</span>
+        <div class="min-w-0">
+            <p class="font-bold text-sm">${escapeHtml(title)}</p>
+            <p class="text-sm opacity-90 truncate">${escapeHtml(message)}</p>
+        </div>
+    `;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transition = 'opacity 0.3s';
+        setTimeout(() => notification.remove(), 300);
+    }, 4000);
+}
+
+// ============================================================
+// Insights — Timeline, Duplicates, Stale Contacts
+// ============================================================
+
+async function loadInsights() {
+    loadTimeline();
+    loadStaleContacts();
+    loadDuplicates();
+}
+
+async function loadTimeline() {
+    const list = document.getElementById('timeline-list');
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts/insights/timeline?limit=10`);
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        const interactions = data.interactions || [];
+
+        if (interactions.length === 0) {
+            list.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-6 text-text-muted">
+                    <span class="material-symbols-outlined text-2xl mb-1 opacity-40">history</span>
+                    <p class="text-xs">No interactions yet</p>
+                </div>`;
+            return;
+        }
+
+        list.innerHTML = interactions.map(inter => {
+            const contact = inter.Contact || {};
+            const name = escapeHtml(`${contact.firstName || ''} ${contact.lastName || ''}`.trim() || 'Unknown');
+            const icon = INTERACTION_ICONS[inter.type] || INTERACTION_ICONS.OTHER;
+            const tc = TYPE_CONFIG[contact.type] || TYPE_CONFIG.OTHER;
+            const interTitle = escapeHtml(inter.title || inter.type || 'Interaction');
+            const ago = timeAgo(inter.date || inter.createdAt);
+
+            return `
+                <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 cursor-pointer transition-colors border-b border-border-subtle last:border-0" onclick="openDetail('${escapeHtml(contact.id)}')">
+                    <div class="size-7 rounded-full flex items-center justify-center shrink-0" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">
+                        <span class="material-symbols-outlined text-[14px]">${icon}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-text-main truncate">${interTitle}</p>
+                        <p class="text-[10px] text-text-muted truncate">with ${name}${contact.company ? ' · ' + escapeHtml(contact.company) : ''}</p>
+                    </div>
+                    <span class="text-[10px] text-text-muted shrink-0">${escapeHtml(ago)}</span>
+                </div>`;
+        }).join('');
+    } catch (err) {
+        list.innerHTML = `<div class="px-4 py-4 text-xs text-text-muted text-center">Unable to load timeline</div>`;
+    }
+}
+
+async function loadStaleContacts() {
+    const list = document.getElementById('stale-list');
+    const badge = document.getElementById('stale-count');
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts/insights/stale?days=30`);
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        const stale = data.contacts || [];
+
+        badge.textContent = stale.length;
+        if (stale.length === 0) {
+            badge.classList.add('hidden');
+            list.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-6 text-text-muted">
+                    <span class="material-symbols-outlined text-2xl mb-1 text-secondary opacity-60">check_circle</span>
+                    <p class="text-xs">All contacts are up to date!</p>
+                </div>`;
+            return;
+        }
+
+        list.innerHTML = stale.slice(0, 8).map(c => {
+            const tc = TYPE_CONFIG[c.type] || TYPE_CONFIG.OTHER;
+            const name = escapeHtml(`${c.firstName || ''} ${c.lastName || ''}`.trim());
+            const initials = ((c.firstName || '')[0] || '') + ((c.lastName || '')[0] || '');
+
+            return `
+                <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-amber-50/50 cursor-pointer transition-colors border-b border-border-subtle last:border-0" onclick="openDetail('${escapeHtml(c.id)}')">
+                    <div class="size-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">
+                        ${escapeHtml(initials.toUpperCase())}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-text-main truncate">${name}</p>
+                        <p class="text-[10px] text-text-muted truncate">${c.company ? escapeHtml(c.company) + ' · ' : ''}${escapeHtml(c.reason)}</p>
+                    </div>
+                    <span class="material-symbols-outlined text-amber-500 text-[16px] shrink-0">schedule</span>
+                </div>`;
+        }).join('');
+    } catch (err) {
+        list.innerHTML = `<div class="px-4 py-4 text-xs text-text-muted text-center">Unable to load reminders</div>`;
+    }
+}
+
+async function loadDuplicates() {
+    const list = document.getElementById('dup-list');
+    const badge = document.getElementById('dup-count');
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts/insights/duplicates`);
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        const dups = data.duplicates || [];
+
+        badge.textContent = dups.length;
+        if (dups.length === 0) {
+            badge.classList.add('hidden');
+            list.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-6 text-text-muted">
+                    <span class="material-symbols-outlined text-2xl mb-1 text-secondary opacity-60">verified</span>
+                    <p class="text-xs">No duplicates found</p>
+                </div>`;
+            return;
+        }
+
+        list.innerHTML = dups.map(dup => {
+            const names = dup.contacts.map(c => escapeHtml(`${c.firstName} ${c.lastName}`)).join(', ');
+            const icon = dup.reason === 'Same email' ? 'mail' : 'person';
+
+            return `
+                <div class="flex items-center gap-3 px-4 py-2.5 hover:bg-red-50/50 transition-colors border-b border-border-subtle last:border-0">
+                    <div class="size-7 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                        <span class="material-symbols-outlined text-red-500 text-[14px]">${icon}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-medium text-text-main truncate">${names}</p>
+                        <p class="text-[10px] text-text-muted">${escapeHtml(dup.reason)}: ${escapeHtml(dup.key)}</p>
+                    </div>
+                    <span class="material-symbols-outlined text-red-400 text-[16px] shrink-0">warning</span>
+                </div>`;
+        }).join('');
+    } catch (err) {
+        list.innerHTML = `<div class="px-4 py-4 text-xs text-text-muted text-center">Unable to check duplicates</div>`;
+    }
+}
+
+// ============================================================
+// Filter & Search Event Handlers
+// ============================================================
+
+function initializeFilters() {
+    // Type filter dropdown toggle
+    const typeBtn = document.getElementById('type-filter-btn');
+    const typeDropdown = document.getElementById('type-dropdown');
+
+    typeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        typeDropdown.classList.toggle('hidden');
+    });
+
+    // Type filter options
+    typeDropdown.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentFilter.type = btn.dataset.type;
+            document.getElementById('type-filter-text').textContent = btn.dataset.type
+                ? (TYPE_CONFIG[btn.dataset.type]?.label || btn.dataset.type)
+                : 'All Types';
+            typeDropdown.classList.add('hidden');
+            loadContacts();
+        });
+    });
+
+    // Close dropdowns on outside click
+    document.addEventListener('click', () => {
+        typeDropdown.classList.add('hidden');
+    });
+
+    // Search input with debounce
+    const searchInput = document.getElementById('contact-search');
+    const debouncedSearch = debounce(() => {
+        currentFilter.search = searchInput.value.trim();
+        loadContacts();
+    }, 300);
+    searchInput.addEventListener('input', debouncedSearch);
+
+    // Add Contact button
+    document.getElementById('add-contact-btn').addEventListener('click', () => openContactModal());
+
+    // Close contact modal on backdrop click
+    document.getElementById('contact-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('contact-modal')) closeContactModal();
+    });
+
+    // Close link deal modal on backdrop click
+    document.getElementById('link-deal-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('link-deal-modal')) closeLinkDealModal();
+    });
+
+    // Deal search input with debounce
+    const dealSearchInput = document.getElementById('deal-search-input');
+    const debouncedDealSearch = debounce(() => {
+        handleDealSearch(dealSearchInput.value.trim());
+    }, 300);
+    dealSearchInput.addEventListener('input', debouncedDealSearch);
+
+    // Keyboard shortcuts
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            if (!document.getElementById('link-deal-modal').classList.contains('hidden')) {
+                closeLinkDealModal();
+            } else if (!document.getElementById('contact-modal').classList.contains('hidden')) {
+                closeContactModal();
+            } else if (!document.getElementById('detail-panel').classList.contains('hidden')) {
+                closeDetail();
+            }
+        }
+    });
+}
+
+// ============================================================
+// Initialization
+// ============================================================
+
+document.addEventListener('DOMContentLoaded', async function() {
+    try {
+        await PEAuth.initSupabase();
+        const auth = await PEAuth.checkAuth();
+        if (!auth) return;
+
+        PELayout.init('crm', { collapsible: true });
+        initializeFilters();
+    } catch (err) {
+        console.error('Init error:', err);
+    }
+
+    // Always attempt to load contacts even if layout fails
+    try {
+        await loadContacts();
+    } catch (err) {
+        console.error('Load contacts error:', err);
+        const grid = document.getElementById('contacts-grid');
+        if (grid) grid.innerHTML = renderErrorState(err.message);
+    }
+
+    // Load insights panels (timeline, stale, duplicates) in parallel
+    loadInsights();
+});
+</script>
+</body></html>
+
+
+
