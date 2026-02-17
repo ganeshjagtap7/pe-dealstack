@@ -3,7 +3,7 @@
  * Handles all API calls for the Virtual Data Room
  */
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
 // Get auth token from PEAuth if available (async because getAccessToken is async)
 async function getAuthToken(): Promise<string | null> {

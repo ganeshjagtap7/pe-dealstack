@@ -1,7 +1,7 @@
 // Deal Intelligence & Chat Terminal Interactive Features
 // PE OS - AI-Powered Deal Analysis
 
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
 // ============================================================
 // State Management

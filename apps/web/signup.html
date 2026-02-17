@@ -469,15 +469,20 @@
             // Force light mode
             document.documentElement.classList.remove('dark');
 
-            // Initialize auth and check if already logged in
-            await PEAuth.initSupabase();
-            const notAuth = await PEAuth.checkNotAuth();
+            try {
+                // Initialize auth and check if already logged in
+                await PEAuth.initSupabase();
+                const notAuth = await PEAuth.checkNotAuth();
 
-            // If user is NOT authenticated, show the signup form
-            if (notAuth) {
+                // If user is NOT authenticated, show the signup form
+                if (notAuth) {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }
+                // If user is authenticated, checkNotAuth will redirect - don't show anything
+            } catch (err) {
+                console.error('Auth initialization error:', err);
                 document.getElementById('loadingScreen').style.display = 'none';
             }
-            // If user is authenticated, checkNotAuth will redirect - don't show anything
         });
     </script>
 </body>

@@ -115,32 +115,38 @@
     };
 
     document.addEventListener('DOMContentLoaded', async () => {
-        // Initialize Supabase first
-        await PEAuth.initSupabase();
+        try {
+            // Initialize Supabase first
+            await PEAuth.initSupabase();
 
-        // Check auth - redirect to dashboard (not back here) if not authenticated
-        const auth = await PEAuth.checkAuth('/dashboard.html');
-        if (!auth) return;
+            // Check auth - redirect to dashboard (not back here) if not authenticated
+            const auth = await PEAuth.checkAuth('/dashboard.html');
+            if (!auth) return;
 
-        // Get feature from URL param
-        const urlParams = new URLSearchParams(window.location.search);
-        const feature = urlParams.get('feature') || 'default';
+            // Get feature from URL param
+            const urlParams = new URLSearchParams(window.location.search);
+            const feature = urlParams.get('feature') || 'default';
 
-        // Update page content based on feature
-        const config = features[feature];
-        if (config) {
-            document.getElementById('feature-title').textContent = config.title + ' - Coming Soon!';
-            document.getElementById('feature-icon').textContent = config.icon;
-            document.getElementById('feature-description').textContent = config.description;
-            document.title = config.title + ' - Coming Soon - PE OS';
+            // Update page content based on feature
+            const config = features[feature];
+            if (config) {
+                document.getElementById('feature-title').textContent = config.title + ' - Coming Soon!';
+                document.getElementById('feature-icon').textContent = config.icon;
+                document.getElementById('feature-description').textContent = config.description;
+                document.title = config.title + ' - Coming Soon - PE OS';
+            }
+
+            // Initialize layout with the feature as active nav item
+            PELayout.init(feature, { collapsible: true });
+
+            // Hide loading, show content
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('pe-layout-root').style.opacity = '1';
+        } catch (err) {
+            console.error('Auth initialization error:', err);
+            document.getElementById('loadingScreen').style.display = 'none';
+            document.getElementById('pe-layout-root').style.opacity = '1';
         }
-
-        // Initialize layout with the feature as active nav item
-        PELayout.init(feature, { collapsible: true });
-
-        // Hide loading, show content
-        document.getElementById('loadingScreen').style.display = 'none';
-        document.getElementById('pe-layout-root').style.opacity = '1';
     });
 </script>
 </body>

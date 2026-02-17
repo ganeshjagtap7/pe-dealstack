@@ -284,11 +284,15 @@ Add Another
 <script src="js/layout.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function() {
-        await PEAuth.initSupabase();
-        const auth = await PEAuth.checkAuth();
-        if (!auth) return;
+        try {
+            await PEAuth.initSupabase();
+            const auth = await PEAuth.checkAuth();
+            if (!auth) return;
 
-        PELayout.init('deal-intake', { collapsible: true });
+            PELayout.init('deal-intake', { collapsible: true });
+        } catch (err) {
+            console.error('Auth initialization error:', err);
+        }
     });
 </script>
 <script src="js/deal-intake.js"></script>

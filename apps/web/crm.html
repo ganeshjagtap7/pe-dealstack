@@ -321,7 +321,7 @@
 <script src="js/globalSearch.js"></script>
 <script src="js/inviteModal.js"></script>
 <script>
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
 // Current filter/sort state
 let filters = {

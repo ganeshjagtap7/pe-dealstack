@@ -11,11 +11,12 @@ function injectEnvConfig(): Plugin {
     name: 'inject-env-config',
     configResolved(config) {
       const env = loadEnv(config.mode, config.root, 'VITE_')
+      // Fall back to non-VITE_ prefixed process.env vars (for Render/production builds)
       envConfig = JSON.stringify({
-        SUPABASE_URL: env.VITE_SUPABASE_URL || '',
-        SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY || '',
-        API_URL: env.VITE_API_URL || '',
-        SENTRY_DSN: env.VITE_SENTRY_DSN || '',
+        SUPABASE_URL: env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
+        SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
+        API_URL: env.VITE_API_URL || process.env.API_URL || '',
+        SENTRY_DSN: env.VITE_SENTRY_DSN || process.env.SENTRY_DSN || '',
       })
     },
     transformIndexHtml(html) {
