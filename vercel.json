@@ -1,4 +1,10 @@
 {
   "buildCommand": "npm run build:web",
-  "outputDirectory": "apps/web/dist"
+  "outputDirectory": "apps/web/dist",
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://pe-os.onrender.com/api/:path*"
+    }
+  ]
 }
