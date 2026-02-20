@@ -100,6 +100,8 @@ export default defineConfig({
         'documentation': resolve(__dirname, 'documentation.html'),
         'api-reference': resolve(__dirname, 'api-reference.html'),
         'help-center': resolve(__dirname, 'help-center.html'),
+        templates: resolve(__dirname, 'templates.html'),
+        'contacts': resolve(__dirname, 'contacts.html'),
       },
     },
   },
