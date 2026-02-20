@@ -5,6 +5,64 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 8 — February 20, 2026
+
+#### Vercel Deployment Debugging + Production API Routing Fix — 6:06 PM
+
+**Goal:** Fix production deployment failures on Vercel and restore CRM/API functionality on `pe-dealstack.vercel.app` without changing existing app behavior.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `vercel.json` | **Created** | Added `"buildCommand": "npm run build:web"` and `"outputDirectory": "apps/web/dist"` | Vercel default expected `public` directory and failed after successful build because output path was not configured |
+| `turbo.json` | **Updated** | Added `globalEnv` entries for runtime/build variables: `NODE_ENV`, `SUPABASE_*`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `SENTRY_DSN`, and `VITE_*` vars | Removed Turborepo warnings and ensured environment variables are available during package builds on Vercel |
+| `vercel.json` | **Updated** | Added rewrite rule: `"/api/:path*" -> "https://pe-os.onrender.com/api/:path*"` | Frontend is hosted on Vercel but backend API runs on Render; relative `/api` calls returned 404 without edge rewrite |
+| `PROGRESS.md` | **Updated** | Appended this timestamped deployment incident log and fix summary | Maintains day-by-day founder-readable changelog and incident traceability |
+
+---
+
+#### Incident Timeline — 6:06 PM to 6:12 PM
+
+| Time | Event | Outcome |
+|------|-------|---------|
+| 6:06 PM | First deployment log reviewed | Build succeeded, but deployment failed with `No Output Directory named "public"` |
+| 6:07 PM | Root cause isolated | Vercel project expected `public`, while web build generated `apps/web/dist` |
+| 6:08 PM | Config fix prepared | Added root `vercel.json` with explicit build/output config |
+| 6:09 PM | Warning cleanup prepared | Added `globalEnv` config in `turbo.json` |
+| 6:10 PM | User redeploy still failed | New Vercel run still referenced old commit (`e63936f`) that did not include config fix |
+| 6:11 PM | Missing commit pushed | Pushed commit with `vercel.json` + `turbo.json` |
+| 6:12 PM | Runtime error reported in app (`/crm.html`) | 404s on `/api/deals`, `/api/users/me`, `/api/notifications` confirmed API routing mismatch between Vercel frontend and Render backend |
+| 6:12 PM | Final production fix pushed | Added Vercel rewrite for `/api/*` to Render backend endpoint |
+
+---
+
+#### Commits Shipped (Session 8)
+
+| Commit | Message | Scope |
+|--------|---------|-------|
+| `3b35781` | `build(vercel): set output directory to apps/web/dist and declare turbo env vars` | Deployment configuration + Turborepo env handling |
+| `c0abff1` | `fix(vercel): rewrite /api routes to Render backend` | Runtime API routing fix for production frontend |
+
+---
+
+#### Validation Notes — 6:12 PM
+
+1. Web build completes successfully (`vite build`) and emits static assets to `apps/web/dist`.
+2. Prior deployment failure was configuration-level (output directory mismatch), not compile failure.
+3. Post-build app error (`HTTP 404` on `/api/...`) was networking/routing-level and fixed by edge rewrite.
+4. Existing frontend API call patterns were intentionally preserved to avoid broad code changes; routing fix was implemented at platform config layer.
+
+---
+
+#### Process Rule Reinforced — 6:12 PM
+
+**For every future `PROGRESS.md` update:**
+1. Start with exact timestamp.
+2. Include explicit goal line.
+3. Keep prior content untouched; append-only updates.
+4. Record incident timelines, root causes, and shipped commit IDs when production issues are involved.
+
+---
+
 ### Session 7 — February 20, 2026
 
 #### Local Run + Repo Status Validation — 5:56 PM
