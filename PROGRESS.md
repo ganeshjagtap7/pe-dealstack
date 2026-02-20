@@ -5,6 +5,63 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 9 — February 20, 2026
+
+#### Production Recovery + Template Manager Hardening — 7:40 PM
+
+**Goal:** Stabilize deployment paths (Vercel + Render), restore missing pages/routes, and make `templates.html` functionally usable (not static/blank) with reliable user workflows.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `vercel.json` | **Created/Updated** | Added explicit `buildCommand` + `outputDirectory` and API rewrite from `/api/:path*` to Render backend | Vercel build was succeeding but failing output lookup (`public` mismatch), and runtime `/api` calls were returning 404 without rewrite |
+| `turbo.json` | **Updated** | Added `globalEnv` variables for platform + Vite runtime usage | Removed Turborepo env warnings and ensured expected vars are visible during build |
+| `apps/web/js/layout.js` | **Fixed** | Updated CRM nav route to `/contacts.html` (from coming-soon route) | Sidebar CRM button incorrectly opened a placeholder page instead of live CRM Contacts |
+| `apps/web/vite.config.ts` | **Fixed** | Added `contacts.html` + `templates.html` to Vite MPA inputs and added `templates.js` to copied root files list | `templates.html`/`contacts.html` and script dependencies were not fully emitted/copied in production bundles, causing 404s/dead UI |
+| `apps/api/src/routes/templates.ts` | **Hardened** | Added graceful empty-array fallback for both `42P01` and `PGRST205` | Template list endpoint was hard-failing when template tables/relations were not present in Supabase schema cache |
+| `apps/web/templates.html` | **Enhanced** | Added IDs for toolbar controls (`filter-active-btn`, `sort-usage-btn`) | Existing toolbar controls were visual only; needed JS wiring for actual behavior |
+| `apps/web/templates.js` | **Major functional upgrade** | Implemented robust filtering/sorting/search state, non-destructive search behavior, valid selection retention, save/cancel snapshot restore, preview action, duplicate/delete actions, template normalization, and local fallback flow when API returns empty list | Templates page had multiple visible but non-functional controls; goal was production usability with clear fallback behavior |
+| `PROGRESS.md` | **Updated** | Appended this timestamped session log with goal + chronological fix details | Maintains detailed founder-shareable changelog and append-only audit trail |
+
+---
+
+#### Incident + Fix Timeline — 6:06 PM to 7:40 PM
+
+| Time | Event | Outcome |
+|------|-------|---------|
+| 6:06 PM | Vercel deploy investigated | Build completed but deployment failed with output-dir mismatch (`public` expected) |
+| 6:10 PM | Deployment config corrected | Added root Vercel config + Turborepo env config |
+| 6:12 PM | Runtime app errors triaged | `/api` calls from Vercel frontend were 404; added API rewrite to Render backend |
+| 6:25 PM | CRM nav mismatch fixed | Sidebar CRM link updated from coming-soon route to live contacts page |
+| 6:40 PM | Templates/Contacts page 404 root cause found | Vite MPA input list missing page entries in production build |
+| 6:50 PM | Build config fixed | Added missing page inputs and redeploy path correction |
+| 7:05 PM | Templates page “UI not working” debugged | Found missing `templates.js` in production dist copy list |
+| 7:10 PM | Static script shipping fixed | Added `templates.js` to copied output assets |
+| 7:20 PM | Templates UX hardening pass | Implemented functional filter/sort/preview/duplicate/delete/save/cancel and reliable selection/search behavior |
+| 7:35 PM | Demo visibility requirement addressed | Re-enabled sample-template fallback when API returns empty list so users can visualize product value |
+| 7:40 PM | Local verification complete | Web/API builds passed; templates + contacts routes and scripts confirmed locally |
+
+---
+
+#### User-Facing Outcomes (Session 9)
+
+1. `templates.html` and `contacts.html` are now built as first-class production pages.
+2. CRM sidebar now opens live contacts page instead of coming-soon.
+3. Templates page no longer appears dead/static due to missing `templates.js`.
+4. When backend template data is unavailable or empty, users still see realistic sample templates to understand workflow.
+5. Template manager controls now have concrete behavior (search/filter/sort/save/cancel/preview/duplicate/delete).
+
+---
+
+#### Process Rule Reinforced — 7:40 PM
+
+**For all future `PROGRESS.md` entries:**
+1. Include exact timestamp.
+2. Start with explicit goal.
+3. Preserve historical content exactly (append-only).
+4. Include root cause + fix chronology + shipped file-level changes for production-impacting work.
+
+---
+
 ### Session 8 — February 20, 2026
 
 #### Vercel Deployment Debugging + Production API Routing Fix — 6:06 PM

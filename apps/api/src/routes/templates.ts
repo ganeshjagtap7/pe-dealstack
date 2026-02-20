@@ -78,8 +78,8 @@ router.get('/', async (req, res) => {
     const { data: templates, error } = await query;
 
     if (error) {
-      // If table doesn't exist, return empty array with helpful message
-      if (error.code === '42P01') {
+      // If template tables/relations are missing, return empty list so UI can fall back gracefully.
+      if (error.code === '42P01' || error.code === 'PGRST205') {
         return res.json([]);
       }
       throw error;

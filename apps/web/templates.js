@@ -20,6 +20,10 @@ let activeTab = 'investment-memos';
 let editingSection = null;
 let draggedSection = null;
 let isLoading = false;
+let searchQuery = '';
+let showOnlyActive = false;
+let sortByUsage = true;
+let lastSavedSnapshot = null;
 
 // Sample templates for fallback when API is not available
 const SAMPLE_TEMPLATES = [
@@ -120,7 +124,11 @@ async function fetchTemplates() {
         const response = await PEAuth.authFetch(`${API_BASE}/templates`);
         if (response.ok) {
             const data = await response.json();
-            return data;
+            if (Array.isArray(data) && data.length > 0) {
+                return data;
+            }
+            console.info('Templates API returned empty list, using sample templates for better UX');
+            return SAMPLE_TEMPLATES;
         }
         throw new Error('Failed to fetch templates');
     } catch (error) {
@@ -246,19 +254,17 @@ async function initTemplateManager() {
     showLoadingState();
 
     // Fetch templates from API
-    templates = await fetchTemplates();
+    templates = (await fetchTemplates()).map(normalizeTemplate);
 
     renderTemplates();
     initTabs();
     initModals();
     initEditor();
     initSearch();
+    initToolbarControls();
     initDragAndDrop();
 
-    // Select first template by default
-    if (templates.length > 0) {
-        selectTemplate(templates[0].id);
-    }
+    selectFirstVisibleTemplate();
 
     hideLoadingState();
 }
@@ -288,23 +294,13 @@ function renderTemplates() {
     const grid = document.getElementById('templates-grid');
     if (!grid) return;
 
-    // Map category names
-    const categoryMap = {
-        'investment-memos': 'INVESTMENT_MEMO',
-        'diligence-checklists': 'CHECKLIST',
-        'outreach-sequences': 'OUTREACH'
-    };
+    const visibleTemplates = getVisibleTemplates();
 
-    const filteredTemplates = templates.filter(t => {
-        const targetCategory = categoryMap[activeTab];
-        return t.category === targetCategory;
-    });
-
-    let html = filteredTemplates.map(template => `
+    let html = visibleTemplates.map(template => `
         <div class="template-card group bg-surface-card rounded-xl ${selectedTemplate?.id === template.id ? 'border-2 border-primary shadow-card-hover' : 'border border-border-subtle shadow-card hover:shadow-card-hover hover:border-primary/30'} overflow-hidden transition-all cursor-pointer relative"
              data-template-id="${template.id}">
             <div class="absolute top-3 right-3 z-10 ${selectedTemplate?.id === template.id ? '' : 'opacity-0 group-hover:opacity-100'} transition-opacity">
-                <button class="template-menu-btn h-8 w-8 bg-surface-card/90 backdrop-blur rounded-full flex items-center justify-center text-text-muted hover:text-primary transition-colors shadow-sm border border-border-subtle">
+                <button class="template-menu-btn h-8 w-8 bg-surface-card/90 backdrop-blur rounded-full flex items-center justify-center text-text-muted hover:text-primary transition-colors shadow-sm border border-border-subtle" data-template-id="${template.id}">
                     <span class="material-symbols-outlined text-[18px]">more_vert</span>
                 </button>
             </div>
@@ -338,6 +334,16 @@ function renderTemplates() {
         </div>
     `).join('');
 
+    if (visibleTemplates.length === 0) {
+        html = `
+            <div class="col-span-3 flex flex-col items-center justify-center py-14 text-center">
+                <span class="material-symbols-outlined text-4xl text-text-muted mb-2">folder_open</span>
+                <p class="text-sm font-medium text-text-main mb-1">No templates found</p>
+                <p class="text-xs text-text-muted mb-4">Try a different tab/filter or create a new template.</p>
+            </div>
+        `;
+    }
+
     // Add "Create from Scratch" card
     html += `
         <div id="create-from-scratch" class="group border-2 border-dashed border-border-subtle rounded-xl flex flex-col items-center justify-center text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/30 transition-all cursor-pointer min-h-[280px]">
@@ -359,12 +365,30 @@ function renderTemplates() {
         });
     });
 
+    document.querySelectorAll('.template-menu-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            const templateId = btn.dataset.templateId;
+            const action = window.prompt('Type action: "duplicate" or "delete"');
+            if (!action) return;
+            const normalized = action.trim().toLowerCase();
+            if (normalized === 'duplicate') {
+                await duplicateTemplate(templateId);
+            } else if (normalized === 'delete') {
+                await deleteTemplateById(templateId);
+            } else {
+                showNotification('Unknown action', 'error');
+            }
+        });
+    });
+
     document.getElementById('create-from-scratch')?.addEventListener('click', openNewTemplateModal);
 }
 
 function selectTemplate(templateId) {
     selectedTemplate = templates.find(t => t.id === templateId || t.id === String(templateId));
     if (!selectedTemplate) return;
+    lastSavedSnapshot = deepClone(selectedTemplate);
 
     renderTemplates();
     renderEditor();
@@ -609,6 +633,7 @@ function initTabs() {
             tab.classList.add('border-primary', 'text-primary', 'font-semibold');
             activeTab = tab.dataset.tab;
             renderTemplates();
+            selectFirstVisibleTemplate();
         });
     });
 }
@@ -879,6 +904,10 @@ function initEditor() {
         const updateData = {
             name: document.getElementById('editor-template-name').value.trim()
         };
+        if (!updateData.name) {
+            showNotification('Template name cannot be empty', 'error');
+            return;
+        }
 
         const categorySelect = document.getElementById('template-category');
         if (categorySelect.selectedIndex === 0) updateData.category = 'INVESTMENT_MEMO';
@@ -898,6 +927,7 @@ function initEditor() {
             await updateTemplateAPI(selectedTemplate.id, updateData);
         }
 
+        lastSavedSnapshot = deepClone(selectedTemplate);
         renderTemplates();
         showNotification('Template saved successfully', 'success');
     });
@@ -905,7 +935,20 @@ function initEditor() {
     // Cancel button
     const cancelBtn = document.getElementById('cancel-edit-btn');
     cancelBtn?.addEventListener('click', () => {
+        if (!selectedTemplate || !lastSavedSnapshot) return;
+        const idx = templates.findIndex(t => t.id === selectedTemplate.id);
+        if (idx >= 0) {
+            templates[idx] = deepClone(lastSavedSnapshot);
+            selectedTemplate = templates[idx];
+        }
         renderEditor();
+        renderTemplates();
+    });
+
+    const previewBtn = document.getElementById('preview-template-btn');
+    previewBtn?.addEventListener('click', () => {
+        if (!selectedTemplate) return;
+        openTemplatePreview(selectedTemplate);
     });
 }
 
@@ -915,25 +958,30 @@ function initEditor() {
 
 function initSearch() {
     const searchInput = document.getElementById('template-search');
-    let originalTemplates = null;
 
     searchInput?.addEventListener('input', (e) => {
-        const query = e.target.value.toLowerCase();
-
-        if (!originalTemplates) {
-            originalTemplates = [...templates];
-        }
-
-        if (query) {
-            templates = originalTemplates.filter(t =>
-                t.name.toLowerCase().includes(query) ||
-                (t.description && t.description.toLowerCase().includes(query))
-            );
-        } else {
-            templates = [...originalTemplates];
-        }
-
+        searchQuery = (e.target.value || '').toLowerCase().trim();
         renderTemplates();
+        ensureValidSelection();
+    });
+}
+
+function initToolbarControls() {
+    const filterBtn = document.getElementById('filter-active-btn');
+    const sortBtn = document.getElementById('sort-usage-btn');
+
+    filterBtn?.addEventListener('click', () => {
+        showOnlyActive = !showOnlyActive;
+        filterBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">filter_list</span>Filter: ${showOnlyActive ? 'Active' : 'All'}`;
+        renderTemplates();
+        ensureValidSelection();
+    });
+
+    sortBtn?.addEventListener('click', () => {
+        sortByUsage = !sortByUsage;
+        sortBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">sort</span>Sort: ${sortByUsage ? 'Usage' : 'Newest'}`;
+        renderTemplates();
+        ensureValidSelection();
     });
 }
 
@@ -978,6 +1026,141 @@ function showNotification(message, type = 'info') {
         notification.classList.add('translate-y-full', 'opacity-0');
         setTimeout(() => notification.remove(), 300);
     }, 3000);
+}
+
+function getVisibleTemplates() {
+    const categoryMap = {
+        'investment-memos': 'INVESTMENT_MEMO',
+        'diligence-checklists': 'CHECKLIST',
+        'outreach-sequences': 'OUTREACH'
+    };
+    const targetCategory = categoryMap[activeTab];
+
+    return templates
+        .filter(t => t.category === targetCategory)
+        .filter(t => !showOnlyActive || t.isActive)
+        .filter(t => !searchQuery || t.name.toLowerCase().includes(searchQuery) || (t.description || '').toLowerCase().includes(searchQuery))
+        .sort((a, b) => sortByUsage ? (b.usageCount || 0) - (a.usageCount || 0) : (new Date(b.createdAt || 0) - new Date(a.createdAt || 0)));
+}
+
+function ensureValidSelection() {
+    const visible = getVisibleTemplates();
+    if (!selectedTemplate || !visible.some(t => t.id === selectedTemplate.id)) {
+        if (visible.length > 0) selectTemplate(visible[0].id);
+    }
+}
+
+function selectFirstVisibleTemplate() {
+    const visible = getVisibleTemplates();
+    if (visible.length > 0) {
+        selectTemplate(visible[0].id);
+    } else {
+        selectedTemplate = null;
+    }
+}
+
+function deepClone(value) {
+    return JSON.parse(JSON.stringify(value));
+}
+
+function normalizeTemplate(template) {
+    return {
+        ...template,
+        id: String(template.id),
+        name: template.name || 'Untitled Template',
+        description: template.description || '',
+        category: template.category || 'INVESTMENT_MEMO',
+        usageCount: Number(template.usageCount || 0),
+        isActive: template.isActive !== false,
+        permissions: template.permissions || 'FIRM_WIDE',
+        sections: (template.sections || []).map((section, index) => ({
+            ...section,
+            id: String(section.id || `s-${Date.now()}-${index}`),
+            title: section.title || `Section ${index + 1}`,
+            description: section.description || '',
+            aiEnabled: !!section.aiEnabled,
+            mandatory: !!section.mandatory,
+            sortOrder: Number(section.sortOrder ?? index),
+        })),
+    };
+}
+
+async function duplicateTemplate(templateId) {
+    const source = templates.find(t => t.id === templateId);
+    if (!source) return;
+
+    if (!source.id.startsWith('sample-') && !source.id.startsWith('local-')) {
+        try {
+            const res = await PEAuth.authFetch(`${API_BASE}/templates/${source.id}/duplicate`, { method: 'POST' });
+            if (res.ok) {
+                const duplicated = normalizeTemplate(await res.json());
+                templates.unshift(duplicated);
+                selectTemplate(duplicated.id);
+                showNotification('Template duplicated', 'success');
+                return;
+            }
+        } catch (error) {
+            console.error('API duplicate failed, using local fallback:', error);
+        }
+    }
+
+    const clone = deepClone(source);
+    clone.id = `local-${Date.now()}`;
+    clone.name = `${source.name} (Copy)`;
+    clone.createdAt = new Date().toISOString().split('T')[0];
+    clone.usageCount = 0;
+    clone.sections = (clone.sections || []).map((s, i) => ({ ...s, id: `s-${Date.now()}-${i}` }));
+    templates.unshift(clone);
+    selectTemplate(clone.id);
+    showNotification('Template duplicated (local)', 'success');
+}
+
+async function deleteTemplateById(templateId) {
+    const template = templates.find(t => t.id === templateId);
+    if (!template) return;
+    if (!window.confirm(`Delete template "${template.name}"?`)) return;
+
+    if (!template.id.startsWith('sample-') && !template.id.startsWith('local-')) {
+        const deleted = await deleteTemplateAPI(template.id);
+        if (!deleted) {
+            showNotification('Failed to delete template', 'error');
+            return;
+        }
+    }
+
+    templates = templates.filter(t => t.id !== templateId);
+    showNotification('Template deleted', 'success');
+    ensureValidSelection();
+    renderTemplates();
+    if (selectedTemplate) renderEditor();
+}
+
+function openTemplatePreview(template) {
+    const sections = [...(template.sections || [])].sort((a, b) => a.sortOrder - b.sortOrder);
+    const previewHtml = `
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>${template.name} Preview</title></head>
+<body style="font-family: Inter, Arial, sans-serif; margin: 24px; color:#111827;">
+  <h1 style="margin-bottom:4px;">${template.name}</h1>
+  <p style="color:#4B5563;margin-top:0;">${template.description || 'No description'}</p>
+  <hr style="border:0;border-top:1px solid #E5E7EB;margin:16px 0;" />
+  ${sections.map((s, i) => `
+    <section style="margin-bottom:16px;">
+      <h3 style="margin:0 0 6px 0;">${i + 1}. ${s.title}</h3>
+      <p style="margin:0;color:#4B5563;">${s.description || 'No description'}</p>
+    </section>
+  `).join('')}
+</body>
+</html>`;
+    const popup = window.open('', '_blank', 'width=900,height=700');
+    if (!popup) {
+        showNotification('Popup blocked. Please allow popups for preview.', 'error');
+        return;
+    }
+    popup.document.open();
+    popup.document.write(previewHtml);
+    popup.document.close();
 }
 
 // ============================================================
