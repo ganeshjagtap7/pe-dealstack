@@ -72,6 +72,34 @@ After changes, a `grep` search for "Alex Morgan" across the entire `apps/web/` d
 
 ---
 
+#### Permanent Fix: sessionStorage User Caching — 6:21 PM IST
+
+**Timestamp:** 2026-02-21 18:21 IST
+
+**Goal:** Eliminate the "Loading..." flash entirely on page navigation by caching user data in `sessionStorage`. After the very first successful API call, all subsequent page navigations display the user's real name instantly (0ms delay).
+
+**How it works:**
+1. First page load: `layout.js` calls `/api/users/me`, gets user data, displays it, and **caches it in `sessionStorage`**.
+2. Every subsequent page load: `layout.js` reads cache **synchronously** (instant), paints the real name immediately, then silently refreshes the data from the API in the background.
+3. On logout: cache is cleared so the next login starts fresh.
+4. On browser tab close: `sessionStorage` auto-clears (unlike `localStorage`), preventing stale data.
+
+**Why `sessionStorage` and not `localStorage`:**
+- `sessionStorage` is scoped to the browser tab and auto-clears when the tab closes
+- Prevents stale user data from persisting across sessions or different users
+- If someone logs out and a different user logs in, the cache is already cleared
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/js/layout.js` | **Enhanced** | Added `getCachedUser()` / `cacheUserData()` functions, immediate display from cache on layout init, cache clear on logout | Zero-flash user identity on all page navigations after first load |
+
+**Expected behavior after fix:**
+- First page load after login: `Loading...` → real name (one-time ~200-500ms delay)
+- All subsequent page navigations: **Real name appears instantly** (cached, 0ms)
+- After logout + re-login: Fresh API call on first page, then cached again
+
+---
+
 ### Session 9 — February 20, 2026
 
 #### Production Recovery + Template Manager Hardening — 7:40 PM

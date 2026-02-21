@@ -19,15 +19,44 @@ const NAV_ITEMS = [
     { id: 'ai-reports', label: 'AI Reports', icon: 'auto_awesome', href: '/memo-builder.html', isAI: true, memberOnly: true },
 ];
 
-// User data - will be loaded from API
-let USER = {
+// Cache key for sessionStorage
+const USER_CACHE_KEY = 'pe-user-cache';
+
+// Try to load cached user data immediately (before any async work)
+function getCachedUser() {
+    try {
+        const cached = sessionStorage.getItem(USER_CACHE_KEY);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            // Validate cache has required fields
+            if (parsed && parsed.name && parsed.name !== 'Loading...') {
+                return parsed;
+            }
+        }
+    } catch (e) {
+        // sessionStorage not available or corrupted — ignore
+    }
+    return null;
+}
+
+function cacheUserData(userData) {
+    try {
+        sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
+    } catch (e) {
+        // Storage full or unavailable — not critical
+    }
+}
+
+// User data — immediately use cache if available, otherwise show Loading...
+const cachedUser = getCachedUser();
+let USER = cachedUser || {
     name: 'Loading...',
     role: '',           // Display role/title
     systemRole: '',     // System role for permissions (ADMIN, MEMBER, VIEWER)
     avatar: ''
 };
 
-// Load user data from API
+// Load user data from API (and refresh cache)
 async function loadUserData() {
     try {
         if (typeof PEAuth !== 'undefined' && PEAuth.authFetch) {
@@ -43,6 +72,8 @@ async function loadUserData() {
                     systemRole: userData.role || 'MEMBER',  // ADMIN, MEMBER, or VIEWER
                     avatar: userData.avatar || ''
                 };
+                // Cache for instant display on next page navigation
+                cacheUserData(USER);
                 updateUserDisplay();
                 updateSidebarForRole();  // Filter sidebar based on role
                 // Dispatch event so other components can update when user data is loaded
@@ -583,6 +614,8 @@ function initPELayout(activePage, options = {}) {
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
         logoutBtn.addEventListener('click', async () => {
+            // Clear cached user data on logout
+            try { sessionStorage.removeItem(USER_CACHE_KEY); } catch (e) { }
             if (typeof PEAuth !== 'undefined' && PEAuth.signOut) {
                 await PEAuth.signOut();
             } else {
@@ -596,6 +629,14 @@ function initPELayout(activePage, options = {}) {
     console.log('PE OS Layout initialized for:', activePage);
 
     // Load user data from API and update display
+    // If we have cached data, immediately paint it (0ms, no flash)
+    if (cachedUser) {
+        updateUserDisplay();
+        updateSidebarForRole();
+        // Also dispatch immediate event with cached data so other components can use it
+        window.dispatchEvent(new CustomEvent('pe-user-loaded', { detail: { user: USER } }));
+    }
+    // Then refresh from API in background (updates cache for next navigation)
     loadUserData();
 
     // Dispatch custom event to signal layout is ready
