@@ -5,6 +5,73 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 10 — February 21, 2026
+
+#### Hardcoded User Identity Cleanup — 6:19 PM IST
+
+**Timestamp:** 2026-02-21 18:19 IST
+
+**Goal:** Remove all hardcoded "Alex Morgan" names and external avatar URLs across the application. These caused a visible lag/flash where "Alex Morgan" appeared briefly on page load or refresh before the actual logged-in user's name (e.g., "Ganesh") was fetched from the API and displayed.
+
+---
+
+#### Root Cause Analysis — 6:19 PM IST
+
+Two problems were identified:
+
+1. **Hardcoded HTML headers in `crm.html` and `deal.html`:** These pages had their own inline header sections with "Alex Morgan" and a hardcoded Google avatar URL baked directly into the HTML — they were NOT using `layout.js`'s dynamic `generateHeader()` function.
+
+2. **Hardcoded sidebar profile in `crm-dynamic.html`:** The sidebar had "Alex Morgan" / "Senior Associate" hardcoded in the user profile card at the bottom.
+
+3. **Hardcoded placeholder in `dashboard.js`:** The "New Deal" form had "Alex Morgan" as the placeholder text for the "Lead Partner" input field.
+
+**How `layout.js` works (correct behavior):** The shared layout script initializes a `USER` object with `name: 'Loading...'` and then asynchronously calls `/api/users/me` to fetch the real user data. Once the API responds (~200-500ms), it updates the display with the actual name. This async pattern is correct — but pages with hardcoded HTML were bypassing it entirely.
+
+---
+
+#### Changes Made — 6:19 PM IST
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/crm.html` | **Fixed** | Replaced hardcoded "Alex Morgan" + external Google avatar URL in header `#user-menu-btn` with `Loading...` text and empty styled avatar div | Eliminated flash of wrong user identity on CRM page load |
+| `apps/web/deal.html` | **Fixed** | Replaced hardcoded "Alex Morgan" + external Google avatar URL in header `#user-menu-btn` with `Loading...` text and empty styled avatar div | Eliminated flash of wrong user identity on Deal detail page load |
+| `apps/web/crm-dynamic.html` | **Fixed** | Replaced hardcoded "Alex Morgan" / "Senior Associate" in sidebar profile with `Loading...` / "Team Member" | Eliminated wrong name showing in sidebar on dynamic CRM page |
+| `apps/web/dashboard.js` | **Fixed** | Changed "Lead Partner" input placeholder from "Alex Morgan" to "e.g., John Smith" | Removed last remaining reference to the hardcoded demo user name |
+| `PROGRESS.md` | **Updated** | Added this timestamped session log (Session 10) | Maintains detailed founder-shareable changelog with full traceability |
+
+---
+
+#### Verification — 6:19 PM IST
+
+After changes, a `grep` search for "Alex Morgan" across the entire `apps/web/` directory confirmed **zero remaining instances** in any HTML file or active display code. The only remaining reference is the generic placeholder text "e.g., John Smith" in `dashboard.js`.
+
+**Expected behavior after fix:**
+- On page load/refresh: User sees `Loading...` briefly (~200-500ms)
+- After API responds: `layout.js` updates the display to show the actual logged-in user's name and initials avatar
+- No more "Alex Morgan" flash on any page
+
+---
+
+#### User-Facing Outcomes (Session 10)
+
+1. No more "Alex Morgan" appearing on any page load or refresh — across CRM, Deal detail, and Dynamic CRM pages.
+2. All pages now show a clean `Loading...` state before the real user data loads.
+3. Avatar placeholders use a styled empty div instead of broken external image URLs.
+4. Form placeholder updated to be generic instead of referencing a demo user.
+
+---
+
+#### Process Rule Reinforced — 6:19 PM IST
+
+**For all future `PROGRESS.md` entries:**
+1. Include exact timestamp (with IST timezone).
+2. Start with explicit goal.
+3. Preserve historical content exactly (append-only).
+4. Include root cause + fix details + shipped file-level changes.
+5. Write entries as a detailed changelog suitable for founder updates and day-specific auditability.
+
+---
+
 ### Session 9 — February 20, 2026
 
 #### Production Recovery + Template Manager Hardening — 7:40 PM

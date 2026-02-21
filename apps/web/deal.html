@@ -1,13 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Deal Intelligence - PE OS</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
     <script>
         tailwind.config = {
             theme: {
@@ -59,41 +61,50 @@
             width: 6px;
             height: 6px;
         }
+
         .custom-scrollbar::-webkit-scrollbar-track {
             background: transparent;
         }
+
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #D1D5DB;
             border-radius: 3px;
         }
+
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #9CA3AF;
         }
+
         body {
             font-feature-settings: "cv11", "ss01";
             -webkit-font-smoothing: antialiased;
         }
+
         @keyframes slideIn {
             from {
                 opacity: 0;
                 transform: translateY(-10px) scale(0.95);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0) scale(1);
             }
         }
+
         .glass-panel {
             background: rgba(255, 255, 255, 0.8);
             backdrop-filter: blur(8px);
             border: 1px solid rgba(229, 231, 235, 0.8);
             box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
         }
+
         .ai-bubble-gradient {
             background: linear-gradient(135deg, #E6EEF5 0%, #F8F9FA 100%);
         }
     </style>
 </head>
+
 <body class="bg-background-body text-text-main font-sans overflow-hidden h-screen flex">
     <!-- Sidebar (injected by layout.js) -->
     <div id="sidebar-root"></div>
@@ -101,7 +112,8 @@
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col overflow-hidden">
         <!-- Header -->
-        <header class="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-10">
+        <header
+            class="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-10">
             <div class="flex items-center gap-4 flex-1">
                 <button class="md:hidden text-text-main" id="mobile-menu-btn">
                     <span class="material-symbols-outlined">menu</span>
@@ -112,37 +124,52 @@
                     <span class="material-symbols-outlined text-base text-text-muted">chevron_right</span>
                     <span id="breadcrumb-industry" class="text-text-secondary">Technology</span>
                     <span class="material-symbols-outlined text-base text-text-muted">chevron_right</span>
-                    <span id="breadcrumb-deal" class="text-text-main font-semibold bg-primary-light px-2 py-0.5 rounded border border-border-subtle">Loading...</span>
+                    <span id="breadcrumb-deal"
+                        class="text-text-main font-semibold bg-primary-light px-2 py-0.5 rounded border border-border-subtle">Loading...</span>
                 </nav>
             </div>
             <div class="flex items-center gap-4">
                 <!-- Team Avatar Group -->
-                <div id="deal-team-avatars" class="hidden md:flex items-center cursor-pointer hover:opacity-80 transition-opacity" onclick="openShareModal()">
+                <div id="deal-team-avatars"
+                    class="hidden md:flex items-center cursor-pointer hover:opacity-80 transition-opacity"
+                    onclick="openShareModal()">
                     <div class="flex -space-x-2" id="team-avatar-stack">
                         <!-- Avatars will be rendered here by JS -->
                     </div>
-                    <span id="team-more-count" class="hidden ml-1 text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full">+0</span>
+                    <span id="team-more-count"
+                        class="hidden ml-1 text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full">+0</span>
                 </div>
 
-                <button id="data-room-btn" class="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle" onclick="openDataRoom()">
+                <button id="data-room-btn"
+                    class="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle"
+                    onclick="openDataRoom()">
                     <span class="material-symbols-outlined text-[18px]">folder_open</span>
                     Data Room
                 </button>
-                <button id="share-link-btn" class="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors" title="Copy share link">
+                <button id="share-link-btn"
+                    class="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors"
+                    title="Copy share link">
                     <span class="material-symbols-outlined text-[20px]">link</span>
                 </button>
-                <button id="edit-deal-btn" class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
+                <button id="edit-deal-btn"
+                    class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
                     <span class="material-symbols-outlined text-[18px]">edit_document</span>
                     Edit Deal
                 </button>
-                <button class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative" id="notifications-btn">
+                <button
+                    class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative"
+                    id="notifications-btn">
                     <span class="material-symbols-outlined text-[20px]">notifications</span>
                     <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
                 </button>
                 <div class="h-6 w-px bg-border-subtle"></div>
-                <button class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors" id="user-menu-btn">
-                    <div class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm" style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk');"></div>
-                    <span class="hidden md:inline">Alex Morgan</span>
+                <button
+                    class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
+                    id="user-menu-btn">
+                    <div
+                        class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm bg-primary flex items-center justify-center text-white text-xs font-bold">
+                    </div>
+                    <span class="hidden md:inline">Loading...</span>
                     <span class="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
                 </button>
             </div>
@@ -151,22 +178,31 @@
         <!-- Main Content - Two Column Layout -->
         <main class="flex-1 flex overflow-hidden">
             <!-- Left Panel - Deal Details -->
-            <section class="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar">
+            <section
+                class="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar">
                 <!-- Deal Header -->
                 <div class="flex flex-col gap-6 mb-8">
                     <div class="flex justify-between items-start">
                         <div class="flex items-start gap-4">
                             <div class="size-16 rounded-xl bg-white p-1 border border-border-subtle shadow-card">
-                                <div class="w-full h-full bg-primary-light rounded-lg flex items-center justify-center border border-border-subtle">
-                                    <span id="deal-icon" class="material-symbols-outlined text-primary text-3xl">local_shipping</span>
+                                <div
+                                    class="w-full h-full bg-primary-light rounded-lg flex items-center justify-center border border-border-subtle">
+                                    <span id="deal-icon"
+                                        class="material-symbols-outlined text-primary text-3xl">local_shipping</span>
                                 </div>
                             </div>
                             <div>
-                                <h2 id="deal-title" class="text-2xl font-bold text-text-main leading-tight">Loading...</h2>
+                                <h2 id="deal-title" class="text-2xl font-bold text-text-main leading-tight">Loading...
+                                </h2>
                                 <div class="flex flex-wrap gap-2 mt-2">
-                                    <span id="deal-type-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-primary-light text-primary border border-primary/20">Series B</span>
-                                    <span id="deal-stage-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100">Due Diligence</span>
-                                    <span id="deal-industry-badge" class="px-2.5 py-0.5 rounded text-xs font-semibold bg-secondary-light text-secondary border border-secondary/20">Technology</span>
+                                    <span id="deal-type-badge"
+                                        class="px-2.5 py-0.5 rounded text-xs font-semibold bg-primary-light text-primary border border-primary/20">Series
+                                        B</span>
+                                    <span id="deal-stage-badge"
+                                        class="px-2.5 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100">Due
+                                        Diligence</span>
+                                    <span id="deal-industry-badge"
+                                        class="px-2.5 py-0.5 rounded text-xs font-semibold bg-secondary-light text-secondary border border-secondary/20">Technology</span>
                                 </div>
                             </div>
                         </div>
@@ -175,11 +211,13 @@
                     <!-- Stage Pipeline -->
                     <div id="stage-pipeline" class="glass-panel p-4 rounded-xl">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-xs font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
+                            <h3
+                                class="text-xs font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
                                 <span class="material-symbols-outlined text-primary text-sm">timeline</span>
                                 Deal Pipeline
                             </h3>
-                            <button id="change-stage-btn" class="text-xs text-primary hover:text-primary-hover font-medium flex items-center gap-1 transition-colors">
+                            <button id="change-stage-btn"
+                                class="text-xs text-primary hover:text-primary-hover font-medium flex items-center gap-1 transition-colors">
                                 <span class="material-symbols-outlined text-sm">edit</span>
                                 Change Stage
                             </button>
@@ -188,9 +226,11 @@
                             <!-- Pipeline stages will be rendered by JS -->
                         </div>
                     </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
+                    <div
+                        class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Lead Partner</p>
+                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Lead Partner
+                            </p>
                             <div id="lead-partner-container" class="flex items-center gap-2">
                                 <div class="size-5 rounded-full bg-primary border border-primary/20"></div>
                                 <span id="lead-partner-name" class="text-sm text-text-main font-bold">—</span>
@@ -208,7 +248,8 @@
                             <span id="deal-source" class="text-sm text-text-main font-bold">—</span>
                         </div>
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Last Updated</p>
+                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Last Updated
+                            </p>
                             <span id="deal-updated" class="text-sm text-text-main font-bold">—</span>
                         </div>
                     </div>
@@ -218,12 +259,19 @@
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
                     <!-- Revenue Card -->
                     <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all"></div>
-                        <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">Revenue (LTM)</p>
+                        <div
+                            class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all">
+                        </div>
+                        <p
+                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
+                            Revenue (LTM)</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-revenue" class="text-lg font-bold text-text-muted leading-none">Not available</span>
-                            <span id="revenue-growth-badge" class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">
-                                <span class="material-symbols-outlined text-[12px]">arrow_upward</span><span id="revenue-growth-value"></span>
+                            <span id="deal-revenue" class="text-lg font-bold text-text-muted leading-none">Not
+                                available</span>
+                            <span id="revenue-growth-badge"
+                                class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">
+                                <span class="material-symbols-outlined text-[12px]">arrow_upward</span><span
+                                    id="revenue-growth-value"></span>
                             </span>
                         </div>
                         <div id="revenue-chart" class="h-10 mt-3 w-full flex items-end gap-1 opacity-80">
@@ -231,36 +279,56 @@
                     </div>
                     <!-- EBITDA Card -->
                     <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 size-20 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-all"></div>
-                        <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">EBITDA Margin</p>
+                        <div
+                            class="absolute -right-4 -top-4 size-20 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-all">
+                        </div>
+                        <p
+                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
+                            EBITDA Margin</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-ebitda" class="text-lg font-bold text-text-muted leading-none">Not available</span>
-                            <span id="ebitda-trend-badge" class="text-[10px] font-bold text-text-muted bg-background-body border border-border-subtle px-1.5 py-0.5 rounded inline-flex items-center hidden"></span>
+                            <span id="deal-ebitda" class="text-lg font-bold text-text-muted leading-none">Not
+                                available</span>
+                            <span id="ebitda-trend-badge"
+                                class="text-[10px] font-bold text-text-muted bg-background-body border border-border-subtle px-1.5 py-0.5 rounded inline-flex items-center hidden"></span>
                         </div>
                         <div class="h-10 mt-3 w-full flex items-center">
                             <div class="w-full h-2 bg-border-subtle rounded-full overflow-hidden">
-                                <div id="ebitda-bar" class="h-full bg-primary rounded-full transition-all" style="width: 0%"></div>
+                                <div id="ebitda-bar" class="h-full bg-primary rounded-full transition-all"
+                                    style="width: 0%"></div>
                             </div>
                         </div>
                     </div>
                     <!-- Deal Size Card -->
                     <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 size-20 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition-all"></div>
-                        <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">Deal Size</p>
+                        <div
+                            class="absolute -right-4 -top-4 size-20 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition-all">
+                        </div>
+                        <p
+                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
+                            Deal Size</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-size" class="text-lg font-bold text-text-muted leading-none">Not available</span>
+                            <span id="deal-size" class="text-lg font-bold text-text-muted leading-none">Not
+                                available</span>
                         </div>
                         <div class="h-10 mt-3 flex items-center">
-                            <p id="deal-multiple" class="text-xs text-text-muted font-medium leading-tight italic opacity-50">Add via Edit Deal</p>
+                            <p id="deal-multiple"
+                                class="text-xs text-text-muted font-medium leading-tight italic opacity-50">Add via Edit
+                                Deal</p>
                         </div>
                     </div>
                     <!-- IRR Card -->
                     <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all"></div>
-                        <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">Projected IRR</p>
+                        <div
+                            class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all">
+                        </div>
+                        <p
+                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
+                            Projected IRR</p>
                         <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-irr" class="text-lg font-bold text-text-muted leading-none">Not available</span>
-                            <span id="irr-target-badge" class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">Target</span>
+                            <span id="deal-irr" class="text-lg font-bold text-text-muted leading-none">Not
+                                available</span>
+                            <span id="irr-target-badge"
+                                class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">Target</span>
                         </div>
                         <div class="h-10 mt-3 flex items-center gap-2">
                             <span class="text-xs text-text-muted font-medium">MoM:</span>
@@ -272,7 +340,8 @@
                 <!-- Deal Progress & Risks -->
                 <div class="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
                     <div class="glass-panel p-5 rounded-xl">
-                        <h3 class="text-sm font-bold text-text-main uppercase tracking-wider mb-4 flex items-center gap-2">
+                        <h3
+                            class="text-sm font-bold text-text-main uppercase tracking-wider mb-4 flex items-center gap-2">
                             <span class="material-symbols-outlined text-primary text-lg">flag</span>
                             Deal Progress
                         </h3>
@@ -282,7 +351,8 @@
                     </div>
                     <div class="flex flex-col gap-4">
                         <div class="glass-panel p-5 rounded-xl">
-                            <h3 class="text-sm font-bold text-text-main uppercase tracking-wider mb-4 flex items-center gap-2">
+                            <h3
+                                class="text-sm font-bold text-text-main uppercase tracking-wider mb-4 flex items-center gap-2">
                                 <span class="material-symbols-outlined text-amber-500 text-lg">warning</span>
                                 Key Risks
                             </h3>
@@ -300,8 +370,10 @@
                         Add Note
                     </h3>
                     <div class="flex gap-2">
-                        <input type="text" id="note-input" placeholder="Add a note about this deal..." class="flex-1 px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" />
-                        <button id="add-note-btn" class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
+                        <input type="text" id="note-input" placeholder="Add a note about this deal..."
+                            class="flex-1 px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                        <button id="add-note-btn"
+                            class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
                             <span class="material-symbols-outlined text-lg">add</span>
                             Add
                         </button>
@@ -315,7 +387,8 @@
                             <span class="material-symbols-outlined text-primary text-lg">history</span>
                             Activity Feed
                         </h3>
-                        <button id="refresh-activities-btn" class="text-xs text-primary hover:text-primary-hover font-medium flex items-center gap-1 transition-colors">
+                        <button id="refresh-activities-btn"
+                            class="text-xs text-primary hover:text-primary-hover font-medium flex items-center gap-1 transition-colors">
                             <span class="material-symbols-outlined text-sm">refresh</span>
                             Refresh
                         </button>
@@ -338,20 +411,27 @@
             </section>
 
             <!-- Right Panel - AI Chat -->
-            <section class="flex-1 flex flex-col bg-background-body relative border-l border-border-subtle/60 shadow-inner">
+            <section
+                class="flex-1 flex flex-col bg-background-body relative border-l border-border-subtle/60 shadow-inner">
                 <!-- Chat Header -->
-                <div class="h-14 border-b border-border-subtle flex items-center justify-between px-6 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
+                <div
+                    class="h-14 border-b border-border-subtle flex items-center justify-between px-6 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
                     <div class="flex items-center gap-2">
                         <div class="size-2 rounded-full bg-secondary animate-pulse"></div>
                         <span class="text-sm font-bold text-text-main tracking-wide">Deal Assistant AI</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-primary-light text-primary border border-primary/20">Beta</span>
+                        <span
+                            class="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-primary-light text-primary border border-primary/20">Beta</span>
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="text-xs text-text-muted font-medium">Context:</span>
                         <div id="context-docs" class="flex -space-x-2">
-                            <div class="size-6 rounded-full bg-red-100 border border-white flex items-center justify-center text-[10px] text-red-700 font-bold z-20 shadow-sm" title="PDF">P</div>
-                            <div class="size-6 rounded-full bg-secondary-light border border-white flex items-center justify-center text-[10px] text-secondary font-bold z-10 shadow-sm" title="Excel">X</div>
-                            <div class="size-6 rounded-full bg-background-body border border-white flex items-center justify-center text-[10px] text-text-secondary z-0 shadow-sm">+2</div>
+                            <div class="size-6 rounded-full bg-red-100 border border-white flex items-center justify-center text-[10px] text-red-700 font-bold z-20 shadow-sm"
+                                title="PDF">P</div>
+                            <div class="size-6 rounded-full bg-secondary-light border border-white flex items-center justify-center text-[10px] text-secondary font-bold z-10 shadow-sm"
+                                title="Excel">X</div>
+                            <div
+                                class="size-6 rounded-full bg-background-body border border-white flex items-center justify-center text-[10px] text-text-secondary z-0 shadow-sm">
+                                +2</div>
                         </div>
                         <button class="text-text-muted hover:text-text-main transition-colors" id="ai-settings-btn">
                             <span class="material-symbols-outlined text-lg">settings</span>
@@ -362,18 +442,23 @@
                 <!-- Chat Messages -->
                 <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col custom-scrollbar">
                     <div class="flex justify-center">
-                        <span class="text-xs text-text-muted font-medium bg-white border border-border-subtle px-3 py-1 rounded-full shadow-sm">Today, 10:42 AM</span>
+                        <span
+                            class="text-xs text-text-muted font-medium bg-white border border-border-subtle px-3 py-1 rounded-full shadow-sm">Today,
+                            10:42 AM</span>
                     </div>
 
                     <!-- AI Welcome Message -->
                     <div class="flex gap-4 max-w-[90%]">
-                        <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
+                        <div
+                            class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
                             <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
                         </div>
                         <div class="flex flex-col gap-1">
                             <span class="text-xs font-bold text-text-muted ml-1">PE OS AI</span>
-                            <div id="ai-intro" class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
-                                <p>I've analyzed the uploaded documents for <strong>this deal</strong>. I have context on:</p>
+                            <div id="ai-intro"
+                                class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
+                                <p>I've analyzed the uploaded documents for <strong>this deal</strong>. I have context
+                                    on:</p>
                                 <ul class="list-disc list-inside mt-2 space-y-1 text-text-secondary">
                                     <li>Q3 Financial Model (Excel)</li>
                                     <li>Management Presentation v2 (PDF)</li>
@@ -390,19 +475,27 @@
                     <div id="attached-files" class="flex gap-2 mb-3 overflow-x-auto custom-scrollbar">
                         <!-- Attached files will be inserted here -->
                     </div>
-                    <div class="relative bg-background-body rounded-xl border border-border-subtle shadow-inner focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
-                        <textarea id="chat-input" class="w-full bg-transparent border-none text-text-main placeholder:text-text-muted px-4 py-3 pr-24 focus:ring-0 resize-none min-h-[50px] max-h-32 text-sm leading-relaxed" placeholder="Ask about the deal, financials, or risks..." rows="1"></textarea>
+                    <div
+                        class="relative bg-background-body rounded-xl border border-border-subtle shadow-inner focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+                        <textarea id="chat-input"
+                            class="w-full bg-transparent border-none text-text-main placeholder:text-text-muted px-4 py-3 pr-24 focus:ring-0 resize-none min-h-[50px] max-h-32 text-sm leading-relaxed"
+                            placeholder="Ask about the deal, financials, or risks..." rows="1"></textarea>
                         <div class="absolute right-2 bottom-2 flex items-center gap-1">
-                            <button id="attach-file-btn" class="p-1.5 text-text-muted hover:text-primary hover:bg-primary-light rounded-lg transition-colors" title="Attach File">
+                            <button id="attach-file-btn"
+                                class="p-1.5 text-text-muted hover:text-primary hover:bg-primary-light rounded-lg transition-colors"
+                                title="Attach File">
                                 <span class="material-symbols-outlined text-[20px]">attach_file</span>
                             </button>
-                            <button id="send-message-btn" class="p-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors shadow-md shadow-primary/30" title="Send Message">
+                            <button id="send-message-btn"
+                                class="p-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors shadow-md shadow-primary/30"
+                                title="Send Message">
                                 <span class="material-symbols-outlined text-[20px]">arrow_upward</span>
                             </button>
                         </div>
                     </div>
                     <div class="text-center mt-2">
-                        <p class="text-[10px] text-text-muted">AI can make mistakes. Verify critical data from original documents.</p>
+                        <p class="text-[10px] text-text-muted">AI can make mistakes. Verify critical data from original
+                            documents.</p>
                     </div>
                 </div>
             </section>
@@ -412,20 +505,24 @@
     <!-- Load shared layout and auth -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
-<!-- Share Link Popup (positioned with JS) -->
-<div id="share-link-popup" class="hidden fixed bg-white rounded-xl shadow-2xl border border-border-subtle p-4 z-[100] w-72" style="top: 0; left: auto;">
-    <div class="flex items-center gap-2 mb-3">
-        <span class="material-symbols-outlined text-primary text-[18px]">link</span>
-        <span class="text-sm font-semibold text-text-main">Share Link</span>
+    <!-- Share Link Popup (positioned with JS) -->
+    <div id="share-link-popup"
+        class="hidden fixed bg-white rounded-xl shadow-2xl border border-border-subtle p-4 z-[100] w-72"
+        style="top: 0; left: auto;">
+        <div class="flex items-center gap-2 mb-3">
+            <span class="material-symbols-outlined text-primary text-[18px]">link</span>
+            <span class="text-sm font-semibold text-text-main">Share Link</span>
+        </div>
+        <div class="flex gap-2">
+            <input id="share-link-input" type="text" readonly
+                class="flex-1 min-w-0 px-3 py-2 text-xs bg-gray-50 border border-border-subtle rounded-lg text-text-secondary" />
+            <button id="copy-link-btn"
+                class="shrink-0 px-3 py-2 bg-primary text-white rounded-lg text-xs font-medium hover:bg-primary-hover transition-colors flex items-center gap-1">
+                <span class="material-symbols-outlined text-[14px]">content_copy</span>
+                Copy
+            </button>
+        </div>
     </div>
-    <div class="flex gap-2">
-        <input id="share-link-input" type="text" readonly class="flex-1 min-w-0 px-3 py-2 text-xs bg-gray-50 border border-border-subtle rounded-lg text-text-secondary" />
-        <button id="copy-link-btn" class="shrink-0 px-3 py-2 bg-primary text-white rounded-lg text-xs font-medium hover:bg-primary-hover transition-colors flex items-center gap-1">
-            <span class="material-symbols-outlined text-[14px]">content_copy</span>
-            Copy
-        </button>
-    </div>
-</div>
 
     <script src="js/layout.js"></script>
     <script src="js/docPreview.js"></script>
@@ -435,4 +532,5 @@
     <script src="js/inviteModal.js"></script>
     <script src="deal.js"></script>
 </body>
+
 </html>

@@ -643,7 +643,7 @@ function showNewDealModal() {
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-text-main mb-2">Lead Partner</label>
-                        <input type="text" class="w-full px-4 py-2 border border-border-subtle rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" placeholder="Alex Morgan">
+                        <input type="text" class="w-full px-4 py-2 border border-border-subtle rounded-lg focus:ring-2 focus:ring-primary focus:border-primary" placeholder="e.g., John Smith">
                     </div>
                 </div>
                 <div class="flex gap-3 mt-6">

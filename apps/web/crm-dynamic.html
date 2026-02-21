@@ -1,13 +1,18 @@
 <!DOCTYPE html>
-<html lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>AI-Native Deal CRM</title>
-<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>AI-Native Deal CRM</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap"
+        rel="stylesheet" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+        rel="stylesheet" />
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <script>
         tailwind.config = {
             theme: {
                 extend: {
@@ -33,159 +38,191 @@
             },
         }
     </script>
-<style>
+    <style>
         .custom-scrollbar::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
+
         .custom-scrollbar::-webkit-scrollbar-track {
             background: transparent;
         }
+
         .custom-scrollbar::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 3px;
         }
+
         .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background: #94a3b8;
         }
     </style>
 </head>
-<body class="font-display bg-background-light text-text-main h-screen flex overflow-hidden selection:bg-primary/10 selection:text-primary">
-<!-- Sidebar -->
-<aside class="w-64 bg-white border-r border-border-subtle flex-col hidden md:flex shrink-0 z-30 relative text-text-main shadow-sm">
-<div class="p-6 flex items-center gap-3">
-<div class="bg-center bg-no-repeat bg-cover rounded-xl size-10 bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
-<span class="material-symbols-outlined text-[20px]">dataset</span>
-</div>
-<div class="flex flex-col">
-<h1 class="text-text-main text-base font-extrabold leading-none tracking-tight">Ventus AI</h1>
-<p class="text-text-muted text-xs font-medium mt-1">PE Operating System</p>
-</div>
-</div>
-<nav class="flex-1 px-4 py-4 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary text-white shadow-md shadow-primary/20 cursor-pointer group border border-primary/5">
-<span class="material-symbols-outlined text-[20px]">business_center</span>
-<p class="text-sm font-semibold">Deals</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
-<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">pie_chart</span>
-<p class="text-sm font-medium">Portfolio</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
-<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">auto_awesome</span>
-<p class="text-sm font-medium">AI Insights</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
-<span class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">folder_shared</span>
-<p class="text-sm font-medium">Documents</p>
-</div>
-</nav>
-<div class="p-4 border-t border-border-subtle">
-<div class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary mb-2">
-<span class="material-symbols-outlined text-[20px]">settings</span>
-<p class="text-sm font-medium">Settings</p>
-</div>
-<div class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-50 border border-border-subtle">
-<div class="size-8 rounded-full bg-slate-200 bg-center bg-cover border border-white shadow-sm" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBjB2-f5sosRtm7M_Up0HtcNdSmCo5k3YyFeAeOAgN1hgoO-qf96zlezHWVXZYE2jC2nCxWrnruNHHb7Zs_JSriz4mQdfCDWTxToArRRNj2FSuGVemo1E4HdrgDqv7_agS4CQKsxiacBhXXom9yCoV96AX0TSIgEsuqJEgH_StAUJ_xT4ivmuXa4CP0dI4flfgbKfFXSJOTF2GHQUgr7OLMxrPcthrpkSHzVLtpskSZArf5BokcuOQI1a1gwWHF67SgA-XvO-r3urk");'></div>
-<div class="flex flex-col flex-1 min-w-0">
-<p class="text-text-main text-xs font-bold truncate">Alex Morgan</p>
-<p class="text-text-muted text-[10px] truncate">Senior Associate</p>
-</div>
-</div>
-</div>
-</aside>
 
-<!-- Main Content -->
-<main class="flex-1 flex flex-col h-full overflow-hidden relative bg-background-light">
-<!-- Header -->
-<header class="bg-surface-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-border-subtle px-8 py-5">
-<div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 max-w-[1600px] mx-auto w-full">
-<div class="flex flex-col gap-1 min-w-[200px]">
-<h2 class="text-text-main text-2xl font-bold leading-tight tracking-tight">Deal Pipeline</h2>
-<p class="text-text-muted text-sm font-medium flex items-center gap-2">
-<span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
-<span id="deal-count">Loading...</span>
-</p>
-</div>
-<div class="flex-1 max-w-2xl w-full">
-<label class="group flex w-full items-center rounded-xl bg-white border border-border-subtle hover:border-primary/30 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/10 transition-all h-12 shadow-sm">
-<div class="pl-4 pr-3 text-text-muted group-focus-within:text-primary transition-colors">
-<span class="material-symbols-outlined text-[20px]">search</span>
-</div>
-<input class="w-full bg-transparent border-none text-text-main placeholder-text-muted/70 focus:ring-0 text-sm font-medium" placeholder="Ask AI: Show me SaaS deals with EBITDA > $5M..."/>
-<div class="pr-3 hidden sm:block">
-<kbd class="hidden sm:inline-block rounded px-2 py-1 text-[10px] font-bold text-text-muted bg-slate-100 border border-border-subtle">CMD+K</kbd>
-</div>
-</label>
-</div>
-<div class="flex items-center gap-4 justify-end">
-<button class="p-2.5 text-text-muted hover:text-text-main hover:bg-slate-100 rounded-full transition-colors relative">
-<span class="material-symbols-outlined">notifications</span>
-<span class="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full border-2 border-white"></span>
-</button>
-<button class="flex items-center justify-center gap-2 h-11 px-6 bg-primary hover:bg-primary-hover text-white rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95 group">
-<span class="material-symbols-outlined text-[20px] group-hover:animate-pulse">smart_toy</span>
-<span class="text-sm font-bold tracking-wide">Ingest Deal Data</span>
-</button>
-</div>
-</div>
-<div class="flex gap-3 mt-6 overflow-x-auto custom-scrollbar pb-2 max-w-[1600px] mx-auto w-full">
-<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
-<p class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Stage: All</p>
-<span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
-</button>
-<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
-<p class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Industry: SaaS, Health...</p>
-<span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
-</button>
-<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3.5 hover:bg-slate-200 transition-all">
-<p class="text-primary text-xs font-bold">Deal Size > $10M</p>
-<span class="material-symbols-outlined text-primary text-[16px]">close</span>
-</button>
-<div class="h-8 w-[1px] bg-border-subtle mx-1"></div>
-<button class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-transparent px-2 hover:bg-slate-100 transition-all">
-<span class="material-symbols-outlined text-text-muted text-[18px]">sort</span>
-<p class="text-text-muted text-xs font-semibold">Sort by: Smart Rank</p>
-</button>
-</div>
-</header>
+<body
+    class="font-display bg-background-light text-text-main h-screen flex overflow-hidden selection:bg-primary/10 selection:text-primary">
+    <!-- Sidebar -->
+    <aside
+        class="w-64 bg-white border-r border-border-subtle flex-col hidden md:flex shrink-0 z-30 relative text-text-main shadow-sm">
+        <div class="p-6 flex items-center gap-3">
+            <div
+                class="bg-center bg-no-repeat bg-cover rounded-xl size-10 bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+                <span class="material-symbols-outlined text-[20px]">dataset</span>
+            </div>
+            <div class="flex flex-col">
+                <h1 class="text-text-main text-base font-extrabold leading-none tracking-tight">Ventus AI</h1>
+                <p class="text-text-muted text-xs font-medium mt-1">PE Operating System</p>
+            </div>
+        </div>
+        <nav class="flex-1 px-4 py-4 flex flex-col gap-1 overflow-y-auto custom-scrollbar">
+            <div
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-primary text-white shadow-md shadow-primary/20 cursor-pointer group border border-primary/5">
+                <span class="material-symbols-outlined text-[20px]">business_center</span>
+                <p class="text-sm font-semibold">Deals</p>
+            </div>
+            <div
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
+                <span
+                    class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">pie_chart</span>
+                <p class="text-sm font-medium">Portfolio</p>
+            </div>
+            <div
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
+                <span
+                    class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">auto_awesome</span>
+                <p class="text-sm font-medium">AI Insights</p>
+            </div>
+            <div
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary group">
+                <span
+                    class="material-symbols-outlined text-[20px] group-hover:text-primary transition-colors">folder_shared</span>
+                <p class="text-sm font-medium">Documents</p>
+            </div>
+        </nav>
+        <div class="p-4 border-t border-border-subtle">
+            <div
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 cursor-pointer transition-colors text-text-muted hover:text-primary mb-2">
+                <span class="material-symbols-outlined text-[20px]">settings</span>
+                <p class="text-sm font-medium">Settings</p>
+            </div>
+            <div class="flex items-center gap-3 px-3 py-3 rounded-xl bg-slate-50 border border-border-subtle">
+                <div class="size-8 rounded-full bg-slate-200 bg-center bg-cover border border-white shadow-sm"
+                    style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBjB2-f5sosRtm7M_Up0HtcNdSmCo5k3YyFeAeOAgN1hgoO-qf96zlezHWVXZYE2jC2nCxWrnruNHHb7Zs_JSriz4mQdfCDWTxToArRRNj2FSuGVemo1E4HdrgDqv7_agS4CQKsxiacBhXXom9yCoV96AX0TSIgEsuqJEgH_StAUJ_xT4ivmuXa4CP0dI4flfgbKfFXSJOTF2GHQUgr7OLMxrPcthrpkSHzVLtpskSZArf5BokcuOQI1a1gwWHF67SgA-XvO-r3urk");'>
+                </div>
+                <div class="flex flex-col flex-1 min-w-0">
+                    <p class="text-text-main text-xs font-bold truncate">Loading...</p>
+                    <p class="text-text-muted text-[10px] truncate">Team Member</p>
+                </div>
+            </div>
+        </div>
+    </aside>
 
-<!-- Deals Grid -->
-<div class="flex-1 overflow-y-auto custom-scrollbar p-8">
-<div id="deals-grid" class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 pb-20">
-<!-- Loading state -->
-<div class="col-span-full flex items-center justify-center py-20">
-<div class="text-center">
-<div class="animate-spin size-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-<p class="text-text-muted">Loading deals...</p>
-</div>
-</div>
-</div>
-</div>
-</main>
+    <!-- Main Content -->
+    <main class="flex-1 flex flex-col h-full overflow-hidden relative bg-background-light">
+        <!-- Header -->
+        <header class="bg-surface-white/80 backdrop-blur-md sticky top-0 z-20 border-b border-border-subtle px-8 py-5">
+            <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-6 max-w-[1600px] mx-auto w-full">
+                <div class="flex flex-col gap-1 min-w-[200px]">
+                    <h2 class="text-text-main text-2xl font-bold leading-tight tracking-tight">Deal Pipeline</h2>
+                    <p class="text-text-muted text-sm font-medium flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></span>
+                        <span id="deal-count">Loading...</span>
+                    </p>
+                </div>
+                <div class="flex-1 max-w-2xl w-full">
+                    <label
+                        class="group flex w-full items-center rounded-xl bg-white border border-border-subtle hover:border-primary/30 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary/10 transition-all h-12 shadow-sm">
+                        <div class="pl-4 pr-3 text-text-muted group-focus-within:text-primary transition-colors">
+                            <span class="material-symbols-outlined text-[20px]">search</span>
+                        </div>
+                        <input
+                            class="w-full bg-transparent border-none text-text-main placeholder-text-muted/70 focus:ring-0 text-sm font-medium"
+                            placeholder="Ask AI: Show me SaaS deals with EBITDA > $5M..." />
+                        <div class="pr-3 hidden sm:block">
+                            <kbd
+                                class="hidden sm:inline-block rounded px-2 py-1 text-[10px] font-bold text-text-muted bg-slate-100 border border-border-subtle">CMD+K</kbd>
+                        </div>
+                    </label>
+                </div>
+                <div class="flex items-center gap-4 justify-end">
+                    <button
+                        class="p-2.5 text-text-muted hover:text-text-main hover:bg-slate-100 rounded-full transition-colors relative">
+                        <span class="material-symbols-outlined">notifications</span>
+                        <span
+                            class="absolute top-2.5 right-2.5 size-2 bg-red-500 rounded-full border-2 border-white"></span>
+                    </button>
+                    <button
+                        class="flex items-center justify-center gap-2 h-11 px-6 bg-primary hover:bg-primary-hover text-white rounded-lg shadow-lg shadow-primary/20 transition-all active:scale-95 group">
+                        <span class="material-symbols-outlined text-[20px] group-hover:animate-pulse">smart_toy</span>
+                        <span class="text-sm font-bold tracking-wide">Ingest Deal Data</span>
+                    </button>
+                </div>
+            </div>
+            <div class="flex gap-3 mt-6 overflow-x-auto custom-scrollbar pb-2 max-w-[1600px] mx-auto w-full">
+                <button
+                    class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                    <p class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Stage: All</p>
+                    <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+                </button>
+                <button
+                    class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-white border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                    <p class="text-text-secondary group-hover:text-text-main text-xs font-semibold">Industry: SaaS,
+                        Health...</p>
+                    <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+                </button>
+                <button
+                    class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-slate-100 border border-slate-200 px-3.5 hover:bg-slate-200 transition-all">
+                    <p class="text-primary text-xs font-bold">Deal Size > $10M</p>
+                    <span class="material-symbols-outlined text-primary text-[16px]">close</span>
+                </button>
+                <div class="h-8 w-[1px] bg-border-subtle mx-1"></div>
+                <button
+                    class="flex h-8 shrink-0 items-center gap-2 rounded-full bg-transparent px-2 hover:bg-slate-100 transition-all">
+                    <span class="material-symbols-outlined text-text-muted text-[18px]">sort</span>
+                    <p class="text-text-muted text-xs font-semibold">Sort by: Smart Rank</p>
+                </button>
+            </div>
+        </header>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="js/auth.js"></script>
-<script>
-const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
+        <!-- Deals Grid -->
+        <div class="flex-1 overflow-y-auto custom-scrollbar p-8">
+            <div id="deals-grid"
+                class="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-6 pb-20">
+                <!-- Loading state -->
+                <div class="col-span-full flex items-center justify-center py-20">
+                    <div class="text-center">
+                        <div
+                            class="animate-spin size-12 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4">
+                        </div>
+                        <p class="text-text-muted">Loading deals...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
 
-// Fetch and display deals
-async function loadDeals() {
-    try {
-        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
-        if (!response.ok) throw new Error('Failed to fetch deals');
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script>
+        const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
-        const deals = await response.json();
+        // Fetch and display deals
+        async function loadDeals() {
+            try {
+                const response = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
+                if (!response.ok) throw new Error('Failed to fetch deals');
 
-        // Update deal count
-        const activeDeals = deals.filter(d => d.status === 'ACTIVE').length;
-        document.getElementById('deal-count').textContent = `${activeDeals} Active Opportunities`;
+                const deals = await response.json();
 
-        // Render deals
-        renderDeals(deals);
-    } catch (error) {
-        console.error('Error loading deals:', error);
-        document.getElementById('deals-grid').innerHTML = `
+                // Update deal count
+                const activeDeals = deals.filter(d => d.status === 'ACTIVE').length;
+                document.getElementById('deal-count').textContent = `${activeDeals} Active Opportunities`;
+
+                // Render deals
+                renderDeals(deals);
+            } catch (error) {
+                console.error('Error loading deals:', error);
+                document.getElementById('deals-grid').innerHTML = `
             <div class="col-span-full flex items-center justify-center py-20">
                 <div class="text-center">
                     <span class="material-symbols-outlined text-5xl text-red-500 mb-4">error</span>
@@ -197,51 +234,51 @@ async function loadDeals() {
                 </div>
             </div>
         `;
-    }
-}
+            }
+        }
 
-function getStageColor(stage) {
-    const colors = {
-        'DUE_DILIGENCE': 'emerald',
-        'INITIAL_REVIEW': 'blue',
-        'IOI_SUBMITTED': 'amber',
-        'LOI_SUBMITTED': 'purple',
-        'NEGOTIATION': 'orange',
-        'CLOSING': 'green',
-        'PASSED': 'slate',
-    };
-    return colors[stage] || 'gray';
-}
+        function getStageColor(stage) {
+            const colors = {
+                'DUE_DILIGENCE': 'emerald',
+                'INITIAL_REVIEW': 'blue',
+                'IOI_SUBMITTED': 'amber',
+                'LOI_SUBMITTED': 'purple',
+                'NEGOTIATION': 'orange',
+                'CLOSING': 'green',
+                'PASSED': 'slate',
+            };
+            return colors[stage] || 'gray';
+        }
 
-function getStageLabel(stage) {
-    const labels = {
-        'DUE_DILIGENCE': 'Due Diligence',
-        'INITIAL_REVIEW': 'Initial Review',
-        'IOI_SUBMITTED': 'IOI Submitted',
-        'LOI_SUBMITTED': 'LOI Submitted',
-        'NEGOTIATION': 'Negotiation',
-        'CLOSING': 'Closing',
-        'PASSED': 'Passed',
-    };
-    return labels[stage] || stage;
-}
+        function getStageLabel(stage) {
+            const labels = {
+                'DUE_DILIGENCE': 'Due Diligence',
+                'INITIAL_REVIEW': 'Initial Review',
+                'IOI_SUBMITTED': 'IOI Submitted',
+                'LOI_SUBMITTED': 'LOI Submitted',
+                'NEGOTIATION': 'Negotiation',
+                'CLOSING': 'Closing',
+                'PASSED': 'Passed',
+            };
+            return labels[stage] || stage;
+        }
 
-function formatTime(dateString) {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now - date;
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        function formatTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = now - date;
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-    if (hours < 24) return `${hours}h ago`;
-    return `${days}d ago`;
-}
+            if (hours < 24) return `${hours}h ago`;
+            return `${days}d ago`;
+        }
 
-function renderDeals(deals) {
-    const grid = document.getElementById('deals-grid');
+        function renderDeals(deals) {
+            const grid = document.getElementById('deals-grid');
 
-    if (deals.length === 0) {
-        grid.innerHTML = `
+            if (deals.length === 0) {
+                grid.innerHTML = `
             <div class="col-span-full flex items-center justify-center py-20">
                 <div class="text-center">
                     <span class="material-symbols-outlined text-5xl text-text-muted mb-4">inventory_2</span>
@@ -249,23 +286,23 @@ function renderDeals(deals) {
                 </div>
             </div>
         `;
-        return;
-    }
+                return;
+            }
 
-    const activeDeals = deals.filter(d => d.status === 'ACTIVE');
-    const passedDeals = deals.filter(d => d.status === 'PASSED');
+            const activeDeals = deals.filter(d => d.status === 'ACTIVE');
+            const passedDeals = deals.filter(d => d.status === 'PASSED');
 
-    grid.innerHTML = activeDeals.map(deal => renderDealCard(deal)).join('') +
-                     passedDeals.map(deal => renderDealCard(deal)).join('') +
-                     renderUploadCard();
-}
+            grid.innerHTML = activeDeals.map(deal => renderDealCard(deal)).join('') +
+                passedDeals.map(deal => renderDealCard(deal)).join('') +
+                renderUploadCard();
+        }
 
-function renderDealCard(deal) {
-    const stageColor = getStageColor(deal.stage);
-    const isPass ed = deal.status === 'PASSED';
-    const opacityClass = isPassed ? 'opacity-80 hover:opacity-100 grayscale hover:grayscale-0' : '';
+        function renderDealCard(deal) {
+            const stageColor = getStageColor(deal.stage);
+            const isPass ed = deal.status === 'PASSED';
+            const opacityClass = isPassed ? 'opacity-80 hover:opacity-100 grayscale hover:grayscale-0' : '';
 
-    return `
+            return `
         <a href="deal.html?id=${deal.id}" class="block">
             <article class="bg-surface-white rounded-xl border border-border-subtle p-6 hover:border-primary/30 transition-all cursor-pointer group flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden ${opacityClass}">
                 <div class="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-slate-50 to-transparent rounded-bl-full -mr-8 -mt-8 pointer-events-none"></div>
@@ -320,10 +357,10 @@ function renderDealCard(deal) {
             </article>
         </a>
     `;
-}
+        }
 
-function renderUploadCard() {
-    return `
+        function renderUploadCard() {
+            return `
         <article class="bg-transparent rounded-xl border-2 border-dashed border-slate-300 p-6 hover:border-primary hover:bg-white/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[300px] text-center gap-4">
             <div class="size-16 rounded-full bg-white border border-slate-200 flex items-center justify-center group-hover:scale-110 group-hover:border-primary/20 transition-all shadow-sm group-hover:shadow-md">
                 <span class="material-symbols-outlined text-text-muted group-hover:text-primary text-3xl">add</span>
@@ -334,16 +371,18 @@ function renderUploadCard() {
             </div>
         </article>
     `;
-}
+        }
 
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', async function() {
-    // Initialize auth and check if user is logged in
-    await PEAuth.initSupabase();
-    const auth = await PEAuth.checkAuth();
-    if (!auth) return; // Will redirect to login
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', async function () {
+            // Initialize auth and check if user is logged in
+            await PEAuth.initSupabase();
+            const auth = await PEAuth.checkAuth();
+            if (!auth) return; // Will redirect to login
 
-    loadDeals();
-});
-</script>
-</body></html>
+            loadDeals();
+        });
+    </script>
+</body>
+
+</html>
