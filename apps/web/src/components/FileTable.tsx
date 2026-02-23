@@ -7,9 +7,10 @@ interface FileTableProps {
   onFileClick?: (file: VDRFile) => void;
   onDeleteFile?: (fileId: string) => void;
   onRenameFile?: (fileId: string, newName: string) => void;
+  onLinkToDeal?: (file: VDRFile) => void;
 }
 
-export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile }) => {
+export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile, onLinkToDeal }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -238,6 +239,19 @@ export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folde
                                 <span className="material-symbols-outlined text-[18px]">download</span>
                                 Download
                               </button>
+                              {onLinkToDeal && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onLinkToDeal(file);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">link</span>
+                                  Link to Deal
+                                </button>
+                              )}
                               <div className="border-t border-slate-200 my-1"></div>
                               <button
                                 onClick={(e) => handleDelete(e, file.id)}

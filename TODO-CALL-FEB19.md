@@ -114,11 +114,17 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 
 ## 🟡 P2 — Medium Priority (UX & Feature Gaps)
 
-### 9. Data Room → Deal Card Auto-Creation Toggle — ❌ NOT DONE
-- **Action:**
-  - [ ] Add a checkbox/toggle when uploading to data room: "Create deal from this document?"
-  - [ ] Default to unchecked (or smart-detect based on file type/content)
-  - [ ] Allow linking existing data room files to existing deals
+### 9. Data Room → Deal Auto-Update Toggle & Document Linking — ✅ DONE
+- **Status:** Fully implemented. Upload confirmation modal with "Auto-update deal" toggle. Smart defaults for CIM/financials. "Link to Deal" action in file context menu.
+- **What's done:**
+  - [x] Upload confirmation modal with file list + "Auto-update deal with extracted data" checkbox
+  - [x] Smart default: auto-checked when filename contains `cim`, `teaser`, `financial`, `model`
+  - [x] Backend: `autoUpdateDeal` flag on `POST /api/deals/:id/documents` triggers `mergeIntoExistingDeal` (confidence-based merge)
+  - [x] "Link to Deal" in file context menu → searchable deal picker modal → copies document to target deal
+  - [x] Backend: `POST /api/documents/:id/link` endpoint creates Document copy + auto-merges extracted data
+  - [x] Extracted `mergeIntoExistingDeal` into shared `dealMerger.ts` service (used by both ingest + documents routes)
+  - [x] Success toast notifications for deal updates and document linking
+- **Key files:** `dealMerger.ts` (shared service), `documents.ts` (autoUpdateDeal + link endpoint), `vdr.tsx` (upload modal + link modal), `vdrApi.ts` (uploadDocument options + linkDocumentToDeal), `FileTable.tsx` (Link to Deal menu item)
 - **Ref:** (00:05:50), (00:07:21)
 
 ### 10. Navigation — Can't Return to Dashboard from Sub-Views — ❌ NOT DONE
@@ -190,9 +196,9 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 |----------|-------|------|---------|-----------|
 | 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
 | 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
-| 🟡 P2 | 7 | 0 | 0 | 7 ❌ |
+| 🟡 P2 | 7 | 1 ✅ | 0 | 6 ❌ |
 | 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
-| **Total** | **20** | **8** | **0** | **12** |
+| **Total** | **20** | **9** | **0** | **11** |
 
 ---
 
@@ -208,8 +214,9 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 7. ~~Ingest → Update Existing Deals~~ ✅ (mode toggle + deal picker + smart merge)
 8. ~~AI Reports / Templates~~ ✅ (in-app preview, chat dedup fix, template→memo integration, dynamic chips, citation preview)
 
-**Next — P2:**
-9–15. Data room toggle, Navigation, Folder rename, Settings, Notifications, Admin, Dashboard metrics
+**Next — P2 (1 of 7 done):**
+9. ~~Data room auto-update toggle + document linking~~ ✅
+10–15. Navigation, Folder rename, Settings, Notifications, Admin, Dashboard metrics
 
 **Backlog (P3):**
 16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence

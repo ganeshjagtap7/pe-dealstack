@@ -174,13 +174,17 @@ export async function fetchDocuments(dealId: string, folderId?: string): Promise
 export async function uploadDocument(
   dealId: string,
   folderId: string,
-  file: File
-): Promise<APIDocument | null> {
+  file: File,
+  options?: { autoUpdateDeal?: boolean }
+): Promise<APIDocument & { dealUpdated?: boolean; updatedFields?: string[] } | null> {
   try {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('folderId', folderId);
     formData.append('type', 'OTHER');
+    if (options?.autoUpdateDeal) {
+      formData.append('autoUpdateDeal', 'true');
+    }
 
     const token = await getAuthToken();
     const response = await fetch(`${API_BASE_URL}/deals/${dealId}/documents`, {
@@ -198,6 +202,46 @@ export async function uploadDocument(
   } catch (error) {
     console.error('Error uploading document:', error);
     throw error;
+  }
+}
+
+/**
+ * Link (copy) a document to another deal
+ */
+export async function linkDocumentToDeal(
+  documentId: string,
+  targetDealId: string
+): Promise<APIDocument | null> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/documents/${documentId}/link`, {
+      method: 'POST',
+      body: JSON.stringify({ targetDealId }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to link document');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error linking document:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fetch all deals (for deal picker in link-to-deal modal)
+ */
+export async function fetchAllDeals(): Promise<Array<{ id: string; name: string; industry?: string; revenue?: number }>> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/deals?limit=100`);
+    if (!response.ok) throw new Error('Failed to fetch deals');
+    const data = await response.json();
+    return Array.isArray(data) ? data : data.deals || [];
+  } catch (error) {
+    console.error('Error fetching deals:', error);
+    return [];
   }
 }
 
@@ -304,20 +348,6 @@ export async function createDeal(name: string): Promise<any | null> {
   } catch (error) {
     console.error('Error creating deal:', error);
     throw error;
-  }
-}
-
-/**
- * Fetch all deals (for Data Rooms overview)
- */
-export async function fetchAllDeals(): Promise<any[]> {
-  try {
-    const response = await authFetch(`${API_BASE_URL}/deals`);
-    if (!response.ok) throw new Error('Failed to fetch deals');
-    return await response.json();
-  } catch (error) {
-    console.error('Error fetching deals:', error);
-    return [];
   }
 }
 

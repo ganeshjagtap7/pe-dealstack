@@ -23,6 +23,7 @@ import {
   deleteDocument,
   renameDocument,
   getDocumentDownloadUrl,
+  linkDocumentToDeal,
   transformFolder,
   transformDocument,
   transformInsights,
@@ -276,6 +277,13 @@ export const VDRApp: React.FC = () => {
   const [uploading, setUploading] = useState(false);
   const [useMockData, setUseMockData] = useState(false);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
+  const [autoUpdateDeal, setAutoUpdateDeal] = useState(false);
+  const [uploadToast, setUploadToast] = useState<string | null>(null);
+  const [linkModalFile, setLinkModalFile] = useState<VDRFile | null>(null);
+  const [linkDeals, setLinkDeals] = useState<Array<{ id: string; name: string; industry?: string }>>([]);
+  const [linkSearchQuery, setLinkSearchQuery] = useState('');
+  const [linking, setLinking] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
 
@@ -330,8 +338,8 @@ export const VDRApp: React.FC = () => {
     return results;
   }, [allFiles, activeFolderId, searchQuery, filters]);
 
-  // File upload handler - MUST be before any conditional returns
-  const handleFileUpload = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+  // File select handler — shows confirmation modal (stage 1)
+  const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files || files.length === 0 || !activeFolderId) return;
 
@@ -351,7 +359,7 @@ export const VDRApp: React.FC = () => {
           },
           author: {
             name: 'You',
-            avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk',
+            avatar: '',
           },
           date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
           folderId: activeFolderId,
@@ -363,10 +371,7 @@ export const VDRApp: React.FC = () => {
       return;
     }
 
-    // Real API upload
-    if (!dealId) return;
-
-    const maxFileSize = 50 * 1024 * 1024; // 50MB
+    const maxFileSize = 50 * 1024 * 1024;
     const allowedTypes = [
       'application/pdf',
       'application/vnd.ms-excel',
@@ -375,28 +380,47 @@ export const VDRApp: React.FC = () => {
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     ];
 
-    setUploading(true);
-
+    const validFiles: File[] = [];
     for (const file of Array.from(files)) {
-      // Validate file size
       if (file.size > maxFileSize) {
         alert(`File ${file.name} exceeds maximum size of 50MB`);
         continue;
       }
-
-      // Validate file type
       if (!allowedTypes.includes(file.type)) {
         alert(`File ${file.name} has unsupported file type`);
         continue;
       }
+      validFiles.push(file);
+    }
 
+    if (validFiles.length > 0) {
+      // Smart default: auto-check toggle for CIM/financials/teaser documents
+      const hasHighValueDoc = validFiles.some(f => {
+        const name = f.name.toLowerCase();
+        return name.includes('cim') || name.includes('teaser') || name.includes('financial') || name.includes('model');
+      });
+      setAutoUpdateDeal(hasHighValueDoc);
+      setPendingFiles(validFiles);
+    }
+
+    event.target.value = '';
+  }, [activeFolderId, useMockData]);
+
+  // Confirm upload handler — uploads with options (stage 2)
+  const handleConfirmUpload = useCallback(async () => {
+    if (!pendingFiles || !dealId || !activeFolderId) return;
+
+    setUploading(true);
+    setPendingFiles(null);
+    let anyDealUpdated = false;
+    let lastUpdatedDoc = '';
+
+    for (const file of pendingFiles) {
       try {
-        const uploadedDoc = await uploadDocument(dealId, activeFolderId, file);
+        const uploadedDoc = await uploadDocument(dealId, activeFolderId, file, { autoUpdateDeal });
         if (uploadedDoc) {
           const transformedFile = transformDocument(uploadedDoc);
           setAllFiles((prev) => [transformedFile, ...prev]);
-
-          // Update folder file count
           setFolders((prev) =>
             prev.map((folder) =>
               folder.id === activeFolderId
@@ -404,6 +428,10 @@ export const VDRApp: React.FC = () => {
                 : folder
             )
           );
+          if ((uploadedDoc as any).dealUpdated) {
+            anyDealUpdated = true;
+            lastUpdatedDoc = file.name;
+          }
         }
       } catch (error) {
         console.error(`Error uploading ${file.name}:`, error);
@@ -412,9 +440,36 @@ export const VDRApp: React.FC = () => {
     }
 
     setUploading(false);
-    // Reset input
-    event.target.value = '';
-  }, [dealId, activeFolderId, useMockData]);
+
+    if (anyDealUpdated) {
+      setUploadToast(`Deal updated with extracted data from ${lastUpdatedDoc}`);
+      setTimeout(() => setUploadToast(null), 5000);
+    }
+  }, [pendingFiles, dealId, activeFolderId, autoUpdateDeal]);
+
+  // Link document to another deal
+  const handleLinkToDeal = useCallback(async (file: VDRFile) => {
+    setLinkModalFile(file);
+    setLinkSearchQuery('');
+    const deals = await fetchAllDeals();
+    // Filter out current deal
+    setLinkDeals(deals.filter(d => d.id !== dealId));
+  }, [dealId]);
+
+  const confirmLinkToDeal = useCallback(async (targetDealId: string) => {
+    if (!linkModalFile) return;
+    setLinking(true);
+    try {
+      await linkDocumentToDeal(linkModalFile.id, targetDealId);
+      const targetDeal = linkDeals.find(d => d.id === targetDealId);
+      setUploadToast(`"${linkModalFile.name}" linked to ${targetDeal?.name || 'deal'}`);
+      setTimeout(() => setUploadToast(null), 5000);
+      setLinkModalFile(null);
+    } catch (error) {
+      alert(`Failed to link document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+    setLinking(false);
+  }, [linkModalFile, linkDeals]);
 
   // File click handler - MUST be before any conditional returns
   const handleFileClick = useCallback(async (file: VDRFile) => {
@@ -814,7 +869,7 @@ Generated by PE OS VDR System
         type="file"
         multiple
         accept=".pdf,.xlsx,.xls,.doc,.docx"
-        onChange={handleFileUpload}
+        onChange={handleFileSelect}
         style={{ display: 'none' }}
       />
 
@@ -1012,6 +1067,7 @@ Generated by PE OS VDR System
             onFileClick={handleFileClick}
             onDeleteFile={handleDeleteFile}
             onRenameFile={handleRenameFile}
+            onLinkToDeal={handleLinkToDeal}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">
@@ -1033,6 +1089,125 @@ Generated by PE OS VDR System
         isCollapsed={insightsPanelCollapsed}
         onToggleCollapse={handleToggleInsightsPanel}
       />
+
+      {/* Upload Confirmation Modal */}
+      {pendingFiles && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setPendingFiles(null)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <h3 className="text-lg font-semibold text-slate-900">
+                Upload {pendingFiles.length} file{pendingFiles.length > 1 ? 's' : ''}
+              </h3>
+              <button onClick={() => setPendingFiles(null)} className="text-slate-400 hover:text-slate-600">
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+            <div className="p-5">
+              <ul className="mb-4 space-y-1.5 max-h-40 overflow-y-auto">
+                {pendingFiles.map((f, i) => (
+                  <li key={i} className="text-sm text-slate-600 flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[16px] text-slate-400">description</span>
+                    <span className="truncate">{f.name}</span>
+                    <span className="text-xs text-slate-400 shrink-0">({(f.size / 1024 / 1024).toFixed(1)} MB)</span>
+                  </li>
+                ))}
+              </ul>
+              {pendingFiles.some(f => f.type === 'application/pdf') && (
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={autoUpdateDeal}
+                    onChange={(e) => setAutoUpdateDeal(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <div>
+                    <div className="text-sm font-medium text-slate-900">
+                      Auto-update deal with extracted data
+                    </div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      Merge financial data (revenue, EBITDA, industry) from PDF into the deal card
+                    </div>
+                  </div>
+                </label>
+              )}
+            </div>
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200">
+              <button onClick={() => setPendingFiles(null)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmUpload}
+                disabled={uploading}
+                className="px-5 py-2 text-sm font-medium text-white bg-slate-900 hover:bg-slate-800 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {uploading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Link to Deal Modal */}
+      {linkModalFile && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setLinkModalFile(null)} />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+            <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">Link to Deal</h3>
+                <p className="text-xs text-slate-500 mt-0.5 truncate">"{linkModalFile.name}"</p>
+              </div>
+              <button onClick={() => setLinkModalFile(null)} className="text-slate-400 hover:text-slate-600">
+                <span className="material-symbols-outlined text-xl">close</span>
+              </button>
+            </div>
+            <div className="p-5">
+              <input
+                type="text"
+                placeholder="Search deals..."
+                value={linkSearchQuery}
+                onChange={(e) => setLinkSearchQuery(e.target.value)}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                autoFocus
+              />
+              <ul className="max-h-60 overflow-y-auto space-y-1">
+                {linkDeals
+                  .filter(d => !linkSearchQuery || d.name.toLowerCase().includes(linkSearchQuery.toLowerCase()))
+                  .map(deal => (
+                    <li key={deal.id}>
+                      <button
+                        onClick={() => confirmLinkToDeal(deal.id)}
+                        disabled={linking}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50 transition-colors disabled:opacity-50"
+                      >
+                        <span className="material-symbols-outlined text-[20px] text-slate-400">business_center</span>
+                        <div className="min-w-0">
+                          <div className="text-sm font-medium text-slate-900 truncate">{deal.name}</div>
+                          {deal.industry && <div className="text-xs text-slate-500">{deal.industry}</div>}
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                {linkDeals.filter(d => !linkSearchQuery || d.name.toLowerCase().includes(linkSearchQuery.toLowerCase())).length === 0 && (
+                  <li className="text-sm text-slate-400 text-center py-4">No deals found</li>
+                )}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      {uploadToast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-4">
+          <span className="material-symbols-outlined text-green-400 text-xl">check_circle</span>
+          <span className="text-sm">{uploadToast}</span>
+          <button onClick={() => setUploadToast(null)} className="text-white/60 hover:text-white ml-2">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

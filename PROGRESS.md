@@ -5,6 +5,76 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 13 — February 23, 2026
+
+#### TODO #9: Data Room → Deal Auto-Update Toggle & Document Linking — ~6:15 PM IST
+
+**Timestamp:** 2026-02-23 18:15 IST
+
+**Goal:** When users upload documents to a deal's data room, the AI extraction already runs but never feeds data back into the deal card. Add a toggle to merge extracted financials into the deal, smart-detect high-value documents, and allow linking documents across deals.
+
+---
+
+##### Sub-task 1: Extract `mergeIntoExistingDeal` into Shared Service
+
+**Root Cause:** `mergeIntoExistingDeal()` (confidence-based deal merge) lived as a local function in `ingest.ts`. Both `documents.ts` (VDR upload) and `ingest.ts` (deal intake) need it.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/services/dealMerger.ts` | **Created** | New shared service exporting `mergeIntoExistingDeal()` and `getIconForIndustry()` with `industryIcons` map | Single source of truth for deal merge logic |
+| `apps/api/src/routes/ingest.ts` | **Refactored** | Removed local `industryIcons`, `getIconForIndustry`, `mergeIntoExistingDeal`; now imports from `../services/dealMerger.js` | Eliminate code duplication |
+
+---
+
+##### Sub-task 2: Backend — `autoUpdateDeal` Flag on Document Upload
+
+**Root Cause:** `POST /api/deals/:dealId/documents` already ran AI extraction on PDFs and stored `extractedData` on the Document record, but never merged it into the Deal's financial fields.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/documents.ts` | **Enhanced** | Read `autoUpdateDeal` from form body; if true and AI extraction succeeded, call `mergeIntoExistingDeal()` | Connects VDR upload to deal data update |
+| `apps/api/src/routes/documents.ts` | **Enhanced** | Response now includes `dealUpdated` boolean and `updatedFields` array | Frontend can show feedback about what was updated |
+| `apps/api/src/routes/documents.ts` | **Fixed** | Typed `aiExtractedData` as `ExtractedDealData` instead of `Record<string, any>` | Type safety for merge function |
+
+---
+
+##### Sub-task 3: Backend — Link Document to Deal Endpoint
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/documents.ts` | **Added** | `POST /api/documents/:id/link` — accepts `targetDealId`, creates new Document row pointing at same `fileUrl`, auto-merges extracted data into target deal, logs Activity | Users can share documents across deals without re-uploading |
+
+---
+
+##### Sub-task 4: Frontend — Upload Confirmation Modal with Toggle
+
+**Root Cause:** File upload was instant (no intermediate UI between clicking "Upload" and API call). No way to control whether extracted data should update the deal.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/src/vdr.tsx` | **Replaced** | Split `handleFileUpload` into `handleFileSelect` (validates + shows modal) and `handleConfirmUpload` (uploads with options) | Two-stage upload flow allows user to control auto-update |
+| `apps/web/src/vdr.tsx` | **Added** | Upload confirmation modal: file list with sizes, "Auto-update deal with extracted data" checkbox, smart default (auto-checked for CIM/financial/teaser/model filenames) | Users control whether upload updates deal financials |
+| `apps/web/src/vdr.tsx` | **Added** | Success toast notification when deal is updated from upload | Immediate feedback that deal data was enriched |
+| `apps/web/src/services/vdrApi.ts` | **Updated** | `uploadDocument()` accepts `options?: { autoUpdateDeal?: boolean }`, appends to FormData | Pass toggle state to backend |
+
+---
+
+##### Sub-task 5: Frontend — Link to Deal Feature
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/src/components/FileTable.tsx` | **Added** | "Link to Deal" button in file dropdown context menu (between Download and Delete), `onLinkToDeal` prop | Quick access to link any document to another deal |
+| `apps/web/src/vdr.tsx` | **Added** | Link-to-Deal modal with searchable deal list, `handleLinkToDeal()` and `confirmLinkToDeal()` handlers | Users pick target deal from searchable list |
+| `apps/web/src/services/vdrApi.ts` | **Added** | `linkDocumentToDeal()` and `fetchAllDeals()` functions | API integration for document linking and deal picker |
+
+---
+
+**Verification:** TypeScript type check clean (`npx tsc --noEmit`), Vite build succeeds (645ms).
+
+**Status:** TODO #9 complete. P2 progress: 1 of 7 done. Overall: 9/20 tasks done, 11 remaining.
+
+---
+
 ### Session 12 — February 23, 2026
 
 #### TODO #7: AI Reports / Templates — Full Integration — ~5:30 PM IST

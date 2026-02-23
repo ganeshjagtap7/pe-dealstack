@@ -3,7 +3,8 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import multer from 'multer';
 import { createRequire } from 'module';
-import { extractDealDataFromText } from '../services/aiExtractor.js';
+import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';
+import { mergeIntoExistingDeal } from '../services/dealMerger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES, FILE_SIZE_LIMITS } from '../services/fileValidator.js';
 import { embedDocument } from '../rag.js';
@@ -273,7 +274,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     let extractedText: string | null = null;
     let extractionStatus = 'pending';
     let numPages: number | null = null;
-    let aiExtractedData: Record<string, any> | null = null;
+    let aiExtractedData: ExtractedDealData | null = null;
 
     if (file && mimeType === 'application/pdf') {
       extractionStatus = 'processing';
@@ -350,6 +351,23 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       })
       .eq('id', dealId);
 
+    // Auto-update deal with extracted data if requested
+    const autoUpdateDeal = req.body.autoUpdateDeal === 'true' || req.body.autoUpdateDeal === true;
+    let dealUpdated = false;
+    let updatedFields: string[] = [];
+    if (autoUpdateDeal && aiExtractedData) {
+      try {
+        const mergeResult = await mergeIntoExistingDeal(dealId, aiExtractedData, (req as any).user?.id, documentName);
+        dealUpdated = true;
+        updatedFields = Object.keys(mergeResult.deal || {}).filter(k =>
+          ['revenue', 'ebitda', 'industry', 'description', 'aiThesis'].includes(k) && mergeResult.deal[k] != null
+        );
+        log.info('Deal auto-updated from document upload', { dealId, documentName, updatedFields });
+      } catch (mergeError) {
+        log.error('Deal auto-update failed (upload continues)', mergeError, { dealId, documentName });
+      }
+    }
+
     // Log activity
     let activityDescription = `${docType} document uploaded`;
     if (extractedText && aiExtractedData) {
@@ -399,7 +417,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         });
     }
 
-    res.status(201).json(document);
+    res.status(201).json({ ...document, dealUpdated, updatedFields });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
@@ -562,6 +580,91 @@ router.get('/documents/:id/download', async (req, res) => {
   } catch (error) {
     log.error('Error getting download URL', error);
     res.status(500).json({ error: 'Failed to get download URL' });
+  }
+});
+
+// POST /api/documents/:id/link - Link (copy) a document to another deal
+router.post('/documents/:id/link', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const schema = z.object({
+      targetDealId: z.string().uuid(),
+    });
+    const { targetDealId } = schema.parse(req.body);
+
+    // Fetch original document
+    const { data: original, error: fetchErr } = await supabase
+      .from('Document')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchErr || !original) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Verify target deal exists
+    const { data: targetDeal, error: dealErr } = await supabase
+      .from('Deal')
+      .select('id, name')
+      .eq('id', targetDealId)
+      .single();
+
+    if (dealErr || !targetDeal) {
+      return res.status(404).json({ error: 'Target deal not found' });
+    }
+
+    // Create new Document row pointing at same storage file
+    const { data: linked, error: insertErr } = await supabase
+      .from('Document')
+      .insert({
+        dealId: targetDealId,
+        folderId: null, // No folder assignment on target deal
+        uploadedBy: original.uploadedBy,
+        name: original.name,
+        type: original.type,
+        fileUrl: original.fileUrl,
+        fileSize: original.fileSize,
+        mimeType: original.mimeType,
+        extractedData: original.extractedData,
+        extractedText: original.extractedText,
+        status: original.status,
+        confidence: original.confidence,
+        aiAnalysis: original.aiAnalysis,
+        aiAnalyzedAt: original.aiAnalyzedAt,
+        tags: original.tags,
+      })
+      .select()
+      .single();
+
+    if (insertErr) throw insertErr;
+
+    // If original had extracted data, merge into target deal
+    if (original.extractedData) {
+      try {
+        await mergeIntoExistingDeal(targetDealId, original.extractedData, (req as any).user?.id, original.name);
+        log.info('Target deal auto-updated from linked document', { targetDealId, documentName: original.name });
+      } catch (mergeError) {
+        log.error('Failed to auto-update target deal from linked doc', mergeError);
+      }
+    }
+
+    // Log activity on target deal
+    await supabase.from('Activity').insert({
+      dealId: targetDealId,
+      type: 'DOCUMENT_ADDED',
+      title: `Document linked: ${original.name}`,
+      description: `Document "${original.name}" linked from another deal's data room`,
+      metadata: { sourceDealId: original.dealId, documentId: linked.id },
+    });
+
+    res.status(201).json(linked);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    log.error('Error linking document', error);
+    res.status(500).json({ error: 'Failed to link document' });
   }
 });
 
