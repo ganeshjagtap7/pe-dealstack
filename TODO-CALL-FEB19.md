@@ -166,11 +166,17 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 - **Key files:** `settings.html` (UI + JS), `users.ts` (schema + merge logic)
 - **Ref:** (00:07:21), (00:08:06), (00:09:32)
 
-### 13. Notifications — Not Fully Wired — ❌ NOT DONE
-- **Action:**
-  - [ ] Connect notification center to real events
-  - [ ] Add notification types: deal created, file uploaded, team member invited, AI extraction complete
-  - [ ] Add real-time updates (or polling)
+### 13. Notifications — Wired to Real Events — ✅ DONE
+- **Status:** All notification triggers wired. 9 trigger points across 4 route files. User preferences respected (opted-out types skipped). Bell badge no longer hardcoded.
+- **What's done:**
+  - [x] Deal routes: deal created, deal updated (with stage change detection), team member added
+  - [x] Document routes: document uploaded, document linked to deal
+  - [x] AI routes: thesis generated, risk analysis complete, deal created via AI ingest
+  - [x] Invitation routes: new member joined (notifies firm admins)
+  - [x] Preference enforcement: `createNotification()` and `notifyDealTeam()` check user preferences before creating
+  - [x] Bell badge: hidden by default, shown dynamically when unread count > 0
+  - [x] Polling: already working at 30s intervals (existed before)
+- **Key files:** `notifications.ts` (preference checking + resolveUserId), `deals.ts`, `documents.ts`, `ai.ts`, `invitations.ts`, `layout.js`
 - **Ref:** (00:08:51)
 
 ### 14. Admin Page — Not Connected to Platform — ❌ NOT DONE
@@ -209,15 +215,15 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 
 ---
 
-## 📋 Summary — Status Count (as of Feb 23, 2026)
+## 📋 Summary — Status Count (as of Feb 24, 2026)
 
 | Priority | Total | Done | Partial | Remaining |
 |----------|-------|------|---------|-----------|
 | 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
 | 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
-| 🟡 P2 | 7 | 4 ✅ | 0 | 3 ❌ |
+| 🟡 P2 | 7 | 5 ✅ | 0 | 2 ❌ |
 | 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
-| **Total** | **20** | **12** | **0** | **8** |
+| **Total** | **20** | **13** | **0** | **7** |
 
 ---
 
@@ -233,12 +239,13 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 7. ~~Ingest → Update Existing Deals~~ ✅ (mode toggle + deal picker + smart merge)
 8. ~~AI Reports / Templates~~ ✅ (in-app preview, chat dedup fix, template→memo integration, dynamic chips, citation preview)
 
-**Next — P2 (4 of 7 done):**
+**Next — P2 (5 of 7 done):**
 9. ~~Data room auto-update toggle + document linking~~ ✅
 10. ~~Navigation — breadcrumbs + back support~~ ✅
 11. ~~Folder rename in data room~~ ✅ (three-dot menu + inline rename + delete)
 12. ~~Settings / AI Preferences~~ ✅ (password change, notification prefs, currency, extraction defaults)
-13–15. Notifications, Admin, Dashboard metrics
+13. ~~Notifications — wired to real events~~ ✅ (9 triggers, preference enforcement, dynamic badge)
+14–15. Admin, Dashboard metrics
 
 **Backlog (P3):**
 16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence

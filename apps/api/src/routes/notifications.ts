@@ -5,6 +5,20 @@ import { log } from '../utils/logger.js';
 
 const router = Router();
 
+// Helper: Resolve Supabase auth UUID to internal User table UUID
+export async function resolveUserId(authId: string): Promise<string | null> {
+  try {
+    const { data } = await supabase
+      .from('User')
+      .select('id')
+      .eq('authId', authId)
+      .single();
+    return data?.id || null;
+  } catch {
+    return null;
+  }
+}
+
 // Validation schemas
 const createNotificationSchema = z.object({
   userId: z.string().uuid(),
@@ -242,6 +256,28 @@ router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
   }
 });
 
+// Helper: Check if a user has opted out of a notification type
+async function isNotificationEnabled(userId: string, type: string): Promise<boolean> {
+  try {
+    const { data: user } = await supabase
+      .from('User')
+      .select('preferences')
+      .eq('id', userId)
+      .single();
+
+    if (!user?.preferences) return true; // Default: enabled
+
+    const prefs = typeof user.preferences === 'string'
+      ? JSON.parse(user.preferences)
+      : user.preferences;
+
+    // Only skip if explicitly set to false
+    return prefs?.notifications?.[type] !== false;
+  } catch {
+    return true; // On error, default to enabled
+  }
+}
+
 // Utility function to create notifications (exported for use in other routes)
 export async function createNotification(data: {
   userId: string;
@@ -251,6 +287,13 @@ export async function createNotification(data: {
   dealId?: string;
   documentId?: string;
 }) {
+  // Respect user notification preferences
+  const enabled = await isNotificationEnabled(data.userId, data.type);
+  if (!enabled) {
+    log.debug('Notification skipped (user opted out)', { userId: data.userId, type: data.type });
+    return null;
+  }
+
   const { data: notification, error } = await supabase
     .from('Notification')
     .insert(data)
@@ -273,10 +316,10 @@ export async function notifyDealTeam(
   message?: string,
   excludeUserId?: string
 ) {
-  // Get all team members for the deal
+  // Get all team members with their preferences
   const { data: teamMembers, error } = await supabase
     .from('DealTeamMember')
-    .select('userId')
+    .select('userId, user:User!userId(preferences)')
     .eq('dealId', dealId);
 
   if (error || !teamMembers) {
@@ -284,9 +327,19 @@ export async function notifyDealTeam(
     return;
   }
 
-  // Create notifications for each team member
+  // Filter out sender + users who opted out of this notification type
   const notifications = teamMembers
-    .filter(tm => tm.userId !== excludeUserId)
+    .filter(tm => {
+      if (tm.userId === excludeUserId) return false;
+      const user = tm.user as any;
+      if (user?.preferences) {
+        const prefs = typeof user.preferences === 'string'
+          ? JSON.parse(user.preferences)
+          : user.preferences;
+        if (prefs?.notifications?.[type] === false) return false;
+      }
+      return true;
+    })
     .map(tm => ({
       userId: tm.userId,
       type,

@@ -364,7 +364,7 @@ function generateHeader(options = {}) {
                 ${newDealButton}
                 <button class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative" id="notifications-btn">
                     <span class="material-symbols-outlined text-[20px]">notifications</span>
-                    <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
+                    <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white hidden" id="notification-dot"></span>
                 </button>
                 <div class="h-6 w-px bg-border-subtle"></div>
                 <div class="relative" id="user-menu-container">

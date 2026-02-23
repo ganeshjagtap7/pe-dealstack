@@ -8,6 +8,7 @@ import { isGeminiEnabled } from '../gemini.js';
 import { log } from '../utils/logger.js';
 import { NotFoundError } from '../middleware/errorHandler.js';
 import type { OpenAIMessage, SortableByDate } from '../types/index.js';
+import { createNotification, notifyDealTeam, resolveUserId } from './notifications.js';
 
 const router = Router();
 
@@ -290,6 +291,20 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) =>
     // Audit log
     await AuditLog.dealCreated(req, deal.id, deal.name);
 
+    // Notify: deal created (fire-and-forget)
+    if (req.user?.id) {
+      resolveUserId(req.user.id).then(internalId => {
+        if (internalId) {
+          createNotification({
+            userId: internalId,
+            type: 'DEAL_UPDATE',
+            title: `New deal created: ${deal.name}`,
+            dealId: deal.id,
+          });
+        }
+      }).catch(err => log.error('Notification error (deal create)', err));
+    }
+
     res.status(201).json(deal);
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -359,6 +374,17 @@ router.patch('/:id', async (req, res) => {
 
     // Audit log
     await AuditLog.dealUpdated(req, deal.id, deal.name, data);
+
+    // Notify team: deal updated (fire-and-forget)
+    if (req.user?.id) {
+      resolveUserId(req.user.id).then(internalId => {
+        const stageChanged = data.stage && data.stage !== existingDeal.stage;
+        const title = stageChanged
+          ? `Deal "${deal.name}" stage changed to ${data.stage}`
+          : `Deal "${deal.name}" was updated`;
+        notifyDealTeam(deal.id, 'DEAL_UPDATE', title, undefined, internalId || undefined);
+      }).catch(err => log.error('Notification error (deal update)', err));
+    }
 
     res.json(deal);
   } catch (error) {
@@ -520,6 +546,15 @@ router.post('/:id/team', async (req, res) => {
       title: `Team member added`,
       description: `Added as ${data.role}`,
     });
+
+    // Notify the new team member (fire-and-forget)
+    const { data: dealInfo } = await supabase.from('Deal').select('name').eq('id', id).single();
+    createNotification({
+      userId: data.userId,
+      type: 'DEAL_UPDATE',
+      title: `You were added to "${dealInfo?.name || 'a deal'}" as ${data.role}`,
+      dealId: id,
+    }).catch(err => log.error('Notification error (team member added)', err));
 
     res.status(201).json(member);
   } catch (error) {

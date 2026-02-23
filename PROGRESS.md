@@ -8348,3 +8348,42 @@ Created three new informational pages for the platform.
 | 9 | Word (.docx) document preview | ✅ Done | `docPreview.js` |
 
 ---
+
+## Session 17 — TODO #13: Notifications — Wire to Real Events
+**Date:** February 24, 2026  
+**Time:** ~2:45 PM
+
+### Summary
+Connected the notification system to real backend events. The infrastructure (API routes, database table, frontend bell icon + dropdown, 30s polling) already existed but nothing ever triggered notifications. Added 9 notification trigger points across 4 route files, preference enforcement, auth→user ID resolution, and fixed the hardcoded bell badge.
+
+### Changes
+
+| # | Change | Status | Files |
+|---|--------|--------|-------|
+| 1 | Preference enforcement in `createNotification()` | ✅ Done | `notifications.ts` |
+| 2 | Preference enforcement in `notifyDealTeam()` | ✅ Done | `notifications.ts` |
+| 3 | `resolveUserId()` helper (auth UUID → User table ID) | ✅ Done | `notifications.ts` |
+| 4 | Deal created notification | ✅ Done | `deals.ts` |
+| 5 | Deal updated notification (with stage change detection) | ✅ Done | `deals.ts` |
+| 6 | Team member added notification | ✅ Done | `deals.ts` |
+| 7 | Document uploaded notification | ✅ Done | `documents.ts` |
+| 8 | Document linked to deal notification | ✅ Done | `documents.ts` |
+| 9 | AI thesis generated notification | ✅ Done | `ai.ts` |
+| 10 | AI risk analysis complete notification | ✅ Done | `ai.ts` |
+| 11 | Deal created via AI ingest notification | ✅ Done | `ai.ts` |
+| 12 | Invitation accepted — notify firm admins | ✅ Done | `invitations.ts` |
+| 13 | Fix hardcoded bell badge (hidden by default) | ✅ Done | `layout.js` |
+
+### Technical Details
+- All notification calls are fire-and-forget (non-blocking) using `.catch()` or async IIFE
+- `notifyDealTeam()` now fetches team members WITH their preferences in one query, filters out opted-out users
+- `createNotification()` checks individual user preference before inserting
+- `resolveUserId()` converts Supabase auth UUID to internal User table UUID (needed because `req.user.id` is the auth UUID, not the User table primary key)
+- Bell badge dot starts hidden, `notificationCenter.js` shows it when `unreadCount > 0`
+- Notification types used: DEAL_UPDATE, DOCUMENT_UPLOADED, AI_INSIGHT, SYSTEM
+
+### Verification
+- `tsc --noEmit` — ✅ passed (0 errors)
+- `vite build` — ✅ passed (624ms)
+
+---

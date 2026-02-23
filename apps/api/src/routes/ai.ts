@@ -9,6 +9,7 @@ import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TY
 import { AuditLog } from '../services/auditLog.js';
 import { AICache } from '../services/aiCache.js';
 import { log } from '../utils/logger.js';
+import { createNotification, notifyDealTeam, resolveUserId } from './notifications.js';
 
 // Use createRequire to load CommonJS pdf-parse module
 const require = createRequire(import.meta.url);
@@ -257,6 +258,13 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
       metadata: { type: 'thesis_generation', refresh: forceRefresh },
     });
 
+    // Notify team: thesis generated (fire-and-forget)
+    if (req.user?.id) {
+      resolveUserId(req.user.id).then(internalId => {
+        notifyDealTeam(dealId, 'AI_INSIGHT', `AI thesis generated for "${deal.name}"`, undefined, internalId || undefined);
+      }).catch(err => log.error('Notification error (thesis)', err));
+    }
+
     res.json({
       thesis,
       dealId,
@@ -343,6 +351,13 @@ Format your response as a JSON array of risk objects with fields: title, descrip
 
     // Store in cache
     await AICache.setRisks(dealId, risks);
+
+    // Notify team: risk analysis complete (fire-and-forget)
+    if (req.user?.id) {
+      resolveUserId(req.user.id).then(internalId => {
+        notifyDealTeam(dealId, 'AI_INSIGHT', `Risk analysis completed for "${deal.name}"`, undefined, internalId || undefined);
+      }).catch(err => log.error('Notification error (risks)', err));
+    }
 
     res.json({
       risks,
@@ -589,6 +604,21 @@ router.post('/ai/ingest', upload.single('file'), async (req, res) => {
 
     // Audit log
     await AuditLog.aiIngest(req, safeName, deal.id);
+
+    // Notify: deal created via AI ingest (fire-and-forget)
+    if (req.user?.id) {
+      resolveUserId(req.user.id).then(internalId => {
+        if (internalId) {
+          createNotification({
+            userId: internalId,
+            type: 'AI_INSIGHT',
+            title: `Deal created via AI: ${deal.name}`,
+            message: `${extractedData.overallConfidence}% confidence from "${safeName}"`,
+            dealId: deal.id,
+          });
+        }
+      }).catch(err => log.error('Notification error (ingest)', err));
+    }
 
     log.info('AI Ingest complete', { dealId: deal.id, filename: safeName, confidence: extractedData.overallConfidence });
 

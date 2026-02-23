@@ -10,6 +10,7 @@ import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TY
 import { embedDocument } from '../rag.js';
 import { AICache } from '../services/aiCache.js';
 import { log } from '../utils/logger.js';
+import { notifyDealTeam, resolveUserId } from './notifications.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -396,6 +397,18 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     // Audit log
     await AuditLog.documentUploaded(req, document.id, documentName, dealId);
 
+    // Notify team: document uploaded (fire-and-forget)
+    if (req.user?.id) {
+      resolveUserId(req.user.id).then(internalId => {
+        notifyDealTeam(
+          dealId, 'DOCUMENT_UPLOADED',
+          `New document uploaded: ${documentName}`,
+          aiExtractedData ? `AI-analyzed (${numPages} pages)` : undefined,
+          internalId || undefined
+        );
+      }).catch(err => log.error('Notification error (doc upload)', err));
+    }
+
     // Invalidate AI cache since new document was uploaded
     // This ensures next thesis/risk analysis uses fresh data
     await AICache.invalidate(dealId);
@@ -657,6 +670,18 @@ router.post('/documents/:id/link', async (req, res) => {
       description: `Document "${original.name}" linked from another deal's data room`,
       metadata: { sourceDealId: original.dealId, documentId: linked.id },
     });
+
+    // Notify target deal team: document linked (fire-and-forget)
+    if (req.user?.id) {
+      resolveUserId(req.user.id).then(internalId => {
+        notifyDealTeam(
+          targetDealId, 'DOCUMENT_UPLOADED',
+          `Document linked: ${original.name}`,
+          `Linked from another deal's data room`,
+          internalId || undefined
+        );
+      }).catch(err => log.error('Notification error (doc link)', err));
+    }
 
     res.status(201).json(linked);
   } catch (error) {

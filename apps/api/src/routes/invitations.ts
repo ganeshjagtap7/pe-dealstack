@@ -5,6 +5,7 @@ import { Resend } from 'resend';
 import { supabase } from '../supabase.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -536,6 +537,30 @@ router.post('/accept/:token', async (req: Request, res: Response, next: NextFunc
       userId: newUser?.id,
       metadata: { email: invitation.email, firmName: invitation.firmName },
     });
+
+    // Notify firm admins: new member joined (fire-and-forget)
+    const memberName = fullName || invitation.email.split('@')[0];
+    (async () => {
+      try {
+        const { data: admins } = await supabase
+          .from('User')
+          .select('id')
+          .eq('firmName', invitation.firmName)
+          .eq('role', 'ADMIN');
+        if (admins) {
+          for (const admin of admins) {
+            await createNotification({
+              userId: admin.id,
+              type: 'SYSTEM',
+              title: `${memberName} joined your workspace`,
+              message: `Accepted invitation as ${invitation.role}`,
+            });
+          }
+        }
+      } catch (err) {
+        log.error('Notification error (invite accept)', err);
+      }
+    })();
 
     res.json({
       success: true,
