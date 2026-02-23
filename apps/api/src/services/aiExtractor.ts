@@ -1,6 +1,16 @@
 import { openai, isAIEnabled } from '../openai.js';
 import { log } from '../utils/logger.js';
 
+// Format a value in millions to human-readable form with smart units
+function formatExtractedValue(valueInMillions: number): string {
+  const abs = Math.abs(valueInMillions);
+  const sign = valueInMillions < 0 ? '-' : '';
+  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}B`;
+  if (abs >= 1) return `${sign}$${abs.toFixed(1)}M`;
+  if (abs * 1000 >= 1) return `${sign}$${(abs * 1000).toFixed(1)}K`;
+  return `${sign}$${(abs * 1000000).toFixed(0)}`;
+}
+
 // Schema for extracted deal data with confidence scores
 export interface ExtractedField<T> {
   value: T;
@@ -112,10 +122,18 @@ COMMON PATTERNS TO LOOK FOR:
 - Company Name: Usually in header, "Company Overview", or "About [Company]"
 - Industry: Look for sector descriptions, market focus, business type
 
-FINANCIAL CONVERSION:
+FINANCIAL CONVERSION (always convert to millions USD):
 - "50 million" or "$50M" or "$50,000,000" = 50
 - "1.5 billion" or "$1.5B" = 1500
-- Remove commas and convert to number`;
+- "$500,000" or "500K" = 0.5
+- "$38,200" or "$38.2K" = 0.0382
+- "$6,000" = 0.006
+- "$1,800" = 0.0018
+- "$500" = 0.0005
+- Remove commas and convert to number
+- IMPORTANT: Small values are valid! Do NOT round small amounts to 0 or null.
+  Many micro-acquisitions and small businesses have revenue in thousands or even hundreds of dollars.
+  Always preserve the exact fractional value in millions.`;
 
 /**
  * Extract structured deal data from document text using AI
@@ -200,14 +218,14 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
 
     if (result.revenue.value !== null) {
       if (result.revenue.confidence < 70) {
-        reviewReasons.push(`Revenue uncertain: $${result.revenue.value}M (${result.revenue.confidence}% confidence)`);
+        reviewReasons.push(`Revenue uncertain: ${formatExtractedValue(result.revenue.value)} (${result.revenue.confidence}% confidence)`);
       }
       confidenceScores.push(result.revenue.confidence);
     }
 
     if (result.ebitda.value !== null) {
       if (result.ebitda.confidence < 70) {
-        reviewReasons.push(`EBITDA uncertain: $${result.ebitda.value}M (${result.ebitda.confidence}% confidence)`);
+        reviewReasons.push(`EBITDA uncertain: ${formatExtractedValue(result.ebitda.value)} (${result.ebitda.confidence}% confidence)`);
       }
       confidenceScores.push(result.ebitda.confidence);
     }

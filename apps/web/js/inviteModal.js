@@ -4,7 +4,7 @@
  * Design: Multi-user invite form with role and workspace assignment
  */
 
-const InviteModal = (function() {
+const InviteModal = (function () {
   const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
 
   // XSS prevention - escape HTML entities
@@ -474,6 +474,8 @@ const InviteModal = (function() {
 
     let successCount = 0;
     let errorCount = 0;
+    let emailFailCount = 0;
+    let errorMessages = [];
 
     for (const row of validRows) {
       try {
@@ -488,12 +490,21 @@ const InviteModal = (function() {
         });
 
         if (response.ok) {
+          const data = await response.json();
           successCount++;
+          if (data.emailSent === false) {
+            emailFailCount++;
+          }
         } else {
+          const errData = await response.json().catch(() => ({}));
+          const msg = errData.error || 'Failed to send invitation';
+          console.error('Invitation error:', msg);
+          errorMessages.push(`${row.email}: ${msg}`);
           errorCount++;
         }
       } catch (error) {
         console.error('Error sending invitation:', error);
+        errorMessages.push(`${row.email}: Network error`);
         errorCount++;
       }
     }
@@ -506,12 +517,22 @@ const InviteModal = (function() {
     `;
 
     if (successCount > 0) {
-      showNotification('Success', `${successCount} invitation${successCount > 1 ? 's' : ''} sent successfully`, 'success');
+      if (emailFailCount > 0 && emailFailCount === successCount) {
+        showNotification('Warning', `${successCount} invitation${successCount > 1 ? 's' : ''} created but email delivery failed. Check email service configuration.`, 'error');
+      } else if (emailFailCount > 0) {
+        showNotification('Partial Success', `${successCount - emailFailCount} email${successCount - emailFailCount > 1 ? 's' : ''} sent. ${emailFailCount} email${emailFailCount > 1 ? 's' : ''} failed to deliver.`, 'warning');
+      } else {
+        showNotification('Success', `${successCount} invitation${successCount > 1 ? 's' : ''} sent successfully!`, 'success');
+      }
       close();
     }
 
-    if (errorCount > 0) {
-      showNotification('Warning', `${errorCount} invitation${errorCount > 1 ? 's' : ''} failed to send`, 'error');
+    if (errorCount > 0 && successCount === 0) {
+      // All failed — show the specific error
+      showNotification('Error', errorMessages[0] || 'Failed to send invitations', 'error');
+    } else if (errorCount > 0) {
+      // Some failed — show summary
+      showNotification('Warning', errorMessages.join('. '), 'error');
     }
   }
 

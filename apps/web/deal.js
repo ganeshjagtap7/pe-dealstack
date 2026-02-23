@@ -87,6 +87,44 @@ function openDataRoom() {
     }
 }
 
+function toggleDealActionsMenu() {
+    const menu = document.getElementById('deal-actions-menu');
+    menu?.classList.toggle('hidden');
+}
+
+// Close deal actions menu when clicking outside
+document.addEventListener('click', (e) => {
+    const wrapper = document.getElementById('deal-actions-wrapper');
+    if (wrapper && !wrapper.contains(e.target)) {
+        document.getElementById('deal-actions-menu')?.classList.add('hidden');
+    }
+});
+
+async function deleteDealFromDetail() {
+    const menu = document.getElementById('deal-actions-menu');
+    menu?.classList.add('hidden');
+
+    const dealName = state.dealData?.name || 'this deal';
+    if (!confirm(`Are you sure you want to delete "${dealName}"?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`)) {
+        return;
+    }
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) {
+            const err = await response.json().catch(() => ({}));
+            throw new Error(err.error || 'Failed to delete deal');
+        }
+        // Redirect to deals list
+        window.location.href = 'crm.html';
+    } catch (error) {
+        console.error('Error deleting deal:', error);
+        showNotification('Error', error.message || 'Failed to delete deal', 'error');
+    }
+}
+
 async function loadDealData() {
     const dealId = getDealIdFromUrl();
     if (!dealId) {
@@ -149,11 +187,29 @@ function getDocColor(name) {
     return 'slate';
 }
 
+// Format currency — values are stored in millions USD in the database
+// Displays in the most natural unit: B (billions), M (millions), or K (thousands)
 function formatCurrency(value) {
     if (value === null || value === undefined) return 'N/A';
     const absValue = Math.abs(value);
-    if (absValue >= 1000) return `$${(value / 1000).toFixed(1)}B`;
-    return `$${value.toFixed(1)}M`;
+    const sign = value < 0 ? '-' : '';
+    // >= 1000M = Billions
+    if (absValue >= 1000) {
+        const b = absValue / 1000;
+        return `${sign}$${b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
+    }
+    // >= 1M = Millions  
+    if (absValue >= 1) {
+        return `${sign}$${absValue >= 100 ? absValue.toFixed(0) : absValue >= 10 ? absValue.toFixed(1) : absValue.toFixed(2)}M`;
+    }
+    // < 1M = Thousands (value is fractional millions, e.g. 0.038 = $38K)
+    const k = absValue * 1000;
+    if (k >= 1) {
+        return `${sign}$${k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
+    }
+    // Very small values — show as dollar amount
+    const dollars = absValue * 1000000;
+    return `${sign}$${dollars.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
 
 // Stage configuration - ordered pipeline stages
@@ -260,8 +316,8 @@ function renderStagePipeline(currentStage) {
         const terminalStage = TERMINAL_STAGES.find(s => s.key === currentStage);
         if (terminalStage) {
             const colorClass = currentStage === 'CLOSED_WON' ? 'bg-green-500 text-white' :
-                               currentStage === 'CLOSED_LOST' ? 'bg-red-500 text-white' :
-                               'bg-gray-500 text-white';
+                currentStage === 'CLOSED_LOST' ? 'bg-red-500 text-white' :
+                    'bg-gray-500 text-white';
             html += `
                 <div class="flex items-center ml-2">
                     <div class="h-0.5 w-4 bg-gray-300"></div>
@@ -715,7 +771,7 @@ function renderDealProgress(deal) {
         const terminalStage = TERMINAL_STAGES.find(s => s.key === currentStage);
         if (terminalStage) {
             const bgColor = currentStage === 'CLOSED_WON' ? 'bg-secondary' :
-                            currentStage === 'CLOSED_LOST' ? 'bg-red-500' : 'bg-gray-400';
+                currentStage === 'CLOSED_LOST' ? 'bg-red-500' : 'bg-gray-400';
             html += `
                 <div class="flex gap-4 mt-6 relative">
                     ${`<div class="size-6 rounded-full ${bgColor} border-4 border-white z-10 shrink-0 flex items-center justify-center shadow-sm">
@@ -1131,14 +1187,14 @@ function updateChatContext(documents) {
     contextDocs.innerHTML = documents.slice(0, 3).map((doc, i) => {
         const ext = doc.name.split('.').pop()?.toLowerCase() || '';
         const icon = icons[ext] || 'D';
-        return `<div class="size-6 rounded-full bg-${bgColors[i % bgColors.length]} border border-white flex items-center justify-center text-[10px] text-${textColors[i % textColors.length]} font-bold z-${20-i*10} shadow-sm" title="${doc.name}">${icon}</div>`;
+        return `<div class="size-6 rounded-full bg-${bgColors[i % bgColors.length]} border border-white flex items-center justify-center text-[10px] text-${textColors[i % textColors.length]} font-bold z-${20 - i * 10} shadow-sm" title="${doc.name}">${icon}</div>`;
     }).join('') + (documents.length > 3 ? `<div class="size-6 rounded-full bg-background-body border border-white flex items-center justify-center text-[10px] text-text-secondary z-0 shadow-sm">+${documents.length - 3}</div>` : '');
 }
 
 // ============================================================
 // DOM Ready
 // ============================================================
-document.addEventListener('DOMContentLoaded', async function() {
+document.addEventListener('DOMContentLoaded', async function () {
     console.log('PE OS Deal Intelligence page initialized');
 
     // Initialize auth and check if user is logged in
@@ -1262,13 +1318,13 @@ function initChatInterface() {
     loadChatHistory();
 
     // Auto-resize textarea
-    textarea.addEventListener('input', function() {
+    textarea.addEventListener('input', function () {
         this.style.height = 'auto';
         this.style.height = Math.min(this.scrollHeight, 128) + 'px';
     });
 
     // Send message on Enter (Shift+Enter for new line)
-    textarea.addEventListener('keydown', function(e) {
+    textarea.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage();
@@ -1562,13 +1618,13 @@ function addAIResponseFromAPI(responseText, action = null) {
     chatContainer.appendChild(messageDiv);
 
     // Add event listeners to new buttons
-    messageDiv.querySelector('.ai-helpful-btn').addEventListener('click', function() {
+    messageDiv.querySelector('.ai-helpful-btn').addEventListener('click', function () {
         this.innerHTML = '<span class="material-symbols-outlined text-sm">thumb_up</span> Marked helpful';
         this.classList.add('text-primary');
         showNotification('Feedback Received', 'Thank you for your feedback!', 'success');
     });
 
-    messageDiv.querySelector('.ai-copy-btn').addEventListener('click', function() {
+    messageDiv.querySelector('.ai-copy-btn').addEventListener('click', function () {
         const text = messageDiv.querySelector('.ai-bubble-gradient').innerText;
         navigator.clipboard.writeText(text);
         this.innerHTML = '<span class="material-symbols-outlined text-sm">check</span> Copied';
@@ -1613,13 +1669,13 @@ function addAIResponse(userMessage) {
     chatContainer.appendChild(messageDiv);
 
     // Add event listeners to new buttons
-    messageDiv.querySelector('.ai-helpful-btn').addEventListener('click', function() {
+    messageDiv.querySelector('.ai-helpful-btn').addEventListener('click', function () {
         this.innerHTML = '<span class="material-symbols-outlined text-sm">thumb_up</span> Marked helpful';
         this.classList.add('text-primary');
         showNotification('Feedback Received', 'Thank you for your feedback!', 'success');
     });
 
-    messageDiv.querySelector('.ai-copy-btn').addEventListener('click', function() {
+    messageDiv.querySelector('.ai-copy-btn').addEventListener('click', function () {
         const text = messageDiv.querySelector('.ai-bubble-gradient').innerText;
         navigator.clipboard.writeText(text);
         this.innerHTML = '<span class="material-symbols-outlined text-sm">check</span> Copied';
@@ -1799,7 +1855,7 @@ function initFileAttachments() {
 
     // Remove file buttons
     document.querySelectorAll('.flex.items-center.gap-2.bg-slate-50 button').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             const fileChip = this.closest('.flex.items-center.gap-2');
             fileChip.style.transition = 'opacity 0.3s';
             fileChip.style.opacity = '0';
@@ -1851,10 +1907,10 @@ async function uploadFile(file) {
         uploadChip.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
 
         const fileIcon = file.name.endsWith('.pdf') ? 'picture_as_pdf' :
-                         file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'table_chart' :
-                         file.name.endsWith('.csv') ? 'table_view' : 'description';
+            file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'table_chart' :
+                file.name.endsWith('.csv') ? 'table_view' : 'description';
         const iconColor = file.name.endsWith('.pdf') ? 'red' :
-                          file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'emerald' : 'blue';
+            file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'emerald' : 'blue';
 
         uploadChip.innerHTML = `
             <span class="material-symbols-outlined text-${iconColor}-500 text-sm">${fileIcon}</span>
@@ -1891,7 +1947,7 @@ async function uploadFile(file) {
             <button class="hover:text-red-700 ml-1 transition-colors"><span class="material-symbols-outlined text-sm">close</span></button>
         `;
 
-        uploadChip.querySelector('button').addEventListener('click', function() {
+        uploadChip.querySelector('button').addEventListener('click', function () {
             uploadChip.style.transition = 'opacity 0.3s';
             uploadChip.style.opacity = '0';
             setTimeout(() => uploadChip.remove(), 300);
@@ -2106,6 +2162,50 @@ async function removeTeamMember(memberId) {
     }
 }
 
+// Convert a value stored in millions to its most natural {value, unit} for editing
+function millionsToNatural(valueInMillions) {
+    if (valueInMillions == null) return { value: '', unit: '$' };
+    const abs = Math.abs(valueInMillions);
+    if (abs >= 1000) return { value: (valueInMillions / 1000), unit: 'B' };
+    if (abs >= 1) return { value: valueInMillions, unit: 'M' };
+    if (abs >= 0.001) return { value: (valueInMillions * 1000), unit: 'K' };
+    return { value: (valueInMillions * 1000000), unit: '$' };
+}
+
+// Convert a user-entered value + unit back to millions for storage
+function naturalToMillions(value, unit) {
+    if (value === '' || value == null || isNaN(parseFloat(value))) return null;
+    const num = parseFloat(value);
+    switch (unit) {
+        case 'B': return num * 1000;
+        case 'M': return num;
+        case 'K': return num / 1000;
+        case '$': return num / 1000000;
+        default: return num;
+    }
+}
+
+// Build a currency input with value + unit selector
+function buildCurrencyInput(id, label, valueInMillions, placeholder) {
+    const natural = millionsToNatural(valueInMillions);
+    const displayVal = natural.value !== '' ? (typeof natural.value === 'number' ? parseFloat(natural.value.toPrecision(10)) : natural.value) : '';
+    return `
+        <div>
+            <label class="block text-sm font-semibold text-slate-700 mb-2">${label}</label>
+            <div class="flex gap-1.5">
+                <select id="${id}-unit" class="px-2 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-slate-50 font-medium text-slate-600 shrink-0" style="width: 60px">
+                    <option value="$" ${natural.unit === '$' ? 'selected' : ''}>$</option>
+                    <option value="K" ${natural.unit === 'K' ? 'selected' : ''}>$K</option>
+                    <option value="M" ${natural.unit === 'M' ? 'selected' : ''}>$M</option>
+                    <option value="B" ${natural.unit === 'B' ? 'selected' : ''}>$B</option>
+                </select>
+                <input type="number" id="${id}" value="${displayVal}" step="any" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="${placeholder}">
+            </div>
+            <p class="text-[10px] text-slate-400 mt-1">${displayVal !== '' ? 'Currently: ' + formatCurrency(valueInMillions) : 'No value set'}</p>
+        </div>
+    `;
+}
+
 function showEditDealModal() {
     const deal = state.dealData || {};
 
@@ -2144,18 +2244,9 @@ function showEditDealModal() {
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Industry</label>
                         <input type="text" id="edit-deal-industry" value="${deal.industry || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
                     </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Revenue (in millions)</label>
-                        <input type="number" id="edit-deal-revenue" value="${deal.revenue || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 120">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">EBITDA (in millions)</label>
-                        <input type="number" id="edit-deal-ebitda" value="${deal.ebitda || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 26">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-slate-700 mb-2">Deal Size (in millions)</label>
-                        <input type="number" id="edit-deal-size" value="${deal.dealSize || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 450">
-                    </div>
+                    ${buildCurrencyInput('edit-deal-revenue', 'Revenue', deal.revenue, 'e.g., 1800')}
+                    ${buildCurrencyInput('edit-deal-ebitda', 'EBITDA', deal.ebitda, 'e.g., 500')}
+                    ${buildCurrencyInput('edit-deal-size', 'Deal Size', deal.dealSize, 'e.g., 6000')}
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Projected IRR (%)</label>
                         <input type="number" id="edit-deal-irr" value="${deal.irrProjected || ''}" step="0.1" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 24">
@@ -2202,17 +2293,27 @@ async function saveDealChangesFromModal() {
     const oldStage = state.dealData?.stage;
     const newStage = document.getElementById('edit-deal-stage').value;
 
+    const irrVal = document.getElementById('edit-deal-irr').value;
+    const momVal = document.getElementById('edit-deal-mom').value;
+
     const updateData = {
         name: document.getElementById('edit-deal-name').value,
         stage: newStage,
-        industry: document.getElementById('edit-deal-industry').value,
-        revenue: parseFloat(document.getElementById('edit-deal-revenue').value) || null,
-        ebitda: parseFloat(document.getElementById('edit-deal-ebitda').value) || null,
-        dealSize: parseFloat(document.getElementById('edit-deal-size').value) || null,
-        irrProjected: parseFloat(document.getElementById('edit-deal-irr').value) || null,
-        mom: parseFloat(document.getElementById('edit-deal-mom').value) || null,
-        description: document.getElementById('edit-deal-description').value,
+        industry: document.getElementById('edit-deal-industry').value || null,
+        revenue: naturalToMillions(document.getElementById('edit-deal-revenue').value, document.getElementById('edit-deal-revenue-unit').value),
+        ebitda: naturalToMillions(document.getElementById('edit-deal-ebitda').value, document.getElementById('edit-deal-ebitda-unit').value),
+        dealSize: naturalToMillions(document.getElementById('edit-deal-size').value, document.getElementById('edit-deal-size-unit').value),
+        irrProjected: irrVal !== '' ? parseFloat(irrVal) : null,
+        mom: momVal !== '' ? parseFloat(momVal) : null,
+        description: document.getElementById('edit-deal-description').value || null,
     };
+
+    // Strip undefined/NaN values
+    Object.keys(updateData).forEach(k => {
+        if (updateData[k] !== null && typeof updateData[k] === 'number' && isNaN(updateData[k])) {
+            updateData[k] = null;
+        }
+    });
 
     try {
         const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}`, {
@@ -2221,8 +2322,17 @@ async function saveDealChangesFromModal() {
             body: JSON.stringify(updateData),
         });
 
+        // Read actual error from API
         if (!response.ok) {
-            throw new Error('Failed to update deal');
+            let errMsg = 'Failed to update deal';
+            try {
+                const errData = await response.json();
+                errMsg = errData.error || errData.message || errMsg;
+                if (errData.details) {
+                    errMsg += ': ' + JSON.stringify(errData.details);
+                }
+            } catch { }
+            throw new Error(errMsg);
         }
 
         const updatedDeal = await response.json();
@@ -2247,7 +2357,7 @@ async function saveDealChangesFromModal() {
 
     } catch (error) {
         console.error('Error saving deal:', error);
-        showNotification('Error', 'Failed to save deal changes', 'error');
+        showNotification('Error', error.message || 'Failed to save deal changes', 'error');
     }
 }
 
@@ -2255,7 +2365,7 @@ async function saveDealChangesFromModal() {
 // Citation Buttons
 // ============================================================
 function initCitationButtons() {
-    document.addEventListener('click', function(e) {
+    document.addEventListener('click', function (e) {
         const citationBtn = e.target.closest('.citation-btn, button[class*="Page"], button[class*="Section"]');
         if (citationBtn) {
             showDocumentReference(citationBtn);
@@ -2348,7 +2458,7 @@ function showDocumentReference(button) {
 function initDocumentPreviews() {
     document.querySelectorAll('.flex.items-center.gap-3.p-2').forEach(doc => {
         if (doc.classList.contains('cursor-pointer')) {
-            doc.addEventListener('click', function() {
+            doc.addEventListener('click', function () {
                 const docName = this.querySelector('.text-sm.font-bold').textContent;
                 showDocumentPreview(docName);
             });
@@ -2426,7 +2536,7 @@ function showDocumentPreview(docName) {
 // ============================================================
 function initAIResponseActions() {
     document.querySelectorAll('.ai-helpful-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             this.innerHTML = '<span class="material-symbols-outlined text-sm">thumb_up</span> Marked helpful';
             this.classList.add('text-primary');
             showNotification('Feedback Received', 'Thank you for your feedback!', 'success');
@@ -2434,7 +2544,7 @@ function initAIResponseActions() {
     });
 
     document.querySelectorAll('.ai-copy-btn').forEach(btn => {
-        btn.addEventListener('click', function() {
+        btn.addEventListener('click', function () {
             const bubble = this.closest('.flex.flex-col').querySelector('.ai-bubble-gradient');
             const text = bubble.innerText;
             navigator.clipboard.writeText(text);

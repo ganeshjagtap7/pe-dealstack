@@ -1,11 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import crypto from 'crypto';
+import { Resend } from 'resend';
 import { supabase } from '../supabase.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
+
+// Initialize Resend
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 
 // Validation schemas
 const createInvitationSchema = z.object({
@@ -30,7 +34,7 @@ function getExpirationDate(): Date {
   return date;
 }
 
-// Helper: Send invitation email (using Supabase edge function or custom SMTP)
+// Helper: Send invitation email via Resend
 async function sendInvitationEmail(
   email: string,
   inviterName: string,
@@ -39,63 +43,61 @@ async function sendInvitationEmail(
   role: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // For now, we'll use Supabase's built-in email via auth.admin
-    // In production, you'd use SendGrid, AWS SES, or Resend
-
-    const baseUrl = process.env.APP_URL || 'http://localhost:5173';
+    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
     const inviteUrl = `${baseUrl}/accept-invite.html?token=${token}`;
 
-    // Log the invitation URL for development
-    log.info('Invitation email prepared', { email, inviterName, firmName, role, inviteUrl });
+    log.info('Sending invitation email', { email, inviterName, firmName, role, inviteUrl });
 
-    // If SendGrid is configured, send actual email
-    if (process.env.SENDGRID_API_KEY) {
-      const response = await fetch('https://api.sendgrid.com/v3/mail/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.SENDGRID_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          personalizations: [{
-            to: [{ email }],
-            subject: `You're invited to join ${firmName} on PE OS`,
-          }],
-          from: {
-            email: process.env.SENDGRID_FROM_EMAIL || 'noreply@peos.app',
-            name: 'PE OS',
-          },
-          content: [{
-            type: 'text/html',
-            value: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <h2 style="color: #003366;">You're Invited!</h2>
-                <p><strong>${inviterName}</strong> has invited you to join <strong>${firmName}</strong> on PE OS.</p>
-                <p>You've been assigned the role of <strong>${role}</strong>.</p>
-                <p style="margin: 30px 0;">
-                  <a href="${inviteUrl}"
-                     style="background-color: #003366; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                    Accept Invitation
-                  </a>
-                </p>
-                <p style="color: #666; font-size: 14px;">This invitation expires in 7 days.</p>
-                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
-                <p style="color: #999; font-size: 12px;">
-                  PE OS - AI-Powered Private Equity CRM<br/>
-                  If you didn't expect this invitation, you can safely ignore this email.
-                </p>
-              </div>
-            `,
-          }],
-        }),
-      });
-
-      if (!response.ok) {
-        log.error('SendGrid error', new Error(await response.text()));
-        return { success: false, error: 'Failed to send email' };
-      }
+    if (!resend) {
+      log.warn('Resend not configured — RESEND_API_KEY missing. Invitation URL logged above.');
+      return { success: false, error: 'Email service not configured (RESEND_API_KEY missing)' };
     }
 
+    const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+
+    const { data, error } = await resend.emails.send({
+      from: `PE OS <${fromEmail}>`,
+      to: [email],
+      subject: `You're invited to join ${firmName} on PE OS`,
+      html: `
+        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff;">
+          <div style="background: linear-gradient(135deg, #003366, #0055aa); padding: 32px; text-align: center; border-radius: 8px 8px 0 0;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 24px; font-weight: 600;">PE OS</h1>
+            <p style="color: #b3d1ff; margin: 8px 0 0; font-size: 14px;">AI-Powered Private Equity CRM</p>
+          </div>
+          <div style="padding: 32px;">
+            <h2 style="color: #003366; margin: 0 0 16px; font-size: 20px;">You're Invited! 🎉</h2>
+            <p style="color: #333; font-size: 16px; line-height: 1.6;">
+              <strong>${inviterName}</strong> has invited you to join <strong>${firmName}</strong> on PE OS.
+            </p>
+            <p style="color: #555; font-size: 15px; line-height: 1.6;">
+              You've been assigned the role of <strong>${role}</strong>. Click the button below to create your account and get started.
+            </p>
+            <div style="text-align: center; margin: 32px 0;">
+              <a href="${inviteUrl}"
+                 style="background: linear-gradient(135deg, #003366, #0055aa); color: #ffffff; padding: 14px 32px; text-decoration: none; border-radius: 8px; display: inline-block; font-size: 16px; font-weight: 600; letter-spacing: 0.5px;">
+                Accept Invitation
+              </a>
+            </div>
+            <p style="color: #888; font-size: 13px; text-align: center;">This invitation expires in 7 days.</p>
+          </div>
+          <hr style="border: none; border-top: 1px solid #eef2f7; margin: 0;" />
+          <div style="padding: 20px 32px; text-align: center;">
+            <p style="color: #aaa; font-size: 12px; margin: 0;">
+              PE OS — AI-Powered Private Equity CRM<br/>
+              If you didn't expect this invitation, you can safely ignore this email.
+            </p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      log.error('Resend email error', error);
+      return { success: false, error: error.message || 'Failed to send email' };
+    }
+
+    log.info('Invitation email sent successfully', { email, messageId: data?.id });
     return { success: true };
   } catch (error) {
     log.error('Email send error', error);
@@ -117,8 +119,8 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const { data: currentUser, error: userError } = await supabase
       .from('User')
       .select('firmName, role')
-      .eq('id', user.id)
-      .single();
+      .eq('authId', user.id)
+      .maybeSingle();
 
     if (userError) throw userError;
 
@@ -175,14 +177,22 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     const { email, role } = validation.data;
 
-    // Get current user's info
+    log.info('Creating invitation', { email, role, userId: user.id });
+
+    // Get current user's info (user.id from auth middleware is the Supabase auth UUID, stored as authId in User table)
     const { data: currentUser, error: userError } = await supabase
       .from('User')
-      .select('name, firmName, role')
-      .eq('id', user.id)
-      .single();
+      .select('id, name, firmName, role')
+      .eq('authId', user.id)
+      .maybeSingle();
+
+    log.info('Current user lookup result', { currentUser: currentUser?.id, firmName: currentUser?.firmName, userError: userError?.message });
 
     if (userError) throw userError;
+
+    if (!currentUser) {
+      return res.status(400).json({ error: 'User profile not found' });
+    }
 
     if (!currentUser?.firmName) {
       return res.status(400).json({ error: 'You must belong to a firm to invite members' });
@@ -194,25 +204,29 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     // Check if user already exists in the firm
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: existingUserErr } = await supabase
       .from('User')
       .select('id')
       .eq('email', email)
       .eq('firmName', currentUser.firmName)
-      .single();
+      .maybeSingle();
+
+    log.info('Existing user check', { existingUser, error: existingUserErr?.message });
 
     if (existingUser) {
       return res.status(400).json({ error: 'User is already a member of your firm' });
     }
 
     // Check for existing pending invitation
-    const { data: existingInvite } = await supabase
+    const { data: existingInvite, error: existingInviteErr } = await supabase
       .from('Invitation')
       .select('id')
       .eq('email', email)
       .eq('firmName', currentUser.firmName)
       .eq('status', 'PENDING')
-      .single();
+      .maybeSingle();
+
+    log.info('Existing invite check', { existingInvite, error: existingInviteErr?.message });
 
     if (existingInvite) {
       return res.status(400).json({ error: 'An invitation is already pending for this email' });
@@ -222,13 +236,15 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     const token = generateToken();
     const expiresAt = getExpirationDate();
 
+    log.info('Inserting invitation record', { email, firmName: currentUser.firmName, role });
+
     const { data: invitation, error: insertError } = await supabase
       .from('Invitation')
       .insert({
         email,
         firmName: currentUser.firmName,
         role,
-        invitedBy: user.id,
+        invitedBy: currentUser.id,
         token,
         expiresAt: expiresAt.toISOString(),
         status: 'PENDING',
@@ -236,7 +252,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       .select()
       .single();
 
-    if (insertError) throw insertError;
+    if (insertError) {
+      log.error('Invitation insert error', insertError);
+      throw insertError;
+    }
 
     // Send invitation email
     const emailResult = await sendInvitationEmail(
@@ -287,14 +306,17 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
 
     const { emails, role } = validation.data;
 
-    // Get current user's info
+    // Get current user's info (user.id is supabase auth UUID)
     const { data: currentUser, error: userError } = await supabase
       .from('User')
-      .select('name, firmName, role')
-      .eq('id', user.id)
-      .single();
+      .select('id, name, firmName, role')
+      .eq('authId', user.id)
+      .maybeSingle();
 
     if (userError) throw userError;
+    if (!currentUser) {
+      return res.status(400).json({ error: 'User profile not found' });
+    }
 
     if (!currentUser?.firmName) {
       return res.status(400).json({ error: 'You must belong to a firm to invite members' });
@@ -310,7 +332,7 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
           .select('id')
           .eq('email', email)
           .eq('firmName', currentUser.firmName)
-          .single();
+          .maybeSingle();
 
         if (existingUser) {
           results.push({ email, status: 'exists' });
@@ -324,7 +346,7 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
           .eq('email', email)
           .eq('firmName', currentUser.firmName)
           .eq('status', 'PENDING')
-          .single();
+          .maybeSingle();
 
         if (existingInvite) {
           results.push({ email, status: 'pending' });
@@ -341,7 +363,7 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
             email,
             firmName: currentUser.firmName,
             role,
-            invitedBy: user.id,
+            invitedBy: currentUser.id,
             token,
             expiresAt: expiresAt.toISOString(),
             status: 'PENDING',
@@ -552,8 +574,8 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     const { data: currentUser } = await supabase
       .from('User')
       .select('firmName')
-      .eq('id', user.id)
-      .single();
+      .eq('authId', user.id)
+      .maybeSingle();
 
     if (currentUser?.firmName !== invitation.firmName) {
       return res.status(403).json({ error: 'Not authorized' });
@@ -609,8 +631,8 @@ router.post('/:id/resend', async (req: Request, res: Response, next: NextFunctio
     const { data: currentUser } = await supabase
       .from('User')
       .select('name, firmName')
-      .eq('id', user.id)
-      .single();
+      .eq('authId', user.id)
+      .maybeSingle();
 
     if (currentUser?.firmName !== invitation.firmName) {
       return res.status(403).json({ error: 'Not authorized' });

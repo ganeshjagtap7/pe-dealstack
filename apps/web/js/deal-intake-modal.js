@@ -8,6 +8,26 @@
 let modalSelectedFile = null;
 let modalCreatedDealId = null;
 
+// Format a value stored in millions USD to the most natural display unit
+function formatCurrencyValue(valueInMillions) {
+    if (valueInMillions == null) return '—';
+    const abs = Math.abs(valueInMillions);
+    const sign = valueInMillions < 0 ? '-' : '';
+    if (abs >= 1000) {
+        const b = abs / 1000;
+        return `${sign}$${b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
+    }
+    if (abs >= 1) {
+        return `${sign}$${abs >= 100 ? abs.toFixed(0) : abs >= 10 ? abs.toFixed(1) : abs.toFixed(2)}M`;
+    }
+    const k = abs * 1000;
+    if (k >= 1) {
+        return `${sign}$${k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
+    }
+    const dollars = abs * 1000000;
+    return `${sign}$${dollars.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
 /**
  * Build and inject the deal intake modal HTML into the DOM.
  * Call this once during page init.
@@ -440,8 +460,8 @@ function showIntakeExtractionPreview(data) {
 
     setIntakeField('company', extraction.companyName?.value || data.deal?.name || 'Unknown', extraction.companyName?.confidence);
     setIntakeField('industry', extraction.industry?.value || '—', extraction.industry?.confidence);
-    setIntakeField('revenue', extraction.revenue?.value != null ? `$${extraction.revenue.value}M` : '—', extraction.revenue?.confidence);
-    setIntakeField('ebitda', extraction.ebitda?.value != null ? `$${extraction.ebitda.value}M` : '—', extraction.ebitda?.confidence);
+    setIntakeField('revenue', formatCurrencyValue(extraction.revenue?.value), extraction.revenue?.confidence);
+    setIntakeField('ebitda', formatCurrencyValue(extraction.ebitda?.value), extraction.ebitda?.confidence);
     setIntakeField('overall', `${extraction.overallConfidence || 0}%`, extraction.overallConfidence);
 
     const reviewBadge = document.getElementById('intake-review-badge');

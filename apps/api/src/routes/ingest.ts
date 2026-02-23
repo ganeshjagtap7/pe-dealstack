@@ -14,6 +14,25 @@ import { AuditLog } from '../services/auditLog.js';
 import { validateFinancials } from '../services/financialValidator.js';
 import { parseEmailFile, buildDealTextFromEmail } from '../services/emailParser.js';
 
+// Format a value stored in millions USD to the most natural display unit
+function formatValueWithUnit(valueInMillions: number): string {
+  const abs = Math.abs(valueInMillions);
+  const sign = valueInMillions < 0 ? '-' : '';
+  if (abs >= 1000) {
+    const b = abs / 1000;
+    return `${sign}$${b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
+  }
+  if (abs >= 1) {
+    return `${sign}$${abs >= 10 ? abs.toFixed(1) : abs.toFixed(2)}M`;
+  }
+  const k = abs * 1000;
+  if (k >= 1) {
+    return `${sign}$${k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
+  }
+  const dollars = abs * 1000000;
+  return `${sign}$${dollars.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+}
+
 // Transform deep extraction result into ExtractedDealData format
 function transformDeepResultToExtractedDealData(result: DeepExtractionResult): ExtractedDealData {
   const d = result.dealData;
@@ -74,8 +93,8 @@ const upload = multer({
       'text/plain',
     ];
     if (allowedTypes.includes(file.mimetype) ||
-        file.originalname.endsWith('.eml') ||
-        file.mimetype === 'message/rfc822') {
+      file.originalname.endsWith('.eml') ||
+      file.mimetype === 'message/rfc822') {
       cb(null, true);
     } else {
       cb(new Error('Invalid file type. Allowed: PDF, Excel, Word, Text, Email (.eml)'));
@@ -983,8 +1002,8 @@ router.post('/url', async (req, res) => {
     }
 
     const financials: string[] = [];
-    if (aiData.revenue.value != null) financials.push(`- **Revenue:** $${aiData.revenue.value}M`);
-    if (aiData.ebitda.value != null) financials.push(`- **EBITDA:** $${aiData.ebitda.value}M`);
+    if (aiData.revenue.value != null) financials.push(`- **Revenue:** ${formatValueWithUnit(aiData.revenue.value)}`);
+    if (aiData.ebitda.value != null) financials.push(`- **EBITDA:** ${formatValueWithUnit(aiData.ebitda.value)}`);
     if (aiData.ebitdaMargin?.value != null) financials.push(`- **EBITDA Margin:** ${aiData.ebitdaMargin.value}%`);
     if (aiData.revenueGrowth?.value != null) financials.push(`- **Revenue Growth:** ${aiData.revenueGrowth.value}% YoY`);
     if (financials.length > 0) {

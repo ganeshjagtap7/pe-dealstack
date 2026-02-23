@@ -216,6 +216,11 @@
                                 <span class="material-symbols-outlined text-[18px]">block</span>
                                 Mark as Passed
                             </button>
+                            <button id="bulk-delete-btn"
+                                class="flex items-center gap-2 px-4 py-2 bg-red-600/90 hover:bg-red-600 rounded-lg text-sm font-medium transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">delete</span>
+                                Delete
+                            </button>
                         </div>
                     </div>
 
@@ -464,13 +469,29 @@
             'CLOSED_LOST': { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', label: 'Closed Lost' }
         };
 
-        // Format currency
+        // Format currency — values are stored in millions USD in the database
+        // Displays in the most natural unit: B (billions), M (millions), or K (thousands)
         function formatCurrency(value) {
             if (value === null || value === undefined) return 'N/A';
             const absValue = Math.abs(value);
-            if (absValue >= 1000) return `$${(value / 1000).toFixed(1)}B`;
-            if (absValue >= 1) return `$${value.toFixed(1)}M`;
-            return `$${(value * 1000).toFixed(0)}K`;
+            const sign = value < 0 ? '-' : '';
+            // >= 1000M = Billions
+            if (absValue >= 1000) {
+                const b = absValue / 1000;
+                return `${sign}$${b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
+            }
+            // >= 1M = Millions  
+            if (absValue >= 1) {
+                return `${sign}$${absValue >= 100 ? absValue.toFixed(0) : absValue >= 10 ? absValue.toFixed(1) : absValue.toFixed(2)}M`;
+            }
+            // < 1M = Thousands (value is fractional millions, e.g. 0.038 = $38K)
+            const k = absValue * 1000;
+            if (k >= 1) {
+                return `${sign}$${k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
+            }
+            // Very small values — show as dollar amount
+            const dollars = absValue * 1000000;
+            return `${sign}$${dollars.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
         }
 
         // Format relative time
@@ -514,6 +535,27 @@
                     <span class="material-symbols-outlined text-[16px] ${isSelected ? 'text-white' : 'text-transparent group-hover/card:text-gray-300'}">${isSelected ? 'check' : 'check'}</span>
                 </label>
             </div>
+            <!-- Three-dot Menu -->
+            <div class="absolute top-3 right-3 z-10">
+                <button onclick="event.preventDefault(); event.stopPropagation(); toggleDealMenu('${deal.id}');" class="flex items-center justify-center size-7 rounded-md bg-white/90 backdrop-blur border border-border-subtle cursor-pointer hover:border-primary shadow-sm transition-all opacity-0 group-hover/card:opacity-100 focus:opacity-100" title="More options">
+                    <span class="material-symbols-outlined text-[18px] text-text-muted">more_vert</span>
+                </button>
+                <div id="deal-menu-${deal.id}" class="hidden absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+                    <a href="deal.html?id=${deal.id}" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">open_in_new</span>
+                        Open Deal
+                    </a>
+                    <a href="vdr.html?dealId=${deal.id}" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">folder_open</span>
+                        Open Data Room
+                    </a>
+                    <div class="border-t border-border-subtle my-1"></div>
+                    <button onclick="event.preventDefault(); event.stopPropagation(); deleteDeal('${deal.id}', '${deal.name.replace(/'/g, "\\'").replace(/"/g, '&quot;')}');" class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                        Delete Deal
+                    </button>
+                </div>
+            </div>
             <a href="deal.html?id=${deal.id}" class="block">
                 <article class="bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden ${isPassed ? 'opacity-70 hover:opacity-100' : ''} ${isSelected ? 'ring-2 ring-primary border-primary' : ''}">
                     <div class="flex justify-between items-start mb-4">
@@ -526,7 +568,7 @@
                                 <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
                             </div>
                         </div>
-                        <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider">${style.label}</span>
+                        <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider mr-8">${style.label}</span>
                     </div>
                 <div class="grid grid-cols-2 gap-3 mb-4">
                     <div class="bg-background-body rounded-md p-3">
@@ -1036,6 +1078,105 @@
             await bulkUpdateStage('PASSED');
         }
 
+        // Delete single deal
+        async function deleteDeal(dealId, dealName) {
+            closeDealMenus();
+            if (!confirm(`Are you sure you want to delete "${dealName}"?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`)) {
+                return;
+            }
+            try {
+                const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`, {
+                    method: 'DELETE'
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to delete deal');
+                }
+                // Remove from local state and re-render
+                allDeals = allDeals.filter(d => d.id !== dealId);
+                selectedDeals.delete(dealId);
+                renderDealsGrid();
+                updateBulkActionsBar();
+                updateDealCount();
+                showNotification('Deal Deleted', `"${dealName}" has been deleted`, 'success');
+            } catch (error) {
+                console.error('Error deleting deal:', error);
+                showNotification('Error', error.message || 'Failed to delete deal', 'error');
+            }
+        }
+
+        // Bulk delete deals
+        async function bulkDeleteDeals() {
+            const dealIds = [...selectedDeals];
+            if (dealIds.length === 0) return;
+            if (!confirm(`Are you sure you want to delete ${dealIds.length} deal${dealIds.length > 1 ? 's' : ''}?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`)) {
+                return;
+            }
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (const dealId of dealIds) {
+                try {
+                    const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`, {
+                        method: 'DELETE'
+                    });
+                    if (response.ok) {
+                        successCount++;
+                        allDeals = allDeals.filter(d => d.id !== dealId);
+                        selectedDeals.delete(dealId);
+                    } else {
+                        failCount++;
+                    }
+                } catch (error) {
+                    failCount++;
+                }
+            }
+
+            renderDealsGrid();
+            updateBulkActionsBar();
+            updateDealCount();
+
+            if (failCount === 0) {
+                showNotification('Deals Deleted', `${successCount} deal${successCount > 1 ? 's' : ''} deleted successfully`, 'success');
+            } else {
+                showNotification('Partial Success', `${successCount} deleted, ${failCount} failed`, 'error');
+            }
+        }
+
+        // Deal card menu toggle
+        function toggleDealMenu(dealId) {
+            const menu = document.getElementById(`deal-menu-${dealId}`);
+            // Close any other open menus first
+            document.querySelectorAll('[id^="deal-menu-"]').forEach(m => {
+                if (m.id !== `deal-menu-${dealId}`) m.classList.add('hidden');
+            });
+            menu?.classList.toggle('hidden');
+        }
+
+        function closeDealMenus() {
+            document.querySelectorAll('[id^="deal-menu-"]').forEach(m => m.classList.add('hidden'));
+        }
+
+        // Close deal menus when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('[id^="deal-menu-"]') && !e.target.closest('button[onclick*="toggleDealMenu"]')) {
+                closeDealMenus();
+            }
+        });
+
+        // Update the deal count in the header after deletion
+        function updateDealCount() {
+            const countEl = document.getElementById('deal-count');
+            if (countEl) {
+                const activeDeals = allDeals.filter(d => d.status !== 'PASSED').length;
+                countEl.innerHTML = `
+            <span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(5,150,105,0.4)]"></span>
+            ${activeDeals} Active Opportunities
+        `;
+            }
+        }
+
         // CSV Export
         function exportSelectedToCSV() {
             const dealIds = [...selectedDeals];
@@ -1052,9 +1193,9 @@
                 'Industry',
                 'Stage',
                 'Status',
-                'Revenue ($M)',
-                'EBITDA ($M)',
-                'Deal Size ($M)',
+                'Revenue (displayed)',
+                'EBITDA (displayed)',
+                'Deal Size (displayed)',
                 'IRR Projected (%)',
                 'MoM Multiple',
                 'AI Thesis',
@@ -1068,9 +1209,9 @@
                 escapeCSV(deal.industry || ''),
                 escapeCSV(stageStyles[deal.stage]?.label || deal.stage),
                 escapeCSV(deal.status || ''),
-                deal.revenue?.toString() || '',
-                deal.ebitda?.toString() || '',
-                deal.dealSize?.toString() || '',
+                deal.revenue != null ? formatCurrency(deal.revenue) : '',
+                deal.ebitda != null ? formatCurrency(deal.ebitda) : '',
+                deal.dealSize != null ? formatCurrency(deal.dealSize) : '',
                 deal.irrProjected?.toString() || '',
                 deal.mom?.toString() || '',
                 escapeCSV(deal.aiThesis || ''),
@@ -1382,6 +1523,9 @@
 
             // Mark as Passed button
             document.getElementById('bulk-pass-btn')?.addEventListener('click', bulkMarkAsPassed);
+
+            // Bulk delete button
+            document.getElementById('bulk-delete-btn')?.addEventListener('click', bulkDeleteDeals);
 
             // Keyboard shortcuts for bulk selection
             document.addEventListener('keydown', (e) => {

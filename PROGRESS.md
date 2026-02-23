@@ -5,6 +5,46 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 11 — February 23, 2026
+
+#### Call TODOs: Invitations & Deletions — 3:08 PM IST
+
+**Timestamp:** 2026-02-23 15:08 IST
+
+**Goal:** Fix the invitation workflow which was failing due to database mapping errors and generic responses, and implement a full deal deletion standard across the frontend and backend, including complete cascading data destruction.
+
+---
+
+#### Fix 1: Invitation Workflows (User Mappings & Error Handling)
+
+**Root Causes:**
+1. **User Lookups:** The invitations API attempted to locate users using the `id` column, but Supabase passes down an auth UUID mapped to the `authId` column.
+2. **Missing Records:** Supabase's `.single()` method aggressively throws a `PGRST116` error if no row is returned, which bubbled up to a 500 error instead of a graceful failure.
+3. **Foreign Keys:** The `invitedBy` field was assigning the Supabase Auth UUID rather than the internal `User.id` primary key.
+4. **Vague UI:** The frontend merely tallied the number of failed invitations rather than parsing out exact backend reasons.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/invitations.ts` | **Fixed** | Updated user query from `.eq('id', req.user.id)` to `.eq('authId', req.user.id)` and used the resulting `.id` for `invitedBy`. | To correctly map between Supabase's Auth schema and the application's internal database schema. |
+| `apps/api/src/routes/invitations.ts` | **Enhanced** | Refactored `.single()` lookups into `.maybeSingle()` across existing-user and existing-invitation routines. | Prevented `PGRST116` server crashes when records rightfully don't exist yet. |
+| `apps/web/js/inviteModal.js` | **Fixed** | Refactored `handleBulkSubmit` to parse discrete JSON error messages out of failing responses, and alert them specifically. | Provided clear UX alerts (like "An invitation is already pending for this email") instead of generic "Failure" toasts. |
+
+---
+
+#### Fix 2: Deal & Data Room Deletion (UI & API)
+
+**Root Causes:**
+1. The backend schema did not configure `ON DELETE CASCADE` for relations bound to Deals (meaning naive deal deletion throws foreign key constraint violations).
+2. The UI offered no path to delete deals from either the list view or the detail view.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/deals.ts` | **Built** | Updated `DELETE /:id` to chronologically traverse and purge all related tables (`DocumentChunk`, `Document`, `FolderInsight`, `Folder`, `ChatMessage`, `Conversation`, `Activity`, `DealTeamMember`, `Memo`, `Notification`) before dropping the `Deal`. | To safely and completely prune deals without running into FK violations. |
+| `apps/web/crm.html` | **Built** | Added a three-dot floating "More Options" menu directly to deal cards housing a `Delete Deal` hook, added a `Bulk Delete` action, and wired them up to re-render the views on success. | Offered users immediate paths to clean up their pipeline from the dashboard. |
+| `apps/web/deal.html` & `apps/web/deal.js` | **Built** | Formatted an actions menu into the Header section carrying an `Open Data Room` and a `Delete Deal` action with a secondary confirmation hook. | Guaranteed deal administrators could destruct current deals directly from the deal view context. |
+
+---
+
 ### Session 10 — February 21, 2026
 
 #### Hardcoded User Identity Cleanup — 6:19 PM IST

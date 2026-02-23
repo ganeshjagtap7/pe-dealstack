@@ -6,9 +6,19 @@ export interface ValidationResult {
   corrections: Record<string, { original: any; corrected: any; reason: string }>;
 }
 
+// Format value in millions to human-readable form
+function fmtVal(v: number): string {
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}B`;
+  if (abs >= 1) return `${sign}$${abs.toFixed(1)}M`;
+  if (abs * 1000 >= 1) return `${sign}$${(abs * 1000).toFixed(1)}K`;
+  return `${sign}$${(abs * 1000000).toFixed(0)}`;
+}
+
 /**
  * Validate and sanity-check extracted financial data.
- * PE deals typically range $5M-$5B. Flag anything outside norms.
+ * Supports deals ranging from micro-acquisitions ($1K+) to large PE ($5B).
  */
 export function validateFinancials(data: {
   revenue?: number | null;
@@ -24,15 +34,16 @@ export function validateFinancials(data: {
   // Revenue sanity check (expect values in millions)
   if (data.revenue !== null && data.revenue !== undefined) {
     if (data.revenue > 50000) {
-      warnings.push(`Revenue $${data.revenue}M seems too high. May be in thousands.`);
+      warnings.push(`Revenue ${fmtVal(data.revenue)} seems too high. May be in thousands.`);
       corrections.revenue = {
         original: data.revenue,
         corrected: data.revenue / 1000,
         reason: 'Value exceeds $50B — likely reported in thousands, not millions',
       };
     }
-    if (data.revenue > 0 && data.revenue < 0.1) {
-      warnings.push(`Revenue $${data.revenue}M seems too low. May be in wrong units.`);
+    if (data.revenue > 0 && data.revenue < 0.0001) {
+      // Only flag if less than $100 — micro-acquisitions with $1K+ revenue are valid
+      warnings.push(`Revenue ${fmtVal(data.revenue)} seems extremely low. Verify units.`);
     }
     if (data.revenue < 0) {
       warnings.push('Revenue is negative — likely an error.');

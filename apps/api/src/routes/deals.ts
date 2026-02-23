@@ -18,20 +18,20 @@ const createDealSchema = z.object({
   companyName: z.string().optional(),
   stage: z.string().default('INITIAL_REVIEW'),
   status: z.string().default('ACTIVE'),
-  irrProjected: z.number().optional(),
-  mom: z.number().optional(),
-  ebitda: z.number().optional(),
-  revenue: z.number().optional(),
-  industry: z.string().optional(),
-  dealSize: z.number().optional(),
-  description: z.string().optional(),
-  aiThesis: z.string().optional(),
+  irrProjected: z.number().nullable().optional(),
+  mom: z.number().nullable().optional(),
+  ebitda: z.number().nullable().optional(),
+  revenue: z.number().nullable().optional(),
+  industry: z.string().nullable().optional(),
+  dealSize: z.number().nullable().optional(),
+  description: z.string().nullable().optional(),
+  aiThesis: z.string().nullable().optional(),
   icon: z.string().optional(),
-  assignedTo: z.string().uuid().optional(),
+  assignedTo: z.string().uuid().nullable().optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional().default('MEDIUM'),
   tags: z.array(z.string()).optional(),
-  targetCloseDate: z.string().optional(),
-  source: z.string().optional(),
+  targetCloseDate: z.string().nullable().optional(),
+  source: z.string().nullable().optional(),
 });
 
 const updateDealSchema = createDealSchema.partial();
@@ -382,6 +382,54 @@ router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, re
       .eq('id', id)
       .single();
 
+    if (!deal) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
+    // Delete child records in correct order (FK constraints don't have ON DELETE CASCADE)
+    // 1. DocumentChunk (references Document and Deal)
+    await supabase.from('DocumentChunk').delete().eq('dealId', id);
+
+    // 2. Documents (references Deal and Folder)
+    await supabase.from('Document').delete().eq('dealId', id);
+
+    // 3. FolderInsight (references Folder — get folder IDs first)
+    const { data: folders } = await supabase.from('Folder').select('id').eq('dealId', id);
+    if (folders && folders.length > 0) {
+      const folderIds = folders.map(f => f.id);
+      for (const fId of folderIds) {
+        await supabase.from('FolderInsight').delete().eq('folderId', fId);
+      }
+    }
+
+    // 4. Folders
+    await supabase.from('Folder').delete().eq('dealId', id);
+
+    // 5. ChatMessage (references Deal)
+    await supabase.from('ChatMessage').delete().eq('dealId', id);
+
+    // 6. Conversation (references Deal)
+    await supabase.from('Conversation').delete().eq('dealId', id);
+
+    // 7. Activity (references Deal)
+    await supabase.from('Activity').delete().eq('dealId', id);
+
+    // 8. DealTeamMember (references Deal)
+    await supabase.from('DealTeamMember').delete().eq('dealId', id);
+
+    // 9. Memo (references Deal) — delete sections first
+    const { data: memos } = await supabase.from('Memo').select('id').eq('dealId', id);
+    if (memos && memos.length > 0) {
+      for (const m of memos) {
+        await supabase.from('MemoSection').delete().eq('memoId', m.id);
+      }
+    }
+    await supabase.from('Memo').delete().eq('dealId', id);
+
+    // 10. Notification (references Deal)
+    await supabase.from('Notification').delete().eq('dealId', id);
+
+    // Finally, delete the deal itself
     const { error } = await supabase
       .from('Deal')
       .delete()
@@ -392,6 +440,7 @@ router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, re
     // Audit log
     await AuditLog.dealDeleted(req, id, deal?.name || 'Unknown');
 
+    log.info('Deal deleted with cascade', { dealId: id, dealName: deal.name });
     res.status(204).send();
   } catch (error) {
     log.error('Error deleting deal', error);

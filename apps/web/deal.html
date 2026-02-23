@@ -206,6 +206,28 @@
                                 </div>
                             </div>
                         </div>
+                        <!-- Deal Actions Menu -->
+                        <div class="relative" id="deal-actions-wrapper">
+                            <button onclick="toggleDealActionsMenu()"
+                                class="flex items-center justify-center size-9 rounded-lg border border-border-subtle bg-white hover:border-primary/30 hover:shadow-sm transition-all"
+                                title="More actions">
+                                <span class="material-symbols-outlined text-[20px] text-text-muted">more_vert</span>
+                            </button>
+                            <div id="deal-actions-menu"
+                                class="hidden absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+                                <button onclick="openDataRoom()"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">folder_open</span>
+                                    Open Data Room
+                                </button>
+                                <div class="border-t border-border-subtle my-1"></div>
+                                <button onclick="deleteDealFromDetail()"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                                    Delete Deal
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Stage Pipeline -->
