@@ -152,11 +152,18 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 - **Key files:** `FolderTree.tsx` (context menu + inline rename), `vdrApi.ts` (renameFolder), `vdr.tsx` (handlers)
 - **Ref:** (00:04:57)
 
-### 12. Settings / AI Preferences — Not Functional — ❌ NOT DONE
-- **Action:**
-  - [ ] Build AI model selection (GPT-4, Claude, etc. — if applicable)
-  - [ ] Add preferences for: default extraction behavior, preferred currency, industry focus
-  - [ ] Profile settings: change password, update name/avatar
+### 12. Settings / AI Preferences — ✅ DONE
+- **Status:** Fully functional. All 5 settings sections now work: General (profile), AI Preferences (sectors + sensitivity + currency + extraction defaults), Interface (typography + density), Security (password change), Notifications (6 toggle types).
+- **What's done:**
+  - [x] Password change form with live validation (8+ chars, uppercase, number, match) via Supabase Auth
+  - [x] Notification preferences: 6 toggleable types (Deal Updates, Document Uploads, Mentions, AI Insights, Tasks, Comments)
+  - [x] Preferred currency dropdown (USD, EUR, GBP, INR, CAD, AUD, JPY, CHF)
+  - [x] Auto-extract on upload toggle (default ON)
+  - [x] Auto-update deal from extraction toggle (default OFF)
+  - [x] Backend schema extended with merge-safe preferences update
+  - [x] Industry focus — already worked (sectors + presets + modal)
+  - [x] Profile name/title/avatar — already worked
+- **Key files:** `settings.html` (UI + JS), `users.ts` (schema + merge logic)
 - **Ref:** (00:07:21), (00:08:06), (00:09:32)
 
 ### 13. Notifications — Not Fully Wired — ❌ NOT DONE
@@ -208,9 +215,9 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 |----------|-------|------|---------|-----------|
 | 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
 | 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
-| 🟡 P2 | 7 | 3 ✅ | 0 | 4 ❌ |
+| 🟡 P2 | 7 | 4 ✅ | 0 | 3 ❌ |
 | 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
-| **Total** | **20** | **11** | **0** | **9** |
+| **Total** | **20** | **12** | **0** | **8** |
 
 ---
 
@@ -226,11 +233,12 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 7. ~~Ingest → Update Existing Deals~~ ✅ (mode toggle + deal picker + smart merge)
 8. ~~AI Reports / Templates~~ ✅ (in-app preview, chat dedup fix, template→memo integration, dynamic chips, citation preview)
 
-**Next — P2 (3 of 7 done):**
+**Next — P2 (4 of 7 done):**
 9. ~~Data room auto-update toggle + document linking~~ ✅
 10. ~~Navigation — breadcrumbs + back support~~ ✅
 11. ~~Folder rename in data room~~ ✅ (three-dot menu + inline rename + delete)
-12–15. Settings, Notifications, Admin, Dashboard metrics
+12. ~~Settings / AI Preferences~~ ✅ (password change, notification prefs, currency, extraction defaults)
+13–15. Notifications, Admin, Dashboard metrics
 
 **Backlog (P3):**
 16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence

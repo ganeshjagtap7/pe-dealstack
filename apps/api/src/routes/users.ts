@@ -239,11 +239,17 @@ const updateSelfSchema = z.object({
   avatar: z.string().url().optional().nullable(),
   title: z.string().max(255).optional(),
   phone: z.string().max(50).optional(),
-  // AI preferences (stored as JSON or separate fields)
+  // AI preferences (stored as JSON in preferences column)
   investmentFocus: z.array(z.string()).optional(),
   sourcingSensitivity: z.number().min(0).max(100).optional(),
   typography: z.enum(['modern', 'serif']).optional(),
   density: z.enum(['compact', 'default', 'relaxed']).optional(),
+  // AI extraction defaults
+  preferredCurrency: z.string().max(10).optional(),
+  autoExtract: z.boolean().optional(),
+  autoUpdateDeal: z.boolean().optional(),
+  // Notification preferences
+  notifications: z.record(z.boolean()).optional(),
 });
 
 router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
@@ -276,15 +282,23 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
     if (validation.data.title !== undefined) updateData.title = validation.data.title;
     if (validation.data.phone !== undefined) updateData.phone = validation.data.phone;
 
-    // Store AI preferences as JSON in a preferences field or as separate columns
-    const preferences: Record<string, any> = {};
-    if (validation.data.investmentFocus !== undefined) preferences.investmentFocus = validation.data.investmentFocus;
-    if (validation.data.sourcingSensitivity !== undefined) preferences.sourcingSensitivity = validation.data.sourcingSensitivity;
-    if (validation.data.typography !== undefined) preferences.typography = validation.data.typography;
-    if (validation.data.density !== undefined) preferences.density = validation.data.density;
+    // Build preferences update — merge with existing preferences
+    const newPrefs: Record<string, any> = {};
+    if (validation.data.investmentFocus !== undefined) newPrefs.investmentFocus = validation.data.investmentFocus;
+    if (validation.data.sourcingSensitivity !== undefined) newPrefs.sourcingSensitivity = validation.data.sourcingSensitivity;
+    if (validation.data.typography !== undefined) newPrefs.typography = validation.data.typography;
+    if (validation.data.density !== undefined) newPrefs.density = validation.data.density;
+    if (validation.data.preferredCurrency !== undefined) newPrefs.preferredCurrency = validation.data.preferredCurrency;
+    if (validation.data.autoExtract !== undefined) newPrefs.autoExtract = validation.data.autoExtract;
+    if (validation.data.autoUpdateDeal !== undefined) newPrefs.autoUpdateDeal = validation.data.autoUpdateDeal;
+    if (validation.data.notifications !== undefined) newPrefs.notifications = validation.data.notifications;
 
-    if (Object.keys(preferences).length > 0) {
-      updateData.preferences = preferences;
+    if (Object.keys(newPrefs).length > 0) {
+      // Merge with existing preferences so we don't overwrite unrelated fields
+      const existingPrefs = typeof existingUser.preferences === 'string'
+        ? JSON.parse(existingUser.preferences || '{}')
+        : (existingUser.preferences || {});
+      updateData.preferences = { ...existingPrefs, ...newPrefs };
     }
 
     // Update by the actual User table id (not auth id)

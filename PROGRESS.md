@@ -5,6 +5,72 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 16 — February 24, 2026
+
+#### TODO #12: Settings / AI Preferences — Make Fully Functional — ~1:30 PM IST
+
+**Timestamp:** 2026-02-24 13:30 IST
+
+**Goal:** The Settings page had polished UI but several non-functional sections. Profile (name, title, avatar), AI sector focus, sourcing sensitivity, and interface customization already worked. Needed to wire up password change, build notification preferences, add AI extraction defaults (currency, auto-extract, auto-update), and extend the backend schema.
+
+---
+
+##### Sub-task 1: Backend — Extend Preferences Schema
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/users.ts` | **Extended** | Added `preferredCurrency`, `autoExtract`, `autoUpdateDeal`, `notifications` (record of booleans) to `updateSelfSchema` Zod validation | New preference fields need server-side validation |
+| `apps/api/src/routes/users.ts` | **Fixed** | Preferences update now **merges** with existing preferences instead of overwriting. Fetches existing prefs, spreads new fields on top | Previously, saving AI prefs would wipe notification prefs and vice versa |
+
+---
+
+##### Sub-task 2: Security — Password Change
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/settings.html` | **Replaced** | Static "Change Password" button → expandable form with New Password + Confirm Password fields, live validation rules (8+ chars, uppercase, number, match), Submit + Cancel buttons | Users can now change their password directly from Settings |
+| `apps/web/settings.html` | **Added** | `initPasswordForm()` JS function: validation with live rule indicators (green check / grey circle), calls `PEAuth.updatePassword(newPassword)` on submit, success toast, form auto-collapses | Uses existing Supabase auth method from `auth.js` line 223 |
+
+---
+
+##### Sub-task 3: AI Extraction Defaults
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/settings.html` | **Added** | Preferred Currency dropdown (USD, EUR, GBP, INR, CAD, AUD, JPY, CHF) in the AI Preferences section | Users can set their default currency for financial displays |
+| `apps/web/settings.html` | **Added** | "Auto-extract on upload" toggle (default ON) — whether AI extraction runs automatically when PDFs are uploaded | Gives users control over AI extraction behavior |
+| `apps/web/settings.html` | **Added** | "Auto-update deal from extraction" toggle (default OFF) — whether extracted data auto-merges into deal card | Complements the per-upload toggle from Task #9 with a global default |
+
+---
+
+##### Sub-task 4: Notification Preferences
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/settings.html` | **Added** | New `section-notifications` with 6 toggle switches: Deal Updates, Document Uploads, Mentions, AI Insights, Task Assignments, Comments | Previously the nav link existed but led to no content |
+| `apps/web/settings.html` | **Added** | `renderNotificationToggles()` function generates toggle rows dynamically from `NOTIFICATION_TYPES` array, each with icon, label, description, and toggle switch | Consistent, maintainable pattern — easy to add new types |
+| `apps/web/settings.html` | **Added** | `notificationPrefs` state object saved into `preferences.notifications` JSON | Stored alongside existing AI preferences in same JSONB column |
+
+---
+
+##### Sub-task 5: State Management & Save Logic
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/settings.html` | **Extended** | Added state variables: `preferredCurrency`, `autoExtract`, `autoUpdateDeal`, `notificationPrefs` | Track new settings in memory |
+| `apps/web/settings.html` | **Extended** | `loadUserProfile()` now parses all new fields from `preferences` JSON | Load persisted settings on page open |
+| `apps/web/settings.html` | **Extended** | `renderProfile()` sets currency dropdown, toggle states, and renders notification toggles | Reflect loaded data in UI |
+| `apps/web/settings.html` | **Extended** | `saveProfile()` payload includes all new fields | Send new preferences to backend on Save |
+| `apps/web/settings.html` | **Extended** | Event listeners for currency change, auto-extract toggle, auto-update toggle all call `markChanged()` | Enable Save button when any setting changes |
+
+---
+
+**Verification:** Vite build succeeds (622ms). Backend TypeScript check clean (`npx tsc --noEmit`).
+
+**Status:** TODO #12 complete. P2 progress: 4 of 7 done. Overall: 12/20 tasks done.
+
+---
+
 ### Session 15 — February 24, 2026
 
 #### TODO #11: Folder Rename in Data Room — ~12:30 PM IST

@@ -254,6 +254,50 @@
                                             <span>High Precision</span>
                                         </div>
                                     </div>
+
+                                    <div class="border-t border-border-subtle"></div>
+
+                                    <!-- Preferred Currency -->
+                                    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                        <div>
+                                            <label class="text-xs font-bold text-text-secondary uppercase tracking-wider block">Preferred Currency</label>
+                                            <span class="text-xs text-text-muted block mt-1">Default currency for displaying financial values across all deals.</span>
+                                        </div>
+                                        <select id="input-currency" class="rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm min-w-[140px]">
+                                            <option value="USD">$ USD</option>
+                                            <option value="EUR">€ EUR</option>
+                                            <option value="GBP">£ GBP</option>
+                                            <option value="INR">₹ INR</option>
+                                            <option value="CAD">C$ CAD</option>
+                                            <option value="AUD">A$ AUD</option>
+                                            <option value="JPY">¥ JPY</option>
+                                            <option value="CHF">CHF</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- Auto-Extract on Upload -->
+                                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-border-subtle">
+                                        <div>
+                                            <p class="text-sm font-semibold text-text-main">Auto-extract on upload</p>
+                                            <p class="text-xs text-text-muted">Automatically run AI extraction when PDFs are uploaded to the data room.</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input id="toggle-auto-extract" type="checkbox" class="sr-only peer" checked>
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
+
+                                    <!-- Auto-Update Deal from Extraction -->
+                                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-border-subtle">
+                                        <div>
+                                            <p class="text-sm font-semibold text-text-main">Auto-update deal from extraction</p>
+                                            <p class="text-xs text-text-muted">Automatically merge extracted financial data into the deal card when uploading documents.</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input id="toggle-auto-update" type="checkbox" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                                        </label>
+                                    </div>
                                 </div>
                             </section>
 
@@ -320,16 +364,56 @@
                                         <p class="text-xs text-text-muted">Manage your password and account security settings.</p>
                                     </div>
                                 </div>
-                                <div class="p-6">
-                                    <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-border-subtle">
+                                <div class="p-6 space-y-4">
+                                    <div id="password-display" class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-border-subtle">
                                         <div>
                                             <p class="text-sm font-semibold text-text-main">Password</p>
-                                            <p class="text-xs text-text-muted">Last changed 30 days ago</p>
+                                            <p class="text-xs text-text-muted">Managed via Supabase Auth</p>
                                         </div>
-                                        <button class="px-4 py-2 bg-white border border-border-subtle text-text-main text-sm font-medium rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">
+                                        <button id="toggle-password-form" class="px-4 py-2 bg-white border border-border-subtle text-text-main text-sm font-medium rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm">
                                             Change Password
                                         </button>
                                     </div>
+                                    <div id="password-form" class="hidden p-4 bg-gray-50 rounded-lg border border-border-subtle space-y-4">
+                                        <div>
+                                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">New Password</label>
+                                            <input id="input-new-password" type="password" class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm" placeholder="Minimum 8 characters">
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Confirm Password</label>
+                                            <input id="input-confirm-password" type="password" class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm" placeholder="Re-enter new password">
+                                        </div>
+                                        <ul class="text-xs text-text-muted space-y-1">
+                                            <li id="pw-rule-length" class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">circle</span> At least 8 characters</li>
+                                            <li id="pw-rule-upper" class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">circle</span> One uppercase letter</li>
+                                            <li id="pw-rule-number" class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">circle</span> One number</li>
+                                            <li id="pw-rule-match" class="flex items-center gap-1.5"><span class="material-symbols-outlined text-[14px]">circle</span> Passwords match</li>
+                                        </ul>
+                                        <div class="flex items-center gap-3">
+                                            <button id="submit-password" class="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-sm font-semibold rounded-lg transition-colors shadow-card disabled:opacity-50" disabled>
+                                                Update Password
+                                            </button>
+                                            <button id="cancel-password" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Notifications Preferences -->
+                            <section id="section-notifications" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="px-6 py-5 border-b border-border-subtle flex items-center gap-3">
+                                    <div class="p-2 bg-blue-50 rounded-lg text-blue-600 border border-blue-200">
+                                        <span class="material-symbols-outlined text-[20px] block">notifications</span>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-base font-bold text-text-main">Notification Preferences</h2>
+                                        <p class="text-xs text-text-muted">Choose which events trigger in-app notifications.</p>
+                                    </div>
+                                </div>
+                                <div class="p-6 space-y-1" id="notification-toggles">
+                                    <!-- Toggles rendered by JS -->
                                 </div>
                             </section>
 
@@ -398,6 +482,26 @@ let investmentFocus = [];
 let sourcingSensitivity = 50;
 let typography = 'modern';
 let density = 'default';
+let preferredCurrency = 'USD';
+let autoExtract = true;
+let autoUpdateDeal = false;
+let notificationPrefs = {
+    DEAL_UPDATE: true,
+    DOCUMENT_UPLOADED: true,
+    MENTION: true,
+    AI_INSIGHT: true,
+    TASK_ASSIGNED: true,
+    COMMENT: true,
+};
+
+const NOTIFICATION_TYPES = [
+    { key: 'DEAL_UPDATE', label: 'Deal Updates', description: 'When deal data or stage changes', icon: 'trending_up' },
+    { key: 'DOCUMENT_UPLOADED', label: 'Document Uploads', description: 'When new files are added to a data room', icon: 'upload_file' },
+    { key: 'MENTION', label: 'Mentions', description: 'When someone mentions you in a comment', icon: 'alternate_email' },
+    { key: 'AI_INSIGHT', label: 'AI Insights', description: 'When the AI generates new analysis or flags', icon: 'auto_awesome' },
+    { key: 'TASK_ASSIGNED', label: 'Task Assignments', description: 'When a task is assigned to you', icon: 'task_alt' },
+    { key: 'COMMENT', label: 'Comments', description: 'When someone comments on your deals or memos', icon: 'comment' },
+];
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -449,6 +553,12 @@ async function loadUserProfile() {
             sourcingSensitivity = typeof prefs.sourcingSensitivity === 'number' ? prefs.sourcingSensitivity : 50;
             typography = prefs.typography || 'modern';
             density = prefs.density || 'default';
+            preferredCurrency = prefs.preferredCurrency || 'USD';
+            autoExtract = prefs.autoExtract !== undefined ? prefs.autoExtract : true;
+            autoUpdateDeal = prefs.autoUpdateDeal !== undefined ? prefs.autoUpdateDeal : false;
+            if (prefs.notifications && typeof prefs.notifications === 'object') {
+                notificationPrefs = { ...notificationPrefs, ...prefs.notifications };
+            }
         }
 
         renderProfile();
@@ -509,6 +619,19 @@ function renderProfile() {
 
         // Density
         updateDensity(density);
+
+        // Currency
+        const currencySelect = document.getElementById('input-currency');
+        if (currencySelect) currencySelect.value = preferredCurrency;
+
+        // Auto-extract & auto-update toggles
+        const autoExtractToggle = document.getElementById('toggle-auto-extract');
+        if (autoExtractToggle) autoExtractToggle.checked = autoExtract;
+        const autoUpdateToggle = document.getElementById('toggle-auto-update');
+        if (autoUpdateToggle) autoUpdateToggle.checked = autoUpdateDeal;
+
+        // Notification toggles
+        renderNotificationToggles();
 
         console.log('Profile rendered successfully');
     } catch (err) {
@@ -725,6 +848,122 @@ function updateDensity(type) {
     });
 }
 
+// Notification toggles
+function renderNotificationToggles() {
+    const container = document.getElementById('notification-toggles');
+    if (!container) return;
+
+    container.innerHTML = NOTIFICATION_TYPES.map(nt => `
+        <div class="flex items-center justify-between p-4 rounded-lg hover:bg-gray-50 transition-colors">
+            <div class="flex items-center gap-3">
+                <span class="material-symbols-outlined text-[20px] text-text-muted">${nt.icon}</span>
+                <div>
+                    <p class="text-sm font-semibold text-text-main">${nt.label}</p>
+                    <p class="text-xs text-text-muted">${nt.description}</p>
+                </div>
+            </div>
+            <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" class="sr-only peer notification-toggle" data-type="${nt.key}" ${notificationPrefs[nt.key] !== false ? 'checked' : ''}>
+                <div class="w-11 h-6 bg-gray-200 peer-focus:ring-2 peer-focus:ring-primary/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+            </label>
+        </div>
+    `).join('');
+
+    // Attach change listeners
+    container.querySelectorAll('.notification-toggle').forEach(toggle => {
+        toggle.addEventListener('change', (e) => {
+            notificationPrefs[e.target.dataset.type] = e.target.checked;
+            markChanged();
+        });
+    });
+}
+
+// Password change
+function initPasswordForm() {
+    const toggleBtn = document.getElementById('toggle-password-form');
+    const form = document.getElementById('password-form');
+    const display = document.getElementById('password-display');
+    const submitBtn = document.getElementById('submit-password');
+    const cancelBtn = document.getElementById('cancel-password');
+    const newPwInput = document.getElementById('input-new-password');
+    const confirmPwInput = document.getElementById('input-confirm-password');
+
+    if (!toggleBtn || !form) return;
+
+    toggleBtn.addEventListener('click', () => {
+        form.classList.remove('hidden');
+        display.classList.add('hidden');
+        if (newPwInput) newPwInput.focus();
+    });
+
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', () => {
+            form.classList.add('hidden');
+            display.classList.remove('hidden');
+            if (newPwInput) newPwInput.value = '';
+            if (confirmPwInput) confirmPwInput.value = '';
+        });
+    }
+
+    const validatePassword = () => {
+        const pw = newPwInput?.value || '';
+        const confirm = confirmPwInput?.value || '';
+        const rules = {
+            length: pw.length >= 8,
+            upper: /[A-Z]/.test(pw),
+            number: /[0-9]/.test(pw),
+            match: pw.length > 0 && pw === confirm,
+        };
+
+        ['length', 'upper', 'number', 'match'].forEach(rule => {
+            const el = document.getElementById(`pw-rule-${rule}`);
+            if (!el) return;
+            const icon = el.querySelector('.material-symbols-outlined');
+            if (rules[rule]) {
+                el.classList.add('text-secondary');
+                el.classList.remove('text-text-muted');
+                if (icon) { icon.textContent = 'check_circle'; icon.style.fontVariationSettings = "'FILL' 1"; }
+            } else {
+                el.classList.remove('text-secondary');
+                el.classList.add('text-text-muted');
+                if (icon) { icon.textContent = 'circle'; icon.style.fontVariationSettings = ''; }
+            }
+        });
+
+        const allValid = Object.values(rules).every(Boolean);
+        if (submitBtn) submitBtn.disabled = !allValid;
+        return allValid;
+    };
+
+    if (newPwInput) newPwInput.addEventListener('input', validatePassword);
+    if (confirmPwInput) confirmPwInput.addEventListener('input', validatePassword);
+
+    if (submitBtn) {
+        submitBtn.addEventListener('click', async () => {
+            if (!validatePassword()) return;
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Updating...';
+
+            try {
+                const result = await PEAuth.updatePassword(newPwInput.value);
+                if (result.error) throw new Error(result.error.message || 'Failed to update password');
+
+                showToast('Password updated successfully', 'success');
+                form.classList.add('hidden');
+                display.classList.remove('hidden');
+                newPwInput.value = '';
+                confirmPwInput.value = '';
+            } catch (error) {
+                showToast(error.message || 'Failed to update password', 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Update Password';
+            }
+        });
+    }
+}
+
 // Event listeners
 function initializeEventListeners() {
     // Settings nav
@@ -811,6 +1050,36 @@ function initializeEventListeners() {
         avatarInput.addEventListener('change', handleAvatarUpload);
     }
 
+    // Currency
+    const currencySelect = document.getElementById('input-currency');
+    if (currencySelect) {
+        currencySelect.addEventListener('change', () => {
+            preferredCurrency = currencySelect.value;
+            markChanged();
+        });
+    }
+
+    // Auto-extract toggle
+    const autoExtractToggle = document.getElementById('toggle-auto-extract');
+    if (autoExtractToggle) {
+        autoExtractToggle.addEventListener('change', () => {
+            autoExtract = autoExtractToggle.checked;
+            markChanged();
+        });
+    }
+
+    // Auto-update toggle
+    const autoUpdateToggle = document.getElementById('toggle-auto-update');
+    if (autoUpdateToggle) {
+        autoUpdateToggle.addEventListener('change', () => {
+            autoUpdateDeal = autoUpdateToggle.checked;
+            markChanged();
+        });
+    }
+
+    // Password form
+    initPasswordForm();
+
     // Deactivate
     const deactivateBtn = document.getElementById('deactivate-btn');
     if (deactivateBtn) {
@@ -895,6 +1164,10 @@ async function saveProfile() {
             sourcingSensitivity,
             typography,
             density,
+            preferredCurrency,
+            autoExtract,
+            autoUpdateDeal,
+            notifications: notificationPrefs,
         };
 
         console.log('Saving profile:', payload);
