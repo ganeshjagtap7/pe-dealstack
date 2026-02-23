@@ -140,10 +140,16 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 - **Key files:** `layout.js` (helper), `deal.html` + `deal.js` (breadcrumb fix), `crm.html`, `vdr.tsx`, `memo-builder.html` + `memo-builder.js`
 - **Ref:** (00:09:32), (00:10:39)
 
-### 11. Folder Rename in Data Room — ❌ NOT DONE
-- **Action:**
-  - [ ] Add rename option (right-click / three-dot menu on folders)
-  - [ ] Update all references when folder is renamed
+### 11. Folder Rename in Data Room — ✅ DONE
+- **Status:** Fully implemented. Three-dot context menu on folders with Rename and Delete options. Inline rename with Enter/Escape support, following the same UX pattern as file rename in FileTable.
+- **What's done:**
+  - [x] Three-dot context menu on folders (appears on hover) with Rename and Delete
+  - [x] Inline rename: replaces folder name with focused input, Enter to save, Escape to cancel
+  - [x] `renameFolder()` API function in vdrApi.ts (calls existing `PATCH /api/folders/:id`)
+  - [x] Delete folder with cascade (removes folder + all child files)
+  - [x] Toast notification on rename/delete success
+  - [x] Active folder auto-switches if deleted folder was active
+- **Key files:** `FolderTree.tsx` (context menu + inline rename), `vdrApi.ts` (renameFolder), `vdr.tsx` (handlers)
 - **Ref:** (00:04:57)
 
 ### 12. Settings / AI Preferences — Not Functional — ❌ NOT DONE
@@ -202,9 +208,9 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 |----------|-------|------|---------|-----------|
 | 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
 | 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
-| 🟡 P2 | 7 | 2 ✅ | 0 | 5 ❌ |
+| 🟡 P2 | 7 | 3 ✅ | 0 | 4 ❌ |
 | 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
-| **Total** | **20** | **10** | **0** | **10** |
+| **Total** | **20** | **11** | **0** | **9** |
 
 ---
 
@@ -220,10 +226,11 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 7. ~~Ingest → Update Existing Deals~~ ✅ (mode toggle + deal picker + smart merge)
 8. ~~AI Reports / Templates~~ ✅ (in-app preview, chat dedup fix, template→memo integration, dynamic chips, citation preview)
 
-**Next — P2 (2 of 7 done):**
+**Next — P2 (3 of 7 done):**
 9. ~~Data room auto-update toggle + document linking~~ ✅
 10. ~~Navigation — breadcrumbs + back support~~ ✅
-11–15. Folder rename, Settings, Notifications, Admin, Dashboard metrics
+11. ~~Folder rename in data room~~ ✅ (three-dot menu + inline rename + delete)
+12–15. Settings, Notifications, Admin, Dashboard metrics
 
 **Backlog (P3):**
 16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence

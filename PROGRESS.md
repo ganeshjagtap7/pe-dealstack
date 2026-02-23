@@ -5,6 +5,52 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 15 — February 24, 2026
+
+#### TODO #11: Folder Rename in Data Room — ~12:30 PM IST
+
+**Timestamp:** 2026-02-24 12:30 IST
+
+**Goal:** Add the ability to rename (and delete) folders in the VDR Data Room. Previously, once a folder was created its name was permanent. The backend `PATCH /api/folders/:id` endpoint already supported renaming, but there was no frontend UI — the `FolderTree` component had no context menu at all.
+
+---
+
+##### Sub-task 1: API Service — Add `renameFolder()` Function
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/src/services/vdrApi.ts` | **Added** | `renameFolder(folderId, newName)` function — calls `PATCH /api/folders/${folderId}` with `{ name: newName }` | Frontend needed an API wrapper to call the existing backend rename endpoint |
+
+---
+
+##### Sub-task 2: FolderTree Component — Context Menu + Inline Rename
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/src/components/FolderTree.tsx` | **Rebuilt** | Added state management (`openMenuId`, `renamingFolderId`, `renameValue`), outside-click handler, focus management for rename input, Enter/Escape key support | Following the same pattern used by `FileTable.tsx` for file rename |
+| `apps/web/src/components/FolderTree.tsx` | **Added** | Three-dot `more_vert` button on each folder row — appears on hover, stays visible when menu is open. Dropdown has "Rename" and "Delete" (with red styling + divider) | Consistent with FileTable's context menu UX |
+| `apps/web/src/components/FolderTree.tsx` | **Added** | Inline rename: clicking "Rename" replaces the folder name `<span>` with a focused `<input>`, submits on Enter/blur, cancels on Escape | In-place editing avoids modal overhead for a simple rename operation |
+| `apps/web/src/components/FolderTree.tsx` | **Added** | New props: `onRenameFolder?: (folderId, newName) => void`, `onDeleteFolder?: (folderId) => void` | Parent component provides the actual API call logic |
+
+---
+
+##### Sub-task 3: VDR Main Component — Wire Up Handlers
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/src/vdr.tsx` | **Added imports** | `deleteFolder`, `renameFolder` from `vdrApi` | Need both API functions for the handlers |
+| `apps/web/src/vdr.tsx` | **Added** | `handleRenameFolder(folderId, newName)` — calls API, updates local `folders` state, shows toast notification | Optimistic UI update on successful rename |
+| `apps/web/src/vdr.tsx` | **Added** | `handleDeleteFolder(folderId)` — calls `deleteFolder(folderId, true)` with cascade, removes folder + its files from state, switches active folder if deleted | Complete cleanup including child files |
+| `apps/web/src/vdr.tsx` | **Updated** | `<FolderTree>` now receives `onRenameFolder` and `onDeleteFolder` callbacks | Connects UI actions to API calls |
+
+---
+
+**Verification:** Vite build succeeds (622ms), 86 modules transformed. No TypeScript errors.
+
+**Status:** TODO #11 complete. P2 progress: 3 of 7 done. Overall: 11/20 tasks done.
+
+---
+
 ### Session 14 — February 23, 2026
 
 #### TODO #10: Navigation — Breadcrumbs + Back Support — ~7:00 PM IST

@@ -152,6 +152,22 @@ export async function deleteFolder(folderId: string, cascade = false): Promise<b
 }
 
 /**
+ * Rename a folder
+ */
+export async function renameFolder(folderId: string, newName: string): Promise<boolean> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/folders/${folderId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name: newName }),
+    });
+    return response.ok;
+  } catch (error) {
+    console.error('Error renaming folder:', error);
+    return false;
+  }
+}
+
+/**
  * Fetch documents for a deal or folder
  */
 export async function fetchDocuments(dealId: string, folderId?: string): Promise<APIDocument[]> {
