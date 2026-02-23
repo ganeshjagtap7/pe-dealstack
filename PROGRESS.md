@@ -209,6 +209,59 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 11b — February 23, 2026
+
+#### TODO #4, #5, #8: Ingest Updates, Source Quotes & Chatbot History — ~4:30 PM IST
+
+**Timestamp:** 2026-02-23 16:30 IST
+
+**Goal:** Complete the three remaining P1 items from the Feb 19 call: (1) enable ingesting data into existing deals instead of only creating new ones; (2) display AI extraction source quotes and confidence details so users can verify financial data; (3) fix chatbot history display bugs that made it look like conversation history was lost.
+
+---
+
+##### Task #4: Ingest Deal Data — Update Existing Deals
+
+**Problem:** The ingest modal could only create new deals. Users who uploaded additional CIMs or financials for an existing deal had to create duplicates, then manually copy data across.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/js/deal-intake-modal.js` | **Enhanced** (+234 lines) | Added mode toggle ("Create New Deal" / "Update Existing Deal"), searchable deal picker with live API search (by name, shows industry + revenue), `dealId` passed to all 3 ingest API calls, dynamic button labels ("Extract & Create Deal" ↔ "Extract & Update Deal"), preview text updates based on mode | Users can direct newly extracted data into an existing deal rather than creating duplicates |
+| `apps/api/src/routes/ingest.ts` | **Refactored** (+326, -287 lines) | All 3 ingest endpoints (file upload, paste text, URL scrape) accept optional `dealId` param. Added `mergeIntoExistingDeal()` function: fetches existing deal, compares extraction confidence per field, updates only when new data has higher confidence or existing field is null. Merges `aiRisks` and `investmentHighlights` by appending unique items. Logs "DOCUMENT_ADDED" Activity for updates vs "DEAL_CREATED" for new deals | Smart confidence-based merge prevents overwriting good data with lower-confidence extractions |
+| `supabase_schema.sql` | **Added** (+7 lines) | `DealTeamMember` table schema for deal team assignment tracking | Schema preparation for future team assignment features |
+
+---
+
+##### Task #5: AI Extraction — Source Quotes & Review Details
+
+**Problem:** Extraction preview showed confidence bars but no evidence from the document. Users couldn't verify if extracted financial values were real or hallucinated by the AI.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/js/deal-intake-modal.js` | **Enhanced** | Preview HTML now shows source quotes per field (truncated, displayed below confidence bar), "Not Found" label with grey badge when value is null with 0 confidence, review reasons listed with specific details under the preview | Users can verify extracted financial data against actual source text from the document |
+| `apps/web/deal.html` | **Updated** | Minor structural adjustments to extraction preview container | Compatibility with enhanced preview rendering |
+
+---
+
+##### Task #8: Chatbot (Parakeet) — History Display Fixes
+
+**Problem:** Chat appeared to lose all history when closed and reopened. The actual issue was cosmetic: history was correctly saved to DB and loaded on reopen, but the intro welcome message wasn't being removed — making it look like a fresh chat session.
+
+**Root Cause:** `loadChatHistory()` tried to remove the intro message using CSS selector `.ai-intro-message`, but the actual class in the HTML was different. The intro message stayed visible, covering up the loaded history messages.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/deal.js` | **Fixed** | Corrected intro message CSS selector to match actual HTML class, removed hardcoded fake document names ("Q3 Financial Model", etc.) from intro text | Intro message now properly hides when real chat history loads |
+| `apps/web/deal.js` | **Added** | "X previous messages" header displayed when history loads, "Clear Chat" button in chat header (calls `DELETE /api/deals/:id/chat/history`, clears messages from DB and UI) | Users see history count context and can start a fresh conversation when needed |
+| `apps/web/deal.html` | **Updated** | Adjusted chat section HTML to support clear chat button and history count header | Structural support for new chat UX features |
+
+---
+
+**Verification:** Vite build succeeds. All 3 ingest paths (file upload, paste text, URL scrape) work in both "Create New" and "Update Existing" modes.
+
+**Status:** P1 items #4, #5, #8 complete. Combined with earlier P0 fixes (Session 11), all 8 P0+P1 critical items are now done.
+
+---
+
 ### Session 11 — February 23, 2026
 
 #### Call TODOs: Invitations & Deletions — 3:08 PM IST
