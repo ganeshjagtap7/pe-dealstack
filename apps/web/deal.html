@@ -455,6 +455,9 @@
                                 class="size-6 rounded-full bg-background-body border border-white flex items-center justify-center text-[10px] text-text-secondary z-0 shadow-sm">
                                 +2</div>
                         </div>
+                        <button class="text-text-muted hover:text-red-500 transition-colors" id="clear-chat-btn" title="Clear chat history">
+                            <span class="material-symbols-outlined text-lg">delete_sweep</span>
+                        </button>
                         <button class="text-text-muted hover:text-text-main transition-colors" id="ai-settings-btn">
                             <span class="material-symbols-outlined text-lg">settings</span>
                         </button>
@@ -463,14 +466,8 @@
 
                 <!-- Chat Messages -->
                 <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col custom-scrollbar">
-                    <div class="flex justify-center">
-                        <span
-                            class="text-xs text-text-muted font-medium bg-white border border-border-subtle px-3 py-1 rounded-full shadow-sm">Today,
-                            10:42 AM</span>
-                    </div>
-
-                    <!-- AI Welcome Message -->
-                    <div class="flex gap-4 max-w-[90%]">
+                    <!-- AI Welcome Message (removed when history loads) -->
+                    <div class="ai-intro-message flex gap-4 max-w-[90%]">
                         <div
                             class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
                             <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
@@ -479,14 +476,8 @@
                             <span class="text-xs font-bold text-text-muted ml-1">PE OS AI</span>
                             <div id="ai-intro"
                                 class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
-                                <p>I've analyzed the uploaded documents for <strong>this deal</strong>. I have context
-                                    on:</p>
-                                <ul class="list-disc list-inside mt-2 space-y-1 text-text-secondary">
-                                    <li>Q3 Financial Model (Excel)</li>
-                                    <li>Management Presentation v2 (PDF)</li>
-                                    <li>Legal Due Diligence Memo (PDF)</li>
-                                </ul>
-                                <p class="mt-3">What would you like to know about this deal?</p>
+                                <p>I'm ready to help analyze this deal. Ask me about financials, risks, or any uploaded documents.</p>
+                                <p class="mt-2">What would you like to know?</p>
                             </div>
                         </div>
                     </div>

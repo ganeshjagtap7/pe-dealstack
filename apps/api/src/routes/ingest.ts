@@ -143,6 +143,98 @@ function getIconForIndustry(industry: string | null): string {
   return 'business_center';
 }
 
+/**
+ * Merge AI-extracted data into an existing deal.
+ * Updates financial fields only when new extraction has higher confidence or existing is null.
+ * Returns the updated deal.
+ */
+async function mergeIntoExistingDeal(
+  dealId: string,
+  aiData: ExtractedDealData,
+  userId: string | undefined,
+  sourceName: string,
+): Promise<{ deal: any; isNew: false }> {
+  // Fetch existing deal
+  const { data: existingDeal, error: fetchErr } = await supabase
+    .from('Deal')
+    .select('*, company:Company(*)')
+    .eq('id', dealId)
+    .single();
+
+  if (fetchErr || !existingDeal) {
+    throw new Error('Deal not found');
+  }
+
+  // Build update object — only override fields where new data is better
+  const updates: Record<string, any> = {
+    lastDocument: sourceName,
+    lastDocumentUpdated: new Date().toISOString(),
+  };
+
+  const existingConf = existingDeal.extractionConfidence || 0;
+
+  // Merge each financial field: update if existing is null or new confidence is higher
+  if (aiData.revenue.value != null && (existingDeal.revenue == null || aiData.revenue.confidence > existingConf)) {
+    updates.revenue = aiData.revenue.value;
+    updates.dealSize = aiData.revenue.value;
+  }
+  if (aiData.ebitda.value != null && (existingDeal.ebitda == null || aiData.ebitda.confidence > existingConf)) {
+    updates.ebitda = aiData.ebitda.value;
+  }
+  if (aiData.industry.value && (!existingDeal.industry || aiData.industry.confidence > existingConf)) {
+    updates.industry = aiData.industry.value;
+    updates.icon = getIconForIndustry(aiData.industry.value);
+  }
+  if (aiData.description.value && aiData.description.value !== 'No description available' && (!existingDeal.description || aiData.description.confidence > existingConf)) {
+    updates.description = aiData.description.value;
+  }
+  if (aiData.summary && (!existingDeal.aiThesis || aiData.overallConfidence > existingConf)) {
+    updates.aiThesis = aiData.summary;
+  }
+
+  // Merge risks/highlights (append new unique items)
+  const existingRisks = existingDeal.aiRisks || { keyRisks: [], investmentHighlights: [] };
+  const mergedKeyRisks = [...new Set([...(existingRisks.keyRisks || []), ...(aiData.keyRisks || [])])];
+  const mergedHighlights = [...new Set([...(existingRisks.investmentHighlights || []), ...(aiData.investmentHighlights || [])])];
+  updates.aiRisks = { keyRisks: mergedKeyRisks, investmentHighlights: mergedHighlights };
+
+  // Update confidence to the higher of old vs new
+  if (aiData.overallConfidence > existingConf) {
+    updates.extractionConfidence = aiData.overallConfidence;
+  }
+
+  // Clear needsReview if new extraction is confident
+  if (!aiData.needsReview && existingDeal.needsReview) {
+    updates.needsReview = false;
+    updates.reviewReasons = [];
+    updates.status = 'ACTIVE';
+  }
+
+  const { data: updatedDeal, error: updateErr } = await supabase
+    .from('Deal')
+    .update(updates)
+    .eq('id', dealId)
+    .select('*, company:Company(*)')
+    .single();
+
+  if (updateErr) throw updateErr;
+
+  // Log activity
+  await supabase.from('Activity').insert({
+    dealId,
+    type: 'DOCUMENT_ADDED',
+    title: `New document added: ${sourceName}`,
+    description: `Additional data ingested into "${existingDeal.name}" with ${aiData.overallConfidence}% confidence`,
+    metadata: {
+      sourceName,
+      overallConfidence: aiData.overallConfidence,
+      fieldsUpdated: Object.keys(updates).filter(k => k !== 'lastDocument' && k !== 'lastDocumentUpdated'),
+    },
+  });
+
+  return { deal: updatedDeal, isNew: false };
+}
+
 // POST /api/ingest - Upload document and auto-create deal
 router.post('/', upload.single('file'), async (req, res) => {
   try {
@@ -242,78 +334,87 @@ router.post('/', upload.single('file'), async (req, res) => {
       aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
     }
 
-    // Step 3: Create or find company
-    log.debug('Step 3: Creating/finding company');
-    const companyName = aiData.companyName.value || `Company from ${documentName}`;
+    // Check if updating an existing deal or creating a new one
+    const targetDealId = req.body.dealId;
+    let deal: any;
+    let company: any;
+    let isUpdate = false;
 
-    // Check if company exists
-    const { data: existingCompany } = await supabase
-      .from('Company')
-      .select('id, name')
-      .ilike('name', companyName)
-      .single();
-
-    let company;
-    if (existingCompany) {
-      company = existingCompany;
-      log.debug('Found existing company', { name: company.name, id: company.id });
+    if (targetDealId) {
+      // ─── Update Existing Deal path ───
+      log.info('Ingest into existing deal', { dealId: targetDealId });
+      const result = await mergeIntoExistingDeal(targetDealId, aiData, req.user?.id, documentName);
+      deal = result.deal;
+      company = deal.company;
+      isUpdate = true;
     } else {
-      // Create new company
-      const { data: newCompany, error: companyError } = await supabase
+      // ─── Create New Deal path (original flow) ───
+      log.debug('Step 3: Creating/finding company');
+      const companyName = aiData.companyName.value || `Company from ${documentName}`;
+
+      const { data: existingCompany } = await supabase
         .from('Company')
+        .select('id, name')
+        .ilike('name', companyName)
+        .single();
+
+      if (existingCompany) {
+        company = existingCompany;
+        log.debug('Found existing company', { name: company.name, id: company.id });
+      } else {
+        const { data: newCompany, error: companyError } = await supabase
+          .from('Company')
+          .insert({
+            name: companyName,
+            industry: aiData.industry.value,
+            description: aiData.description.value,
+          })
+          .select()
+          .single();
+
+        if (companyError) {
+          log.error('Company creation error', companyError);
+          throw companyError;
+        }
+        company = newCompany;
+        log.debug('Created new company', { name: company.name, id: company.id });
+      }
+
+      log.debug('Step 4: Creating deal');
+      const dealIcon = getIconForIndustry(aiData.industry.value);
+      const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
+
+      const { data: newDeal, error: dealError } = await supabase
+        .from('Deal')
         .insert({
           name: companyName,
+          companyId: company.id,
+          stage: 'INITIAL_REVIEW',
+          status: dealStatus,
           industry: aiData.industry.value,
           description: aiData.description.value,
+          revenue: aiData.revenue.value,
+          ebitda: aiData.ebitda.value,
+          dealSize: aiData.revenue.value,
+          aiThesis: aiData.summary,
+          icon: dealIcon,
+          lastDocument: documentName,
+          lastDocumentUpdated: new Date().toISOString(),
+          extractionConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+          aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
         })
         .select()
         .single();
 
-      if (companyError) {
-        log.error('Company creation error', companyError);
-        throw companyError;
+      if (dealError) {
+        log.error('Deal creation error', dealError);
+        throw dealError;
       }
-      company = newCompany;
-      log.debug('Created new company', { name: company.name, id: company.id });
+      deal = newDeal;
+      log.info('Deal created', { name: deal.name, id: deal.id, status: dealStatus });
     }
-
-    // Step 4: Create deal with review status
-    log.debug('Step 4: Creating deal');
-    const dealIcon = getIconForIndustry(aiData.industry.value);
-
-    // Determine deal status based on confidence
-    const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
-
-    const { data: deal, error: dealError } = await supabase
-      .from('Deal')
-      .insert({
-        name: companyName,
-        companyId: company.id,
-        stage: 'INITIAL_REVIEW',
-        status: dealStatus,
-        industry: aiData.industry.value,
-        description: aiData.description.value,
-        revenue: aiData.revenue.value,
-        ebitda: aiData.ebitda.value,
-        dealSize: aiData.revenue.value, // Use revenue as deal size estimate
-        aiThesis: aiData.summary,
-        icon: dealIcon,
-        lastDocument: documentName,
-        lastDocumentUpdated: new Date().toISOString(),
-        // Store extraction metadata
-        extractionConfidence: aiData.overallConfidence,
-        needsReview: aiData.needsReview,
-        reviewReasons: aiData.reviewReasons,
-        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
-      })
-      .select()
-      .single();
-
-    if (dealError) {
-      log.error('Deal creation error', dealError);
-      throw dealError;
-    }
-    log.info('Deal created', { name: deal.name, id: deal.id, status: dealStatus });
 
     // Step 5: Upload file to storage
     log.debug('Step 5: Uploading file to storage');
@@ -343,7 +444,6 @@ router.post('/', upload.single('file'), async (req, res) => {
     // Step 6: Create document record with confidence data
     log.debug('Step 6: Creating document record');
 
-    // Determine document type from filename
     let docType = 'OTHER';
     const lowerName = documentName.toLowerCase();
     if (lowerName.includes('cim') || lowerName.includes('confidential')) docType = 'CIM';
@@ -362,7 +462,6 @@ router.post('/', upload.single('file'), async (req, res) => {
         fileSize: file.size,
         mimeType,
         extractedData: {
-          // Store full extraction with confidence
           companyName: aiData.companyName,
           industry: aiData.industry,
           description: aiData.description,
@@ -382,7 +481,7 @@ router.post('/', upload.single('file'), async (req, res) => {
         },
         extractedText,
         status: aiData.needsReview ? 'pending_review' : 'analyzed',
-        confidence: aiData.overallConfidence / 100, // Store as 0-1 for DB
+        confidence: aiData.overallConfidence / 100,
         aiAnalyzedAt: new Date().toISOString(),
       })
       .select()
@@ -410,44 +509,38 @@ router.post('/', upload.single('file'), async (req, res) => {
         });
     }
 
-    // Step 8: Log activity
-    await supabase.from('Activity').insert({
-      dealId: deal.id,
-      type: 'DEAL_CREATED',
-      title: `Deal created from ${docType}`,
-      description: aiData.needsReview
-        ? `New deal "${companyName}" created with ${aiData.overallConfidence}% confidence - NEEDS REVIEW`
-        : `New deal "${companyName}" auto-created with ${aiData.overallConfidence}% confidence`,
-      metadata: {
-        documentId: document.id,
-        documentType: docType,
-        extractedCompany: aiData.companyName.value,
-        companyConfidence: aiData.companyName.confidence,
-        extractedIndustry: aiData.industry.value,
-        industryConfidence: aiData.industry.confidence,
-        extractedRevenue: aiData.revenue.value,
-        revenueConfidence: aiData.revenue.confidence,
-        extractedEbitda: aiData.ebitda.value,
-        ebitdaConfidence: aiData.ebitda.confidence,
-        overallConfidence: aiData.overallConfidence,
-        needsReview: aiData.needsReview,
-        reviewReasons: aiData.reviewReasons,
-      },
-    });
-
-    // Step 9: Auto-assign creator as analyst
-    if (req.user?.id) {
-      await supabase.from('DealTeamMember').insert({
+    // Step 8: Log activity (only for new deals — merge already logs)
+    if (!isUpdate) {
+      await supabase.from('Activity').insert({
         dealId: deal.id,
-        userId: req.user.id,
-        role: 'MEMBER',
+        type: 'DEAL_CREATED',
+        title: `Deal created from ${docType}`,
+        description: aiData.needsReview
+          ? `New deal "${deal.name}" created with ${aiData.overallConfidence}% confidence - NEEDS REVIEW`
+          : `New deal "${deal.name}" auto-created with ${aiData.overallConfidence}% confidence`,
+        metadata: {
+          documentId: document.id,
+          documentType: docType,
+          overallConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+        },
       });
+
+      // Auto-assign creator as analyst (only for new deals)
+      if (req.user?.id) {
+        await supabase.from('DealTeamMember').insert({
+          dealId: deal.id,
+          userId: req.user.id,
+          role: 'MEMBER',
+        });
+      }
     }
 
-    // Step 10: Audit log
+    // Audit log
     await AuditLog.aiIngest(req, documentName, deal.id);
 
-    // Step 11: Auto-trigger multi-doc analysis if 2+ documents exist
+    // Auto-trigger multi-doc analysis if 2+ documents exist
     const { count: docCount } = await supabase
       .from('Document')
       .select('id', { count: 'exact', head: true })
@@ -464,14 +557,14 @@ router.post('/', upload.single('file'), async (req, res) => {
         .catch(err => log.error('Auto multi-doc analysis failed', err));
     }
 
-    log.info('Ingest complete', { dealId: deal.id });
+    log.info('Ingest complete', { dealId: deal.id, isUpdate });
 
-    // Return the created deal with extraction confidence data
-    res.status(201).json({
+    res.status(isUpdate ? 200 : 201).json({
       success: true,
+      isUpdate,
       deal: {
         ...deal,
-        company,
+        company: company || deal.company,
       },
       document,
       extraction: {
@@ -659,6 +752,7 @@ const textIngestSchema = z.object({
   text: z.string().min(50, 'Text must be at least 50 characters'),
   sourceName: z.string().optional(),
   sourceType: z.enum(['email', 'note', 'slack', 'whatsapp', 'other']).optional(),
+  dealId: z.string().uuid().optional(),
 });
 
 // POST /api/ingest/text — Create deal from raw pasted text
@@ -669,8 +763,8 @@ router.post('/text', async (req, res) => {
       return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
     }
 
-    const { text, sourceName, sourceType } = validation.data;
-    log.info('Text ingest starting', { textLength: text.length, sourceType });
+    const { text, sourceName, sourceType, dealId: targetDealId } = validation.data;
+    log.info('Text ingest starting', { textLength: text.length, sourceType, targetDealId });
 
     // Step 1: Extract data using existing AI extractor
     const aiData = await extractDealDataFromText(text);
@@ -691,67 +785,78 @@ router.post('/text', async (req, res) => {
       aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
     }
 
-    // Step 2: Create or find company
-    const companyName = aiData.companyName.value || 'Unknown Company';
-    const { data: existingCompany } = await supabase
-      .from('Company')
-      .select('id, name')
-      .ilike('name', companyName)
-      .single();
+    const docName = sourceName || `${sourceType || 'Text'} input - ${new Date().toLocaleDateString()}`;
+    let deal: any;
+    let company: any;
+    let isUpdate = false;
 
-    let company;
-    if (existingCompany) {
-      company = existingCompany;
-      log.debug('Found existing company', { name: company.name });
+    if (targetDealId) {
+      // ─── Update Existing Deal path ───
+      log.info('Text ingest into existing deal', { dealId: targetDealId });
+      const result = await mergeIntoExistingDeal(targetDealId, aiData, req.user?.id, docName);
+      deal = result.deal;
+      company = deal.company;
+      isUpdate = true;
     } else {
-      const { data: newCompany, error: companyError } = await supabase
+      // ─── Create New Deal path ───
+      const companyName = aiData.companyName.value || 'Unknown Company';
+      const { data: existingCompany } = await supabase
         .from('Company')
+        .select('id, name')
+        .ilike('name', companyName)
+        .single();
+
+      if (existingCompany) {
+        company = existingCompany;
+      } else {
+        const { data: newCompany, error: companyError } = await supabase
+          .from('Company')
+          .insert({
+            name: companyName,
+            industry: aiData.industry.value,
+            description: aiData.description.value,
+          })
+          .select()
+          .single();
+        if (companyError) throw companyError;
+        company = newCompany;
+      }
+
+      const dealIcon = getIconForIndustry(aiData.industry.value);
+      const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
+
+      const { data: newDeal, error: dealError } = await supabase
+        .from('Deal')
         .insert({
           name: companyName,
+          companyId: company.id,
+          stage: 'INITIAL_REVIEW',
+          status: dealStatus,
           industry: aiData.industry.value,
           description: aiData.description.value,
+          revenue: aiData.revenue.value,
+          ebitda: aiData.ebitda.value,
+          dealSize: aiData.revenue.value,
+          aiThesis: aiData.summary,
+          icon: dealIcon,
+          extractionConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+          aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
         })
         .select()
         .single();
-      if (companyError) throw companyError;
-      company = newCompany;
-      log.debug('Created company', { name: company.name });
+
+      if (dealError) throw dealError;
+      deal = newDeal;
     }
 
-    // Step 3: Create deal
-    const dealIcon = getIconForIndustry(aiData.industry.value);
-    const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
-
-    const { data: deal, error: dealError } = await supabase
-      .from('Deal')
-      .insert({
-        name: companyName,
-        companyId: company.id,
-        stage: 'INITIAL_REVIEW',
-        status: dealStatus,
-        industry: aiData.industry.value,
-        description: aiData.description.value,
-        revenue: aiData.revenue.value,
-        ebitda: aiData.ebitda.value,
-        dealSize: aiData.revenue.value,
-        aiThesis: aiData.summary,
-        icon: dealIcon,
-        extractionConfidence: aiData.overallConfidence,
-        needsReview: aiData.needsReview,
-        reviewReasons: aiData.reviewReasons,
-        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
-      })
-      .select()
-      .single();
-
-    if (dealError) throw dealError;
-
-    // Step 4: Create document record for text source
+    // Create document record for text source
     const { data: document } = await supabase
       .from('Document')
       .insert({
         dealId: deal.id,
-        name: sourceName || `${sourceType || 'Text'} input - ${new Date().toLocaleDateString()}`,
+        name: docName,
         type: 'OTHER',
         extractedText: text,
         extractedData: {
@@ -780,33 +885,26 @@ router.post('/text', async (req, res) => {
       .select()
       .single();
 
-    // Step 5: Log activity
-    await supabase.from('Activity').insert({
-      dealId: deal.id,
-      type: 'DEAL_CREATED',
-      title: `Deal created from ${sourceType || 'text'} input`,
-      description: aiData.needsReview
-        ? `"${companyName}" extracted with ${aiData.overallConfidence}% confidence — NEEDS REVIEW`
-        : `"${companyName}" auto-created with ${aiData.overallConfidence}% confidence`,
-      metadata: {
-        sourceType,
-        sourceName,
-        overallConfidence: aiData.overallConfidence,
-        needsReview: aiData.needsReview,
-        reviewReasons: aiData.reviewReasons,
-      },
-    });
-
-    // Step 6: Auto-assign creator as analyst
-    if (req.user?.id) {
-      await supabase.from('DealTeamMember').insert({
+    // Log activity + assign team (only for new deals)
+    if (!isUpdate) {
+      await supabase.from('Activity').insert({
         dealId: deal.id,
-        userId: req.user.id,
-        role: 'MEMBER',
+        type: 'DEAL_CREATED',
+        title: `Deal created from ${sourceType || 'text'} input`,
+        description: `"${deal.name}" auto-created with ${aiData.overallConfidence}% confidence`,
+        metadata: { sourceType, sourceName, overallConfidence: aiData.overallConfidence },
       });
+
+      if (req.user?.id) {
+        await supabase.from('DealTeamMember').insert({
+          dealId: deal.id,
+          userId: req.user.id,
+          role: 'MEMBER',
+        });
+      }
     }
 
-    // Step 7: Trigger RAG embedding in background
+    // Trigger RAG embedding in background
     if (text.length > 100) {
       embedDocument(document?.id || deal.id, deal.id, text)
         .then(result => {
@@ -816,14 +914,14 @@ router.post('/text', async (req, res) => {
         .catch(err => log.error('RAG embedding error', err));
     }
 
-    // Audit log
-    await AuditLog.aiIngest(req, sourceName || `${sourceType || 'text'} input`, deal.id);
+    await AuditLog.aiIngest(req, docName, deal.id);
 
-    log.info('Text ingest complete', { dealId: deal.id, confidence: aiData.overallConfidence });
+    log.info('Text ingest complete', { dealId: deal.id, isUpdate });
 
-    res.status(201).json({
+    res.status(isUpdate ? 200 : 201).json({
       success: true,
-      deal: { ...deal, company },
+      isUpdate,
+      deal: { ...deal, company: company || deal.company },
       document,
       extraction: {
         companyName: aiData.companyName,
@@ -847,6 +945,7 @@ const urlResearchSchema = z.object({
   url: z.string().url('Must be a valid URL'),
   companyName: z.string().optional(),
   autoCreateDeal: z.boolean().optional().default(true),
+  dealId: z.string().uuid().optional(),
 });
 
 // POST /api/ingest/url — Research company from website URL (scrapes multiple pages)
@@ -857,8 +956,8 @@ router.post('/url', async (req, res) => {
       return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
     }
 
-    const { url, companyName: userCompanyName, autoCreateDeal } = validation.data;
-    log.info('URL research starting', { url });
+    const { url, companyName: userCompanyName, autoCreateDeal, dealId: targetDealId } = validation.data;
+    log.info('URL research starting', { url, targetDealId });
 
     // Step 1: Research company (scrapes multiple pages in parallel)
     const research = await researchCompany(url);
@@ -883,7 +982,6 @@ router.post('/url', async (req, res) => {
       return res.status(400).json({ error: 'AI could not extract deal data from website content' });
     }
 
-    // Override company name if user provided one
     if (userCompanyName) {
       aiData.companyName.value = userCompanyName;
       aiData.companyName.confidence = 100;
@@ -903,7 +1001,7 @@ router.post('/url', async (req, res) => {
     }
 
     // If preview-only mode, return extraction without creating deal
-    if (!autoCreateDeal) {
+    if (!autoCreateDeal && !targetDealId) {
       return res.json({
         success: true,
         extraction: {
@@ -922,63 +1020,73 @@ router.post('/url', async (req, res) => {
       });
     }
 
-    // Step 3: Create or find company
     const companyName = aiData.companyName.value || userCompanyName || 'Unknown Company';
-    const { data: existingCompany } = await supabase
-      .from('Company')
-      .select('id, name')
-      .ilike('name', companyName)
-      .single();
+    let deal: any;
+    let company: any;
+    let isUpdate = false;
 
-    let company;
-    if (existingCompany) {
-      company = existingCompany;
-      log.debug('Found existing company', { name: company.name });
+    if (targetDealId) {
+      // ─── Update Existing Deal path ───
+      log.info('URL ingest into existing deal', { dealId: targetDealId });
+      const result = await mergeIntoExistingDeal(targetDealId, aiData, req.user?.id, `Web Research — ${url}`);
+      deal = result.deal;
+      company = deal.company;
+      isUpdate = true;
     } else {
-      const { data: newCompany, error: companyError } = await supabase
+      // ─── Create New Deal path ───
+      const { data: existingCompany } = await supabase
         .from('Company')
+        .select('id, name')
+        .ilike('name', companyName)
+        .single();
+
+      if (existingCompany) {
+        company = existingCompany;
+      } else {
+        const { data: newCompany, error: companyError } = await supabase
+          .from('Company')
+          .insert({
+            name: companyName,
+            industry: aiData.industry.value,
+            description: aiData.description.value,
+          })
+          .select()
+          .single();
+        if (companyError) throw companyError;
+        company = newCompany;
+      }
+
+      const dealIcon = getIconForIndustry(aiData.industry.value);
+      const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
+
+      const { data: newDeal, error: dealError } = await supabase
+        .from('Deal')
         .insert({
           name: companyName,
+          companyId: company.id,
+          stage: 'INITIAL_REVIEW',
+          status: dealStatus,
           industry: aiData.industry.value,
           description: aiData.description.value,
+          revenue: aiData.revenue.value,
+          ebitda: aiData.ebitda.value,
+          dealSize: aiData.revenue.value,
+          aiThesis: aiData.summary,
+          icon: dealIcon,
+          extractionConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+          aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
+          source: 'web_research',
         })
         .select()
         .single();
-      if (companyError) throw companyError;
-      company = newCompany;
-      log.debug('Created company', { name: company.name });
+
+      if (dealError) throw dealError;
+      deal = newDeal;
     }
 
-    // Step 4: Create deal
-    const dealIcon = getIconForIndustry(aiData.industry.value);
-    const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
-
-    const { data: deal, error: dealError } = await supabase
-      .from('Deal')
-      .insert({
-        name: companyName,
-        companyId: company.id,
-        stage: 'INITIAL_REVIEW',
-        status: dealStatus,
-        industry: aiData.industry.value,
-        description: aiData.description.value,
-        revenue: aiData.revenue.value,
-        ebitda: aiData.ebitda.value,
-        dealSize: aiData.revenue.value,
-        aiThesis: aiData.summary,
-        icon: dealIcon,
-        extractionConfidence: aiData.overallConfidence,
-        needsReview: aiData.needsReview,
-        reviewReasons: aiData.reviewReasons,
-        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
-        source: 'web_research',
-      })
-      .select()
-      .single();
-
-    if (dealError) throw dealError;
-
-    // Step 5: Generate formatted Deal Overview and store as document
+    // Generate formatted Deal Overview and store as document
     const overviewSections: string[] = [];
     overviewSections.push(`# Deal Overview: ${companyName}\n`);
 
@@ -1062,34 +1170,31 @@ router.post('/url', async (req, res) => {
       .select()
       .single();
 
-    // Step 6: Log activity
-    await supabase.from('Activity').insert({
-      dealId: deal.id,
-      type: 'DEAL_CREATED',
-      title: 'Deal created from web research',
-      description: aiData.needsReview
-        ? `"${companyName}" researched from ${url} (${research.companyWebsite.scrapedPages.length} pages) with ${aiData.overallConfidence}% confidence — NEEDS REVIEW`
-        : `"${companyName}" auto-created from ${url} (${research.companyWebsite.scrapedPages.length} pages) with ${aiData.overallConfidence}% confidence`,
-      metadata: {
-        sourceType: 'web_research',
-        url,
-        pagesScraped: research.companyWebsite.scrapedPages,
-        overallConfidence: aiData.overallConfidence,
-        needsReview: aiData.needsReview,
-        reviewReasons: aiData.reviewReasons,
-      },
-    });
-
-    // Step 7: Auto-assign creator as analyst
-    if (req.user?.id) {
-      await supabase.from('DealTeamMember').insert({
+    // Log activity + assign team (only for new deals)
+    if (!isUpdate) {
+      await supabase.from('Activity').insert({
         dealId: deal.id,
-        userId: req.user.id,
-        role: 'MEMBER',
+        type: 'DEAL_CREATED',
+        title: 'Deal created from web research',
+        description: `"${companyName}" auto-created from ${url} (${research.companyWebsite.scrapedPages.length} pages) with ${aiData.overallConfidence}% confidence`,
+        metadata: {
+          sourceType: 'web_research',
+          url,
+          pagesScraped: research.companyWebsite.scrapedPages,
+          overallConfidence: aiData.overallConfidence,
+        },
       });
+
+      if (req.user?.id) {
+        await supabase.from('DealTeamMember').insert({
+          dealId: deal.id,
+          userId: req.user.id,
+          role: 'MEMBER',
+        });
+      }
     }
 
-    // Step 8: RAG embed research text in background
+    // RAG embed research text in background
     if (researchText.length > 100) {
       embedDocument(document?.id || deal.id, deal.id, researchText)
         .then(result => {
@@ -1099,18 +1204,14 @@ router.post('/url', async (req, res) => {
         .catch(err => log.error('Research RAG embedding error', err));
     }
 
-    // Audit log
     await AuditLog.aiIngest(req, `Web Research — ${url}`, deal.id);
 
-    log.info('URL research ingest complete', {
-      dealId: deal.id,
-      url,
-      pagesScraped: research.companyWebsite.scrapedPages.length,
-    });
+    log.info('URL research ingest complete', { dealId: deal.id, url, isUpdate });
 
-    res.status(201).json({
+    res.status(isUpdate ? 200 : 201).json({
       success: true,
-      deal: { ...deal, company },
+      isUpdate,
+      deal: { ...deal, company: company || deal.company },
       document,
       extraction: {
         companyName: aiData.companyName,

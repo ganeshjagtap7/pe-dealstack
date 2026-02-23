@@ -7,6 +7,9 @@
 
 let modalSelectedFile = null;
 let modalCreatedDealId = null;
+let modalSelectedDealId = null; // For "Update Existing Deal" mode
+let modalIntakeMode = 'new'; // 'new' or 'existing'
+let modalDealSearchTimeout = null;
 
 // Format a value stored in millions USD to the most natural display unit
 function formatCurrencyValue(valueInMillions) {
@@ -46,9 +49,43 @@ function initDealIntakeModal(apiBaseURL) {
 
             <div class="p-6">
                 <!-- Header -->
-                <div class="flex flex-col gap-1 mb-5">
+                <div class="flex flex-col gap-1 mb-4">
                     <h3 class="text-xl font-bold text-text-main tracking-tight">Ingest Deal Data</h3>
-                    <p class="text-text-secondary text-sm">Upload a document, paste text, or enter a company URL to create a new deal.</p>
+                    <p id="intake-header-desc" class="text-text-secondary text-sm">Upload a document, paste text, or enter a company URL to create a new deal.</p>
+                </div>
+
+                <!-- Mode Toggle: New vs Update -->
+                <div class="flex gap-2 mb-4">
+                    <button id="intake-mode-new" onclick="setIntakeMode('new')" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all bg-primary text-white">
+                        <span class="material-symbols-outlined text-[16px]">add_circle</span>
+                        Create New Deal
+                    </button>
+                    <button id="intake-mode-existing" onclick="setIntakeMode('existing')" class="flex-1 flex items-center justify-center gap-1.5 py-2 px-3 rounded-lg text-sm font-medium transition-all border border-border-subtle text-text-secondary hover:bg-gray-50">
+                        <span class="material-symbols-outlined text-[16px]">update</span>
+                        Update Existing Deal
+                    </button>
+                </div>
+
+                <!-- Deal Picker (hidden by default) -->
+                <div id="intake-deal-picker" class="hidden mb-4">
+                    <div class="rounded-lg border border-border-subtle bg-white p-4">
+                        <label class="block text-sm font-medium text-text-main mb-2">Select a deal to update</label>
+                        <div class="relative">
+                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">search</span>
+                            <input id="intake-deal-search" type="text" class="w-full rounded-lg border border-border-subtle bg-white pl-10 pr-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" placeholder="Search deals by name..." />
+                        </div>
+                        <div id="intake-deal-results" class="mt-2 max-h-48 overflow-y-auto rounded-lg border border-border-subtle hidden"></div>
+                        <div id="intake-selected-deal" class="hidden mt-3 flex items-center gap-3 rounded-lg bg-primary-light/50 border border-primary/20 px-4 py-3">
+                            <span class="material-symbols-outlined text-primary">handshake</span>
+                            <div class="flex-1 min-w-0">
+                                <p id="intake-selected-deal-name" class="text-sm font-medium text-text-main truncate"></p>
+                                <p id="intake-selected-deal-info" class="text-xs text-text-muted"></p>
+                            </div>
+                            <button onclick="clearSelectedDeal()" class="p-1 rounded hover:bg-white/50 text-text-muted hover:text-red-500 transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Tab Navigation -->
@@ -184,6 +221,7 @@ function initDealIntakeModal(apiBaseURL) {
                                 <div class="w-full bg-gray-100 h-1.5 mt-1.5 rounded-full overflow-hidden">
                                     <div id="intake-bar-company" class="h-1.5 rounded-full transition-all" style="width: 0%"></div>
                                 </div>
+                                <p id="intake-source-company" class="hidden mt-1.5 text-[11px] text-text-muted italic border-l-2 border-primary/30 pl-2 leading-relaxed"></p>
                             </div>
                             <div>
                                 <div class="flex items-center justify-between mb-1">
@@ -194,6 +232,7 @@ function initDealIntakeModal(apiBaseURL) {
                                 <div class="w-full bg-gray-100 h-1.5 mt-1.5 rounded-full overflow-hidden">
                                     <div id="intake-bar-industry" class="h-1.5 rounded-full transition-all" style="width: 0%"></div>
                                 </div>
+                                <p id="intake-source-industry" class="hidden mt-1.5 text-[11px] text-text-muted italic border-l-2 border-primary/30 pl-2 leading-relaxed"></p>
                             </div>
                             <div>
                                 <div class="flex items-center justify-between mb-1">
@@ -214,6 +253,7 @@ function initDealIntakeModal(apiBaseURL) {
                                 <div class="w-full bg-gray-100 h-1.5 mt-1.5 rounded-full overflow-hidden">
                                     <div id="intake-bar-revenue" class="h-1.5 rounded-full transition-all" style="width: 0%"></div>
                                 </div>
+                                <p id="intake-source-revenue" class="hidden mt-1.5 text-[11px] text-text-muted italic border-l-2 border-primary/30 pl-2 leading-relaxed"></p>
                             </div>
                             <div>
                                 <div class="flex items-center justify-between mb-1">
@@ -224,6 +264,7 @@ function initDealIntakeModal(apiBaseURL) {
                                 <div class="w-full bg-gray-100 h-1.5 mt-1.5 rounded-full overflow-hidden">
                                     <div id="intake-bar-ebitda" class="h-1.5 rounded-full transition-all" style="width: 0%"></div>
                                 </div>
+                                <p id="intake-source-ebitda" class="hidden mt-1.5 text-[11px] text-text-muted italic border-l-2 border-primary/30 pl-2 leading-relaxed"></p>
                             </div>
                         </div>
                         <!-- Review Reasons -->
@@ -313,6 +354,20 @@ function initDealIntakeModal(apiBaseURL) {
         });
     }
 
+    // ── Deal search handler for Update Existing mode ──
+    const dealSearch = document.getElementById('intake-deal-search');
+    if (dealSearch) {
+        dealSearch.addEventListener('input', () => {
+            clearTimeout(modalDealSearchTimeout);
+            const query = dealSearch.value.trim();
+            if (query.length < 2) {
+                document.getElementById('intake-deal-results')?.classList.add('hidden');
+                return;
+            }
+            modalDealSearchTimeout = setTimeout(() => searchDealsForPicker(query), 300);
+        });
+    }
+
     // Store API base URL for use in functions
     window._intakeAPIBase = apiBaseURL;
 }
@@ -387,10 +442,17 @@ function formatIntakeFileSize(bytes) {
 
 async function intakeUploadFile() {
     if (!modalSelectedFile) return;
+    if (modalIntakeMode === 'existing' && !modalSelectedDealId) {
+        showIntakeError('No deal selected', 'Please search and select a deal to update.');
+        return;
+    }
     showIntakeLoading();
     try {
         const formData = new FormData();
         formData.append('file', modalSelectedFile);
+        if (modalIntakeMode === 'existing' && modalSelectedDealId) {
+            formData.append('dealId', modalSelectedDealId);
+        }
         const isExcel = modalSelectedFile.name.match(/\.(xlsx|xls|csv)$/i);
         const endpoint = isExcel
             ? `${window._intakeAPIBase}/ingest/bulk`
@@ -413,13 +475,21 @@ async function intakeUploadFile() {
 async function intakeExtractFromText() {
     const text = document.getElementById('intake-text-input').value.trim();
     if (text.length < 50) return;
+    if (modalIntakeMode === 'existing' && !modalSelectedDealId) {
+        showIntakeError('No deal selected', 'Please search and select a deal to update.');
+        return;
+    }
     showIntakeLoading();
     try {
         const sourceType = document.getElementById('intake-text-source-type').value;
+        const body = { text, sourceType };
+        if (modalIntakeMode === 'existing' && modalSelectedDealId) {
+            body.dealId = modalSelectedDealId;
+        }
         const response = await PEAuth.authFetch(`${window._intakeAPIBase}/ingest/text`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, sourceType }),
+            body: JSON.stringify(body),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Text extraction failed');
@@ -434,13 +504,21 @@ async function intakeExtractFromText() {
 async function intakeExtractFromURL() {
     const url = document.getElementById('intake-url-input').value.trim();
     if (!url) return;
+    if (modalIntakeMode === 'existing' && !modalSelectedDealId) {
+        showIntakeError('No deal selected', 'Please search and select a deal to update.');
+        return;
+    }
     showIntakeLoading();
     try {
         const companyName = document.getElementById('intake-url-company-name').value.trim() || undefined;
+        const body = { url, companyName };
+        if (modalIntakeMode === 'existing' && modalSelectedDealId) {
+            body.dealId = modalSelectedDealId;
+        }
         const response = await PEAuth.authFetch(`${window._intakeAPIBase}/ingest/url`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, companyName }),
+            body: JSON.stringify(body),
         });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'URL scraping failed');
@@ -458,10 +536,37 @@ function showIntakeExtractionPreview(data) {
     const extraction = data.extraction || {};
     modalCreatedDealId = data.deal?.id;
 
-    setIntakeField('company', extraction.companyName?.value || data.deal?.name || 'Unknown', extraction.companyName?.confidence);
-    setIntakeField('industry', extraction.industry?.value || '—', extraction.industry?.confidence);
-    setIntakeField('revenue', formatCurrencyValue(extraction.revenue?.value), extraction.revenue?.confidence);
-    setIntakeField('ebitda', formatCurrencyValue(extraction.ebitda?.value), extraction.ebitda?.confidence);
+    // Update header based on whether this was a create or update
+    const previewHeader = document.querySelector('#intake-extraction-preview h4');
+    const previewIcon = document.querySelector('#intake-extraction-preview .material-symbols-outlined');
+    if (data.isUpdate) {
+        if (previewHeader) previewHeader.textContent = 'Deal Updated';
+        if (previewIcon) previewIcon.textContent = 'update';
+    } else {
+        if (previewHeader) previewHeader.textContent = 'Deal Created';
+        if (previewIcon) previewIcon.textContent = 'check_circle';
+    }
+
+    setIntakeField('company',
+        extraction.companyName?.value || data.deal?.name || 'Unknown',
+        extraction.companyName?.confidence,
+        extraction.companyName?.source
+    );
+    setIntakeField('industry',
+        extraction.industry?.value || (extraction.industry?.confidence === 0 ? 'Not Found' : '—'),
+        extraction.industry?.confidence,
+        extraction.industry?.source
+    );
+    setIntakeField('revenue',
+        extraction.revenue?.value != null ? formatCurrencyValue(extraction.revenue.value) : (extraction.revenue?.confidence === 0 ? 'Not Found' : '—'),
+        extraction.revenue?.confidence,
+        extraction.revenue?.source
+    );
+    setIntakeField('ebitda',
+        extraction.ebitda?.value != null ? formatCurrencyValue(extraction.ebitda.value) : (extraction.ebitda?.confidence === 0 ? 'Not Found' : '—'),
+        extraction.ebitda?.confidence,
+        extraction.ebitda?.source
+    );
     setIntakeField('overall', `${extraction.overallConfidence || 0}%`, extraction.overallConfidence);
 
     const reviewBadge = document.getElementById('intake-review-badge');
@@ -515,10 +620,11 @@ function showIntakeBulkResult(data) {
     if (typeof loadDeals === 'function') loadDeals();
 }
 
-function setIntakeField(field, value, confidence) {
+function setIntakeField(field, value, confidence, source) {
     const valEl = document.getElementById(`intake-val-${field}`);
     const confEl = document.getElementById(`intake-conf-${field}`);
     const barEl = document.getElementById(`intake-bar-${field}`);
+    const sourceEl = document.getElementById(`intake-source-${field}`);
 
     if (valEl) valEl.textContent = value;
 
@@ -541,6 +647,110 @@ function setIntakeField(field, value, confidence) {
         confEl.textContent = '';
         barEl.style.width = '0%';
     }
+
+    // Show source quote if available
+    if (sourceEl) {
+        if (source) {
+            sourceEl.textContent = `"${source}"`;
+            sourceEl.classList.remove('hidden');
+        } else {
+            sourceEl.textContent = '';
+            sourceEl.classList.add('hidden');
+        }
+    }
+}
+
+// ─── Mode Toggle & Deal Picker ───
+
+function setIntakeMode(mode) {
+    modalIntakeMode = mode;
+    modalSelectedDealId = null;
+
+    const newBtn = document.getElementById('intake-mode-new');
+    const existingBtn = document.getElementById('intake-mode-existing');
+    const picker = document.getElementById('intake-deal-picker');
+    const desc = document.getElementById('intake-header-desc');
+
+    if (mode === 'existing') {
+        newBtn?.classList.remove('bg-primary', 'text-white');
+        newBtn?.classList.add('border', 'border-border-subtle', 'text-text-secondary', 'hover:bg-gray-50');
+        existingBtn?.classList.remove('border', 'border-border-subtle', 'text-text-secondary', 'hover:bg-gray-50');
+        existingBtn?.classList.add('bg-primary', 'text-white');
+        picker?.classList.remove('hidden');
+        if (desc) desc.textContent = 'Add data to an existing deal — select the deal below, then upload or paste new information.';
+        updateIntakeButtonLabels('Update Deal');
+    } else {
+        existingBtn?.classList.remove('bg-primary', 'text-white');
+        existingBtn?.classList.add('border', 'border-border-subtle', 'text-text-secondary', 'hover:bg-gray-50');
+        newBtn?.classList.remove('border', 'border-border-subtle', 'text-text-secondary', 'hover:bg-gray-50');
+        newBtn?.classList.add('bg-primary', 'text-white');
+        picker?.classList.add('hidden');
+        if (desc) desc.textContent = 'Upload a document, paste text, or enter a company URL to create a new deal.';
+        updateIntakeButtonLabels('Create Deal');
+        clearSelectedDeal();
+    }
+}
+
+function updateIntakeButtonLabels(action) {
+    const uploadBtn = document.getElementById('intake-upload-btn');
+    const textBtn = document.getElementById('intake-text-btn');
+    const urlBtn = document.getElementById('intake-url-btn');
+    if (uploadBtn) uploadBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">auto_awesome</span> Extract & ${action}`;
+    if (textBtn) textBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">auto_awesome</span> Extract & ${action}`;
+    if (urlBtn) urlBtn.innerHTML = `<span class="material-symbols-outlined text-[18px]">auto_awesome</span> Scrape & ${action}`;
+}
+
+async function searchDealsForPicker(query) {
+    const resultsEl = document.getElementById('intake-deal-results');
+    if (!resultsEl) return;
+
+    try {
+        const response = await PEAuth.authFetch(`${window._intakeAPIBase}/deals?search=${encodeURIComponent(query)}&sortBy=updatedAt&sortOrder=desc`);
+        if (!response.ok) throw new Error('Search failed');
+        const deals = await response.json();
+
+        if (!deals || deals.length === 0) {
+            resultsEl.innerHTML = '<p class="p-3 text-sm text-text-muted text-center">No deals found</p>';
+            resultsEl.classList.remove('hidden');
+            return;
+        }
+
+        resultsEl.innerHTML = deals.slice(0, 8).map(d => `
+            <button onclick="selectDealForUpdate('${d.id}', '${(d.name || '').replace(/'/g, "\\'")}', '${(d.industry || '').replace(/'/g, "\\'")}')" class="w-full text-left px-3 py-2.5 hover:bg-primary-light/50 transition-colors border-b border-border-subtle last:border-b-0 flex items-center gap-3">
+                <span class="material-symbols-outlined text-text-muted text-[18px]">${d.icon || 'business_center'}</span>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-text-main truncate">${d.name || 'Unnamed Deal'}</p>
+                    <p class="text-xs text-text-muted">${d.industry || 'No industry'} ${d.revenue != null ? '· ' + formatCurrencyValue(d.revenue) : ''}</p>
+                </div>
+            </button>
+        `).join('');
+        resultsEl.classList.remove('hidden');
+    } catch (err) {
+        resultsEl.innerHTML = '<p class="p-3 text-sm text-red-500 text-center">Search failed</p>';
+        resultsEl.classList.remove('hidden');
+    }
+}
+
+function selectDealForUpdate(dealId, dealName, industry) {
+    modalSelectedDealId = dealId;
+    document.getElementById('intake-deal-results')?.classList.add('hidden');
+    document.getElementById('intake-deal-search').value = '';
+
+    const selectedEl = document.getElementById('intake-selected-deal');
+    const nameEl = document.getElementById('intake-selected-deal-name');
+    const infoEl = document.getElementById('intake-selected-deal-info');
+
+    if (nameEl) nameEl.textContent = dealName;
+    if (infoEl) infoEl.textContent = industry || 'No industry';
+    selectedEl?.classList.remove('hidden');
+}
+
+function clearSelectedDeal() {
+    modalSelectedDealId = null;
+    document.getElementById('intake-selected-deal')?.classList.add('hidden');
+    document.getElementById('intake-deal-results')?.classList.add('hidden');
+    const searchInput = document.getElementById('intake-deal-search');
+    if (searchInput) searchInput.value = '';
 }
 
 function intakeGoToDeal() {
@@ -590,6 +800,8 @@ function hideIntakeError() {
 function resetIntakeModal() {
     clearIntakeFile();
     modalCreatedDealId = null;
+    // Reset mode to "new" and clear deal picker
+    setIntakeMode('new');
 
     // Reset text
     const textInput = document.getElementById('intake-text-input');
@@ -614,12 +826,14 @@ function resetIntakeModal() {
         viewBtn.onclick = intakeGoToDeal;
     }
 
-    // Reset confidence bars
+    // Reset confidence bars and source quotes
     ['company', 'industry', 'revenue', 'ebitda', 'overall'].forEach(field => {
         const confEl = document.getElementById(`intake-conf-${field}`);
         const barEl = document.getElementById(`intake-bar-${field}`);
+        const sourceEl = document.getElementById(`intake-source-${field}`);
         if (confEl) { confEl.textContent = ''; confEl.className = 'text-xs font-medium'; }
         if (barEl) { barEl.style.width = '0%'; barEl.className = 'h-1.5 rounded-full transition-all'; }
+        if (sourceEl) { sourceEl.textContent = ''; sourceEl.classList.add('hidden'); }
     });
 
     // Hide preview and error, show upload tab

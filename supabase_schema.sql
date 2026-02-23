@@ -27,6 +27,13 @@ CREATE TABLE public.AuditLog (
   ipAddress text,
   userAgent text,
   createdAt timestamp with time zone DEFAULT now(),
+  userEmail text,
+  userRole text,
+  entityName text,
+  description text,
+  metadata jsonb DEFAULT '{}'::jsonb,
+  requestId text,
+  severity text DEFAULT 'INFO'::text,
   CONSTRAINT AuditLog_pkey PRIMARY KEY (id)
 );
 CREATE TABLE public.ChatMessage (

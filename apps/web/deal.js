@@ -1334,6 +1334,40 @@ function initChatInterface() {
     // Send button click
     sendButton.addEventListener('click', sendMessage);
 
+    // Clear chat history button
+    const clearChatBtn = document.getElementById('clear-chat-btn');
+    if (clearChatBtn) {
+        clearChatBtn.addEventListener('click', async () => {
+            if (!state.dealId) return;
+            if (!confirm('Clear all chat history for this deal? This cannot be undone.')) return;
+            try {
+                const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/chat/history`, { method: 'DELETE' });
+                if (response.ok) {
+                    state.messages = [];
+                    chatContainer.innerHTML = '';
+                    // Restore intro message
+                    chatContainer.innerHTML = `
+                        <div class="ai-intro-message flex gap-4 max-w-[90%]">
+                            <div class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
+                                <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <span class="text-xs font-bold text-text-muted ml-1">PE OS AI</span>
+                                <div class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
+                                    <p>I'm ready to help analyze this deal. Ask me about financials, risks, or any uploaded documents.</p>
+                                    <p class="mt-2">What would you like to know?</p>
+                                </div>
+                            </div>
+                        </div>`;
+                    showNotification('Chat Cleared', 'Conversation history has been cleared', 'success');
+                }
+            } catch (error) {
+                console.error('[Chat] Failed to clear history:', error);
+                showNotification('Error', 'Failed to clear chat history', 'error');
+            }
+        });
+    }
+
     async function sendMessage() {
         const message = textarea.value.trim();
         if (!message) return;
@@ -1425,12 +1459,17 @@ async function loadChatHistory() {
             console.log(`[Chat] Loaded ${data.count} messages from history`, data);
 
             if (data.messages && data.messages.length > 0) {
-                // Clear the default intro message
                 const chatContainer = document.getElementById('chat-messages');
-                const introMessage = chatContainer?.querySelector('.ai-intro-message');
-                if (introMessage) {
-                    introMessage.remove();
-                }
+
+                // Clear the default intro message and any hardcoded content
+                chatContainer.querySelectorAll('.ai-intro-message').forEach(el => el.remove());
+
+                // Add conversation history header
+                const firstMsgDate = new Date(data.messages[0].createdAt);
+                const headerDiv = document.createElement('div');
+                headerDiv.className = 'flex justify-center';
+                headerDiv.innerHTML = `<span class="text-xs text-text-muted font-medium bg-white border border-border-subtle px-3 py-1 rounded-full shadow-sm">${data.count} previous messages</span>`;
+                chatContainer.appendChild(headerDiv);
 
                 // Render each message
                 data.messages.forEach(msg => {
