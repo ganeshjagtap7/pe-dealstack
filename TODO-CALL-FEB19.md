@@ -127,11 +127,17 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 - **Key files:** `dealMerger.ts` (shared service), `documents.ts` (autoUpdateDeal + link endpoint), `vdr.tsx` (upload modal + link modal), `vdrApi.ts` (uploadDocument options + linkDocumentToDeal), `FileTable.tsx` (Link to Deal menu item)
 - **Ref:** (00:05:50), (00:07:21)
 
-### 10. Navigation — Can't Return to Dashboard from Sub-Views — ❌ NOT DONE
-- **Action:**
-  - [ ] Add breadcrumb navigation (Data Room > LTD Ideas > File.pdf)
-  - [ ] Make sidebar item click navigate to root of that section
-  - [ ] Add back button / browser back support
+### 10. Navigation — Breadcrumbs + Back Support — ✅ DONE
+- **Status:** Fully implemented. Breadcrumbs on all key pages. Back buttons on sub-views. Sidebar already links to section roots.
+- **What's done:**
+  - [x] Breadcrumb trail on deal detail: Deals > {Industry} > {Deal Name} (populated from API data)
+  - [x] Breadcrumb on CRM: Dashboard > Deals
+  - [x] Breadcrumb on VDR: Deals > {Deal Name} > Data Room > {Folder Name} (updates on folder switch)
+  - [x] Breadcrumb on memo builder: Dashboard > AI Reports > {Memo Name} (or Deals > {Deal} > {Memo} if linked)
+  - [x] Back button (arrow) on deal, VDR, and memo builder pages (uses history.back())
+  - [x] Shared `renderBreadcrumbs()` helper in layout.js for reuse
+  - [x] Sidebar already navigates to section roots (no change needed)
+- **Key files:** `layout.js` (helper), `deal.html` + `deal.js` (breadcrumb fix), `crm.html`, `vdr.tsx`, `memo-builder.html` + `memo-builder.js`
 - **Ref:** (00:09:32), (00:10:39)
 
 ### 11. Folder Rename in Data Room — ❌ NOT DONE
@@ -196,9 +202,9 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 |----------|-------|------|---------|-----------|
 | 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
 | 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
-| 🟡 P2 | 7 | 1 ✅ | 0 | 6 ❌ |
+| 🟡 P2 | 7 | 2 ✅ | 0 | 5 ❌ |
 | 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
-| **Total** | **20** | **9** | **0** | **11** |
+| **Total** | **20** | **10** | **0** | **10** |
 
 ---
 
@@ -214,9 +220,10 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 7. ~~Ingest → Update Existing Deals~~ ✅ (mode toggle + deal picker + smart merge)
 8. ~~AI Reports / Templates~~ ✅ (in-app preview, chat dedup fix, template→memo integration, dynamic chips, citation preview)
 
-**Next — P2 (1 of 7 done):**
+**Next — P2 (2 of 7 done):**
 9. ~~Data room auto-update toggle + document linking~~ ✅
-10–15. Navigation, Folder rename, Settings, Notifications, Admin, Dashboard metrics
+10. ~~Navigation — breadcrumbs + back support~~ ✅
+11–15. Folder rename, Settings, Notifications, Admin, Dashboard metrics
 
 **Backlog (P3):**
 16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence

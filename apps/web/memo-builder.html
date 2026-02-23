@@ -126,6 +126,22 @@
     <!-- Main App Container -->
     <div class="flex-1 flex flex-col overflow-hidden">
 
+    <!-- Breadcrumb Bar -->
+    <div id="memo-breadcrumbs" class="flex items-center h-10 px-6 border-b border-slate-100 bg-slate-50/80 text-sm shrink-0">
+        <nav class="flex items-center gap-1.5">
+            <button onclick="history.back()"
+                    class="flex items-center justify-center size-7 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors mr-1"
+                    title="Go back">
+                <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+            </button>
+            <a href="/dashboard.html" class="text-slate-400 hover:text-primary transition-colors">Dashboard</a>
+            <span class="material-symbols-outlined text-[14px] text-slate-300">chevron_right</span>
+            <span id="breadcrumb-trail" class="flex items-center gap-1.5">
+                <a href="/memo-builder.html" class="text-slate-400 hover:text-primary transition-colors">AI Reports</a>
+            </span>
+        </nav>
+    </div>
+
     <!-- Top Navigation -->
     <header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 bg-white px-6 py-3 shrink-0 z-20 shadow-sm">
         <div class="flex items-center gap-4">

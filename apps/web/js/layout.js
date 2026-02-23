@@ -649,11 +649,61 @@ function getTailwindConfig() {
     return TAILWIND_CONFIG;
 }
 
+/**
+ * Generate breadcrumb HTML from an array of crumbs
+ * @param {Array<{label: string, href?: string, icon?: string}>} crumbs
+ * @param {Object} options - { showBack: boolean, backHref?: string }
+ * @returns {string} HTML string
+ */
+function generateBreadcrumbHTML(crumbs, options = {}) {
+    const { showBack = false, backHref } = options;
+
+    const backBtn = showBack ? `
+        <button onclick="${backHref ? `window.location.href='${backHref}'` : 'history.back()'}"
+                class="flex items-center justify-center size-7 rounded-md hover:bg-primary-light text-text-muted hover:text-primary transition-colors mr-1"
+                title="Go back">
+            <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+        </button>
+    ` : '';
+
+    const crumbItems = crumbs.map((crumb, i) => {
+        const isLast = i === crumbs.length - 1;
+        const separator = i > 0 ? `<span class="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>` : '';
+
+        if (isLast) {
+            return `${separator}<span class="text-text-main font-medium truncate max-w-[200px]">${crumb.label}</span>`;
+        }
+        return `${separator}<a href="${crumb.href || '#'}" class="text-text-muted hover:text-primary transition-colors whitespace-nowrap">${crumb.label}</a>`;
+    }).join('');
+
+    return `
+        <nav class="flex items-center gap-1.5 text-sm pe-breadcrumbs">
+            ${backBtn}
+            ${crumbItems}
+        </nav>
+    `;
+}
+
+/**
+ * Render breadcrumbs into a container element
+ * @param {string} containerId - The DOM element ID to render into
+ * @param {Array<{label: string, href?: string}>} crumbs
+ * @param {Object} options - { showBack: boolean, backHref?: string }
+ */
+function renderBreadcrumbs(containerId, crumbs, options = {}) {
+    const container = document.getElementById(containerId);
+    if (container) {
+        container.innerHTML = generateBreadcrumbHTML(crumbs, options);
+    }
+}
+
 // Export for use
 window.PELayout = {
     init: initPELayout,
     generateSidebar,
     generateHeader,
+    generateBreadcrumbHTML,
+    renderBreadcrumbs,
     getTailwindConfig,
     NAV_ITEMS,
     USER

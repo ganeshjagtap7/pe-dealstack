@@ -119,13 +119,17 @@
                     <span class="material-symbols-outlined">menu</span>
                 </button>
                 <!-- Breadcrumb -->
-                <nav class="flex items-center gap-2 text-sm text-text-secondary">
-                    <a class="hover:text-primary transition-colors" href="crm.html">Deals</a>
-                    <span class="material-symbols-outlined text-base text-text-muted">chevron_right</span>
-                    <span id="breadcrumb-industry" class="text-text-secondary">Technology</span>
-                    <span class="material-symbols-outlined text-base text-text-muted">chevron_right</span>
-                    <span id="breadcrumb-deal"
-                        class="text-text-main font-semibold bg-primary-light px-2 py-0.5 rounded border border-border-subtle">Loading...</span>
+                <nav class="flex items-center gap-1.5 text-sm">
+                    <button onclick="history.back()"
+                            class="flex items-center justify-center size-7 rounded-md hover:bg-primary-light text-text-muted hover:text-primary transition-colors mr-1"
+                            title="Go back">
+                        <span class="material-symbols-outlined text-[18px]">arrow_back</span>
+                    </button>
+                    <a class="text-text-muted hover:text-primary transition-colors" href="/crm.html">Deals</a>
+                    <span class="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
+                    <span id="breadcrumb-industry" class="text-text-muted">—</span>
+                    <span class="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
+                    <span id="breadcrumb-deal" class="text-text-main font-medium truncate max-w-[200px]">Loading...</span>
                 </nav>
             </div>
             <div class="flex items-center gap-4">

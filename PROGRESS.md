@@ -5,6 +5,66 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 14 — February 23, 2026
+
+#### TODO #10: Navigation — Breadcrumbs + Back Support — ~7:00 PM IST
+
+**Timestamp:** 2026-02-23 19:00 IST
+
+**Goal:** Add breadcrumb navigation trails and back buttons to all key pages so users can always navigate back to parent views. Previously, clicking into a deal detail or data room had no way to return except the browser back button or sidebar.
+
+---
+
+##### Sub-task 1: Shared Breadcrumb Helper in layout.js
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/js/layout.js` | **Added** | `generateBreadcrumbHTML(crumbs, options)` function — generates breadcrumb nav HTML from array of `{label, href}` objects, optional back button | Reusable helper for any page needing breadcrumbs |
+| `apps/web/js/layout.js` | **Added** | `renderBreadcrumbs(containerId, crumbs, options)` — renders breadcrumbs into a DOM container by ID | Convenience wrapper for dynamic breadcrumb injection |
+| `apps/web/js/layout.js` | **Exported** | Both functions added to `window.PELayout` global | Available to all pages |
+
+---
+
+##### Sub-task 2: Deal Detail Page — Fix Breadcrumb + Add Back Button
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/deal.html` | **Fixed** | Replaced breadcrumb skeleton with proper nav structure + back arrow button | Breadcrumb was hardcoded "Technology" / "Loading...", now dynamic |
+| `apps/web/deal.js` | **Fixed** | `populateDealPage()` now sets breadcrumb-industry to `deal.industry \|\| 'Deal'` and breadcrumb-deal to `deal.name \|\| 'Untitled Deal'` | Handles null industry gracefully |
+
+---
+
+##### Sub-task 3: CRM Page — Add Breadcrumb
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/crm.html` | **Added** | Breadcrumb bar in header: Dashboard > Deals | Users can navigate back to dashboard from deals list |
+
+---
+
+##### Sub-task 4: VDR (Data Room) — Full Breadcrumb Trail
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/src/vdr.tsx` | **Replaced** | Static "Data Room > Deal > Folder" text with linked breadcrumbs: Deals > {Deal Name} > Data Room > {Folder Name}. Added back button. All segments are clickable links. | Users can navigate back to deal, CRM, or switch context |
+
+---
+
+##### Sub-task 5: Memo Builder — Contextual Breadcrumbs
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/memo-builder.html` | **Added** | Breadcrumb bar above header with back button and `#breadcrumb-trail` container | Structural container for dynamic breadcrumbs |
+| `apps/web/memo-builder.js` | **Added** | `updateHeader()` now populates breadcrumb trail: shows "Deals > {Deal} > {Memo}" if memo linked to deal, otherwise "AI Reports > {Memo}" | Context-aware navigation based on deal association |
+
+---
+
+**Verification:** TypeScript type check clean, Vite build succeeds (626ms).
+
+**Status:** TODO #10 complete. P2 progress: 2 of 7 done. Overall: 10/20 tasks done, 10 remaining (halfway!).
+
+---
+
 ### Session 13 — February 23, 2026
 
 #### TODO #9: Data Room → Deal Auto-Update Toggle & Document Linking — ~6:15 PM IST

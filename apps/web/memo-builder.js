@@ -637,6 +637,28 @@ function updateHeader() {
     document.getElementById('doc-project').textContent = state.memo.projectName;
     document.getElementById('doc-date').textContent = `Date: ${state.memo.date}`;
     document.getElementById('doc-sponsor').textContent = `Sponsor: ${state.memo.sponsor}`;
+
+    // Update breadcrumbs
+    const trail = document.getElementById('breadcrumb-trail');
+    if (trail) {
+        const dealId = state.memo.dealId;
+        const memoName = state.memo.projectName || 'Memo';
+        if (dealId) {
+            trail.innerHTML = `
+                <a href="/crm.html" class="text-slate-400 hover:text-primary transition-colors">Deals</a>
+                <span class="material-symbols-outlined text-[14px] text-slate-300">chevron_right</span>
+                <a href="/deal.html?id=${dealId}" class="text-slate-500 hover:text-primary transition-colors">${memoName.split(' ')[0]}</a>
+                <span class="material-symbols-outlined text-[14px] text-slate-300">chevron_right</span>
+                <span class="text-slate-900 font-medium truncate max-w-[200px]">${memoName}</span>
+            `;
+        } else {
+            trail.innerHTML = `
+                <a href="/memo-builder.html" class="text-slate-400 hover:text-primary transition-colors">AI Reports</a>
+                <span class="material-symbols-outlined text-[14px] text-slate-300">chevron_right</span>
+                <span class="text-slate-900 font-medium truncate max-w-[200px]">${memoName}</span>
+            `;
+        }
+    }
 }
 
 // ============================================================
