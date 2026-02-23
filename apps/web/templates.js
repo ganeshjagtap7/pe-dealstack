@@ -950,6 +950,12 @@ function initEditor() {
         if (!selectedTemplate) return;
         openTemplatePreview(selectedTemplate);
     });
+
+    const useBtn = document.getElementById('use-template-btn');
+    useBtn?.addEventListener('click', () => {
+        if (!selectedTemplate) return;
+        useSelectedTemplate();
+    });
 }
 
 // ============================================================
@@ -1137,30 +1143,53 @@ async function deleteTemplateById(templateId) {
 
 function openTemplatePreview(template) {
     const sections = [...(template.sections || [])].sort((a, b) => a.sortOrder - b.sortOrder);
-    const previewHtml = `
-<!doctype html>
-<html>
-<head><meta charset="utf-8"><title>${template.name} Preview</title></head>
-<body style="font-family: Inter, Arial, sans-serif; margin: 24px; color:#111827;">
-  <h1 style="margin-bottom:4px;">${template.name}</h1>
-  <p style="color:#4B5563;margin-top:0;">${template.description || 'No description'}</p>
-  <hr style="border:0;border-top:1px solid #E5E7EB;margin:16px 0;" />
-  ${sections.map((s, i) => `
-    <section style="margin-bottom:16px;">
-      <h3 style="margin:0 0 6px 0;">${i + 1}. ${s.title}</h3>
-      <p style="margin:0;color:#4B5563;">${s.description || 'No description'}</p>
-    </section>
-  `).join('')}
-</body>
-</html>`;
-    const popup = window.open('', '_blank', 'width=900,height=700');
-    if (!popup) {
-        showNotification('Popup blocked. Please allow popups for preview.', 'error');
-        return;
-    }
-    popup.document.open();
-    popup.document.write(previewHtml);
-    popup.document.close();
+
+    const modal = document.getElementById('template-preview-modal');
+    const title = document.getElementById('preview-modal-title');
+    const content = document.getElementById('preview-modal-content');
+    if (!modal || !title || !content) return;
+
+    title.textContent = template.name;
+
+    content.innerHTML = `
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-text-main mb-1">${template.name}</h1>
+            <p class="text-sm text-text-muted">${template.description || 'No description'}</p>
+            <div class="flex items-center gap-3 mt-3">
+                ${template.isGoldStandard ? '<span class="bg-primary/10 text-primary text-xs font-bold px-2 py-0.5 rounded-full">Gold Standard</span>' : ''}
+                <span class="text-xs text-text-muted">${sections.length} sections</span>
+                <span class="text-xs text-text-muted">${template.usageCount || 0} uses</span>
+            </div>
+        </div>
+        <hr class="border-border-subtle mb-6" />
+        ${sections.map((s, i) => `
+            <div class="mb-4 pl-4 border-l-2 ${s.mandatory ? 'border-primary' : 'border-border-subtle'}">
+                <div class="flex items-center gap-2 mb-1">
+                    <h3 class="text-sm font-bold text-text-main">${i + 1}. ${s.title}</h3>
+                    ${s.aiEnabled ? '<span class="bg-primary/10 text-primary text-[10px] px-1.5 py-0.5 rounded font-medium">AI</span>' : ''}
+                    ${s.mandatory ? '<span class="bg-background-body text-text-muted text-[10px] px-1.5 py-0.5 rounded font-medium border border-border-subtle">Required</span>' : ''}
+                </div>
+                <p class="text-xs text-text-muted">${s.description || 'No description'}</p>
+            </div>
+        `).join('')}
+    `;
+
+    modal.classList.remove('hidden');
+
+    // Wire up buttons
+    const closeModal = () => modal.classList.add('hidden');
+    document.getElementById('preview-use-template-btn').onclick = () => {
+        closeModal();
+        window.location.href = '/memo-builder.html?new=true&templateId=' + template.id;
+    };
+    document.getElementById('close-preview-modal').onclick = closeModal;
+    document.getElementById('preview-close-btn').onclick = closeModal;
+    document.getElementById('template-preview-backdrop').onclick = closeModal;
+}
+
+function useSelectedTemplate() {
+    if (!selectedTemplate) return;
+    window.location.href = '/memo-builder.html?new=true&templateId=' + selectedTemplate.id;
 }
 
 // ============================================================

@@ -16,11 +16,36 @@ const createMemoSchema = z.object({
   title: z.string().min(1),
   projectName: z.string().optional(),
   dealId: z.string().uuid().nullable().optional(),
+  templateId: z.string().uuid().optional(),
   type: z.enum(['IC_MEMO', 'TEASER', 'SUMMARY', 'CUSTOM']).default('IC_MEMO'),
   status: z.enum(['DRAFT', 'REVIEW', 'FINAL', 'ARCHIVED']).default('DRAFT'),
   sponsor: z.string().optional(),
   memoDate: z.string().optional(),
 });
+
+// Map template section titles to memo section types
+const SECTION_TYPE_MAP: Record<string, string> = {
+  'executive summary': 'EXECUTIVE_SUMMARY',
+  'company overview': 'COMPANY_OVERVIEW',
+  'business overview': 'COMPANY_OVERVIEW',
+  'financial performance': 'FINANCIAL_PERFORMANCE',
+  'financial analysis': 'FINANCIAL_PERFORMANCE',
+  'market analysis': 'MARKET_DYNAMICS',
+  'market dynamics': 'MARKET_DYNAMICS',
+  'competitive landscape': 'COMPETITIVE_LANDSCAPE',
+  'risk assessment': 'RISK_ASSESSMENT',
+  'deal structure': 'DEAL_STRUCTURE',
+  'valuation': 'DEAL_STRUCTURE',
+  'value creation': 'VALUE_CREATION',
+  'exit strategy': 'EXIT_STRATEGY',
+  'recommendation': 'RECOMMENDATION',
+  'appendix': 'APPENDIX',
+  'unit economics': 'FINANCIAL_PERFORMANCE',
+  'brand analysis': 'COMPANY_OVERVIEW',
+  'strategic rationale': 'EXECUTIVE_SUMMARY',
+  'situation overview': 'EXECUTIVE_SUMMARY',
+  'turnaround plan': 'VALUE_CREATION',
+};
 
 const updateMemoSchema = createMemoSchema.partial();
 
@@ -212,8 +237,10 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
     }
 
+    // Strip templateId from memoData (not a Memo table column)
+    const { templateId, ...memoFields } = validation.data;
     const memoData = {
-      ...validation.data,
+      ...memoFields,
       createdBy: user?.id,
       lastEditedBy: user?.id,
     };
@@ -227,10 +254,50 @@ router.post('/', async (req, res) => {
     if (error) {
       throw error;
     }
-    log.debug('Memo created', { memoId: memo.id });
+    log.debug('Memo created', { memoId: memo.id, templateId });
 
-    // Create default sections if IC_MEMO type
-    if (memo.type === 'IC_MEMO') {
+    // Create sections from template or use defaults
+    let usedTemplate = false;
+    if (templateId) {
+      const { data: templateSections, error: tplError } = await supabase
+        .from('MemoTemplateSection')
+        .select('*')
+        .eq('templateId', templateId)
+        .order('sortOrder', { ascending: true });
+
+      if (!tplError && templateSections && templateSections.length > 0) {
+        const sections = templateSections.map((ts: any, idx: number) => ({
+          memoId: memo.id,
+          type: SECTION_TYPE_MAP[ts.title.toLowerCase()] || 'CUSTOM',
+          title: ts.title,
+          sortOrder: ts.sortOrder ?? idx,
+          aiPrompt: ts.aiPrompt || null,
+        }));
+
+        const { error: sectionsError } = await supabase.from('MemoSection').insert(sections);
+        if (sectionsError) throw sectionsError;
+
+        usedTemplate = true;
+
+        // Increment template usage count
+        const { data: tpl } = await supabase
+          .from('MemoTemplate')
+          .select('usageCount')
+          .eq('id', templateId)
+          .single();
+        if (tpl) {
+          await supabase
+            .from('MemoTemplate')
+            .update({ usageCount: (tpl.usageCount || 0) + 1 })
+            .eq('id', templateId);
+        }
+
+        log.debug('Memo created from template', { memoId: memo.id, templateId, sectionCount: sections.length });
+      }
+    }
+
+    // Fall back to default sections for IC_MEMO if no template was used
+    if (!usedTemplate && memo.type === 'IC_MEMO') {
       const defaultSections = [
         { memoId: memo.id, type: 'EXECUTIVE_SUMMARY', title: 'Executive Summary', sortOrder: 0 },
         { memoId: memo.id, type: 'FINANCIAL_PERFORMANCE', title: 'Financial Performance', sortOrder: 1 },
@@ -240,9 +307,7 @@ router.post('/', async (req, res) => {
       ];
 
       const { error: sectionsError } = await supabase.from('MemoSection').insert(defaultSections);
-      if (sectionsError) {
-        throw sectionsError;
-      }
+      if (sectionsError) throw sectionsError;
     }
 
     // Fetch the memo with sections
@@ -704,15 +769,15 @@ router.post('/:id/chat', async (req, res) => {
       .eq('id', id)
       .single();
 
-    // Get recent messages for context
+    // Get recent messages for context (ascending order for chronological history)
+    // Note: the user message we just saved above is included, so we fetch 11 and drop the last one
     const { data: recentMessages } = await supabase
       .from('MemoChatMessage')
       .select('role, content')
       .eq('conversationId', conversationId)
-      .order('createdAt', { ascending: false })
-      .limit(10);
+      .order('createdAt', { ascending: true });
 
-    // Build context
+    // Build context with more section detail for better AI responses
     const memoContext = [];
     memoContext.push(`Memo: ${memo?.title || 'Untitled'}`);
     memoContext.push(`Project: ${memo?.projectName || 'N/A'}`);
@@ -720,24 +785,28 @@ router.post('/:id/chat', async (req, res) => {
     if (memo?.sections) {
       memoContext.push('\nCurrent Sections:');
       memo.sections.forEach((s: any) => {
-        memoContext.push(`- ${s.title}: ${s.content?.substring(0, 200) || '(empty)'}...`);
+        memoContext.push(`- ${s.title}: ${s.content?.substring(0, 500) || '(empty)'}`);
       });
     }
 
     if (memo?.deal) {
       memoContext.push(`\nDeal: ${memo.deal.name}`);
       memoContext.push(`Industry: ${memo.deal.industry || 'N/A'}`);
+      if (memo.deal.revenue) memoContext.push(`Revenue: $${memo.deal.revenue}M`);
+      if (memo.deal.ebitda) memoContext.push(`EBITDA: $${memo.deal.ebitda}M`);
+      if (memo.deal.dealSize) memoContext.push(`Deal Size: $${memo.deal.dealSize}M`);
     }
 
     // Call OpenAI
     const messages: any[] = [
       { role: 'system', content: MEMO_ANALYST_PROMPT },
-      { role: 'system', content: `Memo Context:\n${memoContext.join('\n')}` },
+      { role: 'system', content: `Memo Context:\n${memoContext.join('\n')}\n\nProvide specific, actionable responses. Reference deal data when available.` },
     ];
 
-    // Add recent messages (reversed to chronological order)
-    if (recentMessages) {
-      recentMessages.reverse().slice(0, 8).forEach((msg: any) => {
+    // Add conversation history (exclude the just-saved user message — we add it explicitly below)
+    if (recentMessages && recentMessages.length > 0) {
+      const history = recentMessages.slice(0, -1).slice(-8);
+      history.forEach((msg: any) => {
         messages.push({ role: msg.role, content: msg.content });
       });
     }
@@ -749,7 +818,7 @@ router.post('/:id/chat', async (req, res) => {
       model: 'gpt-4-turbo-preview',
       messages,
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 1500,
     });
 
     const aiContent = response.choices[0].message.content;

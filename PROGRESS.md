@@ -5,6 +5,80 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 12 — February 23, 2026
+
+#### TODO #7: AI Reports / Templates — Full Integration — ~5:30 PM IST
+
+**Timestamp:** 2026-02-23 17:30 IST
+
+**Goal:** Complete the last remaining P1 task — connect the fully-built Templates system with the Memo Builder, fix template preview popup, fix AI chat quality degradation, add dynamic prompt chips, and add citation/file preview.
+
+---
+
+##### Sub-task 1: Template Preview → In-App Modal (fix external redirect)
+
+**Root Cause:** `openTemplatePreview()` in `templates.js` used `window.open()` to open a popup, which users perceived as "redirecting to external website."
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/templates.html` | **Added** | In-app preview modal HTML (title, description, sections with AI/mandatory badges, "Use This Template" button) | Replace browser popup with integrated modal |
+| `apps/web/templates.js` | **Replaced** | `openTemplatePreview()` now renders modal in-page instead of `window.open()` | Users stay within the app |
+
+---
+
+##### Sub-task 2: Fix AI Chat Quality Degradation (duplicate message bug)
+
+**Root Cause:** In `POST /api/memos/:id/chat`, the user message was saved to DB at line 682, then re-fetched in the recent messages query (lines 708-712), then explicitly appended again to the messages array at line 746. This sent duplicate user messages to OpenAI, confusing the model after 2+ turns.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/memos.ts` | **Fixed** | Changed message query to ascending order, slice off the just-saved message (last entry), take last 8 for context | Eliminated duplicate user messages in AI context |
+| `apps/api/src/routes/memos.ts` | **Enhanced** | Increased `max_tokens` from 1000 → 1500, section content truncation from 200 → 500 chars | Richer AI responses with more context |
+| `apps/api/src/routes/memos.ts` | **Enhanced** | Added deal financial data (revenue, ebitda, dealSize) to AI context + instruction for specific, actionable responses | AI can reference actual deal numbers |
+
+---
+
+##### Sub-task 3: Template → Memo Builder Integration (core feature)
+
+**Root Cause:** Templates and Memo Builder were two fully-built systems with zero integration. Users could create templates but had no way to use them when generating memos.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/api/src/routes/memos.ts` | **Added** | `templateId` field to `createMemoSchema` (Zod), `SECTION_TYPE_MAP` constant mapping ~20 template title patterns to memo section types | Backend can accept and process template references |
+| `apps/api/src/routes/memos.ts` | **Added** | In `POST /api/memos`: if `templateId` provided, fetch `MemoTemplateSection` rows, map to `MemoSection` rows via `SECTION_TYPE_MAP`, insert them, increment template `usageCount` | Auto-populate memo sections from template structure |
+| `apps/web/templates.html` | **Added** | "Use Template" button in editor drawer footer | Quick path from template editing to memo creation |
+| `apps/web/templates.js` | **Added** | `useSelectedTemplate()` function, "Use Template" click handler navigating to `/memo-builder.html?new=true&templateId=<id>` | Frontend navigation from templates to memo builder |
+| `apps/web/memo-builder.js` | **Added** | Read `templateId` from URL params, pass to `createMemoAPI()` which includes it in POST body | Memo builder consumes template reference |
+
+---
+
+##### Sub-task 4: Dynamic Deal-Specific Prompt Chips
+
+**Root Cause:** 3 static hardcoded prompt chips ("Refine Thesis", "Add Risk Factor", "Improve Formatting") were generic and didn't adapt to deal context.
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/memo-builder.html` | **Replaced** | Static prompt chip buttons → empty `#prompt-chips` container | Container for dynamic chips |
+| `apps/web/memo-builder.js` | **Added** | `renderPromptChips()` function generating deal-specific chips: generic ("Rewrite for Tone"), deal-aware ("EBITDA Bridge for {dealName}"), section-aware ("Summarize Risks", "Draft {title}" for empty sections). Max 5 chips. | Context-aware suggestions improve UX |
+| `apps/web/memo-builder.js` | **Removed** | Old static prompt chip bindings from `setupEventHandlers()` | Replaced by dynamic system |
+
+---
+
+##### Sub-task 5: Citation/File Preview Stub
+
+| File | Action | What Changed | Why |
+|------|--------|-------------|-----|
+| `apps/web/memo-builder.js` | **Replaced** | `showCitation()` was `window.alert()` → now matches citation source to deal documents and opens `fileUrl` in new tab, or shows toast notification | Functional citation UX instead of raw alert |
+| `apps/web/memo-builder.js` | **Added** | `showNotification()` helper for toast messages | Reusable notification system |
+
+---
+
+**Verification:** TypeScript type check clean (`npx tsc --noEmit`), Vite build succeeds (678ms).
+
+**Status:** All P0 + P1 tasks from Feb 19 call TODO are now complete (8/8). Remaining: 7 P2 items + 5 P3 items.
+
+---
+
 ### Session 11 — February 23, 2026
 
 #### Call TODOs: Invitations & Deletions — 3:08 PM IST

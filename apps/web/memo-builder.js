@@ -171,6 +171,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const createNew = urlParams.get('new') === 'true';
     const dealId = urlParams.get('dealId');
     const projectName = urlParams.get('project');
+    const templateId = urlParams.get('templateId');
     const demoMode = urlParams.get('demo') === 'true';
 
     if (memoId) {
@@ -186,11 +187,12 @@ document.addEventListener('DOMContentLoaded', async function() {
         loadDemoData();
     } else if (createNew || !dealId) {
         // Create a new memo automatically for new projects
-        console.log('Creating new memo...');
-        showLoadingState('Creating your memo...');
+        console.log('Creating new memo...', templateId ? `from template ${templateId}` : '');
+        showLoadingState(templateId ? 'Creating memo from template...' : 'Creating your memo...');
         const created = await createNewMemo({
             dealId: dealId || undefined,
             projectName: projectName || 'New Investment Memo',
+            templateId: templateId || undefined,
         });
         hideLoadingState();
         if (!created) {
@@ -224,6 +226,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderSidebar();
     renderSections();
     renderMessages();
+    renderPromptChips();
 
     // Setup event handlers
     setupEventHandlers();
@@ -275,6 +278,7 @@ async function createMemoAPI(options = {}) {
                 title: options.title || 'Investment Committee Memo',
                 projectName: options.projectName || 'New Project',
                 ...(options.dealId ? { dealId: options.dealId } : {}),
+                ...(options.templateId ? { templateId: options.templateId } : {}),
                 type: options.type || 'IC_MEMO',
                 status: 'DRAFT',
                 sponsor: options.sponsor || '',
@@ -868,6 +872,60 @@ function setupSectionButtons() {
 }
 
 // ============================================================
+// Prompt Chips (Dynamic)
+// ============================================================
+function renderPromptChips() {
+    const container = document.getElementById('prompt-chips');
+    if (!container) return;
+
+    const chips = [];
+
+    // Always include generic useful chips
+    chips.push({ icon: 'edit_note', label: 'Rewrite for Tone', prompt: 'Rewrite the active section for a more formal, investment-committee-ready tone' });
+
+    // Deal-specific chips when a deal is linked
+    const dealName = state.memo?.projectName || '';
+    if (dealName && dealName !== 'New Investment Memo') {
+        chips.push({ icon: 'bar_chart', label: 'EBITDA Bridge', prompt: `Add an EBITDA bridge analysis for ${dealName}` });
+        chips.push({ icon: 'trending_up', label: 'Revenue Growth', prompt: `Analyze the revenue growth trajectory and key drivers for ${dealName}` });
+    } else {
+        chips.push({ icon: 'bar_chart', label: 'Add EBITDA Bridge', prompt: 'Add an EBITDA bridge analysis' });
+    }
+
+    // Section-aware chips
+    const sectionTypes = state.sections.map(s => s.type);
+    if (sectionTypes.includes('RISK_ASSESSMENT')) {
+        chips.push({ icon: 'warning', label: 'Summarize Risks', prompt: 'Summarize the key risks identified in this memo with severity ratings' });
+    }
+    if (!sectionTypes.includes('COMPETITIVE_LANDSCAPE')) {
+        chips.push({ icon: 'groups', label: 'Add Competitors', prompt: 'Generate a competitive landscape analysis section for this memo' });
+    }
+
+    // Chip for first empty section
+    const emptySection = state.sections.find(s => !s.content || s.content.length < 50);
+    if (emptySection) {
+        chips.push({ icon: 'auto_awesome', label: `Draft ${emptySection.title}`, prompt: `Generate professional content for the "${emptySection.title}" section based on available deal data` });
+    }
+
+    // Render (max 5)
+    container.innerHTML = chips.slice(0, 5).map((chip, i) => `
+        <button class="prompt-chip shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full ${i === 0 ? 'bg-primary-light text-primary border-primary/20' : 'bg-slate-100 text-slate-600 border-slate-200'} text-xs font-medium hover:bg-primary/20 hover:text-primary transition-colors border" data-prompt="${escapeHtml(chip.prompt)}">
+            <span class="material-symbols-outlined text-[14px]">${chip.icon}</span>
+            ${chip.label}
+        </button>
+    `).join('');
+
+    // Bind click handlers
+    container.querySelectorAll('.prompt-chip').forEach(chipEl => {
+        chipEl.addEventListener('click', () => {
+            const chatInput = document.getElementById('chat-input');
+            chatInput.value = chipEl.dataset.prompt;
+            chatInput.focus();
+        });
+    });
+}
+
+// ============================================================
 // Chat Rendering
 // ============================================================
 function renderMessages() {
@@ -965,14 +1023,7 @@ function setupEventHandlers() {
         }
     });
 
-    // Prompt chips
-    document.querySelectorAll('.prompt-chip').forEach(chip => {
-        chip.addEventListener('click', () => {
-            const prompt = chip.dataset.prompt;
-            chatInput.value = prompt;
-            chatInput.focus();
-        });
-    });
+    // Prompt chips are now handled by renderPromptChips()
 
     // Close/Expand AI panel
     document.getElementById('close-ai-panel').addEventListener('click', toggleAIPanel);
@@ -1908,7 +1959,32 @@ function addSectionContent(sectionId) {
 }
 
 function showCitation(source, page) {
-    alert(`Citation Source: ${source}\nPage: ${page}\n\nThis would open the source document viewer focused on page ${page}.`);
+    // Try to open the actual document if deal has documents
+    if (state.memo?.deal?.documents) {
+        const doc = state.memo.deal.documents.find(d =>
+            d.name.toLowerCase().includes(source.toLowerCase()) ||
+            d.type.toLowerCase().includes(source.toLowerCase())
+        );
+        if (doc?.fileUrl) {
+            window.open(doc.fileUrl, '_blank');
+            return;
+        }
+    }
+    showNotification(`Source: ${source}, Page ${page} — Document viewer coming soon`, 'info');
+}
+
+function showNotification(message, type = 'info') {
+    const colors = { success: '#059669', error: '#EF4444', info: '#003366' };
+    const icons = { success: 'check_circle', error: 'error', info: 'info' };
+    const notification = document.createElement('div');
+    notification.className = 'fixed bottom-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 text-white text-sm font-medium transition-opacity';
+    notification.style.backgroundColor = colors[type] || colors.info;
+    notification.innerHTML = `<span class="material-symbols-outlined text-[18px]">${icons[type] || 'info'}</span>${escapeHtml(message)}`;
+    document.body.appendChild(notification);
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        setTimeout(() => notification.remove(), 300);
+    }, 3000);
 }
 
 // ============================================================

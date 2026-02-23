@@ -3,6 +3,7 @@
 > **Source:** Call transcript — Ganesh, Aum Thakarkar, Dev Shah, hello admin (tester)
 > **Date of call:** Feb 19, 2026
 > **Created:** Feb 21, 2026
+> **Last audit:** Feb 23, 2026 (code review)
 
 ---
 
@@ -10,29 +11,24 @@
 
 These are broken features that currently affect credibility with testers/clients.
 
-### 1. Invite Team — Email Not Sending
-- **Issue:** "Invite Team" creates the user record but the invitation email never arrives.
-- **Impact:** Team onboarding is completely broken — no one can join the workspace.
-- **Action:** Debug the email sending pipeline (Supabase invite / SMTP config). Verify on Render env vars.
+### 1. Invite Team — Email Not Sending — ✅ DONE (config fix)
+- **Status:** Code is fully implemented using Resend email service. Was blocked by missing `RESEND_API_KEY` env var.
+- **Fix applied:** Added `RESEND_API_KEY` to `apps/api/.env` on Feb 23.
+- **Remaining:**
+  - [ ] Add `RESEND_API_KEY` to Render production env vars
+  - [ ] Test end-to-end invite flow in production
 - **Ref:** (00:14:10)
 
-### 2. Deal Values — Wrong Units ($38.2M vs $38.2K)
-- **Issue:** All financial values are displayed with a hardcoded "M" (millions) unit. A $38.2K deal shows as $0.0382M, which is confusing and looks broken.
-- **Impact:** Core product credibility — financial data accuracy is the #1 requirement.
-- **Action:**
-  - [ ] Add a `unit` field to deal financials (K / M / B / actual number)
-  - [ ] Display values in the most natural unit (auto-detect or user-selectable)
-  - [ ] During AI extraction, preserve the original unit from the source document
-  - [ ] Handle currency conversion properly (AI's training data has outdated exchange rates — use a live API or let user specify currency)
+### 2. Deal Values — Wrong Units ($38.2M vs $38.2K) — ✅ DONE
+- **Status:** Fully fixed. All values stored internally in millions. Frontend auto-formats to K/M/B based on magnitude. Edit modal has unit dropdown ($, $K, $M, $B). AI extractor auto-converts during ingestion.
+- **Key files:** `deal.js:192-211` (formatCurrency), `deal.js:2165-2206` (unit conversion), `aiExtractor.ts:4-12`
+- **Action:** No further work needed.
 - **Ref:** (00:15:44), (00:16:25), (00:17:17)
 
-### 3. Cannot Delete Files or Deals from Data Room
-- **Issue:** Once a file or deal is added to the data room, there's no way to remove it.
-- **Impact:** Users get stuck with test data and clutter. Basic CRUD is incomplete.
-- **Action:**
-  - [ ] Add delete button to data room files (with confirmation dialog)
-  - [ ] Add delete/archive option for deals
-  - [ ] Ensure proper cascade (deleting a deal cleans up related data room files)
+### 3. Cannot Delete Files or Deals from Data Room — ✅ DONE
+- **Status:** Fully implemented in commit `ebd4440` (Feb 23). Cascading deletion covers 11 child tables. UI available in deal detail page (menu → Delete Deal), CRM list (single + bulk delete), and data room (file + folder delete).
+- **Key files:** `deals.ts:373-449`, `deal.html:224-228`, `deal.js:103-126`, `crm.html:1082-1143`, `documents.ts:485-535`, `folders.ts:207-272`
+- **Action:** No further work needed.
 - **Ref:** (00:17:17)
 
 ---
@@ -41,108 +37,126 @@ These are broken features that currently affect credibility with testers/clients
 
 Per Aum's guidance: *"Priority should be making the core product outputs accurate and reliable before investing in AI-native input features."*
 
-### 4. Ingest Deal Data — Should Update Existing Deals (Not Just Create New Ones)
-- **Issue:** "Ingest Deal Data" always creates a new deal. Users want to select an existing deal and ingest additional data into it (e.g., add new financials, updated CIM).
-- **Impact:** Major UX gap — users can't iteratively build up a deal's data.
-- **Action:**
-  - [ ] Add a toggle/option in the Ingest modal: "Create New Deal" vs "Update Existing Deal"
-  - [ ] When "Update Existing" is selected, show a deal picker/search
-  - [ ] Ingest the file/text/URL data into the selected deal's data room
-  - [ ] Merge extracted financials with existing deal data (with conflict resolution UI)
+### 4. Ingest Deal Data — Should Update Existing Deals (Not Just Create New Ones) — ✅ DONE
+- **Status:** Fully implemented. Modal now has "Create New Deal" / "Update Existing Deal" toggle. Deal picker with live search. Backend merges extracted data into existing deals (higher confidence wins).
+- **What's done:**
+  - [x] Mode toggle in Ingest modal: "Create New Deal" vs "Update Existing Deal"
+  - [x] Searchable deal picker with live results (searches by name, shows industry + revenue)
+  - [x] All 3 ingest paths support `dealId` param (file upload, paste text, URL scrape)
+  - [x] Smart merge: updates financial fields only when new extraction has higher confidence or existing is null
+  - [x] Merges risks/highlights (appends new unique items)
+  - [x] Document always attached to deal's data room regardless of mode
+  - [x] Activity log shows "Document Added" for updates vs "Deal Created" for new
+  - [x] Extraction preview shows "Deal Updated" vs "Deal Created" dynamically
+  - [x] Button labels update: "Extract & Create Deal" → "Extract & Update Deal"
+- **Key files:** `deal-intake-modal.js` (mode toggle, deal picker, dealId passing), `ingest.ts` (mergeIntoExistingDeal helper, dealId support on all 3 endpoints)
 - **Ref:** (00:23:23), (00:25:43)
 
-### 5. AI Extraction — Reduce Hallucination in Financial Data
-- **Issue:** AI approximates values like IRR, EBITDA margins, and sometimes fabricates numbers that aren't in the source document.
-- **Impact:** Destroys user trust — financial data must be exact or explicitly marked as estimated.
-- **Action:**
-  - [ ] Add confidence indicators to each extracted field (already partially built — verify accuracy)
-  - [ ] If a value isn't found in the document, show "Not Found" instead of guessing
-  - [ ] Add a "Source Quote" for each extracted value showing the exact text it came from
-  - [ ] Consider: let users annotate/highlight sections of uploaded docs before AI processes them (hello admin's suggestion)
+### 5. AI Extraction — Reduce Hallucination in Financial Data — ✅ DONE
+- **Status:** Fully implemented. Backend extracts with confidence + source quotes. Frontend now displays source quotes, shows "Not Found" for missing values, and lists review reasons.
+- **What's done:**
+  - [x] Confidence indicators per extracted field (backend + frontend bars)
+  - [x] Financial validator catches nonsensical values
+  - [x] "Needs Review" flag when confidence is low
+  - [x] Source quotes displayed under each field in extraction preview (Feb 23)
+  - [x] "Not Found" shown when value is null with 0 confidence (Feb 23)
+  - [x] Review reasons listed with specific details (Feb 23)
+- **Key files:** `deal-intake-modal.js:165-232` (preview HTML), `deal-intake-modal.js:538-575` (setIntakeField with source)
 - **Ref:** (00:20:27), (00:21:27), (00:48:08), (00:51:03)
 
-### 6. Custom Filters — Not Working
-- **Issue:** The custom filter feature on the deals dashboard is non-functional. Users can't create filters manually or through AI.
-- **Impact:** With 15+ deals, finding specific deals becomes painful without filtering.
-- **Action:**
-  - [ ] Fix manual custom filter creation (industry, revenue range, stage, etc.)
-  - [ ] Wire up the AI filter feature (natural language → filter query)
-  - [ ] Persist saved filters per user
+### 6. Custom Filters — ✅ DONE (was misdiagnosed)
+- **Status:** Fully working in `crm.html` (the actual CRM page). Initial audit incorrectly checked `crm-dynamic.html` (an older file).
+- **What's working:**
+  - [x] Stage filter dropdown with all stages
+  - [x] Industry filter (dynamically populated from actual deal data)
+  - [x] Deal size range presets (Under $10M, $10-50M, $50-100M, Over $100M)
+  - [x] Priority filter (Urgent/High/Medium/Low)
+  - [x] Sort by 9 options (Recent, Size, IRR, Revenue, Priority, Name A-Z)
+  - [x] Search with debounce across name, industry, thesis
+  - [x] Clear All Filters button
+  - [x] Backend Zod-validated query params with Supabase filtering
+- **Remaining (nice-to-have):**
+  - [ ] AI-powered natural language filter (e.g., "show me SaaS deals over $50M")
+  - [ ] Persist saved/favorite filter combos per user
 - **Ref:** (00:18:14)
 
-### 7. AI Reports / Templates — Broken
-- **Issue:** Template links redirect to an external website instead of opening within the app. The AI analyst stops giving quality responses after 2 prompts.
-- **Impact:** One of the core "AI-native" features is non-functional.
-- **Action:**
-  - [ ] Fix template links to open in-app (not external redirect)
-  - [ ] Debug AI analyst — likely context window overflow or prompt degradation after 2 turns
-  - [ ] File preview in AI Reports — uploaded files can't be opened/previewed for quick review
-  - [ ] Add auto-generated sample prompts so new users know what to ask
+### 7. AI Reports / Templates — ✅ DONE
+- **Status:** Fully implemented. Templates integrate with memo builder. AI chat quality fixed. Dynamic prompt chips. Citation preview.
+- **What's done:**
+  - [x] Template CRUD API (create, update, delete, duplicate, sections)
+  - [x] Templates page and JS script
+  - [x] AI analyst chat persistence
+  - [x] Fix template preview to open in-app modal (was `window.open()` popup)
+  - [x] Fix AI chat quality degradation (duplicate message bug — user msg saved then re-fetched + re-appended)
+  - [x] Integrate templates with memo builder (backend auto-populates sections from template, increments usageCount)
+  - [x] "Use Template" button on templates page → navigates to memo builder with `?templateId=<id>`
+  - [x] Dynamic deal-specific prompt chips (section-aware, deal-aware, replaces static chips)
+  - [x] Citation/file preview (matches source to deal documents, opens fileUrl or shows toast)
+- **Key files:** `memos.ts` (templateId in schema, SECTION_TYPE_MAP, chat dedup fix), `templates.html` (preview modal, Use Template btn), `templates.js` (in-app preview, useSelectedTemplate), `memo-builder.html` (dynamic chips container), `memo-builder.js` (templateId handling, renderPromptChips, showCitation)
 - **Ref:** (00:18:14), (00:12:10), (00:31:40), (00:32:35)
 
-### 8. Parakeet Chatbot — History Lost on Close
-- **Issue:** All conversation history is lost when the chatbot is closed and reopened.
-- **Impact:** Users lose valuable analysis context. Feels broken compared to ChatGPT-like experiences.
-- **Action:**
-  - [ ] Implement chat history persistence (save conversations to Supabase)
-  - [ ] Show a conversation list/thread selector (like ChatGPT sidebar)
-  - [ ] Preserve context when re-opening a conversation
+### 8. Parakeet Chatbot — History Lost on Close — ✅ DONE
+- **Status:** Chat history was being saved to DB all along, but a CSS class mismatch prevented the intro message from being removed when history loaded — making it look like history was lost. Fixed Feb 23.
+- **What was done previously:**
+  - [x] Chat history persistence in database (ChatMessage table per deal)
+  - [x] API endpoints: send message, get history, clear history
+  - [x] Context preservation (last 10 messages sent to AI)
+  - [x] History loaded on page init via `loadChatHistory()`
+- **What was fixed (Feb 23):**
+  - [x] Fixed intro message removal (wrong CSS class selector `.ai-intro-message`)
+  - [x] Removed hardcoded fake document names from intro ("Q3 Financial Model" etc.)
+  - [x] Added "X previous messages" header when history loads
+  - [x] Added "Clear Chat" button in chat header (calls DELETE /api/deals/:id/chat/history)
+- **Key files:** `deal.html:464-493` (chat HTML), `deal.js:1412-1457` (loadChatHistory), `deal.js:1338-1368` (clear chat)
 - **Ref:** (00:10:39), (00:11:26)
 
 ---
 
 ## 🟡 P2 — Medium Priority (UX & Feature Gaps)
 
-### 9. Data Room → Deal Card Auto-Creation Toggle
-- **Issue:** Adding any document to the data room automatically creates a deal card, even for non-deal documents (e.g., internal templates, NDAs). This clutters the deals dashboard.
+### 9. Data Room → Deal Card Auto-Creation Toggle — ❌ NOT DONE
 - **Action:**
   - [ ] Add a checkbox/toggle when uploading to data room: "Create deal from this document?"
   - [ ] Default to unchecked (or smart-detect based on file type/content)
   - [ ] Allow linking existing data room files to existing deals
 - **Ref:** (00:05:50), (00:07:21)
 
-### 10. Navigation — Can't Return to Dashboard from Sub-Views
-- **Issue:** When clicking into a deal or data room item (e.g., "LTD Ideas"), there's no easy way to go back to the main dashboard/list view.
+### 10. Navigation — Can't Return to Dashboard from Sub-Views — ❌ NOT DONE
 - **Action:**
   - [ ] Add breadcrumb navigation (Data Room > LTD Ideas > File.pdf)
-  - [ ] Make sidebar item click navigate to root of that section (clicking "Data Room" goes to data room list)
+  - [ ] Make sidebar item click navigate to root of that section
   - [ ] Add back button / browser back support
 - **Ref:** (00:09:32), (00:10:39)
 
-### 11. Folder Rename in Data Room
-- **Issue:** Folders in the data room cannot be renamed after creation.
+### 11. Folder Rename in Data Room — ❌ NOT DONE
 - **Action:**
   - [ ] Add rename option (right-click / three-dot menu on folders)
   - [ ] Update all references when folder is renamed
 - **Ref:** (00:04:57)
 
-### 12. Settings / AI Preferences — Not Functional
-- **Issue:** The AI Preferences section in settings is a shell with no working features.
+### 12. Settings / AI Preferences — Not Functional — ❌ NOT DONE
 - **Action:**
   - [ ] Build AI model selection (GPT-4, Claude, etc. — if applicable)
   - [ ] Add preferences for: default extraction behavior, preferred currency, industry focus
   - [ ] Profile settings: change password, update name/avatar
 - **Ref:** (00:07:21), (00:08:06), (00:09:32)
 
-### 13. Notifications — Not Fully Wired
-- **Issue:** Notifications UI exists but isn't connected to real events (file added, deal created, team member joined, etc.)
+### 13. Notifications — Not Fully Wired — ❌ NOT DONE
 - **Action:**
   - [ ] Connect notification center to real events
   - [ ] Add notification types: deal created, file uploaded, team member invited, AI extraction complete
   - [ ] Add real-time updates (or polling)
 - **Ref:** (00:08:51)
 
-### 14. Admin Page — Not Connected to Platform
-- **Issue:** Admin page exists as MVP but is isolated. "View Deck" and other links don't work. Task creation may not be fully functional.
+### 14. Admin Page — Not Connected to Platform — ❌ NOT DONE
 - **Action:**
   - [ ] Connect Admin page to live data (deals, users, activity)
   - [ ] Fix task creation and assignment flow
-  - [ ] Add team activity/audit log to Admin page (who did what, when)
+  - [ ] Add team activity/audit log to Admin page
   - [ ] Implement role-based views (Admin vs Analyst)
 - **Ref:** (00:34:56), (00:35:55)
 
-### 15. Deal Dashboard — Customizable Metrics
-- **Issue:** Dashboard shows fixed metrics (IRR, MoM, etc.) which may not be relevant to all buyers. Users want to choose which metrics appear.
+### 15. Deal Dashboard — Customizable Metrics — ❌ NOT DONE
 - **Action:**
   - [ ] Add a "Customize Columns" option on the deals dashboard
   - [ ] Let users toggle which financial metrics are visible
@@ -153,85 +167,49 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 
 ## 🟢 P3 — Low Priority (Nice-to-Have / Future)
 
-### 16. Google Drive Integration
-- **Issue:** Client wants two-way sync between PE OS data room and their Google Drive. Changes in either should reflect in both.
-- **Note:** Complex feature. Aum flagged that this complicates audit/security logging. Needs architecture planning.
-- **Action:**
-  - [ ] Research Google Drive API for two-way sync
-  - [ ] Design connector architecture (webhook-based? polling?)
-  - [ ] Address audit logging implications
-  - [ ] Support Google Docs real-time collaboration & versioning
+### 16. Google Drive Integration — ❌ NOT DONE
 - **Ref:** (00:00:00), (00:01:15), (00:03:57)
 
-### 17. Security / Audit Logs — Frontend
-- **Issue:** Backend tracks user actions (logins, button presses, data access) but frontend has no UI to view these logs.
-- **Action:**
-  - [ ] Build audit log viewer in Admin page
-  - [ ] Show: user, action, timestamp, affected resource
-  - [ ] Add export option for SOC2 compliance reporting
+### 17. Security / Audit Logs — Frontend — ❌ NOT DONE
 - **Ref:** (00:01:15), (00:02:06)
 
-### 18. UI Customization / Theming
-- **Issue:** Users want ability to change colors / personalization.
-- **Note:** Aum agreed this is valuable but low priority.
-- **Action:**
-  - [ ] Add theme options (dark/light mode at minimum)
-  - [ ] Optional: accent color picker
+### 18. UI Customization / Theming — ❌ NOT DONE
 - **Ref:** (00:08:51)
 
-### 19. Trello-Like Task Board
-- **Issue:** Aum suggested Trello-style cards for deal team tasks — assign, checklists, boards.
-- **Note:** Aum explicitly said "lowest priority."
-- **Action:**
-  - [ ] Design Kanban board for tasks within deals
-  - [ ] Assign tasks to team members, set priorities
-  - [ ] Add checklists within tasks
+### 19. Trello-Like Task Board — ❌ NOT DONE
 - **Ref:** (00:37:25)
 
-### 20. Contact Intelligence / Relationship Tracking
-- **Issue:** Ganesh proposed tracking relationship history with contacts — who reached out, when, call transcripts auto-linked.
-- **Note:** Aum acknowledged merit but pushed to later priority.
-- **Action:**
-  - [ ] Design contact timeline view
-  - [ ] Auto-link communication history to contacts
-  - [ ] Track relationship strength signals
+### 20. Contact Intelligence / Relationship Tracking — ❌ NOT DONE
 - **Ref:** (00:39:16), (00:40:40)
 
 ---
 
-## 📋 Summary — Quick Count
+## 📋 Summary — Status Count (as of Feb 23, 2026)
 
-| Priority | Count | Description |
-|----------|-------|-------------|
-| 🔴 P0 | 3 | Critical bugs — fix immediately |
-| 🟠 P1 | 5 | Core product quality — this sprint |
-| 🟡 P2 | 7 | UX & feature gaps — next sprint |
-| 🟢 P3 | 5 | Nice-to-have — backlog |
-| **Total** | **20** | |
+| Priority | Total | Done | Partial | Remaining |
+|----------|-------|------|---------|-----------|
+| 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
+| 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
+| 🟡 P2 | 7 | 0 | 0 | 7 ❌ |
+| 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
+| **Total** | **20** | **8** | **0** | **12** |
 
 ---
 
-## 🎯 Suggested Build Order
+## 🎯 Next Build Order (Updated)
 
-**Week 1 (P0 — Critical Bugs):**
-1. Fix Invite Team email sending
-2. Fix deal value units (K/M/B + currency)
-3. Add file/deal deletion in data room
+**All P0 + P1 complete! ✅**
+1. ~~Fix Invite Team email~~ ✅
+2. ~~Fix deal value units~~ ✅
+3. ~~Add file/deal deletion~~ ✅
+4. ~~Custom Filters~~ ✅ (already working)
+5. ~~AI Extraction source quotes~~ ✅ (source quotes + "Not Found" + review reasons)
+6. ~~Chatbot history UI~~ ✅ (fixed intro removal bug + added clear chat button)
+7. ~~Ingest → Update Existing Deals~~ ✅ (mode toggle + deal picker + smart merge)
+8. ~~AI Reports / Templates~~ ✅ (in-app preview, chat dedup fix, template→memo integration, dynamic chips, citation preview)
 
-**Week 2 (P1 — Core Quality):**
-4. Ingest Deal Data → update existing deals
-5. Fix custom filters
-6. Fix AI Reports / Templates
-7. Chatbot history persistence
-
-**Week 3 (P1 continued + P2 start):**
-8. AI extraction — reduce hallucination (confidence + source quotes)
-9. Data room → deal card toggle
-10. Navigation / breadcrumbs
-11. Folder rename
-
-**Week 4+ (P2 continued):**
-12–15. Settings, Notifications, Admin page, Dashboard customization
+**Next — P2:**
+9–15. Data room toggle, Navigation, Folder rename, Settings, Notifications, Admin, Dashboard metrics
 
 **Backlog (P3):**
 16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence
