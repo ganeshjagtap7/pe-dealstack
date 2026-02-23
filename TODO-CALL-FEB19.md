@@ -179,12 +179,20 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 - **Key files:** `notifications.ts` (preference checking + resolveUserId), `deals.ts`, `documents.ts`, `ai.ts`, `invitations.ts`, `layout.js`
 - **Ref:** (00:08:51)
 
-### 14. Admin Page — Not Connected to Platform — ❌ NOT DONE
-- **Action:**
-  - [ ] Connect Admin page to live data (deals, users, activity)
-  - [ ] Fix task creation and assignment flow
-  - [ ] Add team activity/audit log to Admin page
-  - [ ] Implement role-based views (Admin vs Analyst)
+### 14. Admin Page — Connected to Live Platform Data — ✅ DONE
+- **Status:** All 4 action items complete. Admin Command Center now shows real data from the platform.
+- **What's done:**
+  - [x] Stats cards wired to live API data (team count, deal volume, pending tasks, utilization)
+  - [x] Resource Allocation shows real team members with their deal assignments + task counts
+  - [x] Task table powered by new Task CRUD API (`GET/POST/PATCH/DELETE /api/tasks`)
+  - [x] Create Task modal saves to database with assignee notifications (TASK_ASSIGNED)
+  - [x] Assign Deal modal uses real deals + users, calls `POST /api/deals/:id/team`
+  - [x] Activity Feed wired to audit log API (`GET /api/audit`) with action-to-text mapping
+  - [x] RBAC gate: non-admin/partner/principal redirected to CRM page
+  - [x] All hardcoded data removed (Mike Ross, Rachel Zane, fake tasks, fake activity)
+  - [x] Switched to `PEAuth.authFetch()` for consistent auth handling
+- **Requires:** Run `Task` table SQL in Supabase SQL Editor (see PROGRESS.md Session 18)
+- **Key files:** `tasks.ts` (new), `index.ts`, `admin-dashboard.js`, `admin-dashboard.html`
 - **Ref:** (00:34:56), (00:35:55)
 
 ### 15. Deal Dashboard — Customizable Metrics — ❌ NOT DONE
@@ -221,9 +229,9 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 |----------|-------|------|---------|-----------|
 | 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
 | 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
-| 🟡 P2 | 7 | 5 ✅ | 0 | 2 ❌ |
+| 🟡 P2 | 7 | 6 ✅ | 0 | 1 ❌ |
 | 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
-| **Total** | **20** | **13** | **0** | **7** |
+| **Total** | **20** | **14** | **0** | **6** |
 
 ---
 
@@ -245,7 +253,8 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 11. ~~Folder rename in data room~~ ✅ (three-dot menu + inline rename + delete)
 12. ~~Settings / AI Preferences~~ ✅ (password change, notification prefs, currency, extraction defaults)
 13. ~~Notifications — wired to real events~~ ✅ (9 triggers, preference enforcement, dynamic badge)
-14–15. Admin, Dashboard metrics
+14. ~~Admin page — connected to live data~~ ✅ (stats, tasks, activity feed, RBAC, modals)
+15. Dashboard customizable metrics
 
 **Backlog (P3):**
 16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence

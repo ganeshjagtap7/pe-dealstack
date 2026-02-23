@@ -124,7 +124,7 @@
             <span class="material-symbols-outlined text-text-muted text-[20px]">groups</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
-            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="analyst-count">8</h3>
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="analyst-count">&mdash;</h3>
             <span class="text-xs text-text-secondary mb-1.5">Active analysts</span>
         </div>
         <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
@@ -139,8 +139,8 @@
             <span class="material-symbols-outlined text-text-muted text-[20px]">payments</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
-            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="deal-volume">$485M</h3>
-            <span class="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">+12% vs Q3</span>
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="deal-volume">&mdash;</h3>
+            <span class="text-xs text-text-secondary mb-1.5">Total pipeline</span>
         </div>
         <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
             <div class="bg-primary h-1.5 rounded-full" style="width: 75%"></div>
@@ -154,7 +154,7 @@
             <span class="material-symbols-outlined text-text-muted text-[20px]">pending_actions</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
-            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="overdue-tasks">3</h3>
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="overdue-tasks">&mdash;</h3>
             <span class="text-xs text-text-secondary mb-1.5">Tasks pending</span>
         </div>
         <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
@@ -169,7 +169,7 @@
             <span class="material-symbols-outlined text-text-muted text-[20px]">speed</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
-            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="utilization">82%</h3>
+            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="utilization">&mdash;</h3>
             <span class="text-xs text-text-secondary mb-1.5">Capacity used</span>
         </div>
         <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
@@ -193,87 +193,9 @@
                 <button class="text-sm text-primary font-medium hover:text-primary-hover transition-colors">View Detailed Report</button>
             </div>
             <div class="p-5 space-y-5" id="resource-allocation">
-                <!-- Analyst Row 1 -->
-                <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">MR</div>
-                    <div class="w-28 flex-shrink-0">
-                        <p class="text-sm font-medium text-text-main">Mike Ross</p>
-                        <p class="text-xs text-text-muted">Senior Analyst</p>
-                    </div>
-                    <div class="flex-1 grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-xs text-text-muted mb-1.5">Active Deals</p>
-                            <div class="flex gap-1 flex-wrap">
-                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">TechCorp</span>
-                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">Nebula</span>
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-xs text-text-muted mb-1.5">Capacity (95%)</p>
-                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full" style="width: 95%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-right w-14 flex-shrink-0">
-                        <span class="block text-lg font-bold text-text-main">5</span>
-                        <span class="text-xs text-text-muted">Tasks</span>
-                    </div>
-                </div>
-
-                <!-- Analyst Row 2 -->
-                <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">RZ</div>
-                    <div class="w-28 flex-shrink-0">
-                        <p class="text-sm font-medium text-text-main">Rachel Zane</p>
-                        <p class="text-xs text-text-muted">Associate</p>
-                    </div>
-                    <div class="flex-1 grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-xs text-text-muted mb-1.5">Active Deals</p>
-                            <div class="flex gap-1 flex-wrap">
-                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">Apex Log</span>
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-xs text-text-muted mb-1.5">Capacity (45%)</p>
-                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full" style="width: 45%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-right w-14 flex-shrink-0">
-                        <span class="block text-lg font-bold text-text-main">2</span>
-                        <span class="text-xs text-text-muted">Tasks</span>
-                    </div>
-                </div>
-
-                <!-- Analyst Row 3 -->
-                <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                    <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">HS</div>
-                    <div class="w-28 flex-shrink-0">
-                        <p class="text-sm font-medium text-text-main">Harvey S.</p>
-                        <p class="text-xs text-text-muted">Analyst</p>
-                    </div>
-                    <div class="flex-1 grid grid-cols-2 gap-4">
-                        <div>
-                            <p class="text-xs text-text-muted mb-1.5">Active Deals</p>
-                            <div class="flex gap-1 flex-wrap">
-                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">MediCare</span>
-                                <span class="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle">Clay</span>
-                            </div>
-                        </div>
-                        <div>
-                            <p class="text-xs text-text-muted mb-1.5">Capacity (70%)</p>
-                            <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                                <div class="bg-primary h-full rounded-full" style="width: 70%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="text-right w-14 flex-shrink-0">
-                        <span class="block text-lg font-bold text-text-main">4</span>
-                        <span class="text-xs text-text-muted">Tasks</span>
-                    </div>
+                <div class="text-center py-8 text-text-muted">
+                    <span class="material-symbols-outlined text-[24px] mb-2 block animate-spin">progress_activity</span>
+                    <p class="text-sm">Loading team data...</p>
                 </div>
             </div>
         </div>
@@ -310,80 +232,10 @@
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-border-subtle" id="task-table-body">
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-5 py-4 font-medium text-text-main">Finalize LBO Model</td>
-                            <td class="px-5 py-4">
-                                <span class="inline-flex items-center gap-1 bg-red-50 text-accent-danger text-xs px-2.5 py-1 rounded-full font-medium border border-red-100">High</span>
-                            </td>
-                            <td class="px-5 py-4 text-text-main">Today, 5:00 PM</td>
-                            <td class="px-5 py-4">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">MR</div>
-                                    <span class="text-text-secondary">Mike R.</span>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">TechCorp SaaS</td>
-                            <td class="px-5 py-4">
-                                <span class="text-primary flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-primary"></span> In Progress
-                                </span>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-5 py-4 font-medium text-text-main">Review Legal DD</td>
-                            <td class="px-5 py-4">
-                                <span class="inline-flex items-center gap-1 bg-slate-100 text-slate-600 text-xs px-2.5 py-1 rounded-full font-medium border border-slate-200">Med</span>
-                            </td>
-                            <td class="px-5 py-4 text-text-main">Tomorrow</td>
-                            <td class="px-5 py-4">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">RZ</div>
-                                    <span class="text-text-secondary">Rachel Z.</span>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">Apex Logistics</td>
-                            <td class="px-5 py-4">
-                                <span class="text-text-muted flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span> Pending
-                                </span>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-gray-50 transition-colors">
-                            <td class="px-5 py-4 font-medium text-text-main">Competitor Analysis</td>
-                            <td class="px-5 py-4">
-                                <span class="inline-flex items-center gap-1 bg-gray-100 text-text-secondary text-xs px-2.5 py-1 rounded-full font-medium border border-gray-200">Low</span>
-                            </td>
-                            <td class="px-5 py-4 text-text-main">Feb 10</td>
-                            <td class="px-5 py-4">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">HS</div>
-                                    <span class="text-text-secondary">Harvey S.</span>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">MediCare Plus</td>
-                            <td class="px-5 py-4">
-                                <span class="text-primary flex items-center gap-1.5">
-                                    <span class="material-symbols-outlined text-[16px]">check_circle</span> Completed
-                                </span>
-                            </td>
-                        </tr>
-                        <tr class="hover:bg-gray-50 transition-colors bg-red-50/30">
-                            <td class="px-5 py-4 font-medium text-text-main">Prepare IC Deck</td>
-                            <td class="px-5 py-4">
-                                <span class="inline-flex items-center gap-1 bg-red-50 text-accent-danger text-xs px-2.5 py-1 rounded-full font-medium border border-red-100">High</span>
-                            </td>
-                            <td class="px-5 py-4 text-accent-danger font-medium">Overdue (2h)</td>
-                            <td class="px-5 py-4">
-                                <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">MR</div>
-                                    <span class="text-text-secondary">Mike R.</span>
-                                </div>
-                            </td>
-                            <td class="px-5 py-4 text-primary font-medium cursor-pointer hover:underline">TechCorp SaaS</td>
-                            <td class="px-5 py-4">
-                                <span class="text-accent-danger flex items-center gap-1.5 font-medium">
-                                    <span class="material-symbols-outlined text-[16px]">error</span> Stuck
-                                </span>
+                        <tr>
+                            <td colspan="6" class="px-5 py-12 text-center text-text-muted">
+                                <span class="material-symbols-outlined text-[24px] mb-2 block animate-spin">progress_activity</span>
+                                <p class="text-sm">Loading tasks...</p>
                             </td>
                         </tr>
                     </tbody>
@@ -410,73 +262,9 @@
             </div>
             <div class="flex-1 overflow-y-auto p-5 relative activity-timeline custom-scrollbar">
                 <div class="space-y-5 relative">
-                    <!-- Activity 1 -->
-                    <div class="flex gap-3 relative z-10">
-                        <div class="relative flex-shrink-0">
-                            <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">MR</div>
-                            <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
-                                <span class="material-symbols-outlined text-white text-[10px]">upload_file</span>
-                            </div>
-                        </div>
-                        <div class="flex-1 pt-0.5">
-                            <p class="text-sm text-text-main">
-                                <span class="font-semibold">Mike Ross</span> uploaded V2 model for <span class="text-primary font-medium cursor-pointer hover:underline">TechCorp SaaS</span>.
-                            </p>
-                            <p class="text-xs text-text-muted mt-1">12 mins ago</p>
-                        </div>
-                    </div>
-
-                    <!-- Activity 2 - AI Flag -->
-                    <div class="flex gap-3 relative z-10">
-                        <div class="relative flex-shrink-0">
-                            <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">
-                                <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-                            </div>
-                            <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
-                                <span class="material-symbols-outlined text-white text-[10px]">priority_high</span>
-                            </div>
-                        </div>
-                        <div class="flex-1 pt-0.5">
-                            <p class="text-sm text-text-main">
-                                <span class="font-semibold text-primary">PE OS AI</span> flagged a revenue anomaly in <span class="text-primary font-medium cursor-pointer hover:underline">Nebula Systems</span>.
-                            </p>
-                            <p class="text-xs text-text-muted mt-1">45 mins ago</p>
-                            <div class="mt-2 bg-slate-50 border border-slate-200 p-2 rounded text-xs text-slate-600">
-                                Warning: Q4 growth mismatch (-15%)
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Activity 3 -->
-                    <div class="flex gap-3 relative z-10">
-                        <div class="relative flex-shrink-0">
-                            <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">RZ</div>
-                            <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
-                                <span class="material-symbols-outlined text-white text-[10px]">chat</span>
-                            </div>
-                        </div>
-                        <div class="flex-1 pt-0.5">
-                            <p class="text-sm text-text-main">
-                                <span class="font-semibold">Rachel Zane</span> commented on the Legal DD checklist.
-                            </p>
-                            <p class="text-xs text-text-muted mt-1">1h ago</p>
-                        </div>
-                    </div>
-
-                    <!-- Activity 4 -->
-                    <div class="flex gap-3 relative z-10">
-                        <div class="relative flex-shrink-0">
-                            <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">LL</div>
-                            <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
-                                <span class="material-symbols-outlined text-white text-[10px]">arrow_forward</span>
-                            </div>
-                        </div>
-                        <div class="flex-1 pt-0.5">
-                            <p class="text-sm text-text-main">
-                                <span class="font-semibold">Louis Litt</span> moved <span class="text-primary font-medium cursor-pointer hover:underline">Titan Freight</span> to 'Due Diligence'.
-                            </p>
-                            <p class="text-xs text-text-muted mt-1">2h ago</p>
-                        </div>
+                    <div class="text-center py-8 text-text-muted">
+                        <span class="material-symbols-outlined text-[24px] mb-2 block animate-spin">progress_activity</span>
+                        <p class="text-sm">Loading activity...</p>
                     </div>
                 </div>
             </div>
@@ -537,22 +325,14 @@
             <div class="p-6 space-y-5">
                 <div>
                     <label class="block text-sm font-medium text-text-main mb-2">Select Deal</label>
-                    <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                    <select id="assign-deal-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                         <option value="">Choose a deal...</option>
-                        <option value="1">TechCorp SaaS - $125M</option>
-                        <option value="2">Nebula Systems - $85M</option>
-                        <option value="3">MediCare Plus - $200M</option>
-                        <option value="4">Apex Logistics - $65M</option>
                     </select>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-text-main mb-2">Assign To</label>
-                    <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                        <option value="">Choose an analyst...</option>
-                        <option value="1">Mike Ross - Senior Analyst</option>
-                        <option value="2">Rachel Zane - Associate</option>
-                        <option value="3">Harvey Specter - Analyst</option>
-                        <option value="4">Louis Litt - Analyst</option>
+                    <select id="assign-user-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <option value="">Choose a team member...</option>
                     </select>
                 </div>
                 <div>
@@ -575,7 +355,7 @@
             </div>
             <div class="p-6 border-t border-border-subtle bg-gray-50 rounded-b-xl flex justify-end gap-3">
                 <button id="cancel-assign" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                <button class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Assign Deal</button>
+                <button id="submit-assign" class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Assign Deal</button>
             </div>
         </div>
     </div>
@@ -597,50 +377,44 @@
             <div class="p-6 space-y-5">
                 <div>
                     <label class="block text-sm font-medium text-text-main mb-2">Task Title</label>
-                    <input type="text" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Enter task title...">
+                    <input id="task-title-input" type="text" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="Enter task title...">
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-text-main mb-2">Assign To</label>
-                        <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                            <option value="">Choose analyst...</option>
-                            <option value="1">Mike Ross</option>
-                            <option value="2">Rachel Zane</option>
-                            <option value="3">Harvey Specter</option>
+                        <select id="task-user-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="">Choose team member...</option>
                         </select>
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-text-main mb-2">Related Deal</label>
-                        <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <select id="task-deal-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                             <option value="">Choose deal...</option>
-                            <option value="1">TechCorp SaaS</option>
-                            <option value="2">Nebula Systems</option>
-                            <option value="3">MediCare Plus</option>
                         </select>
                     </div>
                 </div>
                 <div class="grid grid-cols-2 gap-4">
                     <div>
                         <label class="block text-sm font-medium text-text-main mb-2">Due Date</label>
-                        <input type="date" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <input id="task-due-date" type="date" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
                     </div>
                     <div>
                         <label class="block text-sm font-medium text-text-main mb-2">Priority</label>
-                        <select class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
-                            <option value="high">High</option>
-                            <option value="medium" selected>Medium</option>
-                            <option value="low">Low</option>
+                        <select id="task-priority-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM" selected>Medium</option>
+                            <option value="LOW">Low</option>
                         </select>
                     </div>
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-text-main mb-2">Description (Optional)</label>
-                    <textarea rows="3" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" placeholder="Add task details..."></textarea>
+                    <textarea id="task-description" rows="3" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" placeholder="Add task details..."></textarea>
                 </div>
             </div>
             <div class="p-6 border-t border-border-subtle bg-gray-50 rounded-b-xl flex justify-end gap-3">
                 <button id="cancel-task" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
-                <button class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Create Task</button>
+                <button id="submit-task" class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Create Task</button>
             </div>
         </div>
     </div>

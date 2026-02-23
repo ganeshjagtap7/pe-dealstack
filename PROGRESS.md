@@ -8387,3 +8387,58 @@ Connected the notification system to real backend events. The infrastructure (AP
 - `vite build` — ✅ passed (624ms)
 
 ---
+
+## Session 18 — TODO #14: Admin Page — Connect to Live Platform Data
+
+#### Admin Command Center Wired to Live Data — ~4:30 PM
+
+**Summary:** The Admin Command Center page was a fully-styled shell with 100% hardcoded/mocked data (fake analyst names, fake tasks, fake activity feed, fake stats). Connected every section to real backend APIs and added a full Task CRUD system.
+
+**Requires:** Run the following SQL in Supabase SQL Editor to create the Task table:
+```sql
+CREATE TABLE "Task" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT,
+  status TEXT NOT NULL DEFAULT 'PENDING' CHECK (status IN ('PENDING','IN_PROGRESS','COMPLETED','STUCK')),
+  priority TEXT NOT NULL DEFAULT 'MEDIUM' CHECK (priority IN ('LOW','MEDIUM','HIGH','URGENT')),
+  "assignedTo" UUID REFERENCES "User"(id),
+  "dealId" UUID REFERENCES "Deal"(id),
+  "dueDate" TIMESTAMPTZ,
+  "createdBy" UUID REFERENCES "User"(id),
+  "firmName" TEXT,
+  "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+  "updatedAt" TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+| # | Change | Status | Files |
+|---|--------|--------|-------|
+| 1 | New Task CRUD backend routes (GET/POST/PATCH/DELETE /api/tasks) | ✅ Done | `tasks.ts` (new) |
+| 2 | Task routes registered in Express app | ✅ Done | `index.ts` |
+| 3 | Stats cards wired to live API (team count, deal volume, tasks, utilization) | ✅ Done | `admin-dashboard.js` |
+| 4 | Resource Allocation section shows real team members + deal assignments | ✅ Done | `admin-dashboard.js` |
+| 5 | Task table powered by real tasks API with dynamic rendering | ✅ Done | `admin-dashboard.js` |
+| 6 | Activity Feed wired to audit log API with action-to-text mapping | ✅ Done | `admin-dashboard.js` |
+| 7 | Create Task modal saves to POST /api/tasks with TASK_ASSIGNED notification | ✅ Done | `admin-dashboard.js`, `admin-dashboard.html` |
+| 8 | Assign Deal modal uses real deals/users, calls POST /api/deals/:id/team | ✅ Done | `admin-dashboard.js`, `admin-dashboard.html` |
+| 9 | RBAC gate: non-admin/partner/principal users redirected to CRM | ✅ Done | `admin-dashboard.js` |
+| 10 | All hardcoded data removed (Mike Ross, Rachel Zane, fake tasks, etc.) | ✅ Done | `admin-dashboard.html` |
+| 11 | Form inputs given proper IDs for JS access | ✅ Done | `admin-dashboard.html` |
+| 12 | Switched to PEAuth.authFetch() for consistent auth | ✅ Done | `admin-dashboard.js` |
+| 13 | Loading states shown while data fetches | ✅ Done | `admin-dashboard.html` |
+
+### Technical Details
+- Task routes include Zod validation, joins to User (assignee) and Deal tables
+- Tasks scoped to user's firmName for workspace isolation
+- Task creation fires TASK_ASSIGNED notification to assignee (via createNotification)
+- formatCurrency handles dealSize in millions (project convention)
+- Activity feed maps 20+ audit action types to human-readable text + icons
+- Resource allocation fetches deal assignments per member via GET /api/users/:id/deals
+- Modal dropdowns populated dynamically on open (not hardcoded options)
+
+### Verification
+- `tsc --noEmit` — ✅ passed (0 errors)
+- `vite build` — ✅ passed (620ms)
+
+---
