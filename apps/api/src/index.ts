@@ -224,7 +224,7 @@ app.get('/api/ai/status', (req, res) => {
   const { isAIEnabled } = require('./openai.js');
   res.json({
     enabled: isAIEnabled(),
-    model: 'gpt-4-turbo-preview',
+    model: 'gpt-4o',
   });
 });
 

@@ -84,7 +84,7 @@ router.post('/deals/:dealId/chat', async (req, res) => {
 
     // Call OpenAI
     const completion = await openai!.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages,
       temperature: 0.7,
       max_tokens: 1000,
@@ -118,12 +118,12 @@ router.post('/deals/:dealId/chat', async (req, res) => {
       userId,
       role: 'assistant',
       content: response,
-      metadata: { model: 'gpt-4-turbo-preview' },
+      metadata: { model: 'gpt-4o' },
     });
 
     res.json({
       response,
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       dealId,
     });
   } catch (error) {
@@ -235,7 +235,7 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
     log.info('Generating thesis for deal', { dealId, forceRefresh });
 
     const completion = await openai!.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
         { role: 'user', content: prompt },
@@ -330,7 +330,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
     log.info('Analyzing risks for deal', { dealId, forceRefresh });
 
     const completion = await openai!.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
         { role: 'user', content: prompt },
@@ -374,7 +374,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
 router.get('/ai/status', (req, res) => {
   res.json({
     enabled: isAIEnabled(),
-    model: 'gpt-4-turbo-preview',
+    model: 'gpt-4o',
   });
 });
 
@@ -778,7 +778,7 @@ Today's date: ${new Date().toLocaleDateString()}`;
     log.info('Portfolio AI query', { query: message.substring(0, 50) });
 
     const completion = await openai!.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `${portfolioContext}\n\nUser Question: ${message}` },

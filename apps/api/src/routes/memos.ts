@@ -655,7 +655,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 
     // Call OpenAI
     const response = await openai!.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: MEMO_ANALYST_PROMPT },
         { role: 'system', content: `Context:\n${context}` },
@@ -673,7 +673,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
       .update({
         content: generatedContent,
         aiGenerated: true,
-        aiModel: 'gpt-4-turbo-preview',
+        aiModel: 'gpt-4o',
         aiPrompt: sectionPrompt,
         updatedAt: new Date().toISOString(),
       })
@@ -815,7 +815,7 @@ router.post('/:id/chat', async (req, res) => {
     messages.push({ role: 'user', content: validation.data.content });
 
     const response = await openai!.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages,
       temperature: 0.7,
       max_tokens: 1500,
@@ -830,7 +830,7 @@ router.post('/:id/chat', async (req, res) => {
         conversationId,
         role: 'assistant',
         content: aiContent,
-        metadata: { model: 'gpt-4-turbo-preview' },
+        metadata: { model: 'gpt-4o' },
       })
       .select()
       .single();

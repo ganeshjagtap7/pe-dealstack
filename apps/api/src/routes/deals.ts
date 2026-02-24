@@ -1025,7 +1025,7 @@ router.post('/:dealId/chat', async (req, res) => {
     // Call OpenAI with function calling
     log.debug('Calling OpenAI', { messageCount: messages.length });
     const completion = await openai.chat.completions.create({
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       messages,
       tools: DEAL_UPDATE_TOOLS,
       tool_choice: 'auto',
@@ -1183,7 +1183,7 @@ router.post('/:dealId/chat', async (req, res) => {
 
       // Get final response
       const followUp = await openai.chat.completions.create({
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o',
         messages,
         max_tokens: 500,
         temperature: 0.7,
@@ -1210,7 +1210,7 @@ router.post('/:dealId/chat', async (req, res) => {
         userId,
         role: 'assistant',
         content: aiResponse,
-        metadata: { model: 'gpt-4-turbo-preview', updates: updatedFields },
+        metadata: { model: 'gpt-4o', updates: updatedFields },
       });
       if (aiMsgError) {
         log.error('Failed to save AI message (with updates)', aiMsgError);
@@ -1221,7 +1221,7 @@ router.post('/:dealId/chat', async (req, res) => {
 
       return res.json({
         response: aiResponse,
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o',
         updates: updatedFields,
         ...(suggestedAction && { action: suggestedAction }),
       });
@@ -1250,7 +1250,7 @@ router.post('/:dealId/chat', async (req, res) => {
         userId,
         role: 'assistant',
         content: aiResponse,
-        metadata: { model: 'gpt-4-turbo-preview', action: suggestedAction },
+        metadata: { model: 'gpt-4o', action: suggestedAction },
       });
       if (aiMsgError) {
         log.error('Failed to save AI message (with action)', aiMsgError);
@@ -1260,7 +1260,7 @@ router.post('/:dealId/chat', async (req, res) => {
 
       return res.json({
         response: aiResponse,
-        model: 'gpt-4-turbo-preview',
+        model: 'gpt-4o',
         action: suggestedAction,
       });
     }
@@ -1284,7 +1284,7 @@ router.post('/:dealId/chat', async (req, res) => {
       dealId,
       role: 'assistant',
       content: aiResponse,
-      metadata: { model: 'gpt-4-turbo-preview' },
+      metadata: { model: 'gpt-4o' },
     });
     if (aiMsgError) {
       log.error('Failed to save AI message', aiMsgError);
@@ -1295,7 +1295,7 @@ router.post('/:dealId/chat', async (req, res) => {
 
     res.json({
       response: aiResponse,
-      model: 'gpt-4-turbo-preview',
+      model: 'gpt-4o',
       ...(suggestedAction && { action: suggestedAction }),
     });
   } catch (error) {

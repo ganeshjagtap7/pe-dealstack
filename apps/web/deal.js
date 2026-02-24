@@ -1471,9 +1471,9 @@ async function loadChatHistory() {
             const data = await response.json();
             console.log(`[Chat] Loaded ${data.count} messages from history`, data);
 
-            if (data.messages && data.messages.length > 0) {
-                const chatContainer = document.getElementById('chat-messages');
+            const chatContainer = document.getElementById('chat-messages');
 
+            if (data.messages && data.messages.length > 0) {
                 // Clear the default intro message and any hardcoded content
                 chatContainer.querySelectorAll('.ai-intro-message').forEach(el => el.remove());
 
@@ -1498,7 +1498,7 @@ async function loadChatHistory() {
             } else {
                 console.log('[Chat] No messages in history');
                 // Show intro message when there's no history
-                chatContainer.querySelectorAll('.ai-intro-message').forEach(el => el.classList.remove('hidden'));
+                chatContainer?.querySelectorAll('.ai-intro-message').forEach(el => el.classList.remove('hidden'));
             }
         } else {
             const errorData = await response.json().catch(() => ({}));

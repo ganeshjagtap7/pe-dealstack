@@ -282,7 +282,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
         messages.push({ role: 'user', content });
 
         const completion = await openai.chat.completions.create({
-          model: 'gpt-4-turbo-preview',
+          model: 'gpt-4o',
           messages,
           max_tokens: 1000,
           temperature: 0.7,
@@ -305,7 +305,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
         conversationId: id,
         role: 'assistant',
         content: aiResponseContent,
-        metadata: { model: isAIEnabled() ? 'gpt-4-turbo-preview' : 'fallback' }
+        metadata: { model: isAIEnabled() ? 'gpt-4o' : 'fallback' }
       })
       .select()
       .single();
