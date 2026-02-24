@@ -250,6 +250,8 @@ const updateSelfSchema = z.object({
   autoUpdateDeal: z.boolean().optional(),
   // Notification preferences
   notifications: z.record(z.boolean()).optional(),
+  // Dashboard display preferences
+  dealCardMetrics: z.array(z.enum(['irrProjected', 'mom', 'ebitda', 'revenue', 'dealSize'])).min(1).max(5).optional(),
 });
 
 router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
@@ -292,6 +294,7 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
     if (validation.data.autoExtract !== undefined) newPrefs.autoExtract = validation.data.autoExtract;
     if (validation.data.autoUpdateDeal !== undefined) newPrefs.autoUpdateDeal = validation.data.autoUpdateDeal;
     if (validation.data.notifications !== undefined) newPrefs.notifications = validation.data.notifications;
+    if (validation.data.dealCardMetrics !== undefined) newPrefs.dealCardMetrics = validation.data.dealCardMetrics;
 
     if (Object.keys(newPrefs).length > 0) {
       // Merge with existing preferences so we don't overwrite unrelated fields

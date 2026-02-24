@@ -372,6 +372,26 @@
                                 <span class="material-symbols-outlined text-[20px]">view_kanban</span>
                             </button>
                         </div>
+                        <!-- Customize Metrics -->
+                        <div class="relative">
+                            <button id="metrics-btn"
+                                class="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-primary-light transition-all"
+                                title="Customize Metrics">
+                                <span class="material-symbols-outlined text-text-muted text-[18px]">tune</span>
+                                <p class="text-text-secondary text-sm font-medium hidden lg:block">Metrics</p>
+                            </button>
+                            <div id="metrics-dropdown"
+                                class="hidden absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[220px] py-2">
+                                <div class="px-4 py-2 border-b border-border-subtle">
+                                    <p class="text-xs font-bold text-text-muted uppercase tracking-wider">Visible Metrics</p>
+                                </div>
+                                <div id="metrics-options" class="py-1"></div>
+                                <div class="border-t border-border-subtle px-4 py-2 flex items-center justify-between">
+                                    <button id="metrics-reset-btn" class="text-xs text-text-muted hover:text-primary transition-colors">Reset</button>
+                                    <button id="metrics-save-btn" class="text-xs font-medium text-white bg-primary px-3 py-1 rounded-md hover:bg-primary-hover transition-colors">Apply</button>
+                                </div>
+                            </div>
+                        </div>
                         <div class="h-6 w-px bg-border-subtle hidden sm:block"></div>
                         <div class="relative">
                             <button id="sort-btn"
@@ -475,6 +495,45 @@
             'CLOSED_LOST': { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-700', label: 'Closed Lost' }
         };
 
+        // Metrics configuration — maps metric keys to display info
+        const METRIC_CONFIG = {
+            irrProjected: {
+                label: 'IRR (Proj)',
+                kanbanLabel: 'IRR',
+                format: (val) => val ? val.toFixed(1) + '%' : 'N/A',
+                colorFn: () => 'text-text-main',
+            },
+            mom: {
+                label: 'MoM',
+                kanbanLabel: 'MoM',
+                format: (val) => val ? val.toFixed(1) + 'x' : 'N/A',
+                colorFn: (val) => val >= 3 ? 'text-secondary' : 'text-text-main',
+            },
+            ebitda: {
+                label: 'EBITDA',
+                kanbanLabel: 'EBITDA',
+                format: (val) => formatCurrency(val),
+                colorFn: (val) => val < 0 ? 'text-red-600' : 'text-text-main',
+            },
+            revenue: {
+                label: 'Revenue',
+                kanbanLabel: 'Revenue',
+                format: (val) => formatCurrency(val),
+                colorFn: () => 'text-text-main',
+            },
+            dealSize: {
+                label: 'Deal Size',
+                kanbanLabel: 'Size',
+                format: (val) => formatCurrency(val),
+                colorFn: () => 'text-text-main',
+            },
+        };
+
+        const DEFAULT_CARD_METRICS = ['irrProjected', 'mom', 'ebitda', 'revenue'];
+        let activeCardMetrics = [...DEFAULT_CARD_METRICS];
+
+        const METRICS_STORAGE_KEY = 'pe-deal-card-metrics';
+
         // Format currency — values are stored in millions USD in the database
         // Displays in the most natural unit: B (billions), M (millions), or K (thousands)
         function formatCurrency(value) {
@@ -527,10 +586,22 @@
         function renderDealCard(deal) {
             const style = stageStyles[deal.stage] || stageStyles['INITIAL_REVIEW'];
             const isPassed = deal.status === 'PASSED' || deal.stage === 'PASSED';
-            const momColor = deal.mom >= 3 ? 'text-secondary' : 'text-text-main';
-            const ebitdaColor = deal.ebitda < 0 ? 'text-red-600' : 'text-text-main';
             const hasRiskFlag = deal.ebitda < 0 || deal.stage === 'PASSED';
             const isSelected = selectedDeals.has(deal.id);
+
+            const gridCols = activeCardMetrics.length >= 5 ? 'grid-cols-3' : 'grid-cols-2';
+            const metricsGrid = activeCardMetrics.map(key => {
+                const config = METRIC_CONFIG[key];
+                if (!config) return '';
+                const value = deal[key];
+                const colorClass = config.colorFn(value);
+                return `
+                    <div class="bg-background-body rounded-md p-3">
+                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">${config.label}</span>
+                        <span class="${colorClass} font-bold text-lg">${config.format(value)}</span>
+                    </div>
+                `;
+            }).join('');
 
             return `
         <div class="relative group/card" data-deal-id="${deal.id}">
@@ -576,23 +647,8 @@
                         </div>
                         <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider mr-8">${style.label}</span>
                     </div>
-                <div class="grid grid-cols-2 gap-3 mb-4">
-                    <div class="bg-background-body rounded-md p-3">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">IRR (Proj)</span>
-                        <span class="text-text-main font-bold text-lg">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : 'N/A'}</span>
-                    </div>
-                    <div class="bg-background-body rounded-md p-3">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">MoM</span>
-                        <span class="${momColor} font-bold text-lg">${deal.mom ? deal.mom.toFixed(1) + 'x' : 'N/A'}</span>
-                    </div>
-                    <div class="bg-background-body rounded-md p-3">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">EBITDA</span>
-                        <span class="${ebitdaColor} font-bold text-lg">${formatCurrency(deal.ebitda)}</span>
-                    </div>
-                    <div class="bg-background-body rounded-md p-3">
-                        <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">Revenue</span>
-                        <span class="text-text-main font-bold text-lg">${formatCurrency(deal.revenue)}</span>
-                    </div>
+                <div class="grid ${gridCols} gap-3 mb-4">
+                    ${metricsGrid}
                 </div>
                 <div class="bg-background-body rounded-md p-3 mt-auto border border-border-subtle">
                     <div class="flex items-center gap-2 mb-1.5">
@@ -1360,8 +1416,21 @@
 
         // Render a compact Kanban card
         function renderKanbanCard(deal) {
-            const momColor = deal.mom >= 3 ? 'text-secondary' : 'text-text-main';
             const hasRiskFlag = deal.ebitda < 0 || deal.stage === 'PASSED';
+
+            const kanbanMetrics = activeCardMetrics.slice(0, 3);
+            const metricsRow = kanbanMetrics.map(key => {
+                const config = METRIC_CONFIG[key];
+                if (!config) return '';
+                const value = deal[key];
+                const colorClass = config.colorFn(value);
+                return `
+                    <div class="flex-1 bg-background-body rounded px-2 py-1.5">
+                        <span class="text-[9px] text-text-muted font-medium uppercase block">${config.kanbanLabel}</span>
+                        <span class="text-xs font-bold ${colorClass}">${config.format(value)}</span>
+                    </div>
+                `;
+            }).join('');
 
             return `
         <div class="kanban-card bg-white rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
@@ -1383,18 +1452,7 @@
 
                 <!-- Metrics Row -->
                 <div class="flex gap-3 mb-2">
-                    <div class="flex-1 bg-background-body rounded px-2 py-1.5">
-                        <span class="text-[9px] text-text-muted font-medium uppercase block">IRR</span>
-                        <span class="text-xs font-bold text-text-main">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : 'N/A'}</span>
-                    </div>
-                    <div class="flex-1 bg-background-body rounded px-2 py-1.5">
-                        <span class="text-[9px] text-text-muted font-medium uppercase block">MoM</span>
-                        <span class="text-xs font-bold ${momColor}">${deal.mom ? deal.mom.toFixed(1) + 'x' : 'N/A'}</span>
-                    </div>
-                    <div class="flex-1 bg-background-body rounded px-2 py-1.5">
-                        <span class="text-[9px] text-text-muted font-medium uppercase block">Size</span>
-                        <span class="text-xs font-bold text-text-main">${formatCurrency(deal.dealSize)}</span>
-                    </div>
+                    ${metricsRow}
                 </div>
 
                 <!-- AI Insight (truncated) -->
@@ -1505,6 +1563,95 @@
             grid.innerHTML = allDeals.map(deal => renderDealCard(deal)).join('') + renderUploadCard();
         }
 
+        // ============================================================
+        // Customize Metrics
+        // ============================================================
+
+        function renderMetricsOptions() {
+            const container = document.getElementById('metrics-options');
+            if (!container) return;
+            container.innerHTML = Object.entries(METRIC_CONFIG).map(([key, config]) => {
+                const isChecked = activeCardMetrics.includes(key);
+                return `
+                    <label class="flex items-center gap-3 px-4 py-2 hover:bg-primary-light cursor-pointer transition-colors">
+                        <input type="checkbox" class="metric-checkbox size-4 rounded border-gray-300 text-primary focus:ring-primary"
+                            data-metric="${key}" ${isChecked ? 'checked' : ''}>
+                        <span class="text-sm text-text-main font-medium">${config.label}</span>
+                    </label>
+                `;
+            }).join('');
+        }
+
+        function initializeMetricsSelector() {
+            const btn = document.getElementById('metrics-btn');
+            const dropdown = document.getElementById('metrics-dropdown');
+            if (!btn || !dropdown) return;
+
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                // Close other dropdowns
+                document.querySelectorAll('[id$="-dropdown"]').forEach(d => {
+                    if (d.id !== 'metrics-dropdown') d.classList.add('hidden');
+                });
+                dropdown.classList.toggle('hidden');
+                if (!dropdown.classList.contains('hidden')) {
+                    renderMetricsOptions();
+                }
+            });
+
+            document.getElementById('metrics-save-btn')?.addEventListener('click', () => {
+                const checked = [...document.querySelectorAll('.metric-checkbox:checked')]
+                    .map(cb => cb.dataset.metric);
+                if (checked.length === 0) {
+                    showNotification('Error', 'Select at least one metric', 'error');
+                    return;
+                }
+                activeCardMetrics = checked;
+                dropdown.classList.add('hidden');
+                // Re-render immediately
+                if (currentView === 'kanban') {
+                    renderKanbanBoard();
+                } else {
+                    renderDealsGrid();
+                }
+                saveMetricsPreference(checked);
+            });
+
+            document.getElementById('metrics-reset-btn')?.addEventListener('click', () => {
+                activeCardMetrics = [...DEFAULT_CARD_METRICS];
+                renderMetricsOptions();
+            });
+        }
+
+        async function saveMetricsPreference(metrics) {
+            try {
+                localStorage.setItem(METRICS_STORAGE_KEY, JSON.stringify(metrics));
+                await PEAuth.authFetch(`${API_BASE_URL}/users/me`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dealCardMetrics: metrics }),
+                });
+            } catch (error) {
+                console.warn('Failed to save metrics preference:', error);
+            }
+        }
+
+        function loadCachedMetrics() {
+            try {
+                const cached = localStorage.getItem(METRICS_STORAGE_KEY);
+                if (cached) {
+                    const parsed = JSON.parse(cached);
+                    const validKeys = Object.keys(METRIC_CONFIG);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        const validated = parsed.filter(k => validKeys.includes(k));
+                        if (validated.length > 0) {
+                            activeCardMetrics = validated;
+                        }
+                    }
+                }
+            } catch (e) { /* ignore */ }
+        }
+
         // Initialize view toggle
         function initializeViewToggle() {
             document.getElementById('view-list-btn')?.addEventListener('click', () => setView('list'));
@@ -1586,6 +1733,29 @@
         }
 
         // Initialize on page load
+        // Apply user preferences from server (source of truth)
+        window.addEventListener('pe-user-loaded', (e) => {
+            const prefs = e.detail?.user?.preferences;
+            if (!prefs) return;
+            const parsed = typeof prefs === 'string' ? JSON.parse(prefs) : prefs;
+            if (Array.isArray(parsed.dealCardMetrics) && parsed.dealCardMetrics.length > 0) {
+                const validKeys = Object.keys(METRIC_CONFIG);
+                const validated = parsed.dealCardMetrics.filter(k => validKeys.includes(k));
+                if (validated.length > 0) {
+                    activeCardMetrics = validated;
+                    localStorage.setItem(METRICS_STORAGE_KEY, JSON.stringify(validated));
+                    // Re-render if deals already loaded
+                    if (allDeals.length > 0) {
+                        if (currentView === 'kanban') {
+                            renderKanbanBoard();
+                        } else {
+                            renderDealsGrid();
+                        }
+                    }
+                }
+            }
+        });
+
         document.addEventListener('DOMContentLoaded', async () => {
             // Check authentication - redirect to login if not authenticated
             await PEAuth.initSupabase();
@@ -1595,8 +1765,10 @@
             // Initialize shared layout with collapsible sidebar
             PELayout.init('deals', { collapsible: true });
 
+            loadCachedMetrics();
             initializeFilters();
             initializeViewToggle();
+            initializeMetricsSelector();
             loadDeals();
             initializeUploadModal();
             initializeUploadCard();

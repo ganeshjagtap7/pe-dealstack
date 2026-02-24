@@ -52,7 +52,8 @@ let USER = cachedUser || {
     name: 'Loading...',
     role: '',           // Display role/title
     systemRole: '',     // System role for permissions (ADMIN, MEMBER, VIEWER)
-    avatar: ''
+    avatar: '',
+    preferences: {}
 };
 
 // Load user data from API (and refresh cache)
@@ -69,7 +70,8 @@ async function loadUserData() {
                     name: userData.name || userData.email?.split('@')[0] || 'User',
                     role: userData.title || getRoleLabel(userData.role) || 'Team Member',
                     systemRole: userData.role || 'MEMBER',  // ADMIN, MEMBER, or VIEWER
-                    avatar: userData.avatar || ''
+                    avatar: userData.avatar || '',
+                    preferences: userData.preferences || {}
                 };
                 // Cache for instant display on next page navigation
                 cacheUserData(USER);
