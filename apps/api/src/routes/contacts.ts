@@ -38,6 +38,14 @@ const linkDealSchema = z.object({
   role: z.enum(dealRoles).default('OTHER'),
 });
 
+const relationshipTypes = ['KNOWS', 'REFERRED_BY', 'REPORTS_TO', 'COLLEAGUE', 'INTRODUCED_BY'] as const;
+
+const createConnectionSchema = z.object({
+  relatedContactId: z.string().uuid(),
+  type: z.enum(relationshipTypes),
+  notes: z.string().max(2000).optional().or(z.literal('')),
+});
+
 const contactsQuerySchema = z.object({
   search: z.string().max(200).optional(),
   type: z.enum(contactTypes).optional(),
@@ -520,6 +528,250 @@ router.get('/insights/stale', async (req: any, res) => {
   } catch (error) {
     log.error('Stale contacts error', error);
     res.status(500).json({ error: 'Failed to check stale contacts' });
+  }
+});
+
+// ─── GET /api/contacts/insights/scores — Relationship strength scores ─
+
+router.get('/insights/scores', async (req: any, res) => {
+  try {
+    // Fetch all contacts
+    const { data: contacts, error: cErr } = await supabase
+      .from('Contact')
+      .select('id, lastContactedAt');
+    if (cErr) throw cErr;
+
+    // Count interactions per contact
+    const { data: interactions, error: iErr } = await supabase
+      .from('ContactInteraction')
+      .select('contactId');
+    if (iErr) throw iErr;
+
+    // Count linked deals per contact
+    const { data: dealLinks, error: dErr } = await supabase
+      .from('ContactDeal')
+      .select('contactId');
+    if (dErr) throw dErr;
+
+    const interactionCounts: Record<string, number> = {};
+    for (const i of interactions || []) {
+      interactionCounts[i.contactId] = (interactionCounts[i.contactId] || 0) + 1;
+    }
+
+    const dealCounts: Record<string, number> = {};
+    for (const d of dealLinks || []) {
+      dealCounts[d.contactId] = (dealCounts[d.contactId] || 0) + 1;
+    }
+
+    const now = Date.now();
+    const scores: Record<string, any> = {};
+
+    for (const c of contacts || []) {
+      // Recency score (0-40)
+      let recency = 0;
+      if (c.lastContactedAt) {
+        const days = (now - new Date(c.lastContactedAt).getTime()) / 86400000;
+        if (days <= 7) recency = 40;
+        else if (days <= 14) recency = 35;
+        else if (days <= 30) recency = 28;
+        else if (days <= 60) recency = 18;
+        else if (days <= 90) recency = 10;
+        else if (days <= 180) recency = 5;
+      }
+
+      // Frequency score (0-40)
+      const iCount = interactionCounts[c.id] || 0;
+      let frequency = 0;
+      if (iCount >= 20) frequency = 40;
+      else if (iCount >= 12) frequency = 35;
+      else if (iCount >= 8) frequency = 28;
+      else if (iCount >= 5) frequency = 22;
+      else if (iCount >= 3) frequency = 15;
+      else if (iCount >= 1) frequency = 8;
+
+      // Deals score (0-20)
+      const dCount = dealCounts[c.id] || 0;
+      let deals = 0;
+      if (dCount >= 4) deals = 20;
+      else if (dCount >= 3) deals = 16;
+      else if (dCount >= 2) deals = 12;
+      else if (dCount >= 1) deals = 8;
+
+      const score = recency + frequency + deals;
+      let label = 'Cold';
+      if (score > 75) label = 'Strong';
+      else if (score > 50) label = 'Active';
+      else if (score > 25) label = 'Warm';
+
+      scores[c.id] = { score, label, breakdown: { recency, frequency, deals } };
+    }
+
+    res.json({ scores });
+  } catch (error) {
+    log.error('Scores error', error);
+    res.status(500).json({ error: 'Failed to compute scores' });
+  }
+});
+
+// ─── GET /api/contacts/insights/network — Network overview stats ─
+
+router.get('/insights/network', async (req: any, res) => {
+  try {
+    const { data: contacts, error: cErr } = await supabase
+      .from('Contact')
+      .select('id, firstName, lastName, type, company');
+    if (cErr) throw cErr;
+
+    const { data: connections, error: rErr } = await supabase
+      .from('ContactRelationship')
+      .select('contactId, relatedContactId');
+    if (rErr) throw rErr;
+
+    const { data: dealLinks, error: dErr } = await supabase
+      .from('ContactDeal')
+      .select('contactId');
+    if (dErr) throw dErr;
+
+    // Type breakdown
+    const byType: Record<string, number> = {};
+    for (const c of contacts || []) {
+      byType[c.type] = (byType[c.type] || 0) + 1;
+    }
+
+    // Count connections + deals per contact
+    const linkCount: Record<string, number> = {};
+    for (const r of connections || []) {
+      linkCount[r.contactId] = (linkCount[r.contactId] || 0) + 1;
+      linkCount[r.relatedContactId] = (linkCount[r.relatedContactId] || 0) + 1;
+    }
+    for (const d of dealLinks || []) {
+      linkCount[d.contactId] = (linkCount[d.contactId] || 0) + 1;
+    }
+
+    // Top 5 most connected
+    const contactMap = new Map((contacts || []).map((c: any) => [c.id, c]));
+    const ranked = Object.entries(linkCount)
+      .sort(([, a], [, b]) => (b as number) - (a as number))
+      .slice(0, 5)
+      .map(([id, total]) => {
+        const c = contactMap.get(id) || {} as any;
+        return {
+          id,
+          firstName: c.firstName || '',
+          lastName: c.lastName || '',
+          type: c.type || 'OTHER',
+          company: c.company || '',
+          totalLinks: total,
+        };
+      });
+
+    res.json({
+      totalContacts: (contacts || []).length,
+      byType,
+      totalConnections: (connections || []).length,
+      mostConnected: ranked,
+    });
+  } catch (error) {
+    log.error('Network stats error', error);
+    res.status(500).json({ error: 'Failed to load network stats' });
+  }
+});
+
+// ─── GET /api/contacts/:id/connections — List connections (bidirectional) ─
+
+router.get('/:id/connections', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch where this contact is either side of the relationship
+    const { data: asSource, error: e1 } = await supabase
+      .from('ContactRelationship')
+      .select('*, contact:relatedContactId(id, firstName, lastName, type, company, title)')
+      .eq('contactId', id);
+
+    const { data: asTarget, error: e2 } = await supabase
+      .from('ContactRelationship')
+      .select('*, contact:contactId(id, firstName, lastName, type, company, title)')
+      .eq('relatedContactId', id);
+
+    if (e1) throw e1;
+    if (e2) throw e2;
+
+    const connections = [
+      ...(asSource || []).map((r: any) => ({ id: r.id, type: r.type, notes: r.notes, contact: r.contact, direction: 'outgoing' })),
+      ...(asTarget || []).map((r: any) => ({ id: r.id, type: r.type, notes: r.notes, contact: r.contact, direction: 'incoming' })),
+    ];
+
+    res.json({ connections });
+  } catch (error) {
+    log.error('List connections error', error);
+    res.status(500).json({ error: 'Failed to list connections' });
+  }
+});
+
+// ─── POST /api/contacts/:id/connections — Create connection ─
+
+router.post('/:id/connections', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const validation = createConnectionSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
+    }
+
+    const { relatedContactId, type, notes } = validation.data;
+
+    if (relatedContactId === id) {
+      return res.status(400).json({ error: 'Cannot create a connection to the same contact' });
+    }
+
+    const { data: connection, error } = await supabase
+      .from('ContactRelationship')
+      .insert({
+        contactId: id,
+        relatedContactId,
+        type,
+        notes: notes || null,
+        createdBy: req.user?.id,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(409).json({ error: 'This connection already exists' });
+      }
+      throw error;
+    }
+
+    log.info('Connection created', { contactId: id, relatedContactId, type });
+
+    res.status(201).json(connection);
+  } catch (error) {
+    log.error('Create connection error', error);
+    res.status(500).json({ error: 'Failed to create connection' });
+  }
+});
+
+// ─── DELETE /api/contacts/:id/connections/:connectionId — Remove connection ─
+
+router.delete('/:id/connections/:connectionId', async (req: any, res) => {
+  try {
+    const { connectionId } = req.params;
+
+    const { error } = await supabase
+      .from('ContactRelationship')
+      .delete()
+      .eq('id', connectionId);
+
+    if (error) throw error;
+
+    log.info('Connection removed', { connectionId });
+
+    res.json({ success: true });
+  } catch (error) {
+    log.error('Delete connection error', error);
+    res.status(500).json({ error: 'Failed to remove connection' });
   }
 });
 

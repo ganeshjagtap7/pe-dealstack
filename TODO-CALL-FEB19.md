@@ -195,11 +195,19 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 - **Key files:** `tasks.ts` (new), `index.ts`, `admin-dashboard.js`, `admin-dashboard.html`
 - **Ref:** (00:34:56), (00:35:55)
 
-### 15. Deal Dashboard — Customizable Metrics — ❌ NOT DONE
-- **Action:**
-  - [ ] Add a "Customize Columns" option on the deals dashboard
-  - [ ] Let users toggle which financial metrics are visible
-  - [ ] Save preferences per user
+### 15. Deal Dashboard — Customizable Metrics — ✅ DONE
+- **Status:** Fully implemented. "Metrics" button in toolbar opens dropdown with 5 toggleable metrics. Preferences saved per user via JSONB preferences column.
+- **What's done:**
+  - [x] "Customize Metrics" button in CRM toolbar (tune icon, between view toggle and sort)
+  - [x] Dropdown with checkboxes for 5 metrics: IRR (Proj), MoM, EBITDA, Revenue, Deal Size
+  - [x] Apply/Reset controls — validates at least 1 metric selected
+  - [x] Deal cards dynamically render only selected metrics (2x2 grid or 3-col for 5)
+  - [x] Kanban cards dynamically render first 3 of selected metrics
+  - [x] Preferences saved to backend via `PATCH /api/users/me` (JSONB `dealCardMetrics` field)
+  - [x] Preferences cached in localStorage for instant load on next visit
+  - [x] Server preferences synced via `pe-user-loaded` event (source of truth)
+  - [x] `METRIC_CONFIG` map centralizes label, format, and color logic for all metrics
+- **Key files:** `crm.html` (UI + JS), `users.ts` (Zod schema), `layout.js` (preferences passthrough)
 - **Ref:** (00:19:25)
 
 ---
@@ -218,20 +226,33 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 ### 19. Trello-Like Task Board — ❌ NOT DONE
 - **Ref:** (00:37:25)
 
-### 20. Contact Intelligence / Relationship Tracking — ❌ NOT DONE
+### 20. Contact Intelligence / Relationship Tracking — ✅ DONE
+- **Status:** Fully implemented. Relationship scoring, connection tracking, network stats, and interaction analytics.
+- **What's done:**
+  - [x] Relationship strength scoring (0-100) based on recency + frequency + deals — Cold/Warm/Active/Strong labels
+  - [x] Score badges on all contact cards (colored dot + score)
+  - [x] Interaction stats in detail panel: total count, monthly frequency, type breakdown
+  - [x] Connection CRUD: add/remove bidirectional relationships between contacts
+  - [x] 5 relationship types: Knows, Referred by, Reports to, Colleague, Introduced by
+  - [x] Add Connection modal with contact search, type picker, and notes
+  - [x] Connections section in detail panel with relationship type badges + navigation
+  - [x] Network Stats insight panel: total contacts, total connections, type breakdown, top 3 most-connected
+  - [x] 4-panel insights bar (Needs Attention, Recent Activity, Duplicates, Network Stats)
+- **Requires:** Run `ContactRelationship` table SQL in Supabase SQL Editor (see PROGRESS.md)
+- **Key files:** `contacts.ts` (5 new endpoints), `contacts.html` (scoring, connections, network panel, modal)
 - **Ref:** (00:39:16), (00:40:40)
 
 ---
 
-## 📋 Summary — Status Count (as of Feb 24, 2026)
+## 📋 Summary — Status Count (as of Feb 24, 2026) — ALL P0-P2 COMPLETE + 1 P3
 
 | Priority | Total | Done | Partial | Remaining |
 |----------|-------|------|---------|-----------|
 | 🔴 P0 | 3 | 3 ✅ | 0 | 0 |
 | 🟠 P1 | 5 | 5 ✅ | 0 | 0 |
-| 🟡 P2 | 7 | 6 ✅ | 0 | 1 ❌ |
-| 🟢 P3 | 5 | 0 | 0 | 5 ❌ |
-| **Total** | **20** | **14** | **0** | **6** |
+| 🟡 P2 | 7 | 7 ✅ | 0 | 0 |
+| 🟢 P3 | 5 | 1 ✅ | 0 | 4 ❌ |
+| **Total** | **20** | **16** | **0** | **4** |
 
 ---
 
@@ -247,14 +268,17 @@ Per Aum's guidance: *"Priority should be making the core product outputs accurat
 7. ~~Ingest → Update Existing Deals~~ ✅ (mode toggle + deal picker + smart merge)
 8. ~~AI Reports / Templates~~ ✅ (in-app preview, chat dedup fix, template→memo integration, dynamic chips, citation preview)
 
-**Next — P2 (5 of 7 done):**
+**All P2 complete! ✅**
 9. ~~Data room auto-update toggle + document linking~~ ✅
 10. ~~Navigation — breadcrumbs + back support~~ ✅
 11. ~~Folder rename in data room~~ ✅ (three-dot menu + inline rename + delete)
 12. ~~Settings / AI Preferences~~ ✅ (password change, notification prefs, currency, extraction defaults)
 13. ~~Notifications — wired to real events~~ ✅ (9 triggers, preference enforcement, dynamic badge)
 14. ~~Admin page — connected to live data~~ ✅ (stats, tasks, activity feed, RBAC, modals)
-15. Dashboard customizable metrics
+15. ~~Dashboard customizable metrics~~ ✅ (metrics dropdown, per-user prefs, dynamic cards)
+
+**P3 done:**
+20. ~~Contact Intelligence / Relationship Tracking~~ ✅ (scores, connections, network stats, interaction analytics)
 
 **Backlog (P3):**
-16–20. Google Drive, Audit UI, Theming, Task board, Contact Intelligence
+16–19. Google Drive, Audit UI, Theming, Task board

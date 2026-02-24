@@ -129,7 +129,7 @@
 </div>
 
 <!-- Insights Bar -->
-<div id="insights-bar" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+<div id="insights-bar" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
     <!-- Stale Contacts / Reminders -->
     <div id="stale-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
@@ -172,6 +172,21 @@
             <span id="dup-count" class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">0</span>
         </div>
         <div id="dup-list" class="max-h-[200px] overflow-y-auto custom-scrollbar">
+            <div class="flex items-center justify-center py-6">
+                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Network Stats -->
+    <div id="network-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
+        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-emerald-50/50">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-emerald-600 text-[18px]">hub</span>
+                <h3 class="text-sm font-bold text-text-main">Network Stats</h3>
+            </div>
+        </div>
+        <div id="network-stats-content" class="max-h-[200px] overflow-y-auto custom-scrollbar">
             <div class="flex items-center justify-center py-6">
                 <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
             </div>
@@ -378,6 +393,60 @@
     </div>
 </div>
 
+<!-- Add Connection Modal -->
+<div id="connection-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+    <div class="bg-surface-card rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] flex flex-col animate-[slideIn_0.2s_ease-out]">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-border-subtle shrink-0">
+            <h3 class="text-lg font-bold text-text-main">Add Connection</h3>
+            <button onclick="closeConnectionModal()" class="p-1.5 rounded-lg hover:bg-gray-100 text-text-muted hover:text-text-main transition-colors">
+                <span class="material-symbols-outlined text-[20px]">close</span>
+            </button>
+        </div>
+        <div class="p-4 border-b border-border-subtle shrink-0">
+            <div class="relative group">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <span class="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[18px]">search</span>
+                </div>
+                <input id="connection-search-input" type="text" placeholder="Search contacts..."
+                    class="block w-full rounded-lg border border-border-subtle bg-background-body py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all" />
+            </div>
+        </div>
+        <div id="connection-search-results" class="flex-1 overflow-y-auto custom-scrollbar p-2 min-h-[150px] max-h-[250px]">
+            <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+                <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search</span>
+                Type to search for contacts...
+            </div>
+        </div>
+        <div id="connection-form" class="hidden shrink-0 border-t border-border-subtle p-4">
+            <div class="flex items-center gap-3 mb-3 p-3 bg-primary-light/50 rounded-lg border border-primary/10">
+                <span class="material-symbols-outlined text-primary text-[20px]">person</span>
+                <span id="selected-connection-name" class="text-sm font-medium text-text-main truncate"></span>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-text-main mb-1.5">Relationship Type</label>
+                <select id="connection-type"
+                    class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors">
+                    <option value="KNOWS">Knows</option>
+                    <option value="REFERRED_BY">Referred by</option>
+                    <option value="REPORTS_TO">Reports to</option>
+                    <option value="COLLEAGUE">Colleague</option>
+                    <option value="INTRODUCED_BY">Introduced by</option>
+                </select>
+            </div>
+            <div class="mb-3">
+                <label class="block text-sm font-medium text-text-main mb-1.5">Notes <span class="text-text-muted font-normal">(optional)</span></label>
+                <input id="connection-notes" type="text" placeholder="How do they know each other?"
+                    class="w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" />
+            </div>
+            <button id="connection-submit" onclick="submitConnection()"
+                class="w-full py-2 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-colors flex items-center justify-center gap-2">
+                <span class="material-symbols-outlined text-[18px]">link</span>
+                Add Connection
+            </button>
+        </div>
+    </div>
+</div>
+
 </main>
 </div>
 
@@ -399,6 +468,8 @@ let currentContact = null;
 let currentFilter = { search: '', type: '' };
 let searchTimeout = null;
 let selectedDealId = null;
+let contactScores = {};
+let selectedConnectionContactId = null;
 
 // ============================================================
 // Utility Functions
@@ -457,6 +528,22 @@ const STAGE_STYLES = {
     'PASSED':         { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Passed' },
     'CLOSED_WON':     { bg: 'bg-secondary-light', text: 'text-secondary', label: 'Closed Won' },
     'CLOSED_LOST':    { bg: 'bg-red-50', text: 'text-red-700', label: 'Closed Lost' },
+};
+
+// Relationship score config
+const SCORE_CONFIG = {
+    Cold:   { bg: 'bg-blue-100',    text: 'text-blue-700',    dot: 'bg-blue-500' },
+    Warm:   { bg: 'bg-amber-100',   text: 'text-amber-700',   dot: 'bg-amber-500' },
+    Active: { bg: 'bg-emerald-100', text: 'text-emerald-700', dot: 'bg-emerald-500' },
+    Strong: { bg: 'bg-green-100',   text: 'text-green-800',   dot: 'bg-green-600' },
+};
+
+const RELATIONSHIP_TYPE_CONFIG = {
+    KNOWS:         { label: 'Knows',         icon: 'handshake',    bg: 'bg-blue-100',    text: 'text-blue-700' },
+    REFERRED_BY:   { label: 'Referred by',   icon: 'share',        bg: 'bg-purple-100',  text: 'text-purple-700' },
+    REPORTS_TO:    { label: 'Reports to',    icon: 'account_tree', bg: 'bg-amber-100',   text: 'text-amber-700' },
+    COLLEAGUE:     { label: 'Colleague',     icon: 'group',        bg: 'bg-emerald-100', text: 'text-emerald-700' },
+    INTRODUCED_BY: { label: 'Introduced by', icon: 'person_add',   bg: 'bg-pink-100',    text: 'text-pink-700' },
 };
 
 function getInitials(firstName, lastName) {
@@ -573,6 +660,55 @@ async function searchDeals(query) {
 }
 
 // ============================================================
+// API — Scores, Connections, Network
+// ============================================================
+
+async function fetchScores() {
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts/insights/scores`);
+        if (!res.ok) return {};
+        const data = await res.json();
+        return data.scores || {};
+    } catch { return {}; }
+}
+
+async function fetchConnections(contactId) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${contactId}/connections`);
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.connections || [];
+}
+
+async function createConnection(contactId, body) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${contactId}/connections`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to create connection');
+    }
+    return await res.json();
+}
+
+async function deleteConnection(contactId, connectionId) {
+    const res = await PEAuth.authFetch(`${API_BASE}/contacts/${contactId}/connections/${connectionId}`, { method: 'DELETE' });
+    if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to remove connection');
+    }
+}
+
+async function fetchNetworkInsights() {
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts/insights/network`);
+        if (!res.ok) return null;
+        return await res.json();
+    } catch { return null; }
+}
+
+// ============================================================
 // Rendering — Contact Cards
 // ============================================================
 
@@ -643,15 +779,23 @@ function renderContactCard(contact) {
                 </div>
                 ` : ''}
 
-                <!-- Footer: Last contacted + Deals count -->
+                <!-- Footer: Last contacted + Score + Deals count -->
                 <div class="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
                     <span class="text-[11px] text-text-muted font-medium">${escapeHtml(lastContactedText)}</span>
-                    ${linkedDealsCount > 0 ? `
-                    <span class="flex items-center gap-1 text-[11px] text-text-muted font-medium">
-                        <span class="material-symbols-outlined text-[14px]">work</span>
-                        ${linkedDealsCount} deal${linkedDealsCount !== 1 ? 's' : ''}
-                    </span>
-                    ` : ''}
+                    <div class="flex items-center gap-2">
+                        ${(() => {
+                            const sd = contactScores[contact.id];
+                            if (!sd) return '';
+                            const sc = SCORE_CONFIG[sd.label] || SCORE_CONFIG.Cold;
+                            return `<span class="flex items-center gap-1 px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.text} text-[10px] font-bold"><span class="w-1.5 h-1.5 rounded-full ${sc.dot}"></span>${sd.score}</span>`;
+                        })()}
+                        ${linkedDealsCount > 0 ? `
+                        <span class="flex items-center gap-1 text-[11px] text-text-muted font-medium">
+                            <span class="material-symbols-outlined text-[14px]">work</span>
+                            ${linkedDealsCount}
+                        </span>
+                        ` : ''}
+                    </div>
                 </div>
             </article>
         </div>
@@ -705,9 +849,10 @@ async function loadContacts() {
     grid.innerHTML = renderLoadingState();
 
     try {
-        const data = await fetchContacts();
+        const [data, scores] = await Promise.all([fetchContacts(), fetchScores()]);
         contacts = data.contacts || data || [];
         totalContacts = data.total || contacts.length;
+        contactScores = scores;
 
         // Update header counts
         const badge = document.getElementById('contact-count-badge');
@@ -852,6 +997,18 @@ function renderDetailPanel(contact) {
         html += `</div></div>`;
     }
 
+    // Connections (loaded asynchronously)
+    html += `<div class="mb-6" id="connections-section">`;
+    html += `<div class="flex items-center justify-between mb-3">`;
+    html += `  <h4 class="text-xs font-bold uppercase tracking-wider text-text-muted">Connections</h4>`;
+    html += `  <button onclick="showAddConnectionModal()" class="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-primary hover:bg-primary-light transition-colors">`;
+    html += `    <span class="material-symbols-outlined text-[14px]">add</span> Add`;
+    html += `  </button>`;
+    html += `</div>`;
+    html += `<div id="connections-list" class="flex flex-col gap-2">`;
+    html += `  <div class="flex items-center justify-center py-3"><span class="material-symbols-outlined text-text-muted text-sm animate-spin">sync</span></div>`;
+    html += `</div></div>`;
+
     // Notes
     if (notes) {
         html += `<div class="mb-6">`;
@@ -894,6 +1051,55 @@ function renderDetailPanel(contact) {
         html += `</div>`;
     }
     html += `</div>`;
+
+    // Interaction Stats
+    if (sortedInteractions.length > 0) {
+        const typeCounts = { NOTE: 0, MEETING: 0, CALL: 0, EMAIL: 0, OTHER: 0 };
+        for (const inter of sortedInteractions) {
+            typeCounts[inter.type] = (typeCounts[inter.type] || 0) + 1;
+        }
+        const dates = sortedInteractions.map(i => new Date(i.date || i.createdAt).getTime());
+        const oldest = Math.min(...dates);
+        const newest = Math.max(...dates);
+        const monthSpan = Math.max(1, (newest - oldest) / (30 * 86400000));
+        const avgPerMonth = (sortedInteractions.length / monthSpan).toFixed(1);
+
+        html += `<div class="mb-6">`;
+        html += `<h4 class="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Interaction Stats</h4>`;
+        html += `<div class="grid grid-cols-3 gap-2 mb-2">`;
+        html += `<div class="p-2.5 rounded-lg bg-background-body border border-border-subtle text-center">
+            <p class="text-lg font-bold text-text-main">${sortedInteractions.length}</p>
+            <p class="text-[10px] text-text-muted font-medium uppercase">Total</p>
+        </div>`;
+        html += `<div class="p-2.5 rounded-lg bg-background-body border border-border-subtle text-center">
+            <p class="text-lg font-bold text-text-main">~${avgPerMonth}</p>
+            <p class="text-[10px] text-text-muted font-medium uppercase">Per Month</p>
+        </div>`;
+        const scoreData = contactScores[contact.id];
+        if (scoreData) {
+            const sc = SCORE_CONFIG[scoreData.label] || SCORE_CONFIG.Cold;
+            html += `<div class="p-2.5 rounded-lg ${sc.bg} border border-border-subtle text-center">
+                <p class="text-lg font-bold ${sc.text}">${scoreData.score}</p>
+                <p class="text-[10px] ${sc.text} font-medium uppercase">${scoreData.label}</p>
+            </div>`;
+        } else {
+            html += `<div class="p-2.5 rounded-lg bg-background-body border border-border-subtle text-center">
+                <p class="text-lg font-bold text-text-muted">—</p>
+                <p class="text-[10px] text-text-muted font-medium uppercase">Score</p>
+            </div>`;
+        }
+        html += `</div>`;
+        html += `<div class="flex flex-wrap gap-2">`;
+        for (const [type, count] of Object.entries(typeCounts)) {
+            if (count > 0) {
+                const icon = INTERACTION_ICONS[type] || INTERACTION_ICONS.OTHER;
+                html += `<span class="flex items-center gap-1 px-2 py-1 rounded-md bg-background-body border border-border-subtle text-[11px] text-text-secondary font-medium">
+                    <span class="material-symbols-outlined text-[14px]">${icon}</span> ${count} ${type.charAt(0) + type.slice(1).toLowerCase()}${count !== 1 ? 's' : ''}
+                </span>`;
+            }
+        }
+        html += `</div></div>`;
+    }
 
     // Interaction Timeline
     html += `<div class="mb-2">`;
@@ -980,6 +1186,185 @@ function renderDetailPanel(contact) {
     html += `</div>`;
 
     body.innerHTML = html;
+
+    // Load connections asynchronously
+    loadConnectionsForDetail(contact.id);
+}
+
+async function loadConnectionsForDetail(contactId) {
+    const list = document.getElementById('connections-list');
+    if (!list) return;
+    try {
+        const connections = await fetchConnections(contactId);
+        if (connections.length === 0) {
+            list.innerHTML = `<p class="text-text-muted text-sm italic">No connections yet</p>`;
+            return;
+        }
+        list.innerHTML = connections.map(conn => {
+            const c = conn.contact || {};
+            const rtc = RELATIONSHIP_TYPE_CONFIG[conn.type] || { label: conn.type, icon: 'link', bg: 'bg-gray-100', text: 'text-gray-700' };
+            const tc = TYPE_CONFIG[c.type] || TYPE_CONFIG.OTHER;
+            const name = escapeHtml(`${c.firstName || ''} ${c.lastName || ''}`.trim());
+            const initials = getInitials(c.firstName, c.lastName);
+            return `
+                <div class="flex items-center gap-3 p-2.5 rounded-lg border border-border-subtle hover:border-primary/30 hover:bg-primary-light/30 transition-all group cursor-pointer" onclick="openDetail('${escapeHtml(c.id)}')">
+                    <div class="size-8 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">
+                        ${escapeHtml(initials)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-text-main truncate group-hover:text-primary">${name}</p>
+                        <p class="text-[10px] text-text-muted truncate">${escapeHtml(c.company || '')}${c.title ? ' · ' + escapeHtml(c.title) : ''}</p>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-md ${rtc.bg} ${rtc.text} text-[9px] font-bold uppercase tracking-wider shrink-0">${escapeHtml(rtc.label)}</span>
+                    <button onclick="event.stopPropagation(); handleDeleteConnection('${contactId}', '${escapeHtml(conn.id)}')" class="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0" title="Remove">
+                        <span class="material-symbols-outlined text-[14px]">close</span>
+                    </button>
+                </div>
+            `;
+        }).join('');
+    } catch (err) {
+        list.innerHTML = `<p class="text-text-muted text-xs">Unable to load connections</p>`;
+    }
+}
+
+async function handleDeleteConnection(contactId, connectionId) {
+    if (!confirm('Remove this connection?')) return;
+    try {
+        await deleteConnection(contactId, connectionId);
+        showNotification('Connection Removed', 'Connection has been removed.', 'success');
+        if (currentContact) openDetail(currentContact.id);
+    } catch (err) {
+        showNotification('Error', err.message, 'error');
+    }
+}
+
+// ============================================================
+// Add Connection Modal
+// ============================================================
+
+function showAddConnectionModal() {
+    if (!currentContact) return;
+    selectedConnectionContactId = null;
+    const modal = document.getElementById('connection-modal');
+    const results = document.getElementById('connection-search-results');
+    const form = document.getElementById('connection-form');
+    const searchInput = document.getElementById('connection-search-input');
+
+    results.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+            <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search</span>
+            Type to search for contacts...
+        </div>`;
+    form.classList.add('hidden');
+    searchInput.value = '';
+    document.getElementById('connection-type').value = 'KNOWS';
+    document.getElementById('connection-notes').value = '';
+
+    modal.classList.remove('hidden');
+    setTimeout(() => searchInput.focus(), 100);
+}
+
+function closeConnectionModal() {
+    document.getElementById('connection-modal').classList.add('hidden');
+    selectedConnectionContactId = null;
+}
+
+async function handleConnectionSearch(query) {
+    const results = document.getElementById('connection-search-results');
+    const form = document.getElementById('connection-form');
+
+    if (!query || query.length < 2) {
+        results.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+                <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search</span>
+                Type to search for contacts...
+            </div>`;
+        form.classList.add('hidden');
+        selectedConnectionContactId = null;
+        return;
+    }
+
+    results.innerHTML = `
+        <div class="flex items-center justify-center py-6">
+            <span class="material-symbols-outlined text-primary animate-spin text-xl">sync</span>
+        </div>`;
+
+    try {
+        const params = new URLSearchParams({ search: query, limit: '20' });
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts?${params.toString()}`);
+        if (!res.ok) throw new Error('Search failed');
+        const data = await res.json();
+        const allResults = Array.isArray(data) ? data : (data.contacts || []);
+
+        // Exclude current contact
+        const available = allResults.filter(c => c.id !== currentContact.id);
+
+        if (available.length === 0) {
+            results.innerHTML = `
+                <div class="flex flex-col items-center justify-center py-8 text-text-muted text-sm">
+                    <span class="material-symbols-outlined text-3xl mb-2 opacity-40">search_off</span>
+                    No matching contacts found
+                </div>`;
+            return;
+        }
+
+        results.innerHTML = available.map(c => {
+            const tc = TYPE_CONFIG[c.type] || TYPE_CONFIG.OTHER;
+            const name = `${c.firstName || ''} ${c.lastName || ''}`.trim();
+            const initials = getInitials(c.firstName, c.lastName);
+            return `
+                <button class="conn-search-result w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-primary-light/50 transition-colors"
+                        data-contact-id="${escapeHtml(c.id)}" data-contact-name="${escapeHtml(name)}">
+                    <div class="size-8 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">
+                        ${escapeHtml(initials)}
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-text-main truncate">${escapeHtml(name)}</p>
+                        <p class="text-xs text-text-muted truncate">${c.company ? escapeHtml(c.company) + ' · ' : ''}${escapeHtml(tc.label)}</p>
+                    </div>
+                </button>`;
+        }).join('');
+
+        // Click handlers for search results
+        results.querySelectorAll('.conn-search-result').forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedConnectionContactId = btn.dataset.contactId;
+                document.getElementById('selected-connection-name').textContent = btn.dataset.contactName;
+                form.classList.remove('hidden');
+
+                results.querySelectorAll('.conn-search-result').forEach(b => b.classList.remove('bg-primary-light/50', 'ring-1', 'ring-primary/30'));
+                btn.classList.add('bg-primary-light/50', 'ring-1', 'ring-primary/30');
+            });
+        });
+    } catch (err) {
+        console.error('Error searching contacts for connection:', err);
+        results.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 text-red-500 text-sm">
+                <span class="material-symbols-outlined text-3xl mb-2">error</span>
+                Failed to search contacts
+            </div>`;
+    }
+}
+
+async function submitConnection() {
+    if (!currentContact || !selectedConnectionContactId) return;
+
+    const type = document.getElementById('connection-type').value;
+    const notes = document.getElementById('connection-notes').value.trim();
+
+    try {
+        await createConnection(currentContact.id, {
+            relatedContactId: selectedConnectionContactId,
+            type,
+            notes: notes || undefined,
+        });
+        showNotification('Connection Added', 'Connection has been created.', 'success');
+        closeConnectionModal();
+        await openDetail(currentContact.id);
+    } catch (err) {
+        console.error('Error creating connection:', err);
+        showNotification('Error', err.message, 'error');
+    }
 }
 
 function closeDetail() {
@@ -1328,13 +1713,70 @@ function showNotification(title, message, type) {
 }
 
 // ============================================================
-// Insights — Timeline, Duplicates, Stale Contacts
+// Insights — Timeline, Duplicates, Stale Contacts, Network
 // ============================================================
 
 async function loadInsights() {
     loadTimeline();
     loadStaleContacts();
     loadDuplicates();
+    loadNetworkStats();
+}
+
+async function loadNetworkStats() {
+    const container = document.getElementById('network-stats-content');
+    try {
+        const data = await fetchNetworkInsights();
+        if (!data) throw new Error('No data');
+
+        const byType = data.byType || {};
+        const mostConnected = (data.mostConnected || []).slice(0, 3);
+
+        let typeBadges = Object.entries(byType)
+            .filter(([, count]) => count > 0)
+            .map(([type, count]) => {
+                const tc = TYPE_CONFIG[type] || TYPE_CONFIG.OTHER;
+                return `<span class="px-2 py-0.5 rounded-md ${tc.bg} ${tc.text} text-[10px] font-bold">${escapeHtml(tc.label)} ${count}</span>`;
+            }).join('');
+
+        let topList = '';
+        if (mostConnected.length > 0) {
+            topList = `
+                <div class="mt-2 pt-2 border-t border-border-subtle">
+                    <p class="text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Most Connected</p>
+                    ${mostConnected.map(c => {
+                        const tc = TYPE_CONFIG[c.type] || TYPE_CONFIG.OTHER;
+                        const name = `${c.firstName || ''} ${c.lastName || ''}`.trim();
+                        return `
+                        <div class="flex items-center gap-2 py-1 cursor-pointer hover:bg-gray-50 rounded px-1 -mx-1" onclick="openDetail('${escapeHtml(c.id)}')">
+                            <div class="size-5 rounded-full flex items-center justify-center shrink-0 text-[8px] font-bold" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">
+                                ${escapeHtml(((c.firstName || '')[0] || '') + ((c.lastName || '')[0] || '')).toUpperCase()}
+                            </div>
+                            <span class="text-xs text-text-main truncate flex-1">${escapeHtml(name)}</span>
+                            <span class="text-[10px] text-text-muted">${c.score || 0}</span>
+                        </div>`;
+                    }).join('')}
+                </div>`;
+        }
+
+        container.innerHTML = `
+            <div class="px-4 py-3">
+                <div class="flex items-center gap-4 mb-2">
+                    <div class="text-center">
+                        <p class="text-lg font-bold text-text-main">${data.totalContacts || 0}</p>
+                        <p class="text-[10px] text-text-muted">Contacts</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-lg font-bold text-emerald-600">${data.totalConnections || 0}</p>
+                        <p class="text-[10px] text-text-muted">Connections</p>
+                    </div>
+                </div>
+                ${typeBadges ? `<div class="flex flex-wrap gap-1">${typeBadges}</div>` : ''}
+                ${topList}
+            </div>`;
+    } catch (err) {
+        container.innerHTML = `<div class="px-4 py-4 text-xs text-text-muted text-center">Unable to load network stats</div>`;
+    }
 }
 
 async function loadTimeline() {
@@ -1521,10 +1963,24 @@ function initializeFilters() {
     }, 300);
     dealSearchInput.addEventListener('input', debouncedDealSearch);
 
+    // Close connection modal on backdrop click
+    document.getElementById('connection-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('connection-modal')) closeConnectionModal();
+    });
+
+    // Connection search input with debounce
+    const connSearchInput = document.getElementById('connection-search-input');
+    const debouncedConnSearch = debounce(() => {
+        handleConnectionSearch(connSearchInput.value.trim());
+    }, 300);
+    connSearchInput.addEventListener('input', debouncedConnSearch);
+
     // Keyboard shortcuts
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-            if (!document.getElementById('link-deal-modal').classList.contains('hidden')) {
+            if (!document.getElementById('connection-modal').classList.contains('hidden')) {
+                closeConnectionModal();
+            } else if (!document.getElementById('link-deal-modal').classList.contains('hidden')) {
                 closeLinkDealModal();
             } else if (!document.getElementById('contact-modal').classList.contains('hidden')) {
                 closeContactModal();

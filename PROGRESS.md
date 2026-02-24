@@ -5,6 +5,89 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 20 — February 24, 2026
+
+#### TODO #20: Contact Intelligence / Relationship Tracking — ~6:30 PM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/contacts.ts` | Added `relationshipTypes` and `createConnectionSchema` Zod schemas | Validate relationship type (KNOWS, REFERRED_BY, REPORTS_TO, COLLEAGUE, INTRODUCED_BY) and connection payloads |
+| 2 | `apps/api/src/routes/contacts.ts` | Added `GET /insights/scores` endpoint | Computes relationship strength (0-100) for all contacts: recency (0-40 pts), frequency (0-40 pts), deals (0-20 pts). Labels: Cold/Warm/Active/Strong |
+| 3 | `apps/api/src/routes/contacts.ts` | Added `GET /insights/network` endpoint | Network overview: total contacts, contacts by type, total connections, top 5 most-connected |
+| 4 | `apps/api/src/routes/contacts.ts` | Added `GET /:id/connections` endpoint | Bidirectional fetch of connections (both directions), joins related contact info |
+| 5 | `apps/api/src/routes/contacts.ts` | Added `POST /:id/connections` endpoint | Create connection with Zod validation, self-link prevention, duplicate conflict handling |
+| 6 | `apps/api/src/routes/contacts.ts` | Added `DELETE /:id/connections/:connectionId` endpoint | Remove connection by ID |
+| 7 | `apps/web/contacts.html` | Added `SCORE_CONFIG` and `RELATIONSHIP_TYPE_CONFIG` objects | Color and icon config for 4 score labels and 5 relationship types |
+| 8 | `apps/web/contacts.html` | Added 5 API functions: `fetchScores`, `fetchConnections`, `createConnection`, `deleteConnection`, `fetchNetworkInsights` | Frontend API layer for new backend endpoints |
+| 9 | `apps/web/contacts.html` | Modified `loadContacts()` to fetch scores in parallel | `Promise.all([fetchContacts(), fetchScores()])` — scores load alongside contacts, no extra latency |
+| 10 | `apps/web/contacts.html` | Added score badge to contact card footer | Colored dot + score number (e.g., green "87") next to deals count |
+| 11 | `apps/web/contacts.html` | Added interaction stats section to detail panel | Shows total interactions, monthly frequency, relationship score, and type breakdown badges (calls: X, meetings: X, etc.) |
+| 12 | `apps/web/contacts.html` | Added "Connections" section to detail panel | Lists connected contacts with avatar, name, company, relationship type badge, and remove button. Clicking navigates to that contact |
+| 13 | `apps/web/contacts.html` | Added Add Connection modal HTML + JS | Search contacts, select one, pick relationship type, add optional notes, submit — follows link-deal-modal pattern |
+| 14 | `apps/web/contacts.html` | Added Network Stats insight panel (4th panel in insights bar) | Shows total contacts, total connections, type breakdown badges, top 3 most-connected contacts |
+| 15 | `apps/web/contacts.html` | Updated insights grid from `lg:grid-cols-3` to `lg:grid-cols-4` | Accommodate 4th Network Stats panel |
+| 16 | `apps/web/contacts.html` | Updated `loadInsights()` to also call `loadNetworkStats()` | Network stats loads alongside other insight panels |
+| 17 | `apps/web/contacts.html` | Wired up connection modal event listeners (backdrop click, Escape key, debounced search) | Consistent with existing deal/contact modal patterns |
+| 18 | `TODO-CALL-FEB19.md` | Updated #20 from ❌ to ✅, updated summary to 16/20 done | Documentation |
+
+**Technical details:**
+- Relationship scoring formula: recency (0-40 pts, based on days since `lastContactedAt`), frequency (0-40 pts, based on interaction count), deals (0-20 pts, based on linked deal count)
+- Score labels: Cold (0-25), Warm (26-50), Active (51-75), Strong (76-100) — each with distinct color scheme
+- Connections are bidirectional — both directions queried in `GET /:id/connections`
+- Connection modal reuses existing `GET /contacts?search=...` for contact search (no new endpoint needed)
+- Network Stats panel queries `ContactRelationship` table for connection counts and most-connected contacts
+- **Requires:** Run `ContactRelationship` table SQL in Supabase SQL Editor (provided below)
+- Build verified: `tsc --noEmit` clean, `vite build` clean
+
+**SQL Migration (run in Supabase SQL Editor):**
+```sql
+CREATE TABLE "ContactRelationship" (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  "contactId" UUID NOT NULL REFERENCES "Contact"(id) ON DELETE CASCADE,
+  "relatedContactId" UUID NOT NULL REFERENCES "Contact"(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('KNOWS','REFERRED_BY','REPORTS_TO','COLLEAGUE','INTRODUCED_BY')),
+  notes TEXT,
+  "createdBy" UUID REFERENCES "User"(id),
+  "createdAt" TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE("contactId", "relatedContactId"),
+  CHECK ("contactId" != "relatedContactId")
+);
+CREATE INDEX idx_contact_rel_contact ON "ContactRelationship" ("contactId");
+CREATE INDEX idx_contact_rel_related ON "ContactRelationship" ("relatedContactId");
+```
+
+**Score: 16/20 tasks done — ALL P0, P1, P2 complete + 1 P3 done. 4 P3 backlog remaining.**
+
+---
+
+### Session 19 — February 24, 2026
+
+#### TODO #15: Deal Dashboard — Customizable Metrics — ~4:15 PM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/users.ts` | Added `dealCardMetrics` to `updateSelfSchema` Zod schema + preference merge block | Backend validation and persistence for metric visibility preferences |
+| 2 | `apps/web/js/layout.js` | Added `preferences` field to USER object and cache | Pass user preferences through `pe-user-loaded` event so CRM page can consume without extra API call |
+| 3 | `apps/web/crm.html` | Added `METRIC_CONFIG` map with 5 metrics (IRR, MoM, EBITDA, Revenue, Deal Size) | Centralized label, format function, and color logic — eliminates hardcoded per-metric rendering |
+| 4 | `apps/web/crm.html` | Added "Metrics" button + dropdown to CRM toolbar (between view toggle and sort) | UI for toggling visible metrics — checkboxes, Apply/Reset controls |
+| 5 | `apps/web/crm.html` | Added `initializeMetricsSelector()`, `saveMetricsPreference()`, `loadCachedMetrics()` functions | Dropdown toggle/apply logic, backend save via PATCH, localStorage caching for instant load |
+| 6 | `apps/web/crm.html` | Replaced hardcoded 2x2 metrics grid in `renderDealCard()` with dynamic loop over `activeCardMetrics` | Cards now render only user-selected metrics; grid adapts (2-col or 3-col) |
+| 7 | `apps/web/crm.html` | Replaced hardcoded 3-metric row in `renderKanbanCard()` with dynamic loop (capped at 3) | Kanban cards respect metric preferences too |
+| 8 | `apps/web/crm.html` | Added `pe-user-loaded` listener + `loadCachedMetrics()` in DOMContentLoaded init | Load preferences from localStorage instantly, sync from server as source of truth |
+| 9 | `TODO-CALL-FEB19.md` | Updated #15 from ❌ to ✅, updated summary to 15/20 done, all P0-P2 complete | Documentation |
+
+**Technical details:**
+- 5 available metrics: `irrProjected` (IRR %), `mom` (multiple x), `ebitda` (currency), `revenue` (currency), `dealSize` (currency)
+- Default: IRR, MoM, EBITDA, Revenue (matches previous hardcoded behavior)
+- Preferences stored in `User.preferences` JSONB column (existing infrastructure, no migration needed)
+- Dual persistence: localStorage (instant) + server via `PATCH /api/users/me` (durable)
+- `pe-user-loaded` event syncs server preferences on page load, correcting any stale localStorage
+- Build verified: `tsc --noEmit` clean, `vite build` clean
+
+**Score: 15/20 tasks done — ALL P0, P1, P2 complete. Only P3 backlog (5 items) remaining.**
+
+---
+
 ### Session 16 — February 24, 2026
 
 #### TODO #12: Settings / AI Preferences — Make Fully Functional — ~1:30 PM IST
