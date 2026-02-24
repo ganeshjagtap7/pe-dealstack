@@ -1273,7 +1273,6 @@ router.post('/:dealId/chat', async (req, res) => {
 
     const { error: userMsgError } = await supabase.from('ChatMessage').insert({
       dealId,
-      userId,
       role: 'user',
       content: message,
     });
@@ -1283,7 +1282,6 @@ router.post('/:dealId/chat', async (req, res) => {
 
     const { error: aiMsgError } = await supabase.from('ChatMessage').insert({
       dealId,
-      userId,
       role: 'assistant',
       content: aiResponse,
       metadata: { model: 'gpt-4-turbo-preview' },

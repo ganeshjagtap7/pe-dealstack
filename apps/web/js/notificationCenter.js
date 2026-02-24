@@ -331,6 +331,7 @@ window.PENotifications = (function() {
     // Public API
     return {
         init,
+        setupButton: setupNotificationButton,
         loadNotifications,
         togglePanel,
         closePanel,
@@ -347,6 +348,13 @@ document.addEventListener('DOMContentLoaded', () => {
             window.PENotifications.init();
         }
     }, 500);
+
+    // Re-setup button after layout.js replaces the header (runs at ~1s)
+    setTimeout(() => {
+        if (window.PENotifications) {
+            window.PENotifications.setupButton();
+        }
+    }, 1500);
 });
 
 console.log('PENotifications loaded successfully');

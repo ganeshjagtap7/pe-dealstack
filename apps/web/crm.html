@@ -455,6 +455,26 @@
         </main>
     </div>
 
+    <!-- Delete Deal Confirmation Modal -->
+    <div id="delete-deal-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/20 backdrop-blur-[2px]" id="delete-deal-modal-backdrop"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-xs border border-red-100 overflow-hidden">
+                <div class="px-6 pt-6 pb-5 text-center">
+                    <div class="size-10 rounded-xl bg-red-50 flex items-center justify-center mx-auto mb-3">
+                        <span class="material-symbols-outlined text-red-400 text-xl">delete</span>
+                    </div>
+                    <h3 class="text-[15px] font-semibold text-text-main mb-1.5" id="delete-deal-title">Delete Deal?</h3>
+                    <p class="text-xs text-text-muted leading-relaxed">This will permanently delete the deal along with all documents, data room files, and team assignments.</p>
+                </div>
+                <div class="flex gap-3 px-5 pb-5">
+                    <button id="delete-deal-cancel" class="flex-1 py-2 text-sm font-medium text-text-secondary bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                    <button id="delete-deal-confirm" class="flex-1 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">Delete</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Load shared layout and auth -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
@@ -1140,21 +1160,45 @@
             await bulkUpdateStage('PASSED');
         }
 
+        // Delete deal confirmation modal (promise-based)
+        const deleteModal = document.getElementById('delete-deal-modal');
+        const deleteModalBackdrop = document.getElementById('delete-deal-modal-backdrop');
+        const deleteModalTitle = document.getElementById('delete-deal-title');
+        const deleteModalCancel = document.getElementById('delete-deal-cancel');
+        const deleteModalConfirm = document.getElementById('delete-deal-confirm');
+        let deleteResolve = null;
+
+        function showDeleteConfirm(title) {
+            deleteModalTitle.textContent = title;
+            deleteModal.classList.remove('hidden');
+            return new Promise(resolve => { deleteResolve = resolve; });
+        }
+
+        function closeDeleteModal(confirmed) {
+            deleteModal.classList.add('hidden');
+            if (deleteResolve) { deleteResolve(confirmed); deleteResolve = null; }
+        }
+
+        deleteModalBackdrop.addEventListener('click', () => closeDeleteModal(false));
+        deleteModalCancel.addEventListener('click', () => closeDeleteModal(false));
+        deleteModalConfirm.addEventListener('click', () => closeDeleteModal(true));
+
         // Delete single deal
         async function deleteDeal(dealId, dealName) {
             closeDealMenus();
-            if (!confirm(`Are you sure you want to delete "${dealName}"?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`)) {
-                return;
-            }
+            const confirmed = await showDeleteConfirm(`Delete "${dealName}"?`);
+            if (!confirmed) return;
             try {
                 const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`, {
                     method: 'DELETE'
                 });
                 if (!response.ok) {
                     const err = await response.json().catch(() => ({}));
-                    throw new Error(err.error || 'Failed to delete deal');
+                    if (response.status === 403) {
+                        throw new Error(`You don't have permission to delete deals. Your role (${err.userRole || 'unknown'}) requires deal:delete access. Contact your admin.`);
+                    }
+                    throw new Error(err.message || err.error || 'Failed to delete deal');
                 }
-                // Remove from local state and re-render
                 allDeals = allDeals.filter(d => d.id !== dealId);
                 selectedDeals.delete(dealId);
                 renderDealsGrid();
@@ -1163,7 +1207,7 @@
                 showNotification('Deal Deleted', `"${dealName}" has been deleted`, 'success');
             } catch (error) {
                 console.error('Error deleting deal:', error);
-                showNotification('Error', error.message || 'Failed to delete deal', 'error');
+                showNotification('Permission Denied', error.message || 'Failed to delete deal', 'error');
             }
         }
 
@@ -1171,9 +1215,13 @@
         async function bulkDeleteDeals() {
             const dealIds = [...selectedDeals];
             if (dealIds.length === 0) return;
-            if (!confirm(`Are you sure you want to delete ${dealIds.length} deal${dealIds.length > 1 ? 's' : ''}?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`)) {
-                return;
-            }
+            const count = dealIds.length;
+            const confirmed = await showDeleteConfirm(`Delete ${count} deal${count > 1 ? 's' : ''}?`);
+            if (!confirmed) return;
+            await executeBulkDelete(dealIds);
+        }
+
+        async function executeBulkDelete(dealIds) {
 
             let successCount = 0;
             let failCount = 0;

@@ -1334,12 +1334,25 @@ function initChatInterface() {
     // Send button click
     sendButton.addEventListener('click', sendMessage);
 
-    // Clear chat history button
+    // Clear chat history button — opens styled confirmation modal
     const clearChatBtn = document.getElementById('clear-chat-btn');
-    if (clearChatBtn) {
-        clearChatBtn.addEventListener('click', async () => {
+    const clearChatModal = document.getElementById('clear-chat-modal');
+    const clearChatCancel = document.getElementById('clear-chat-cancel');
+    const clearChatConfirm = document.getElementById('clear-chat-confirm');
+    const clearChatBackdrop = document.getElementById('clear-chat-modal-backdrop');
+
+    if (clearChatBtn && clearChatModal) {
+        clearChatBtn.addEventListener('click', () => {
             if (!state.dealId) return;
-            if (!confirm('Clear all chat history for this deal? This cannot be undone.')) return;
+            clearChatModal.classList.remove('hidden');
+        });
+
+        const closeClearModal = () => clearChatModal.classList.add('hidden');
+        clearChatCancel.addEventListener('click', closeClearModal);
+        clearChatBackdrop.addEventListener('click', closeClearModal);
+
+        clearChatConfirm.addEventListener('click', async () => {
+            closeClearModal();
             try {
                 const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.dealId}/chat/history`, { method: 'DELETE' });
                 if (response.ok) {
@@ -1464,11 +1477,10 @@ async function loadChatHistory() {
                 // Clear the default intro message and any hardcoded content
                 chatContainer.querySelectorAll('.ai-intro-message').forEach(el => el.remove());
 
-                // Add conversation history header
-                const firstMsgDate = new Date(data.messages[0].createdAt);
+                // Add conversation history divider
                 const headerDiv = document.createElement('div');
-                headerDiv.className = 'flex justify-center';
-                headerDiv.innerHTML = `<span class="text-xs text-text-muted font-medium bg-white border border-border-subtle px-3 py-1 rounded-full shadow-sm">${data.count} previous messages</span>`;
+                headerDiv.className = 'flex items-center gap-3 py-1';
+                headerDiv.innerHTML = `<div class="flex-1 h-px bg-border-subtle"></div><span class="text-[11px] text-text-muted/60 font-medium uppercase tracking-wider">Chat History</span><div class="flex-1 h-px bg-border-subtle"></div>`;
                 chatContainer.appendChild(headerDiv);
 
                 // Render each message
@@ -1485,13 +1497,21 @@ async function loadChatHistory() {
                 scrollToBottom();
             } else {
                 console.log('[Chat] No messages in history');
+                // Show intro message when there's no history
+                chatContainer.querySelectorAll('.ai-intro-message').forEach(el => el.classList.remove('hidden'));
             }
         } else {
             const errorData = await response.json().catch(() => ({}));
             console.error('[Chat] Failed to load history:', response.status, errorData);
+            // Show intro on error too
+            const chatContainer = document.getElementById('chat-messages');
+            chatContainer?.querySelectorAll('.ai-intro-message').forEach(el => el.classList.remove('hidden'));
         }
     } catch (error) {
         console.error('[Chat] Failed to load chat history:', error);
+        // Show intro on error
+        const chatContainer = document.getElementById('chat-messages');
+        chatContainer?.querySelectorAll('.ai-intro-message').forEach(el => el.classList.remove('hidden'));
     }
 }
 

@@ -49,6 +49,7 @@ function cacheUserData(userData) {
 // User data — immediately use cache if available, otherwise show Loading...
 const cachedUser = getCachedUser();
 let USER = cachedUser || {
+    id: '',
     name: 'Loading...',
     role: '',           // Display role/title
     systemRole: '',     // System role for permissions (ADMIN, MEMBER, VIEWER)
@@ -67,6 +68,7 @@ async function loadUserData() {
             if (response.ok) {
                 const userData = await response.json();
                 USER = {
+                    id: userData.id || '',
                     name: userData.name || userData.email?.split('@')[0] || 'User',
                     role: userData.title || getRoleLabel(userData.role) || 'Team Member',
                     systemRole: userData.role || 'MEMBER',  // ADMIN, MEMBER, or VIEWER

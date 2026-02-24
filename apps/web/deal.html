@@ -470,8 +470,8 @@
 
                 <!-- Chat Messages -->
                 <div id="chat-messages" class="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col custom-scrollbar">
-                    <!-- AI Welcome Message (removed when history loads) -->
-                    <div class="ai-intro-message flex gap-4 max-w-[90%]">
+                    <!-- AI Welcome Message (hidden by default, shown only if no history) -->
+                    <div class="ai-intro-message flex gap-4 max-w-[90%] hidden">
                         <div
                             class="size-8 rounded-lg bg-gradient-to-br from-primary to-primary-hover flex items-center justify-center shrink-0 shadow-md shadow-primary/20">
                             <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
@@ -547,6 +547,27 @@
     <script src="js/globalSearch.js"></script>
     <script src="js/shareModal.js"></script>
     <script src="js/inviteModal.js"></script>
+
+    <!-- Clear Chat Confirmation Modal -->
+    <div id="clear-chat-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/20 backdrop-blur-[2px]" id="clear-chat-modal-backdrop"></div>
+        <div class="absolute inset-0 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl shadow-xl w-full max-w-xs border border-red-100 overflow-hidden">
+                <div class="px-6 pt-6 pb-5 text-center">
+                    <div class="size-10 rounded-xl bg-red-50 flex items-center justify-center mx-auto mb-3">
+                        <span class="material-symbols-outlined text-red-400 text-xl">delete_sweep</span>
+                    </div>
+                    <h3 class="text-[15px] font-semibold text-text-main mb-1.5">Clear Chat History?</h3>
+                    <p class="text-xs text-text-muted leading-relaxed">All messages for this deal will be permanently removed.</p>
+                </div>
+                <div class="flex gap-3 px-5 pb-5">
+                    <button id="clear-chat-cancel" class="flex-1 py-2 text-sm font-medium text-text-secondary bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                    <button id="clear-chat-confirm" class="flex-1 py-2 text-sm font-medium text-red-500 bg-red-50 hover:bg-red-100 rounded-lg transition-colors">Clear</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="deal.js"></script>
 </body>
 

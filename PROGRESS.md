@@ -8525,3 +8525,94 @@ CREATE TABLE "Task" (
 - `vite build` — ✅ passed (620ms)
 
 ---
+
+### Session 21 — February 25, 2026
+
+#### UI Polish & Bug Fixes (multiple pages) — ~12:00 PM IST
+
+**Summary:** Fixed several UI/UX issues across CRM, Deal, Dashboard, Admin, Settings, VDR, and notification pages. Expanded RBAC permissions for MEMBER and OPS roles. Connected dashboard tasks widget to real API. Added styled confirmation modals. Fixed memo builder DB issues (missing tables + FK constraints).
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/middleware/rbac.ts` | Added `MEMBER` role to ROLES enum and role hierarchy | Default role for new users was `MEMBER` but had no permissions defined — all new users were getting 403s |
+| 2 | `apps/api/src/middleware/rbac.ts` | Added full MEMBER permission set (deal CRUD, doc view/upload/delete, memo view/create/edit, AI) | New users need baseline access without needing admin to assign a PE-specific role |
+| 3 | `apps/api/src/middleware/rbac.ts` | Expanded OPS role permissions (added deal:create/edit/delete/assign/export, doc:delete, memo:create/edit, AI generate/ingest, admin:audit) | OPS users were blocked from most actions; they need near-admin access for operations |
+| 4 | `apps/api/src/routes/deals.ts` | Removed `userId` field from ChatMessage inserts (user + assistant messages) | ChatMessage table schema has no `userId` column — was causing silent insert failures for deal chat |
+| 5 | `apps/web/deal.js` | Replaced `confirm()` dialog with styled Clear Chat modal (open/close/confirm flow) | Native browser `confirm()` looks jarring and unprofessional — matches app's modal design system |
+| 6 | `apps/web/deal.js` | Changed chat history header from pill badge to subtle divider line with "CHAT HISTORY" label | Previous "X previous messages" pill was distracting; divider is cleaner |
+| 7 | `apps/web/deal.js` | Show AI intro message when no chat history exists or on load error | Previously showed blank chat area on first visit — now shows welcome message |
+| 8 | `apps/web/deal.html` | AI intro message hidden by default (`hidden` class), shown only if no history | Prevents flash of intro message before history loads and replaces it |
+| 9 | `apps/web/deal.html` | Added Clear Chat confirmation modal HTML (red-themed, icon, cancel/confirm buttons) | Styled modal for clear chat action with proper backdrop and accessibility |
+| 10 | `apps/web/crm.html` | Added Delete Deal confirmation modal HTML (red-themed, dynamic title) | Replaces native `confirm()` with styled modal matching app design |
+| 11 | `apps/web/crm.html` | Refactored `deleteDeal()` to use promise-based modal instead of `confirm()` | Modal shows deal name, returns promise resolved by confirm/cancel buttons |
+| 12 | `apps/web/crm.html` | Added graceful 403 error handling for deal deletion | Shows "Permission Denied" with role info instead of generic error when user lacks `deal:delete` |
+| 13 | `apps/web/crm.html` | Refactored bulk delete to use same confirmation modal | Consistent UX for single and bulk delete operations |
+| 14 | `apps/web/dashboard.js` | Replaced hardcoded 5-task array with live API integration | Tasks were static demo data — now fetches real tasks via `GET /api/tasks?assignedTo={userId}` |
+| 15 | `apps/web/dashboard.js` | Added `loadRealTasks()` with loading state, error state, and empty state | Shows spinner while loading, cloud-off icon on error, "All caught up!" when no tasks |
+| 16 | `apps/web/dashboard.js` | Added task checkbox → PATCH `/api/tasks/:id` with optimistic UI + rollback | Checking a task marks it COMPLETED in real-time with API persistence and revert on failure |
+| 17 | `apps/web/dashboard.js` | Added "View All Tasks" modal with full task list, priority badges, deal links | Expands beyond the 5-task widget limit to show all assigned tasks |
+| 18 | `apps/web/dashboard.js` | Added `formatTaskDue()` for human-readable due dates (Overdue, Due Today, Due Tomorrow, etc.) | Replaced static strings with calculated relative dates |
+| 19 | `apps/web/admin-dashboard.html` | Added Schedule Review modal (title, deal, assignee, date, priority, notes fields) | "Schedule Review" button was non-functional — now creates `[Review]` prefixed tasks |
+| 20 | `apps/web/admin-dashboard.html` | Added Send Reminder modal (team member, deal, message fields) | "Send Reminder" button was non-functional — now sends notifications via POST /api/notifications |
+| 21 | `apps/web/admin-dashboard.html` | Made Upcoming Reviews card dynamic (renders from `[Review]` tasks) | Was hardcoded "TechCorp IC Meeting Feb 08" — now shows real scheduled reviews |
+| 22 | `apps/web/admin-dashboard.html` | Added IDs to filter/sort buttons for task table | Enables JS to attach filter and sort dropdown handlers |
+| 23 | `apps/web/admin-dashboard.js` | Added `handleScheduleReview()` — creates task with `[Review]` prefix via POST /api/tasks | Reviews stored as tasks for unified management |
+| 24 | `apps/web/admin-dashboard.js` | Added `handleSendReminder()` — sends notification via POST /api/notifications | Admin can send targeted reminders to team members with deal context |
+| 25 | `apps/web/admin-dashboard.js` | Added `renderUpcomingReviews()` — dynamically renders from `[Review]` tasks, shows overdue state | Auto-populates from real task data, sorted by due date |
+| 26 | `apps/web/admin-dashboard.js` | Added task filter/sort system (5 filters: All/Pending/In Progress/Completed/Overdue, 3 sorts: Date/Due/Priority) | Task table was static — now supports interactive filtering and sorting with dropdown menus |
+| 27 | `apps/web/settings.html` | Fixed settings nav links: `href="#general"` → `href="#section-general"` (all 5 nav items) | Clicking nav items caused page to scroll to wrong position due to ID mismatch |
+| 28 | `apps/web/settings.html` | Added smooth scroll + `history.replaceState` for settings navigation | Nav items now smoothly scroll to their sections and update URL hash |
+| 29 | `apps/web/settings.html` | Added hash-based deep linking on page load | Opening `/settings.html#security` scrolls directly to Security section |
+| 30 | `apps/web/js/layout.js` | Added `id` field to USER object (both cached and API-loaded) | Dashboard tasks needed `USER.id` to filter tasks by assignee — was undefined before |
+| 31 | `apps/web/js/notificationCenter.js` | Exposed `setupButton` in public API | Needed for re-initialization after layout.js replaces header HTML |
+| 32 | `apps/web/js/notificationCenter.js` | Added delayed re-setup (1.5s timeout) after DOMContentLoaded | Notification bell button was lost when layout.js replaced header ~1s after load |
+| 33 | `apps/web/src/vdr.tsx` | Made "Data Room" breadcrumb text clickable (navigates to root folder) | Clicking "Data Room" in breadcrumb `Deal > Data Room > Folder` now goes back to root |
+
+#### Memo Builder DB Fixes — ~1:30 PM IST
+
+**Summary:** Investigated and fixed memo builder showing hardcoded "Project Apollo" demo data instead of creating real memos. Root cause was missing DB tables and FK constraints.
+
+| # | Issue | Root Cause | Fix |
+|---|-------|-----------|-----|
+| 1 | Memo builder always shows demo "Project Apollo" data | `POST /api/memos` failing → frontend `loadDemoData()` fallback | Fixed underlying DB issues (see below) |
+| 2 | `MemoTemplate` and `MemoTemplateSection` tables missing | Migration SQL was documented in PROGRESS.md Session 11 but never run | User ran CREATE TABLE SQL in Supabase SQL Editor |
+| 3 | `Memo_createdBy_fkey` FK constraint violation on memo creation | `createdBy` (TEXT) had FK to `User(id)` (UUID) — type mismatch | User ran `ALTER TABLE "Memo" DROP CONSTRAINT` for both `createdBy` and `lastEditedBy` FK constraints |
+| 4 | `templateId=sample-1` fails Zod validation | Backend `createMemoSchema` requires `templateId: z.string().uuid()` but frontend sends non-UUID strings for built-in samples | Identified — pending fix for template flow integration |
+| 5 | RLS policies "already exists" error on re-running migration | Memo tables already existed from previous setup | User ran DROP/CREATE policy SQL |
+
+**SQL migrations run by user in Supabase:**
+```sql
+-- 1. MemoTemplate + MemoTemplateSection tables (from PROGRESS.md Session 11)
+CREATE TABLE IF NOT EXISTS "MemoTemplate" (...)
+CREATE TABLE IF NOT EXISTS "MemoTemplateSection" (...)
+
+-- 2. Drop bad FK constraints on Memo table
+ALTER TABLE "Memo" DROP CONSTRAINT IF EXISTS "Memo_createdBy_fkey";
+ALTER TABLE "Memo" DROP CONSTRAINT IF EXISTS "Memo_lastEditedBy_fkey";
+
+-- 3. Fix RLS policies
+DROP POLICY IF EXISTS "Allow all for Memo" ON "Memo";
+CREATE POLICY "Allow all for Memo" ON "Memo" FOR ALL USING (true) WITH CHECK (true);
+-- (same for MemoSection, MemoConversation, MemoChatMessage, ChatMessage)
+```
+
+#### Remaining TODO Extraction — ~11:30 AM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `REMAINING-TODO.md` | Created organized TODO file from compact.md (6855 lines) | User wanted all pending items extracted into a standalone reference file for later work |
+
+**Categories in REMAINING-TODO.md:**
+- Immediate/Blocking (5 items): uncommitted changes, env vars, key rotation, debug endpoints, UI verification
+- P3 Backlog (4 items): Google Drive, Audit UI, Theming, Task Board
+- Backend Features Missing Frontend UI (4 items): CSV export, URL research preview, multi-doc analysis, email ingest
+- Infrastructure/DevOps (5 items): encryption key, PgBouncer, pg_trgm, Render deploy, TypeScript `any` fixes
+- Quick Wins/Polish (6 items): broken links, console.logs, CTA buttons, duplicate imports, mobile menu, forex API
+- Contacts CRM Roadmap (10 tiers): future features user said "we can move into when I say"
+
+### Verification
+- API server: running on port 3001, hot-reload working
+- Memo builder: creates real memos after DB fixes (no more demo fallback)
+- All modified files: 14 tracked files + 1 new file (REMAINING-TODO.md)
+
+---

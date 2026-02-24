@@ -105,11 +105,11 @@
         <span class="material-symbols-outlined text-[18px]">add_task</span>
         Create Task
     </button>
-    <button class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-gray-100 rounded-lg transition-all">
+    <button id="schedule-review-btn" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-gray-100 rounded-lg transition-all">
         <span class="material-symbols-outlined text-[18px]">calendar_month</span>
         Schedule Review
     </button>
-    <button class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-gray-100 rounded-lg transition-all">
+    <button id="send-reminder-btn" class="flex items-center gap-2 px-4 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-gray-100 rounded-lg transition-all">
         <span class="material-symbols-outlined text-[18px]">notifications_active</span>
         Send Reminder
     </button>
@@ -210,11 +210,11 @@
                     </h2>
                     <span class="bg-gray-200 text-text-secondary text-xs px-2 py-0.5 rounded-full font-medium" id="pending-count">12 Pending</span>
                 </div>
-                <div class="flex gap-2">
-                    <button class="p-1.5 text-text-muted hover:text-primary hover:bg-gray-100 rounded transition-colors">
+                <div class="flex gap-2 relative">
+                    <button id="task-filter-btn" class="p-1.5 text-text-muted hover:text-primary hover:bg-gray-100 rounded transition-colors" title="Filter tasks">
                         <span class="material-symbols-outlined text-[20px]">filter_list</span>
                     </button>
-                    <button class="p-1.5 text-text-muted hover:text-primary hover:bg-gray-100 rounded transition-colors">
+                    <button id="task-sort-btn" class="p-1.5 text-text-muted hover:text-primary hover:bg-gray-100 rounded transition-colors" title="Sort tasks">
                         <span class="material-symbols-outlined text-[20px]">sort</span>
                     </button>
                 </div>
@@ -273,32 +273,14 @@
             </div>
         </div>
 
-        <!-- Upcoming Review Card -->
-        <div class="bg-gradient-to-br from-primary to-primary-hover rounded-xl shadow-lg p-5 text-white relative overflow-hidden">
+        <!-- Upcoming Reviews (dynamic from [Review] tasks) -->
+        <div id="upcoming-reviews-card" class="bg-gradient-to-br from-primary to-primary-hover rounded-xl shadow-lg p-5 text-white relative overflow-hidden">
             <div class="absolute top-0 right-0 p-3 opacity-10">
                 <span class="material-symbols-outlined text-[80px]">event_available</span>
             </div>
-            <h3 class="font-bold text-lg mb-1 relative z-10">Upcoming Review</h3>
-            <p class="text-blue-200 text-sm mb-4 relative z-10">Investment Committee - TechCorp</p>
-            <div class="bg-white/10 backdrop-blur-sm rounded-lg p-3 mb-4 border border-white/10 relative z-10">
-                <div class="flex items-center gap-3">
-                    <div class="bg-white text-primary rounded-lg px-2.5 py-1.5 text-center min-w-[50px]">
-                        <span class="block text-[10px] font-bold uppercase tracking-wide">Feb</span>
-                        <span class="block text-xl font-bold leading-none">08</span>
-                    </div>
-                    <div>
-                        <p class="font-medium text-sm">Thursday, 2:00 PM</p>
-                        <p class="text-xs text-blue-200">Main Conference Room</p>
-                    </div>
-                </div>
-            </div>
-            <div class="flex gap-2 relative z-10">
-                <button class="flex-1 bg-white text-primary text-sm font-semibold py-2 rounded-lg hover:bg-gray-100 transition-colors">
-                    View Deck
-                </button>
-                <button class="flex-1 bg-white/10 text-white text-sm font-semibold py-2 rounded-lg hover:bg-white/20 transition-colors border border-white/20">
-                    Reschedule
-                </button>
+            <h3 class="font-bold text-lg mb-1 relative z-10">Upcoming Reviews</h3>
+            <div id="upcoming-reviews-list" class="relative z-10">
+                <p class="text-blue-200 text-sm">Loading...</p>
             </div>
         </div>
     </div>
@@ -415,6 +397,110 @@
             <div class="p-6 border-t border-border-subtle bg-gray-50 rounded-b-xl flex justify-end gap-3">
                 <button id="cancel-task" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
                 <button id="submit-task" class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Create Task</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Schedule Review Modal -->
+<div id="schedule-review-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/50 transition-opacity" id="review-modal-backdrop"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
+            <div class="p-6 border-b border-border-subtle">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-text-main flex items-center gap-2">
+                        <span class="material-symbols-outlined text-primary">calendar_month</span>
+                        Schedule Review
+                    </h3>
+                    <button id="close-review-modal" class="p-1 text-text-muted hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Review Title</label>
+                    <input id="review-title-input" type="text" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" placeholder="e.g., IC Meeting — TechCorp SaaS">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Related Deal</label>
+                        <select id="review-deal-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="">Choose deal...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Review Date</label>
+                        <input id="review-date-input" type="date" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Reviewer</label>
+                        <select id="review-user-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="">Assign reviewer...</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-text-main mb-2">Priority</label>
+                        <select id="review-priority-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                            <option value="HIGH">High</option>
+                            <option value="MEDIUM" selected>Medium</option>
+                            <option value="LOW">Low</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Notes (Optional)</label>
+                    <textarea id="review-notes" rows="2" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" placeholder="Review agenda or prep notes..."></textarea>
+                </div>
+            </div>
+            <div class="p-6 border-t border-border-subtle bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button id="cancel-review" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button id="submit-review" class="px-4 py-2 text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded-lg transition-colors">Schedule Review</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Send Reminder Modal -->
+<div id="send-reminder-modal" class="hidden fixed inset-0 z-50 overflow-y-auto">
+    <div class="flex min-h-full items-center justify-center p-4">
+        <div class="fixed inset-0 bg-black/50 transition-opacity" id="reminder-modal-backdrop"></div>
+        <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-lg transform transition-all">
+            <div class="p-6 border-b border-border-subtle">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-semibold text-text-main flex items-center gap-2">
+                        <span class="material-symbols-outlined text-orange-500">notifications_active</span>
+                        Send Reminder
+                    </h3>
+                    <button id="close-reminder-modal" class="p-1 text-text-muted hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">
+                        <span class="material-symbols-outlined">close</span>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-5">
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Send To</label>
+                    <select id="reminder-user-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <option value="">Choose team member...</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Message</label>
+                    <textarea id="reminder-message" rows="3" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none" placeholder="e.g., Please submit the IC memo by EOD..."></textarea>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-text-main mb-2">Related Deal (Optional)</label>
+                    <select id="reminder-deal-select" class="w-full px-3 py-2.5 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all">
+                        <option value="">No deal</option>
+                    </select>
+                </div>
+            </div>
+            <div class="p-6 border-t border-border-subtle bg-gray-50 rounded-b-xl flex justify-end gap-3">
+                <button id="cancel-reminder" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main hover:bg-gray-100 rounded-lg transition-colors">Cancel</button>
+                <button id="submit-reminder" class="px-4 py-2 text-sm font-medium text-white bg-orange-500 hover:bg-orange-600 rounded-lg transition-colors">Send Reminder</button>
             </div>
         </div>
     </div>

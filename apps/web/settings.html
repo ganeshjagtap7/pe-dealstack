@@ -140,23 +140,23 @@
                         <!-- Settings Sidebar -->
                         <aside class="hidden lg:block w-56 shrink-0">
                             <nav class="sticky top-6 flex flex-col gap-1">
-                                <a href="#general" data-section="general" class="settings-nav-item active flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                <a href="#section-general" data-section="general" class="settings-nav-item active flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
                                     <span class="material-symbols-outlined text-[20px]">person</span>
                                     <span class="text-sm font-medium">General</span>
                                 </a>
-                                <a href="#ai" data-section="ai" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                <a href="#section-ai" data-section="ai" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
                                     <span class="material-symbols-outlined text-[20px]">auto_awesome</span>
                                     <span class="text-sm font-medium">AI Preferences</span>
                                 </a>
-                                <a href="#interface" data-section="interface" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                <a href="#section-interface" data-section="interface" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
                                     <span class="material-symbols-outlined text-[20px]">display_settings</span>
                                     <span class="text-sm font-medium">Interface</span>
                                 </a>
-                                <a href="#security" data-section="security" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                <a href="#section-security" data-section="security" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
                                     <span class="material-symbols-outlined text-[20px]">shield</span>
                                     <span class="text-sm font-medium">Security</span>
                                 </a>
-                                <a href="#notifications" data-section="notifications" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                <a href="#section-notifications" data-section="notifications" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
                                     <span class="material-symbols-outlined text-[20px]">notifications</span>
                                     <span class="text-sm font-medium">Notifications</span>
                                 </a>
@@ -966,13 +966,32 @@ function initPasswordForm() {
 
 // Event listeners
 function initializeEventListeners() {
-    // Settings nav
+    // Settings nav — smooth scroll to section
     document.querySelectorAll('.settings-nav-item').forEach(item => {
         item.addEventListener('click', (e) => {
+            e.preventDefault();
             document.querySelectorAll('.settings-nav-item').forEach(i => i.classList.remove('active'));
             e.currentTarget.classList.add('active');
+            const section = e.currentTarget.dataset.section;
+            const target = document.getElementById(`section-${section}`);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                history.replaceState(null, '', `#${section}`);
+            }
         });
     });
+
+    // Handle direct hash links on page load
+    const hash = window.location.hash.replace('#', '').replace('section-', '');
+    if (hash) {
+        const target = document.getElementById(`section-${hash}`);
+        if (target) {
+            setTimeout(() => target.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300);
+            document.querySelectorAll('.settings-nav-item').forEach(i => {
+                i.classList.toggle('active', i.dataset.section === hash);
+            });
+        }
+    }
 
     // Form inputs - with null checks
     const nameInput = document.getElementById('input-name');
