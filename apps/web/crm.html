@@ -1599,6 +1599,11 @@
                 }
             });
 
+            // Prevent clicks inside dropdown from closing it
+            dropdown.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+
             document.getElementById('metrics-save-btn')?.addEventListener('click', () => {
                 const checked = [...document.querySelectorAll('.metric-checkbox:checked')]
                     .map(cb => cb.dataset.metric);

@@ -725,19 +725,25 @@ router.post('/:id/connections', async (req: any, res) => {
       return res.status(400).json({ error: 'Cannot create a connection to the same contact' });
     }
 
+    const insertData: any = {
+      contactId: id,
+      relatedContactId,
+      type,
+      notes: notes || null,
+    };
+    // Only set createdBy if user ID exists — FK may fail if User table ID differs from auth ID
+    if (req.user?.id) {
+      insertData.createdBy = req.user.id;
+    }
+
     const { data: connection, error } = await supabase
       .from('ContactRelationship')
-      .insert({
-        contactId: id,
-        relatedContactId,
-        type,
-        notes: notes || null,
-        createdBy: req.user?.id,
-      })
+      .insert(insertData)
       .select()
       .single();
 
     if (error) {
+      log.error('Connection insert error', { code: error.code, message: error.message, details: error.details, hint: error.hint });
       if (error.code === '23505') {
         return res.status(409).json({ error: 'This connection already exists' });
       }
