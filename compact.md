@@ -7088,3 +7088,198 @@ Summary:
 If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/ganesh/.claude/projects/-Users-ganesh-AI-CRM/26cc2d81-105e-4383-b9df-e996fdcc0992.jsonl
 
 ------------------------------------------------------------
+This session is being continued from a previous conversation that ran out of context. The summary below covers the earlier portion of the conversation.
+
+Analysis:
+Let me chronologically trace through the conversation to identify all key details:
+
+1. **Context from previous session (compacted):**
+   - User was verifying TODO items from TODO-CALL-FEB19.md: #7 Templates + Memo Builder, #4 Ingest updates, #5 AI Extraction source quotes
+   - Discovered memo builder shows hardcoded "Project Apollo" demo data
+   - Found root causes: MemoTemplate/MemoTemplateSection tables missing, templateId=sample-1 fails Zod UUID validation, Memo_createdBy_fkey FK constraint
+   - User ran MemoTemplate SQL and policy fixes
+   - REMAINING-TODO.md was created
+   - Multiple uncommitted files from previous sessions
+
+2. **User message: "done ran above sql querry sicessfulyy !"**
+   - User confirmed running MemoTemplate + MemoTemplateSection CREATE TABLE SQL
+
+3. **My response:** Told user to test `memo-builder.html?new=true` without templateId first
+
+4. **User message: "still i am seeing this hardcoded data" (with screenshot)**
+   - Screenshot shows memo-builder at `localhost:3000/memo-builder.html?new=true` still showing Project Apollo demo data
+
+5. **Investigation:** Read memo-builder.js initialization flow (lines 140-237) and memos.ts POST route (lines 220-345)
+   - Found createMemoAPI sends POST to /api/memos
+   - Backend creates memo in Supabase, creates default sections
+   - If any error, frontend falls back to loadDemoData()
+
+6. **More investigation:** Checked API server status, found previous background process completed. Restarted API server.
+
+7. **My response:** Asked user to refresh and check DevTools console for the actual error
+
+8. **User message: "i can see this" (with screenshot of DevTools console)**
+   - Console clearly shows: `POST http://localhost:3001/api/memos 500 (Internal Server Error)`
+   - Error: `Failed to create memo: insert or update on table "...ates for...eign key constraint "Memo_createdBy_fkey"`
+   - Then: `Failed to create memo, using demo data`
+
+9. **My diagnosis:** FK constraint on `createdBy` referencing User table, but user ID from auth doesn't match or type mismatch (TEXT vs UUID)
+   - Fix: DROP the FK constraints on createdBy and lastEditedBy
+
+10. **User message: "done ,"** - confirmed running ALTER TABLE DROP CONSTRAINT SQL
+
+11. **My response:** Asked user to refresh memo-builder.html?new=true
+
+12. **User message: "good"** - confirmed it's working now (implicit)
+
+13. **User's final request:** "update the progress.md file with deatils and push the code to git and commit with proper comments. moving on onwards always include timestamp in progress.md file and the goal for this is to keep track of my day to day work where i can visit back sometine and see all the things i done, it should be like a deatiled channelog also which i can share with my founders if they every ask what did i do these many days or what did i do in this specific daay. keep all original data as it is of the file, just add new lines to it dont make any changes to previous data in file."
+
+14. **My actions:**
+    - Read PROGRESS.md (8527 lines), found end at line 8527
+    - Checked git status: 16 modified/deleted files + untracked files
+    - Checked git diff --stat for all changes
+    - Read detailed diffs for all changed files:
+      - rbac.ts: MEMBER role + expanded OPS permissions
+      - deals.ts: removed userId from ChatMessage inserts
+      - deal.js: styled clear chat modal, chat history divider, intro message fixes
+      - deal.html: hidden intro message, clear chat modal HTML
+      - crm.html: delete deal modal, promise-based confirm, graceful 403
+      - dashboard.js: real API tasks integration (replaced hardcoded)
+      - admin-dashboard.html: schedule review modal, send reminder modal, dynamic reviews card, filter/sort button IDs
+      - admin-dashboard.js: handleScheduleReview, handleSendReminder, renderUpcomingReviews, task filter/sort system
+      - settings.html: fixed nav scroll IDs, smooth scroll, hash deep linking
+      - layout.js: added id to USER object
+      - notificationCenter.js: exposed setupButton, delayed re-setup
+      - vdr.tsx: clickable Data Room breadcrumb
+    - Appended Session 21 entry to PROGRESS.md with detailed tables and timestamps
+    - Staged 15 files (excluding .env.example deletions and personal todo files)
+    - Committed with detailed message
+    - Pushed to main (b8a148b)
+
+Key files and changes tracked:
+- All 15 files committed with detailed changelog in PROGRESS.md
+- REMAINING-TODO.md created as new file
+- compact.md updated with session summaries
+
+The memo builder verification (#7) was the main debugging task. The FK constraint issue was the final blocker. After fixing it, the user confirmed it worked ("good"), then asked to update progress and commit.
+
+The original todo list had 3 verification items (#7, #4, #5) but the user pivoted to commit/push before completing #4 and #5.
+
+Summary:
+1. Primary Request and Intent:
+   - **Initial task (from previous session):** Verify 3 TODO items in the live UI, one by one: #7 Templates + Memo Builder integration, #4 Ingest updates to existing deals, #5 AI Extraction source quotes
+   - **This session's debugging:** Fix memo builder showing hardcoded "Project Apollo" demo data instead of creating real memos via API
+   - **Final explicit request:** Update PROGRESS.md with detailed changelog (including timestamps, file-by-file changes), then commit and push to git with proper commit messages
+   - **Standing instruction for PROGRESS.md:** Always include timestamps, keep as detailed changelog that can be shared with founders, never modify previous entries — only append new data
+   - **Standing instruction:** "yes lets do all one by one, after each is done get my approval and then move to next. dont do all at once!" and "dont push to git unless i approve"
+
+2. Key Technical Concepts:
+   - **Monorepo:** Turborepo + npm workspaces (apps/api Express+TS port 3001, apps/web Vite+vanilla JS port 3000)
+   - **Database:** Supabase (PostgreSQL + Auth + Storage) with RLS policies
+   - **Memo Builder demo fallback pattern:** `createMemoAPI()` → if 500 error → `loadDemoData()` shows hardcoded DEMO_MEMO
+   - **Zod validation:** `createMemoSchema` with `templateId: z.string().uuid().optional()` — rejects non-UUID strings like "sample-1"
+   - **RBAC system:** Role hierarchy with MEMBER/OPS/ANALYST/ADMIN roles and permission-based access control
+   - **Auth pattern:** `PEAuth.authFetch()` wraps fetch with Supabase JWT, `authMiddleware` verifies on backend
+   - **Supabase FK constraints:** TEXT columns with FK references to UUID columns cause type mismatch failures
+   - **Template integration flow:** MemoTemplate → MemoTemplateSection → SECTION_TYPE_MAP → MemoSection
+
+3. Files and Code Sections:
+
+   - **`apps/web/memo-builder.js`** — Core file for memo builder, contains demo fallback logic
+     - Lines 14-107: `DEMO_MEMO` hardcoded "Project Apollo" data with 5 fake sections
+     - Lines 160-237: DOMContentLoaded initialization — URL param parsing, API call attempts, `loadDemoData()` fallback
+     - Lines 272-305: `createMemoAPI()` — POSTs to `/api/memos`, returns null on failure
+     - Lines 366-374: `createNewMemo()` — calls createMemoAPI, then loadMemoFromAPI
+     - Lines 618-629: `loadDemoData()` — sets state.memo = DEMO_MEMO when API fails
+     ```javascript
+     if (createNew || !dealId) {
+         const created = await createNewMemo({ dealId, projectName, templateId });
+         if (!created) { loadDemoData(); }
+     }
+     ```
+
+   - **`apps/api/src/routes/memos.ts`** — Backend memo CRUD routes
+     - Lines 15-24: `createMemoSchema` Zod validation with `templateId: z.string().uuid().optional()`
+     - Lines 228-345: POST `/api/memos` — creates memo in Supabase, creates sections from template or defaults
+     - Lines 240-246: Strips templateId, sets `createdBy: user?.id` (this was the FK violation source)
+     ```typescript
+     const { templateId, ...memoFields } = validation.data;
+     const memoData = {
+       ...memoFields,
+       createdBy: user?.id,
+       lastEditedBy: user?.id,
+     };
+     ```
+
+   - **`apps/api/prisma/migrations/add_memo_tables.sql`** — SQL migration for Memo, MemoSection, MemoConversation, MemoChatMessage, ChatMessage tables (152 lines). `createdBy` defined as TEXT with no FK, but constraint was added separately.
+
+   - **`apps/api/src/middleware/rbac.ts`** — Modified: Added MEMBER role + expanded OPS permissions
+     - Added `MEMBER: 'member'` to ROLES enum
+     - Added MEMBER to ROLE_HIERARCHY
+     - Added full MEMBER permission set (deal CRUD, doc view/upload/delete, memo view/create/edit, AI)
+     - Expanded OPS from read-only to near-admin (deal CRUD, admin audit, AI generate/ingest)
+
+   - **`apps/api/src/routes/deals.ts`** — Removed `userId` field from ChatMessage inserts (both user and assistant messages) — table has no userId column
+
+   - **`apps/web/deal.js`** — Replaced confirm() with styled modal for clear chat, changed history header to divider, show intro message when no history
+   - **`apps/web/deal.html`** — Hidden intro message by default, added clear chat confirmation modal HTML
+   - **`apps/web/crm.html`** — Added delete deal confirmation modal, promise-based confirm flow, graceful 403 handling
+   - **`apps/web/dashboard.js`** — Replaced hardcoded 5-task array with live API: `loadRealTasks()`, checkbox → PATCH, "View All" modal, `formatTaskDue()`
+   - **`apps/web/admin-dashboard.html`** — Added Schedule Review modal, Send Reminder modal, dynamic Upcoming Reviews card, filter/sort button IDs
+   - **`apps/web/admin-dashboard.js`** — Added `handleScheduleReview()`, `handleSendReminder()`, `renderUpcomingReviews()`, task filter/sort system (5 filters, 3 sorts)
+   - **`apps/web/settings.html`** — Fixed nav href IDs (`#general` → `#section-general`), added smooth scroll + hash deep linking
+   - **`apps/web/js/layout.js`** — Added `id: ''` / `id: userData.id` to USER object for task assignee filtering
+   - **`apps/web/js/notificationCenter.js`** — Exposed `setupButton` in public API, added 1.5s delayed re-setup after layout.js header replacement
+   - **`apps/web/src/vdr.tsx`** — Made "Data Room" breadcrumb text clickable with `onClick={() => setActiveFolderId(null)}`
+   - **`PROGRESS.md`** — Appended Session 21 with 3 sub-sections: UI Polish (33 items), Memo Builder DB Fixes (5 items), TODO Extraction (1 item)
+   - **`REMAINING-TODO.md`** — Created: organized extraction of all pending items from compact.md (6 categories)
+
+4. Errors and Fixes:
+   - **Memo builder showing hardcoded demo data:**
+     - Root cause 1: `MemoTemplate` and `MemoTemplateSection` tables didn't exist in Supabase — migration was documented in PROGRESS.md but never run
+     - Fix: User ran CREATE TABLE SQL in Supabase SQL Editor
+   - **RLS policy "already exists" error when re-running migration:**
+     - Root cause: Memo/MemoSection tables already existed from previous setup
+     - Fix: Provided DROP POLICY IF EXISTS + CREATE POLICY SQL, user ran successfully
+   - **POST /api/memos returns 500 — FK constraint violation `Memo_createdBy_fkey`:**
+     - Root cause: `createdBy` (TEXT) had a foreign key constraint to `User(id)` — the auth user ID didn't match or type mismatch
+     - Fix: `ALTER TABLE "Memo" DROP CONSTRAINT IF EXISTS "Memo_createdBy_fkey"` and same for `lastEditedBy`
+     - User confirmed running the SQL: "done ,"
+   - **templateId=sample-1 fails Zod UUID validation:**
+     - Root cause: Frontend templates page sends non-UUID IDs for built-in samples, backend requires `z.string().uuid()`
+     - Status: Identified but NOT yet fixed — testing was done without templateId param (`?new=true` only)
+   - **API server process stopped during debugging:**
+     - Fix: Restarted with `cd apps/api && npm run dev` in background
+
+5. Problem Solving:
+   - Traced the full memo builder failure path: URL params → DOMContentLoaded init → `createMemoAPI()` POST → 500 error → `loadDemoData()` fallback
+   - Used browser DevTools screenshot to identify exact error: FK constraint violation on `Memo_createdBy_fkey`
+   - Solved incrementally: first created missing tables, then fixed RLS policies, then fixed FK constraints
+   - After FK fix, memo builder successfully creates real memos (user confirmed with "good")
+   - Successfully committed 15 files and pushed to remote (b8a148b)
+
+6. All User Messages:
+   - "done ran above sql querry sicessfulyy !" — confirming MemoTemplate tables SQL was run
+   - "still i am seeing this hardcoded data" (with screenshot of memo builder showing Project Apollo at `localhost:3000/memo-builder.html?new=true`)
+   - "i can see this" (with DevTools console screenshot showing POST /api/memos 500, FK constraint error `Memo_createdBy_fkey`)
+   - "done ," — confirming DROP CONSTRAINT SQL was run
+   - "good" — confirming memo builder is now working
+   - "update the progress.md file with deatils and push the code to git and commit with proper comments. moving on onwards always include timestamp in progress.md file and the goal for this is to keep track of my day to day work where i can visit back sometine and see all the things i done, it should be like a deatiled channelog also which i can share with my founders if they every ask what did i do these many days or what did i do in this specific daay. keep all original data as it is of the file, just add new lines to it dont make any changes to previous data in file."
+
+7. Pending Tasks:
+   - **Verify #4 Ingest updates to existing deals** — not yet started (was pending in todo list)
+   - **Verify #5 AI Extraction source quotes** — not yet started (was pending in todo list)
+   - **Fix templateId=sample-1 UUID validation issue** — identified but not fixed; the template flow (Templates page → "Use Template" → memo builder with real template UUID) still needs testing/fixing
+   - **REMAINING-TODO.md items** — user said "will do this later"
+
+8. Current Work:
+   The most recent completed work was updating PROGRESS.md with Session 21 details and committing/pushing all changes to git. The commit `b8a148b` was pushed to `main` with 15 files. The PROGRESS.md was updated with detailed file-by-file change tables, timestamps (~12:00 PM, ~1:30 PM, ~11:30 AM IST), and SQL migration documentation. The user's PROGRESS.md preferences (timestamps, detailed changelog, founder-shareable, append-only) have been noted and saved in memory.
+
+9. Optional Next Step:
+   The original verification task had 3 items: #7 Templates (mostly verified — basic memo creation works, template flow still has the UUID issue), #4 Ingest updates, #5 AI Extraction source quotes. The user's last explicit request was to commit and push, which is complete. The user would need to confirm whether to continue verifying #4 and #5, or if they want to move on to something else. No next step should be taken without user direction.
+
+If you need specific details from before compaction (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/ganesh/.claude/projects/-Users-ganesh-AI-CRM/26cc2d81-105e-4383-b9df-e996fdcc0992.jsonl
+
+--------------------------------------------------------------
+
+

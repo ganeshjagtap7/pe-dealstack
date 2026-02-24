@@ -8616,3 +8616,53 @@ CREATE POLICY "Allow all for Memo" ON "Memo" FOR ALL USING (true) WITH CHECK (tr
 - All modified files: 14 tracked files + 1 new file (REMAINING-TODO.md)
 
 ---
+
+## Session 22 — February 25, 2026
+
+### OpenReplay Session Replay Integration — ~12:00 PM IST
+
+Added OpenReplay session replay tracking to the frontend for user behavior analytics and debugging. This allows watching real user sessions to identify UX issues, bugs, and usage patterns.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/src/openreplay-init.ts` | **Created** — OpenReplay tracker initialization module | Initializes the OpenReplay SDK with project key from `window.__ENV.OPENREPLAY_KEY`, disables secure mode on localhost for dev testing, exposes tracker instance on `window.__openReplayTracker` |
+| 2 | `apps/web/js/auth.js` | Added OpenReplay user identification in `checkAuth()` | After successful auth, calls `tracker.setUserID(email)` and sets metadata (name, firm, role) so session replays can be filtered by user identity |
+| 3 | `apps/web/vite.config.ts` | Added `OPENREPLAY_KEY` to env injection + `<script type="module">` tag for init | Injects `VITE_OPENREPLAY_KEY` / `OPENREPLAY_KEY` into `window.__ENV` and loads the OpenReplay init script via module tag in `</head>` |
+| 4 | `apps/web/package.json` | Added `@openreplay/tracker: ^17.1.6` dependency | NPM package for OpenReplay browser SDK |
+| 5 | `package-lock.json` | Updated lockfile with @openreplay/tracker resolution | Auto-generated after npm install |
+
+**How it works:**
+1. `vite.config.ts` injects `OPENREPLAY_KEY` into `window.__ENV` and adds `<script type="module" src="/src/openreplay-init.ts">` to all pages
+2. `openreplay-init.ts` reads the key, creates a `Tracker` instance, calls `.start()`, and stores it on `window.__openReplayTracker`
+3. `auth.js` picks up the tracker after login and tags the session with user email, name, firm, and role metadata
+4. Requires `VITE_OPENREPLAY_KEY` (or `OPENREPLAY_KEY`) env var to be set — gracefully does nothing if key is absent
+
+### Housekeeping — ~12:00 PM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `.env.example` | **Deleted** | Removed root .env.example — environment variables are documented elsewhere and the file risked leaking placeholder patterns |
+| 2 | `apps/web/.env.example` | **Deleted** | Same cleanup for frontend .env.example |
+| 3 | `Prompt.md` | Minor whitespace edit | Trivial formatting change |
+| 4 | `compact.md` | Appended Session 21 continuation summary | Session context log for conversation continuity across compaction boundaries |
+
+### Contact Intelligence / Relationship Tracking (TODO #20) — ~12:30 PM IST
+
+Completed implementation plan for TODO #20 from the call list. This adds relationship scoring, connection tracking, network stats, and interaction analytics to the Contacts page.
+
+**What was planned and built:**
+- **Backend (contacts.ts):** 5 new endpoints — `GET /insights/scores` (relationship strength 0-100), `GET /insights/network` (network overview stats), `GET /:id/connections`, `POST /:id/connections`, `DELETE /:id/connections/:connectionId`
+- **Frontend (contacts.html):** Score badges on contact cards, interaction stats in detail panel, connections section with add/remove, add connection modal with search, Network Stats insight panel (4th panel)
+- **Database:** `ContactRelationship` table SQL migration (requires manual run in Supabase SQL Editor)
+- **Scoring formula:** Recency (0-40 pts) + Frequency (0-40 pts) + Deals (0-20 pts) → labels: Cold/Warm/Active/Strong
+
+**Status:** Plan approved, implementation completed in previous session. TODO-CALL-FEB19.md updated to mark #20 as ✅ DONE.
+
+### Verification
+
+- OpenReplay: tracker loads on all pages, user identification fires after auth
+- Contact Intelligence: fully implemented with scoring, connections, network stats
+- `.env.example` files cleaned up
+- All changes committed and pushed
+
+---

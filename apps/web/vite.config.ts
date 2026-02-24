@@ -17,6 +17,7 @@ function injectEnvConfig(): Plugin {
         SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
         API_URL: env.VITE_API_URL || process.env.API_URL || '',
         SENTRY_DSN: env.VITE_SENTRY_DSN || process.env.SENTRY_DSN || '',
+        OPENREPLAY_KEY: env.VITE_OPENREPLAY_KEY || process.env.OPENREPLAY_KEY || '',
       })
     },
     transformIndexHtml(html) {
@@ -26,7 +27,7 @@ function injectEnvConfig(): Plugin {
       Sentry.init({ dsn: window.__ENV.SENTRY_DSN, environment: window.location.hostname === 'localhost' ? 'development' : 'production', tracesSampleRate: 0.1 });
     }
   </script>`
-      return html.replace('</head>', `  <script>window.__ENV=${envConfig}</script>\n  ${sentryScript}\n</head>`)
+      return html.replace('</head>', `  <script>window.__ENV=${envConfig}</script>\n  ${sentryScript}\n  <script type="module" src="/src/openreplay-init.ts"></script>\n</head>`)
     },
   }
 }

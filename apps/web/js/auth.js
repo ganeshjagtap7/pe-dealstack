@@ -170,6 +170,22 @@ async function checkAuth(redirectTo = null) {
     return null;
   }
 
+  // Identify user in OpenReplay for session replay filtering
+  if (window.__openReplayTracker) {
+    try {
+      window.__openReplayTracker.setUserID(user.email || user.id);
+      if (user.user_metadata?.full_name) {
+        window.__openReplayTracker.setMetadata('name', user.user_metadata.full_name);
+      }
+      if (user.user_metadata?.firm_name) {
+        window.__openReplayTracker.setMetadata('firm', user.user_metadata.firm_name);
+      }
+      if (user.user_metadata?.role) {
+        window.__openReplayTracker.setMetadata('role', user.user_metadata.role);
+      }
+    } catch (e) { /* OpenReplay not loaded yet, ignore */ }
+  }
+
   return { user, session };
 }
 

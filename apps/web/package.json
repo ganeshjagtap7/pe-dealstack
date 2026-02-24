@@ -13,6 +13,7 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
+    "@openreplay/tracker": "^17.1.6",
     "@sentry/browser": "^10.38.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
