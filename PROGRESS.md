@@ -8727,3 +8727,46 @@ Completed implementation plan for TODO #20 from the call list. This adds relatio
 - All changes committed and pushed
 
 ---
+
+## Session 24 — February 25, 2026
+
+### Vercel Production Bug Fixes — ~8:15 PM IST
+
+After the Render → Vercel migration (Session 23), several console errors appeared on the live site. Diagnosed and fixed all three:
+
+**Issue 1: `Invalid Sentry Dsn: SENTRY_DSN=` error on every page load**
+- **Root cause:** The `.env` file is gitignored so `VITE_SENTRY_DSN` isn't available during Vercel builds. The fallback `process.env.SENTRY_DSN` was being read, but the value was malformed or the DSN itself was invalid, causing `Sentry.init()` to throw.
+- **Fix:** Added validation (`startsWith('https://')`) before calling `Sentry.init()` and wrapped the entire init block in a try-catch so it fails silently instead of polluting the console.
+
+**Issue 2: `GET /src/openreplay-init.ts` 404 (Not Found) on every page**
+- **Root cause:** The Vite plugin always injected `<script type="module" src="/src/openreplay-init.ts">` into all pages. In dev mode Vite serves `.ts` files directly, but in production builds the source file doesn't exist in `dist/` — only compiled assets do.
+- **Fix:** Made the script tag injection conditional — only inject when `OPENREPLAY_KEY` is available at build time. On Vercel (where the key isn't set), the script tag is omitted entirely.
+
+**Issue 3: `/api/contacts/insights/network` and `/api/contacts/insights/duplicates` returning 500**
+- **Root cause:** The `/insights/network` endpoint queries the `ContactRelationship` table which hasn't been created in Supabase yet (SQL migration from TODO #20 pending manual execution). The `/:id/connections` endpoint had the same issue. The `/insights/duplicates` 500 was from the earlier broken deployment (resolved by the Session 23 serverless fix).
+- **Fix:** Made both `/insights/network` and `/:id/connections` endpoints gracefully handle the missing `ContactRelationship` table — they return empty data (`connections: []`, `totalConnections: 0`) instead of throwing 500.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/vite.config.ts` | Sentry init wrapped in try-catch with DSN validation; OpenReplay script tag conditionally injected only when key is available | Eliminates `Invalid Sentry Dsn` error and `/src/openreplay-init.ts` 404 on production |
+| 2 | `apps/api/src/routes/contacts.ts` | `/insights/network` and `/:id/connections` gracefully handle missing `ContactRelationship` table | Prevents 500 errors until the table migration is run in Supabase |
+
+**Commit:** `7e92eb4` — `fix: resolve Sentry DSN, OpenReplay 404, and contacts network 500 errors`
+
+---
+
+### VDR File Menu — Delete Option Hidden — ~8:40 PM IST
+
+**Issue:** The 3-dot action menu on VDR files only showed Rename, Download, and Link to Deal. The Delete option was missing from the visible menu.
+
+**Root cause:** The Delete button was already in the code (line 256-274 of FileTable.tsx) but the dropdown menu rendered inside a `<td>` → `<table>` → `<div class="overflow-hidden">` chain. The `overflow-hidden` on the table container clipped the dropdown, cutting off the Delete option at the bottom.
+
+**Fix:** Converted the dropdown from `position: absolute` (inside the clipped container) to a **React portal** (`ReactDOM.createPortal`) that renders directly on `document.body` with `position: fixed`. The menu position is calculated from the button's `getBoundingClientRect()` and auto-flips upward when there isn't enough space below.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/src/components/FileTable.tsx` | Dropdown menu rendered via `ReactDOM.createPortal(menu, document.body)` with fixed positioning and viewport-aware placement | Menu now escapes `overflow-hidden` container; all 4 options visible (Rename, Download, Link to Deal, Delete) |
+
+**Commit:** `b75ce36` — `fix(vdr): show Delete option in file action menu`
+
+---
