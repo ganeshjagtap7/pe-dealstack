@@ -4,7 +4,7 @@
   "outputDirectory": "apps/web/dist",
   "functions": {
     "api/index.ts": {
-      "includesFiles": "apps/api/src/**",
+      "includeFiles": "apps/api/src/**",
       "maxDuration": 60
     }
   },
