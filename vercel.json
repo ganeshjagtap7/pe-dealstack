@@ -1,10 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm run build:web",
+  "buildCommand": "npm run build:api && npm run build:web",
   "outputDirectory": "apps/web/dist",
   "functions": {
     "api/index.ts": {
-      "includeFiles": "apps/api/src/**",
+      "includeFiles": "apps/api/dist/**",
       "maxDuration": 60
     }
   },
