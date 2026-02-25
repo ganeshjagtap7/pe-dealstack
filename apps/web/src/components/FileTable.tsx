@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { VDRFile } from '../types/vdr.types';
 
 interface FileTableProps {
@@ -12,6 +13,7 @@ interface FileTableProps {
 
 export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile, onLinkToDeal }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const menuRef = useRef<HTMLDivElement>(null);
@@ -38,7 +40,17 @@ export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folde
 
   const handleMenuToggle = (e: React.MouseEvent, fileId: string) => {
     e.stopPropagation();
-    setOpenMenuId(openMenuId === fileId ? null : fileId);
+    if (openMenuId === fileId) {
+      setOpenMenuId(null);
+      return;
+    }
+    // Calculate position from the button
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const menuHeight = 200; // approximate menu height
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const top = spaceBelow < menuHeight ? rect.top - menuHeight : rect.bottom + 4;
+    setMenuPos({ top, left: rect.right - 176 }); // 176 = w-44 (11rem)
+    setOpenMenuId(fileId);
   };
 
   const handleDelete = (e: React.MouseEvent, fileId: string) => {
@@ -209,60 +221,63 @@ export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folde
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-xs text-slate-500">{file.date}</td>
                       <td className="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium sm:pr-6">
-                        <div className="relative" ref={openMenuId === file.id ? menuRef : null}>
-                          <button
-                            className="text-slate-400 hover:text-primary transition-colors p-1 rounded hover:bg-slate-100"
-                            aria-label="More options"
-                            onClick={(e) => handleMenuToggle(e, file.id)}
-                          >
-                            <span className="material-symbols-outlined">more_vert</span>
-                          </button>
+                        <button
+                          className="text-slate-400 hover:text-primary transition-colors p-1 rounded hover:bg-slate-100"
+                          aria-label="More options"
+                          onClick={(e) => handleMenuToggle(e, file.id)}
+                        >
+                          <span className="material-symbols-outlined">more_vert</span>
+                        </button>
 
-                          {/* Dropdown Menu */}
-                          {openMenuId === file.id && (
-                            <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
-                              <button
-                                onClick={(e) => handleRenameStart(e, file)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">edit</span>
-                                Rename
-                              </button>
+                        {/* Dropdown Menu — rendered via portal to escape overflow-hidden */}
+                        {openMenuId === file.id && menuPos && ReactDOM.createPortal(
+                          <div
+                            ref={menuRef}
+                            className="fixed w-44 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-[9999]"
+                            style={{ top: menuPos.top, left: menuPos.left }}
+                          >
+                            <button
+                              onClick={(e) => handleRenameStart(e, file)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">edit</span>
+                              Rename
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onFileClick?.(file);
+                                setOpenMenuId(null);
+                              }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">download</span>
+                              Download
+                            </button>
+                            {onLinkToDeal && (
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onFileClick?.(file);
+                                  onLinkToDeal(file);
                                   setOpenMenuId(null);
                                 }}
                                 className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
                               >
-                                <span className="material-symbols-outlined text-[18px]">download</span>
-                                Download
+                                <span className="material-symbols-outlined text-[18px]">link</span>
+                                Link to Deal
                               </button>
-                              {onLinkToDeal && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    onLinkToDeal(file);
-                                    setOpenMenuId(null);
-                                  }}
-                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
-                                >
-                                  <span className="material-symbols-outlined text-[18px]">link</span>
-                                  Link to Deal
-                                </button>
-                              )}
-                              <div className="border-t border-slate-200 my-1"></div>
-                              <button
-                                onClick={(e) => handleDelete(e, file.id)}
-                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
-                              >
-                                <span className="material-symbols-outlined text-[18px]">delete</span>
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                            )}
+                            <div className="border-t border-slate-200 my-1"></div>
+                            <button
+                              onClick={(e) => handleDelete(e, file.id)}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete</span>
+                              Delete
+                            </button>
+                          </div>,
+                          document.body
+                        )}
                       </td>
                     </tr>
                   );
