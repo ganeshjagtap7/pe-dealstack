@@ -622,10 +622,12 @@ router.get('/insights/network', async (req: any, res) => {
       .select('id, firstName, lastName, type, company');
     if (cErr) throw cErr;
 
-    const { data: connections, error: rErr } = await supabase
+    // ContactRelationship table may not exist yet — gracefully default to empty
+    let connections: any[] = [];
+    const { data: connData, error: rErr } = await supabase
       .from('ContactRelationship')
       .select('contactId, relatedContactId');
-    if (rErr) throw rErr;
+    if (!rErr) connections = connData || [];
 
     const { data: dealLinks, error: dErr } = await supabase
       .from('ContactDeal')
@@ -684,6 +686,7 @@ router.get('/:id/connections', async (req: any, res) => {
     const { id } = req.params;
 
     // Fetch where this contact is either side of the relationship
+    // ContactRelationship table may not exist yet — return empty if so
     const { data: asSource, error: e1 } = await supabase
       .from('ContactRelationship')
       .select('*, contact:relatedContactId(id, firstName, lastName, type, company, title)')
@@ -694,8 +697,11 @@ router.get('/:id/connections', async (req: any, res) => {
       .select('*, contact:contactId(id, firstName, lastName, type, company, title)')
       .eq('relatedContactId', id);
 
-    if (e1) throw e1;
-    if (e2) throw e2;
+    // If table doesn't exist, return empty connections
+    if (e1 || e2) {
+      res.json({ connections: [] });
+      return;
+    }
 
     const connections = [
       ...(asSource || []).map((r: any) => ({ id: r.id, type: r.type, notes: r.notes, contact: r.contact, direction: 'outgoing' })),

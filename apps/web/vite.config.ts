@@ -7,27 +7,34 @@ import { copyFileSync, mkdirSync, readdirSync, existsSync } from 'fs'
 // This allows plain <script> files (like auth.js) to access env config via window.__ENV
 function injectEnvConfig(): Plugin {
   let envConfig: string
+  let hasOpenReplayKey = false
   return {
     name: 'inject-env-config',
     configResolved(config) {
       const env = loadEnv(config.mode, config.root, 'VITE_')
-      // Fall back to non-VITE_ prefixed process.env vars (for Render/production builds)
+      // Fall back to non-VITE_ prefixed process.env vars (for Vercel/production builds)
+      const openReplayKey = env.VITE_OPENREPLAY_KEY || process.env.OPENREPLAY_KEY || ''
+      hasOpenReplayKey = !!openReplayKey
       envConfig = JSON.stringify({
         SUPABASE_URL: env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
         SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
         API_URL: env.VITE_API_URL || process.env.API_URL || '',
         SENTRY_DSN: env.VITE_SENTRY_DSN || process.env.SENTRY_DSN || '',
-        OPENREPLAY_KEY: env.VITE_OPENREPLAY_KEY || process.env.OPENREPLAY_KEY || '',
+        OPENREPLAY_KEY: openReplayKey,
       })
     },
     transformIndexHtml(html) {
       const sentryScript = `<script src="https://browser.sentry-cdn.com/8.48.0/bundle.min.js" crossorigin="anonymous"></script>
   <script>
-    if (window.__ENV && window.__ENV.SENTRY_DSN) {
-      Sentry.init({ dsn: window.__ENV.SENTRY_DSN, environment: window.location.hostname === 'localhost' ? 'development' : 'production', tracesSampleRate: 0.1 });
-    }
+    try {
+      if (window.__ENV && window.__ENV.SENTRY_DSN && window.__ENV.SENTRY_DSN.startsWith('https://')) {
+        Sentry.init({ dsn: window.__ENV.SENTRY_DSN, environment: window.location.hostname === 'localhost' ? 'development' : 'production', tracesSampleRate: 0.1 });
+      }
+    } catch(e) { console.warn('Sentry init skipped:', e.message); }
   </script>`
-      return html.replace('</head>', `  <script>window.__ENV=${envConfig}</script>\n  ${sentryScript}\n  <script type="module" src="/src/openreplay-init.ts"></script>\n</head>`)
+      // Only inject OpenReplay script if key is available (avoids 404 in production when .ts source isn't served)
+      const openReplayTag = hasOpenReplayKey ? `\n  <script type="module" src="/src/openreplay-init.ts"></script>` : ''
+      return html.replace('</head>', `  <script>window.__ENV=${envConfig}</script>\n  ${sentryScript}${openReplayTag}\n</head>`)
     },
   }
 }
