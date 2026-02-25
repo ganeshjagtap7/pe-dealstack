@@ -5,6 +5,67 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 23 — February 25, 2026
+
+#### Migrate Backend from Render to Vercel Serverless — ~12:30 PM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/app.ts` | **NEW** — Extracted Express app configuration into standalone module | Separates Express app (middleware, routes, error handlers) from server startup. Exports `default app` for both local dev and Vercel serverless import |
+| 2 | `apps/api/src/index.ts` | Simplified to import from `app.ts` + `app.listen()` only | Local dev entry point — just starts the server. No longer contains Express setup logic |
+| 3 | `api/index.ts` | **NEW** — Vercel serverless function entry point at project root | Imports Express app from `apps/api/src/app.ts` and exports it as default for Vercel's `@vercel/node` runtime |
+| 4 | `vercel.json` | Replaced Render proxy rewrite with Vercel serverless function config | Removed `destination: "https://pe-os.onrender.com/api/:path*"` — API now runs as Vercel serverless function. Added `functions` config with `maxDuration: 60`, rewrites for `/api/*`, `/health`, `/health/ready`, and `cleanUrls: true` |
+| 5 | `apps/api/src/app.ts` | Added `https://pe-dealstack.vercel.app` to CORS allowedOrigins | Frontend and API now same-origin on Vercel, but CORS still needed for direct API access |
+| 6 | `apps/api/src/app.ts` | Converted `require('./openai.js')` to static `import { isAIEnabled }` | Dynamic `require()` in ESM module is problematic — converted to proper static import for Vercel bundler compatibility |
+| 7 | `apps/api/src/app.ts` | Changed `process.exit(1)` to `throw new Error()` for missing env vars | `process.exit()` kills the serverless function instance unexpectedly — throwing lets the error propagate properly |
+
+**Architecture change:**
+- **Before:** Frontend on Vercel (static) → API proxy to Render.com (Express server) → Supabase
+- **After:** Frontend on Vercel (static) + API on Vercel (serverless function) → Supabase
+- Render.com is no longer needed — can be decommissioned
+
+**Technical details:**
+- Express app exported from `app.ts` works as both a local server (`index.ts` + `app.listen()`) and a Vercel serverless function (`api/index.ts` exports it)
+- Vercel's `@vercel/node` runtime automatically handles the Express app as a serverless function
+- `maxDuration: 60` allows AI endpoints (OpenAI calls) up to 60 seconds per request
+- Rate limiting uses in-memory store (less effective in serverless but still provides per-instance protection)
+- All file uploads use Supabase Storage (in-memory multer) — no local filesystem dependency
+- No WebSockets, cron jobs, or background processes — 100% request/response compatible with serverless
+- Build verified: `tsc --noEmit` clean, `vite build` clean
+
+**After deploying, set these environment variables in Vercel Dashboard → Settings → Environment Variables:**
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `OPENAI_API_KEY`
+- `GEMINI_API_KEY` (optional)
+- `SENTRY_DSN` (optional)
+- `NODE_ENV` = `production`
+
+---
+
+### Session 22b — February 25, 2026
+
+#### Fix Chat History + OpenAI Model Upgrade — ~10:00 AM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/deal.js` | Fixed `chatContainer` scope bug — moved declaration before if/else block | `ReferenceError: chatContainer is not defined` — variable was declared inside `if` block but referenced in `else` block |
+| 2 | `apps/api/chat-history-migration.sql` | Updated `dealId` column type from TEXT to UUID | FK constraint error: `Deal.id` is UUID in actual Supabase DB (not TEXT as Prisma schema suggests). Migration now uses `"dealId" UUID REFERENCES "Deal"("id")` |
+| 3 | `apps/api/src/routes/deals.ts` | Changed `gpt-4-turbo-preview` → `gpt-4o` (8 occurrences) | `gpt-4-turbo-preview` is deprecated — was causing 500 errors on chat POST |
+| 4 | `apps/api/src/routes/ai.ts` | Changed `gpt-4-turbo-preview` → `gpt-4o` (7 occurrences) | Same model upgrade |
+| 5 | `apps/api/src/routes/chat.ts` | Changed `gpt-4-turbo-preview` → `gpt-4o` (2 occurrences) | Same model upgrade |
+| 6 | `apps/api/src/routes/memos.ts` | Changed `gpt-4-turbo-preview` → `gpt-4o` (4 occurrences) | Same model upgrade |
+| 7 | `apps/api/src/services/multiDocAnalyzer.ts` | Changed `gpt-4-turbo-preview` → `gpt-4o` (1 occurrence) | Same model upgrade |
+| 8 | `apps/api/src/index.ts` | Changed `gpt-4-turbo-preview` → `gpt-4o` in AI status response | Same model upgrade |
+
+**Root cause of chat not persisting after refresh:**
+1. `gpt-4-turbo-preview` model was deprecated → POST /api/deals/:id/chat returned 500
+2. Frontend fell back to mock response (not saved to DB) → history was always empty
+3. `chatContainer` scope bug caused JS error on history load → prevented rendering even if data existed
+4. ChatMessage table had wrong FK type (TEXT vs UUID) → inserts would fail
+
+---
+
 ### Session 20 — February 24, 2026
 
 #### TODO #20: Contact Intelligence / Relationship Tracking — ~6:30 PM IST

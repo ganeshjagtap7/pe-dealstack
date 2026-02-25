@@ -1,10 +1,17 @@
 {
+  "version": 2,
   "buildCommand": "npm run build:web",
   "outputDirectory": "apps/web/dist",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "https://pe-os.onrender.com/api/:path*"
+  "functions": {
+    "api/index.ts": {
+      "includesFiles": "apps/api/src/**",
+      "maxDuration": 60
     }
-  ]
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/health/ready", "destination": "/api" }
+  ],
+  "cleanUrls": true
 }
