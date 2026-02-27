@@ -92,10 +92,11 @@ model Deal {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
-  company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  documents       Document[]
-  activities      Activity[]
-  memos           Memo[]
+  company              Company              @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  documents            Document[]
+  activities           Activity[]
+  memos                Memo[]
+  financialStatements  FinancialStatement[]
 
   @@index([companyId])
   @@index([stage])
@@ -119,7 +120,8 @@ model Document {
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
-  deal        Deal         @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  deal                Deal                 @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  financialStatements FinancialStatement[]
 
   @@index([dealId])
   @@index([type])
@@ -268,4 +270,46 @@ model ChatMessage {
 
   @@index([dealId])
   @@index([createdAt])
+}
+
+// ─── Financial Statement Extraction ──────────────────────────
+// Stores full 3-statement model extracted from CIMs/financials
+// lineItems is JSONB: { "revenue": 12.5, "ebitda": 3.2, ... }
+// One row per (dealId, statementType, period) — upsertable
+
+model FinancialStatement {
+  id         String   @id @default(uuid())
+
+  // Foreign keys
+  dealId     String
+  documentId String?  // Which document this was extracted from
+
+  // Classification
+  statementType String // INCOME_STATEMENT | BALANCE_SHEET | CASH_FLOW
+  period        String // "2021", "2022", "LTM", "2025E"
+  periodType    String @default("HISTORICAL") // HISTORICAL | PROJECTED | LTM
+
+  // Extracted data
+  lineItems Json   @default("{}") // All line items as JSONB
+  currency  String @default("USD")
+  unitScale String @default("MILLIONS") // MILLIONS | THOUSANDS | ACTUALS
+
+  // Extraction metadata
+  extractionConfidence Int     @default(0)   // 0-100
+  extractionSource     String? @default("gpt4o") // gpt4o | azure | vision | manual
+  extractedAt          DateTime?
+
+  // Human review
+  reviewedAt DateTime?
+  reviewedBy String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  deal     Deal      @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  document Document? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@unique([dealId, statementType, period])
+  @@index([dealId])
+  @@index([dealId, statementType])
 }

@@ -20,6 +20,7 @@ import auditRouter from './routes/audit.js';
 import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
+import financialsRouter from './routes/financials.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
@@ -201,6 +202,7 @@ app.use('/api/audit', authMiddleware, auditRouter);
 app.use('/api/tasks', authMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, exportRouter);
 app.use('/api/contacts', authMiddleware, contactsRouter);
+app.use('/api', authMiddleware, financialsRouter);
 
 // ========================================
 // Public Invitation Routes (no auth for verify/accept)
