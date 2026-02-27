@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createRequire } from 'module';
-import { prisma } from '../db.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { runFastPass, runDeepPass } from '../services/financialExtractionOrchestrator.js';
@@ -86,12 +85,16 @@ router.get('/deals/:dealId/financials', async (req, res) => {
   try {
     const { dealId } = req.params;
 
-    const statements = await prisma.financialStatement.findMany({
-      where: { dealId },
-      orderBy: [{ statementType: 'asc' }, { period: 'asc' }],
-    });
+    const { data: statements, error } = await supabase
+      .from('FinancialStatement')
+      .select('*')
+      .eq('dealId', dealId)
+      .order('statementType', { ascending: true })
+      .order('period', { ascending: true });
 
-    res.json(statements);
+    if (error) throw error;
+
+    res.json(statements ?? []);
   } catch (err) {
     log.error('GET financials error', err);
     res.status(500).json({ error: 'Failed to fetch financial statements' });
@@ -105,12 +108,16 @@ router.get('/deals/:dealId/financials/summary', async (req, res) => {
   try {
     const { dealId } = req.params;
 
-    const incomeRows = await prisma.financialStatement.findMany({
-      where: { dealId, statementType: 'INCOME_STATEMENT' },
-      orderBy: { period: 'asc' },
-    });
+    const { data: incomeRows, error } = await supabase
+      .from('FinancialStatement')
+      .select('*')
+      .eq('dealId', dealId)
+      .eq('statementType', 'INCOME_STATEMENT')
+      .order('period', { ascending: true });
 
-    if (incomeRows.length === 0) {
+    if (error) throw error;
+
+    if (!incomeRows || incomeRows.length === 0) {
       return res.json({ hasData: false, periods: [] });
     }
 
@@ -166,23 +173,29 @@ router.patch('/deals/:dealId/financials/:statementId', async (req, res) => {
     const updates = patchStatementSchema.parse(req.body);
 
     // Confirm ownership
-    const existing = await prisma.financialStatement.findFirst({
-      where: { id: statementId, dealId },
-    });
-    if (!existing) {
+    const { data: existing, error: findError } = await supabase
+      .from('FinancialStatement')
+      .select('id')
+      .eq('id', statementId)
+      .eq('dealId', dealId)
+      .single();
+
+    if (findError || !existing) {
       return res.status(404).json({ error: 'Statement not found' });
     }
 
-    const updated = await prisma.financialStatement.update({
-      where: { id: statementId },
-      data: {
+    const { data: updated, error: updateError } = await supabase
+      .from('FinancialStatement')
+      .update({
         ...updates,
-        reviewedAt: new Date(),
+        reviewedAt: new Date().toISOString(),
         reviewedBy: user?.id ?? null,
-        // Mark as manually reviewed — preserves extraction metadata
-        extractionSource: existing.extractionSource === 'gpt4o' ? 'gpt4o' : existing.extractionSource,
-      },
-    });
+      })
+      .eq('id', statementId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
 
     res.json(updated);
   } catch (err) {
@@ -270,12 +283,16 @@ router.get('/deals/:dealId/financials/validation', async (req, res) => {
   try {
     const { dealId } = req.params;
 
-    const rows = await prisma.financialStatement.findMany({
-      where: { dealId },
-      orderBy: [{ statementType: 'asc' }, { period: 'asc' }],
-    });
+    const { data: rows, error } = await supabase
+      .from('FinancialStatement')
+      .select('*')
+      .eq('dealId', dealId)
+      .order('statementType', { ascending: true })
+      .order('period', { ascending: true });
 
-    if (rows.length === 0) {
+    if (error) throw error;
+
+    if (!rows || rows.length === 0) {
       return res.json({
         hasData: false,
         checks: [],

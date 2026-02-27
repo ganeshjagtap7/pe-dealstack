@@ -1,4 +1,4 @@
-import { prisma } from '../db.js';
+import { supabase } from '../supabase.js';
 import { extractDealDataFromText, ExtractedDealData } from './aiExtractor.js';
 import { classifyFinancials, ClassificationResult, ClassifiedStatement } from './financialClassifier.js';
 import { log } from '../utils/logger.js';
@@ -83,49 +83,46 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
 
   const statementIds: string[] = [];
   let periodsStored = 0;
-  const now = new Date();
+  const now = new Date().toISOString();
 
   for (const stmt of classification.statements) {
     for (const periodData of stmt.periods) {
       try {
-        const record = await prisma.financialStatement.upsert({
-          where: {
-            dealId_statementType_period: {
+        const { data, error } = await supabase
+          .from('FinancialStatement')
+          .upsert(
+            {
               dealId: input.dealId,
+              documentId: input.documentId ?? null,
               statementType: stmt.statementType,
               period: periodData.period,
+              periodType: periodData.periodType,
+              lineItems: periodData.lineItems,
+              currency: stmt.currency,
+              unitScale: stmt.unitScale,
+              extractionConfidence: periodData.confidence,
+              extractionSource: 'gpt4o',
+              extractedAt: now,
             },
-          },
-          create: {
+            { onConflict: 'dealId,statementType,period' },
+          )
+          .select('id')
+          .single();
+
+        if (error) {
+          log.error('Deep pass: failed to upsert period', {
             dealId: input.dealId,
-            documentId: input.documentId ?? null,
             statementType: stmt.statementType,
             period: periodData.period,
-            periodType: periodData.periodType,
-            lineItems: periodData.lineItems,
-            currency: stmt.currency,
-            unitScale: stmt.unitScale,
-            extractionConfidence: periodData.confidence,
-            extractionSource: 'gpt4o',
-            extractedAt: now,
-          },
-          update: {
-            // On re-extraction, update the data but preserve any human review
-            documentId: input.documentId ?? undefined,
-            periodType: periodData.periodType,
-            lineItems: periodData.lineItems,
-            currency: stmt.currency,
-            unitScale: stmt.unitScale,
-            extractionConfidence: periodData.confidence,
-            extractionSource: 'gpt4o',
-            extractedAt: now,
-          },
-        });
+            error,
+          });
+          continue;
+        }
 
-        statementIds.push(record.id);
+        if (data?.id) statementIds.push(data.id);
         periodsStored++;
       } catch (err) {
-        log.error('Deep pass: failed to upsert period', {
+        log.error('Deep pass: unexpected error upserting period', {
           dealId: input.dealId,
           statementType: stmt.statementType,
           period: periodData.period,
