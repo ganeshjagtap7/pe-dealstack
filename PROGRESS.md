@@ -8770,3 +8770,115 @@ After the Render → Vercel migration (Session 23), several console errors appea
 **Commit:** `b75ce36` — `fix(vdr): show Delete option in file action menu`
 
 ---
+
+## Session 25 — February 28, 2026
+
+### Financial Statements Panel + Deal Page UI Fixes — ~11:00 AM IST
+
+Three interconnected issues were reported by the user after Session 24: (1) Key Risks card layout broken, (2) Key Risks item styling looked "broken and low quality", (3) Financial Statements section — built during Sessions 25-26 on the `feature/financial-extraction` branch — was completely invisible on the deal page.
+
+---
+
+#### Fix 1: Key Risks Card Scroll Alignment — ~11:10 AM IST
+
+**Problem:** The Key Risks card was growing to unbounded height when there were many risks, pushing everything below it down and breaking the layout. The user wanted it "static/fixed" just like the Activity Feed card.
+
+**Root cause:** The Activity Feed uses `max-h-64 overflow-y-auto custom-scrollbar` on its inner list div. Key Risks had no height constraint at all.
+
+**Fix:** Applied the same flex-scroll pattern used by Activity Feed:
+- Outer card: `flex flex-col` + `max-height:320px`
+- Header row: `shrink-0` (never shrinks)
+- Inner list div: `flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1`
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/deal.html` | Key Risks card: `flex flex-col` + `style="max-height:320px"` on outer; `shrink-0` on header; `flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1` on list div | Card stays fixed height, inner risks list scrolls |
+
+---
+
+#### Fix 2: Key Risks Item Styling — ~11:30 AM IST
+
+**Problem:** Risk list items had `bg-amber-50 dark:bg-amber-950/30 border-amber-200` backgrounds — user described it as "brown background, broken low quality".
+
+**Fix:** Replaced amber color scheme with clean white cards + colored left-border accents (matching the glass-panel aesthetic of the rest of the product):
+- Top risk (index 0): `border-l-2 border-l-red-400` + red `error` icon
+- Other risks: `border-l-2 border-l-orange-300` + orange `warning` icon
+- Highlights (opportunities): `border-l-2 border-l-secondary` + green `check_circle` icon
+- All items: white bg with `border border-border-subtle`, `hover:shadow-sm transition-all`
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/deal.js` | `renderKeyRisks()` function (lines ~818-848): replaced all `bg-amber-*` + `bg-emerald-*` backgrounds with white cards + left-border accents | Premium look that matches the product design language |
+
+---
+
+#### Fix 3: Financial Statements Section — Multiple Root Causes — ~12:00 PM IST
+
+**Context:** The full 3-statement financial extraction pipeline was built in previous sessions (DB migration, GPT-4o classifier, extraction orchestrator, validation engine, API routes, frontend dashboard). However, the section was never visible to the user on the deal page.
+
+**Root cause chain (multiple layers):**
+
+**Layer 1 — `glass-panel` CSS invisible on white background:**
+The Financial Statements container used `class="glass-panel"`. The `.glass-panel` CSS is defined inline in `deal.html` as:
+```css
+.glass-panel {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(229, 231, 235, 0.8);
+}
+```
+The left panel background is `bg-surface-card` = `#FFFFFF`. White on white = completely invisible. Section existed in the DOM but rendered as transparent.
+
+**Layer 2 — Tailwind opacity modifiers on custom colors don't produce visible results:**
+First fix attempt used `border border-primary/20` + `bg-primary/[0.05]` header. With `primary = #003366` (dark navy), 5% opacity on white = essentially still transparent. Header appeared as a 1px thin line.
+
+**Layer 3 — Tailwind classes not applying to `<button>` element:**
+Second fix attempt used `style="background:#003366"` for the header but kept `class="py-3.5"` for padding. Browser default button styles can override Tailwind padding, resulting in a collapsed button height.
+
+**Layer 4 — `btn-primary` CSS class undefined:**
+The empty state "Extract Financials" button inside `financials-content` used `class="btn-primary"` which doesn't exist anywhere in the codebase — rendered as plain unstyled text.
+
+**Final fix — pure inline CSS for the entire section:**
+Replaced all Tailwind and glass-panel classes with explicit inline `style=""` attributes on every element:
+- Outer container: `style="border-radius:12px;border:2px solid #003366;margin-bottom:24px;overflow:hidden;box-shadow:0 2px 8px rgba(0,51,102,0.15);"`
+- Toggle button: `style="width:100%;display:flex;align-items:center;gap:10px;padding:14px 20px;background:#003366;border:none;cursor:pointer;"`
+- Text + icons: explicit `style="color:#fff"` etc.
+- Body panel: `style="background:#fff;padding:20px;"`
+- Toggle logic changed from `classList.toggle('hidden')` to `element.style.display` to avoid Tailwind's `hidden` class behavior
+
+Pre-populated the static HTML with the "Extract Financials" CTA so it's visible even before `loadFinancials()` JS runs.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/deal.html` | Financial Statements section rewritten with pure inline CSS (all styles explicit, no Tailwind dependencies) | Eliminates all 4 root causes above. Section now unmissable with `2px solid #003366` border + solid navy header |
+| 2 | `apps/web/js/financials.js` | `openFinancialsPanel()` updated to use `style.display` instead of `classList.remove('hidden')` | Matches new toggle mechanism |
+| 3 | `apps/web/js/financials.js` | Empty state "Extract Financials" button: replaced `btn-primary` (undefined class) with `style="background:#003366;color:#fff;..."` inline | Button now visible and clickable |
+
+---
+
+#### Fix 4: Auto-Extract on Financial Document Upload — ~1:00 PM IST
+
+**Problem:** When user uploaded `Luktara_Financial_Model_Sample.xlsx` (a FINANCIALS-type document), financial data did not appear automatically. User had to scroll to find the Financial Statements section and manually click "Extract Financials". UX friction was high.
+
+**Fix:** Added auto-extraction trigger in the `uploadFile()` function in `deal.js`. After a successful upload, if the file is Excel (`.xlsx/.xls/.csv`) OR the document type returned by the API is `FINANCIALS` or `CIM`, it automatically:
+1. Shows a notification: "Extracting Financials — Running financial extraction on [filename]…"
+2. Waits 1.5s (for DB record to settle) then calls `handleExtract(uploadedDoc.id)` with the specific document ID
+
+Also updated `handleExtract()` in `financials.js` to accept an optional `documentId` parameter — when provided, passes it in the POST body so extraction targets the specific document rather than falling back to the most recent document.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/deal.js` | `uploadFile()`: Added post-upload check — if Excel or FINANCIALS/CIM type, auto-calls `handleExtract(doc.id)` after 1.5s delay | Financial extraction now happens automatically on financial document upload |
+| 2 | `apps/web/js/financials.js` | `handleExtract(documentId?)`: Added optional `documentId` param; passes `{ documentId }` in POST body when provided | Extraction targets the specific just-uploaded doc, not arbitrary "most recent" |
+
+---
+
+### Summary of All Files Changed This Session
+
+| File | Changes |
+|------|---------|
+| `apps/web/deal.html` | Key Risks card scroll fix; Financial Statements section full rewrite (pure inline CSS) |
+| `apps/web/deal.js` | Key Risks item styling (amber → white+border); Auto-extract on financial doc upload |
+| `apps/web/js/financials.js` | `handleExtract()` accepts documentId; `openFinancialsPanel()` uses display toggle; empty state button styled |
+
+---

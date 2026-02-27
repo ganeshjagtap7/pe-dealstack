@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:docs.openreplay.com)",
+      "Bash(npm run build:api:*)",
+      "Bash(vercel --version:*)",
+      "Skill(clean-code)",
+      "Skill(clean-code:*)",
+      "Bash(ps -p 10339,10426,35968,37305 -o pid,command)",
+      "Bash(kill 37305)"
+    ]
+  }
+}

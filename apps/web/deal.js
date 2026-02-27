@@ -12,7 +12,8 @@ const state = {
     uploadingFiles: [],
     dealData: null,
     dealId: null,
-    contextDocuments: []
+    contextDocuments: [],
+    financials: {},
 };
 
 // ============================================================
@@ -151,6 +152,11 @@ async function loadDealData() {
         })) || [];
 
         populateDealPage(deal);
+
+        // Load financial statements (non-blocking)
+        if (typeof loadFinancials === 'function') {
+            loadFinancials(dealId);
+        }
     } catch (error) {
         console.error('Error loading deal:', error);
         showNotification('Error', 'Failed to load deal data', 'error');
@@ -809,19 +815,20 @@ function renderKeyRisks(deal) {
         return;
     }
 
-    let html = '<ul class="space-y-3">';
+    let html = '<ul class="space-y-2">';
 
     risks.forEach((risk, i) => {
-        const bgClass = i === 0
-            ? 'bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-800'
-            : 'bg-white dark:bg-white/5 border-border-subtle hover:border-primary/30';
-        const iconClass = i === 0 ? 'text-amber-500' : 'text-text-muted';
-        const icon = i === 0 ? 'error' : 'info';
+        const isTop = i === 0;
+        const leftBar = isTop
+            ? 'border-l-2 border-l-red-400'
+            : 'border-l-2 border-l-orange-300';
+        const iconClass = isTop ? 'text-red-400' : 'text-orange-400';
+        const icon = isTop ? 'error' : 'warning';
         html += `
-            <li class="${bgClass} border p-3 rounded-lg transition-colors shadow-sm">
-                <div class="flex items-start gap-2">
-                    <span class="material-symbols-outlined ${iconClass} text-sm mt-0.5">${icon}</span>
-                    <p class="text-sm text-text-main font-bold">${escapeHtml(risk)}</p>
+            <li class="bg-white border border-border-subtle ${leftBar} p-3 rounded-lg hover:border-red-200 hover:shadow-sm transition-all">
+                <div class="flex items-start gap-2.5">
+                    <span class="material-symbols-outlined ${iconClass} text-base mt-0.5 shrink-0">${icon}</span>
+                    <p class="text-xs text-text-secondary leading-snug">${escapeHtml(risk)}</p>
                 </div>
             </li>
         `;
@@ -829,10 +836,10 @@ function renderKeyRisks(deal) {
 
     highlights.forEach(highlight => {
         html += `
-            <li class="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-3 rounded-lg transition-colors shadow-sm">
-                <div class="flex items-start gap-2">
-                    <span class="material-symbols-outlined text-secondary text-sm mt-0.5">check_circle</span>
-                    <p class="text-sm text-text-main font-bold">${escapeHtml(highlight)}</p>
+            <li class="bg-white border border-border-subtle border-l-2 border-l-secondary p-3 rounded-lg hover:border-secondary/30 hover:shadow-sm transition-all">
+                <div class="flex items-start gap-2.5">
+                    <span class="material-symbols-outlined text-secondary text-base mt-0.5 shrink-0">check_circle</span>
+                    <p class="text-xs text-text-secondary leading-snug">${escapeHtml(highlight)}</p>
                 </div>
             </li>
         `;
@@ -1988,6 +1995,19 @@ async function uploadFile(file) {
 
         // Show system message in chat
         addSystemMessage(`📄 ${file.name} uploaded. You can now ask questions about this document.`, 'attach_file');
+
+        // Auto-extract financials if this is a financial document
+        const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls') || file.name.endsWith('.csv');
+        const isFinancialType = uploadedDoc.type === 'FINANCIALS' || uploadedDoc.type === 'CIM';
+        if (isExcel || isFinancialType) {
+            showNotification('Extracting Financials', `Running financial extraction on ${file.name}…`, 'info');
+            // Small delay to let the DB record settle before extraction
+            setTimeout(() => {
+                if (typeof handleExtract === 'function') {
+                    handleExtract(uploadedDoc.id);
+                }
+            }, 1500);
+        }
 
         // Refresh the documents section after a brief delay (for embedding to complete)
         setTimeout(() => {
