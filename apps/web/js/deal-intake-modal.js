@@ -129,6 +129,10 @@ function initDealIntakeModal(apiBaseURL) {
                             <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
                             Extract & Create Deal
                         </button>
+                        <button id="intake-upload-direct-btn" onclick="intakeUploadDirect()" disabled class="mt-2 w-full py-2.5 px-4 rounded-lg border border-border-subtle text-text-secondary text-sm font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2 hidden">
+                            <span class="material-symbols-outlined text-[18px]">upload_file</span>
+                            Upload to Data Room Only
+                        </button>
                     </div>
                 </div>
 
@@ -421,6 +425,8 @@ function handleIntakeFileSelect(file) {
     document.getElementById('intake-file-size').textContent = formatIntakeFileSize(file.size);
     document.getElementById('intake-file-info').classList.remove('hidden');
     document.getElementById('intake-upload-btn').disabled = false;
+    const directBtn = document.getElementById('intake-upload-direct-btn');
+    if (directBtn) directBtn.disabled = false;
 }
 
 function clearIntakeFile() {
@@ -430,6 +436,8 @@ function clearIntakeFile() {
     document.getElementById('intake-file-info')?.classList.add('hidden');
     const btn = document.getElementById('intake-upload-btn');
     if (btn) btn.disabled = true;
+    const directBtn = document.getElementById('intake-upload-direct-btn');
+    if (directBtn) directBtn.disabled = true;
 }
 
 function formatIntakeFileSize(bytes) {
@@ -454,17 +462,77 @@ async function intakeUploadFile() {
             formData.append('dealId', modalSelectedDealId);
         }
         const isExcel = modalSelectedFile.name.match(/\.(xlsx|xls|csv)$/i);
-        const endpoint = isExcel
+        // Bulk import only for creating NEW deals from a spreadsheet of deal data.
+        // When updating an existing deal, always use regular ingest (handles financial models, CIMs, etc.)
+        const useBulk = isExcel && modalIntakeMode !== 'existing';
+        const endpoint = useBulk
             ? `${window._intakeAPIBase}/ingest/bulk`
             : `${window._intakeAPIBase}/ingest`;
         const response = await PEAuth.authFetch(endpoint, { method: 'POST', body: formData });
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Upload failed');
-        if (isExcel) {
+        if (useBulk) {
             showIntakeBulkResult(data);
         } else {
             showIntakeExtractionPreview(data);
         }
+    } catch (error) {
+        showIntakeError('Upload failed', error.message);
+    }
+}
+
+// ─── Direct Upload to Data Room (no AI extraction) ───
+
+async function intakeUploadDirect() {
+    if (!modalSelectedFile) return;
+    if (!modalSelectedDealId) {
+        showIntakeError('No deal selected', 'Please search and select a deal to upload to.');
+        return;
+    }
+    showIntakeLoading();
+    try {
+        const formData = new FormData();
+        formData.append('file', modalSelectedFile);
+
+        const response = await PEAuth.authFetch(
+            `${window._intakeAPIBase}/deals/${modalSelectedDealId}/documents`,
+            { method: 'POST', body: formData }
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Upload failed');
+
+        // Reuse the extraction preview area to show upload success
+        hideIntakeLoading();
+        hideIntakeError();
+        modalCreatedDealId = modalSelectedDealId;
+
+        const previewHeader = document.querySelector('#intake-extraction-preview h4');
+        const previewIcon = document.querySelector('#intake-extraction-preview .material-symbols-outlined');
+        if (previewHeader) previewHeader.textContent = 'Document Uploaded';
+        if (previewIcon) previewIcon.textContent = 'upload_file';
+
+        // Hide the detailed extraction fields and review sections
+        document.querySelectorAll('#intake-extraction-preview .grid').forEach(el => el.classList.add('hidden'));
+        document.getElementById('intake-review-badge')?.classList.add('hidden');
+        document.getElementById('intake-review-reasons')?.classList.add('hidden');
+
+        // Insert a simple success message before the action buttons
+        const actionsDiv = document.querySelector('#intake-extraction-preview .flex.gap-3.mt-5');
+        let msgEl = document.getElementById('intake-direct-upload-msg');
+        if (!msgEl) {
+            msgEl = document.createElement('div');
+            msgEl.id = 'intake-direct-upload-msg';
+            msgEl.className = 'text-center py-4';
+            actionsDiv?.parentNode?.insertBefore(msgEl, actionsDiv);
+        }
+        msgEl.innerHTML = `
+            <p class="text-sm font-medium text-text-main">${modalSelectedFile.name}</p>
+            <p class="text-xs text-text-muted mt-1">Added to Data Room. Use <strong>Extract Financials</strong> on the deal page to process financial data.</p>
+        `;
+
+        document.getElementById('intake-extraction-preview')?.classList.remove('hidden');
+
+        if (typeof loadDeals === 'function') loadDeals();
     } catch (error) {
         showIntakeError('Upload failed', error.message);
     }
@@ -671,6 +739,8 @@ function setIntakeMode(mode) {
     const picker = document.getElementById('intake-deal-picker');
     const desc = document.getElementById('intake-header-desc');
 
+    const directBtn = document.getElementById('intake-upload-direct-btn');
+
     if (mode === 'existing') {
         newBtn?.classList.remove('bg-primary', 'text-white');
         newBtn?.classList.add('border', 'border-border-subtle', 'text-text-secondary', 'hover:bg-gray-50');
@@ -679,6 +749,7 @@ function setIntakeMode(mode) {
         picker?.classList.remove('hidden');
         if (desc) desc.textContent = 'Add data to an existing deal — select the deal below, then upload or paste new information.';
         updateIntakeButtonLabels('Update Deal');
+        directBtn?.classList.remove('hidden');
     } else {
         existingBtn?.classList.remove('bg-primary', 'text-white');
         existingBtn?.classList.add('border', 'border-border-subtle', 'text-text-secondary', 'hover:bg-gray-50');
@@ -688,6 +759,7 @@ function setIntakeMode(mode) {
         if (desc) desc.textContent = 'Upload a document, paste text, or enter a company URL to create a new deal.';
         updateIntakeButtonLabels('Create Deal');
         clearSelectedDeal();
+        directBtn?.classList.add('hidden');
     }
 }
 
@@ -835,6 +907,12 @@ function resetIntakeModal() {
         if (barEl) { barEl.style.width = '0%'; barEl.className = 'h-1.5 rounded-full transition-all'; }
         if (sourceEl) { sourceEl.textContent = ''; sourceEl.classList.add('hidden'); }
     });
+
+    // Clean up direct-upload message if it exists
+    const directMsg = document.getElementById('intake-direct-upload-msg');
+    if (directMsg) directMsg.remove();
+    // Restore extraction grid that may have been hidden by direct upload
+    document.querySelectorAll('#intake-extraction-preview .grid').forEach(el => el.classList.remove('hidden'));
 
     // Hide preview and error, show upload tab
     document.getElementById('intake-extraction-preview')?.classList.add('hidden');

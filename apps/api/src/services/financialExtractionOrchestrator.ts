@@ -9,6 +9,10 @@ export interface OrchestrationInput {
   text: string;
   dealId: string;
   documentId?: string;
+  /** Pre-computed classification from vision extraction — skips classifyFinancials() when provided */
+  classification?: ClassificationResult;
+  /** Source label written to DB rows ('gpt4o' | 'gpt4o-vision') */
+  extractionSource?: string;
 }
 
 export interface FastPassResult {
@@ -68,7 +72,9 @@ export async function runFastPass(text: string): Promise<FastPassResult | null> 
  * only this function and classifyFinancials() need to change.
  */
 export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassResult | null> {
-  const classification = await classifyFinancials(input.text);
+  // Use pre-computed classification (vision path) or run text classifier
+  const classification = input.classification ?? await classifyFinancials(input.text);
+  const source = input.extractionSource ?? 'gpt4o';
 
   if (!classification || classification.statements.length === 0) {
     log.warn('Deep pass: no financial statements found', { dealId: input.dealId });
@@ -101,7 +107,7 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
               currency: stmt.currency,
               unitScale: stmt.unitScale,
               extractionConfidence: periodData.confidence,
-              extractionSource: 'gpt4o',
+              extractionSource: source,
               extractedAt: now,
             },
             { onConflict: 'dealId,statementType,period' },

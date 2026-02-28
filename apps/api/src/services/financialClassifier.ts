@@ -148,7 +148,7 @@ export async function classifyFinancials(
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1,
-      max_tokens: 4000,
+      max_tokens: 16000,
     }, { timeout: 90000 });
 
     const content = response.choices[0]?.message?.content;
@@ -233,10 +233,16 @@ function normalizeClassificationResult(raw: any): ClassificationResult {
 function normalizeStatementType(raw: string): StatementType | null {
   const map: Record<string, StatementType> = {
     INCOME_STATEMENT: 'INCOME_STATEMENT',
+    INCOME: 'INCOME_STATEMENT',
+    P_AND_L: 'INCOME_STATEMENT',
+    PNL: 'INCOME_STATEMENT',
+    PROFIT_AND_LOSS: 'INCOME_STATEMENT',
     BALANCE_SHEET: 'BALANCE_SHEET',
     CASH_FLOW: 'CASH_FLOW',
+    CASH_FLOW_STATEMENT: 'CASH_FLOW',
+    CASHFLOW: 'CASH_FLOW',
   };
-  return map[String(raw ?? '').toUpperCase().trim()] ?? null;
+  return map[String(raw ?? '').toUpperCase().trim().replace(/\s+/g, '_')] ?? null;
 }
 
 function normalizePeriodType(raw: string): PeriodType {

@@ -318,11 +318,50 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     const extractedDataToSave = aiExtractedData
       || (req.body.extractedData ? JSON.parse(req.body.extractedData) : null);
 
+    // Auto-assign to a VDR folder if none was provided
+    let resolvedFolderId = req.body.folderId || null;
+    if (!resolvedFolderId) {
+      // Try to find a matching folder in this deal's VDR based on document type
+      const folderPatterns: Record<string, RegExp> = {
+        CIM: /financ|cim/i,
+        FINANCIALS: /financ/i,
+        LEGAL: /legal/i,
+        NDA: /legal|nda/i,
+        LOI: /legal|commercial/i,
+        DD_REPORT: /due\s*diligence|dd/i,
+      };
+      const pattern = folderPatterns[docType];
+      if (pattern) {
+        const { data: folders } = await supabase
+          .from('Folder')
+          .select('id, name')
+          .eq('dealId', dealId)
+          .order('name', { ascending: true });
+
+        if (folders && folders.length > 0) {
+          const match = folders.find((f: any) => pattern.test(f.name));
+          resolvedFolderId = match?.id || folders[0]?.id || null;
+        }
+      } else if (docType === 'OTHER') {
+        // For generic docs, assign to the first folder if any
+        const { data: folders } = await supabase
+          .from('Folder')
+          .select('id')
+          .eq('dealId', dealId)
+          .order('name', { ascending: true })
+          .limit(1);
+        resolvedFolderId = folders?.[0]?.id || null;
+      }
+      if (resolvedFolderId) {
+        log.info('Auto-assigned document to folder', { docType, folderId: resolvedFolderId });
+      }
+    }
+
     const { data: document, error: docError } = await supabase
       .from('Document')
       .insert({
         dealId,
-        folderId: req.body.folderId || null,
+        folderId: resolvedFolderId,
         uploadedBy: req.body.uploadedBy || null,
         name: documentName,
         type: docType,

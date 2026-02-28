@@ -8873,12 +8873,225 @@ Also updated `handleExtract()` in `financials.js` to accept an optional `documen
 
 ---
 
-### Summary of All Files Changed This Session
+### Summary of All Files Changed This Session (Session 25)
 
 | File | Changes |
 |------|---------|
 | `apps/web/deal.html` | Key Risks card scroll fix; Financial Statements section full rewrite (pure inline CSS) |
 | `apps/web/deal.js` | Key Risks item styling (amber → white+border); Auto-extract on financial doc upload |
 | `apps/web/js/financials.js` | `handleExtract()` accepts documentId; `openFinancialsPanel()` uses display toggle; empty state button styled |
+
+---
+
+## Session 26 — February 28, 2026 (Evening)
+
+### Financial Extraction Pipeline — End-to-End Testing & Bug Fixes
+
+**Goal:** Test the full financial extraction pipeline with a real Excel file (Luktara Financial Model), fix all extraction bugs, then redesign the Financial Statements UI to match the product's premium theme.
+
+---
+
+#### 1. Sample Financial Data Generation — ~3:00 PM IST
+
+**What:** Created `Luktara_Financial_Model_Sample.xlsx` — a realistic 3-statement financial model (Income Statement, Balance Sheet, Cash Flow) with 5 years of historical data (FY 2021–2025) + 2 projected years (FY 2026E–2027E). Used Python `openpyxl` to generate it with proper formatting (bold headers, number formats, column widths).
+
+**Why:** Needed a real-world test file to validate the extraction pipeline end-to-end, from Excel upload → CSV conversion → GPT-4o classification → Supabase upsert → UI rendering.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `generate_luktara_financials.py` | New Python script to generate sample Excel financial model | Test data for extraction pipeline |
+| 2 | `Luktara_Financial_Model_Sample.xlsx` | Generated 3-statement Excel file (7 periods × 3 statements) | Test file uploaded to deal's VDR |
+
+---
+
+#### 2. Excel Upload Routing Fix — ~3:20 PM IST
+
+**Problem:** The deal intake modal's upload flow was hardcoded to send all files to `/api/ingest` which only handled PDFs. Excel files uploaded through the VDR panel were also not being routed correctly to the extraction endpoint.
+
+**Fix:**
+- Updated `deal-intake-modal.js` to detect Excel files (`.xlsx`, `.xls`, `.csv`) and route them appropriately
+- Added "Upload to Data Room Only" button so users can upload documents without triggering AI processing
+- Added Excel MIME type handling in the `/api/ingest` route
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/js/deal-intake-modal.js` | Added Excel detection + "Upload to Data Room Only" button | Users can upload financial files without forced AI ingest |
+| 2 | `apps/api/src/routes/ingest.ts` | Added Excel MIME type handling | `/api/ingest` no longer rejects Excel files |
+
+---
+
+#### 3. Document Upload — folderId Auto-Assignment Fix — ~3:40 PM IST
+
+**Problem:** Documents uploaded via the intake modal were vanishing from the VDR file list because they had no `folderId`. The VDR query filters by folder, so documents without a folder were invisible.
+
+**Fix:** Updated `documents.ts` upload handler to auto-assign the root folder for the deal when no `folderId` is provided in the request body.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/documents.ts` | Auto-assign root folderId on upload when missing | Prevents uploaded documents from vanishing in VDR |
+
+---
+
+#### 4. Financial Extraction Bug — Statement Type Normalization — ~4:00 PM IST
+
+**Problem:** After clicking "Extract Financials", the notification showed: `"Unknown statement type: CASH_FLOW_STATEMENT"`. GPT-4o was returning `CASH_FLOW_STATEMENT` as the statement type, but the normalizer in `financialClassifier.ts` only accepted the exact string `CASH_FLOW`.
+
+**Root cause:** The `normalizeStatementType()` function had a strict 1:1 mapping with no aliases. GPT-4o's output varies — sometimes it returns `CASH_FLOW`, sometimes `CASH_FLOW_STATEMENT`, sometimes `CASHFLOW`.
+
+**Fix:** Added comprehensive aliases to the normalizer map:
+- `INCOME` / `P_AND_L` / `PNL` / `PROFIT_AND_LOSS` → `INCOME_STATEMENT`
+- `CASH_FLOW_STATEMENT` / `CASHFLOW` → `CASH_FLOW`
+- Added `.replace(/\s+/g, '_')` to handle space-separated variants
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/services/financialClassifier.ts` | Added 6 statement type aliases + space-to-underscore normalization in `normalizeStatementType()` | GPT-4o returns variant names; all now map correctly |
+
+---
+
+#### 5. Financial Extraction Bug — DB Check Constraint Violation — ~4:20 PM IST
+
+**Problem:** Even after fixing statement type normalization, extraction still returned "No financial data found" (0 periods stored). Server logs showed no errors in the classifier — GPT-4o was returning valid data. But every DB upsert was silently failing.
+
+**Root cause:** The `FinancialStatement` table has a CHECK constraint: `"extractionSource" IN ('gpt4o', 'azure', 'vision', 'manual')`. The code in `financials.ts` was sending `'gpt4o-excel'` for Excel files and `'gpt4o-vision'` for vision extraction. Every INSERT failed with a constraint violation, but the error was caught and logged without surfacing to the user — the API returned `periodsStored: 0` which the frontend showed as "No financial data found".
+
+**Fix:** Changed extraction source values to match the DB constraint:
+- `'gpt4o-excel'` → `'gpt4o'` (the extraction method is already tracked separately in the API response)
+- `'gpt4o-vision'` → `'vision'`
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/financials.ts` | `extractionSource: 'gpt4o-excel'` → `'gpt4o'`; `'gpt4o-vision'` → `'vision'` | Values must match DB CHECK constraint |
+
+**Result:** After this fix, extraction succeeded — **25 periods stored across 3 statement types (Income Statement, Balance Sheet, Cash Flow) with 90% confidence**.
+
+---
+
+#### 6. GPT-4o max_tokens Increase — ~4:30 PM IST
+
+**Problem:** The GPT-4o classifier was sometimes truncating its JSON response when extracting large financial models (3 statements × 7+ periods × 15+ line items each). The response would cut off mid-JSON, causing a parse error.
+
+**Fix:** Increased `max_tokens` from `4000` to `16000` in the classifier's OpenAI call.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/services/financialClassifier.ts` | `max_tokens: 4000` → `16000` | Prevents JSON truncation for large financial models |
+
+---
+
+#### 7. Multi-Layer Extraction Pipeline — ~4:45 PM IST
+
+**What:** Built a shared `extractFinancialsForDoc()` helper in `financials.ts` that implements a 3-layer extraction strategy with automatic fallback:
+
+1. **Layer 1 — Azure Document Intelligence** (if configured): Best for complex CIM layouts with structured tables. Downloads PDF buffer, sends to Azure, gets table-structured text.
+2. **Layer 2 — pdf-parse text extraction**: For text-rich PDFs. Extracts raw text, sends to GPT-4o classifier.
+3. **Layer 3 — GPT-4o Vision**: For scanned/image-only PDFs. Sends PDF as image to GPT-4o-vision for OCR + classification.
+4. **Excel path**: Separate path — uses `xlsx` library to convert spreadsheet to CSV text, then GPT-4o classifier.
+
+Also added a new endpoint: `POST /documents/:documentId/extract-financials` for document-level extraction (used when triggering from the documents list rather than the deal page).
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/financials.ts` | Added `extractFinancialsForDoc()` helper + `POST /documents/:documentId/extract-financials` endpoint | Unified extraction with auto-fallback across 3 extraction methods |
+| 2 | `apps/api/src/services/azureDocIntelligence.ts` | New service — Azure Document Intelligence integration for PDF table extraction | Layer 1 extraction for complex CIM layouts |
+| 3 | `apps/api/src/services/excelFinancialExtractor.ts` | New service — Excel/CSV to structured text conversion using `xlsx` | Excel file support for financial extraction |
+| 4 | `apps/api/src/services/visionExtractor.ts` | New service — GPT-4o Vision for scanned/image PDFs | Layer 3 fallback for non-text-extractable PDFs |
+| 5 | `apps/api/.env.example` | Added `AZURE_DOC_INTELLIGENCE_ENDPOINT` and `AZURE_DOC_INTELLIGENCE_KEY` | Documents Azure config for Layer 1 extraction |
+| 6 | `apps/api/package.json` | Added `xlsx` dependency | Excel parsing support |
+
+---
+
+#### 8. Financial Statements UI — Premium Theme Redesign — ~5:30 PM IST
+
+**Problem:** The Financial Statements section used dark-themed colors (bg-red-900/20, bg-green-900/40) that clashed with the deal page's white/banker-blue (#003366) theme. User feedback: *"there is color mismatch, make it according to theme of product and premium — rn it looks very basic"*.
+
+**Fix:** Complete rewrite of `financials.js` UI rendering:
+
+- **Validation flags:** Changed from dark red backgrounds → collapsible amber-50 banner with toggle to show/hide individual checks
+- **Confidence badges:** Changed from dark-900 pill badges → light pill-style with colored dots (emerald for ≥80%, amber for ≥50%, red for <50%)
+- **Table styling:** White background with subtle alternating rows (#ffffff / #fbfbfc), subtotal rows in bold with light gray background
+- **Tab design:** Added Material Symbols icons (receipt_long, account_balance, payments) to statement type tabs
+- **Line item labels:** Expanded from ~12 labels to 40+ covering all 3 statement types (COGS, SG&A, R&D, PP&E, etc.)
+- **Subtotal emphasis:** Added `SUBTOTAL_KEYS` set — rows like `gross_profit`, `total_assets`, `ebitda` rendered in bold with gray background
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/js/financials.js` | Full UI rewrite — light theme colors, extended line item labels, confidence dot badges, collapsible validation, tab icons, subtotal row emphasis | Matches deal page's premium white/banker-blue design language |
+
+---
+
+#### 9. Sticky Column Fix — Horizontal Scroll Bleed-Through — ~6:00 PM IST
+
+**Problem:** When scrolling the financial table horizontally, the first column (line item labels) was blending with the scrolled content behind it. The sticky column's background was transparent, causing text overlap.
+
+**Root cause:** Tailwind classes like `bg-white` and `bg-gray-50/70` can be overridden by hover states or don't produce truly opaque backgrounds in all contexts. The sticky column needs a solid, non-transparent background to mask content scrolling beneath it.
+
+**Fix:**
+- Replaced Tailwind background classes with inline `style` attributes using solid hex colors (`#ffffff`, `#fbfbfc`, `#f7f8f9`)
+- Added `box-shadow: 2px 0 4px -2px rgba(0,0,0,0.06)` to the sticky column for a visual separator
+- Header sticky cell uses `z-index: 3` (above data rows at `z-index: 2`)
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/js/financials.js` | Sticky column: solid hex backgrounds via `style` attr + right box-shadow separator | Eliminates bleed-through when scrolling horizontally |
+
+---
+
+#### 10. Chart Improvements — Premium Styling & Scale Fixes — ~6:30 PM IST
+
+**Problem:** Charts had several issues:
+1. Revenue chart: FY 2026 annual total ($107.5M) mixed with quarterly data ($3-8M), making quarterly bars invisible due to scale difference
+2. Growth chart: 2000%+ spikes from quarterly→annual period comparisons
+3. All charts: basic flat styling, no gradients, minimal polish
+
+**Fix:** Complete rewrite of all 3 chart rendering functions:
+
+**Revenue & EBITDA Chart (`renderRevenueChart`):**
+- Added `filterConsistentPeriods()` helper — detects if data mixes annual totals with quarterly data and filters to the most common period type
+- Gradient-filled bars using `createGradient()` helper (vertical linear gradient from lighter to darker shade)
+- EBITDA Margin line now has a filled area gradient underneath (semi-transparent fill)
+- Projected periods rendered with lighter fill + dashed borders
+- Better point styling on the margin line (white fill, colored border)
+
+**Growth Chart (`renderGrowthChart`):**
+- Green gradient for positive growth, red gradient for negative
+- Zero-line emphasis via grid callback (thicker line at y=0)
+- +/- signs added to axis labels for clarity
+- Percentage formatting on tooltips
+
+**Balance Sheet Chart (`renderBalanceSheetChart`):**
+- Solid colors matching banker blue palette (#003366 for assets, #1a5276 for liabilities, #27ae60 for equity)
+- Rounded bar corners (borderRadius: 3)
+- Better stacking with cleaner color differentiation
+
+**Shared improvements:**
+- `CHART_TOOLTIP` constant: white background, subtle border, proper padding, no caret
+- `CHART_LEGEND` constant: consistent font, dot-style labels, bottom positioning
+- `createGradient(ctx, color1, color2)` helper for reusable vertical gradients
+- Dollar formatting with `$` prefix and locale number formatting on axes
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/js/financials.js` | Complete rewrite of `renderRevenueChart()`, `renderGrowthChart()`, `renderBalanceSheetChart()` + shared chart helpers | Premium chart styling, fixed scale issues with mixed annual/quarterly data |
+
+---
+
+### Summary of All Files Changed — Session 26
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/services/financialClassifier.ts` | `max_tokens: 4000→16000`; statement type normalization aliases (CASH_FLOW_STATEMENT, PNL, etc.) |
+| `apps/api/src/routes/financials.ts` | `extractFinancialsForDoc()` helper with 3-layer fallback; `extractionSource` constraint fix; `POST /documents/:documentId/extract-financials` endpoint; Document join on GET financials |
+| `apps/api/src/services/azureDocIntelligence.ts` | **New** — Azure Document Intelligence PDF table extraction service |
+| `apps/api/src/services/excelFinancialExtractor.ts` | **New** — Excel/CSV to structured text conversion using `xlsx` library |
+| `apps/api/src/services/visionExtractor.ts` | **New** — GPT-4o Vision extraction for scanned/image PDFs |
+| `apps/api/src/routes/documents.ts` | Auto-assign root folderId on upload when missing |
+| `apps/api/src/routes/ingest.ts` | Excel MIME type handling |
+| `apps/api/.env.example` | Azure Document Intelligence config vars |
+| `apps/api/package.json` | Added `xlsx` dependency |
+| `apps/api/src/services/financialExtractionOrchestrator.ts` | Minor adjustments for extraction source handling |
+| `apps/web/js/deal-intake-modal.js` | Excel detection routing; "Upload to Data Room Only" button |
+| `apps/web/js/financials.js` | **Full rewrite** — premium theme (white/banker-blue), extended line item labels, confidence badges, validation flags, sticky column fix, all 3 charts redesigned with gradients + scale fixes |
+| `package-lock.json` | Updated lockfile for `xlsx` dependency |
 
 ---

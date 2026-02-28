@@ -8,6 +8,7 @@ import { embedDocument } from '../rag.js';
 import { log } from '../utils/logger.js';
 import { extractTextFromWord } from '../services/documentParser.js';
 import { parseExcelToDealRows } from '../services/excelParser.js';
+import { extractTextFromExcel, isExcelFile } from '../services/excelFinancialExtractor.js';
 import { deepExtract, isDeepExtractionAvailable, DeepExtractionResult } from '../services/langExtractClient.js';
 import { researchCompany, buildResearchText } from '../services/companyResearcher.js';
 import { AuditLog } from '../services/auditLog.js';
@@ -150,10 +151,17 @@ router.post('/', upload.single('file'), async (req, res) => {
       if (!extractedText || extractedText.trim().length < 50) {
         return res.status(400).json({ error: 'Text file is too short or empty' });
       }
+    } else if (isExcelFile(mimeType, documentName)) {
+      log.debug('Step 1: Extracting text from Excel');
+      extractedText = extractTextFromExcel(file.buffer);
+      if (!extractedText || extractedText.trim().length < 50) {
+        return res.status(400).json({ error: 'Excel file appears empty or has no readable data' });
+      }
+      log.debug('Excel extracted', { charCount: extractedText.length });
     } else {
       return res.status(400).json({
         error: 'Unsupported file type for auto-deal creation',
-        supported: ['PDF (.pdf)', 'Word (.docx, .doc)', 'Text (.txt)'],
+        supported: ['PDF (.pdf)', 'Word (.docx, .doc)', 'Excel (.xlsx, .xls)', 'Text (.txt)'],
       });
     }
 
@@ -323,10 +331,41 @@ router.post('/', upload.single('file'), async (req, res) => {
     else if (lowerName.includes('loi') || lowerName.includes('letter')) docType = 'LOI';
     else if (lowerName.includes('due diligence') || lowerName.includes('dd')) docType = 'DD_REPORT';
 
+    // Auto-assign to a VDR folder based on document type
+    let ingestFolderId: string | null = null;
+    const folderPatterns: Record<string, RegExp> = {
+      CIM: /financ|cim/i,
+      FINANCIALS: /financ/i,
+      LEGAL: /legal/i,
+      LOI: /legal|commercial/i,
+      DD_REPORT: /due\s*diligence|dd/i,
+    };
+    const folderPattern = folderPatterns[docType];
+    if (folderPattern) {
+      const { data: folders } = await supabase
+        .from('Folder')
+        .select('id, name')
+        .eq('dealId', deal.id)
+        .order('name', { ascending: true });
+      if (folders && folders.length > 0) {
+        const match = folders.find((f: any) => folderPattern.test(f.name));
+        ingestFolderId = match?.id || folders[0]?.id || null;
+      }
+    } else {
+      const { data: folders } = await supabase
+        .from('Folder')
+        .select('id')
+        .eq('dealId', deal.id)
+        .order('name', { ascending: true })
+        .limit(1);
+      ingestFolderId = folders?.[0]?.id || null;
+    }
+
     const { data: document, error: docError } = await supabase
       .from('Document')
       .insert({
         dealId: deal.id,
+        folderId: ingestFolderId,
         name: documentName,
         type: docType,
         fileUrl,

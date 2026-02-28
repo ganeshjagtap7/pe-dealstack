@@ -4,8 +4,10 @@ import { createRequire } from 'module';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { runFastPass, runDeepPass } from '../services/financialExtractionOrchestrator.js';
-import { classifyFinancials } from '../services/financialClassifier.js';
+import { classifyFinancialsVision } from '../services/visionExtractor.js';
+import { extractTextFromExcel, isExcelFile } from '../services/excelFinancialExtractor.js';
 import { validateStatements } from '../services/financialValidator.js';
+import { extractTablesFromPdf, isAzureConfigured } from '../services/azureDocIntelligence.js';
 import type { ClassifiedStatement, FinancialPeriod } from '../services/financialClassifier.js';
 
 const require = createRequire(import.meta.url);
@@ -87,7 +89,7 @@ router.get('/deals/:dealId/financials', async (req, res) => {
 
     const { data: statements, error } = await supabase
       .from('FinancialStatement')
-      .select('*')
+      .select('*, Document(id, name)')
       .eq('dealId', dealId)
       .order('statementType', { ascending: true })
       .order('period', { ascending: true });
@@ -204,6 +206,73 @@ router.patch('/deals/:dealId/financials/:statementId', async (req, res) => {
   }
 });
 
+// ─── Shared extraction helper ─────────────────────────────────
+
+/**
+ * Run financial extraction on a document, choosing the right path:
+ * Excel → CSV text → GPT-4o classifier
+ * PDF (text-rich) → pdf-parse → GPT-4o classifier
+ * PDF (scanned) → GPT-4o Vision
+ */
+async function extractFinancialsForDoc(
+  doc: { id: string; fileUrl: string; name?: string | null; mimeType?: string | null },
+  dealId: string,
+): Promise<{ extractionMethod: string; result: any }> {
+  const excel = isExcelFile(doc.mimeType, doc.name);
+
+  if (excel) {
+    const buffer = await fetchBuffer(doc.fileUrl);
+    if (!buffer) throw new Error('Could not download Excel file');
+    const excelText = extractTextFromExcel(buffer);
+    if (!excelText || excelText.trim().length < 50) throw new Error('Excel file appears empty or has no readable financial data');
+
+    const result = await runDeepPass({ text: excelText, dealId, documentId: doc.id, extractionSource: 'gpt4o' });
+    return { extractionMethod: 'excel', result };
+  }
+
+  // ── Layer 1: Azure Document Intelligence (if configured) ─────
+  // Best quality for structured financial tables in complex CIM layouts.
+  // If not configured or returns no tables, falls through to text/vision paths.
+  if (isAzureConfigured()) {
+    log.info('Extraction helper: trying Azure Doc Intelligence (Layer 1)', { dealId, documentId: doc.id });
+    const pdfBufferForAzure = await fetchBuffer(doc.fileUrl);
+    if (pdfBufferForAzure) {
+      const azureResult = await extractTablesFromPdf(pdfBufferForAzure);
+      if (azureResult && azureResult.text.trim().length > 50) {
+        log.info('Extraction helper: Azure succeeded, running GPT-4o classifier', {
+          dealId, documentId: doc.id, tableCount: azureResult.tableCount, pageCount: azureResult.pageCount,
+        });
+        const result = await runDeepPass({ text: azureResult.text, dealId, documentId: doc.id, extractionSource: 'azure' });
+        return { extractionMethod: 'azure', result };
+      }
+      log.info('Extraction helper: Azure returned no tables, falling back to text/vision', { dealId, documentId: doc.id });
+    }
+  }
+
+  // ── Layer 2: pdf-parse text → GPT-4o (text-rich PDFs) ────────
+  const text = await extractTextFromUrl(doc.fileUrl);
+  const textIsSparse = !text || text.trim().length < 200;
+
+  if (!textIsSparse) {
+    const result = await runDeepPass({ text: text!, dealId, documentId: doc.id, extractionSource: 'gpt4o' });
+    return { extractionMethod: 'text', result };
+  }
+
+  // ── Layer 3: GPT-4o Vision (scanned / image-only PDFs) ───────
+  log.info('Extraction helper: PDF text sparse, switching to vision fallback', {
+    dealId, documentId: doc.id, textLength: text?.trim().length ?? 0,
+  });
+
+  const pdfBuffer = await fetchBuffer(doc.fileUrl);
+  if (!pdfBuffer) throw new Error('Could not download document for vision extraction');
+
+  const visionClassification = await classifyFinancialsVision(pdfBuffer, doc.name ?? 'document.pdf');
+  if (!visionClassification) throw new Error('Could not extract financial data from this document. The PDF may be encrypted or unsupported.');
+
+  const result = await runDeepPass({ text: '', dealId, documentId: doc.id, classification: visionClassification, extractionSource: 'vision' });
+  return { extractionMethod: 'vision', result };
+}
+
 // ─── 5d: POST /api/deals/:dealId/financials/extract ──────────
 // Trigger deep pass extraction on a deal's documents
 
@@ -212,7 +281,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
     const { dealId } = req.params;
     const { documentId } = extractSchema.parse(req.body);
 
-    // 1. Find the document to extract from
+    // Find the document to extract from
     let doc: any = null;
 
     if (documentId) {
@@ -224,7 +293,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         .single();
       doc = data;
     } else {
-      // Default: use the most recent CIM or FINANCIALS document
+      // Prefer most recent CIM or FINANCIALS document
       const { data } = await supabase
         .from('Document')
         .select('id, fileUrl, name, type, mimeType')
@@ -235,7 +304,6 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         .single();
       doc = data;
 
-      // Fallback to any document if no CIM/FINANCIALS
       if (!doc) {
         const { data: anyDoc } = await supabase
           .from('Document')
@@ -252,27 +320,13 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
       return res.status(404).json({ error: 'No document found to extract from' });
     }
 
-    // 2. Extract text from the document
-    const text = await extractTextFromUrl(doc.fileUrl);
-    if (!text || text.trim().length < 100) {
-      return res.status(422).json({ error: 'Could not extract readable text from document' });
-    }
+    const { extractionMethod, result } = await extractFinancialsForDoc(doc, dealId);
 
-    // 3. Run deep pass
-    const deepPassResult = await runDeepPass({
-      text,
-      dealId,
-      documentId: doc.id,
-    });
-
-    res.json({
-      success: true,
-      documentUsed: { id: doc.id, name: doc.name },
-      result: deepPassResult,
-    });
-  } catch (err) {
+    res.json({ success: true, documentUsed: { id: doc.id, name: doc.name }, extractionMethod, result });
+  } catch (err: any) {
     log.error('POST financials extract error', err);
-    res.status(500).json({ error: 'Financial extraction failed' });
+    const status = err.message?.includes('Could not') || err.message?.includes('appears empty') ? 422 : 500;
+    res.status(status).json({ error: err.message ?? 'Financial extraction failed' });
   }
 });
 
@@ -319,6 +373,40 @@ router.get('/deals/:dealId/financials/validation', async (req, res) => {
   } catch (err) {
     log.error('GET financials validation error', err);
     res.status(500).json({ error: 'Failed to run validation' });
+  }
+});
+
+// ─── 2: POST /api/documents/:documentId/extract-financials ────
+// Document-level extraction — looks up dealId from the document itself.
+// Useful when triggering extraction from the documents list rather than the deal page.
+
+router.post('/documents/:documentId/extract-financials', async (req, res) => {
+  try {
+    const { documentId } = req.params;
+
+    const { data: doc } = await supabase
+      .from('Document')
+      .select('id, fileUrl, name, type, mimeType, dealId')
+      .eq('id', documentId)
+      .single();
+
+    if (!doc?.fileUrl || !doc?.dealId) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    const { extractionMethod, result } = await extractFinancialsForDoc(doc, doc.dealId);
+
+    res.json({
+      success: true,
+      documentUsed: { id: doc.id, name: doc.name },
+      dealId: doc.dealId,
+      extractionMethod,
+      result,
+    });
+  } catch (err: any) {
+    log.error('POST document extract-financials error', err);
+    const status = err.message?.includes('Could not') || err.message?.includes('appears empty') ? 422 : 500;
+    res.status(status).json({ error: err.message ?? 'Financial extraction failed' });
   }
 });
 
