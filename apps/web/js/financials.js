@@ -469,15 +469,27 @@ async function handleExtract(documentId) {
 
   finState.extracting = true;
 
-  const btn = document.getElementById('fin-extract-btn');
-  if (btn) {
-    btn.disabled = true;
-    btn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Extracting…`;
+  // Update re-extract button (shown when data already exists)
+  const reExtractBtn = document.getElementById('fin-extract-btn');
+  if (reExtractBtn) {
+    reExtractBtn.disabled = true;
+    reExtractBtn.innerHTML = `<span class="material-symbols-outlined text-sm animate-spin">progress_activity</span> Extracting…`;
   }
 
-  // Also update the empty-state button if present
+  // Update empty-state button with loading state
   const allBtns = document.querySelectorAll('[onclick="handleExtract()"]');
-  allBtns.forEach(b => { b.disabled = true; });
+  allBtns.forEach(b => {
+    b.disabled = true;
+    b.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;animation:spin 1s linear infinite">progress_activity</span> Extracting… (30–60s)`;
+  });
+
+  // Inject spin keyframe if not already present
+  if (!document.getElementById('fin-spin-style')) {
+    const s = document.createElement('style');
+    s.id = 'fin-spin-style';
+    s.textContent = '@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }';
+    document.head.appendChild(s);
+  }
 
   try {
     const body = documentId ? { documentId } : {};
@@ -488,18 +500,30 @@ async function handleExtract(documentId) {
     });
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error ?? 'Extraction failed');
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody.error ?? `Server error ${res.status}`);
     }
 
     const result = await res.json();
     const stored = result.result?.periodsStored ?? 0;
-    showNotification('Financials Extracted', `${stored} period${stored !== 1 ? 's' : ''} stored successfully`, 'success');
+    const warnings = result.result?.warnings ?? [];
+
+    if (stored === 0) {
+      const warningMsg = warnings.length > 0 ? warnings[0] : 'No financial data found in the document. Try uploading a P&L, Balance Sheet, or CIM.';
+      showNotification('No Data Extracted', warningMsg, 'warning');
+    } else {
+      showNotification('Financials Extracted', `${stored} period${stored !== 1 ? 's' : ''} stored (${result.extractionMethod ?? 'gpt4o'})`, 'success');
+    }
 
     // Reload financial data
     await loadFinancials(dealId);
   } catch (err) {
     showNotification('Extraction Failed', err.message ?? 'Could not extract financials', 'error');
+    // Re-enable button on failure so user can retry
+    allBtns.forEach(b => {
+      b.disabled = false;
+      b.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px">auto_awesome</span> Extract Financials`;
+    });
   } finally {
     finState.extracting = false;
   }
