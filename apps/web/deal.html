@@ -369,16 +369,16 @@
                 </div>
 
                 <!-- Financials Section -->
-                <div id="financials-section" style="border-radius:12px;border:2px solid #003366;margin-bottom:24px;overflow:hidden;box-shadow:0 2px 8px rgba(0,51,102,0.15);">
+                <div id="financials-section" style="border-radius:12px;border:2px solid #003366;margin-bottom:24px;box-shadow:0 2px 8px rgba(0,51,102,0.15);flex-shrink:0;">
                     <button id="financials-toggle"
                         onclick="var b=document.getElementById('financials-body');var h=b.style.display==='none';b.style.display=h?'block':'none';this.querySelector('.fin-chevron').style.transform=h?'rotate(180deg)':'';"
-                        style="width:100%;display:flex;align-items:center;gap:10px;padding:14px 20px;background:#003366;border:none;cursor:pointer;text-align:left;">
+                        style="width:100%;display:flex;align-items:center;gap:10px;padding:14px 20px;background:#003366;border:none;cursor:pointer;text-align:left;border-radius:10px 10px 0 0;">
                         <span class="material-symbols-outlined" style="color:#fff;font-size:20px;">table_chart</span>
                         <span style="color:#fff;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Financial Statements</span>
                         <span id="fin-section-badge" style="display:none;margin-left:8px;"></span>
                         <span class="material-symbols-outlined fin-chevron" style="color:rgba(255,255,255,0.75);font-size:18px;margin-left:auto;transform:rotate(180deg);transition:transform 0.2s;">expand_more</span>
                     </button>
-                    <div id="financials-body" style="background:#fff;padding:20px;">
+                    <div id="financials-body" style="background:#fff;padding:20px;border-radius:0 0 10px 10px;">
                         <div id="financials-content">
                             <div style="text-align:center;padding:40px 16px;">
                                 <span class="material-symbols-outlined" style="color:#9CA3AF;font-size:40px;display:block;margin-bottom:8px;">table_chart</span>
