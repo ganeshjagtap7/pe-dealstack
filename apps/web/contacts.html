@@ -120,6 +120,72 @@
                 <button data-type="OTHER" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light">Other</button>
             </div>
         </div>
+        <!-- Sort Dropdown -->
+        <div class="relative">
+            <button id="sort-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                <span class="material-symbols-outlined text-text-muted text-[16px]">swap_vert</span>
+                <p id="sort-btn-text" class="text-text-secondary group-hover:text-text-main text-sm font-medium whitespace-nowrap">Newest First</p>
+                <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+            </button>
+            <div id="sort-dropdown" class="hidden absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[200px] py-1">
+                <div class="px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">Sort by</div>
+                <button data-sort="createdAt" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center justify-between font-medium">
+                    Date Added (Newest)
+                    <span class="sort-check material-symbols-outlined text-primary text-[16px]">check</span>
+                </button>
+                <button data-sort="createdAt" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center justify-between">
+                    Date Added (Oldest)
+                    <span class="sort-check material-symbols-outlined text-primary text-[16px] hidden">check</span>
+                </button>
+                <button data-sort="name" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center justify-between">
+                    Name (A-Z)
+                    <span class="sort-check material-symbols-outlined text-primary text-[16px] hidden">check</span>
+                </button>
+                <button data-sort="name" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center justify-between">
+                    Name (Z-A)
+                    <span class="sort-check material-symbols-outlined text-primary text-[16px] hidden">check</span>
+                </button>
+                <button data-sort="company" data-order="asc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center justify-between">
+                    Company (A-Z)
+                    <span class="sort-check material-symbols-outlined text-primary text-[16px] hidden">check</span>
+                </button>
+                <button data-sort="lastContactedAt" data-order="desc" class="w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center justify-between">
+                    Last Contacted
+                    <span class="sort-check material-symbols-outlined text-primary text-[16px] hidden">check</span>
+                </button>
+            </div>
+        </div>
+        <!-- View Toggle -->
+        <div class="flex h-9 rounded-lg border border-border-subtle overflow-hidden">
+            <button id="view-grid-btn" onclick="setViewMode('grid')" class="flex items-center justify-center w-9 h-full transition-colors bg-primary/10 text-primary" title="Grid view">
+                <span class="material-symbols-outlined text-[18px]">grid_view</span>
+            </button>
+            <button id="view-list-btn" onclick="setViewMode('list')" class="flex items-center justify-center w-9 h-full transition-colors bg-surface-card text-text-muted hover:text-text-secondary" title="List view">
+                <span class="material-symbols-outlined text-[18px]">view_list</span>
+            </button>
+        </div>
+        <!-- More Actions Dropdown -->
+        <div class="relative">
+            <button id="more-actions-btn" class="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group">
+                <span class="material-symbols-outlined text-text-muted text-[16px]">more_horiz</span>
+                <p class="text-text-secondary group-hover:text-text-main text-sm font-medium">More</p>
+                <span class="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
+            </button>
+            <div id="more-actions-dropdown" class="hidden absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[200px] py-1">
+                <button onclick="toggleGroupByCompany(); document.getElementById('more-actions-dropdown').classList.add('hidden');" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-primary-light hover:text-text-main transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">corporate_fare</span>
+                    <span id="group-label">Group by Company</span>
+                </button>
+                <button onclick="exportContacts(); document.getElementById('more-actions-dropdown').classList.add('hidden');" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-primary-light hover:text-text-main transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">download</span>
+                    Export to CSV
+                </button>
+                <button onclick="openImportModal(); document.getElementById('more-actions-dropdown').classList.add('hidden');" class="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-primary-light hover:text-text-main transition-colors">
+                    <span class="material-symbols-outlined text-[18px]">upload_file</span>
+                    Import from CSV
+                </button>
+            </div>
+        </div>
         <!-- Add Contact Button -->
         <button id="add-contact-btn" class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
             <span class="material-symbols-outlined text-[18px]">person_add</span>
@@ -196,12 +262,21 @@
 </div>
 
 <!-- Contacts Grid -->
-<div id="contacts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-6">
+<div id="contacts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-2">
     <!-- Loading state -->
     <div id="loading-state" class="col-span-full flex flex-col items-center justify-center py-20">
         <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
         <p class="text-text-muted text-sm font-medium">Loading contacts...</p>
     </div>
+</div>
+
+<!-- Pagination Bar -->
+<div id="pagination-bar" class="hidden flex items-center justify-between py-4 pb-6">
+    <p id="pagination-info" class="text-sm text-text-muted font-medium"></p>
+    <button id="load-more-btn" onclick="loadMore()" class="hidden flex items-center gap-2 px-5 py-2 rounded-lg border border-border-subtle bg-surface-card text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:shadow-sm transition-all">
+        <span class="material-symbols-outlined text-[18px]">expand_more</span>
+        Load More
+    </button>
 </div>
 
 </div>
@@ -239,6 +314,83 @@
             <span class="material-symbols-outlined text-[16px]">delete</span>
             Delete
         </button>
+    </div>
+</div>
+
+<!-- CSV Import Modal -->
+<div id="import-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-surface-card rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-[slideIn_0.2s_ease-out]">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
+            <div class="flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-[22px]">upload_file</span>
+                <h2 class="text-lg font-bold text-text-main">Import Contacts from CSV</h2>
+            </div>
+            <button onclick="closeImportModal()" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+                <span class="material-symbols-outlined text-text-muted">close</span>
+            </button>
+        </div>
+
+        <!-- Step 1: Upload -->
+        <div id="import-step-upload" class="p-6">
+            <div id="import-dropzone" class="border-2 border-dashed border-border-subtle rounded-xl p-10 text-center hover:border-primary/40 transition-colors cursor-pointer"
+                 onclick="document.getElementById('import-file-input').click()"
+                 ondragover="event.preventDefault(); this.classList.add('border-primary', 'bg-primary/5');"
+                 ondragleave="this.classList.remove('border-primary', 'bg-primary/5');"
+                 ondrop="event.preventDefault(); this.classList.remove('border-primary', 'bg-primary/5'); handleImportFile(event.dataTransfer.files[0]);">
+                <span class="material-symbols-outlined text-text-muted text-4xl mb-3">cloud_upload</span>
+                <p class="text-sm font-medium text-text-main mb-1">Drop your CSV file here or click to browse</p>
+                <p class="text-xs text-text-muted">Required columns: First Name, Last Name. Optional: Email, Phone, Title, Company, Type</p>
+            </div>
+            <input id="import-file-input" type="file" accept=".csv" class="hidden" onchange="handleImportFile(this.files[0])" />
+            <div id="import-template-hint" class="mt-4 flex items-center gap-2 text-xs text-text-muted">
+                <span class="material-symbols-outlined text-[14px]">lightbulb</span>
+                Tip: Export your existing contacts first to see the expected CSV format.
+            </div>
+        </div>
+
+        <!-- Step 2: Preview -->
+        <div id="import-step-preview" class="hidden">
+            <div class="px-6 py-3 bg-slate-50 border-b border-border-subtle flex items-center justify-between">
+                <p class="text-sm text-text-main"><strong id="import-count">0</strong> contacts ready to import</p>
+                <button onclick="resetImportModal()" class="text-xs text-text-muted hover:text-text-main transition-colors flex items-center gap-1">
+                    <span class="material-symbols-outlined text-[14px]">refresh</span>
+                    Choose different file
+                </button>
+            </div>
+            <div class="px-6 py-4 max-h-[40vh] overflow-y-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-border-subtle">
+                            <th class="text-left py-2 text-[11px] font-bold text-text-muted uppercase">Name</th>
+                            <th class="text-left py-2 text-[11px] font-bold text-text-muted uppercase">Email</th>
+                            <th class="text-left py-2 text-[11px] font-bold text-text-muted uppercase">Company</th>
+                            <th class="text-left py-2 text-[11px] font-bold text-text-muted uppercase">Type</th>
+                        </tr>
+                    </thead>
+                    <tbody id="import-preview-body"></tbody>
+                </table>
+            </div>
+            <div class="px-6 py-4 border-t border-border-subtle flex items-center justify-between">
+                <p id="import-error-msg" class="text-xs text-red-600 hidden"></p>
+                <div class="flex items-center gap-3 ml-auto">
+                    <button onclick="closeImportModal()" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main transition-colors">Cancel</button>
+                    <button id="import-submit-btn" onclick="submitImport()" class="flex items-center gap-2 px-5 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
+                        <span class="material-symbols-outlined text-[18px]">upload</span>
+                        Import All
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Step 3: Result -->
+        <div id="import-step-result" class="hidden p-6 text-center">
+            <span id="import-result-icon" class="material-symbols-outlined text-secondary text-5xl mb-3">check_circle</span>
+            <h3 id="import-result-title" class="text-lg font-bold text-text-main mb-2"></h3>
+            <p id="import-result-detail" class="text-sm text-text-muted mb-6"></p>
+            <button onclick="closeImportModal(); loadContacts();" class="px-5 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
+                Done
+            </button>
+        </div>
     </div>
 </div>
 
@@ -465,11 +617,15 @@ const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:30
 let contacts = [];
 let totalContacts = 0;
 let currentContact = null;
-let currentFilter = { search: '', type: '' };
+let currentFilter = { search: '', type: '', sortBy: 'createdAt', sortOrder: 'desc' };
 let searchTimeout = null;
 let selectedDealId = null;
 let contactScores = {};
 let selectedConnectionContactId = null;
+const PAGE_SIZE = 30;
+let currentOffset = 0;
+let viewMode = 'grid'; // 'grid' or 'list'
+let groupByCompany = false;
 
 // ============================================================
 // Utility Functions
@@ -556,14 +712,215 @@ function getInitials(firstName, lastName) {
 // API Calls
 // ============================================================
 
-async function fetchContacts() {
+async function exportContacts() {
+    try {
+        const params = new URLSearchParams();
+        if (currentFilter.search) params.set('search', currentFilter.search);
+        if (currentFilter.type) params.set('type', currentFilter.type);
+        params.set('sortBy', currentFilter.sortBy);
+        params.set('sortOrder', currentFilter.sortOrder);
+
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts/export?${params.toString()}`);
+        if (!res.ok) throw new Error('Export failed');
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `contacts-export-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error('Export error:', err);
+        alert('Failed to export contacts. Please try again.');
+    }
+}
+
+// ============================================================
+// CSV Import
+// ============================================================
+
+let importedContacts = [];
+
+function openImportModal() {
+    document.getElementById('import-modal').classList.remove('hidden');
+    resetImportModal();
+}
+
+function closeImportModal() {
+    document.getElementById('import-modal').classList.add('hidden');
+    importedContacts = [];
+}
+
+function resetImportModal() {
+    importedContacts = [];
+    document.getElementById('import-step-upload').classList.remove('hidden');
+    document.getElementById('import-step-preview').classList.add('hidden');
+    document.getElementById('import-step-result').classList.add('hidden');
+    document.getElementById('import-file-input').value = '';
+    document.getElementById('import-error-msg').classList.add('hidden');
+}
+
+function parseCSV(text) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    if (lines.length < 2) return [];
+
+    // Parse header — handle quoted fields
+    const parseRow = (line) => {
+        const fields = [];
+        let current = '';
+        let inQuotes = false;
+        for (let i = 0; i < line.length; i++) {
+            const ch = line[i];
+            if (ch === '"') { inQuotes = !inQuotes; continue; }
+            if (ch === ',' && !inQuotes) { fields.push(current.trim()); current = ''; continue; }
+            current += ch;
+        }
+        fields.push(current.trim());
+        return fields;
+    };
+
+    const headers = parseRow(lines[0]).map(h => h.toLowerCase().replace(/[^a-z]/g, ''));
+
+    // Map common header names to our fields
+    const fieldMap = {};
+    headers.forEach((h, i) => {
+        if (['firstname', 'first', 'fname'].includes(h)) fieldMap.firstName = i;
+        else if (['lastname', 'last', 'lname', 'surname'].includes(h)) fieldMap.lastName = i;
+        else if (['email', 'emailaddress', 'mail'].includes(h)) fieldMap.email = i;
+        else if (['phone', 'phonenumber', 'mobile', 'tel'].includes(h)) fieldMap.phone = i;
+        else if (['title', 'jobtitle', 'position', 'role'].includes(h)) fieldMap.title = i;
+        else if (['company', 'organization', 'org', 'companyname'].includes(h)) fieldMap.company = i;
+        else if (['type', 'contacttype', 'category'].includes(h)) fieldMap.type = i;
+        else if (['linkedin', 'linkedinurl', 'linkedinprofile'].includes(h)) fieldMap.linkedinUrl = i;
+    });
+
+    if (fieldMap.firstName === undefined && fieldMap.lastName === undefined) {
+        // Try "name" as full name
+        const nameIdx = headers.findIndex(h => h === 'name' || h === 'fullname');
+        if (nameIdx >= 0) fieldMap.fullName = nameIdx;
+    }
+
+    const contacts = [];
+    for (let i = 1; i < lines.length; i++) {
+        const cols = parseRow(lines[i]);
+        if (cols.every(c => !c)) continue; // skip empty rows
+
+        let firstName = '', lastName = '';
+        if (fieldMap.fullName !== undefined) {
+            const parts = (cols[fieldMap.fullName] || '').split(/\s+/);
+            firstName = parts[0] || '';
+            lastName = parts.slice(1).join(' ') || '';
+        } else {
+            firstName = cols[fieldMap.firstName] || '';
+            lastName = cols[fieldMap.lastName] || '';
+        }
+
+        if (!firstName && !lastName) continue;
+
+        const validTypes = ['BANKER', 'ADVISOR', 'EXECUTIVE', 'LP', 'LEGAL', 'OTHER'];
+        let type = (cols[fieldMap.type] || '').toUpperCase();
+        if (!validTypes.includes(type)) type = 'OTHER';
+
+        contacts.push({
+            firstName,
+            lastName,
+            email: cols[fieldMap.email] || '',
+            phone: cols[fieldMap.phone] || '',
+            title: cols[fieldMap.title] || '',
+            company: cols[fieldMap.company] || '',
+            type,
+            linkedinUrl: cols[fieldMap.linkedinUrl] || '',
+        });
+    }
+    return contacts;
+}
+
+function handleImportFile(file) {
+    if (!file) return;
+    if (!file.name.endsWith('.csv')) {
+        alert('Please select a CSV file.');
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        importedContacts = parseCSV(e.target.result);
+        if (importedContacts.length === 0) {
+            alert('No valid contacts found in CSV. Make sure it has First Name and Last Name columns.');
+            return;
+        }
+
+        // Show preview
+        document.getElementById('import-step-upload').classList.add('hidden');
+        document.getElementById('import-step-preview').classList.remove('hidden');
+        document.getElementById('import-count').textContent = importedContacts.length;
+
+        const tbody = document.getElementById('import-preview-body');
+        const preview = importedContacts.slice(0, 50); // show max 50 rows
+        tbody.innerHTML = preview.map(c => `
+            <tr class="border-b border-border-subtle">
+                <td class="py-2 text-text-main font-medium">${escapeHtml(c.firstName)} ${escapeHtml(c.lastName)}</td>
+                <td class="py-2 text-text-muted">${escapeHtml(c.email || '—')}</td>
+                <td class="py-2 text-text-muted">${escapeHtml(c.company || '—')}</td>
+                <td class="py-2"><span class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-text-muted">${escapeHtml(c.type)}</span></td>
+            </tr>
+        `).join('') + (importedContacts.length > 50 ? `<tr><td colspan="4" class="py-2 text-xs text-text-muted text-center">...and ${importedContacts.length - 50} more</td></tr>` : '');
+    };
+    reader.readAsText(file);
+}
+
+async function submitImport() {
+    const btn = document.getElementById('import-submit-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">sync</span> Importing...';
+
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE}/contacts/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contacts: importedContacts }),
+        });
+
+        const data = await res.json();
+
+        // Show result
+        document.getElementById('import-step-preview').classList.add('hidden');
+        document.getElementById('import-step-result').classList.remove('hidden');
+
+        if (data.imported > 0) {
+            document.getElementById('import-result-icon').textContent = 'check_circle';
+            document.getElementById('import-result-icon').className = 'material-symbols-outlined text-secondary text-5xl mb-3';
+            document.getElementById('import-result-title').textContent = `${data.imported} contacts imported!`;
+            document.getElementById('import-result-detail').textContent = data.failed > 0
+                ? `${data.failed} contact${data.failed > 1 ? 's' : ''} failed to import.`
+                : 'All contacts were imported successfully.';
+        } else {
+            document.getElementById('import-result-icon').textContent = 'error';
+            document.getElementById('import-result-icon').className = 'material-symbols-outlined text-red-500 text-5xl mb-3';
+            document.getElementById('import-result-title').textContent = 'Import failed';
+            document.getElementById('import-result-detail').textContent = data.errors?.[0] || 'No contacts could be imported.';
+        }
+    } catch (err) {
+        console.error('Import error:', err);
+        document.getElementById('import-error-msg').textContent = 'Import failed. Please try again.';
+        document.getElementById('import-error-msg').classList.remove('hidden');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">upload</span> Import All';
+    }
+}
+
+async function fetchContacts(offset = 0) {
     const params = new URLSearchParams();
     if (currentFilter.search) params.set('search', currentFilter.search);
     if (currentFilter.type) params.set('type', currentFilter.type);
-    params.set('sortBy', 'createdAt');
-    params.set('sortOrder', 'desc');
-    params.set('limit', '100');
-    params.set('offset', '0');
+    params.set('sortBy', currentFilter.sortBy);
+    params.set('sortOrder', currentFilter.sortOrder);
+    params.set('limit', String(PAGE_SIZE));
+    params.set('offset', String(offset));
 
     const res = await PEAuth.authFetch(`${API_BASE}/contacts?${params.toString()}`);
     if (!res.ok) throw new Error(`Failed to load contacts (${res.status})`);
@@ -818,6 +1175,161 @@ function renderEmptyState() {
     `;
 }
 
+function renderContactRow(contact) {
+    const tc = TYPE_CONFIG[contact.type] || TYPE_CONFIG.OTHER;
+    const initials = getInitials(contact.firstName, contact.lastName);
+    const fullName = escapeHtml((contact.firstName || '') + ' ' + (contact.lastName || ''));
+    const company = escapeHtml(contact.company || '');
+    const email = escapeHtml(contact.email || '');
+    const title = escapeHtml(contact.title || '');
+
+    let lastContactedText = '—';
+    if (contact.interactions && contact.interactions.length > 0) {
+        const sorted = [...contact.interactions].sort((a, b) => new Date(b.date || b.createdAt) - new Date(a.date || a.createdAt));
+        lastContactedText = timeAgo(sorted[0].date || sorted[0].createdAt);
+    } else if (contact.lastInteractionAt) {
+        lastContactedText = timeAgo(contact.lastInteractionAt);
+    }
+
+    const sd = contactScores[contact.id];
+    let scoreBadge = '';
+    if (sd) {
+        const sc = SCORE_CONFIG[sd.label] || SCORE_CONFIG.Cold;
+        scoreBadge = `<span class="flex items-center gap-1 px-1.5 py-0.5 rounded-md ${sc.bg} ${sc.text} text-[10px] font-bold"><span class="w-1.5 h-1.5 rounded-full ${sc.dot}"></span>${sd.score}</span>`;
+    }
+
+    return `
+        <tr class="hover:bg-slate-50/80 cursor-pointer transition-colors border-b border-border-subtle" onclick="openDetail('${escapeHtml(contact.id)}')">
+            <td class="px-4 py-3">
+                <div class="flex items-center gap-3">
+                    <div class="size-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style="background-color: ${tc.avatarBg}; color: ${tc.avatarText};">${escapeHtml(initials)}</div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-semibold text-text-main truncate">${fullName}</p>
+                        ${title ? `<p class="text-xs text-text-muted truncate">${title}</p>` : ''}
+                    </div>
+                </div>
+            </td>
+            <td class="px-4 py-3 text-sm text-text-secondary truncate max-w-[180px]">${company || '—'}</td>
+            <td class="px-4 py-3"><span class="px-2 py-0.5 rounded-md ${tc.bg} ${tc.text} text-[10px] font-bold uppercase">${escapeHtml(tc.label)}</span></td>
+            <td class="px-4 py-3 text-sm text-text-muted truncate max-w-[200px]">${email || '—'}</td>
+            <td class="px-4 py-3 text-sm text-text-muted">${lastContactedText}</td>
+            <td class="px-4 py-3">${scoreBadge || '<span class="text-text-muted text-xs">—</span>'}</td>
+        </tr>
+    `;
+}
+
+function renderListView(contactsList) {
+    return `
+        <div class="col-span-full bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-border-subtle bg-slate-50/50">
+                        <th class="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Name</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Company</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Type</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Email</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Last Contact</th>
+                        <th class="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${contactsList.map(c => renderContactRow(c)).join('')}
+                </tbody>
+            </table>
+        </div>
+    `;
+}
+
+function setViewMode(mode) {
+    viewMode = mode;
+    // Update toggle button styles
+    const gridBtn = document.getElementById('view-grid-btn');
+    const listBtn = document.getElementById('view-list-btn');
+    if (mode === 'grid') {
+        gridBtn.className = 'flex items-center justify-center w-9 h-full transition-colors bg-primary/10 text-primary';
+        listBtn.className = 'flex items-center justify-center w-9 h-full transition-colors bg-surface-card text-text-muted hover:text-text-secondary';
+    } else {
+        listBtn.className = 'flex items-center justify-center w-9 h-full transition-colors bg-primary/10 text-primary';
+        gridBtn.className = 'flex items-center justify-center w-9 h-full transition-colors bg-surface-card text-text-muted hover:text-text-secondary';
+    }
+    // Re-render with current contacts
+    renderContactsView();
+}
+
+function renderContactsView() {
+    const grid = document.getElementById('contacts-grid');
+    if (contacts.length === 0) return;
+
+    if (groupByCompany) {
+        grid.className = 'flex flex-col gap-6 pb-2';
+        grid.innerHTML = renderGroupedByCompany(contacts);
+    } else if (viewMode === 'list') {
+        grid.className = 'pb-2';
+        grid.innerHTML = renderListView(contacts);
+    } else {
+        grid.className = 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-2';
+        grid.innerHTML = contacts.map(c => renderContactCard(c)).join('');
+    }
+}
+
+function toggleGroupByCompany() {
+    groupByCompany = !groupByCompany;
+    const label = document.getElementById('group-label');
+    if (label) label.textContent = groupByCompany ? 'Ungroup Contacts' : 'Group by Company';
+    renderContactsView();
+}
+
+function renderGroupedByCompany(contactsList) {
+    // Group contacts by company
+    const groups = {};
+    for (const c of contactsList) {
+        const key = (c.company || '').trim() || 'No Company';
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(c);
+    }
+
+    // Sort groups: companies with most contacts first, "No Company" last
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+        if (a === 'No Company') return 1;
+        if (b === 'No Company') return -1;
+        return groups[b].length - groups[a].length;
+    });
+
+    return sortedKeys.map(company => {
+        const companyContacts = groups[company];
+        const cards = viewMode === 'list'
+            ? `<div class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-border-subtle bg-slate-50/50">
+                            <th class="px-4 py-2 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Name</th>
+                            <th class="px-4 py-2 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Type</th>
+                            <th class="px-4 py-2 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Email</th>
+                            <th class="px-4 py-2 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Last Contact</th>
+                            <th class="px-4 py-2 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Score</th>
+                        </tr>
+                    </thead>
+                    <tbody>${companyContacts.map(c => renderContactRow(c)).join('')}</tbody>
+                </table>
+               </div>`
+            : `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">${companyContacts.map(c => renderContactCard(c)).join('')}</div>`;
+
+        return `
+            <div>
+                <div class="flex items-center gap-3 mb-3">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-text-muted text-[18px]">corporate_fare</span>
+                        <h3 class="text-sm font-bold text-text-main">${escapeHtml(company)}</h3>
+                    </div>
+                    <span class="px-2 py-0.5 rounded-full bg-slate-100 text-text-muted text-[11px] font-bold">${companyContacts.length}</span>
+                    <div class="flex-1 border-t border-border-subtle"></div>
+                </div>
+                ${cards}
+            </div>
+        `;
+    }).join('');
+}
+
 function renderLoadingState() {
     return `
         <div class="col-span-full flex flex-col items-center justify-center py-20">
@@ -847,12 +1359,14 @@ function renderErrorState(message) {
 async function loadContacts() {
     const grid = document.getElementById('contacts-grid');
     grid.innerHTML = renderLoadingState();
+    currentOffset = 0;
 
     try {
-        const [data, scores] = await Promise.all([fetchContacts(), fetchScores()]);
+        const [data, scores] = await Promise.all([fetchContacts(0), fetchScores()]);
         contacts = data.contacts || data || [];
         totalContacts = data.total || contacts.length;
         contactScores = scores;
+        currentOffset = contacts.length;
 
         // Update header counts
         const badge = document.getElementById('contact-count-badge');
@@ -869,13 +1383,60 @@ async function loadContacts() {
                     <p class="text-text-muted text-sm">Try adjusting your search or filters</p>
                    </div>`
                 : renderEmptyState();
+            updatePaginationBar();
             return;
         }
 
-        grid.innerHTML = contacts.map(c => renderContactCard(c)).join('');
+        renderContactsView();
+        updatePaginationBar();
     } catch (err) {
         console.error('Error loading contacts:', err);
         grid.innerHTML = renderErrorState(err.message);
+    }
+}
+
+async function loadMore() {
+    const btn = document.getElementById('load-more-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined text-[18px] animate-spin">sync</span> Loading...';
+
+    try {
+        const data = await fetchContacts(currentOffset);
+        const newContacts = data.contacts || [];
+        contacts = [...contacts, ...newContacts];
+        currentOffset += newContacts.length;
+
+        // Re-render full view (handles both grid and list modes)
+        renderContactsView();
+        updatePaginationBar();
+    } catch (err) {
+        console.error('Error loading more contacts:', err);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">expand_more</span> Load More';
+    }
+}
+
+function updatePaginationBar() {
+    const bar = document.getElementById('pagination-bar');
+    const info = document.getElementById('pagination-info');
+    const btn = document.getElementById('load-more-btn');
+
+    if (totalContacts === 0) {
+        bar.classList.add('hidden');
+        return;
+    }
+
+    bar.classList.remove('hidden');
+    const showing = Math.min(currentOffset, totalContacts);
+    info.textContent = `Showing ${showing} of ${totalContacts} contact${totalContacts !== 1 ? 's' : ''}`;
+
+    if (showing < totalContacts) {
+        btn.classList.remove('hidden');
+        const remaining = totalContacts - showing;
+        btn.innerHTML = `<span class="material-symbols-outlined text-[18px]">expand_more</span> Load More (${remaining} remaining)`;
+    } else {
+        btn.classList.add('hidden');
     }
 }
 
@@ -1916,6 +2477,8 @@ function initializeFilters() {
     typeBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         typeDropdown.classList.toggle('hidden');
+        document.getElementById('sort-dropdown').classList.add('hidden');
+        document.getElementById('more-actions-dropdown').classList.add('hidden');
     });
 
     // Type filter options
@@ -1930,9 +2493,60 @@ function initializeFilters() {
         });
     });
 
+    // Sort dropdown
+    const sortBtn = document.getElementById('sort-btn');
+    const sortDropdown = document.getElementById('sort-dropdown');
+
+    sortBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        sortDropdown.classList.toggle('hidden');
+        typeDropdown.classList.add('hidden');
+        document.getElementById('more-actions-dropdown').classList.add('hidden');
+    });
+
+    const SORT_LABELS = {
+        'createdAt-desc': 'Newest First',
+        'createdAt-asc': 'Oldest First',
+        'name-asc': 'Name A-Z',
+        'name-desc': 'Name Z-A',
+        'company-asc': 'Company A-Z',
+        'lastContactedAt-desc': 'Last Contacted',
+    };
+
+    sortDropdown.querySelectorAll('button[data-sort]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentFilter.sortBy = btn.dataset.sort;
+            currentFilter.sortOrder = btn.dataset.order;
+            document.getElementById('sort-btn-text').textContent = SORT_LABELS[`${btn.dataset.sort}-${btn.dataset.order}`] || 'Sort';
+            // Update check marks
+            sortDropdown.querySelectorAll('.sort-check').forEach(c => c.classList.add('hidden'));
+            btn.querySelector('.sort-check').classList.remove('hidden');
+            sortDropdown.classList.add('hidden');
+            loadContacts();
+        });
+    });
+
+    // More actions dropdown
+    const moreBtn = document.getElementById('more-actions-btn');
+    const moreDropdown = document.getElementById('more-actions-dropdown');
+
+    moreBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        moreDropdown.classList.toggle('hidden');
+        typeDropdown.classList.add('hidden');
+        sortDropdown.classList.add('hidden');
+    });
+
+    // Close import modal on backdrop click
+    document.getElementById('import-modal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('import-modal')) closeImportModal();
+    });
+
     // Close dropdowns on outside click
     document.addEventListener('click', () => {
         typeDropdown.classList.add('hidden');
+        sortDropdown.classList.add('hidden');
+        moreDropdown.classList.add('hidden');
     });
 
     // Search input with debounce

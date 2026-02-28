@@ -9356,3 +9356,124 @@ Updated `FINANCIAL_EXTRACTION_TODO.md` to mark all remaining items as `[x]`.
 | `apps/web/src/vdr.tsx` | ConfirmDialog + Toast system, Banker Blue Upload button, custom filter handlers, cross-folder search, search results banner |
 
 ---
+
+### Session 30 — March 1, 2026 — 01:10 AM IST
+
+**Focus:** Contacts CRM — Audit + Implement P0/P1 Quick Wins from CONTACTS_AUDIT_TODO.md
+
+---
+
+#### 30.1 — Contacts Audit & Action Plan — ~12:00 AM IST
+
+**What:** Thorough audit of `contacts.html` + `contacts.ts` API against `contacts_crm_todo.md` (10-tier feature roadmap).
+
+**Result:** Created `CONTACTS_AUDIT_TODO.md` with tier-by-tier status:
+- **Tier 1 (Core CRM):** 3/8 done, 4/8 partial (backend-ready, missing frontend UI)
+- **Tier 2 (Relationship Intelligence):** 0/8 done, 2/8 partial (scores calculated but hidden)
+- **Tier 3-10:** Not started (AI enrichment, email sync, meeting prep, etc.)
+
+**Finding:** Item 2.2 (Health indicators on cards) was marked as "Not Started" in the audit but was actually **already implemented** — colored score badges with dots are rendered on contact cards at lines 786-791 of `contacts.html`, using `contactScores` cache populated by `fetchScores()`.
+
+---
+
+#### 30.2 — Sort Dropdown (Item 1.1) — ~12:20 AM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/contacts.html` | Added `sortBy`/`sortOrder` to `currentFilter` state | Was hardcoded to `createdAt`/`desc` — now dynamic |
+| 2 | `apps/web/contacts.html` | New sort dropdown button in header with 6 options: Date Added (Newest/Oldest), Name (A-Z/Z-A), Company (A-Z), Last Contacted | Users had no way to sort contacts — backend already supported all 4 sort fields |
+| 3 | `apps/web/contacts.html` | `fetchContacts()` uses `currentFilter.sortBy/sortOrder` instead of hardcoded values | Wires sort dropdown to actual API params |
+| 4 | `apps/web/contacts.html` | Event handlers: click toggle, checkmark on selected option, mutual dropdown close with Type filter | Consistent dropdown UX pattern |
+
+**Backend already supported:** `name`, `company`, `lastContactedAt`, `createdAt` with `asc`/`desc` (validated via Zod schema in `contacts.ts:54-55`).
+
+---
+
+#### 30.3 — Pagination UI (Item 1.3) — ~12:35 AM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/contacts.html` | Added `PAGE_SIZE = 30` constant + `currentOffset` tracking | Was loading 100 contacts at once with no way to load more |
+| 2 | `apps/web/contacts.html` | `fetchContacts(offset)` now takes dynamic offset param | Enables paginated fetching |
+| 3 | `apps/web/contacts.html` | New `loadMore()` function — fetches next page, appends cards to grid | Seamless infinite scroll without full re-render |
+| 4 | `apps/web/contacts.html` | New `updatePaginationBar()` — shows "Showing X of Y contacts" + "Load More (N remaining)" button | Users can see how many contacts are loaded vs total |
+| 5 | `apps/web/contacts.html` | Pagination bar HTML below grid — info text left, Load More button right | Clean, unobtrusive pagination controls |
+
+**Backend already supported:** `limit` + `offset` query params with `{ count: 'exact' }` for total count.
+
+---
+
+#### 30.4 — Export to CSV (Item 1.5) — ~12:45 AM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/contacts.ts` | **New endpoint** `GET /api/contacts/export` — fetches all contacts (respects search/type/sort filters), generates CSV with proper escaping, returns as downloadable file | No export capability existed before |
+| 2 | `apps/web/contacts.html` | `exportContacts()` function — passes current filters, downloads via blob URL | Frontend triggers CSV download |
+
+**CSV columns:** First Name, Last Name, Email, Phone, Title, Company, Type, LinkedIn, Tags, Last Contacted, Date Added. Proper CSV escaping for commas, quotes, newlines.
+
+---
+
+#### 30.5 — Grid/List View Toggle (Item 1.2) — ~12:55 AM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/contacts.html` | `viewMode` state ('grid' or 'list') + toggle button (grid/list icons) in header | Power users need dense table view — grid cards waste space for large contact lists |
+| 2 | `apps/web/contacts.html` | `renderContactRow(contact)` — dense table row: Avatar+Name | Company | Type | Email | Last Contact | Score | Compact view showing all key fields at a glance |
+| 3 | `apps/web/contacts.html` | `renderListView(contactsList)` — full table with thead column headers | Professional table layout with sortable column feel |
+| 4 | `apps/web/contacts.html` | `setViewMode(mode)` + `renderContactsView()` — switches grid container between 3-col cards and full-width table | Single re-render function used by both loadContacts() and loadMore() |
+
+**List view columns:** Name (with avatar + title), Company, Type badge, Email, Last Contact, Score badge. All rows clickable → opens same detail panel.
+
+---
+
+#### 30.6 — Company Grouping View (Item 1.8) — ~01:00 AM IST
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/contacts.html` | `groupByCompany` state + toggle | Groups contacts under company headers for organizational view |
+| 2 | `apps/web/contacts.html` | `renderGroupedByCompany(contactsList)` — groups by company name, sorts by contact count (most first), "No Company" last | Visual grouping with company icon + name + count badge + divider line |
+| 3 | `apps/web/contacts.html` | Works with **both** grid and list modes — list mode shows table per company, grid mode shows cards per company | Flexible — respects user's current view preference |
+
+---
+
+#### 30.7 — "More" Dropdown + CSV Import (Items 1.4/1.8 UX) — ~01:05 AM IST
+
+**Problem:** Header was getting cluttered — 7 buttons (Search, Type, Sort, Group, Grid/List, Export, Add Contact).
+**Solution:** Consolidated Group, Export, and new Import into a **"More" dropdown**.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/contacts.html` | Replaced standalone Group + Export buttons with "More" dropdown containing: Group by Company, Export to CSV, Import from CSV | Declutters header — keeps daily-use controls visible, tucks less-frequent actions in More |
+| 2 | `apps/web/contacts.html` | **New** 3-step Import Modal: (1) Drag & drop upload zone, (2) Preview table with smart header mapping, (3) Success/failure result | Full CSV import UI — was audit item 1.4 |
+| 3 | `apps/web/contacts.html` | `parseCSV()` — robust CSV parser with: quoted field handling, smart header mapping (handles 20+ column name variations like "fname"/"First Name"/"first"), full-name splitting, type validation | Maps messy real-world CSVs to our contact schema |
+| 4 | `apps/web/contacts.html` | `handleImportFile()`, `submitImport()`, `openImportModal()`, `closeImportModal()`, `resetImportModal()` | Full import lifecycle with loading states, error handling, result display |
+
+**Header after cleanup:** Search | Type Filter | Sort | Grid/List | **More** ▾ | + Add Contact
+
+**Backend already supported:** `POST /api/contacts/import` accepts up to 500 contacts per batch.
+
+---
+
+### Summary — Session 30
+
+| # | Feature | Audit Item | Status |
+|---|---------|-----------|--------|
+| 1 | Contacts Audit & Action Plan | — | Created `CONTACTS_AUDIT_TODO.md` |
+| 2 | Health indicators on cards | 2.2 | Already done (found during audit) |
+| 3 | Sort dropdown | 1.1 | Done — 6 sort options |
+| 4 | Pagination UI | 1.3 | Done — "Showing X of Y" + Load More |
+| 5 | Export to CSV | 1.5 | Done — backend endpoint + frontend download |
+| 6 | Grid/List view toggle | 1.2 | Done — dense table view for power users |
+| 7 | Company grouping | 1.8 | Done — group by company headers |
+| 8 | "More" dropdown + CSV Import | 1.4 | Done — 3-step import with preview |
+
+### Files Changed — Session 30
+
+| File | Changes |
+|------|---------|
+| `apps/web/contacts.html` | Sort dropdown, pagination (Load More + count), grid/list toggle, company grouping, "More" dropdown, CSV import modal with 3-step flow, smart CSV parser |
+| `apps/api/src/routes/contacts.ts` | New `GET /api/contacts/export` endpoint — CSV generation with proper escaping, respects current filters/sort |
+| `CONTACTS_AUDIT_TODO.md` | **New** — Comprehensive contacts feature audit (tier-by-tier status, P0/P1/P2 priority actions) |
+
+---

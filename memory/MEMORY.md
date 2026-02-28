@@ -62,3 +62,5 @@
 - Concise communication, no emojis
 - Short follow-up questions when clarification needed
 - PROGRESS.md format: `## Session N — Month DD, YYYY` + `### Feature — ~HH:MM AM/PM IST`
+
+@supabase_schema.sql  contains latest schema of supabase ! 

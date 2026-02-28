@@ -114,6 +114,70 @@ router.get('/', async (req: any, res) => {
   }
 });
 
+// ─── GET /api/contacts/export — Export contacts as CSV ───────
+
+router.get('/export', async (req: any, res) => {
+  try {
+    const query = contactsQuerySchema.safeParse(req.query);
+    const { search, type, sortBy, sortOrder } = query.success ? query.data : {} as any;
+
+    let q = supabase
+      .from('Contact')
+      .select('firstName, lastName, email, phone, title, company, type, linkedinUrl, tags, lastContactedAt, createdAt');
+
+    if (type) q = q.eq('type', type);
+    if (search) {
+      q = q.or(`firstName.ilike.%${search}%,lastName.ilike.%${search}%,email.ilike.%${search}%,company.ilike.%${search}%`);
+    }
+
+    if (sortBy === 'name') {
+      q = q.order('lastName', { ascending: sortOrder !== 'desc' })
+           .order('firstName', { ascending: sortOrder !== 'desc' });
+    } else if (sortBy === 'company') {
+      q = q.order('company', { ascending: sortOrder !== 'desc', nullsFirst: false });
+    } else if (sortBy === 'lastContactedAt') {
+      q = q.order('lastContactedAt', { ascending: sortOrder === 'asc', nullsFirst: false });
+    } else {
+      q = q.order('createdAt', { ascending: false });
+    }
+
+    const { data: contacts, error } = await q;
+    if (error) throw error;
+
+    const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'Title', 'Company', 'Type', 'LinkedIn', 'Tags', 'Last Contacted', 'Date Added'];
+
+    const escCsv = (val: any) => {
+      if (val == null) return '';
+      const s = String(val);
+      if (s.includes(',') || s.includes('"') || s.includes('\n')) return `"${s.replace(/"/g, '""')}"`;
+      return s;
+    };
+
+    const rows = (contacts || []).map(c => [
+      escCsv(c.firstName),
+      escCsv(c.lastName),
+      escCsv(c.email),
+      escCsv(c.phone),
+      escCsv(c.title),
+      escCsv(c.company),
+      escCsv(c.type),
+      escCsv(c.linkedinUrl),
+      escCsv((c.tags || []).join('; ')),
+      escCsv(c.lastContactedAt ? new Date(c.lastContactedAt).toLocaleDateString() : ''),
+      escCsv(c.createdAt ? new Date(c.createdAt).toLocaleDateString() : ''),
+    ].join(','));
+
+    const csv = [headers.join(','), ...rows].join('\n');
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename="contacts-export-${new Date().toISOString().split('T')[0]}.csv"`);
+    res.send(csv);
+  } catch (error) {
+    log.error('Export contacts error', error);
+    res.status(500).json({ error: 'Failed to export contacts' });
+  }
+});
+
 // ─── GET /api/contacts/:id — Get contact with details ───────
 
 router.get('/:id', async (req: any, res) => {
