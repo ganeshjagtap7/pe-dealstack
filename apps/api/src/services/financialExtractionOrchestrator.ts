@@ -32,6 +32,7 @@ export interface DeepPassResult {
   overallConfidence: number;
   statementIds: string[];
   warnings: string[];
+  hasConflicts: boolean;
 }
 
 export interface OrchestrationResult {
@@ -84,20 +85,48 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
       overallConfidence: 0,
       statementIds: [],
       warnings: classification?.warnings ?? ['No financial data found in document'],
+      hasConflicts: false,
     };
   }
 
   const statementIds: string[] = [];
   let periodsStored = 0;
+  let hasConflicts = false;
   const now = new Date().toISOString();
 
   for (const stmt of classification.statements) {
     for (const periodData of stmt.periods) {
       try {
-        const { data, error } = await supabase
+        // Check for existing active row from a DIFFERENT document
+        const { data: existing } = await supabase
           .from('FinancialStatement')
-          .upsert(
-            {
+          .select('id, documentId, isActive')
+          .eq('dealId', input.dealId)
+          .eq('statementType', stmt.statementType)
+          .eq('period', periodData.period)
+          .eq('isActive', true)
+          .maybeSingle();
+
+        const isConflict = existing && existing.documentId !== (input.documentId ?? null);
+
+        if (isConflict) {
+          // CONFLICT: different document already has active data for this period
+          log.info('Deep pass: conflict detected', {
+            dealId: input.dealId, statementType: stmt.statementType,
+            period: periodData.period, existingDocId: existing.documentId,
+            newDocId: input.documentId,
+          });
+
+          // Mark existing row as needs_review (keep it active)
+          await supabase
+            .from('FinancialStatement')
+            .update({ mergeStatus: 'needs_review' })
+            .eq('id', existing.id);
+
+          // Insert new row as inactive + needs_review
+          const { data, error } = await supabase
+            .from('FinancialStatement')
+            .insert({
               dealId: input.dealId,
               documentId: input.documentId ?? null,
               statementType: stmt.statementType,
@@ -109,30 +138,61 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
               extractionConfidence: periodData.confidence,
               extractionSource: source,
               extractedAt: now,
-            },
-            { onConflict: 'dealId,statementType,period' },
-          )
-          .select('id')
-          .single();
+              isActive: false,
+              mergeStatus: 'needs_review',
+            })
+            .select('id')
+            .single();
 
-        if (error) {
-          log.error('Deep pass: failed to upsert period', {
-            dealId: input.dealId,
-            statementType: stmt.statementType,
-            period: periodData.period,
-            error,
-          });
-          continue;
+          if (error) {
+            log.error('Deep pass: conflict insert failed', {
+              dealId: input.dealId, statementType: stmt.statementType,
+              period: periodData.period, error,
+            });
+            continue;
+          }
+          if (data?.id) statementIds.push(data.id);
+          periodsStored++;
+          hasConflicts = true;
+        } else {
+          // NO CONFLICT: same doc re-extraction or first extraction for this period
+          const { data, error } = await supabase
+            .from('FinancialStatement')
+            .upsert(
+              {
+                dealId: input.dealId,
+                documentId: input.documentId ?? null,
+                statementType: stmt.statementType,
+                period: periodData.period,
+                periodType: periodData.periodType,
+                lineItems: periodData.lineItems,
+                currency: stmt.currency,
+                unitScale: stmt.unitScale,
+                extractionConfidence: periodData.confidence,
+                extractionSource: source,
+                extractedAt: now,
+                isActive: true,
+                mergeStatus: 'auto',
+              },
+              { onConflict: 'dealId,statementType,period,documentId' },
+            )
+            .select('id')
+            .single();
+
+          if (error) {
+            log.error('Deep pass: failed to upsert period', {
+              dealId: input.dealId, statementType: stmt.statementType,
+              period: periodData.period, error,
+            });
+            continue;
+          }
+          if (data?.id) statementIds.push(data.id);
+          periodsStored++;
         }
-
-        if (data?.id) statementIds.push(data.id);
-        periodsStored++;
       } catch (err) {
         log.error('Deep pass: unexpected error upserting period', {
-          dealId: input.dealId,
-          statementType: stmt.statementType,
-          period: periodData.period,
-          error: err,
+          dealId: input.dealId, statementType: stmt.statementType,
+          period: periodData.period, error: err,
         });
       }
     }
@@ -142,6 +202,7 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
     dealId: input.dealId,
     statementsFound: classification.statements.length,
     periodsStored,
+    hasConflicts,
     overallConfidence: classification.overallConfidence,
   });
 
@@ -151,6 +212,7 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
     overallConfidence: classification.overallConfidence,
     statementIds,
     warnings: classification.warnings,
+    hasConflicts,
   };
 }
 

@@ -91,6 +91,7 @@ router.get('/deals/:dealId/financials', async (req, res) => {
       .from('FinancialStatement')
       .select('*, Document(id, name)')
       .eq('dealId', dealId)
+      .eq('isActive', true)
       .order('statementType', { ascending: true })
       .order('period', { ascending: true });
 
@@ -115,6 +116,7 @@ router.get('/deals/:dealId/financials/summary', async (req, res) => {
       .select('*')
       .eq('dealId', dealId)
       .eq('statementType', 'INCOME_STATEMENT')
+      .eq('isActive', true)
       .order('period', { ascending: true });
 
     if (error) throw error;
@@ -322,7 +324,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
 
     const { extractionMethod, result } = await extractFinancialsForDoc(doc, dealId);
 
-    res.json({ success: true, documentUsed: { id: doc.id, name: doc.name }, extractionMethod, result });
+    res.json({ success: true, documentUsed: { id: doc.id, name: doc.name }, extractionMethod, result, hasConflicts: result?.hasConflicts ?? false });
   } catch (err: any) {
     log.error('POST financials extract error', err);
     const status = err.message?.includes('Could not') || err.message?.includes('appears empty') ? 422 : 500;
@@ -341,6 +343,7 @@ router.get('/deals/:dealId/financials/validation', async (req, res) => {
       .from('FinancialStatement')
       .select('*')
       .eq('dealId', dealId)
+      .eq('isActive', true)
       .order('statementType', { ascending: true })
       .order('period', { ascending: true });
 
@@ -407,6 +410,189 @@ router.post('/documents/:documentId/extract-financials', async (req, res) => {
     log.error('POST document extract-financials error', err);
     const status = err.message?.includes('Could not') || err.message?.includes('appears empty') ? 422 : 500;
     res.status(status).json({ error: err.message ?? 'Financial extraction failed' });
+  }
+});
+
+// ─── 6a: GET /api/deals/:dealId/financials/conflicts ─────────
+// Returns all periods with overlapping extractions from different documents
+
+router.get('/deals/:dealId/financials/conflicts', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+
+    const { data: rows, error } = await supabase
+      .from('FinancialStatement')
+      .select('*, Document(id, name)')
+      .eq('dealId', dealId)
+      .eq('mergeStatus', 'needs_review')
+      .order('statementType', { ascending: true })
+      .order('period', { ascending: true });
+
+    if (error) throw error;
+
+    // Group by (statementType, period)
+    const conflicts = new Map<string, any[]>();
+    for (const row of rows ?? []) {
+      const key = `${row.statementType}|${row.period}`;
+      if (!conflicts.has(key)) conflicts.set(key, []);
+      conflicts.get(key)!.push(row);
+    }
+
+    const result = Array.from(conflicts.entries()).map(([key, versions]) => {
+      const [statementType, period] = key.split('|');
+      return {
+        statementType,
+        period,
+        versions: versions.map(v => ({
+          id: v.id,
+          documentId: v.documentId,
+          documentName: (v as any).Document?.name ?? 'Unknown',
+          isActive: v.isActive,
+          lineItems: v.lineItems,
+          extractionConfidence: v.extractionConfidence,
+          extractionSource: v.extractionSource,
+          extractedAt: v.extractedAt,
+          reviewedAt: v.reviewedAt,
+        })),
+      };
+    });
+
+    res.json({ conflicts: result, count: result.length });
+  } catch (err) {
+    log.error('GET financials conflicts error', err);
+    res.status(500).json({ error: 'Failed to fetch conflicts' });
+  }
+});
+
+// ─── 6b: POST /api/deals/:dealId/financials/resolve ──────────
+// User picks a version for an overlapping period
+
+const resolveSchema = z.object({
+  statementType: z.string(),
+  period: z.string(),
+  chosenVersionId: z.string().uuid().optional(),
+  customLineItems: z.record(z.number().nullable()).optional(),
+});
+
+router.post('/deals/:dealId/financials/resolve', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+    const user = (req as any).user;
+    const { statementType, period, chosenVersionId, customLineItems } = resolveSchema.parse(req.body);
+
+    // Get all versions for this conflict
+    const { data: versions, error } = await supabase
+      .from('FinancialStatement')
+      .select('id, isActive')
+      .eq('dealId', dealId)
+      .eq('statementType', statementType)
+      .eq('period', period);
+
+    if (error || !versions?.length) {
+      return res.status(404).json({ error: 'No versions found for this period' });
+    }
+
+    // Deactivate all versions
+    const allIds = versions.map((v: any) => v.id);
+    await supabase
+      .from('FinancialStatement')
+      .update({ isActive: false, mergeStatus: 'user_resolved' })
+      .in('id', allIds);
+
+    if (customLineItems) {
+      // User provided custom values
+      const targetId = chosenVersionId ?? versions[0].id;
+      await supabase
+        .from('FinancialStatement')
+        .update({
+          isActive: true,
+          mergeStatus: 'user_resolved',
+          lineItems: customLineItems,
+          extractionSource: 'manual',
+          reviewedAt: new Date().toISOString(),
+          reviewedBy: user?.id ?? null,
+        })
+        .eq('id', targetId);
+    } else if (chosenVersionId) {
+      // User picked an existing version
+      await supabase
+        .from('FinancialStatement')
+        .update({
+          isActive: true,
+          mergeStatus: 'user_resolved',
+          reviewedAt: new Date().toISOString(),
+          reviewedBy: user?.id ?? null,
+        })
+        .eq('id', chosenVersionId);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    log.error('POST financials resolve error', err);
+    res.status(500).json({ error: 'Failed to resolve conflict' });
+  }
+});
+
+// ─── 6c: POST /api/deals/:dealId/financials/resolve-all ──────
+// Bulk resolve: auto-pick by strategy (highest_confidence or latest_document)
+
+router.post('/deals/:dealId/financials/resolve-all', async (req, res) => {
+  try {
+    const { dealId } = req.params;
+    const user = (req as any).user;
+    const strategy = req.body.strategy ?? 'highest_confidence';
+
+    const { data: rows, error } = await supabase
+      .from('FinancialStatement')
+      .select('*')
+      .eq('dealId', dealId)
+      .eq('mergeStatus', 'needs_review');
+
+    if (error) throw error;
+    if (!rows?.length) return res.json({ resolved: 0 });
+
+    // Group by (statementType, period)
+    const groups = new Map<string, any[]>();
+    for (const row of rows) {
+      const key = `${row.statementType}|${row.period}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(row);
+    }
+
+    let resolved = 0;
+    for (const [, versions] of groups) {
+      // Sort by strategy — winner is first
+      const sorted = [...versions].sort((a: any, b: any) =>
+        strategy === 'latest_document'
+          ? new Date(b.extractedAt).getTime() - new Date(a.extractedAt).getTime()
+          : b.extractionConfidence - a.extractionConfidence,
+      );
+
+      // Deactivate all
+      const ids = versions.map((v: any) => v.id);
+      await supabase
+        .from('FinancialStatement')
+        .update({ isActive: false, mergeStatus: 'user_resolved' })
+        .in('id', ids);
+
+      // Activate winner
+      await supabase
+        .from('FinancialStatement')
+        .update({
+          isActive: true,
+          mergeStatus: 'user_resolved',
+          reviewedAt: new Date().toISOString(),
+          reviewedBy: user?.id ?? null,
+        })
+        .eq('id', sorted[0].id);
+
+      resolved++;
+    }
+
+    res.json({ resolved });
+  } catch (err) {
+    log.error('POST financials resolve-all error', err);
+    res.status(500).json({ error: 'Failed to auto-resolve conflicts' });
   }
 });
 
