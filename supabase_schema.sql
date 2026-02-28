@@ -38,16 +38,14 @@ CREATE TABLE public.AuditLog (
 );
 CREATE TABLE public.ChatMessage (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  dealId uuid NOT NULL,
-  userId uuid,
+  dealId uuid,
+  userId text,
   role text NOT NULL CHECK (role = ANY (ARRAY['user'::text, 'assistant'::text, 'system'::text])),
   content text NOT NULL,
   metadata jsonb DEFAULT '{}'::jsonb,
   createdAt timestamp with time zone DEFAULT now(),
-  updatedAt timestamp with time zone DEFAULT now(),
   CONSTRAINT ChatMessage_pkey PRIMARY KEY (id),
-  CONSTRAINT ChatMessage_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id),
-  CONSTRAINT ChatMessage_userId_fkey FOREIGN KEY (userId) REFERENCES public.User(id)
+  CONSTRAINT ChatMessage_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id)
 );
 CREATE TABLE public.Company (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -67,19 +65,55 @@ CREATE TABLE public.Company (
 );
 CREATE TABLE public.Contact (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
-  companyId uuid NOT NULL,
-  name text NOT NULL,
+  firstName text NOT NULL,
+  lastName text NOT NULL,
   email text,
   phone text,
   title text,
-  department text,
-  isPrimary boolean DEFAULT false,
+  company text,
+  type text NOT NULL DEFAULT 'OTHER'::text CHECK (type = ANY (ARRAY['BANKER'::text, 'ADVISOR'::text, 'EXECUTIVE'::text, 'LP'::text, 'LEGAL'::text, 'OTHER'::text])),
+  linkedinUrl text,
   notes text,
-  avatar text,
+  tags ARRAY DEFAULT '{}'::text[],
+  lastContactedAt timestamp with time zone,
+  createdBy uuid,
+  createdAt timestamp with time zone NOT NULL DEFAULT now(),
+  updatedAt timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT Contact_pkey PRIMARY KEY (id)
+);
+CREATE TABLE public.ContactDeal (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  contactId uuid NOT NULL,
+  dealId uuid NOT NULL,
+  role text DEFAULT 'OTHER'::text CHECK (role = ANY (ARRAY['BANKER'::text, 'ADVISOR'::text, 'BOARD_MEMBER'::text, 'MANAGEMENT'::text, 'OTHER'::text])),
+  createdAt timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT ContactDeal_pkey PRIMARY KEY (id),
+  CONSTRAINT ContactDeal_contactId_fkey FOREIGN KEY (contactId) REFERENCES public.Contact(id),
+  CONSTRAINT ContactDeal_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id)
+);
+CREATE TABLE public.ContactInteraction (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  contactId uuid NOT NULL,
+  type text NOT NULL DEFAULT 'NOTE'::text CHECK (type = ANY (ARRAY['NOTE'::text, 'MEETING'::text, 'CALL'::text, 'EMAIL'::text, 'OTHER'::text])),
+  title text,
+  description text,
+  date timestamp with time zone DEFAULT now(),
+  createdBy uuid,
+  createdAt timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT ContactInteraction_pkey PRIMARY KEY (id),
+  CONSTRAINT ContactInteraction_contactId_fkey FOREIGN KEY (contactId) REFERENCES public.Contact(id)
+);
+CREATE TABLE public.ContactRelationship (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  contactId uuid NOT NULL,
+  relatedContactId uuid NOT NULL,
+  type text NOT NULL CHECK (type = ANY (ARRAY['KNOWS'::text, 'REFERRED_BY'::text, 'REPORTS_TO'::text, 'COLLEAGUE'::text, 'INTRODUCED_BY'::text])),
+  notes text,
+  createdBy uuid,
   createdAt timestamp with time zone DEFAULT now(),
-  updatedAt timestamp with time zone DEFAULT now(),
-  CONSTRAINT Contact_pkey PRIMARY KEY (id),
-  CONSTRAINT Contact_companyId_fkey FOREIGN KEY (companyId) REFERENCES public.Company(id)
+  CONSTRAINT ContactRelationship_pkey PRIMARY KEY (id),
+  CONSTRAINT ContactRelationship_contactId_fkey FOREIGN KEY (contactId) REFERENCES public.Contact(id),
+  CONSTRAINT ContactRelationship_relatedContactId_fkey FOREIGN KEY (relatedContactId) REFERENCES public.Contact(id)
 );
 CREATE TABLE public.Conversation (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -180,6 +214,30 @@ CREATE TABLE public.DocumentChunk (
   CONSTRAINT DocumentChunk_documentId_fkey FOREIGN KEY (documentId) REFERENCES public.Document(id),
   CONSTRAINT DocumentChunk_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id)
 );
+CREATE TABLE public.FinancialStatement (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  dealId uuid NOT NULL,
+  documentId uuid,
+  statementType text NOT NULL CHECK ("statementType" = ANY (ARRAY['INCOME_STATEMENT'::text, 'BALANCE_SHEET'::text, 'CASH_FLOW'::text])),
+  period text NOT NULL,
+  periodType text NOT NULL DEFAULT 'HISTORICAL'::text CHECK ("periodType" = ANY (ARRAY['HISTORICAL'::text, 'PROJECTED'::text, 'LTM'::text])),
+  lineItems jsonb NOT NULL DEFAULT '{}'::jsonb,
+  currency text NOT NULL DEFAULT 'USD'::text,
+  unitScale text NOT NULL DEFAULT 'MILLIONS'::text CHECK ("unitScale" = ANY (ARRAY['MILLIONS'::text, 'THOUSANDS'::text, 'ACTUALS'::text])),
+  extractionConfidence integer NOT NULL DEFAULT 0 CHECK ("extractionConfidence" >= 0 AND "extractionConfidence" <= 100),
+  extractionSource text DEFAULT 'gpt4o'::text CHECK ("extractionSource" = ANY (ARRAY['gpt4o'::text, 'azure'::text, 'vision'::text, 'manual'::text])),
+  extractedAt timestamp with time zone,
+  reviewedAt timestamp with time zone,
+  reviewedBy uuid,
+  createdAt timestamp with time zone NOT NULL DEFAULT now(),
+  updatedAt timestamp with time zone NOT NULL DEFAULT now(),
+  isActive boolean NOT NULL DEFAULT true,
+  mergeStatus text NOT NULL DEFAULT 'auto'::text CHECK ("mergeStatus" = ANY (ARRAY['auto'::text, 'needs_review'::text, 'user_resolved'::text])),
+  CONSTRAINT FinancialStatement_pkey PRIMARY KEY (id),
+  CONSTRAINT FinancialStatement_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id),
+  CONSTRAINT FinancialStatement_documentId_fkey FOREIGN KEY (documentId) REFERENCES public.Document(id),
+  CONSTRAINT FinancialStatement_reviewedBy_fkey FOREIGN KEY (reviewedBy) REFERENCES public.User(id)
+);
 CREATE TABLE public.Folder (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   dealId uuid NOT NULL,
@@ -241,9 +299,7 @@ CREATE TABLE public.Memo (
   createdAt timestamp with time zone DEFAULT now(),
   updatedAt timestamp with time zone DEFAULT now(),
   CONSTRAINT Memo_pkey PRIMARY KEY (id),
-  CONSTRAINT Memo_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id),
-  CONSTRAINT Memo_createdBy_fkey FOREIGN KEY (createdBy) REFERENCES public.User(id),
-  CONSTRAINT Memo_lastEditedBy_fkey FOREIGN KEY (lastEditedBy) REFERENCES public.User(id)
+  CONSTRAINT Memo_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id)
 );
 CREATE TABLE public.MemoChatMessage (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
@@ -285,6 +341,36 @@ CREATE TABLE public.MemoSection (
   CONSTRAINT MemoSection_pkey PRIMARY KEY (id),
   CONSTRAINT MemoSection_memoId_fkey FOREIGN KEY (memoId) REFERENCES public.Memo(id)
 );
+CREATE TABLE public.MemoTemplate (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  name character varying NOT NULL,
+  description text,
+  category character varying DEFAULT 'INVESTMENT_MEMO'::character varying,
+  isGoldStandard boolean DEFAULT false,
+  isLegacy boolean DEFAULT false,
+  isActive boolean DEFAULT true,
+  usageCount integer DEFAULT 0,
+  permissions character varying DEFAULT 'FIRM_WIDE'::character varying,
+  createdBy uuid,
+  createdAt timestamp without time zone DEFAULT now(),
+  updatedAt timestamp without time zone DEFAULT now(),
+  CONSTRAINT MemoTemplate_pkey PRIMARY KEY (id),
+  CONSTRAINT MemoTemplate_createdBy_fkey FOREIGN KEY (createdBy) REFERENCES public.User(id)
+);
+CREATE TABLE public.MemoTemplateSection (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  templateId uuid,
+  title character varying NOT NULL,
+  description text,
+  aiEnabled boolean DEFAULT false,
+  aiPrompt text,
+  mandatory boolean DEFAULT false,
+  requiresApproval boolean DEFAULT false,
+  sortOrder integer DEFAULT 0,
+  createdAt timestamp without time zone DEFAULT now(),
+  CONSTRAINT MemoTemplateSection_pkey PRIMARY KEY (id),
+  CONSTRAINT MemoTemplateSection_templateId_fkey FOREIGN KEY (templateId) REFERENCES public.MemoTemplate(id)
+);
 CREATE TABLE public.Notification (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   userId uuid NOT NULL,
@@ -298,6 +384,24 @@ CREATE TABLE public.Notification (
   CONSTRAINT Notification_pkey PRIMARY KEY (id),
   CONSTRAINT Notification_userId_fkey FOREIGN KEY (userId) REFERENCES public.User(id),
   CONSTRAINT Notification_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id)
+);
+CREATE TABLE public.Task (
+  id uuid NOT NULL DEFAULT gen_random_uuid(),
+  title text NOT NULL,
+  description text,
+  status text NOT NULL DEFAULT 'PENDING'::text CHECK (status = ANY (ARRAY['PENDING'::text, 'IN_PROGRESS'::text, 'COMPLETED'::text, 'STUCK'::text])),
+  priority text NOT NULL DEFAULT 'MEDIUM'::text CHECK (priority = ANY (ARRAY['LOW'::text, 'MEDIUM'::text, 'HIGH'::text, 'URGENT'::text])),
+  assignedTo uuid,
+  dealId uuid,
+  dueDate timestamp with time zone,
+  createdBy uuid,
+  firmName text,
+  createdAt timestamp with time zone DEFAULT now(),
+  updatedAt timestamp with time zone DEFAULT now(),
+  CONSTRAINT Task_pkey PRIMARY KEY (id),
+  CONSTRAINT Task_assignedTo_fkey FOREIGN KEY (assignedTo) REFERENCES public.User(id),
+  CONSTRAINT Task_dealId_fkey FOREIGN KEY (dealId) REFERENCES public.Deal(id),
+  CONSTRAINT Task_createdBy_fkey FOREIGN KEY (createdBy) REFERENCES public.User(id)
 );
 CREATE TABLE public.User (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

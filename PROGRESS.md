@@ -9223,3 +9223,136 @@ Updated `FINANCIAL_EXTRACTION_TODO.md` to mark all remaining items as `[x]`.
 | `FINANCIAL_EXTRACTION_TODO.md` | All items marked complete; updated descriptions to reflect actual implementation |
 
 ---
+
+### Session 29 — March 1, 2026
+
+#### 1. Replace Native Browser Dialogs with Premium UI — ~12:00 PM IST
+
+**Problem:** All delete operations (files, folders) showed the ugly native browser `window.confirm("localhost:3000 says...")` dialog. All error/success messages used `alert()` — raw browser popups that looked unprofessional and broke the premium banker aesthetic.
+
+**Root Cause:** The VDR React app was using `window.confirm()` in FolderTree.tsx and FileTable.tsx for delete confirmations, and 14+ `alert()` calls scattered throughout vdr.tsx for error/success messaging.
+
+**Solution:** Created two new reusable components and rewired all dialogs:
+
+**ConfirmDialog component** (`apps/web/src/components/ConfirmDialog.tsx` — NEW):
+- Centered modal with backdrop blur, slide-in animation, Escape key support
+- 3 variants: `danger` (red — delete operations), `warning` (amber), `info` (banker blue)
+- Each variant has matching icon, icon background, and confirm button color
+- Accessible: `role="alertdialog"`, `aria-modal`, `aria-labelledby`, `aria-describedby`
+
+**Toast notification system** (`apps/web/src/components/Toast.tsx` — NEW):
+- 4 variants: `success` (green), `error` (red), `warning` (amber), `info` (banker blue #003366)
+- Stacking toasts with auto-dismiss + animated progress bar showing remaining time
+- Fixed position bottom-right, z-index 9998 (below confirm dialog at 9999)
+
+**Wiring changes:**
+- FolderTree.tsx and FileTable.tsx: Removed `window.confirm()` — now call `onDeleteFolder()`/`onDeleteFile()` directly, parent handles confirmation
+- vdr.tsx: Added `showToast()`, `dismissToast()`, `showConfirm()`, `closeConfirm()` helpers
+- `handleDeleteFile` and `handleDeleteFolder` rewritten to use `showConfirm()` with async `onConfirm` callback
+- All 14 `alert()` calls replaced with `showToast()` using appropriate variants
+- Old inline upload toast HTML removed, replaced with `<ConfirmDialog>` and `<ToastContainer>` components
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/src/components/ConfirmDialog.tsx` | **New** — Premium confirmation dialog (3 variants, backdrop blur, animations) | Replace ugly native `window.confirm()` popups |
+| 2 | `apps/web/src/components/Toast.tsx` | **New** — Stacking toast notifications (4 variants, progress bar, auto-dismiss) | Replace all `alert()` calls with themed notifications |
+| 3 | `apps/web/src/components/FolderTree.tsx` | Removed `window.confirm()` from `handleDelete` | Parent (vdr.tsx) now handles confirmation dialog |
+| 4 | `apps/web/src/components/FileTable.tsx` | Removed `window.confirm()` from `handleDelete` | Parent (vdr.tsx) now handles confirmation dialog |
+| 5 | `apps/web/src/vdr.tsx` | Added ConfirmDialog/Toast imports, `showToast()`/`showConfirm()` helpers, rewrote delete handlers, replaced all 14 `alert()` calls, removed old inline toast HTML | Centralized dialog management with premium UI |
+
+---
+
+#### 2. Fix Button Colors to Banker Blue Theme — ~1:00 PM IST
+
+**Problem:** The "Upload Files" button in the VDR header and "Generate Full Report" button in the Insights Panel were using `bg-slate-900` (black) instead of the Banker Blue (#003366) used consistently across all other pages.
+
+**Fix:** Changed both buttons to use `style={{ backgroundColor: '#003366' }}` with hover state `#004488`, matching the product-wide theme.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/src/vdr.tsx` | Upload Files button: `bg-slate-900` → `#003366` with `#004488` hover | Match product-wide Banker Blue theme |
+| 2 | `apps/web/src/components/InsightsPanel.tsx` | Generate Full Report button: `bg-slate-900` → `#003366` with `#004488` hover | Match product-wide Banker Blue theme |
+
+---
+
+#### 3. Wire Up Custom Filter Button with Preset Dropdown — ~1:30 PM IST
+
+**Problem:** The "+ Custom" button in the Smart Filters bar was a dead placeholder — clicking it did nothing.
+
+**Solution:** Built a full custom filter system with 7 preset filters and a dropdown menu:
+
+**Custom filter presets added:**
+1. Word Documents — filters `file.type === 'doc'`
+2. Large Files (>5 MB) — parses file.size string, converts to MB
+3. Small Files (<1 MB) — parses file.size string, converts to MB
+4. Last 7 Days — compares file.date against 7-day cutoff
+5. Last 90 Days — compares file.date against 90-day cutoff
+6. AI Analyzed — filters `analysis.type === 'key-insight' || 'complete'`
+7. Pending Analysis — filters standard type with "pending" in label
+
+**UX:**
+- Click "+ Custom" → dropdown with available presets (already-added ones hidden)
+- Click a preset → immediately adds as active filter chip with "x" remove button
+- Custom chips are visually identical to built-in chips but show close icon
+- Dropdown closes on outside click, has slide-in animation
+- "All filters already added" message when all 7 are active
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/src/types/vdr.types.ts` | Added `isCustom?: boolean` to SmartFilter interface | Distinguish removable custom filters from built-in ones |
+| 2 | `apps/web/src/components/FiltersBar.tsx` | Complete rewrite: 7 custom presets, dropdown menu, removable chips, outside-click close | Wire up the dead "+ Custom" placeholder button |
+| 3 | `apps/web/src/vdr.tsx` | Added `handleAddCustomFilter` and `handleRemoveCustomFilter` handlers + props to FiltersBar | State management for custom filters |
+
+---
+
+#### 4. Fix Custom Filter Dropdown Not Showing — ~2:00 PM IST
+
+**Problem:** After wiring up the Custom button, clicking it changed the icon (+ → chevron up) but no dropdown appeared.
+
+**Root Cause:** The Smart Filters chip container had `overflow-x-auto` CSS, which clips absolutely-positioned child elements like the dropdown. The dropdown was rendering but invisible — hidden by the parent's overflow.
+
+**Fix:** Changed `overflow-x-auto scrollbar-hide` to `flex-wrap` on the chips container. Chips now wrap naturally when there are many, and the dropdown renders on top correctly.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/src/components/FiltersBar.tsx` | `overflow-x-auto scrollbar-hide` → `flex-wrap` on chips container | Stop parent overflow from clipping the absolutely-positioned dropdown |
+
+---
+
+#### 5. Make Search Bar Functional Across All Folders — ~2:15 PM IST
+
+**Problem:** The search bar only filtered files within the currently active folder. If a folder had 0 files, searching returned nothing — users had no way to find files across the entire data room.
+
+**Solution:**
+- When a search query is entered, search across ALL folders (not just active)
+- Show a blue banner: "Searching across all folders — X results for 'query'" with Clear button
+- Added clear (×) button inside search input when text is present (replaces ⌘K hint)
+- Clearing search returns to normal folder-scoped view
+
+**How it works:**
+- `isSearching` boolean derived from `searchQuery.trim().length > 0`
+- `filteredFiles` useMemo: when searching → start from `allFiles` (all folders); when not → filter by `activeFolderId`
+- FileTable shows regardless of `activeFolderId` when `isSearching` is true
+- `folderName` prop changes to "Search Results" during search mode
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/src/vdr.tsx` | Cross-folder search logic (`isSearching` flag), search results banner with count + clear button, FileTable renders during search even without active folder | Search bar was useless — now searches entire data room |
+| 2 | `apps/web/src/components/FiltersBar.tsx` | Added clear (×) button inside search input when query is present; hides ⌘K hint during search | UX improvement — easy way to clear search |
+
+---
+
+### Summary of All Files Changed — Session 29
+
+| File | Changes |
+|------|---------|
+| `apps/web/src/components/ConfirmDialog.tsx` | **New** — Premium confirmation dialog with 3 variants (danger/warning/info), backdrop blur, slide-in animation, Escape key |
+| `apps/web/src/components/Toast.tsx` | **New** — Stacking toast notifications with 4 variants (success/error/warning/info), progress bar, auto-dismiss |
+| `apps/web/src/components/FolderTree.tsx` | Removed `window.confirm()` — delegates to parent for confirmation |
+| `apps/web/src/components/FileTable.tsx` | Removed `window.confirm()` — delegates to parent for confirmation |
+| `apps/web/src/components/InsightsPanel.tsx` | Generate Full Report button color: `bg-slate-900` → Banker Blue `#003366` |
+| `apps/web/src/components/FiltersBar.tsx` | Complete rewrite: 7 custom filter presets with dropdown, removable chips, `flex-wrap` fix, search clear button |
+| `apps/web/src/types/vdr.types.ts` | Added `isCustom?: boolean` to SmartFilter interface |
+| `apps/web/src/vdr.tsx` | ConfirmDialog + Toast system, Banker Blue Upload button, custom filter handlers, cross-folder search, search results banner |
+
+---

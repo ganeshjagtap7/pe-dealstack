@@ -73,9 +73,7 @@ export const FolderTree: React.FC<FolderTreeProps> = ({
 
   const handleDelete = (e: React.MouseEvent, folderId: string) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this folder and all its contents?')) {
-      onDeleteFolder?.(folderId);
-    }
+    onDeleteFolder?.(folderId);
     setOpenMenuId(null);
   };
 

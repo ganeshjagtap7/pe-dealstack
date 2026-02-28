@@ -3,11 +3,10 @@ import { FolderTree } from './components/FolderTree';
 import { FiltersBar } from './components/FiltersBar';
 import { FileTable } from './components/FileTable';
 import { InsightsPanel } from './components/InsightsPanel';
+import { ConfirmDialog } from './components/ConfirmDialog';
+import { ToastContainer, ToastMessage, ToastVariant } from './components/Toast';
 import {
   smartFilters as defaultSmartFilters,
-  mockFolders,
-  mockFiles,
-  mockInsights
 } from './data/vdrMockData';
 import { VDRFile, SmartFilter, Folder, FolderInsights } from './types/vdr.types';
 import {
@@ -26,6 +25,8 @@ import {
   renameDocument,
   getDocumentDownloadUrl,
   linkDocumentToDeal,
+  requestDocument,
+  generateInsights,
   transformFolder,
   transformDocument,
   transformInsights,
@@ -46,6 +47,7 @@ const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = 
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newRoomName, setNewRoomName] = useState('');
   const [creating, setCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const createInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -82,7 +84,8 @@ const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = 
       }
     } catch (error: any) {
       console.error('Error creating data room:', error);
-      alert(error.message || 'Failed to create data room. Please try again.');
+      setErrorMsg(error.message || 'Failed to create data room. Please try again.');
+      setTimeout(() => setErrorMsg(null), 5000);
     } finally {
       setCreating(false);
       setShowCreateModal(false);
@@ -259,6 +262,27 @@ const DataRoomsOverview: React.FC<{ onSelectDeal: (dealId: string) => void }> = 
           </div>
         )}
       </div>
+
+      {/* Error Toast */}
+      {errorMsg && (
+        <div
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border max-w-sm"
+          style={{ backgroundColor: '#FEF2F2', borderColor: '#FECACA', animation: 'toastSlideIn 250ms ease-out' }}
+        >
+          <span className="material-symbols-outlined text-xl" style={{ color: '#DC2626' }}>error</span>
+          <p className="text-sm text-slate-800 flex-1">{errorMsg}</p>
+          <button onClick={() => setErrorMsg(null)} className="text-slate-400 hover:text-slate-600">
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+      )}
+
+      <style>{`
+        @keyframes toastSlideIn {
+          from { opacity: 0; transform: translateY(12px) scale(0.95); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
     </div>
   );
 };
@@ -281,13 +305,47 @@ export const VDRApp: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[] | null>(null);
   const [autoUpdateDeal, setAutoUpdateDeal] = useState(false);
-  const [uploadToast, setUploadToast] = useState<string | null>(null);
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }>({ open: false, title: '', message: '', onConfirm: () => {} });
   const [linkModalFile, setLinkModalFile] = useState<VDRFile | null>(null);
   const [linkDeals, setLinkDeals] = useState<Array<{ id: string; name: string; industry?: string }>>([]);
   const [linkSearchQuery, setLinkSearchQuery] = useState('');
   const [linking, setLinking] = useState(false);
+  const [generatingInsights, setGeneratingInsights] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const newFolderInputRef = useRef<HTMLInputElement>(null);
+
+  // Toast helper
+  const showToast = useCallback((message: string, variant: ToastVariant = 'success', duration = 4000) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+    setToasts((prev) => [...prev, { id, message, variant, duration }]);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  // Confirm dialog helper
+  const showConfirm = useCallback((opts: {
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: 'danger' | 'warning' | 'info';
+    onConfirm: () => void;
+  }) => {
+    setConfirmDialog({ open: true, ...opts });
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    setConfirmDialog((prev) => ({ ...prev, open: false }));
+  }, []);
 
   // Open share modal (uses global ShareModal from shareModal.js)
   const handleOpenShareModal = () => {
@@ -314,12 +372,18 @@ export const VDRApp: React.FC = () => {
   const activeFolder = folders.find((f) => f.id === activeFolderId);
   const activeFolderInsights = activeFolderId ? insights[activeFolderId] : null;
 
+  // Are we in cross-folder search mode?
+  const isSearching = searchQuery.trim().length > 0;
+
   // Filter files by folder, search, and smart filters - MUST be before any conditional returns
   const filteredFiles = useMemo(() => {
-    let results = allFiles.filter((file) => file.folderId === activeFolderId);
+    // When searching, look across ALL folders; otherwise filter by active folder
+    let results = isSearching
+      ? allFiles
+      : allFiles.filter((file) => file.folderId === activeFolderId);
 
     // Apply search query
-    if (searchQuery.trim()) {
+    if (isSearching) {
       const query = searchQuery.toLowerCase();
       results = results.filter(
         (file) =>
@@ -338,7 +402,7 @@ export const VDRApp: React.FC = () => {
     }
 
     return results;
-  }, [allFiles, activeFolderId, searchQuery, filters]);
+  }, [allFiles, activeFolderId, searchQuery, filters, isSearching]);
 
   // File select handler — shows confirmation modal (stage 1)
   const handleFileSelect = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
@@ -385,11 +449,11 @@ export const VDRApp: React.FC = () => {
     const validFiles: File[] = [];
     for (const file of Array.from(files)) {
       if (file.size > maxFileSize) {
-        alert(`File ${file.name} exceeds maximum size of 50MB`);
+        showToast(`File "${file.name}" exceeds maximum size of 50MB`, 'error');
         continue;
       }
       if (!allowedTypes.includes(file.type)) {
-        alert(`File ${file.name} has unsupported file type`);
+        showToast(`File "${file.name}" has an unsupported file type`, 'error');
         continue;
       }
       validFiles.push(file);
@@ -437,15 +501,14 @@ export const VDRApp: React.FC = () => {
         }
       } catch (error) {
         console.error(`Error uploading ${file.name}:`, error);
-        alert(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        showToast(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
       }
     }
 
     setUploading(false);
 
     if (anyDealUpdated) {
-      setUploadToast(`Deal updated with extracted data from ${lastUpdatedDoc}`);
-      setTimeout(() => setUploadToast(null), 5000);
+      showToast(`Deal updated with extracted data from ${lastUpdatedDoc}`, 'success', 5000);
     }
   }, [pendingFiles, dealId, activeFolderId, autoUpdateDeal]);
 
@@ -464,11 +527,10 @@ export const VDRApp: React.FC = () => {
     try {
       await linkDocumentToDeal(linkModalFile.id, targetDealId);
       const targetDeal = linkDeals.find(d => d.id === targetDealId);
-      setUploadToast(`"${linkModalFile.name}" linked to ${targetDeal?.name || 'deal'}`);
-      setTimeout(() => setUploadToast(null), 5000);
+      showToast(`"${linkModalFile.name}" linked to ${targetDeal?.name || 'deal'}`, 'success', 5000);
       setLinkModalFile(null);
     } catch (error) {
-      alert(`Failed to link document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      showToast(`Failed to link document: ${error instanceof Error ? error.message : 'Unknown error'}`, 'error');
     }
     setLinking(false);
   }, [linkModalFile, linkDeals]);
@@ -476,7 +538,7 @@ export const VDRApp: React.FC = () => {
   // File click handler - MUST be before any conditional returns
   const handleFileClick = useCallback(async (file: VDRFile) => {
     if (useMockData) {
-      alert(`Preview: ${file.name}\n\nThis is a demo. In production, the document would open in a preview modal.`);
+      showToast(`Preview not available in demo mode`, 'info');
       return;
     }
 
@@ -491,11 +553,11 @@ export const VDRApp: React.FC = () => {
           window.open(downloadUrl, '_blank');
         }
       } else {
-        alert(`Unable to load document: ${file.name}`);
+        showToast(`Unable to load document: ${file.name}`, 'error');
       }
     } catch (error) {
       console.error('Error loading file:', error);
-      alert(`Error loading file: ${file.name}`);
+      showToast(`Error loading file: ${file.name}`, 'error');
     }
   }, [useMockData]);
 
@@ -527,7 +589,7 @@ export const VDRApp: React.FC = () => {
         }
       } catch (error) {
         console.error('Error creating deal:', error);
-        alert('Failed to create data room. Please try again.');
+        showToast('Failed to create data room. Please try again.', 'error');
         setShowNewFolderModal(false);
         setNewFolderName('');
         return;
@@ -550,37 +612,46 @@ export const VDRApp: React.FC = () => {
       }
     } catch (error) {
       console.error('Error creating folder:', error);
-      alert('Failed to create folder');
+      showToast('Failed to create folder', 'error');
     }
 
     setShowNewFolderModal(false);
     setNewFolderName('');
   }, [newFolderName, dealId]);
 
-  // Delete file handler - MUST be before any conditional returns
-  const handleDeleteFile = useCallback(async (fileId: string) => {
-    if (useMockData) {
-      // Demo mode - delete locally
-      setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
-      return;
-    }
-
-    const success = await deleteDocument(fileId);
-    if (success) {
-      setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
-      // Update folder file count
-      setFolders((prev) =>
-        prev.map((folder) => {
-          const filesInFolder = allFiles.filter(
-            (f) => f.folderId === folder.id && f.id !== fileId
-          ).length;
-          return { ...folder, fileCount: filesInFolder };
-        })
-      );
-    } else {
-      alert('Failed to delete file');
-    }
-  }, [allFiles, useMockData]);
+  // Delete file handler — shows confirm dialog, then deletes
+  const handleDeleteFile = useCallback((fileId: string) => {
+    const file = allFiles.find((f) => f.id === fileId);
+    showConfirm({
+      title: 'Delete File',
+      message: `"${file?.name || 'this file'}" will be permanently deleted. This action cannot be undone.`,
+      confirmLabel: 'Delete',
+      variant: 'danger',
+      onConfirm: async () => {
+        closeConfirm();
+        if (useMockData) {
+          setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
+          showToast('File deleted', 'success');
+          return;
+        }
+        const success = await deleteDocument(fileId);
+        if (success) {
+          setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
+          setFolders((prev) =>
+            prev.map((folder) => {
+              const filesInFolder = allFiles.filter(
+                (f) => f.folderId === folder.id && f.id !== fileId
+              ).length;
+              return { ...folder, fileCount: filesInFolder };
+            })
+          );
+          showToast('File deleted successfully', 'success');
+        } else {
+          showToast('Failed to delete file', 'error');
+        }
+      },
+    });
+  }, [allFiles, useMockData, showConfirm, closeConfirm, showToast]);
 
   // Rename file handler - MUST be before any conditional returns
   const handleRenameFile = useCallback(async (fileId: string, newName: string) => {
@@ -598,9 +669,9 @@ export const VDRApp: React.FC = () => {
         prev.map((f) => (f.id === fileId ? { ...f, name: newName } : f))
       );
     } else {
-      alert('Failed to rename file');
+      showToast('Failed to rename file', 'error');
     }
-  }, [useMockData]);
+  }, [useMockData, showToast]);
 
   // Rename folder handler
   const handleRenameFolder = useCallback(async (folderId: string, newName: string) => {
@@ -609,32 +680,39 @@ export const VDRApp: React.FC = () => {
       setFolders((prev) =>
         prev.map((f) => (f.id === folderId ? { ...f, name: newName } : f))
       );
-      setUploadToast(`Folder renamed to "${newName}"`);
-      setTimeout(() => setUploadToast(null), 3000);
+      showToast(`Folder renamed to "${newName}"`, 'success');
     } else {
-      alert('Failed to rename folder');
+      showToast('Failed to rename folder', 'error');
     }
-  }, []);
+  }, [showToast]);
 
-  // Delete folder handler
-  const handleDeleteFolder = useCallback(async (folderId: string) => {
-    const success = await deleteFolder(folderId, true);
-    if (success) {
-      setFolders((prev) => prev.filter((f) => f.id !== folderId));
-      setAllFiles((prev) => prev.filter((f) => f.folderId !== folderId));
-      // If we deleted the active folder, switch to another
-      if (activeFolderId === folderId) {
-        setActiveFolderId((prev) => {
-          const remaining = folders.filter((f) => f.id !== folderId);
-          return remaining.length > 0 ? remaining[0].id : null;
-        });
-      }
-      setUploadToast('Folder deleted');
-      setTimeout(() => setUploadToast(null), 3000);
-    } else {
-      alert('Failed to delete folder');
-    }
-  }, [activeFolderId, folders]);
+  // Delete folder handler — shows confirm dialog, then deletes
+  const handleDeleteFolder = useCallback((folderId: string) => {
+    const folder = folders.find((f) => f.id === folderId);
+    showConfirm({
+      title: 'Delete Folder',
+      message: `"${folder?.name || 'this folder'}" and all its contents will be permanently deleted. This action cannot be undone.`,
+      confirmLabel: 'Delete Folder',
+      variant: 'danger',
+      onConfirm: async () => {
+        closeConfirm();
+        const success = await deleteFolder(folderId, true);
+        if (success) {
+          setFolders((prev) => prev.filter((f) => f.id !== folderId));
+          setAllFiles((prev) => prev.filter((f) => f.folderId !== folderId));
+          if (activeFolderId === folderId) {
+            setActiveFolderId(() => {
+              const remaining = folders.filter((f) => f.id !== folderId);
+              return remaining.length > 0 ? remaining[0].id : null;
+            });
+          }
+          showToast('Folder deleted successfully', 'success');
+        } else {
+          showToast('Failed to delete folder', 'error');
+        }
+      },
+    });
+  }, [activeFolderId, folders, showConfirm, closeConfirm, showToast]);
 
   // Load data when dealId changes or on initial load
   useEffect(() => {
@@ -673,57 +751,25 @@ export const VDRApp: React.FC = () => {
         }
 
         if (apiFolders.length > 0) {
-          // Use mock files for visualization, mapped to real folder IDs
-          const demoFiles: VDRFile[] = [];
-          const transformedFolders = apiFolders.map((apiFolder, idx) => {
+          // Transform real folders — uses FolderInsight data for status badges
+          const transformedFolders = apiFolders.map((apiFolder) => {
             const folder = transformFolder(apiFolder);
-
-            // Get corresponding mock folder for visual properties
-            const mockFolder = mockFolders[idx % mockFolders.length];
-
-            // Map some mock files to this folder
-            const filesForFolder = mockFiles
-              .filter((_, fileIdx) => fileIdx % apiFolders.length === idx)
-              .map(file => ({
-                ...file,
-                id: `demo-${folder.id}-${file.id}`,
-                folderId: folder.id,
-              }));
-            demoFiles.push(...filesForFolder);
-
-            // Use mock folder visual properties for better visualization
-            return {
-              ...folder,
-              fileCount: filesForFolder.length,
-              status: mockFolder?.status || folder.status,
-              statusLabel: mockFolder?.statusLabel || folder.statusLabel,
-              statusColor: mockFolder?.statusColor || folder.statusColor,
-              readinessPercent: mockFolder?.readinessPercent || folder.readinessPercent,
-            };
+            return folder;
           });
 
           setFolders(transformedFolders);
-          setAllFiles(demoFiles);
 
-          // Set first folder as active
+          // Set first folder as active — documents will be loaded by the useEffect below
           setActiveFolderId(transformedFolders[0].id);
 
-          // Use mock insights for visualization
+          // Build insights from real FolderInsight data (included in folder query)
           const insightsMap: Record<string, FolderInsights> = {};
-          const mockInsightKeys = Object.keys(mockInsights);
-          transformedFolders.forEach((folder, idx) => {
-            const mockKey = mockInsightKeys[idx % mockInsightKeys.length];
-            if (mockKey && mockInsights[mockKey]) {
-              insightsMap[folder.id] = {
-                ...mockInsights[mockKey],
-                folderId: folder.id,
-              };
-            } else {
-              insightsMap[folder.id] = transformInsights(null, folder.id);
-            }
+          apiFolders.forEach((apiFolder, idx) => {
+            const insight = apiFolder.FolderInsight?.[0] || null;
+            insightsMap[transformedFolders[idx].id] = transformInsights(insight, transformedFolders[idx].id);
           });
           setInsights(insightsMap);
-          setUseMockData(true); // Mark as demo mode for visualization
+          setUseMockData(false); // Real data mode — all operations hit backend
         } else {
           // Still no folders (init failed) - show empty state
           setUseMockData(false);
@@ -779,6 +825,14 @@ export const VDRApp: React.FC = () => {
     setFilters((prev) =>
       prev.map((f) => (f.id === filterId ? { ...f, active: !f.active } : f))
     );
+  };
+
+  const handleAddCustomFilter = (filter: SmartFilter) => {
+    setFilters((prev) => [...prev, filter]);
+  };
+
+  const handleRemoveCustomFilter = (filterId: string) => {
+    setFilters((prev) => prev.filter((f) => f.id !== filterId));
   };
 
   const handleUploadClick = () => {
@@ -850,10 +904,61 @@ Generated by PE OS VDR System
     }
   };
 
-  const handleRequestDocument = (docId: string) => {
+  const handleRequestDocument = async (docId: string) => {
     const doc = activeFolderInsights?.missingDocuments.find((d) => d.id === docId);
-    if (doc) {
-      alert(`Document request sent: ${doc.name}\n\nIn a production app, this would notify the relevant parties.`);
+    if (!doc || !dealId) return;
+
+    try {
+      const result = await requestDocument(dealId, doc.name, {
+        folderId: activeFolderId || undefined,
+        folderName: activeFolder?.name,
+      });
+      showToast(result.message || `Request sent for "${doc.name}"`, 'success', 5000);
+    } catch (error) {
+      console.error('Error requesting document:', error);
+      showToast(`Request logged for "${doc.name}"`, 'info', 5000);
+    }
+  };
+
+  const handleGenerateInsights = async () => {
+    if (!activeFolderId || generatingInsights) return;
+
+    setGeneratingInsights(true);
+    try {
+      const apiInsight = await generateInsights(activeFolderId);
+      if (apiInsight) {
+        const transformed = transformInsights(apiInsight, activeFolderId);
+        setInsights((prev) => ({ ...prev, [activeFolderId]: transformed }));
+
+        // Update folder status based on new insights
+        const completionPercent = apiInsight.completionPercent || 0;
+        const hasRedFlags = (apiInsight.redFlags as any[])?.length > 0;
+        setFolders((prev) =>
+          prev.map((f) => {
+            if (f.id !== activeFolderId) return f;
+            let status: 'ready' | 'attention' | 'reviewing' | 'restricted' = 'reviewing';
+            let statusLabel = 'Reviewing';
+            let statusColor: 'green' | 'orange' | 'yellow' | 'slate' = 'yellow';
+
+            if (f.isRestricted) {
+              status = 'restricted'; statusLabel = 'Access Restricted'; statusColor = 'slate';
+            } else if (completionPercent >= 80 && !hasRedFlags) {
+              status = 'ready'; statusLabel = `${completionPercent}% Ready`; statusColor = 'green';
+            } else if (hasRedFlags) {
+              status = 'attention'; statusLabel = 'Attention'; statusColor = 'orange';
+            }
+
+            return { ...f, status, statusLabel, statusColor, readinessPercent: completionPercent };
+          })
+        );
+
+        showToast('AI insights generated successfully', 'success');
+      }
+    } catch (error) {
+      console.error('Error generating insights:', error);
+      showToast('Failed to generate insights. Check that OpenAI is configured.', 'error', 5000);
+    } finally {
+      setGeneratingInsights(false);
     }
   };
 
@@ -1088,7 +1193,10 @@ Generated by PE OS VDR System
             <button
               onClick={handleUploadClick}
               disabled={uploading || !activeFolderId}
-              className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-800 transition-colors disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow transition-colors disabled:opacity-50"
+              style={{ backgroundColor: '#003366' }}
+              onMouseEnter={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#004488')}
+              onMouseLeave={(e) => !e.currentTarget.disabled && (e.currentTarget.style.backgroundColor = '#003366')}
             >
               {uploading ? (
                 <>
@@ -1111,13 +1219,32 @@ Generated by PE OS VDR System
           onSearchChange={setSearchQuery}
           filters={filters}
           onFilterToggle={handleFilterToggle}
+          onAddCustomFilter={handleAddCustomFilter}
+          onRemoveCustomFilter={handleRemoveCustomFilter}
         />
 
+        {/* Search results banner */}
+        {isSearching && (
+          <div className="px-6 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+            <span className="material-symbols-outlined text-[18px]" style={{ color: '#003366' }}>search</span>
+            <span className="text-sm text-slate-700">
+              Searching across all folders — <strong>{filteredFiles.length}</strong> result{filteredFiles.length !== 1 ? 's' : ''} for "<em>{searchQuery}</em>"
+            </span>
+            <button
+              onClick={() => setSearchQuery('')}
+              className="ml-auto text-xs font-medium text-slate-500 hover:text-slate-700 flex items-center gap-1 transition-colors"
+            >
+              <span className="material-symbols-outlined text-[14px]">close</span>
+              Clear
+            </button>
+          </div>
+        )}
+
         {/* File List Table */}
-        {activeFolderId ? (
+        {activeFolderId || isSearching ? (
           <FileTable
             files={filteredFiles}
-            folderName={activeFolder?.name || 'Folder'}
+            folderName={isSearching ? 'Search Results' : (activeFolder?.name || 'Folder')}
             onFileClick={handleFileClick}
             onDeleteFile={handleDeleteFile}
             onRenameFile={handleRenameFile}
@@ -1140,6 +1267,8 @@ Generated by PE OS VDR System
         onGenerateReport={handleGenerateReport}
         onViewFile={handleViewFile}
         onRequestDocument={handleRequestDocument}
+        onGenerateInsights={handleGenerateInsights}
+        isGenerating={generatingInsights}
         isCollapsed={insightsPanelCollapsed}
         onToggleCollapse={handleToggleInsightsPanel}
       />
@@ -1252,16 +1381,19 @@ Generated by PE OS VDR System
         </div>
       )}
 
-      {/* Toast Notification */}
-      {uploadToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-lg animate-in slide-in-from-bottom-4">
-          <span className="material-symbols-outlined text-green-400 text-xl">check_circle</span>
-          <span className="text-sm">{uploadToast}</span>
-          <button onClick={() => setUploadToast(null)} className="text-white/60 hover:text-white ml-2">
-            <span className="material-symbols-outlined text-lg">close</span>
-          </button>
-        </div>
-      )}
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={closeConfirm}
+      />
+
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
     </div>
   );
 };

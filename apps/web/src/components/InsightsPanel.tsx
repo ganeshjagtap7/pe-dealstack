@@ -7,6 +7,8 @@ interface InsightsPanelProps {
   onGenerateReport: () => void;
   onViewFile?: (fileId: string) => void;
   onRequestDocument?: (docId: string) => void;
+  onGenerateInsights?: () => void;
+  isGenerating?: boolean;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
 }
@@ -17,6 +19,8 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
   onGenerateReport,
   onViewFile,
   onRequestDocument,
+  onGenerateInsights,
+  isGenerating = false,
   isCollapsed = false,
   onToggleCollapse,
 }) => {
@@ -42,7 +46,8 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
     );
   }
 
-  if (!insights) {
+  // No folder selected
+  if (!insights && !folderName) {
     return (
       <aside className="w-[320px] min-w-[320px] bg-white border-l border-slate-200 shadow-xl z-20 flex flex-col">
         <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-white to-blue-50/30">
@@ -65,9 +70,96 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
     );
   }
 
+  // Check if insights are empty/placeholder (no real AI data yet)
+  const hasRealInsights = insights && (
+    insights.summary !== 'No insights available for this folder yet.' ||
+    insights.redFlags.length > 0 ||
+    insights.missingDocuments.length > 0 ||
+    insights.completionPercent > 0
+  );
+
+  // Generating state
+  if (isGenerating) {
+    return (
+      <aside className="w-[320px] min-w-[320px] bg-white border-l border-slate-200 shadow-xl z-20 flex flex-col">
+        <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-white to-blue-50/30">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">smart_toy</span>
+              <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">AI Quick Insights</h2>
+            </div>
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 rounded hover:bg-slate-100 transition-colors"
+              title="Collapse panel"
+            >
+              <span className="material-symbols-outlined text-slate-400 text-[20px]">chevron_right</span>
+            </button>
+          </div>
+          <p className="text-xs text-slate-500">
+            Analysis for <span className="font-medium text-slate-900">{folderName}</span>
+          </p>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-10 w-10 border-2 border-slate-200 mx-auto mb-4" style={{ borderTopColor: '#003366' }}></div>
+            <p className="text-sm font-medium text-slate-700 mb-1">Analyzing folder...</p>
+            <p className="text-xs text-slate-400">GPT-4o is scanning documents and generating insights</p>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
+  // No insights yet — show CTA to generate
+  if (!hasRealInsights) {
+    return (
+      <aside className="w-[320px] min-w-[320px] bg-white border-l border-slate-200 shadow-xl z-20 flex flex-col">
+        <div className="p-5 border-b border-slate-200 bg-gradient-to-r from-white to-blue-50/30">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-primary">smart_toy</span>
+              <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">AI Quick Insights</h2>
+            </div>
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 rounded hover:bg-slate-100 transition-colors"
+              title="Collapse panel"
+            >
+              <span className="material-symbols-outlined text-slate-400 text-[20px]">chevron_right</span>
+            </button>
+          </div>
+          <p className="text-xs text-slate-500">
+            Analysis for <span className="font-medium text-slate-900">{folderName}</span>
+          </p>
+        </div>
+        <div className="flex-1 flex items-center justify-center p-8">
+          <div className="text-center">
+            <div className="flex items-center justify-center w-14 h-14 rounded-2xl mx-auto mb-4" style={{ backgroundColor: '#E6EEF5' }}>
+              <span className="material-symbols-outlined text-3xl" style={{ color: '#003366' }}>auto_awesome</span>
+            </div>
+            <h3 className="text-sm font-semibold text-slate-900 mb-1">No insights yet</h3>
+            <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+              AI will analyze documents in this folder, identify missing items, and flag potential risks.
+            </p>
+            <button
+              onClick={onGenerateInsights}
+              className="flex items-center justify-center gap-2 w-full rounded-lg py-2.5 text-sm font-bold text-white transition-colors shadow-lg"
+              style={{ backgroundColor: '#003366' }}
+              onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#004488')}
+              onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#003366')}
+            >
+              <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+              Generate AI Insights
+            </button>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
   // Parse and highlight completion percentage in summary
   const formatSummaryWithHighlight = (summary: string) => {
-    // Match patterns like "92% complete" or "92%"
     const percentPattern = /(\d+)%(\s*complete)?/gi;
     const parts = summary.split(percentPattern);
 
@@ -98,13 +190,22 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
             <span className="material-symbols-outlined text-primary">smart_toy</span>
             <h2 className="text-sm font-bold text-slate-900 tracking-wide uppercase">AI Quick Insights</h2>
           </div>
-          <button
-            onClick={onToggleCollapse}
-            className="p-1 rounded hover:bg-slate-100 transition-colors"
-            title="Collapse panel"
-          >
-            <span className="material-symbols-outlined text-slate-400 text-[20px]">chevron_right</span>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={onGenerateInsights}
+              className="p-1 rounded hover:bg-slate-100 transition-colors"
+              title="Refresh AI insights"
+            >
+              <span className="material-symbols-outlined text-slate-400 text-[20px]">refresh</span>
+            </button>
+            <button
+              onClick={onToggleCollapse}
+              className="p-1 rounded hover:bg-slate-100 transition-colors"
+              title="Collapse panel"
+            >
+              <span className="material-symbols-outlined text-slate-400 text-[20px]">chevron_right</span>
+            </button>
+          </div>
         </div>
         <p className="text-xs text-slate-500">
           Analysis for <span className="font-medium text-slate-900">{folderName}</span>
@@ -112,24 +213,49 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
       </div>
 
       <div className="flex-1 overflow-y-auto p-5 space-y-6">
+        {/* Completion Bar */}
+        {insights!.completionPercent > 0 && (
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Completeness</h3>
+              <span className={`text-xs font-bold ${
+                insights!.completionPercent >= 80 ? 'text-green-600' :
+                insights!.completionPercent >= 50 ? 'text-amber-600' : 'text-red-600'
+              }`}>
+                {insights!.completionPercent}%
+              </span>
+            </div>
+            <div className="w-full h-2 rounded-full bg-slate-100">
+              <div
+                className="h-2 rounded-full transition-all duration-500"
+                style={{
+                  width: `${insights!.completionPercent}%`,
+                  backgroundColor: insights!.completionPercent >= 80 ? '#16a34a' :
+                    insights!.completionPercent >= 50 ? '#d97706' : '#dc2626',
+                }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Summary Block */}
         <div className="flex flex-col gap-2">
           <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Summary</h3>
           <div className="rounded-lg bg-slate-50 p-3 text-sm text-slate-600 leading-relaxed border border-slate-100">
-            {formatSummaryWithHighlight(insights.summary)}
+            {formatSummaryWithHighlight(insights!.summary)}
           </div>
         </div>
 
         {/* Red Flags Block */}
-        {insights.redFlags.length > 0 && (
+        {insights!.redFlags.length > 0 && (
           <div className="flex flex-col gap-3">
             <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
               Red Flags
               <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-full">
-                {insights.redFlags.length} Found
+                {insights!.redFlags.length} Found
               </span>
             </h3>
-            {insights.redFlags.map((flag) => (
+            {insights!.redFlags.map((flag) => (
               <div
                 key={flag.id}
                 className={`rounded-lg border p-3 ${
@@ -167,21 +293,26 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
         )}
 
         {/* Missing Docs */}
-        {insights.missingDocuments.length > 0 && (
+        {insights!.missingDocuments.length > 0 && (
           <div className="flex flex-col gap-2">
-            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide">Missing Documents</h3>
+            <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wide flex items-center gap-2">
+              Missing Documents
+              <span className="bg-amber-100 text-amber-700 text-[10px] px-2 py-0.5 rounded-full">
+                {insights!.missingDocuments.length}
+              </span>
+            </h3>
             <ul className="space-y-2">
-              {insights.missingDocuments.map((doc) => (
+              {insights!.missingDocuments.map((doc) => (
                 <li
                   key={doc.id}
                   className="flex items-center justify-between gap-2 text-xs text-slate-600 p-2 rounded hover:bg-slate-50 border border-transparent hover:border-slate-100 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="size-1.5 rounded-full bg-slate-300"></span>
+                    <span className="size-1.5 rounded-full bg-amber-400"></span>
                     <span>{doc.name}</span>
                   </div>
                   <button
-                    className="text-primary font-medium hover:underline"
+                    className="text-primary font-medium hover:underline shrink-0"
                     onClick={() => onRequestDocument?.(doc.id)}
                   >
                     Request
@@ -197,7 +328,10 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
       <div className="p-4 border-t border-slate-200">
         <button
           onClick={onGenerateReport}
-          className="w-full flex items-center justify-center gap-2 rounded-lg bg-slate-900 py-2.5 text-sm font-bold text-white hover:bg-slate-800 transition-colors shadow-lg shadow-slate-900/10"
+          className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-bold text-white transition-colors shadow-lg"
+          style={{ backgroundColor: '#003366' }}
+          onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#004488')}
+          onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = '#003366')}
         >
           <span className="material-symbols-outlined text-[18px]">summarize</span>
           Generate Full Report

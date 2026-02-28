@@ -69,5 +69,6 @@ export interface SmartFilter {
   label: string;
   icon: string;
   active: boolean;
+  isCustom?: boolean;
   filterFn: (file: VDRFile) => boolean;
 }

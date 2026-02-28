@@ -55,9 +55,7 @@ export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folde
 
   const handleDelete = (e: React.MouseEvent, fileId: string) => {
     e.stopPropagation();
-    if (window.confirm('Are you sure you want to delete this file?')) {
-      onDeleteFile?.(fileId);
-    }
+    onDeleteFile?.(fileId);
     setOpenMenuId(null);
   };
 

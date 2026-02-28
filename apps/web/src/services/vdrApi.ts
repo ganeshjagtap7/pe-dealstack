@@ -537,3 +537,50 @@ export function transformInsights(apiInsight: APIFolderInsight | null, folderId:
     })),
   };
 }
+
+/**
+ * Generate AI insights for a folder (calls GPT-4o)
+ */
+export async function generateInsights(folderId: string): Promise<APIFolderInsight | null> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/folders/${folderId}/generate-insights`, {
+      method: 'POST',
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to generate insights');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error generating insights:', error);
+    throw error;
+  }
+}
+
+/**
+ * Request a missing document (sends email + in-app notification to team)
+ */
+export async function requestDocument(
+  dealId: string,
+  documentName: string,
+  options?: { folderId?: string; folderName?: string }
+): Promise<{ success: boolean; message: string }> {
+  try {
+    const response = await authFetch(`${API_BASE_URL}/deals/${dealId}/document-requests`, {
+      method: 'POST',
+      body: JSON.stringify({
+        documentName,
+        folderId: options?.folderId,
+        folderName: options?.folderName,
+      }),
+    });
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to send request');
+    }
+    return await response.json();
+  } catch (error) {
+    console.error('Error requesting document:', error);
+    throw error;
+  }
+}
