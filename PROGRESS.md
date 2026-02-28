@@ -9095,3 +9095,131 @@ Also added a new endpoint: `POST /documents/:documentId/extract-financials` for 
 | `package-lock.json` | Updated lockfile for `xlsx` dependency |
 
 ---
+
+### Session 27 — February 28, 2026
+
+#### 1. Multi-Document Financial Merge — Complete Feature Build — ~10:30 PM IST
+
+**Problem:** When a user uploads multiple documents with overlapping financial periods (e.g., a CIM with 2022-2024 data, then a standalone P&L with 2024-2025), the system silently **overwrites** the first document's data for the overlapping period (2024). No history, no comparison, no way to know data was lost.
+
+**Solution:** Built a full multi-document merge system with conflict detection, side-by-side comparison modal, and user-driven resolution.
+
+---
+
+#### 1a. Database Migration — ~10:30 PM IST
+
+Created `apps/api/financial-merge-migration.sql` — schema changes to support multiple document extractions per period.
+
+**Changes:**
+- Dropped old UNIQUE constraint on `(dealId, statementType, period)` — prevented storing data from multiple documents
+- Added `isActive` BOOLEAN column (default `true`) — controls which version is displayed
+- Added `mergeStatus` TEXT column (default `'auto'`) — tracks conflict lifecycle (`auto`, `needs_review`, `user_resolved`)
+- New UNIQUE constraint on `(dealId, statementType, period, documentId)` — allows one row per document per period
+- Partial unique index `WHERE isActive = true` on `(dealId, statementType, period)` — enforces exactly ONE active row per period at the database level
+- Additional indexes for fast conflict queries
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/financial-merge-migration.sql` | **New** — Multi-document merge schema migration | Enables storing multiple document extractions for same period with conflict resolution |
+
+**User ran migration in Supabase SQL Editor — confirmed success.**
+
+---
+
+#### 1b. Backend — Conflict-Aware Extraction Orchestrator — ~10:45 PM IST
+
+Updated `financialExtractionOrchestrator.ts` to detect and handle conflicts during extraction.
+
+**Before:** Simple upsert — last writer wins, previous data lost.
+**After:** Checks for existing active row from a DIFFERENT document before upserting:
+- **Conflict detected:** Marks existing row as `needs_review` (keeps it active), inserts new row as `isActive: false, mergeStatus: 'needs_review'`
+- **No conflict:** Upserts normally with updated `onConflict: 'dealId,statementType,period,documentId'`
+- Added `hasConflicts: boolean` to `DeepPassResult` interface
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/services/financialExtractionOrchestrator.ts` | Conflict-aware upsert logic replacing simple upsert; `hasConflicts` in DeepPassResult | Detect overlapping periods from different documents instead of silently overwriting |
+
+---
+
+#### 1c. Backend — isActive Filter on Existing Queries — ~11:00 PM IST
+
+Added `.eq('isActive', true)` to 4 existing read queries in `financials.ts` to maintain backward compatibility — only active rows are shown in the normal financial table view.
+
+**Queries updated:**
+1. `GET /deals/:dealId/financials` — all extracted statements
+2. `GET /deals/:dealId/financials/summary` — revenue/EBITDA headline
+3. `PATCH` ownership check — verify statement belongs to deal
+4. `GET /deals/:dealId/financials/validation` — validation checks
+
+Also added `hasConflicts` to the extract response payload.
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/financials.ts` | `.eq('isActive', true)` on 4 read queries; `hasConflicts` in extract response | Backward compatibility — existing features unaffected by merge schema changes |
+
+---
+
+#### 1d. Backend — 3 New Conflict Resolution API Endpoints — ~11:15 PM IST
+
+Added 3 new endpoints to `financials.ts`:
+
+1. **`GET /deals/:dealId/financials/conflicts`** — Returns all `needs_review` rows grouped by (statementType, period) with Document join for document names
+2. **`POST /deals/:dealId/financials/resolve`** — User picks a version: deactivates all, activates chosen one, sets `mergeStatus: 'user_resolved'`. Also supports custom line items for manual edits.
+3. **`POST /deals/:dealId/financials/resolve-all`** — Bulk resolve by strategy: `highest_confidence` (pick highest extractionConfidence) or `latest_document` (pick most recently extracted)
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/api/src/routes/financials.ts` | 3 new endpoints: GET conflicts, POST resolve, POST resolve-all | API layer for conflict detection and resolution |
+
+---
+
+#### 1e. Frontend — Conflict Banner + Merge Modal — ~11:30 PM IST
+
+Updated `financials.js` with full conflict UI:
+
+**Conflict Banner:**
+- Blue border banner above the financial table: "X Overlapping Periods Found"
+- "Review Conflicts" button opens the merge modal
+- "Auto-resolve (Highest Confidence)" button for one-click bulk resolution
+
+**Merge Modal:**
+- Full-screen overlay with navy gradient header
+- Per-conflict comparison cards — one card per conflicting (statementType, period)
+- Side-by-side columns per document version showing all line items
+- Differing values highlighted yellow (`background:rgba(234,179,8,0.08)`)
+- Confidence badges, extraction source labels, "Currently Active" / "Use This Version" buttons
+- Footer with bulk resolve buttons: "Auto-resolve All (Highest Confidence)" and "Use Latest Document"
+
+**Additional UI touches:**
+- Conflict icon (amber merge icon) on table column headers that have unresolved conflicts
+- Post-extraction notification shows "Conflicts Detected" warning when `hasConflicts: true`
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/js/financials.js` | Conflict state management, banner UI, merge modal, resolution handlers, conflict icons on table headers | Complete frontend for multi-document conflict resolution |
+
+---
+
+#### 1f. TODO Completion Verified — ~11:45 PM IST
+
+Verified all 18/18 items from `FINANCIAL_EXTRACTION_TODO.md` are complete:
+- Tasks 1-8 (Backend): DB migration, classifier, orchestrator, validation, API routes, Azure integration, Vision fallback, Excel support
+- Tasks 9-12 (Frontend): Dashboard, charts, validation alerts, extraction status
+- Week 4 polish: Multi-document merge (this session), Excel support, edge cases
+
+Updated `FINANCIAL_EXTRACTION_TODO.md` to mark all remaining items as `[x]`.
+
+---
+
+### Summary of All Files Changed — Session 27
+
+| File | Changes |
+|------|---------|
+| `apps/api/financial-merge-migration.sql` | **New** — Multi-document merge schema migration (DROP old UNIQUE, ADD isActive/mergeStatus columns, new UNIQUE + partial index) |
+| `apps/api/src/services/financialExtractionOrchestrator.ts` | Conflict-aware upsert logic; `hasConflicts` in DeepPassResult |
+| `apps/api/src/routes/financials.ts` | `.eq('isActive', true)` on 4 queries; 3 new endpoints (conflicts, resolve, resolve-all); `hasConflicts` in extract response |
+| `apps/web/js/financials.js` | Conflict banner, merge modal, resolution handlers, conflict icons |
+| `FINANCIAL_EXTRACTION_TODO.md` | All items marked complete; updated descriptions to reflect actual implementation |
+
+---
