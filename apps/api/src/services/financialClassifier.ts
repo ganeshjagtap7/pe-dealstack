@@ -138,7 +138,7 @@ export async function classifyFinancials(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
+      model: 'gpt-4o',
       messages: [
         { role: 'system', content: CLASSIFICATION_SYSTEM_PROMPT },
         {
@@ -149,7 +149,7 @@ export async function classifyFinancials(
       response_format: { type: 'json_object' },
       temperature: 0.1,
       max_tokens: 4000,
-    });
+    }, { timeout: 90000 });
 
     const content = response.choices[0]?.message?.content;
     if (!content) {

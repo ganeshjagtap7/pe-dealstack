@@ -491,12 +491,27 @@ async function handleExtract(documentId) {
     document.head.appendChild(s);
   }
 
+  // Progress message updates
+  const progressMsgs = ['Extracting… (reading file)', 'Extracting… (analyzing data)', 'Extracting… (almost done)'];
+  let progressIdx = 0;
+  const progressTimer = setInterval(() => {
+    progressIdx = (progressIdx + 1) % progressMsgs.length;
+    allBtns.forEach(b => {
+      if (b.disabled) b.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;animation:spin 1s linear infinite">progress_activity</span> ${progressMsgs[progressIdx]}`;
+    });
+  }, 15000);
+
+  // 120-second hard timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 120000);
+
   try {
     const body = documentId ? { documentId } : {};
     const res = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials/extract`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
+      signal: controller.signal,
     });
 
     if (!res.ok) {
@@ -518,13 +533,18 @@ async function handleExtract(documentId) {
     // Reload financial data
     await loadFinancials(dealId);
   } catch (err) {
-    showNotification('Extraction Failed', err.message ?? 'Could not extract financials', 'error');
+    const msg = err.name === 'AbortError'
+      ? 'Extraction timed out (>2 min). The file may be too large — try again or upload a simpler P&L.'
+      : (err.message ?? 'Could not extract financials');
+    showNotification('Extraction Failed', msg, 'error');
     // Re-enable button on failure so user can retry
     allBtns.forEach(b => {
       b.disabled = false;
       b.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px">auto_awesome</span> Extract Financials`;
     });
   } finally {
+    clearInterval(progressTimer);
+    clearTimeout(timeoutId);
     finState.extracting = false;
   }
 }
