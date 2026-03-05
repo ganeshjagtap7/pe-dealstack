@@ -5,6 +5,7 @@ import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { createNotification, resolveUserId } from './notifications.js';
+import { getOrgId } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -48,14 +49,13 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     }
 
     const { status, priority, assignedTo, dealId, limit, offset } = validation.data;
-    const firmName = req.user?.firmName;
+    const orgId = getOrgId(req);
 
     let query = supabase
       .from('Task')
       .select('*, assignee:User!assignedTo(id, name, email, avatar, role), deal:Deal!dealId(id, name, stage)', { count: 'exact' })
+      .eq('organizationId', orgId)
       .order('createdAt', { ascending: false });
-
-    if (firmName) query = query.eq('firmName', firmName);
     if (status) query = query.eq('status', status);
     if (priority) query = query.eq('priority', priority);
     if (assignedTo) query = query.eq('assignedTo', assignedTo);
@@ -86,7 +86,7 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_ASSIGN), async (req: Request
     }
 
     const data = validation.data;
-    const firmName = req.user?.firmName;
+    const orgId = getOrgId(req);
 
     // Resolve the creator's internal user ID
     let createdBy: string | null = null;
@@ -105,7 +105,7 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_ASSIGN), async (req: Request
         dealId: data.dealId || null,
         dueDate: data.dueDate || null,
         createdBy,
-        firmName,
+        organizationId: orgId,
       })
       .select('*, assignee:User!assignedTo(id, name, email, avatar, role), deal:Deal!dealId(id, name, stage)')
       .single();
@@ -151,12 +151,14 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
     }
 
     const data = validation.data;
+    const orgId = getOrgId(req);
 
-    // Check task exists
+    // Check task exists within org
     const { data: existing, error: fetchError } = await supabase
       .from('Task')
       .select('*')
       .eq('id', id)
+      .eq('organizationId', orgId)
       .single();
 
     if (fetchError || !existing) {
@@ -167,6 +169,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
       .from('Task')
       .update({ ...data, updatedAt: new Date().toISOString() })
       .eq('id', id)
+      .eq('organizationId', orgId)
       .select('*, assignee:User!assignedTo(id, name, email, avatar, role), deal:Deal!dealId(id, name, stage)')
       .single();
 
@@ -196,11 +199,13 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
 router.delete('/:id', requirePermission(PERMISSIONS.ADMIN_SETTINGS), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     const { error } = await supabase
       .from('Task')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organizationId', orgId);
 
     if (error) {
       log.error('Error deleting task', error);

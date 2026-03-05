@@ -1,0 +1,48 @@
+flowchart TD
+    Start([User Visits PE OS]) --> Landing[Landing Page]
+    Landing --> SignUp[Sign Up]
+    Landing --> Login[Log In]
+    Landing --> ForgotPW[Forgot Password]
+
+    SignUp --> FillForm["Enter Full Name, Firm Name,
+    Title, Email, Password"]
+    FillForm --> SupaCreate["Supabase Creates User
+    role = ADMIN"]
+    SupaCreate --> VerifyEmail["Verification Email Sent"]
+    VerifyEmail --> ClickLink[User Clicks Email Link]
+    ClickLink --> Verified["Account Verified"]
+    Verified --> Login
+
+    Login --> EnterCreds[Enter Email + Password]
+    EnterCreds --> SupaAuth{Supabase Auth}
+    SupaAuth -->|Success| JWT["JWT Token Stored"]
+    SupaAuth -->|Failure| LoginError["Show Error"]
+    LoginError --> EnterCreds
+    JWT --> RoleCheck{User Role?}
+    RoleCheck -->|ADMIN or PARTNER| AdminDash["Admin Dashboard"]
+    RoleCheck -->|MEMBER or ANALYST| MemberDash["Analyst Dashboard"]
+
+    AdminDash --> InviteTeam["Invite Team Member via Email"]
+    InviteTeam --> SendInvite["POST api invitations
+    7-day token generated"]
+    SendInvite --> InviteEmail["Invitation Email Sent"]
+    InviteEmail --> AcceptPage["Invitee Opens accept-invite page"]
+    AcceptPage --> SetPassword[Complete Registration]
+    SetPassword --> AssignRole["Role Assigned
+    ADMIN, MEMBER, or VIEWER"]
+    AssignRole --> Login
+
+    ForgotPW --> EnterEmail[Enter Email]
+    EnterEmail --> ResetEmail["Reset Link Sent"]
+    ResetEmail --> ResetPage["Reset Password Page"]
+    ResetPage --> NewPW[Set New Password]
+    NewPW --> Login
+
+    style Start fill:#6366f1,color:#fff,stroke:#4f46e5
+    style AdminDash fill:#10b981,color:#fff,stroke:#059669
+    style MemberDash fill:#3b82f6,color:#fff,stroke:#2563eb
+    style LoginError fill:#ef4444,color:#fff,stroke:#dc2626
+    style Verified fill:#10b981,color:#fff,stroke:#059669
+    style JWT fill:#f59e0b,color:#fff,stroke:#d97706
+    style SupaAuth fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style RoleCheck fill:#8b5cf6,color:#fff,stroke:#7c3aed

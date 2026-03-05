@@ -1,0 +1,178 @@
+erDiagram
+    USER {
+        uuid id PK
+        string email
+        string full_name
+        string firm_name
+        string role
+        string title
+        string avatar_url
+        timestamp created_at
+    }
+
+    DEAL {
+        uuid id PK
+        string name
+        string description
+        uuid company_id FK
+        string stage
+        string status
+        string industry
+        string priority
+        decimal deal_size
+        decimal ebitda
+        decimal revenue
+        decimal irr_projection
+        uuid assigned_to FK
+        string icon
+        json tags
+        date target_close_date
+        timestamp created_at
+    }
+
+    COMPANY {
+        uuid id PK
+        string name
+        string industry
+        string description
+        string website
+        timestamp created_at
+    }
+
+    DOCUMENT {
+        uuid id PK
+        string name
+        string type
+        uuid deal_id FK
+        uuid folder_id FK
+        uuid uploaded_by FK
+        string file_path
+        integer file_size
+        json extracted_data
+        json ai_analysis
+        boolean is_highlighted
+        json tags
+        timestamp created_at
+    }
+
+    FOLDER {
+        uuid id PK
+        uuid deal_id FK
+        uuid parent_id FK
+        string name
+        string description
+        boolean is_restricted
+        timestamp created_at
+    }
+
+    FOLDER_INSIGHT {
+        uuid id PK
+        uuid folder_id FK
+        integer completeness_pct
+        json missing_documents
+        json red_flags
+        timestamp analyzed_at
+    }
+
+    MEMO {
+        uuid id PK
+        string title
+        string type
+        uuid deal_id FK
+        uuid created_by FK
+        string status
+        timestamp created_at
+    }
+
+    MEMO_SECTION {
+        uuid id PK
+        uuid memo_id FK
+        string type
+        string title
+        text content
+        boolean ai_generated
+        json citations
+        json table_data
+        json chart_config
+        integer sort_order
+    }
+
+    MEMO_TEMPLATE {
+        uuid id PK
+        string name
+        string category
+        boolean is_gold_standard
+        boolean is_active
+        integer usage_count
+    }
+
+    ACTIVITY {
+        uuid id PK
+        uuid deal_id FK
+        uuid user_id FK
+        string type
+        string title
+        string description
+        json metadata
+        timestamp created_at
+    }
+
+    CONVERSATION {
+        uuid id PK
+        uuid deal_id FK
+        uuid user_id FK
+        string title
+        timestamp created_at
+    }
+
+    MESSAGE {
+        uuid id PK
+        uuid conversation_id FK
+        uuid user_id FK
+        text content
+        string role
+        timestamp created_at
+    }
+
+    NOTIFICATION {
+        uuid id PK
+        uuid user_id FK
+        string type
+        string title
+        string message
+        uuid deal_id FK
+        uuid document_id FK
+        boolean is_read
+        timestamp created_at
+    }
+
+    INVITATION {
+        uuid id PK
+        string email
+        string role
+        string firm_name
+        string token
+        string status
+        uuid invited_by FK
+        timestamp expires_at
+        timestamp created_at
+    }
+
+    USER ||--o{ DEAL : "assigned to"
+    COMPANY ||--o{ DEAL : "has"
+    DEAL ||--o{ DOCUMENT : "contains"
+    DEAL ||--o{ FOLDER : "organizes"
+    DEAL ||--o{ ACTIVITY : "logs"
+    DEAL ||--o{ CONVERSATION : "discusses"
+    DEAL ||--o{ MEMO : "analyzes"
+    FOLDER ||--o{ DOCUMENT : "stores"
+    FOLDER ||--o| FOLDER_INSIGHT : "has"
+    FOLDER ||--o{ FOLDER : "nests"
+    MEMO ||--o{ MEMO_SECTION : "contains"
+    CONVERSATION ||--o{ MESSAGE : "has"
+    USER ||--o{ ACTIVITY : "performs"
+    USER ||--o{ CONVERSATION : "participates"
+    USER ||--o{ NOTIFICATION : "receives"
+    USER ||--o{ INVITATION : "sends"
+    USER ||--o{ DOCUMENT : "uploads"
+    USER ||--o{ MEMO : "creates"

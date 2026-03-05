@@ -43,15 +43,15 @@ coverage/
 *.pem
 
 # AI Agent Skills
+.agent/
 .agents/
-.claude/skills/
+.claude/
 
-# Project Documentation (local only)
+# Session artifacts (not needed in repo)
 compact.md
-progress.md
-prompt.md
+Prompt.md
 skill.md
-LAUNCH-CHECKLIST.md
-QA_CHECKLIST.md
-YC-APPLICATION-PLAN.md
-docs/
+
+# Test/sample files
+*.sample.xlsx
+generate_*.py

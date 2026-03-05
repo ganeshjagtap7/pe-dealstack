@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { generateFolderInsights } from '../services/folderInsightsGenerator.js';
+import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -28,6 +29,12 @@ const updateFolderSchema = z.object({
 router.get('/deals/:dealId/folders', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { dealId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
     const { parentId } = req.query;
 
     let query = supabase
@@ -132,6 +139,12 @@ router.get('/folders/:id', async (req: Request, res: Response, next: NextFunctio
 router.post('/deals/:dealId/folders', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { dealId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
     const validation = createFolderSchema.safeParse({ ...req.body, dealId });
 
     if (!validation.success) {
@@ -303,6 +316,11 @@ router.get('/folders/:id/insights', async (req: Request, res: Response, next: Ne
 router.post('/deals/:dealId/folders/init', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { dealId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
 
     // Check if deal already has folders
     const { data: existingFolders } = await supabase

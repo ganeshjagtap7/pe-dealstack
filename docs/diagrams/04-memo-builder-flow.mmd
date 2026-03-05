@@ -1,0 +1,66 @@
+flowchart TD
+    Start{Create Memo}
+    Start -->|From Template| PickTemplate["Browse Template Library
+    IC Memo, Teaser, Summary"]
+    Start -->|From Scratch| BlankMemo["Create Blank Memo"]
+    Start -->|Gold Standard| GoldTemplate["Use Gold Standard Template
+    Pre-built best practice"]
+
+    PickTemplate --> CreateMemo["Memo Created
+    Sections Pre-populated"]
+    GoldTemplate --> CreateMemo
+    BlankMemo --> AddSections["Add Sections Manually"]
+    AddSections --> CreateMemo
+
+    CreateMemo --> LinkDeal{"Link to Deal?"}
+    LinkDeal -->|Yes| SelectDeal["Select Deal
+    Enables RAG Context"]
+    LinkDeal -->|No| Standalone["Standalone Memo"]
+    SelectDeal --> EditMemo
+    Standalone --> EditMemo
+
+    subgraph EditMemo["Edit Memo Sections"]
+        direction TB
+        S1["Executive Summary"]
+        S2["Company Overview"]
+        S3["Financial Performance"]
+        S4["Market Dynamics"]
+        S5["Competitive Landscape"]
+        S6["Risk Assessment"]
+        S7["Deal Structure"]
+        S8["Value Creation"]
+        S9["Exit Strategy"]
+        S10["Recommendation"]
+    end
+
+    EditMemo --> WriteMethod{How to Write?}
+    WriteMethod -->|Manual| ManualWrite["Write Content Manually"]
+    WriteMethod -->|AI Generate| AIPrompt["Enter Custom Prompt"]
+    AIPrompt --> AIGenerate["AI Generates Section
+    Uses Deal Documents as Context"]
+    AIGenerate --> ReviewAI["Review AI Output
+    Edit or Regenerate"]
+    ReviewAI --> ManualWrite
+
+    ManualWrite --> Reorder["Reorder Sections
+    Drag and Drop"]
+    Reorder --> MemoChat["Chat with Memo AI
+    Ask Questions, Get Analysis"]
+
+    MemoChat --> Status{Memo Status}
+    Status --> Draft["DRAFT
+    Work in Progress"]
+    Status --> Review["IN REVIEW
+    Team Feedback"]
+    Status --> Final["FINAL
+    Approved"]
+    Status --> Archived["ARCHIVED"]
+
+    style Start fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style AIGenerate fill:#f59e0b,color:#fff,stroke:#d97706
+    style AIPrompt fill:#f59e0b,color:#fff,stroke:#d97706
+    style Draft fill:#6366f1,color:#fff,stroke:#4f46e5
+    style Review fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Final fill:#10b981,color:#fff,stroke:#059669
+    style Archived fill:#6b7280,color:#fff,stroke:#4b5563
+    style MemoChat fill:#14b8a6,color:#fff,stroke:#0d9488

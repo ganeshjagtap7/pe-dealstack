@@ -4,15 +4,7 @@
  */
 
 window.PENotifications = (function() {
-    const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
-
-    // XSS prevention - escape HTML entities
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str).replace(/[&<>"']/g, char => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-        }[char]));
-    }
+    // API_BASE_URL + escapeHtml loaded from js/config.js + js/formatters.js
 
     let unreadCount = 0;
     let notifications = [];
@@ -33,22 +25,7 @@ window.PENotifications = (function() {
         return icons[type] || icons['SYSTEM'];
     }
 
-    // Format relative time
-    function formatTimeAgo(dateString) {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        const now = new Date();
-        const diff = now - date;
-        const minutes = Math.floor(diff / (1000 * 60));
-        const hours = Math.floor(diff / (1000 * 60 * 60));
-        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-        if (minutes < 1) return 'Just now';
-        if (minutes < 60) return `${minutes}m ago`;
-        if (hours < 24) return `${hours}h ago`;
-        if (days < 7) return `${days}d ago`;
-        return date.toLocaleDateString();
-    }
+    // formatTimeAgo — now in js/formatters.js (using global window.formatTimeAgo)
 
     // Initialize notification center
     async function init() {

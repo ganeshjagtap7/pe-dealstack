@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
+import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
 
 const router = Router();
@@ -17,12 +18,15 @@ const updateCompanySchema = createCompanySchema.partial();
 // GET /api/companies - Get all companies
 router.get('/', async (req, res) => {
   try {
+    const orgId = getOrgId(req);
+
     const { data, error } = await supabase
       .from('Company')
       .select(`
         *,
         deals:Deal(*)
       `)
+      .eq('organizationId', orgId)
       .order('name', { ascending: true });
 
     if (error) throw error;
@@ -38,6 +42,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     const { data, error } = await supabase
       .from('Company')
@@ -50,6 +55,7 @@ router.get('/:id', async (req, res) => {
         )
       `)
       .eq('id', id)
+      .eq('organizationId', orgId)
       .single();
 
     if (error) {
@@ -69,11 +75,15 @@ router.get('/:id', async (req, res) => {
 // POST /api/companies - Create new company
 router.post('/', async (req, res) => {
   try {
+    const orgId = getOrgId(req);
     const data = createCompanySchema.parse(req.body);
 
     const { data: company, error } = await supabase
       .from('Company')
-      .insert(data)
+      .insert({
+        ...data,
+        organizationId: orgId,
+      })
       .select()
       .single();
 
@@ -93,12 +103,14 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
     const data = updateCompanySchema.parse(req.body);
 
     const { data: company, error } = await supabase
       .from('Company')
       .update(data)
       .eq('id', id)
+      .eq('organizationId', orgId)
       .select(`
         *,
         deals:Deal(*)
@@ -126,11 +138,13 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     const { error } = await supabase
       .from('Company')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organizationId', orgId);
 
     if (error) throw error;
 

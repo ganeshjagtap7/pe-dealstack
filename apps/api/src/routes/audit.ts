@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getAuditLogs, getAuditSummary, AUDIT_ACTIONS, RESOURCE_TYPES, SEVERITY } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
+import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -29,6 +30,7 @@ router.get('/', async (req, res) => {
     }
 
     const { resourceId, resourceType, action, severity, userId, startDate, endDate, limit, offset } = validation.data;
+    const orgId = getOrgId(req);
 
     const { data, error, count } = await getAuditLogs({
       resourceId,
@@ -36,6 +38,7 @@ router.get('/', async (req, res) => {
       action: action as any,
       severity: severity as any,
       userId,
+      organizationId: orgId,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
       limit,
@@ -65,11 +68,13 @@ router.get('/', async (req, res) => {
 router.get('/entity/:entityId', async (req, res) => {
   try {
     const { entityId } = req.params;
+    const orgId = getOrgId(req);
     const limit = Math.min(parseInt(req.query.limit as string) || 50, 100);
     const offset = parseInt(req.query.offset as string) || 0;
 
     const { data, error, count } = await getAuditLogs({
       resourceId: entityId,
+      organizationId: orgId,
       limit,
       offset,
     });
@@ -96,7 +101,8 @@ router.get('/entity/:entityId', async (req, res) => {
 router.get('/summary', async (req, res) => {
   try {
     const days = Math.min(parseInt(req.query.days as string) || 30, 90);
-    const summary = await getAuditSummary(days);
+    const orgId = getOrgId(req);
+    const summary = await getAuditSummary(days, orgId);
 
     res.json({
       success: true,

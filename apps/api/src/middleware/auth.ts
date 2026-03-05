@@ -8,6 +8,7 @@ export interface AuthUser {
   email: string;
   name?: string;
   firmName?: string;
+  organizationId?: string;
   role: string;
   user_metadata?: Record<string, unknown>;
 }

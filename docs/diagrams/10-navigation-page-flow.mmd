@@ -1,0 +1,94 @@
+flowchart TD
+    subgraph Public["Public Pages - No Auth Required"]
+        direction LR
+        Home["Landing Page
+        index.html"]
+        LoginP["Login Page"]
+        SignUpP["Signup Page"]
+        ForgotP["Forgot Password"]
+        ResetP["Reset Password"]
+        VerifyP["Verify Email"]
+        AcceptP["Accept Invite"]
+        PricingP["Pricing"]
+        SolutionsP["Solutions"]
+        ResourcesP["Resources"]
+        CompanyP["Company"]
+        PrivacyP["Privacy Policy"]
+        TermsP["Terms of Service"]
+        ComingSoonP["Coming Soon"]
+    end
+
+    subgraph Protected["Protected Pages - Auth Required"]
+        direction TB
+        AnalystDash["Analyst Dashboard
+        dashboard.html
+        MEMBER + ANALYST view"]
+        AdminDash["Admin Dashboard
+        admin-dashboard.html
+        ADMIN + PARTNER view"]
+        CRMPage["CRM Deal Board
+        crm.html
+        Kanban Pipeline View"]
+        DealDetail["Deal Intelligence
+        deal.html
+        Single Deal Deep Dive"]
+        VDRPage["Virtual Data Room
+        vdr.html
+        Document Management"]
+        MemoPage["Memo Builder
+        memo-builder.html
+        AI Writing Tool"]
+        TemplatePage["Templates Library
+        templates.html
+        Memo Templates"]
+        SettingsPage["Settings
+        settings.html
+        User + Workspace Config"]
+    end
+
+    Home -->|Sign Up| SignUpP
+    Home -->|Log In| LoginP
+    SignUpP -->|Verify| VerifyP
+    LoginP -->|Forgot?| ForgotP
+    ForgotP --> ResetP
+    AcceptP -->|After Accept| LoginP
+
+    LoginP -->|ADMIN| AdminDash
+    LoginP -->|MEMBER| AnalystDash
+
+    subgraph Sidebar["Sidebar Navigation"]
+        direction TB
+        NavDash["Dashboard"]
+        NavCRM["Deals CRM"]
+        NavAdmin["Admin Center"]
+        NavSettings["Settings"]
+        NavLogout["Sign Out"]
+    end
+
+    NavDash --> AnalystDash
+    NavDash --> AdminDash
+    NavCRM --> CRMPage
+    NavAdmin --> AdminDash
+    NavSettings --> SettingsPage
+    NavLogout --> LoginP
+
+    CRMPage -->|Click Deal| DealDetail
+    DealDetail -->|Data Room| VDRPage
+    DealDetail -->|Create Memo| MemoPage
+    MemoPage -->|Browse Templates| TemplatePage
+    TemplatePage -->|Use Template| MemoPage
+
+    subgraph TopBar["Top Bar Actions"]
+        direction LR
+        Search["Global Search"]
+        Notif["Notifications Bell"]
+        Profile["User Profile Menu"]
+        Share["Share Deal Modal"]
+    end
+
+    Protected --> TopBar
+
+    style Public fill:#6b7280,color:#fff,stroke:#4b5563
+    style Protected fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Sidebar fill:#6366f1,color:#fff,stroke:#4f46e5
+    style TopBar fill:#8b5cf6,color:#fff,stroke:#7c3aed

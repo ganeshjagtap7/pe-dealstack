@@ -376,7 +376,8 @@
                         <span class="material-symbols-outlined" style="color:#fff;font-size:20px;">table_chart</span>
                         <span style="color:#fff;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;">Financial Statements</span>
                         <span id="fin-section-badge" style="display:none;margin-left:8px;"></span>
-                        <span class="material-symbols-outlined fin-chevron" style="color:rgba(255,255,255,0.75);font-size:18px;margin-left:auto;transform:rotate(180deg);transition:transform 0.2s;">expand_more</span>
+                        <span class="material-symbols-outlined" title="Fullscreen" onclick="event.stopPropagation();openSectionFullscreen('financials')" style="color:rgba(255,255,255,0.5);font-size:16px;margin-left:auto;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='rgba(255,255,255,0.9)'" onmouseout="this.style.color='rgba(255,255,255,0.5)'">open_in_full</span>
+                        <span class="material-symbols-outlined fin-chevron" style="color:rgba(255,255,255,0.75);font-size:18px;transform:rotate(180deg);transition:transform 0.2s;">expand_more</span>
                     </button>
                     <div id="financials-body" style="background:#fff;padding:20px;border-radius:0 0 10px 10px;">
                         <div id="financials-content">
@@ -388,6 +389,27 @@
                                     <span class="material-symbols-outlined" style="font-size:16px;">auto_awesome</span>
                                     Extract Financials
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI Financial Analysis Section -->
+                <div id="analysis-section" style="border-radius:14px;border:1px solid #D6DEE8;margin-bottom:24px;box-shadow:0 4px 16px rgba(0,51,102,0.08),0 1px 3px rgba(0,0,0,0.04);flex-shrink:0;display:none;overflow:hidden;">
+                    <button id="analysis-toggle"
+                        onclick="var b=document.getElementById('analysis-body');var h=b.style.display==='none';b.style.display=h?'block':'none';this.querySelector('.analysis-chevron').style.transform=h?'rotate(180deg)':'';"
+                        style="width:100%;display:flex;align-items:center;gap:10px;padding:16px 24px;background:linear-gradient(135deg,#003366 0%,#004488 100%);border:none;cursor:pointer;text-align:left;">
+                        <span class="material-symbols-outlined" style="color:rgba(255,255,255,0.9);font-size:20px;">insights</span>
+                        <span style="color:#fff;font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;font-family:'Inter',system-ui,sans-serif;">AI Financial Analysis</span>
+                        <span id="qoe-score-badge" style="display:none;margin-left:8px;"></span>
+                        <span class="material-symbols-outlined" title="Fullscreen" onclick="event.stopPropagation();openSectionFullscreen('analysis')" style="color:rgba(255,255,255,0.4);font-size:16px;margin-left:auto;cursor:pointer;transition:color 0.2s;" onmouseover="this.style.color='rgba(255,255,255,0.9)'" onmouseout="this.style.color='rgba(255,255,255,0.4)'">open_in_full</span>
+                        <span class="material-symbols-outlined analysis-chevron" style="color:rgba(255,255,255,0.6);font-size:18px;transform:rotate(180deg);transition:transform 0.25s ease;">expand_more</span>
+                    </button>
+                    <div id="analysis-body" style="background:#F8FAFC;padding:24px;border-top:none;">
+                        <div id="analysis-content">
+                            <div style="text-align:center;padding:48px 16px;">
+                                <span class="material-symbols-outlined" style="color:#94A3B8;font-size:40px;display:block;margin-bottom:10px;">progress_activity</span>
+                                <p style="font-size:13px;font-weight:600;color:#475569;font-family:'Inter',system-ui,sans-serif;">Loading analysis...</p>
                             </div>
                         </div>
                     </div>
@@ -552,6 +574,9 @@
     <!-- Load shared layout and auth -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/formatters.js"></script>
+    <script src="js/notifications.js"></script>
     <!-- Share Link Popup (positioned with JS) -->
     <div id="share-link-popup"
         class="hidden fixed bg-white rounded-xl shadow-2xl border border-border-subtle p-4 z-[100] w-72"
@@ -571,6 +596,7 @@
         </div>
     </div>
 
+    <script src="js/layoutComponents.js"></script>
     <script src="js/layout.js"></script>
     <script src="js/docPreview.js"></script>
     <script src="js/notificationCenter.js"></script>
@@ -598,8 +624,24 @@
         </div>
     </div>
 
+    <script src="deal-activity.js"></script>
+    <script src="deal-chat-responses.js"></script>
+    <script src="deal-chat.js"></script>
+    <script src="deal-stages.js"></script>
+    <script src="deal-team.js"></script>
+    <script src="deal-documents.js"></script>
+    <script src="deal-edit.js"></script>
     <script src="deal.js"></script>
+    <script src="js/financials-helpers.js"></script>
+    <script src="js/financials-charts.js"></script>
+    <script src="js/financials-merge.js"></script>
     <script src="js/financials.js"></script>
+    <script src="js/analysis-charts.js"></script>
+    <script src="js/analysis-modules.js"></script>
+    <script src="js/analysis.js"></script>
+
+    <!-- Fullscreen expand for Financial Statements & Analysis sections -->
+    <script src="js/dealFullscreen.js"></script>
 </body>
 
 </html>

@@ -1,0 +1,67 @@
+flowchart TD
+    Start{Document Entry Point}
+    Start -->|Direct Upload| Upload["Upload Document
+    PDF, Excel, Word, Images"]
+    Start -->|CIM Ingestion| CIMUpload["Upload CIM or Teaser
+    via Ingest Endpoint"]
+    Start -->|VDR Page| VDRBrowse["Browse Virtual Data Room"]
+
+    Upload --> Validate{"Validation"}
+    CIMUpload --> Validate
+
+    Validate -->|Magic Bytes Check| TypeCheck["File Type Verified
+    MIME + Content Inspection"]
+    Validate -->|Size Check| SizeCheck["Max 100MB"]
+    TypeCheck --> SizeCheck
+    SizeCheck -->|Pass| Store["Store in Supabase Storage"]
+    SizeCheck -->|Fail| Reject["Upload Rejected
+    Show Error"]
+
+    Store --> Classify["AI Classifies Document
+    CIM, Teaser, Financials,
+    Legal, Tax, Other"]
+    Classify --> Extract["AI Extracts Key Data
+    Metrics, Dates, Figures"]
+    Extract --> Index["Document Indexed
+    Available for RAG Chat"]
+
+    VDRBrowse --> FolderTree["Folder Structure"]
+
+    subgraph Folders["Standard VDR Folders"]
+        direction TB
+        F1["Financial Statements"]
+        F2["Legal Documents"]
+        F3["Tax Records"]
+        F4["Operations"]
+        F5["Management"]
+        F6["Market Research"]
+    end
+
+    FolderTree --> Folders
+    Store --> FolderTree
+
+    subgraph DocActions["Document Actions"]
+        direction LR
+        Preview["Preview Document"]
+        Download["Download File"]
+        Move["Move to Folder"]
+        Tag["Add Tags"]
+        Highlight["Highlight Important"]
+        Delete["Delete Document"]
+    end
+
+    Index --> DocActions
+
+    FolderTree --> Insights["Folder Insights
+    Completeness Score,
+    Missing Documents,
+    Red Flags"]
+
+    style Start fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style Validate fill:#f59e0b,color:#fff,stroke:#d97706
+    style Store fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Classify fill:#6366f1,color:#fff,stroke:#4f46e5
+    style Extract fill:#6366f1,color:#fff,stroke:#4f46e5
+    style Index fill:#10b981,color:#fff,stroke:#059669
+    style Reject fill:#ef4444,color:#fff,stroke:#dc2626
+    style Insights fill:#14b8a6,color:#fff,stroke:#0d9488

@@ -58,7 +58,7 @@ function copyStaticFiles() {
       }
 
       // Also copy standalone JS files from root
-      const rootFiles = ['dashboard.js', 'deal.js', 'memo-builder.js', 'admin-dashboard.js', 'templates.js']
+      const rootFiles = ['dashboard.js', 'deal.js', 'memo-builder.js', 'admin-dashboard.js', 'templates.js', 'contacts.js', 'crm.js', 'crm-dynamic.js', 'accept-invite.js', 'settings.js']
       rootFiles.forEach(file => {
         const src = resolve(__dirname, file)
         if (existsSync(src)) {

@@ -5,15 +5,7 @@
  */
 
 const InviteModal = (function () {
-  const API_BASE_URL = window.location.hostname === 'localhost' ? 'http://localhost:3001/api' : '/api';
-
-  // XSS prevention - escape HTML entities
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"']/g, char => ({
-      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-    }[char]));
-  }
+  // API_BASE_URL + escapeHtml loaded from js/config.js + js/formatters.js
 
   // State
   let isOpen = false;

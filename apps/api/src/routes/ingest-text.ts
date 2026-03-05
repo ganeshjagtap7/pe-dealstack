@@ -1,0 +1,211 @@
+import { Router } from 'express';
+import { supabase } from '../supabase.js';
+import { extractDealDataFromText } from '../services/aiExtractor.js';
+import { z } from 'zod';
+import { embedDocument } from '../rag.js';
+import { log } from '../utils/logger.js';
+import { validateFinancials } from '../services/financialValidator.js';
+import { mergeIntoExistingDeal, getIconForIndustry } from '../services/dealMerger.js';
+import { AuditLog } from '../services/auditLog.js';
+import { getOrgId } from '../middleware/orgScope.js';
+
+const subRouter = Router();
+
+// ─── Validation Schema ───────────────────────────────────────
+
+const textIngestSchema = z.object({
+  text: z.string().min(50, 'Text must be at least 50 characters'),
+  sourceName: z.string().optional(),
+  sourceType: z.enum(['email', 'note', 'slack', 'whatsapp', 'other']).optional(),
+  dealId: z.string().uuid().optional(),
+});
+
+// POST /api/ingest/text — Create deal from raw pasted text
+subRouter.post('/text', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const validation = textIngestSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
+    }
+
+    const { text, sourceName, sourceType, dealId: targetDealId } = validation.data;
+    log.info('Text ingest starting', { textLength: text.length, sourceType, targetDealId });
+
+    // Step 1: Extract data using existing AI extractor
+    const aiData = await extractDealDataFromText(text);
+    if (!aiData) {
+      return res.status(400).json({ error: 'Could not extract deal data from text. Try providing more detail.' });
+    }
+
+    // Financial validation
+    const financialCheck = validateFinancials({
+      revenue: aiData.revenue.value,
+      ebitda: aiData.ebitda.value,
+      ebitdaMargin: aiData.ebitdaMargin?.value,
+      revenueGrowth: aiData.revenueGrowth?.value,
+      employees: aiData.employees?.value,
+    });
+    if (!financialCheck.isValid) {
+      aiData.needsReview = true;
+      aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
+    }
+
+    const docName = sourceName || `${sourceType || 'Text'} input - ${new Date().toLocaleDateString()}`;
+    let deal: any;
+    let company: any;
+    let isUpdate = false;
+
+    if (targetDealId) {
+      // ─── Update Existing Deal path ───
+      log.info('Text ingest into existing deal', { dealId: targetDealId });
+      const result = await mergeIntoExistingDeal(targetDealId, aiData, req.user?.id, docName);
+      deal = result.deal;
+      company = deal.company;
+      isUpdate = true;
+    } else {
+      // ─── Create New Deal path ───
+      const companyName = aiData.companyName.value || 'Unknown Company';
+      const { data: existingCompany } = await supabase
+        .from('Company')
+        .select('id, name')
+        .ilike('name', companyName)
+        .eq('organizationId', orgId)
+        .single();
+
+      if (existingCompany) {
+        company = existingCompany;
+      } else {
+        const { data: newCompany, error: companyError } = await supabase
+          .from('Company')
+          .insert({
+            name: companyName,
+            industry: aiData.industry.value,
+            description: aiData.description.value,
+            organizationId: orgId,
+          })
+          .select()
+          .single();
+        if (companyError) throw companyError;
+        company = newCompany;
+      }
+
+      const dealIcon = getIconForIndustry(aiData.industry.value);
+      const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
+
+      const { data: newDeal, error: dealError } = await supabase
+        .from('Deal')
+        .insert({
+          name: companyName,
+          companyId: company.id,
+          organizationId: orgId,
+          stage: 'INITIAL_REVIEW',
+          status: dealStatus,
+          industry: aiData.industry.value,
+          description: aiData.description.value,
+          revenue: aiData.revenue.value,
+          ebitda: aiData.ebitda.value,
+          dealSize: aiData.revenue.value,
+          aiThesis: aiData.summary,
+          icon: dealIcon,
+          extractionConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+          aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
+        })
+        .select()
+        .single();
+
+      if (dealError) throw dealError;
+      deal = newDeal;
+    }
+
+    // Create document record for text source
+    const { data: document } = await supabase
+      .from('Document')
+      .insert({
+        dealId: deal.id,
+        name: docName,
+        type: 'OTHER',
+        extractedText: text,
+        extractedData: {
+          companyName: aiData.companyName,
+          industry: aiData.industry,
+          description: aiData.description,
+          revenue: aiData.revenue,
+          ebitda: aiData.ebitda,
+          ebitdaMargin: aiData.ebitdaMargin,
+          revenueGrowth: aiData.revenueGrowth,
+          employees: aiData.employees,
+          foundedYear: aiData.foundedYear,
+          headquarters: aiData.headquarters,
+          keyRisks: aiData.keyRisks,
+          investmentHighlights: aiData.investmentHighlights,
+          summary: aiData.summary,
+          overallConfidence: aiData.overallConfidence,
+          needsReview: aiData.needsReview,
+          reviewReasons: aiData.reviewReasons,
+        },
+        status: aiData.needsReview ? 'pending_review' : 'analyzed',
+        confidence: aiData.overallConfidence / 100,
+        aiAnalyzedAt: new Date().toISOString(),
+        mimeType: 'text/plain',
+      })
+      .select()
+      .single();
+
+    // Log activity + assign team (only for new deals)
+    if (!isUpdate) {
+      await supabase.from('Activity').insert({
+        dealId: deal.id,
+        type: 'DEAL_CREATED',
+        title: `Deal created from ${sourceType || 'text'} input`,
+        description: `"${deal.name}" auto-created with ${aiData.overallConfidence}% confidence`,
+        metadata: { sourceType, sourceName, overallConfidence: aiData.overallConfidence },
+      });
+
+      if (req.user?.id) {
+        await supabase.from('DealTeamMember').insert({
+          dealId: deal.id,
+          userId: req.user.id,
+          role: 'MEMBER',
+        });
+      }
+    }
+
+    // Trigger RAG embedding in background
+    if (text.length > 100) {
+      embedDocument(document?.id || deal.id, deal.id, text)
+        .then(result => {
+          if (result.success) log.debug('RAG embedding complete', { chunkCount: result.chunkCount });
+          else log.error('RAG embedding failed', result.error);
+        })
+        .catch(err => log.error('RAG embedding error', err));
+    }
+
+    await AuditLog.aiIngest(req, docName, deal.id);
+
+    log.info('Text ingest complete', { dealId: deal.id, isUpdate });
+
+    res.status(isUpdate ? 200 : 201).json({
+      success: true,
+      isUpdate,
+      deal: { ...deal, company: company || deal.company },
+      document,
+      extraction: {
+        companyName: aiData.companyName,
+        industry: aiData.industry,
+        revenue: aiData.revenue,
+        ebitda: aiData.ebitda,
+        overallConfidence: aiData.overallConfidence,
+        needsReview: aiData.needsReview,
+        reviewReasons: aiData.reviewReasons,
+      },
+    });
+  } catch (error) {
+    log.error('Text ingest error', error);
+    res.status(500).json({ error: 'Failed to process text input' });
+  }
+});
+
+export default subRouter;

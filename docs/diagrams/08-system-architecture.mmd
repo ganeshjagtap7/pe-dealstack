@@ -1,0 +1,99 @@
+flowchart TB
+    subgraph Client["Frontend - Vite + Vanilla JS - Port 3000"]
+        direction LR
+        Landing["Landing Pages
+        index, pricing, solutions"]
+        Auth["Auth Pages
+        login, signup, verify,
+        reset, accept-invite"]
+        CRM["CRM Page
+        Deal Kanban Board"]
+        DealPage["Deal Intelligence
+        Detail + AI Chat"]
+        AdminDash["Admin Dashboard
+        Command Center"]
+        AnalystDash["Analyst Dashboard
+        Overview"]
+        VDR["Virtual Data Room
+        Document Manager"]
+        MemoBuilder["Memo Builder
+        AI-Powered Editor"]
+        Settings["Settings Page
+        User + Workspace"]
+    end
+
+    subgraph API["Backend - Express + TypeScript - Port 3001"]
+        direction TB
+        subgraph Middleware["Middleware Layer"]
+            AuthMW["Auth Middleware
+            JWT Verification"]
+            RBAC["RBAC Middleware
+            Role Permissions"]
+            RateLimit["Rate Limiter
+            General, AI, Write tiers"]
+            ReqID["Request ID
+            Correlation Tracking"]
+            Validation["Zod Validation
+            Query + Body Schemas"]
+        end
+
+        subgraph Routes["API Routes"]
+            direction LR
+            AuthRoutes["Auth Routes"]
+            DealRoutes["Deal Routes"]
+            CompanyRoutes["Company Routes"]
+            DocRoutes["Document Routes"]
+            FolderRoutes["Folder Routes"]
+            MemoRoutes["Memo Routes"]
+            UserRoutes["User Routes"]
+            InviteRoutes["Invitation Routes"]
+            NotifRoutes["Notification Routes"]
+            ConvoRoutes["Conversation Routes"]
+            TemplateRoutes["Template Routes"]
+            AIRoutes["AI Routes"]
+            IngestRoutes["Ingest Routes"]
+        end
+
+        subgraph Services["Service Layer"]
+            direction LR
+            AIExtractor["AI Extractor
+            CIM + Teaser Parsing"]
+            FileValidator["File Validator
+            Magic Bytes + Size"]
+            AuditLog["Audit Logger"]
+            AICache["AI Response Cache"]
+        end
+    end
+
+    subgraph External["External Services"]
+        direction LR
+        Supabase["Supabase
+        PostgreSQL + Auth + Storage"]
+        OpenAI["OpenAI GPT-4
+        Chat + Generation"]
+        Gemini["Google Gemini
+        Alternative AI"]
+        SendGrid["SendGrid
+        Email Delivery"]
+        Sentry["Sentry
+        Error Tracking"]
+        Render["Render.com
+        Hosting + Deploy"]
+    end
+
+    Client -->|"HTTPS + JWT Bearer Token"| API
+    Middleware --> Routes
+    Routes --> Services
+    API -->|"SQL + Auth + Files"| Supabase
+    Services -->|"AI Prompts"| OpenAI
+    Services -->|"AI Prompts"| Gemini
+    API -->|"Invitation + Reset Emails"| SendGrid
+    API -->|"Error Reports"| Sentry
+    Render -->|"Auto-Deploy from main"| API
+
+    style Client fill:#3b82f6,color:#fff,stroke:#2563eb
+    style API fill:#6366f1,color:#fff,stroke:#4f46e5
+    style External fill:#10b981,color:#fff,stroke:#059669
+    style Middleware fill:#f59e0b,color:#000,stroke:#d97706
+    style Routes fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style Services fill:#14b8a6,color:#fff,stroke:#0d9488

@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
+import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -25,10 +26,12 @@ router.get('/deals', async (req: any, res) => {
     }
 
     const { format, stage, status, industry } = validation.data;
+    const orgId = getOrgId(req);
 
     let query = supabase
       .from('Deal')
       .select('*, company:Company(name, industry)')
+      .eq('organizationId', orgId)
       .order('createdAt', { ascending: false });
 
     if (stage) query = query.eq('stage', stage);

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { openai, isAIEnabled } from '../openai.js';
 import { log } from '../utils/logger.js';
+import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -33,6 +34,15 @@ Provide concise, actionable insights. Use financial terminology appropriately. W
 router.get('/conversations', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { userId, dealId } = req.query;
+    const orgId = getOrgId(req);
+
+    // If dealId specified, verify the deal belongs to user's org
+    if (dealId) {
+      const dealAccess = await verifyDealAccess(dealId as string, orgId);
+      if (!dealAccess) {
+        return res.status(404).json({ error: 'Deal not found' });
+      }
+    }
 
     let query = supabase
       .from('Conversation')
@@ -67,6 +77,7 @@ router.get('/conversations', async (req: Request, res: Response, next: NextFunct
 router.get('/conversations/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     const { data: conversation, error } = await supabase
       .from('Conversation')
@@ -76,6 +87,7 @@ router.get('/conversations/:id', async (req: Request, res: Response, next: NextF
           id,
           name,
           stage,
+          organizationId,
           Company (
             id,
             name
@@ -97,6 +109,11 @@ router.get('/conversations/:id', async (req: Request, res: Response, next: NextF
         return res.status(404).json({ error: 'Conversation not found' });
       }
       throw error;
+    }
+
+    // Verify the conversation's deal belongs to user's org
+    if (conversation.Deal && conversation.Deal.organizationId !== orgId) {
+      return res.status(404).json({ error: 'Conversation not found' });
     }
 
     // Sort messages by createdAt
@@ -124,6 +141,15 @@ router.post('/conversations', async (req: Request, res: Response, next: NextFunc
       });
     }
 
+    // If deal-scoped conversation, verify deal belongs to user's org
+    if (validation.data.dealId) {
+      const orgId = getOrgId(req);
+      const dealAccess = await verifyDealAccess(validation.data.dealId, orgId);
+      if (!dealAccess) {
+        return res.status(404).json({ error: 'Deal not found' });
+      }
+    }
+
     const { data: conversation, error } = await supabase
       .from('Conversation')
       .insert(validation.data)
@@ -142,6 +168,20 @@ router.post('/conversations', async (req: Request, res: Response, next: NextFunc
 router.delete('/conversations/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify the conversation's deal (if any) belongs to user's org
+    const { data: conv } = await supabase
+      .from('Conversation')
+      .select('dealId')
+      .eq('id', id)
+      .single();
+    if (conv?.dealId) {
+      const dealAccess = await verifyDealAccess(conv.dealId, orgId);
+      if (!dealAccess) {
+        return res.status(404).json({ error: 'Conversation not found' });
+      }
+    }
 
     // Delete messages first (cascade should handle this, but being explicit)
     await supabase
@@ -166,6 +206,7 @@ router.delete('/conversations/:id', async (req: Request, res: Response, next: Ne
 router.post('/conversations/:id/messages', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
     const validation = sendMessageSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -194,6 +235,7 @@ router.post('/conversations/:id/messages', async (req: Request, res: Response, n
           industry,
           dealSize,
           aiThesis,
+          organizationId,
           Company (
             id,
             name,
@@ -216,6 +258,11 @@ router.post('/conversations/:id/messages', async (req: Request, res: Response, n
         return res.status(404).json({ error: 'Conversation not found' });
       }
       throw convError;
+    }
+
+    // Verify the conversation's deal belongs to user's org
+    if (conversation.Deal && conversation.Deal.organizationId !== orgId) {
+      return res.status(404).json({ error: 'Conversation not found' });
     }
 
     // Save user message

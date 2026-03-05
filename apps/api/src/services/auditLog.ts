@@ -191,6 +191,7 @@ export async function getAuditLogs(options: {
   resourceType?: ResourceType;
   resourceId?: string;
   severity?: SeverityLevel;
+  organizationId?: string;
   startDate?: Date;
   endDate?: Date;
   limit?: number;
@@ -200,6 +201,10 @@ export async function getAuditLogs(options: {
     .from('AuditLog')
     .select('*', { count: 'exact' })
     .order('createdAt', { ascending: false });
+
+  if (options.organizationId) {
+    query = query.eq('organizationId', options.organizationId);
+  }
 
   if (options.userId) {
     query = query.eq('userId', options.userId);
@@ -245,7 +250,7 @@ export async function getAuditLogs(options: {
 /**
  * Get audit summary statistics
  */
-export async function getAuditSummary(days: number = 30): Promise<{
+export async function getAuditSummary(days: number = 30, organizationId?: string): Promise<{
   totalActions: number;
   byAction: Record<string, number>;
   byUser: Record<string, number>;
@@ -254,10 +259,16 @@ export async function getAuditSummary(days: number = 30): Promise<{
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  const { data } = await supabase
+  let summaryQuery = supabase
     .from('AuditLog')
     .select('action, userEmail, severity')
     .gte('createdAt', startDate.toISOString());
+
+  if (organizationId) {
+    summaryQuery = summaryQuery.eq('organizationId', organizationId);
+  }
+
+  const { data } = await summaryQuery;
 
   const logs = data || [];
 

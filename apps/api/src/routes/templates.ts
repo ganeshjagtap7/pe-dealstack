@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
+import { getOrgId } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -60,6 +61,7 @@ const duplicateTemplateSchema = z.object({
 router.get('/', async (req, res) => {
   try {
     const params = templatesQuerySchema.parse(req.query);
+    const orgId = getOrgId(req);
 
     let query = supabase
       .from('MemoTemplate')
@@ -68,6 +70,7 @@ router.get('/', async (req, res) => {
         sections:MemoTemplateSection(id, title, description, aiEnabled, mandatory, sortOrder),
         createdByUser:User!MemoTemplate_createdBy_fkey(name, email)
       `)
+      .eq('organizationId', orgId)
       .order('usageCount', { ascending: false })
       .range(params.offset, params.offset + params.limit - 1);
 
@@ -103,6 +106,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     const { data: template, error } = await supabase
       .from('MemoTemplate')
@@ -112,6 +116,7 @@ router.get('/:id', async (req, res) => {
         createdByUser:User!MemoTemplate_createdBy_fkey(name, email)
       `)
       .eq('id', id)
+      .eq('organizationId', orgId)
       .single();
 
     if (error) {
@@ -143,10 +148,12 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
     }
 
+    const orgId = getOrgId(req);
     const templateData = {
       ...validation.data,
       createdBy: user?.id,
       usageCount: 0,
+      organizationId: orgId,
     };
 
     const { data: template, error } = await supabase
@@ -195,6 +202,7 @@ router.post('/', async (req, res) => {
 router.patch('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
     const validation = updateTemplateSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -210,6 +218,7 @@ router.patch('/:id', async (req, res) => {
       .from('MemoTemplate')
       .update(updateData)
       .eq('id', id)
+      .eq('organizationId', orgId)
       .select()
       .single();
 
@@ -226,18 +235,21 @@ router.patch('/:id', async (req, res) => {
 router.delete('/:id', requirePermission(PERMISSIONS.MEMO_DELETE), async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     // Get template name before deleting for audit log
     const { data: template } = await supabase
       .from('MemoTemplate')
       .select('name')
       .eq('id', id)
+      .eq('organizationId', orgId)
       .single();
 
     const { error } = await supabase
       .from('MemoTemplate')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('organizationId', orgId);
 
     if (error) throw error;
 
@@ -261,13 +273,15 @@ router.post('/:id/duplicate', async (req, res) => {
   try {
     const { id } = req.params;
     const user = req.user;
+    const orgId = getOrgId(req);
     const { name } = duplicateTemplateSchema.parse(req.body);
 
-    // Get original template with sections
+    // Get original template with sections (org-scoped)
     const { data: original, error: fetchError } = await supabase
       .from('MemoTemplate')
       .select(`*, sections:MemoTemplateSection(*)`)
       .eq('id', id)
+      .eq('organizationId', orgId)
       .single();
 
     if (fetchError) throw fetchError;
@@ -284,6 +298,7 @@ router.post('/:id/duplicate', async (req, res) => {
         permissions: original.permissions,
         createdBy: user?.id,
         usageCount: 0,
+        organizationId: orgId,
       })
       .select()
       .single();
@@ -324,6 +339,7 @@ router.post('/:id/duplicate', async (req, res) => {
 router.post('/:id/use', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     // Increment usage count
     const { data: template, error } = await supabase
@@ -335,12 +351,14 @@ router.post('/:id/use', async (req, res) => {
         .from('MemoTemplate')
         .select('usageCount')
         .eq('id', id)
+        .eq('organizationId', orgId)
         .single();
 
       await supabase
         .from('MemoTemplate')
         .update({ usageCount: (current?.usageCount || 0) + 1 })
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organizationId', orgId);
     }
 
     res.json({ success: true });
@@ -358,6 +376,11 @@ router.post('/:id/use', async (req, res) => {
 router.get('/:id/sections', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify template belongs to org
+    const { data: tpl } = await supabase.from('MemoTemplate').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!tpl) return res.status(404).json({ error: 'Template not found' });
 
     const { data: sections, error } = await supabase
       .from('MemoTemplateSection')
@@ -378,6 +401,12 @@ router.get('/:id/sections', async (req, res) => {
 router.post('/:id/sections', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify template belongs to org
+    const { data: tpl } = await supabase.from('MemoTemplate').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!tpl) return res.status(404).json({ error: 'Template not found' });
+
     const validation = createSectionSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -418,7 +447,13 @@ router.post('/:id/sections', async (req, res) => {
 // PATCH /api/templates/:id/sections/:sectionId - Update section
 router.patch('/:id/sections/:sectionId', async (req, res) => {
   try {
-    const { sectionId } = req.params;
+    const { id, sectionId } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify template belongs to org
+    const { data: tpl } = await supabase.from('MemoTemplate').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!tpl) return res.status(404).json({ error: 'Template not found' });
+
     const validation = updateSectionSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -444,7 +479,12 @@ router.patch('/:id/sections/:sectionId', async (req, res) => {
 // DELETE /api/templates/:id/sections/:sectionId - Delete section
 router.delete('/:id/sections/:sectionId', async (req, res) => {
   try {
-    const { sectionId } = req.params;
+    const { id, sectionId } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify template belongs to org
+    const { data: tpl } = await supabase.from('MemoTemplate').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!tpl) return res.status(404).json({ error: 'Template not found' });
 
     const { error } = await supabase
       .from('MemoTemplateSection')
@@ -464,6 +504,12 @@ router.delete('/:id/sections/:sectionId', async (req, res) => {
 router.post('/:id/sections/reorder', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify template belongs to org
+    const { data: tpl } = await supabase.from('MemoTemplate').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!tpl) return res.status(404).json({ error: 'Template not found' });
+
     const validation = reorderSectionsSchema.safeParse(req.body);
 
     if (!validation.success) {

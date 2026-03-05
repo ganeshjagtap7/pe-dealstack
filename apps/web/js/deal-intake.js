@@ -3,9 +3,7 @@
  * Handles file upload, text paste, and URL scraping for deal creation.
  */
 
-const API_BASE = window.location.hostname === 'localhost'
-    ? 'http://localhost:3001/api'
-    : '/api';
+const API_BASE = API_BASE_URL; // from js/config.js
 
 let selectedFile = null;
 let createdDealId = null;
@@ -80,13 +78,7 @@ function clearFile() {
     document.getElementById('upload-btn').disabled = true;
 }
 
-function formatFileSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-}
+// formatFileSize — now in js/formatters.js
 
 async function uploadFile() {
     if (!selectedFile) return;

@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
+import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -35,6 +36,12 @@ const createActivitySchema = z.object({
 router.get('/deals/:dealId/activities', async (req, res) => {
   try {
     const { dealId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
     const { limit, offset } = activitiesQuerySchema.parse(req.query);
 
     const { data, error, count } = await supabase
@@ -62,6 +69,12 @@ router.get('/deals/:dealId/activities', async (req, res) => {
 router.post('/deals/:dealId/activities', async (req, res) => {
   try {
     const { dealId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
     const data = createActivitySchema.parse(req.body);
 
     // Verify deal exists

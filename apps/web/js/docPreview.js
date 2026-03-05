@@ -4,13 +4,7 @@
  */
 
 window.PEDocPreview = (function() {
-    // XSS prevention - escape HTML entities
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str).replace(/[&<>"']/g, char => ({
-            '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-        }[char]));
-    }
+    // escapeHtml() available globally from js/formatters.js
 
     // PDF.js library URL
     const PDF_JS_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';

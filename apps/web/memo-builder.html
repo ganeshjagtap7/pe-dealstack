@@ -434,7 +434,11 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <!-- Auth Helper -->
     <script src="js/auth.js"></script>
+    <script src="js/config.js"></script>
+    <script src="js/formatters.js"></script>
+    <script src="js/notifications.js"></script>
     <!-- Shared Layout -->
+    <script src="js/layoutComponents.js"></script>
     <script src="js/layout.js"></script>
     <script src="js/inviteModal.js"></script>
     <!-- html2pdf for export -->
@@ -451,7 +455,15 @@
             PELayout.init('memo-builder', { collapsible: true });
         });
     </script>
-    <!-- Main Page Script -->
+    <!-- Memo API Functions -->
+    <script src="memo-api.js"></script>
+    <!-- Memo Chat Module -->
+    <script src="memo-chat.js"></script>
+    <!-- Memo Section Rendering & Actions -->
+    <script src="memo-sections.js"></script>
+    <!-- Memo Editor Modals, Export & Panel Resize -->
+    <script src="memo-editor.js"></script>
+    <!-- Main Page Script (state, init, sidebar, drag & drop) -->
     <script src="memo-builder.js"></script>
 </body>
 </html>

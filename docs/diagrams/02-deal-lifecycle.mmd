@@ -1,0 +1,64 @@
+flowchart TD
+    Entry{How Deal Enters}
+    Entry -->|Manual| CreateDeal["Create Deal Manually
+    Name, Company, Industry,
+    Deal Size, Stage"]
+    Entry -->|Document Upload| Ingest["Upload CIM or Teaser
+    POST api ingest"]
+    Ingest --> AIExtract["AI Extracts Data
+    Company, Industry, Financials,
+    Deal Size, EBITDA"]
+    AIExtract --> AutoCreate["Deal Auto-Created
+    with Extracted Data"]
+
+    CreateDeal --> InitialReview
+    AutoCreate --> InitialReview
+
+    subgraph Pipeline["Deal Pipeline Stages"]
+        direction TB
+        InitialReview["INITIAL REVIEW
+        Screen deal, review teaser"]
+        InitialReview --> DueDiligence["DUE DILIGENCE
+        Deep dive, request documents"]
+        DueDiligence --> IOI["IOI SUBMITTED
+        Indication of Interest sent"]
+        IOI --> LOI["LOI SUBMITTED
+        Letter of Intent sent"]
+        LOI --> Negotiation["NEGOTIATION
+        Final terms discussion"]
+        Negotiation --> Closing["CLOSING
+        Legal, final approvals"]
+    end
+
+    Closing --> Outcome{Outcome}
+    Outcome -->|Won| ClosedWon["CLOSED WON"]
+    Outcome -->|Lost| ClosedLost["CLOSED LOST"]
+
+    InitialReview -.->|Pass| Passed["PASSED
+    Deal rejected early"]
+    DueDiligence -.->|Pass| Passed
+
+    subgraph Actions["Actions at Any Stage"]
+        direction LR
+        Assign["Assign Team Members"]
+        Upload["Upload Documents"]
+        Notes["Add Notes and Activities"]
+        Chat["AI Deal Chat"]
+        Memo["Create Investment Memo"]
+        Priority["Set Priority
+        LOW, MEDIUM, HIGH, URGENT"]
+    end
+
+    Pipeline -.-> Actions
+
+    style Entry fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style InitialReview fill:#6366f1,color:#fff,stroke:#4f46e5
+    style DueDiligence fill:#3b82f6,color:#fff,stroke:#2563eb
+    style IOI fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style LOI fill:#06b6d4,color:#fff,stroke:#0891b2
+    style Negotiation fill:#14b8a6,color:#fff,stroke:#0d9488
+    style Closing fill:#10b981,color:#fff,stroke:#059669
+    style ClosedWon fill:#10b981,color:#fff,stroke:#059669
+    style ClosedLost fill:#ef4444,color:#fff,stroke:#dc2626
+    style Passed fill:#f97316,color:#fff,stroke:#ea580c
+    style AIExtract fill:#f59e0b,color:#fff,stroke:#d97706

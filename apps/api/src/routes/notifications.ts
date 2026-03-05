@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
+import { getOrgId } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -55,6 +56,31 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const params = notificationsQuerySchema.parse(req.query);
     const { userId } = params;
+    const orgId = getOrgId(req);
+
+    // Resolve userId: could be internal UUID or Supabase auth UUID
+    let internalUserId = userId;
+    const { data: targetUser } = await supabase
+      .from('User')
+      .select('id')
+      .eq('id', userId)
+      .eq('organizationId', orgId)
+      .single();
+
+    if (!targetUser) {
+      // Try resolving as Supabase auth UUID
+      const { data: authUser } = await supabase
+        .from('User')
+        .select('id')
+        .eq('authId', userId)
+        .eq('organizationId', orgId)
+        .single();
+
+      if (!authUser) {
+        return res.status(403).json({ error: 'Cannot access notifications for users outside your organization' });
+      }
+      internalUserId = authUser.id;
+    }
 
     let query = supabase
       .from('Notification')
@@ -65,7 +91,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
           name
         )
       `)
-      .eq('userId', userId)
+      .eq('userId', internalUserId)
       .order('createdAt', { ascending: false });
 
     if (params.type) {
@@ -93,7 +119,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const { count: unreadCount } = await supabase
       .from('Notification')
       .select('*', { count: 'exact', head: true })
-      .eq('userId', userId)
+      .eq('userId', internalUserId)
       .eq('isRead', false);
 
     res.json({
@@ -109,6 +135,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     const { data: notification, error } = await supabase
       .from('Notification')
@@ -130,6 +157,19 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       throw error;
     }
 
+    // Defense-in-depth: verify notification belongs to a user in this org
+    if (notification) {
+      const { data: owner } = await supabase
+        .from('User')
+        .select('id')
+        .eq('id', notification.userId)
+        .eq('organizationId', orgId)
+        .single();
+      if (!owner) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
+
     res.json(notification);
   } catch (error) {
     next(error);
@@ -139,6 +179,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 // POST /api/notifications - Create a notification
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const orgId = getOrgId(req);
     const validation = createNotificationSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -146,6 +187,17 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
         error: 'Validation failed',
         details: validation.error.errors
       });
+    }
+
+    // Defense-in-depth: verify target user belongs to this org
+    const { data: targetUser } = await supabase
+      .from('User')
+      .select('id')
+      .eq('id', validation.data.userId)
+      .eq('organizationId', orgId)
+      .single();
+    if (!targetUser) {
+      return res.status(403).json({ error: 'Cannot create notifications for users outside your organization' });
     }
 
     const { data: notification, error } = await supabase
@@ -166,6 +218,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
     const validation = updateNotificationSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -173,6 +226,24 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
         error: 'Validation failed',
         details: validation.error.errors
       });
+    }
+
+    // Defense-in-depth: verify notification belongs to a user in this org
+    const { data: existing } = await supabase
+      .from('Notification')
+      .select('userId')
+      .eq('id', id)
+      .single();
+    if (existing) {
+      const { data: owner } = await supabase
+        .from('User')
+        .select('id')
+        .eq('id', existing.userId)
+        .eq('organizationId', orgId)
+        .single();
+      if (!owner) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
     }
 
     const { data: notification, error } = await supabase
@@ -198,7 +269,19 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
 // POST /api/notifications/mark-all-read - Mark all notifications as read for a user
 router.post('/mark-all-read', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const orgId = getOrgId(req);
     const { userId } = markAllReadSchema.parse(req.body);
+
+    // Defense-in-depth: verify target user belongs to this org
+    const { data: targetUser } = await supabase
+      .from('User')
+      .select('id')
+      .eq('id', userId)
+      .eq('organizationId', orgId)
+      .single();
+    if (!targetUser) {
+      return res.status(403).json({ error: 'Cannot modify notifications for users outside your organization' });
+    }
 
     const { error } = await supabase
       .from('Notification')
@@ -218,6 +301,25 @@ router.post('/mark-all-read', async (req: Request, res: Response, next: NextFunc
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Defense-in-depth: verify notification belongs to a user in this org
+    const { data: existing } = await supabase
+      .from('Notification')
+      .select('userId')
+      .eq('id', id)
+      .single();
+    if (existing) {
+      const { data: owner } = await supabase
+        .from('User')
+        .select('id')
+        .eq('id', existing.userId)
+        .eq('organizationId', orgId)
+        .single();
+      if (!owner) {
+        return res.status(403).json({ error: 'Access denied' });
+      }
+    }
 
     const { error } = await supabase
       .from('Notification')
@@ -235,7 +337,19 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
 // DELETE /api/notifications - Delete all notifications for a user
 router.delete('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const orgId = getOrgId(req);
     const params = deleteNotificationsQuerySchema.parse(req.query);
+
+    // Defense-in-depth: verify target user belongs to this org
+    const { data: targetUser } = await supabase
+      .from('User')
+      .select('id')
+      .eq('id', params.userId)
+      .eq('organizationId', orgId)
+      .single();
+    if (!targetUser) {
+      return res.status(403).json({ error: 'Cannot delete notifications for users outside your organization' });
+    }
 
     let query = supabase
       .from('Notification')

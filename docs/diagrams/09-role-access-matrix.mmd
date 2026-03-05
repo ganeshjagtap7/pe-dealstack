@@ -1,0 +1,113 @@
+flowchart LR
+    subgraph Roles["User Roles"]
+        direction TB
+        ADMIN["ADMIN
+        Full System Access"]
+        PARTNER["PARTNER
+        Senior Leadership"]
+        PRINCIPAL["PRINCIPAL
+        Deal Lead"]
+        VP["VP
+        Senior Associate"]
+        ASSOCIATE["ASSOCIATE
+        Deal Team"]
+        ANALYST["ANALYST
+        Junior Team"]
+        OPS["OPS
+        Operations"]
+        VIEWER["VIEWER
+        Read Only"]
+    end
+
+    subgraph DealPerms["Deal Permissions"]
+        direction TB
+        DV["View Deals"]
+        DC["Create Deals"]
+        DE["Edit Deals"]
+        DD["Delete Deals"]
+        DA["Assign Deals"]
+        DX["Export Deals"]
+    end
+
+    subgraph DocPerms["Document Permissions"]
+        direction TB
+        DOV["View Documents"]
+        DOU["Upload Documents"]
+        DOD["Delete Documents"]
+        DOW["Download Documents"]
+    end
+
+    subgraph MemoPerms["Memo Permissions"]
+        direction TB
+        MV["View Memos"]
+        MC["Create Memos"]
+        ME["Edit Memos"]
+        MD["Delete Memos"]
+        MA["Approve Memos"]
+        MX["Export Memos"]
+    end
+
+    subgraph UserPerms["User Management"]
+        direction TB
+        UV["View Users"]
+        UC["Create Users"]
+        UE["Edit Users"]
+        UD["Delete Users"]
+        UI["Invite Users"]
+    end
+
+    subgraph AIPerms["AI Features"]
+        direction TB
+        AC["AI Chat"]
+        AG["AI Generate"]
+        AI["AI Ingest"]
+    end
+
+    subgraph AdminPerms["Admin Only"]
+        direction TB
+        AS["System Settings"]
+        AA["Audit Logs"]
+        AB["Billing"]
+    end
+
+    ADMIN --> DealPerms
+    ADMIN --> DocPerms
+    ADMIN --> MemoPerms
+    ADMIN --> UserPerms
+    ADMIN --> AIPerms
+    ADMIN --> AdminPerms
+
+    PARTNER --> DV & DC & DE & DA
+    PARTNER --> DOV & DOU & DOW
+    PARTNER --> MV & MC & ME & MA & MX
+    PARTNER --> UV & UI
+    PARTNER --> AC & AG & AI
+
+    PRINCIPAL --> DV & DC & DE & DA
+    PRINCIPAL --> DOV & DOU & DOW
+    PRINCIPAL --> MV & MC & ME
+    PRINCIPAL --> UV
+    PRINCIPAL --> AC & AG
+
+    ASSOCIATE --> DV & DC & DE
+    ASSOCIATE --> DOV & DOU & DOW
+    ASSOCIATE --> MV & MC & ME
+    ASSOCIATE --> AC & AG
+
+    ANALYST --> DV & DC
+    ANALYST --> DOV & DOU
+    ANALYST --> MV & MC & ME
+    ANALYST --> AC & AG
+
+    VIEWER --> DV
+    VIEWER --> DOV & DOW
+    VIEWER --> MV
+
+    style ADMIN fill:#ef4444,color:#fff,stroke:#dc2626
+    style PARTNER fill:#f97316,color:#fff,stroke:#ea580c
+    style PRINCIPAL fill:#f59e0b,color:#fff,stroke:#d97706
+    style VP fill:#eab308,color:#fff,stroke:#ca8a04
+    style ASSOCIATE fill:#10b981,color:#fff,stroke:#059669
+    style ANALYST fill:#3b82f6,color:#fff,stroke:#2563eb
+    style OPS fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style VIEWER fill:#6b7280,color:#fff,stroke:#4b5563

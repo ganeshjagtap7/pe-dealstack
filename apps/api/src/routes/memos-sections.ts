@@ -1,0 +1,218 @@
+import { Router } from 'express';
+import { z } from 'zod';
+import { supabase } from '../supabase.js';
+import { log } from '../utils/logger.js';
+import { getOrgId } from '../middleware/orgScope.js';
+
+const router = Router();
+
+// ============================================================
+// Section Validation Schemas
+// ============================================================
+
+const createSectionSchema = z.object({
+  type: z.enum([
+    'EXECUTIVE_SUMMARY',
+    'COMPANY_OVERVIEW',
+    'FINANCIAL_PERFORMANCE',
+    'MARKET_DYNAMICS',
+    'COMPETITIVE_LANDSCAPE',
+    'RISK_ASSESSMENT',
+    'DEAL_STRUCTURE',
+    'VALUE_CREATION',
+    'EXIT_STRATEGY',
+    'RECOMMENDATION',
+    'APPENDIX',
+    'CUSTOM'
+  ]),
+  title: z.string().min(1),
+  content: z.string().optional(),
+  aiGenerated: z.boolean().optional().default(false),
+  sortOrder: z.number().optional(),
+  citations: z.array(z.any()).optional(),
+  tableData: z.any().optional(),
+  chartConfig: z.any().optional(),
+});
+
+const updateSectionSchema = createSectionSchema.partial();
+
+const reorderSectionsSchema = z.object({
+  sections: z.array(z.object({
+    id: z.string().uuid(),
+    sortOrder: z.number(),
+  })),
+});
+
+// ============================================================
+// Section Routes
+// ============================================================
+
+// GET /api/memos/:id/sections - Get all sections for a memo
+router.get('/:id/sections', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify memo belongs to org
+    const { data: memo } = await supabase.from('Memo').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
+
+    const { data: sections, error } = await supabase
+      .from('MemoSection')
+      .select('*')
+      .eq('memoId', id)
+      .order('sortOrder', { ascending: true });
+
+    if (error) throw error;
+
+    res.json(sections || []);
+  } catch (error) {
+    log.error('Error fetching sections', error);
+    res.status(500).json({ error: 'Failed to fetch sections' });
+  }
+});
+
+// POST /api/memos/:id/sections - Add section
+router.post('/:id/sections', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify memo belongs to org
+    const { data: memo } = await supabase.from('Memo').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
+
+    const validation = createSectionSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
+    }
+
+    // Get max sortOrder
+    const { data: existingSections } = await supabase
+      .from('MemoSection')
+      .select('sortOrder')
+      .eq('memoId', id)
+      .order('sortOrder', { ascending: false })
+      .limit(1);
+
+    const maxSortOrder = existingSections?.[0]?.sortOrder ?? -1;
+
+    const sectionData = {
+      ...validation.data,
+      memoId: id,
+      sortOrder: validation.data.sortOrder ?? maxSortOrder + 1,
+    };
+
+    const { data: section, error } = await supabase
+      .from('MemoSection')
+      .insert(sectionData)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.status(201).json(section);
+  } catch (error) {
+    log.error('Error creating section', error);
+    res.status(500).json({ error: 'Failed to create section' });
+  }
+});
+
+// PATCH /api/memos/:id/sections/:sectionId - Update section
+router.patch('/:id/sections/:sectionId', async (req, res) => {
+  try {
+    const { id, sectionId } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify memo belongs to org
+    const { data: memo } = await supabase.from('Memo').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
+
+    const validation = updateSectionSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
+    }
+
+    const { data: section, error } = await supabase
+      .from('MemoSection')
+      .update(validation.data)
+      .eq('id', sectionId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    res.json(section);
+  } catch (error) {
+    log.error('Error updating section', error);
+    res.status(500).json({ error: 'Failed to update section' });
+  }
+});
+
+// DELETE /api/memos/:id/sections/:sectionId - Delete section
+router.delete('/:id/sections/:sectionId', async (req, res) => {
+  try {
+    const { id, sectionId } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify memo belongs to org
+    const { data: memo } = await supabase.from('Memo').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
+
+    const { error } = await supabase
+      .from('MemoSection')
+      .delete()
+      .eq('id', sectionId);
+
+    if (error) throw error;
+
+    res.json({ success: true });
+  } catch (error) {
+    log.error('Error deleting section', error);
+    res.status(500).json({ error: 'Failed to delete section' });
+  }
+});
+
+// POST /api/memos/:id/sections/reorder - Reorder sections
+router.post('/:id/sections/reorder', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify memo belongs to org
+    const { data: memo } = await supabase.from('Memo').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
+
+    const validation = reorderSectionsSchema.safeParse(req.body);
+
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
+    }
+
+    // Update each section's sortOrder
+    const updates = validation.data.sections.map(({ id: sectionId, sortOrder }) =>
+      supabase
+        .from('MemoSection')
+        .update({ sortOrder })
+        .eq('id', sectionId)
+    );
+
+    await Promise.all(updates);
+
+    // Fetch updated sections
+    const { data: sections } = await supabase
+      .from('MemoSection')
+      .select('*')
+      .eq('memoId', id)
+      .order('sortOrder', { ascending: true });
+
+    res.json(sections);
+  } catch (error) {
+    log.error('Error reordering sections', error);
+    res.status(500).json({ error: 'Failed to reorder sections' });
+  }
+});
+
+export default router;
