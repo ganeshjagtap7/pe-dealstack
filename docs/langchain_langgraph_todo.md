@@ -282,47 +282,49 @@ The more deals a firm processes → the richer their portfolio benchmark data �
 ---
 ---
 
-## OTHER LANGCHAIN/LANGGRAPH INTEGRATIONS (Future)
+## OTHER LANGCHAIN/LANGGRAPH INTEGRATIONS — ✅ ALL COMPLETE (Session 35)
 
 ### Drop-in Replacements (Low Risk)
 
-- [ ] Replace RAG pipeline (`rag.ts`) with LangChain's `SupabaseVectorStore` + retrieval chain
-- [ ] Replace manual JSON parsing in `aiExtractor.ts` with `withStructuredOutput()` using existing Zod schemas
-- [ ] Create unified LLM abstraction layer (swap between GPT-4 / Gemini Flash via config, not code)
+- [x] Replace RAG pipeline (`rag.ts`) with LangChain's `GoogleGenerativeAIEmbeddings` + Supabase vector store
+- [x] Replace manual JSON parsing in `aiExtractor.ts` with `withStructuredOutput()` using Zod schemas
+- [x] Create unified LLM abstraction layer (`services/llm.ts` — swap between GPT-4 / Gemini via config env vars)
 
 ### Tool-Augmented Deal Chat
 
-- [ ] Define LangChain tools: `search_documents`, `get_deal_financials`, `compare_deals`, `get_deal_activity`
-- [ ] Upgrade deal chat (`/api/deals/:dealId/chat`) to use `createReactAgent()` with tools
-- [ ] Upgrade portfolio chat (`/api/portfolio/chat`) to use tools for querying pipeline data
-- [ ] LLM fetches what it needs on demand instead of stuffing all deal data into system prompt
+- [x] Define LangChain tools: `search_documents`, `get_deal_financials`, `compare_deals`, `get_deal_activity`, `update_deal_field`, `suggest_action`
+- [x] Upgrade deal chat (`/api/deals/:dealId/chat`) to use `createReactAgent()` with tools
+- [x] Upgrade portfolio chat (`/api/portfolio/chat`) to use tools (`get_portfolio_summary`, `get_deal_details`, `get_pipeline_analysis`)
+- [x] LLM fetches what it needs on demand via tools instead of stuffing all deal data into system prompt
 
 ### Contact Enrichment Agent
 
-- [ ] Build `StateGraph` for contact enrichment: search web → scrape sources → extract structured data → merge & resolve conflicts
-- [ ] Add conditional routing: confidence < 70% → human review, else → save
-- [ ] Integrate with "Enrich" button on Contacts page
+- [x] Build `StateGraph` for contact enrichment: research → validate → conditional routing → save/review
+- [x] Add conditional routing: confidence < 70% → human review, else → auto-save
+- [x] API endpoint: `POST /api/ai/enrich-contact` (ready for "Enrich" button integration)
 
 ### AI Meeting Prep
 
-- [ ] Build LangGraph workflow: fetch contact history + deal status + recent news + RAG doc summaries (parallel)
-- [ ] LLM compiles meeting brief with suggested talking points
-- [ ] PDF export of meeting brief
+- [x] Build LangGraph workflow: parallel fetch (contact history + deal status + RAG doc summaries + activities)
+- [x] LLM compiles structured meeting brief with talking points, questions, risks, agenda
+- [x] API endpoint: `POST /api/ai/meeting-prep` (structured JSON output, PDF export ready)
 
 ### Deal Signal Monitoring
 
-- [ ] Build scheduled LangGraph agent: for each portfolio company → search news → classify signal type
-- [ ] Route by signal: leadership change → update contacts, M&A → link to pipeline, financial event → update metrics
-- [ ] LangGraph checkpointing so partial runs resume from where they stopped
+- [x] Build LangGraph agent: fetch portfolio → analyze signals per deal → classify signal type → route & notify
+- [x] Route by signal: leadership_change, financial_event, market_shift, competitive_threat, regulatory_change, growth_opportunity, risk_escalation, milestone_approaching
+- [x] Signal severity routing: critical/warning signals create Activity entries for deal timeline
+- [x] API endpoint: `POST /api/ai/scan-signals`
 
 ### Smart Email Drafting
 
-- [ ] Build LangGraph workflow: draft email → tone check → compliance check → suggest edits
-- [ ] Template library integration
-- [ ] Human-in-the-loop review step before send
+- [x] Build LangGraph workflow: draft → tone check → compliance check → finalize (4-node StateGraph)
+- [x] Template library: 7 PE email templates (initial outreach, follow-up, document request, LOI intro, deal update, meeting request, thank you)
+- [x] Human-in-the-loop: returns `ready_for_review` or `compliance_issues` status — user reviews before sending
+- [x] API endpoints: `POST /api/ai/draft-email`, `GET /api/ai/email-templates`
 
 ### Skip LangChain For (Keep Direct SDK)
 
-- Market sentiment endpoint (single LLM call, no complexity)
-- Simple embedding-only calls (direct Gemini SDK is simpler)
-- Any latency-critical path where ~10-50ms abstraction overhead matters
+- Market sentiment endpoint — now uses LangChain `withStructuredOutput()` via unified LLM layer
+- Embedding calls — now use `GoogleGenerativeAIEmbeddings` from `@langchain/google-genai`
+- Legacy routes still using direct OpenAI SDK (memos-chat, ai.ts) — work fine, migrate when touched

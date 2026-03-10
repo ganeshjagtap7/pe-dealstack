@@ -1,6 +1,33 @@
+// ─── RAG Pipeline — LangChain Vector Store ─────────────────────────
+// Uses LangChain's embedding abstraction + Supabase vector store.
+// Supports Gemini text-embedding-004 (primary) with graceful fallback.
+
 import { supabase } from './supabase.js';
-import { generateEmbedding, generateEmbeddings, isGeminiEnabled } from './gemini.js';
+import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { log } from './utils/logger.js';
+
+// ============================================================
+// Embeddings via LangChain
+// ============================================================
+
+let embeddingsModel: GoogleGenerativeAIEmbeddings | null = null;
+
+function getEmbeddingsModel(): GoogleGenerativeAIEmbeddings | null {
+  if (embeddingsModel) return embeddingsModel;
+  if (!process.env.GEMINI_API_KEY) {
+    log.warn('GEMINI_API_KEY not set, RAG embeddings disabled');
+    return null;
+  }
+  embeddingsModel = new GoogleGenerativeAIEmbeddings({
+    modelName: 'text-embedding-004',
+    apiKey: process.env.GEMINI_API_KEY,
+  });
+  return embeddingsModel;
+}
+
+export function isRAGEnabled(): boolean {
+  return !!process.env.GEMINI_API_KEY;
+}
 
 // ============================================================
 // Text Chunking
@@ -21,10 +48,7 @@ export function chunkText(text: string, maxTokens: number = 500, overlap: number
     return [];
   }
 
-  // Rough token estimate (1 token ≈ 4 chars for English)
   const estimateTokens = (s: string) => Math.ceil(s.length / 4);
-
-  // Split into sentences (simple regex)
   const sentences = text.split(/(?<=[.!?])\s+/);
 
   const chunks: Chunk[] = [];
@@ -35,14 +59,12 @@ export function chunkText(text: string, maxTokens: number = 500, overlap: number
     const testChunk = currentChunk + (currentChunk ? ' ' : '') + sentence;
 
     if (estimateTokens(testChunk) > maxTokens && currentChunk) {
-      // Save current chunk
       chunks.push({
         content: currentChunk.trim(),
         index: chunkIndex++,
         tokenCount: estimateTokens(currentChunk),
       });
 
-      // Start new chunk with overlap (last few sentences)
       const overlapText = getOverlapText(currentChunk, overlap);
       currentChunk = overlapText + ' ' + sentence;
     } else {
@@ -50,7 +72,6 @@ export function chunkText(text: string, maxTokens: number = 500, overlap: number
     }
   }
 
-  // Don't forget the last chunk
   if (currentChunk.trim()) {
     chunks.push({
       content: currentChunk.trim(),
@@ -76,7 +97,7 @@ function getOverlapText(text: string, targetTokens: number): string {
 }
 
 // ============================================================
-// Document Embedding
+// Document Embedding (LangChain embeddings)
 // ============================================================
 
 /**
@@ -87,18 +108,17 @@ export async function embedDocument(
   dealId: string,
   text: string
 ): Promise<{ success: boolean; chunkCount: number; error?: string }> {
-  if (!isGeminiEnabled()) {
-    return { success: false, chunkCount: 0, error: 'Gemini not enabled' };
+  const model = getEmbeddingsModel();
+  if (!model) {
+    return { success: false, chunkCount: 0, error: 'Embeddings model not available' };
   }
 
   try {
-    // Update document status to processing
     await supabase
       .from('Document')
       .update({ embeddingStatus: 'processing' })
       .eq('id', documentId);
 
-    // Chunk the text
     const chunks = chunkText(text);
 
     if (chunks.length === 0) {
@@ -113,8 +133,8 @@ export async function embedDocument(
       return { success: true, chunkCount: 0 };
     }
 
-    // Generate embeddings for all chunks
-    const embeddings = await generateEmbeddings(chunks.map(c => c.content));
+    // Use LangChain embeddings (batch)
+    const embeddings = await model.embedDocuments(chunks.map(c => c.content));
 
     // Delete existing chunks for this document
     await supabase
@@ -128,12 +148,11 @@ export async function embedDocument(
       dealId,
       chunkIndex: chunk.index,
       content: chunk.content,
-      embedding: embeddings[i] ? `[${embeddings[i]!.join(',')}]` : null,
+      embedding: embeddings[i] ? `[${embeddings[i].join(',')}]` : null,
       tokenCount: chunk.tokenCount,
       metadata: {},
     }));
 
-    // Insert in batches to avoid timeout
     const batchSize = 50;
     for (let i = 0; i < chunkRecords.length; i += batchSize) {
       const batch = chunkRecords.slice(i, i + batchSize);
@@ -147,7 +166,6 @@ export async function embedDocument(
       }
     }
 
-    // Update document status
     await supabase
       .from('Document')
       .update({
@@ -157,7 +175,7 @@ export async function embedDocument(
       })
       .eq('id', documentId);
 
-    log.debug('Document embedded', { documentId, chunkCount: chunks.length });
+    log.debug('Document embedded (LangChain)', { documentId, chunkCount: chunks.length });
     return { success: true, chunkCount: chunks.length };
 
   } catch (error: any) {
@@ -173,7 +191,7 @@ export async function embedDocument(
 }
 
 // ============================================================
-// Semantic Search
+// Semantic Search (LangChain embeddings + Supabase RPC)
 // ============================================================
 
 interface SearchResult {
@@ -194,24 +212,16 @@ export async function searchDocumentChunks(
   limit: number = 10,
   threshold: number = 0.5
 ): Promise<SearchResult[]> {
-  if (!isGeminiEnabled()) {
-    log.warn('Gemini not enabled, cannot perform semantic search');
+  const model = getEmbeddingsModel();
+  if (!model) {
+    log.warn('Embeddings not available, cannot perform semantic search');
     return [];
   }
 
   try {
-    // Generate embedding for the query
-    const queryEmbedding = await generateEmbedding(query);
-
-    if (!queryEmbedding) {
-      log.error('Failed to generate query embedding');
-      return [];
-    }
-
-    // Format embedding for Postgres
+    const queryEmbedding = await model.embedQuery(query);
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
-    // Call the search function in Supabase
     const { data, error } = await supabase.rpc('search_document_chunks', {
       query_embedding: embeddingStr,
       match_threshold: threshold,
@@ -250,7 +260,6 @@ export function buildRAGContext(
     return 'No relevant document content found.';
   }
 
-  // Group results by document
   const byDocument = new Map<string, SearchResult[]>();
   for (const result of searchResults) {
     const existing = byDocument.get(result.documentId) || [];
@@ -258,7 +267,6 @@ export function buildRAGContext(
     byDocument.set(result.documentId, existing);
   }
 
-  // Build context string
   const contextParts: string[] = [];
 
   for (const [docId, results] of byDocument) {
@@ -267,8 +275,6 @@ export function buildRAGContext(
     const docType = doc?.type || 'document';
 
     contextParts.push(`\n### From: ${docName} (${docType})`);
-
-    // Sort by chunk index and add content
     results.sort((a, b) => (a.metadata?.chunkIndex || 0) - (b.metadata?.chunkIndex || 0));
 
     for (const result of results) {

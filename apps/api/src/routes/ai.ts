@@ -8,12 +8,14 @@ import { notifyDealTeam, resolveUserId } from './notifications.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import ingestRouter from './ai-ingest.js';
 import portfolioRouter from './ai-portfolio.js';
+import aiAgentsRouter from './ai-agents.js';
 
 const router = Router();
 
-// Mount sub-routers for ingest/extract and portfolio/market-sentiment
+// Mount sub-routers for ingest/extract, portfolio/market-sentiment, and AI agents
 router.use('/', ingestRouter);
 router.use('/', portfolioRouter);
+router.use('/', aiAgentsRouter);
 
 // Validation schemas
 const chatMessageSchema = z.object({

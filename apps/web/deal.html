@@ -223,7 +223,19 @@
                                 <span class="material-symbols-outlined text-[20px] text-text-muted">more_vert</span>
                             </button>
                             <div id="deal-actions-menu"
-                                class="hidden absolute right-0 top-full mt-2 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+                                class="hidden absolute right-0 top-full mt-2 w-56 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+                                <div class="px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">AI Tools</div>
+                                <button onclick="toggleDealActionsMenu(); openMeetingPrepModal(state.dealId, state.dealData?.name)"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">event_note</span>
+                                    Meeting Prep
+                                </button>
+                                <button onclick="toggleDealActionsMenu(); openEmailDraftModal(state.dealId, state.dealData?.name)"
+                                    class="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">edit_note</span>
+                                    Draft Email
+                                </button>
+                                <div class="border-t border-border-subtle my-1"></div>
                                 <button onclick="openDataRoom()"
                                     class="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
                                     <span class="material-symbols-outlined text-[18px]">folder_open</span>
@@ -631,6 +643,7 @@
     <script src="deal-team.js"></script>
     <script src="deal-documents.js"></script>
     <script src="deal-edit.js"></script>
+    <script src="js/ai-tools.js"></script>
     <script src="deal.js"></script>
     <script src="js/financials-helpers.js"></script>
     <script src="js/financials-charts.js"></script>

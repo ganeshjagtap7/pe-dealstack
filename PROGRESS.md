@@ -5,6 +5,167 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 35 — March 10, 2026
+
+#### ~IST — Full LangChain/LangGraph Integration — All 15 Remaining Items Complete
+
+**Goal:** Build all remaining LangChain/LangGraph integrations from the roadmap: unified LLM abstraction, structured output, RAG upgrade, tool-augmented chat agents, contact enrichment, meeting prep, deal signal monitoring, and smart email drafting.
+
+---
+
+#### Unified LLM Abstraction Layer
+
+**What:** Created `apps/api/src/services/llm.ts` — single interface to swap between OpenAI and Gemini via environment variables (`LLM_CHAT_PROVIDER`, `LLM_FAST_PROVIDER`, `LLM_CHAT_MODEL`, `LLM_FAST_MODEL`).
+
+**Architecture:**
+| Function | Purpose | Default Model |
+|----------|---------|---------------|
+| `getChatModel()` | Primary chat/analysis | GPT-4o |
+| `getFastModel()` | Sentiment, classification | GPT-4o-mini |
+| `getExtractionModel()` | Structured data extraction (temp 0.1) | GPT-4-turbo |
+| `getModel()` | Escape hatch — any provider + model | Custom |
+
+**Files:** 1 new (`services/llm.ts`)
+
+---
+
+#### AI Extractor → withStructuredOutput() + Zod
+
+**What:** Replaced manual `JSON.parse()` of OpenAI response with LangChain's `withStructuredOutput()` using a Zod schema. The LLM now returns Zod-validated structured data — no more JSON parsing errors.
+
+**Before:** `openai.chat.completions.create({ response_format: { type: 'json_object' } })` → `JSON.parse(content)`
+**After:** `model.withStructuredOutput(ExtractionOutputSchema).invoke([...])` → Zod-validated object
+
+**Files:** 1 modified (`services/aiExtractor.ts`)
+
+---
+
+#### RAG Pipeline → LangChain Embeddings
+
+**What:** Replaced direct Gemini SDK calls (`generateEmbedding`, `generateEmbeddings`) with LangChain's `GoogleGenerativeAIEmbeddings` class. Same Supabase vector store backend, same RPC search function, just the embedding layer is now provider-agnostic.
+
+**Before:** `import { generateEmbedding } from './gemini.js'`
+**After:** `GoogleGenerativeAIEmbeddings({ modelName: 'text-embedding-004' })` → `model.embedDocuments()` / `model.embedQuery()`
+
+**Dependencies added:** `@langchain/google-genai`
+**Files:** 1 modified (`rag.ts`)
+
+---
+
+#### Deal Chat → LangGraph ReAct Agent with 6 Tools
+
+**What:** Replaced the monolithic deal chat endpoint (which stuffed all deal data into the system prompt) with a LangGraph `createReactAgent()` that fetches data on demand via LangChain tools.
+
+**Tools built:**
+| Tool | What it does |
+|------|-------------|
+| `search_documents` | Semantic RAG search across deal documents (with keyword fallback) |
+| `get_deal_financials` | Fetches extracted financial statements + deal-level metrics |
+| `compare_deals` | Compares current deal against portfolio (percentile rankings) |
+| `get_deal_activity` | Fetches recent activity timeline |
+| `update_deal_field` | Updates lead partner, analyst, source, priority, etc. |
+| `suggest_action` | Suggests navigation (create memo, open VDR, etc.) |
+
+**Key benefit:** LLM only fetches what it needs per question — faster responses, lower token usage, more accurate answers.
+
+**Files:** 2 new (`agents/dealChatAgent/index.ts`, `agents/dealChatAgent/tools.ts`), 1 modified (`routes/deals-chat-ai.ts`)
+
+---
+
+#### Portfolio Chat → LangGraph ReAct Agent with 3 Tools
+
+**What:** Same ReAct agent pattern for portfolio chat. Tools: `get_portfolio_summary`, `get_deal_details`, `get_pipeline_analysis`.
+
+**Market sentiment** also upgraded to use LangChain `withStructuredOutput()` with Zod schema instead of raw JSON parsing.
+
+**Files:** 1 modified (`routes/ai-portfolio.ts`)
+
+---
+
+#### Contact Enrichment Agent (New — LangGraph StateGraph)
+
+**What:** 4-node StateGraph: Research → Validate → Save/Review. Uses confidence-based routing — auto-saves if confidence ≥ 70%, flags for human review otherwise.
+
+**Graph flow:**
+```
+START → research → validate → (confidence ≥ 70%) → save → END
+                              (confidence < 70%) → review → END
+```
+
+**API endpoint:** `POST /api/ai/enrich-contact`
+**Files:** 1 new (`agents/contactEnrichment/index.ts`)
+
+---
+
+#### AI Meeting Prep (New)
+
+**What:** Parallel fetch of contact history + deal status + RAG doc summaries + recent activities, then LLM compiles a structured meeting brief.
+
+**Output:** `MeetingBrief` with headline, deal summary, contact profile, 5-7 talking points, 3-5 questions to ask, risks to address, document highlights, suggested agenda.
+
+**API endpoint:** `POST /api/ai/meeting-prep`
+**Files:** 1 new (`agents/meetingPrep/index.ts`)
+
+---
+
+#### Deal Signal Monitoring (New — LangGraph StateGraph)
+
+**What:** 3-node StateGraph: Fetch Portfolio → Analyze Signals → Route & Notify. Analyzes all active deals and generates typed signals.
+
+**Signal types:** `leadership_change`, `financial_event`, `market_shift`, `competitive_threat`, `regulatory_change`, `growth_opportunity`, `risk_escalation`, `milestone_approaching`
+
+**Severity routing:** Critical/warning signals auto-create Activity entries on the deal timeline.
+
+**API endpoint:** `POST /api/ai/scan-signals`
+**Files:** 1 new (`agents/signalMonitor/index.ts`)
+
+---
+
+#### Smart Email Drafting (New — LangGraph StateGraph)
+
+**What:** 4-node StateGraph: Draft → Tone Check → Compliance Check → Finalize. Includes 7 PE-specific email templates and human-in-the-loop review.
+
+**Templates:** Initial Outreach, Follow-Up, Document Request, LOI Introduction, Deal Update, Meeting Request, Thank You.
+
+**Compliance checks:** MNPI disclosure, promissory language, confidentiality concerns, FCPA/anti-bribery.
+
+**API endpoints:** `POST /api/ai/draft-email`, `GET /api/ai/email-templates`
+**Files:** 1 new (`agents/emailDrafter/index.ts`)
+
+---
+
+#### Routes & Wiring
+
+**What:** Created unified AI agents route file (`routes/ai-agents.ts`) with all 4 new endpoints. Mounted in `routes/ai.ts`.
+
+**New API endpoints:**
+| Method | Path | Purpose |
+|--------|------|---------|
+| POST | `/api/ai/enrich-contact` | Contact enrichment with AI |
+| POST | `/api/ai/meeting-prep` | Generate meeting prep brief |
+| POST | `/api/ai/scan-signals` | Scan portfolio for deal signals |
+| POST | `/api/ai/draft-email` | Generate smart email draft |
+| GET | `/api/ai/email-templates` | List available email templates |
+
+**Files:** 1 new (`routes/ai-agents.ts`), 1 modified (`routes/ai.ts`)
+
+---
+
+#### Summary of Session 35
+
+| Category | Count | Details |
+|----------|-------|---------|
+| New files | 8 | `llm.ts`, `dealChatAgent/index.ts`, `dealChatAgent/tools.ts`, `contactEnrichment/index.ts`, `meetingPrep/index.ts`, `signalMonitor/index.ts`, `emailDrafter/index.ts`, `ai-agents.ts` |
+| Modified files | 5 | `aiExtractor.ts`, `rag.ts`, `deals-chat-ai.ts`, `ai-portfolio.ts`, `ai.ts` |
+| New API endpoints | 5 | enrich-contact, meeting-prep, scan-signals, draft-email, email-templates |
+| LangChain tools | 9 | 6 deal chat + 3 portfolio chat |
+| LangGraph agents | 3 | Contact enrichment, Signal monitor, Email drafter (all StateGraph) |
+| Dependencies added | 1 | `@langchain/google-genai` |
+| TypeScript errors | 0 | Clean build |
+| Roadmap items completed | 15/15 | All "Future" LangChain integrations done |
+
+---
+
 ### Session 34 — March 5, 2026 (Evening)
 
 #### 9:00 PM IST — Senior Developer Codebase Audit + Bug Fixes + Cleanup
@@ -9767,5 +9928,111 @@ Updated `FINANCIAL_EXTRACTION_TODO.md` to mark all remaining items as `[x]`.
 | `apps/web/contacts.html` | Sort dropdown, pagination (Load More + count), grid/list toggle, company grouping, "More" dropdown, CSV import modal with 3-step flow, smart CSV parser |
 | `apps/api/src/routes/contacts.ts` | New `GET /api/contacts/export` endpoint — CSV generation with proper escaping, respects current filters/sort |
 | `CONTACTS_AUDIT_TODO.md` | **New** — Comprehensive contacts feature audit (tier-by-tier status, P0/P1/P2 priority actions) |
+
+---
+
+### Session 36 — March 10, 2026
+
+#### ~IST — AI Agent Frontend UI + Roadmap Verification + Bug Fixes
+
+**Goal:** Verify all 69 LangChain/LangGraph roadmap items are truly complete, build frontend UI for all 5 AI agent endpoints (zero UI existed), and fix runtime errors discovered during testing.
+
+---
+
+#### 36.1 — Roadmap Verification — ~IST
+
+**What:** Cross-referenced every item in `docs/langchain_langgraph_todo.md` against actual implementation files.
+
+| Phase | Items | Status |
+|-------|-------|--------|
+| Phase 1: LangGraph Financial Agent | Items 1-18 | All [x] — agent graph in `agents/financialAgent/` |
+| Phase 2: QoE Analysis | Items 19-26 | All [x] — `services/analysis/qoe.ts` |
+| Phase 3: Analysis Suite | Items 27-48 | All [x] — 6 files in `services/analysis/` |
+| Phase 4: Red Flags | Items 49-54 | All [x] — `services/analysis/redFlags.ts` |
+| Phase 5: Cross-Doc + Benchmarking | Items 55-63 | All [x] — `services/analysis/crossDoc.ts` + `benchmark.ts` |
+| Phase 6: Investment Memo | Items 64-69 | All [x] — `services/analysis/memo.ts` |
+
+**Result:** All 69/69 roadmap items confirmed complete. Analysis suite split across 6 files in `services/analysis/` (not a single file as originally planned — better architecture).
+
+---
+
+#### 36.2 — AI Agent Frontend UI (`ai-tools.js`) — ~IST
+
+**Problem:** Session 35 built 5 AI agent API endpoints but zero frontend UI. Users had no way to access Contact Enrichment, Meeting Prep, Signal Monitor, or Email Drafter.
+
+**Solution:** Created `apps/web/js/ai-tools.js` (~615 lines) — complete frontend module for all 5 AI agents, following PE OS design system (Banker Blue, white cards, Material Symbols Outlined icons).
+
+**Features built:**
+
+| Agent | UI Location | What It Does |
+|-------|-------------|--------------|
+| **Contact Enrichment** | Contacts page → detail panel → "AI Enrich" button | Sends contact info to LLM → generates professional profile (title, company, industry, bio, expertise, deal relevance). Confidence ≥70% → auto-save. <70% → flag for human review. Shows results inline with confidence badge. |
+| **Meeting Prep** | Deal page → ⋮ Actions menu → "Meeting Prep" | Full-screen modal with topic/date inputs. Generates structured brief: headline, deal summary, talking points, questions to ask, risks, document highlights, suggested agenda. Premium card layout. |
+| **Deal Signal Monitor** | Dashboard → "AI Deal Signals" widget | Card widget with "Scan Signals" button. Scans entire portfolio, shows severity-coded signal cards (critical=red, warning=amber, info=blue) with signal type badges, descriptions, and suggested actions. |
+| **Smart Email Drafter** | Deal page → ⋮ Actions menu → "Draft Email" | Full-screen modal with purpose input, template picker (7 templates), tone selector (5 tones). Shows generated email with subject, body, tone score gauge, compliance status badge, and copy-to-clipboard. |
+| **Email Templates** | Inside Email Drafter modal | Auto-fetches 7 templates (Initial Outreach, Follow-Up, Document Request, LOI Intro, Deal Update, Meeting Request, Thank You) from API on modal open. |
+
+**Files changed:**
+
+| # | File | What Changed | Why |
+|---|------|-------------|-----|
+| 1 | `apps/web/js/ai-tools.js` | **New** — 615-line module with all 5 AI agent UIs | Central AI tools frontend module |
+| 2 | `apps/web/contacts.html` | Added "AI Enrich" button in detail-actions bar + `<script src="js/ai-tools.js">` | Wires contact enrichment to UI |
+| 3 | `apps/web/deal.html` | Added "AI Tools" section in ⋮ menu with "Meeting Prep" + "Draft Email" buttons + `<script src="js/ai-tools.js">`. Widened menu `w-48` → `w-56` | Wires meeting prep + email drafter to deal page |
+| 4 | `apps/web/dashboard.html` | Added "AI Deal Signals" widget card in right column + `<script src="js/ai-tools.js">` | Signal monitor widget on dashboard |
+
+---
+
+#### 36.3 — Bug Fix: LangGraph Node Name Collision — ~IST
+
+**Problem:** `emailDrafter/index.ts` crashed with: `"draft is already being used as a state attribute, cannot also be used as a node name"`
+**Root Cause:** LangGraph StateGraph had a state field named `draft` AND a node named `'draft'` — LangGraph doesn't allow this collision.
+**Fix:** Renamed node from `'draft'` to `'writeDraft'` in `.addNode()` and all `.addEdge()` calls.
+
+| File | Change |
+|------|--------|
+| `apps/api/src/services/agents/emailDrafter/index.ts` | `addNode('draft', ...)` → `addNode('writeDraft', ...)`, updated all edge references |
+
+---
+
+#### 36.4 — Bug Fix: 404 on All AI Agent Routes — ~IST
+
+**Problem:** `POST /api/ai/enrich-contact` returned 404. All 5 AI agent endpoints unreachable.
+**Root Cause:** Route mounting chain: `app.ts` mounts `aiRouter` at `/api` → `ai.ts` mounts `aiAgentsRouter` at `/` → but routes in `ai-agents.ts` had paths like `/enrich-contact` instead of `/ai/enrich-contact`. The other AI sub-router (`ai-portfolio.ts`) correctly used `/ai/` prefix.
+**Fix:** Added `/ai/` prefix to all 5 route paths in `ai-agents.ts`.
+
+| File | Change |
+|------|--------|
+| `apps/api/src/routes/ai-agents.ts` | `/enrich-contact` → `/ai/enrich-contact`, `/meeting-prep` → `/ai/meeting-prep`, `/scan-signals` → `/ai/scan-signals`, `/email-templates` → `/ai/email-templates`, `/draft-email` → `/ai/draft-email` |
+
+---
+
+#### 36.5 — Bug Fix: EADDRINUSE Port 3001 — ~IST
+
+**Problem:** API server failed to start with `EADDRINUSE :3001` after a crash.
+**Fix:** `lsof -ti:3001 | xargs kill -9` then restart.
+
+---
+
+### Summary — Session 36
+
+| # | Work Item | Status |
+|---|-----------|--------|
+| 1 | Roadmap verification (69 items) | Confirmed 69/69 complete |
+| 2 | AI Agent Frontend UI (5 agents) | Done — `ai-tools.js` + 3 HTML files |
+| 3 | Fix: LangGraph node/state name collision | Done — renamed `draft` → `writeDraft` |
+| 4 | Fix: 404 on AI agent routes | Done — added `/ai/` prefix |
+| 5 | Fix: EADDRINUSE port 3001 | Done |
+
+### Files Changed — Session 36
+
+| File | Changes |
+|------|---------|
+| `apps/web/js/ai-tools.js` | **New** — Complete AI agent frontend (contact enrichment, meeting prep, signal monitor, email drafter) |
+| `apps/web/contacts.html` | Added "AI Enrich" button + ai-tools.js script tag |
+| `apps/web/deal.html` | Added "Meeting Prep" + "Draft Email" in actions menu + ai-tools.js script tag |
+| `apps/web/dashboard.html` | Added "AI Deal Signals" widget + ai-tools.js script tag |
+| `apps/api/src/services/agents/emailDrafter/index.ts` | Renamed node `draft` → `writeDraft` (LangGraph collision fix) |
+| `apps/api/src/routes/ai-agents.ts` | Added `/ai/` prefix to all 5 route paths (404 fix) |
 
 ---

@@ -361,6 +361,26 @@ Recommended Action: Review Q3 projections for Project Alpha.
 </div>
 </div>
 
+<!-- AI Deal Signals Widget -->
+<div id="signals-widget" data-widget="ai-signals" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
+<div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary text-[20px]">radar</span>
+<h3 class="font-bold text-text-main text-base">AI Deal Signals</h3>
+</div>
+<button id="scan-signals-btn" onclick="scanDealSignals(this)" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all" style="background-color: #003366;">
+<span class="material-symbols-outlined text-[16px]">radar</span>
+Scan Signals
+</button>
+</div>
+<div id="signals-results" class="hidden"></div>
+<div id="signals-empty" class="p-5 text-center">
+<span class="material-symbols-outlined text-text-muted text-2xl mb-2">monitoring</span>
+<p class="text-sm font-medium text-text-main mb-1">Portfolio Signal Monitor</p>
+<p class="text-xs text-text-muted">Click "Scan Signals" to analyze your portfolio for risks, opportunities, and actionable deal signals using AI.</p>
+</div>
+</div>
+
 <!-- Add Widget Button -->
 <button id="add-widget-btn" class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
 <span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
@@ -427,6 +447,7 @@ Recommended Action: Review Q3 projections for Project Alpha.
 </div>
 </div>
 
+<script src="js/ai-tools.js"></script>
 <script src="dashboard-tasks.js"></script>
 <script src="dashboard-widgets.js"></script>
 <script src="dashboard-search.js"></script>

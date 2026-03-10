@@ -63,4 +63,13 @@
 - Short follow-up questions when clarification needed
 - PROGRESS.md format: `## Session N — Month DD, YYYY` + `### Feature — ~HH:MM AM/PM IST`
 
-@supabase_schema.sql  contains latest schema of supabase ! 
+@supabase_schema.sql  contains latest schema of supabase !
+
+## AI Agent Frontend (Session 36)
+- **Frontend module:** `apps/web/js/ai-tools.js` — ~615 lines wiring all 5 AI agent endpoints to UI
+- **Contact Enrichment:** "AI Enrich" button in contacts detail panel → sends contact to LLM → shows enriched profile with confidence badge
+- **Meeting Prep:** Deal page ⋮ menu → full-screen modal → structured brief (headline, talking points, questions, risks, agenda)
+- **Email Drafter:** Deal page ⋮ menu → modal with 7 templates, 5 tone options → draft + tone score + compliance check
+- **Signal Monitor:** Dashboard widget → scans portfolio → severity-coded signal cards
+- **Key fix:** LangGraph node `draft` renamed to `writeDraft` (state/node name collision)
+- **Key fix:** `ai-agents.ts` routes need `/ai/` prefix for correct mounting at `/api/ai/*` 

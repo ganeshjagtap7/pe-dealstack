@@ -1,4 +1,6 @@
-import { openai, isAIEnabled } from '../openai.js';
+import { z } from 'zod';
+import { getExtractionModel, isLLMAvailable } from './llm.js';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 
 // Format a value in millions to human-readable form with smart units
@@ -11,11 +13,65 @@ function formatExtractedValue(valueInMillions: number): string {
   return `${sign}$${(abs * 1000000).toFixed(0)}`;
 }
 
-// Schema for extracted deal data with confidence scores
+// ─── Zod Schema for Structured Output ──────────────────────────────
+
+const ExtractionOutputSchema = z.object({
+  companyName: z.object({
+    value: z.string().nullable(),
+    confidence: z.number().min(0).max(100),
+    source: z.string().optional(),
+  }).describe('Company name extracted from document'),
+  industry: z.object({
+    value: z.string().nullable(),
+    confidence: z.number().min(0).max(100),
+    source: z.string().optional(),
+  }).describe('Industry classification'),
+  description: z.object({
+    value: z.string(),
+    confidence: z.number().min(0).max(100),
+  }).describe('2-3 sentence business description'),
+  revenue: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+    source: z.string().optional(),
+  }).describe('Annual revenue in millions USD'),
+  ebitda: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+    source: z.string().optional(),
+  }).describe('EBITDA in millions USD'),
+  ebitdaMargin: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+  }).describe('EBITDA margin as percentage'),
+  revenueGrowth: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+    source: z.string().optional(),
+  }).describe('YoY revenue growth percentage'),
+  employees: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+  }).describe('Employee count'),
+  foundedYear: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+  }).describe('Year company was founded'),
+  headquarters: z.object({
+    value: z.string().nullable(),
+    confidence: z.number().min(0).max(100),
+  }).describe('City, State or City, Country'),
+  keyRisks: z.array(z.string()).describe('3-5 key investment risks'),
+  investmentHighlights: z.array(z.string()).describe('3-5 positive investment points'),
+  summary: z.string().describe('3-4 sentence executive summary'),
+});
+
+// ─── TypeScript Interfaces (unchanged for backward compat) ─────────
+
 export interface ExtractedField<T> {
   value: T;
-  confidence: number; // 0-100
-  source?: string; // Quote from document supporting extraction
+  confidence: number;
+  source?: string;
 }
 
 export interface ExtractedDealData {
@@ -32,12 +88,11 @@ export interface ExtractedDealData {
   keyRisks: string[];
   investmentHighlights: string[];
   summary: string;
-  overallConfidence: number; // Average confidence score
-  needsReview: boolean; // True if any key field has low confidence
-  reviewReasons: string[]; // Why review is needed
+  overallConfidence: number;
+  needsReview: boolean;
+  reviewReasons: string[];
 }
 
-// Legacy interface for backwards compatibility
 export interface LegacyExtractedDealData {
   companyName: string | null;
   industry: string | null;
@@ -51,6 +106,8 @@ export interface LegacyExtractedDealData {
   summary: string;
 }
 
+// ─── System Prompt ────────────────────────────────────────────────
+
 const EXTRACTION_SYSTEM_PROMPT = `You are a senior private equity analyst with expertise in analyzing CIMs, teasers, and financial documents. Your task is to extract key business and financial data with HIGH ACCURACY.
 
 CRITICAL INSTRUCTIONS:
@@ -63,58 +120,6 @@ CRITICAL INSTRUCTIONS:
 3. Include a source quote for each extraction when confidence is below 90
 4. Financial figures MUST be in millions USD - convert if necessary
 5. If you cannot find data, set value to null with confidence 0
-
-Return JSON with this exact structure:
-{
-  "companyName": {
-    "value": string or null,
-    "confidence": number (0-100),
-    "source": "quote from document if confidence < 90"
-  },
-  "industry": {
-    "value": string or null (e.g., "Healthcare Services", "Enterprise Software", "Industrial Manufacturing"),
-    "confidence": number (0-100),
-    "source": "quote if needed"
-  },
-  "description": {
-    "value": string - 2-3 sentence business description,
-    "confidence": number (0-100)
-  },
-  "revenue": {
-    "value": number or null - Annual revenue in millions USD,
-    "confidence": number (0-100),
-    "source": "quote showing revenue figure"
-  },
-  "ebitda": {
-    "value": number or null - EBITDA in millions USD,
-    "confidence": number (0-100),
-    "source": "quote showing EBITDA"
-  },
-  "ebitdaMargin": {
-    "value": number or null - EBITDA margin as percentage (e.g., 25.5 means 25.5%),
-    "confidence": number (0-100)
-  },
-  "revenueGrowth": {
-    "value": number or null - YoY revenue growth percentage,
-    "confidence": number (0-100),
-    "source": "quote if available"
-  },
-  "employees": {
-    "value": number or null - Employee count,
-    "confidence": number (0-100)
-  },
-  "foundedYear": {
-    "value": number or null - Year company was founded,
-    "confidence": number (0-100)
-  },
-  "headquarters": {
-    "value": string or null - City, State or City, Country,
-    "confidence": number (0-100)
-  },
-  "keyRisks": ["risk 1", "risk 2", ...] - 3-5 key investment risks,
-  "investmentHighlights": ["highlight 1", ...] - 3-5 positive investment points,
-  "summary": string - 3-4 sentence executive summary of the opportunity
-}
 
 COMMON PATTERNS TO LOOK FOR:
 - Revenue: "revenue of $X", "sales of $X", "top-line of $X", "$X in revenue"
@@ -131,17 +136,15 @@ FINANCIAL CONVERSION (always convert to millions USD):
 - "$1,800" = 0.0018
 - "$500" = 0.0005
 - Remove commas and convert to number
-- IMPORTANT: Small values are valid! Do NOT round small amounts to 0 or null.
-  Many micro-acquisitions and small businesses have revenue in thousands or even hundreds of dollars.
-  Always preserve the exact fractional value in millions.`;
+- IMPORTANT: Small values are valid! Do NOT round small amounts to 0 or null.`;
 
 /**
  * Extract structured deal data from document text using AI
- * Returns data with confidence scores for manual review
+ * Uses LangChain withStructuredOutput() for type-safe Zod-validated extraction
  */
 export async function extractDealDataFromText(text: string): Promise<ExtractedDealData | null> {
-  if (!isAIEnabled() || !openai) {
-    log.warn('AI extraction skipped: OpenAI not configured');
+  if (!isLLMAvailable()) {
+    log.warn('AI extraction skipped: no LLM provider configured');
     return null;
   }
 
@@ -151,35 +154,16 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
   }
 
   try {
-    // Use more text for better extraction (up to 20,000 chars)
     const truncatedText = text.slice(0, 20000);
+    log.debug('AI extraction starting (structured output)', { textLength: truncatedText.length });
 
-    log.debug('AI extraction starting', { textLength: truncatedText.length });
+    const model = getExtractionModel(3000);
+    const structuredModel = model.withStructuredOutput(ExtractionOutputSchema);
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-4-turbo',
-      messages: [
-        {
-          role: 'system',
-          content: EXTRACTION_SYSTEM_PROMPT,
-        },
-        {
-          role: 'user',
-          content: `Analyze this document and extract business/financial data with confidence scores:\n\n${truncatedText}`,
-        },
-      ],
-      response_format: { type: 'json_object' },
-      temperature: 0.1, // Very low for consistency
-      max_tokens: 3000,
-    });
-
-    const content = response.choices[0]?.message?.content;
-    if (!content) {
-      log.error('AI extraction failed: no response content');
-      return null;
-    }
-
-    const extracted = JSON.parse(content);
+    const extracted = await structuredModel.invoke([
+      new SystemMessage(EXTRACTION_SYSTEM_PROMPT),
+      new HumanMessage(`Analyze this document and extract business/financial data with confidence scores:\n\n${truncatedText}`),
+    ]);
 
     // Build result with proper defaults
     const result: ExtractedDealData = {
@@ -205,7 +189,6 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     const confidenceScores: number[] = [];
     const reviewReasons: string[] = [];
 
-    // Check critical fields
     if (result.companyName.confidence < 70) {
       reviewReasons.push(`Company name uncertain (${result.companyName.confidence}% confidence)`);
     }
@@ -230,7 +213,6 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
       confidenceScores.push(result.ebitda.confidence);
     }
 
-    // Calculate average confidence
     result.overallConfidence = confidenceScores.length > 0
       ? Math.round(confidenceScores.reduce((a, b) => a + b, 0) / confidenceScores.length)
       : 0;
@@ -238,7 +220,7 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     result.needsReview = reviewReasons.length > 0 || result.overallConfidence < 70;
     result.reviewReasons = reviewReasons;
 
-    log.debug('AI extraction completed', {
+    log.debug('AI extraction completed (structured output)', {
       companyName: result.companyName.value,
       overallConfidence: result.overallConfidence,
       needsReview: result.needsReview,
