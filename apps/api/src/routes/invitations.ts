@@ -271,6 +271,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       log.warn('Email send failed but invitation created', { error: emailResult.error });
     }
 
+    // Build invite URL for fallback sharing
+    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const inviteUrl = `${baseUrl}/accept-invite.html?token=${token}`;
+
     // Audit log
     await AuditLog.log(req, {
       action: 'INVITATION_SENT',
@@ -282,6 +286,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     res.status(201).json({
       ...invitation,
       emailSent: emailResult.success,
+      emailError: emailResult.success ? undefined : emailResult.error,
+      inviteUrl: emailResult.success ? undefined : inviteUrl,
     });
   } catch (error) {
     next(error);

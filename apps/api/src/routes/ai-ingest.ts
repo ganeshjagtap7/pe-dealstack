@@ -193,11 +193,29 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
       fileUrl = urlData?.publicUrl;
     }
 
+    // Auto-create default VDR folders for the new deal
+    const defaultFolders = [
+      { name: '100 Financials', sortOrder: 100, description: 'Financial statements, projections, and analysis' },
+      { name: '200 Legal', sortOrder: 200, description: 'Legal documents, contracts, and agreements' },
+      { name: '300 Commercial', sortOrder: 300, description: 'Commercial due diligence materials' },
+      { name: '400 HR & Data', sortOrder: 400, description: 'HR documents and data room materials' },
+      { name: '500 Intellectual Property', sortOrder: 500, description: 'IP documentation and patents' },
+    ];
+    const { data: createdFolders } = await supabase
+      .from('Folder')
+      .insert(defaultFolders.map(f => ({ ...f, dealId: deal.id, parentId: null, isRestricted: false })))
+      .select('id, name');
+
+    // Assign to Financials folder (CIM docs go there)
+    const financialsFolder = createdFolders?.find((f: any) => /financ/i.test(f.name));
+    const folderId = financialsFolder?.id || createdFolders?.[0]?.id || null;
+
     // Create document record
     const { data: document } = await supabase
       .from('Document')
       .insert({
         dealId: deal.id,
+        folderId,
         name: safeName,
         type: 'CIM',
         fileUrl,

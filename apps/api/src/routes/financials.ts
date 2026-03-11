@@ -129,13 +129,12 @@ router.patch('/deals/:dealId/financials/:statementId', async (req, res) => {
     const dealAccess = await verifyDealAccess(dealId, orgId);
     if (!dealAccess) return res.status(404).json({ error: 'Deal not found' });
 
-    const user = (req as any).user;
     const updates = patchStatementSchema.parse(req.body);
 
-    // Confirm ownership
+    // Fetch existing statement (need lineItems for merge)
     const { data: existing, error: findError } = await supabase
       .from('FinancialStatement')
-      .select('id')
+      .select('id, lineItems')
       .eq('id', statementId)
       .eq('dealId', dealId)
       .single();
@@ -144,13 +143,36 @@ router.patch('/deals/:dealId/financials/:statementId', async (req, res) => {
       return res.status(404).json({ error: 'Statement not found' });
     }
 
+    // Merge lineItems instead of replacing the entire JSONB column
+    const updatePayload: Record<string, unknown> = {
+      reviewedAt: new Date().toISOString(),
+    };
+
+    if (updates.lineItems) {
+      updatePayload.lineItems = {
+        ...((existing.lineItems as Record<string, unknown>) ?? {}),
+        ...updates.lineItems,
+      };
+    }
+    if (updates.period) updatePayload.period = updates.period;
+    if (updates.periodType) updatePayload.periodType = updates.periodType;
+    if (updates.currency) updatePayload.currency = updates.currency;
+    if (updates.unitScale) updatePayload.unitScale = updates.unitScale;
+
+    // Resolve internal User id from auth UUID for reviewedBy FK
+    const authId = req.user?.id;
+    if (authId) {
+      const { data: userRecord } = await supabase
+        .from('User')
+        .select('id')
+        .eq('authId', authId)
+        .single();
+      if (userRecord) updatePayload.reviewedBy = userRecord.id;
+    }
+
     const { data: updated, error: updateError } = await supabase
       .from('FinancialStatement')
-      .update({
-        ...updates,
-        reviewedAt: new Date().toISOString(),
-        reviewedBy: user?.id ?? null,
-      })
+      .update(updatePayload)
       .eq('id', statementId)
       .select()
       .single();

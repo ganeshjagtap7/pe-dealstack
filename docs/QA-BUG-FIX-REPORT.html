@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bug Fix Report - PE OS</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    color: #222;
+    max-width: 750px;
+    margin: 40px auto;
+    padding: 0 30px;
+    font-size: 14px;
+    line-height: 1.7;
+  }
+  h1 { font-size: 20px; margin-bottom: 4px; }
+  h2 { font-size: 16px; margin-top: 28px; margin-bottom: 10px; border-bottom: 1px solid #ccc; padding-bottom: 4px; }
+  .meta { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .issue { margin-bottom: 18px; }
+  .issue-title { font-weight: bold; margin-bottom: 2px; }
+  .label { display: inline-block; font-size: 11px; font-weight: bold; padding: 1px 6px; border-radius: 3px; margin-right: 6px; }
+  .fixed { background: #d4edda; color: #155724; }
+  .reported { color: #856404; background: #fff3cd; }
+  .quote { color: #555; font-style: italic; margin: 4px 0 4px 16px; font-size: 13px; }
+  .fix { margin: 4px 0 0 16px; font-size: 13px; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin-bottom: 3px; }
+  .note { background: #f5f5f5; padding: 12px 16px; border-radius: 6px; margin-top: 20px; font-size: 13px; }
+  @media print {
+    body { margin: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<h1>PE OS — Bug Fix Report</h1>
+<div class="meta">
+  Date: March 11, 2026 &nbsp;|&nbsp; In response to: Pushkar's QA Testing Report<br>
+  Status: All 14 reported issues fixed &nbsp;|&nbsp; Branch: feature/financial-extraction
+</div>
+
+<p>Hi Pushkar — thanks for the detailed testing! Below is a point-by-point response to every issue you flagged. All fixes are done and ready for re-testing.</p>
+
+<h2>1. Organization Isolation / New Signup Issues</h2>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> New signup sees other firm's deals and contacts</div>
+  <div class="quote">You reported: "THE DEAL PAGE IS NOT EMPTY" / "CONTACTS PAGE IS NOT EMPTY" / "IS NOT ACCURATE IN BOTH DEVICES SHOWS 18 DEALS"</div>
+  <div class="fix"><strong>What happened:</strong> When you signed up with drxpsus@gmail.com, the system had a timing issue — your user profile wasn't created fast enough, so the app loaded without knowing which organization you belong to. It showed everyone's data instead of filtering to just your firm.<br>
+  <strong>Fix:</strong> The system now auto-creates your user profile and organization on the very first API call after signup. No more timing issues. New signups will see empty pages as expected.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Can't create deals</div>
+  <div class="quote">You reported: "DEAL IS NOT GETTING CREATED" (Ingest Deal Data showed "Upload Failed")</div>
+  <div class="fix"><strong>Same root cause</strong> — the system didn't know your organization ID, so it couldn't save the deal. Fixed by the same auto-create fix above.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Can't create contacts</div>
+  <div class="quote">You reported: "DID NOT GET CREATED SHOWED ISSUE" — error: "null value in column organizationId"</div>
+  <div class="fix"><strong>Same root cause.</strong> Now that org ID is always available, contact creation works.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Settings page not loading / profile not updating</div>
+  <div class="quote">You reported: "ITS NOT UPDATING MY PROFILE" — settings page showed "Loading..." forever</div>
+  <div class="fix"><strong>Same root cause.</strong> The settings page calls /api/users/me which was failing for new users. Now works on first load.</div>
+</div>
+
+<h2>2. Document & Data Room Issues</h2>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Uploaded documents disappear from Data Room</div>
+  <div class="quote">You reported: "THE FILE IS VISIBLE IN RECENT DOCUMENTS BUT ITS NOT VISIBLE IN DATA ROOM" / "DOCUMENT SHOWED PROCESSING AND WHEN I WENT BACK THE DOCUMENT DIDNT SHOW UP" / "DOCUMENT DISAPPEARED FROM THE CHAT TOO"</div>
+  <div class="fix"><strong>What happened:</strong> Documents need to be assigned to a folder to show up in the Data Room. New deals didn't have any folders, so uploaded files had no folder = invisible.<br>
+  <strong>Fix:</strong> When you upload a file to a deal that has no folders yet, the system now automatically creates the default folder structure (Financials, Legal, Commercial, HR & Data, IP) and puts the file in the right folder. Files uploaded via AI chat also get assigned to a folder now.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Can't extract financials from Data Room files</div>
+  <div class="quote">You reported: "ONLY EXTRACTION WORKS VIA INGEST DEAL DATA AND NOT VIA DATA ROOM" / "DATAROOM FILES AS OFF CURRENTLY CANT BE EXTRACTED"</div>
+  <div class="fix"><strong>Fix:</strong> Added an "Extract Financials" option to the file menu (three-dot menu) in the Data Room. You can now right-click any PDF or Excel file in the Data Room and trigger extraction directly from there.</div>
+</div>
+
+<h2>3. Financial Extraction Issues</h2>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Decimal accuracy is wrong</div>
+  <div class="quote">You reported: "EXTRACTION THE NUMBER IS IN MILLION EVEN THOUGH ITS IN MILLION THE DECIMAL ITS CHANGING TOO IS VERY WRONG"</div>
+  <div class="fix"><strong>What happened:</strong> The AI was returning numbers with floating-point artifacts (like 12.50000001 instead of 12.5).<br>
+  <strong>Fix:</strong> All extracted values are now rounded — financial values to 4 decimal places, percentages to 2 decimal places. Numbers display cleanly now.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Projected vs Historical year detection is wrong</div>
+  <div class="quote">You reported: "FOR PROJECTED PERIODS FIRST IT ASSUMED 2024 TO BE PROJECTED" / "PROBABLY NO LOGIC ON HOW TO DEFINE PROJECTED OR HISTORICAL YEARS"</div>
+  <div class="fix"><strong>Fix:</strong> Added a verification step after extraction. If a year is in the future (e.g., 2027, 2028) but the AI labeled it as "Historical", the system now corrects it to "Projected". Also detects suffixes like "E", "F", "Est" in period names. Past years won't be incorrectly marked as projected.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> EBITDA not showing when source doc doesn't have it</div>
+  <div class="quote">You reported: "THE FINANCIALS I ADDED DID NOT HAVE A SEPARATE EBITDA NO. BUT IT CAN BE CALCULATED"</div>
+  <div class="fix"><strong>Fix:</strong> The system now auto-calculates derived metrics when they're missing:
+    <ul>
+      <li>EBITDA = EBIT + D&A (or Revenue - COGS - Total OpEx)</li>
+      <li>Gross Profit = Revenue - COGS</li>
+      <li>Gross Margin % and EBITDA Margin % from the above</li>
+    </ul>
+    These only fill in gaps — if the AI already extracted the value, it won't be overwritten.
+  </div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Cell editing fails — "Could not save the change"</div>
+  <div class="quote">You reported: "WHENEVER I TRY TO MAKE CHANGES IT SHOWS COULD NOT SAVE THE CHANGE"</div>
+  <div class="fix"><strong>What happened:</strong> Two bugs — (1) the save was using the wrong user ID format which caused a database error, and (2) editing one cell was accidentally wiping all other cells in that row.<br>
+  <strong>Fix:</strong> Fixed the user ID lookup, and changed from full-row replacement to single-cell update. Editing now works correctly.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Balance Sheet chart missing on some deals</div>
+  <div class="quote">You reported: "WORKING PROPERLY BUT IT SHOWED FOR ONE OUT OF TWO FINANCIALS I UPLOADED — CHECK THE DEALS BUFFER AND PRE FLOP WIZARD"</div>
+  <div class="fix"><strong>What happened:</strong> When Balance Sheet data exists but the key chart values (cash, receivables, equity, etc.) are all empty, the chart showed as a blank white space.<br>
+  <strong>Fix:</strong> Now shows a helpful message explaining that the data exists but chart values aren't extracted yet, and suggests re-extracting.</div>
+</div>
+
+<h2>4. Team Invitation</h2>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Invitation email not getting sent</div>
+  <div class="quote">You reported: "THE EMAIL INVITE IS NOT GETTING SENT"</div>
+  <div class="fix"><strong>What happened:</strong> The email service needs a verified domain to send to external addresses. The invitation was being created in the database but the email wasn't going out.<br>
+  <strong>Fix:</strong> When email delivery fails, the app now shows a <strong>"Copy Invite Link"</strong> button so you can copy the invitation link and share it manually (via WhatsApp, Slack, email, etc.). The link works the same way — recipient clicks it to accept the invite.</div>
+</div>
+
+<h2>5. Contacts Page UI</h2>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> Grid/List toggle not visible</div>
+  <div class="quote">You reported: "CANT SEE ANY GRID AND LIST OPTION TO SWITCH"</div>
+  <div class="fix"><strong>What happened:</strong> The CSS build was only scanning 2 pages (index and VDR). The contacts page styles weren't being generated, so the buttons were there but invisible.<br>
+  <strong>Fix:</strong> Updated the CSS build to scan all pages. Grid/List toggle is now visible.</div>
+</div>
+
+<div class="issue">
+  <div class="issue-title"><span class="label fixed">FIXED</span> "More" dropdown not visible (Export/Import)</div>
+  <div class="quote">You reported: "CANT SEE MORE OPTION TO EXPORT THE FILE"</div>
+  <div class="fix"><strong>Same root cause</strong> as above. The "More" button with Export to CSV, Import, and Group by Company options is now visible.</div>
+</div>
+
+<h2>Items That Were Working Fine (No Changes)</h2>
+<ul>
+  <li>Confidence Breakdown Popup</li>
+  <li>Financial Statements section visibility</li>
+  <li>Auto-Extract on Upload</li>
+  <li>3 Statement Tabs (Income Statement, Balance Sheet, Cash Flow)</li>
+  <li>Sticky first column on horizontal scroll</li>
+  <li>Per-column confidence badges</li>
+  <li>Source attribution / document name</li>
+  <li>Validation / Red Flags banner</li>
+  <li>YoY Growth Chart</li>
+  <li>Existing user login (pushkarrathod12@gmail.com — all data intact)</li>
+</ul>
+
+<div class="note">
+  <strong>Feature request noted:</strong> You mentioned the idea of a "free format financial" where you upload a properly formatted Excel and it keeps the exact layout instead of extracting into our standard format. Great idea — we'll add this to the product roadmap for a future update.
+</div>
+
+<br>
+<p>All 14 issues are fixed. Please re-test when the updated version is deployed. Let me know if anything else comes up!</p>
+
+<p>— Ganesh</p>
+
+</body>
+</html>

@@ -199,6 +199,10 @@ function normalizeClassificationResult(raw: any): ClassificationResult {
       for (const p of stmt.periods) {
         const periodType = normalizePeriodType(p.periodType);
         const lineItems = normalizeLineItems(p.lineItems ?? {});
+        // Auto-calculate derived fields if missing
+        if (statementType === 'INCOME_STATEMENT') {
+          computeDerivedFields(lineItems);
+        }
         const confidence = clamp(Number(p.confidence) || 0, 0, 100);
 
         if (!p.period) continue;
@@ -216,6 +220,9 @@ function normalizeClassificationResult(raw: any): ClassificationResult {
       warnings.push(`No periods found for ${statementType}`);
       continue;
     }
+
+    // Post-process: correct periodType based on year
+    correctPeriodTypes(periods);
 
     statements.push({
       statementType,
@@ -270,10 +277,84 @@ function normalizeLineItems(raw: Record<string, any>): Record<string, number | n
       result[key] = null;
     } else {
       const num = Number(val);
-      result[key] = isNaN(num) ? null : num;
+      if (isNaN(num)) {
+        result[key] = null;
+      } else if (key.endsWith('_pct')) {
+        // Percentages: round to 2 decimal places (e.g. 25.55%)
+        result[key] = Math.round(num * 100) / 100;
+      } else {
+        // Financial values in millions: round to 4 decimals ($100 precision)
+        result[key] = Math.round(num * 10000) / 10000;
+      }
     }
   }
   return result;
+}
+
+/**
+ * Auto-calculate derived income statement fields when missing.
+ * E.g., EBITDA = revenue - cogs - total_opex (or = ebit + da),
+ * gross_profit = revenue - cogs, margins from base values.
+ */
+function computeDerivedFields(li: Record<string, number | null>): void {
+  const v = (k: string) => (li[k] !== null && li[k] !== undefined ? li[k]! : null);
+
+  // gross_profit = revenue - cogs
+  if (v('gross_profit') === null && v('revenue') !== null && v('cogs') !== null) {
+    li.gross_profit = Math.round((v('revenue')! - v('cogs')!) * 10000) / 10000;
+  }
+
+  // ebitda = ebit + da  OR  revenue - cogs - total_opex
+  if (v('ebitda') === null) {
+    if (v('ebit') !== null && v('da') !== null) {
+      li.ebitda = Math.round((v('ebit')! + v('da')!) * 10000) / 10000;
+    } else if (v('revenue') !== null && v('cogs') !== null && v('total_opex') !== null) {
+      li.ebitda = Math.round((v('revenue')! - v('cogs')! - v('total_opex')!) * 10000) / 10000;
+    } else if (v('gross_profit') !== null && v('total_opex') !== null) {
+      li.ebitda = Math.round((v('gross_profit')! - v('total_opex')!) * 10000) / 10000;
+    }
+  }
+
+  // ebit = ebitda - da
+  if (v('ebit') === null && v('ebitda') !== null && v('da') !== null) {
+    li.ebit = Math.round((v('ebitda')! - v('da')!) * 10000) / 10000;
+  }
+
+  // gross_margin_pct = gross_profit / revenue * 100
+  if (v('gross_margin_pct') === null && v('gross_profit') !== null && v('revenue') !== null && v('revenue')! !== 0) {
+    li.gross_margin_pct = Math.round((v('gross_profit')! / v('revenue')!) * 10000) / 100;
+  }
+
+  // ebitda_margin_pct = ebitda / revenue * 100
+  if (v('ebitda_margin_pct') === null && v('ebitda') !== null && v('revenue') !== null && v('revenue')! !== 0) {
+    li.ebitda_margin_pct = Math.round((v('ebitda')! / v('revenue')!) * 10000) / 100;
+  }
+}
+
+/**
+ * Post-process period types: future years should be PROJECTED, not HISTORICAL.
+ * Also handles suffixed periods like "2025E", "2026F", "FY2025P".
+ */
+function correctPeriodTypes(periods: FinancialPeriod[]): void {
+  const currentYear = new Date().getFullYear();
+
+  for (const p of periods) {
+    // Extract the 4-digit year from the period string (handles "FY2025", "2025E", "Q3 2025", etc.)
+    const yearMatch = p.period.match(/(\d{4})/);
+    if (!yearMatch) continue;
+    const year = parseInt(yearMatch[1], 10);
+
+    // Check for explicit projected suffixes in the original period string
+    const projectedSuffix = /[EFP]$/i.test(p.period.replace(/\d/g, '').trim()) ||
+      /\b(est|forecast|budget|proj)\b/i.test(p.period);
+
+    if (projectedSuffix && p.periodType === 'HISTORICAL') {
+      p.periodType = 'PROJECTED';
+    } else if (year > currentYear && p.periodType === 'HISTORICAL') {
+      // Future year marked as HISTORICAL → correct to PROJECTED
+      p.periodType = 'PROJECTED';
+    }
+  }
 }
 
 function clamp(val: number, min: number, max: number): number {

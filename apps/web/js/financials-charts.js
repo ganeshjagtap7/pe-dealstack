@@ -335,6 +335,15 @@ function renderBalanceSheetChart() {
 
   const labels = rows.map(r => r.period);
   const li = (row, key) => row.lineItems?.[key] ?? 0;
+
+  // Check if any chart-relevant data exists (not all zeros/nulls)
+  const chartKeys = ['cash', 'accounts_receivable', 'inventory', 'ppe_net', 'goodwill', 'intangibles',
+    'total_current_liabilities', 'long_term_debt', 'total_equity', 'total_assets', 'total_liabilities'];
+  const hasChartData = rows.some(r => chartKeys.some(k => r.lineItems?.[k] != null && r.lineItems?.[k] !== 0));
+  if (!hasChartData) {
+    canvas.parentElement.innerHTML = '<p class="text-xs text-gray-400 text-center py-8">Balance sheet data exists but key values (assets, liabilities, equity) are not yet extracted. Try re-extracting.</p>';
+    return;
+  }
   const unitLabel = rows[0]?.unitScale === 'THOUSANDS' ? '$K' : '$M';
 
   finState.chartInstance = new Chart(canvas, {

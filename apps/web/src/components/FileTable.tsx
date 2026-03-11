@@ -9,9 +9,10 @@ interface FileTableProps {
   onDeleteFile?: (fileId: string) => void;
   onRenameFile?: (fileId: string, newName: string) => void;
   onLinkToDeal?: (file: VDRFile) => void;
+  onExtractFinancials?: (file: VDRFile) => void;
 }
 
-export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile, onLinkToDeal }) => {
+export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile, onLinkToDeal, onExtractFinancials }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
@@ -263,6 +264,19 @@ export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folde
                               >
                                 <span className="material-symbols-outlined text-[18px]">link</span>
                                 Link to Deal
+                              </button>
+                            )}
+                            {onExtractFinancials && (file.type === 'excel' || file.type === 'pdf') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onExtractFinancials(file);
+                                  setOpenMenuId(null);
+                                }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                              >
+                                <span className="material-symbols-outlined text-[18px]">analytics</span>
+                                Extract Financials
                               </button>
                             )}
                             <div className="border-t border-slate-200 my-1"></div>

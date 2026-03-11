@@ -468,6 +468,7 @@ const InviteModal = (function () {
     let errorCount = 0;
     let emailFailCount = 0;
     let errorMessages = [];
+    let lastInviteUrl = null;
 
     for (const row of validRows) {
       try {
@@ -486,6 +487,7 @@ const InviteModal = (function () {
           successCount++;
           if (data.emailSent === false) {
             emailFailCount++;
+            if (data.inviteUrl) lastInviteUrl = data.inviteUrl;
           }
         } else {
           const errData = await response.json().catch(() => ({}));
@@ -510,7 +512,13 @@ const InviteModal = (function () {
 
     if (successCount > 0) {
       if (emailFailCount > 0 && emailFailCount === successCount) {
-        showNotification('Warning', `${successCount} invitation${successCount > 1 ? 's' : ''} created but email delivery failed. Check email service configuration.`, 'error');
+        // All emails failed — show invite link for manual sharing
+        if (lastInviteUrl) {
+          showNotification('Invitation Created', `Invitation created but email could not be sent. Copy the invite link to share manually.`, 'warning');
+          promptCopyInviteLink(lastInviteUrl);
+        } else {
+          showNotification('Warning', `${successCount} invitation${successCount > 1 ? 's' : ''} created but email delivery failed. Check email service configuration.`, 'error');
+        }
       } else if (emailFailCount > 0) {
         showNotification('Partial Success', `${successCount - emailFailCount} email${successCount - emailFailCount > 1 ? 's' : ''} sent. ${emailFailCount} email${emailFailCount > 1 ? 's' : ''} failed to deliver.`, 'warning');
       } else {
@@ -535,6 +543,32 @@ const InviteModal = (function () {
     } else {
       console.log(`[${type}] ${title}: ${message}`);
     }
+  }
+
+  // Show a copy-link prompt when email delivery fails
+  function promptCopyInviteLink(url) {
+    const toast = document.createElement('div');
+    toast.className = 'fixed bottom-6 right-6 z-[60] bg-white border border-[#EBEBEB] rounded-xl shadow-2xl p-4 max-w-md animate-in';
+    toast.innerHTML = `
+      <div class="flex items-start gap-3">
+        <span class="material-symbols-outlined text-amber-500 text-xl mt-0.5">link</span>
+        <div class="flex-1">
+          <p class="text-sm font-semibold text-[#343A40] mb-2">Share Invite Link Manually</p>
+          <div class="flex gap-2">
+            <input type="text" readonly value="${url}" class="flex-1 text-xs bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-gray-600 select-all" />
+            <button onclick="navigator.clipboard.writeText('${url}').then(() => { this.textContent = 'Copied!'; setTimeout(() => this.closest('.fixed').remove(), 1500); })"
+              class="px-3 py-2 text-xs font-medium text-white rounded-lg whitespace-nowrap" style="background-color: #003366;">
+              Copy
+            </button>
+          </div>
+        </div>
+        <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+          <span class="material-symbols-outlined text-lg">close</span>
+        </button>
+      </div>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), 30000);
   }
 
   // Public API

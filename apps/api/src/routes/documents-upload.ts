@@ -225,27 +225,41 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         LOI: /legal|commercial/i,
         DD_REPORT: /due\s*diligence|dd/i,
       };
-      const pattern = folderPatterns[docType];
-      if (pattern) {
-        const { data: folders } = await supabase
-          .from('Folder')
-          .select('id, name')
-          .eq('dealId', dealId)
-          .order('name', { ascending: true });
 
-        if (folders && folders.length > 0) {
-          const match = folders.find((f: any) => pattern.test(f.name));
-          resolvedFolderId = match?.id || folders[0]?.id || null;
-        }
-      } else if (docType === 'OTHER') {
-        // For generic docs, assign to the first folder if any
-        const { data: folders } = await supabase
+      // Get existing folders for this deal
+      let { data: folders } = await supabase
+        .from('Folder')
+        .select('id, name')
+        .eq('dealId', dealId)
+        .order('name', { ascending: true });
+
+      // If deal has no folders at all, auto-create default VDR structure
+      if (!folders || folders.length === 0) {
+        const defaultFolders = [
+          { name: '100 Financials', sortOrder: 100, description: 'Financial statements, projections, and analysis' },
+          { name: '200 Legal', sortOrder: 200, description: 'Legal documents, contracts, and agreements' },
+          { name: '300 Commercial', sortOrder: 300, description: 'Commercial due diligence materials' },
+          { name: '400 HR & Data', sortOrder: 400, description: 'HR documents and data room materials' },
+          { name: '500 Intellectual Property', sortOrder: 500, description: 'IP documentation and patents' },
+        ];
+        const { data: createdFolders } = await supabase
           .from('Folder')
-          .select('id')
-          .eq('dealId', dealId)
-          .order('name', { ascending: true })
-          .limit(1);
-        resolvedFolderId = folders?.[0]?.id || null;
+          .insert(defaultFolders.map(f => ({ ...f, dealId, parentId: null, isRestricted: false })))
+          .select('id, name');
+        if (createdFolders && createdFolders.length > 0) {
+          folders = createdFolders;
+          log.info('Auto-created default VDR folders for deal', { dealId, count: createdFolders.length });
+        }
+      }
+
+      // Match document type to folder
+      const pattern = folderPatterns[docType];
+      if (pattern && folders && folders.length > 0) {
+        const match = folders.find((f: any) => pattern.test(f.name));
+        resolvedFolderId = match?.id || folders[0]?.id || null;
+      } else if (folders && folders.length > 0) {
+        // For any doc type without a specific pattern, assign to the first folder
+        resolvedFolderId = folders[0]?.id || null;
       }
       if (resolvedFolderId) {
         log.info('Auto-assigned document to folder', { docType, folderId: resolvedFolderId });

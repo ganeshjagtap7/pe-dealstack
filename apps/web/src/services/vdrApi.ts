@@ -339,6 +339,21 @@ export async function fetchDeal(dealId: string): Promise<any | null> {
 }
 
 /**
+ * Extract financials from a document
+ */
+export async function extractFinancials(dealId: string, documentId: string): Promise<any> {
+  const response = await authFetch(`${API_BASE_URL}/deals/${dealId}/financials/extract`, {
+    method: 'POST',
+    body: JSON.stringify({ documentId }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Extraction failed (${response.status})`);
+  }
+  return await response.json();
+}
+
+/**
  * Create a new deal (for VDR without existing deal)
  */
 export async function createDeal(name: string): Promise<any | null> {
