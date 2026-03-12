@@ -46,6 +46,15 @@ if (missingOptional.length > 0) {
   log.warn('Optional environment variables not set (some features disabled)', { missing: missingOptional });
 }
 
+// Warn about production-critical vars that will cause broken behavior
+if (process.env.NODE_ENV === 'production') {
+  const productionVars = ['APP_URL', 'RESEND_API_KEY', 'SENTRY_DSN'];
+  const missingProd = productionVars.filter(key => !process.env[key]);
+  if (missingProd.length > 0) {
+    log.warn('Production-recommended env vars missing (emails/error tracking may not work)', { missing: missingProd });
+  }
+}
+
 // Initialize Sentry for error tracking (production only)
 if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
   Sentry.init({
@@ -58,12 +67,13 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 
 const app = express();
 
-// CORS - whitelist allowed origins
+// CORS - whitelist allowed origins (configurable via ALLOWED_ORIGINS env var)
+const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 const allowedOrigins = [
   'https://pe-os.onrender.com',
   'https://pe-dealstack.vercel.app',
-  'http://localhost:3000',
-  'http://localhost:5173',
+  ...extraOrigins,
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
 ];
 app.use(cors({
   origin: (origin, callback) => {

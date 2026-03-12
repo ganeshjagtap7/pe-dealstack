@@ -42,6 +42,9 @@ coverage/
 # Misc
 *.pem
 
+# MCP config (contains API keys)
+.mcp.json
+
 # AI Agent Skills
 .agent/
 .agents/

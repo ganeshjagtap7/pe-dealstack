@@ -482,6 +482,11 @@
             } catch (err) {
                 console.error('Auth initialization error:', err);
                 document.getElementById('loadingScreen').style.display = 'none';
+                const banner = document.createElement('div');
+                banner.style.cssText = 'background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;padding:12px 16px;border-radius:8px;margin-bottom:16px;text-align:center;font-size:14px;';
+                banner.textContent = 'Unable to connect to authentication service. Please check your internet connection and refresh the page.';
+                const form = document.querySelector('form');
+                if (form) form.parentNode.insertBefore(banner, form);
             }
         });
     </script>
