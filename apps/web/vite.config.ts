@@ -57,12 +57,11 @@ function copyStaticFiles() {
         console.log('Copied js/ folder to dist/js/')
       }
 
-      // Also copy standalone JS files from root
-      const rootFiles = ['dashboard.js', 'deal.js', 'memo-builder.js', 'admin-dashboard.js', 'templates.js', 'contacts.js', 'crm.js', 'crm-dynamic.js', 'accept-invite.js', 'settings.js']
-      rootFiles.forEach(file => {
-        const src = resolve(__dirname, file)
-        if (existsSync(src)) {
-          copyFileSync(src, resolve(__dirname, 'dist', file))
+      // Also copy all standalone JS files from root (excluding config files)
+      const skipFiles = ['postcss.config.js', 'tailwind.config.js', 'vite.config.ts']
+      readdirSync(__dirname).forEach(file => {
+        if (file.endsWith('.js') && !skipFiles.includes(file)) {
+          copyFileSync(resolve(__dirname, file), resolve(__dirname, 'dist', file))
           console.log(`Copied ${file} to dist/`)
         }
       })
