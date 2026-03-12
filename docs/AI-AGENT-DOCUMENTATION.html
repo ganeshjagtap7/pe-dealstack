@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PE OS — AI Agent Architecture & Documentation</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    color: #1a1a2e;
+    max-width: 820px;
+    margin: 40px auto;
+    padding: 0 30px;
+    font-size: 13.5px;
+    line-height: 1.65;
+  }
+  h1 { font-size: 22px; margin-bottom: 2px; color: #003366; }
+  h2 { font-size: 17px; margin-top: 32px; margin-bottom: 10px; color: #003366; border-bottom: 2px solid #003366; padding-bottom: 4px; }
+  h3 { font-size: 14px; margin-top: 20px; margin-bottom: 6px; color: #16213e; }
+  .subtitle { color: #555; font-size: 14px; margin-bottom: 24px; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 16px 0; font-size: 13px; }
+  th { text-align: left; background: #003366; color: #fff; font-size: 12px; padding: 6px 10px; }
+  td { padding: 6px 10px; border: 1px solid #ddd; vertical-align: top; }
+  tr:nth-child(even) td { background: #f8f9fa; }
+  code { background: #f0f0f0; padding: 1px 5px; border-radius: 3px; font-size: 12.5px; font-family: 'SF Mono', Consolas, monospace; }
+  .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 16px 20px; margin: 14px 0; background: #fafbfc; }
+  .card-title { font-weight: bold; font-size: 15px; color: #003366; margin-bottom: 6px; }
+  .badge { display: inline-block; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 4px; margin-right: 6px; }
+  .stategraph { background: #e8f5e9; color: #2e7d32; }
+  .react { background: #e3f2fd; color: #1565c0; }
+  .parallel { background: #fff3e0; color: #e65100; }
+  .legacy { background: #f3e5f5; color: #7b1fa2; }
+  .flow { font-family: 'SF Mono', Consolas, monospace; font-size: 12px; color: #333; background: #f5f5f5; padding: 10px 14px; border-radius: 6px; margin: 8px 0; border-left: 3px solid #003366; }
+  .note { background: #fff8e1; border-left: 3px solid #ffc107; padding: 10px 14px; border-radius: 4px; margin: 12px 0; font-size: 13px; }
+  ul { margin: 6px 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .toc { background: #f5f7fa; padding: 16px 20px; border-radius: 8px; margin-bottom: 24px; }
+  .toc a { color: #003366; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc li { margin-bottom: 3px; font-size: 13px; }
+  .section-divider { border: none; border-top: 1px solid #e0e0e0; margin: 28px 0; }
+  @media print { body { margin: 20px; } .card { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<h1>PE OS — AI Agent Architecture</h1>
+<p class="subtitle">
+  Comprehensive documentation of all AI-powered features &nbsp;|&nbsp; Version: March 2026<br>
+  Stack: LangChain + LangGraph + GPT-4o &nbsp;|&nbsp; 8 AI agents &nbsp;|&nbsp; 13+ analysis modules
+</p>
+
+<div class="toc">
+  <strong>Table of Contents</strong>
+  <ol>
+    <li><a href="#overview">System Overview & LLM Layer</a></li>
+    <li><a href="#financial-agent">Financial Extraction Agent</a></li>
+    <li><a href="#deal-chat">Deal Chat Agent</a></li>
+    <li><a href="#portfolio-chat">Portfolio Chat Agent</a></li>
+    <li><a href="#contact-enrichment">Contact Enrichment Agent</a></li>
+    <li><a href="#meeting-prep">Meeting Prep Agent</a></li>
+    <li><a href="#signal-monitor">Deal Signal Monitor</a></li>
+    <li><a href="#email-drafter">Smart Email Drafter</a></li>
+    <li><a href="#analysis">Financial Analysis Suite</a></li>
+    <li><a href="#frontend">Frontend Integration</a></li>
+    <li><a href="#api-reference">API Reference</a></li>
+    <li><a href="#config">Configuration & Environment</a></li>
+  </ol>
+</div>
+
+
+<h2 id="overview">1. System Overview & LLM Layer</h2>
+
+<p>PE OS uses a unified LLM abstraction layer that allows swapping between OpenAI and Google Gemini models via environment variables — no code changes needed.</p>
+
+<div class="card">
+  <div class="card-title">Unified LLM Layer</div>
+  <p><strong>File:</strong> <code>apps/api/src/services/llm.ts</code></p>
+  <table>
+    <tr><th>Function</th><th>Purpose</th><th>Default Model</th><th>Use Case</th></tr>
+    <tr><td><code>getChatModel()</code></td><td>Primary reasoning</td><td>GPT-4o</td><td>Agents, analysis, chat</td></tr>
+    <tr><td><code>getFastModel()</code></td><td>Quick tasks</td><td>GPT-4o-mini</td><td>Classification, sentiment</td></tr>
+    <tr><td><code>getExtractionModel()</code></td><td>Structured extraction</td><td>GPT-4-Turbo (temp 0.1)</td><td>Financial data, parsing</td></tr>
+    <tr><td><code>getModel()</code></td><td>Custom override</td><td>Any</td><td>Escape hatch</td></tr>
+  </table>
+  <p><strong>Environment variables:</strong> <code>LLM_CHAT_PROVIDER</code>, <code>LLM_FAST_PROVIDER</code> (values: <code>openai</code> or <code>gemini</code>)</p>
+</div>
+
+<h3>Agent Architecture Types</h3>
+<table>
+  <tr><th>Pattern</th><th>Description</th><th>Used By</th></tr>
+  <tr><td><span class="badge stategraph">StateGraph</span></td><td>LangGraph directed graph with conditional edges. Best for multi-step workflows with retry/correction loops.</td><td>Financial Extraction, Contact Enrichment, Signal Monitor, Email Drafter</td></tr>
+  <tr><td><span class="badge react">ReAct</span></td><td>LangGraph prebuilt agent with tools. The AI decides which tools to call based on the question.</td><td>Deal Chat, Portfolio Chat</td></tr>
+  <tr><td><span class="badge parallel">Parallel</span></td><td>Concurrent data fetching followed by structured LLM synthesis.</td><td>Meeting Prep</td></tr>
+</table>
+
+
+<hr class="section-divider">
+<h2 id="financial-agent">2. Financial Extraction Agent</h2>
+<span class="badge stategraph">StateGraph — 4 Nodes</span>
+
+<p>Multi-layer financial statement extraction with self-correction. Takes a PDF or Excel file and produces structured financial statements (Income Statement, Balance Sheet, Cash Flow) with confidence scores and validation.</p>
+
+<div class="flow">
+  Upload → <strong>Extract</strong> → <strong>Validate</strong> → (pass?) → <strong>Store</strong> → Done<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↘ (fail + retries left) → <strong>Self-Correct</strong> → Validate ↺ (max 3 loops)
+</div>
+
+<h3>Extraction Layers (prioritized fallback)</h3>
+<table>
+  <tr><th>Priority</th><th>Method</th><th>Best For</th><th>Source Tag</th></tr>
+  <tr><td>1</td><td>xlsx library → CSV → GPT-4o classifier</td><td>Excel files (.xlsx)</td><td><code>gpt4o</code></td></tr>
+  <tr><td>2</td><td>Azure Document Intelligence</td><td>Complex CIM layouts (if configured)</td><td><code>azure</code></td></tr>
+  <tr><td>3</td><td>pdf-parse → GPT-4o classifier</td><td>Text-rich PDFs</td><td><code>gpt4o</code></td></tr>
+  <tr><td>4</td><td>GPT-4o Vision</td><td>Scanned/image-only PDFs</td><td><code>vision</code></td></tr>
+</table>
+
+<h3>Node Details</h3>
+<table>
+  <tr><th>Node</th><th>File</th><th>What It Does</th></tr>
+  <tr><td><strong>Extract</strong></td><td><code>nodes/extractNode.ts</code></td><td>Detects file type, routes to best extraction layer, normalizes line items, corrects projected/historical labels, auto-calculates EBITDA if missing</td></tr>
+  <tr><td><strong>Validate</strong></td><td><code>nodes/validateNode.ts</code></td><td>Math checks: Revenue - COGS = Gross Profit, Assets = Liabilities + Equity, Cash Flow reconciliation. Flags low-confidence periods.</td></tr>
+  <tr><td><strong>Self-Correct</strong></td><td><code>nodes/selfCorrectNode.ts</code></td><td>Re-extracts ONLY the failing statements/periods with a targeted prompt. Merges corrections into existing data.</td></tr>
+  <tr><td><strong>Store</strong></td><td><code>nodes/storeNode.ts</code></td><td>Saves to DB, detects merge conflicts (multi-document), sets isActive flags.</td></tr>
+</table>
+
+<h3>Key Files</h3>
+<ul>
+  <li><code>apps/api/src/services/agents/financialAgent/index.ts</code> — Entry point: <code>runFinancialAgent()</code></li>
+  <li><code>apps/api/src/services/agents/financialAgent/graph.ts</code> — StateGraph wiring + conditional edges</li>
+  <li><code>apps/api/src/services/agents/financialAgent/state.ts</code> — State schema (AgentStep[], retryCount, etc.)</li>
+  <li><code>apps/api/src/services/financialClassifier.ts</code> — GPT-4o classifier, normalizer, derived fields calculator</li>
+</ul>
+
+<h3>Post-Processing (Session 37 Additions)</h3>
+<ul>
+  <li><strong>normalizeLineItems()</strong> — Rounds financial values to 4 decimals, percentages to 2</li>
+  <li><strong>correctPeriodTypes()</strong> — Fixes projected vs historical labels (future years → Projected, detects E/F/Est suffixes)</li>
+  <li><strong>computeDerivedFields()</strong> — Auto-calculates EBITDA, Gross Profit, and margin % when source doc is missing them</li>
+</ul>
+
+
+<hr class="section-divider">
+<h2 id="deal-chat">3. Deal Chat Agent</h2>
+<span class="badge react">ReAct Agent — 6 Tools</span>
+
+<p>Conversational AI assistant on each deal page. Instead of stuffing all deal data into the system prompt, the agent fetches data on-demand using tools — keeping responses focused and token-efficient.</p>
+
+<div class="flow">
+  User asks question → Agent reasons → Selects tool(s) → Fetches data → Generates response
+</div>
+
+<h3>Tools</h3>
+<table>
+  <tr><th>Tool</th><th>What It Does</th></tr>
+  <tr><td><code>search_documents</code></td><td>Semantic search across deal documents via RAG (vector embeddings), falls back to keyword search</td></tr>
+  <tr><td><code>get_deal_financials</code></td><td>Fetches extracted financial statements + key metrics (revenue, EBITDA, growth)</td></tr>
+  <tr><td><code>compare_deals</code></td><td>Compares current deal vs another deal or portfolio averages, shows percentile rankings</td></tr>
+  <tr><td><code>get_deal_activity</code></td><td>Fetches 15 most recent activities (notes, stage changes, uploads, meetings)</td></tr>
+  <tr><td><code>update_deal_field</code></td><td>Updates deal fields: leadPartner, analyst, source, priority, industry, description + team assignment</td></tr>
+  <tr><td><code>suggest_action</code></td><td>Returns navigation suggestions (open VDR, create memo, view financials, change stage)</td></tr>
+</table>
+
+<h3>Key Files</h3>
+<ul>
+  <li><code>apps/api/src/services/agents/dealChatAgent/index.ts</code> — Agent entry point</li>
+  <li><code>apps/api/src/services/agents/dealChatAgent/tools.ts</code> — All 6 tool definitions</li>
+  <li><code>apps/api/src/routes/deals-chat-ai.ts</code> — API route, saves messages to DB</li>
+</ul>
+
+<p><strong>Endpoint:</strong> <code>POST /deals/:dealId/chat</code></p>
+
+
+<hr class="section-divider">
+<h2 id="portfolio-chat">4. Portfolio Chat Agent</h2>
+<span class="badge react">ReAct Agent — 3 Tools</span>
+
+<p>Portfolio-level AI assistant on the dashboard. Answers questions about the entire deal pipeline, portfolio metrics, and individual deal lookups.</p>
+
+<h3>Tools</h3>
+<table>
+  <tr><th>Tool</th><th>What It Does</th></tr>
+  <tr><td><code>get_portfolio_summary</code></td><td>Total deals, aggregate revenue/EBITDA, IRR, stage & industry breakdown, top 10 deals by value</td></tr>
+  <tr><td><code>get_deal_details</code></td><td>Look up a specific deal by name, returns all metrics</td></tr>
+  <tr><td><code>get_pipeline_analysis</code></td><td>Stage distribution, value per stage, conversion rates, velocity metrics</td></tr>
+</table>
+
+<h3>Key File</h3>
+<ul>
+  <li><code>apps/api/src/routes/ai-portfolio.ts</code> — Agent + tools defined inline</li>
+</ul>
+
+<p><strong>Endpoint:</strong> <code>POST /portfolio/chat</code></p>
+
+
+<hr class="section-divider">
+<h2 id="contact-enrichment">5. Contact Enrichment Agent</h2>
+<span class="badge stategraph">StateGraph — 4 Nodes</span>
+
+<p>AI-powered contact research and profile enrichment. Generates LinkedIn profiles, company details, expertise areas, and deal relevance scores. Routes low-confidence results to human review.</p>
+
+<div class="flow">
+  Contact selected → <strong>Research</strong> → <strong>Validate</strong> → (confidence ≥ 70%?) → <strong>Save</strong> → Done<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↘ (< 70%) → <strong>Review</strong> → Flag for human
+</div>
+
+<h3>Enriched Data Output</h3>
+<ul>
+  <li>LinkedIn URL, updated title, company, industry, location</li>
+  <li>Professional bio, expertise areas, connections count</li>
+  <li>Deal relevance score (0-100) with explanation</li>
+  <li>Confidence score based on data completeness</li>
+  <li>Source citations</li>
+</ul>
+
+<h3>Confidence Scoring</h3>
+<table>
+  <tr><th>Data Point</th><th>Points</th></tr>
+  <tr><td>LinkedIn URL found</td><td>+10</td></tr>
+  <tr><td>Title updated</td><td>+5</td></tr>
+  <tr><td>Company updated</td><td>+5</td></tr>
+  <tr><td>Bio generated</td><td>+5</td></tr>
+  <tr><td>Expertise areas found</td><td>+5</td></tr>
+</table>
+
+<p><strong>File:</strong> <code>apps/api/src/services/agents/contactEnrichment/index.ts</code><br>
+<strong>Endpoint:</strong> <code>POST /api/ai/enrich-contact</code></p>
+
+
+<hr class="section-divider">
+<h2 id="meeting-prep">6. Meeting Prep Agent</h2>
+<span class="badge parallel">Parallel Fetch + LLM</span>
+
+<p>Generates comprehensive meeting briefs by pulling data from multiple sources in parallel, then synthesizing with GPT-4o structured output.</p>
+
+<h3>Data Sources (fetched in parallel)</h3>
+<ol>
+  <li>Deal details + financials + team members</li>
+  <li>Contact history + past interactions (if contact specified)</li>
+  <li>RAG document search (if meeting topic specified)</li>
+  <li>Recent deal activities</li>
+</ol>
+
+<h3>Output: Meeting Brief</h3>
+<table>
+  <tr><th>Section</th><th>Content</th></tr>
+  <tr><td>Headline</td><td>One-line summary of the deal + meeting context</td></tr>
+  <tr><td>Deal Summary</td><td>2-3 sentences on current status, stage, key metrics</td></tr>
+  <tr><td>Contact Profile</td><td>Who you're meeting, their background, relevance</td></tr>
+  <tr><td>Key Talking Points</td><td>5-7 data-backed discussion points</td></tr>
+  <tr><td>Questions to Ask</td><td>3-5 targeted questions based on gaps in information</td></tr>
+  <tr><td>Risks to Address</td><td>2-3 risk areas to probe during the meeting</td></tr>
+  <tr><td>Document Highlights</td><td>Key findings from uploaded documents</td></tr>
+  <tr><td>Suggested Agenda</td><td>4-6 structured agenda items with time allocation</td></tr>
+</table>
+
+<p><strong>File:</strong> <code>apps/api/src/services/agents/meetingPrep/index.ts</code><br>
+<strong>Endpoint:</strong> <code>POST /api/ai/meeting-prep</code><br>
+<strong>Input:</strong> <code>{ dealId, contactId?, meetingTopic?, meetingDate? }</code></p>
+
+
+<hr class="section-divider">
+<h2 id="signal-monitor">7. Deal Signal Monitor</h2>
+<span class="badge stategraph">StateGraph — 3 Nodes</span>
+
+<p>Scans the entire portfolio for actionable signals — stalled deals, financial events, competitive threats, growth opportunities, and more. Creates notifications and activity records for critical signals.</p>
+
+<div class="flow">
+  Trigger scan → <strong>Fetch Portfolio</strong> (up to 30 active deals) → <strong>Analyze Signals</strong> → <strong>Route & Notify</strong> → Done
+</div>
+
+<h3>Signal Types (8)</h3>
+<table>
+  <tr><th>Signal Type</th><th>Example</th></tr>
+  <tr><td>leadership_change</td><td>"CEO departure at target company"</td></tr>
+  <tr><td>financial_event</td><td>"Revenue declined 15% QoQ"</td></tr>
+  <tr><td>market_shift</td><td>"SaaS multiples compressed 2x in sector"</td></tr>
+  <tr><td>competitive_threat</td><td>"New entrant raised $50M Series C"</td></tr>
+  <tr><td>regulatory_change</td><td>"FDA approval timeline extended"</td></tr>
+  <tr><td>growth_opportunity</td><td>"Adjacent market expansion possible"</td></tr>
+  <tr><td>risk_escalation</td><td>"Deal stalled in DD for 60+ days"</td></tr>
+  <tr><td>milestone_approaching</td><td>"LOI expiration in 5 days"</td></tr>
+</table>
+
+<h3>Severity Levels</h3>
+<table>
+  <tr><th>Severity</th><th>Color</th><th>Action</th></tr>
+  <tr><td>Critical</td><td style="color:#d32f2f;">Red</td><td>Creates Activity record + Notification</td></tr>
+  <tr><td>Warning</td><td style="color:#f57c00;">Amber</td><td>Creates Activity record</td></tr>
+  <tr><td>Info</td><td style="color:#1976d2;">Blue</td><td>Displayed in UI only</td></tr>
+</table>
+
+<p><strong>File:</strong> <code>apps/api/src/services/agents/signalMonitor/index.ts</code><br>
+<strong>Endpoint:</strong> <code>POST /api/ai/scan-signals</code></p>
+
+
+<hr class="section-divider">
+<h2 id="email-drafter">8. Smart Email Drafter</h2>
+<span class="badge stategraph">StateGraph — 4 Nodes</span>
+
+<p>Generates professional deal emails with template selection, tone control, and compliance checking. Every email goes through tone and compliance gates before being marked ready.</p>
+
+<div class="flow">
+  Select template + tone → <strong>Write Draft</strong> → <strong>Tone Check</strong> → <strong>Compliance Check</strong> → <strong>Finalize</strong><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Score ≥ 80 ✓&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;No issues → <strong>ready_for_review</strong><br>
+  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Score < 80 → adjusts&nbsp;&nbsp;Issues found → <strong>compliance_issues</strong>
+</div>
+
+<h3>Email Templates (7)</h3>
+<table>
+  <tr><th>#</th><th>Template</th><th>Use Case</th></tr>
+  <tr><td>1</td><td>Initial Outreach</td><td>First contact — intro, why interested, firm background</td></tr>
+  <tr><td>2</td><td>Follow Up</td><td>Post-meeting — thank you, key takeaways, next steps</td></tr>
+  <tr><td>3</td><td>Document Request</td><td>Specific docs needed, format preferences, timeline</td></tr>
+  <tr><td>4</td><td>LOI Introduction</td><td>Reference discussions, outline terms, commitment</td></tr>
+  <tr><td>5</td><td>Deal Update</td><td>Status report — developments, decisions, timeline</td></tr>
+  <tr><td>6</td><td>Meeting Request</td><td>Proposed times, attendees, agenda items</td></tr>
+  <tr><td>7</td><td>Thank You</td><td>Gratitude, reference interaction, future opportunity</td></tr>
+</table>
+
+<h3>Tone Options</h3>
+<p><code>professional</code> (default) &nbsp;|&nbsp; <code>friendly</code> &nbsp;|&nbsp; <code>formal</code> &nbsp;|&nbsp; <code>direct</code> &nbsp;|&nbsp; <code>warm</code></p>
+
+<h3>Compliance Checks</h3>
+<ul>
+  <li>MNPI (Material Non-Public Information) disclosure</li>
+  <li>Promissory or commitment language</li>
+  <li>Forward-looking statement warnings</li>
+  <li>FCPA (Foreign Corrupt Practices Act) concerns</li>
+  <li>Confidentiality breach risks</li>
+</ul>
+
+<p><strong>File:</strong> <code>apps/api/src/services/agents/emailDrafter/index.ts</code><br>
+<strong>Endpoints:</strong> <code>POST /api/ai/draft-email</code>, <code>GET /api/ai/email-templates</code></p>
+
+
+<hr class="section-divider">
+<h2 id="analysis">9. Financial Analysis Suite</h2>
+
+<p>13+ analysis modules that run on extracted financial data. Pure math calculations (no AI calls) except for narrative insights and red flag descriptions.</p>
+
+<h3>Analysis Modules</h3>
+<table>
+  <tr><th>Module</th><th>What It Calculates</th></tr>
+  <tr><td>Quality of Earnings (QoE)</td><td>Earnings quality score, adjustment flags, sustainability assessment</td></tr>
+  <tr><td>Financial Ratios (18)</td><td>Growth, profitability, leverage, liquidity, efficiency metrics across 4 tabs</td></tr>
+  <tr><td>DuPont Analysis</td><td>ROE decomposition: Profit Margin × Asset Turnover × Equity Multiplier</td></tr>
+  <tr><td>EBITDA Bridge</td><td>Revenue → Gross Profit → EBITDA waterfall with period-over-period deltas</td></tr>
+  <tr><td>Revenue Quality</td><td>Recurring vs one-time, concentration risk, growth sustainability</td></tr>
+  <tr><td>Cash Flow Analysis</td><td>Operating, investing, financing breakdown, free cash flow, cash conversion</td></tr>
+  <tr><td>Working Capital</td><td>Normalized WC, DSO/DIO/DPO, cash conversion cycle, seasonality</td></tr>
+  <tr><td>Cost Structure</td><td>Fixed vs variable split, operating leverage, cost trends</td></tr>
+  <tr><td>Debt Capacity</td><td>EBITDA-based debt capacity, coverage ratios, recommended leverage</td></tr>
+  <tr><td>LBO Screen</td><td>12 scenarios varying entry multiple, leverage, growth, and exit multiple</td></tr>
+  <tr><td>Red Flag Detection</td><td>Automated flags: margin anomalies, cash flow divergence, leverage spikes</td></tr>
+  <tr><td>Cross-Doc Verification</td><td>Compares values across multiple uploaded documents, flags discrepancies</td></tr>
+  <tr><td>Portfolio Benchmarking</td><td>Current deal vs portfolio averages, percentile rankings</td></tr>
+</table>
+
+<h3>Frontend Tabs</h3>
+<p>The analysis renders below Financial Statements on the deal page with 6 tabs:</p>
+<ol>
+  <li><strong>Overview</strong> — QoE score, key ratios dashboard, EBITDA bridge chart</li>
+  <li><strong>Deep Dive</strong> — 18 ratios with period charts, DuPont, revenue quality</li>
+  <li><strong>Cash & Capital</strong> — Cash flow, working capital, cost structure</li>
+  <li><strong>Valuation</strong> — Debt capacity, LBO screen (12 scenarios)</li>
+  <li><strong>Diligence</strong> — Red flags, cross-doc verification</li>
+  <li><strong>AI Insights</strong> — GPT-4o narrative insights with benchmarking</li>
+</ol>
+
+<h3>Key Files</h3>
+<ul>
+  <li><code>apps/api/src/services/analysis/</code> — All analysis logic (6 files)</li>
+  <li><code>apps/api/src/routes/financials-analysis.ts</code> — API endpoints</li>
+  <li><code>apps/web/js/analysis.js</code> — Main orchestrator (tab renderer)</li>
+  <li><code>apps/web/js/analysis-modules.js</code> — Individual module renderers (14 functions)</li>
+  <li><code>apps/web/js/analysis-charts.js</code> — Chart.js chart renderers</li>
+</ul>
+
+<p><strong>Endpoints:</strong><br>
+<code>GET /deals/:dealId/financials/analysis</code> — Returns all ratio/QoE data<br>
+<code>GET /deals/:dealId/financials/insights</code> — Returns AI narrative insights</p>
+
+
+<hr class="section-divider">
+<h2 id="frontend">10. Frontend Integration</h2>
+
+<p><strong>File:</strong> <code>apps/web/js/ai-tools.js</code> (~615 lines) — loaded on contacts.html, deal.html, dashboard.html</p>
+
+<table>
+  <tr><th>Feature</th><th>Where</th><th>How to Access</th></tr>
+  <tr><td>Contact Enrichment</td><td>Contacts page</td><td>Click any contact → "AI Enrich" button in actions bar</td></tr>
+  <tr><td>Meeting Prep</td><td>Deal page</td><td>⋮ menu (top right) → "Meeting Prep" → full-screen modal</td></tr>
+  <tr><td>Email Drafter</td><td>Deal page</td><td>⋮ menu → "Draft Email" → modal with template picker + tone selector</td></tr>
+  <tr><td>Signal Monitor</td><td>Dashboard</td><td>Signal widget → "Scan Signals" button → severity-coded cards</td></tr>
+  <tr><td>Deal Chat</td><td>Deal page</td><td>Chat panel on right side — ask anything about the deal</td></tr>
+  <tr><td>Portfolio Chat</td><td>Dashboard</td><td>Search bar at top — "Ask AI anything about your portfolio..."</td></tr>
+  <tr><td>Financial Analysis</td><td>Deal page</td><td>Scroll below Financial Statements → 6 analysis tabs auto-load</td></tr>
+  <tr><td>Extract from VDR</td><td>Data Room</td><td>File ⋮ menu → "Extract Financials" (PDF/Excel only)</td></tr>
+</table>
+
+
+<hr class="section-divider">
+<h2 id="api-reference">11. API Reference</h2>
+
+<h3>AI Agent Endpoints</h3>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+  <tr><td>POST</td><td><code>/api/ai/enrich-contact</code></td><td>Enrich a contact's profile with AI research</td></tr>
+  <tr><td>POST</td><td><code>/api/ai/meeting-prep</code></td><td>Generate a meeting brief for a deal</td></tr>
+  <tr><td>POST</td><td><code>/api/ai/scan-signals</code></td><td>Scan portfolio for deal signals</td></tr>
+  <tr><td>POST</td><td><code>/api/ai/draft-email</code></td><td>Draft a deal-related email</td></tr>
+  <tr><td>GET</td><td><code>/api/ai/email-templates</code></td><td>List available email templates</td></tr>
+</table>
+
+<h3>Chat Endpoints</h3>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+  <tr><td>POST</td><td><code>/deals/:dealId/chat</code></td><td>Send message to deal chat agent</td></tr>
+  <tr><td>GET</td><td><code>/deals/:dealId/chat/history</code></td><td>Get chat history</td></tr>
+  <tr><td>POST</td><td><code>/portfolio/chat</code></td><td>Send message to portfolio agent</td></tr>
+</table>
+
+<h3>Financial Analysis Endpoints</h3>
+<table>
+  <tr><th>Method</th><th>Endpoint</th><th>Description</th></tr>
+  <tr><td>GET</td><td><code>/deals/:dealId/financials/analysis</code></td><td>Full analysis (ratios, QoE, LBO, red flags)</td></tr>
+  <tr><td>GET</td><td><code>/deals/:dealId/financials/insights</code></td><td>AI narrative insights</td></tr>
+  <tr><td>POST</td><td><code>/deals/:dealId/financials/extract</code></td><td>Trigger financial extraction</td></tr>
+</table>
+
+
+<hr class="section-divider">
+<h2 id="config">12. Configuration & Environment</h2>
+
+<h3>Required Environment Variables</h3>
+<table>
+  <tr><th>Variable</th><th>Required</th><th>Description</th></tr>
+  <tr><td><code>OPENAI_API_KEY</code></td><td>Yes</td><td>OpenAI API key for GPT-4o models</td></tr>
+  <tr><td><code>GEMINI_API_KEY</code></td><td>Optional</td><td>Google AI key (for embeddings + optional Gemini models)</td></tr>
+  <tr><td><code>LLM_CHAT_PROVIDER</code></td><td>Optional</td><td><code>openai</code> (default) or <code>gemini</code></td></tr>
+  <tr><td><code>LLM_FAST_PROVIDER</code></td><td>Optional</td><td><code>openai</code> (default) or <code>gemini</code></td></tr>
+  <tr><td><code>LLM_CHAT_MODEL</code></td><td>Optional</td><td>Override chat model (default: <code>gpt-4o</code>)</td></tr>
+  <tr><td><code>LLM_FAST_MODEL</code></td><td>Optional</td><td>Override fast model (default: <code>gpt-4o-mini</code>)</td></tr>
+  <tr><td><code>AZURE_DI_ENDPOINT</code></td><td>Optional</td><td>Azure Document Intelligence endpoint (for PDF extraction)</td></tr>
+  <tr><td><code>AZURE_DI_KEY</code></td><td>Optional</td><td>Azure Document Intelligence key</td></tr>
+</table>
+
+<h3>Dependencies</h3>
+<table>
+  <tr><th>Package</th><th>Purpose</th></tr>
+  <tr><td><code>@langchain/langgraph</code></td><td>StateGraph and ReAct agent framework</td></tr>
+  <tr><td><code>@langchain/openai</code></td><td>OpenAI model bindings (ChatOpenAI)</td></tr>
+  <tr><td><code>@langchain/google-genai</code></td><td>Gemini model bindings + embeddings</td></tr>
+  <tr><td><code>@langchain/core</code></td><td>Core types, messages, tools, structured output</td></tr>
+  <tr><td><code>zod</code></td><td>Schema validation for structured LLM output</td></tr>
+</table>
+
+<div class="note">
+  <strong>Architecture Decision:</strong> All agents wrap existing service functions — no extraction, validation, or storage logic was duplicated. The agents act as orchestration layers that call into the existing codebase, making them easy to swap out or extend without touching business logic.
+</div>
+
+<br>
+<p style="color: #888; font-size: 12px; text-align: center;">PE OS AI Documentation — March 2026 — Confidential</p>
+
+</body>
+</html>

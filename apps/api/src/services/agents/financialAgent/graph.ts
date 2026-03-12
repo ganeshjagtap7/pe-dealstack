@@ -1,12 +1,16 @@
 /**
  * Financial Agent Graph — LangGraph state machine.
  *
- * Wires the 4 nodes together with conditional edges:
+ * Wires the 5 nodes together with conditional edges:
  *
- *   START → extract → validate ──→ store → END
- *                        │                  ↑
- *                        └→ self_correct ───┘
- *                           (loops back to validate, max 3 retries)
+ *   START → extract → verify → validate ──→ store → END
+ *                                  │                  ↑
+ *                                  └→ self_correct ───┘
+ *                                     (loops back to validate, max 3 retries)
+ *
+ * The verify node (two-pass verification) compares extracted values against
+ * the source text using GPT-4o-mini and auto-corrects unit scale errors,
+ * transposed digits, and wrong row mappings before validation runs.
  *
  * Each node reads/writes to the shared FinancialAgentState.
  * The validate node decides whether to self-correct or store
@@ -16,6 +20,7 @@
 import { StateGraph, END, START } from '@langchain/langgraph';
 import { FinancialAgentState } from './state.js';
 import { extractNode } from './nodes/extractNode.js';
+import { verifyNode } from './nodes/verifyNode.js';
 import { validateNode } from './nodes/validateNode.js';
 import { selfCorrectNode } from './nodes/selfCorrectNode.js';
 import { storeNode } from './nodes/storeNode.js';
@@ -23,10 +28,10 @@ import type { FinancialAgentStateType } from './state.js';
 
 // ─── Routing Functions ───────────────────────────────────────
 
-/** After extract: if failed go to END, otherwise go to validate */
+/** After extract: if failed go to END, otherwise go to verify */
 function routeAfterExtract(state: FinancialAgentStateType): string {
   if (state.status === 'failed') return END;
-  return 'validate';
+  return 'verify';
 }
 
 /** After validate: route based on status set by validate node */
@@ -46,6 +51,7 @@ function buildFinancialAgentGraph() {
   const graph = new StateGraph(FinancialAgentState)
     // Add nodes
     .addNode('extract', extractNode)
+    .addNode('verify', verifyNode)
     .addNode('validate', validateNode)
     .addNode('self_correct', selfCorrectNode)
     .addNode('store', storeNode)
@@ -53,11 +59,16 @@ function buildFinancialAgentGraph() {
     // Entry edge
     .addEdge(START, 'extract')
 
-    // Conditional edges
+    // Extract → Verify (or END if failed)
     .addConditionalEdges('extract', routeAfterExtract, {
-      validate: 'validate',
+      verify: 'verify',
       [END]: END,
     })
+
+    // Verify → Validate (always — verify is best-effort)
+    .addEdge('verify', 'validate')
+
+    // Validate → self_correct or store
     .addConditionalEdges('validate', routeAfterValidate, {
       self_correct: 'self_correct',
       store: 'store',

@@ -131,8 +131,9 @@ export async function classifyFinancials(
     return null;
   }
 
-  // Use up to 30,000 chars — more than the fast pass (20k) to catch full financials
-  const truncatedText = text.slice(0, 30000);
+  // Use up to 60,000 chars — GPT-4o supports 128K context, so we can safely send more
+  // This catches financial data buried deep in 50+ page CIMs that were previously cut off
+  const truncatedText = text.slice(0, 60000);
 
   log.debug('Financial classifier starting', { textLength: truncatedText.length });
 
@@ -149,7 +150,7 @@ export async function classifyFinancials(
       response_format: { type: 'json_object' },
       temperature: 0.1,
       max_tokens: 16000,
-    }, { timeout: 90000 });
+    }, { timeout: 120000 });
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
