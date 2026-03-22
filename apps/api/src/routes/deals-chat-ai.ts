@@ -6,6 +6,7 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
+import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
 import { generateFallbackResponse } from '../services/chatHelpers.js';
@@ -22,6 +23,13 @@ router.post('/:dealId/chat', async (req, res) => {
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // Verify deal belongs to user's org before any data access
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
     }
 
     // Get deal with basic context (agent fetches details on demand via tools)
@@ -77,10 +85,11 @@ router.post('/:dealId/chat', async (req, res) => {
       }
     }
 
-    // Fetch available users for assignment
+    // Fetch available users for assignment (same org only)
     const { data: availableUsers } = await supabase
       .from('User')
       .select('id, name, title, role')
+      .eq('organizationId', orgId)
       .order('name');
 
     if (availableUsers?.length) {

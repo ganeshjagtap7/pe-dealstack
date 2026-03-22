@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
+import { getOrgId, verifyContactAccess, verifyDealAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -34,6 +35,12 @@ const createConnectionSchema = z.object({
 router.post('/:id/interactions', async (req: any, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(id, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
     const validation = createInteractionSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
@@ -76,12 +83,24 @@ router.post('/:id/interactions', async (req: any, res) => {
 router.post('/:id/deals', async (req: any, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(id, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
     const validation = linkDealSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
     }
 
     const { dealId, role } = validation.data;
+
+    // Also verify the deal belongs to the same org
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
 
     const { data: link, error } = await supabase
       .from('ContactDeal')
@@ -114,6 +133,11 @@ router.post('/:id/deals', async (req: any, res) => {
 router.delete('/:contactId/deals/:dealId', async (req: any, res) => {
   try {
     const { contactId, dealId } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(contactId, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
 
     const { error } = await supabase
       .from('ContactDeal')
@@ -137,6 +161,11 @@ router.delete('/:contactId/deals/:dealId', async (req: any, res) => {
 router.get('/:id/connections', async (req: any, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(id, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
 
     // Fetch where this contact is either side of the relationship
     // ContactRelationship table may not exist yet — return empty if so
@@ -173,6 +202,12 @@ router.get('/:id/connections', async (req: any, res) => {
 router.post('/:id/connections', async (req: any, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(id, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
     const validation = createConnectionSchema.safeParse(req.body);
     if (!validation.success) {
       return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
@@ -222,7 +257,12 @@ router.post('/:id/connections', async (req: any, res) => {
 
 router.delete('/:id/connections/:connectionId', async (req: any, res) => {
   try {
-    const { connectionId } = req.params;
+    const { id, connectionId } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(id, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
 
     const { error } = await supabase
       .from('ContactRelationship')

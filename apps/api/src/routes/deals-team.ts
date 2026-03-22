@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { createNotification } from './notifications.js';
+import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -16,6 +17,11 @@ const addTeamMemberSchema = z.object({
 router.get('/:id/team', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(id, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
 
     const { data, error } = await supabase
       .from('DealTeamMember')
@@ -41,6 +47,12 @@ router.get('/:id/team', async (req, res) => {
 router.post('/:id/team', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(id, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
     const data = addTeamMemberSchema.parse(req.body);
 
     // Check if already a team member
@@ -104,6 +116,12 @@ router.post('/:id/team', async (req, res) => {
 router.patch('/:dealId/team/:memberId', async (req, res) => {
   try {
     const { dealId, memberId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
+
     const { role } = req.body;
 
     if (!['LEAD', 'MEMBER', 'VIEWER'].includes(role)) {
@@ -141,6 +159,11 @@ router.patch('/:dealId/team/:memberId', async (req, res) => {
 router.delete('/:dealId/team/:memberId', async (req, res) => {
   try {
     const { dealId, memberId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) {
+      return res.status(404).json({ error: 'Deal not found' });
+    }
 
     const { error } = await supabase
       .from('DealTeamMember')

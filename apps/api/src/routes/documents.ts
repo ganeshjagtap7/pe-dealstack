@@ -3,7 +3,7 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
-import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { getOrgId, verifyDealAccess, verifyDocumentAccess, verifyFolderAccess } from '../middleware/orgScope.js';
 
 // Sub-routers
 import documentsUploadRouter from './documents-upload.js';
@@ -109,6 +109,12 @@ router.get('/deals/:dealId/documents', async (req, res) => {
 router.get('/folders/:folderId/documents', async (req, res) => {
   try {
     const { folderId } = req.params;
+    const orgId = getOrgId(req);
+    const folderAccess = await verifyFolderAccess(folderId, orgId);
+    if (!folderAccess) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
     const { type, search } = req.query;
 
     let query = supabase
@@ -144,6 +150,11 @@ router.get('/folders/:folderId/documents', async (req, res) => {
 router.get('/documents/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const docAccess = await verifyDocumentAccess(id, orgId);
+    if (!docAccess) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
 
     const { data, error } = await supabase
       .from('Document')
@@ -173,6 +184,12 @@ router.get('/documents/:id', async (req, res) => {
 router.patch('/documents/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const docAccess = await verifyDocumentAccess(id, orgId);
+    if (!docAccess) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
     const data = updateDocumentSchema.parse(req.body);
 
     // Add updatedAt timestamp
@@ -219,6 +236,11 @@ router.patch('/documents/:id', async (req, res) => {
 router.delete('/documents/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const docAccess = await verifyDocumentAccess(id, orgId);
+    if (!docAccess) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
 
     // Get document to find file path
     const { data: doc, error: fetchError } = await supabase
@@ -272,6 +294,11 @@ router.delete('/documents/:id', async (req, res) => {
 router.get('/documents/:id/download', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const docAccess = await verifyDocumentAccess(id, orgId);
+    if (!docAccess) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
 
     const { data: doc, error: fetchError } = await supabase
       .from('Document')

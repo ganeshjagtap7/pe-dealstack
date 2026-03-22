@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { openai, isAIEnabled } from '../openai.js';
 import { log } from '../utils/logger.js';
-import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { getOrgId, verifyDealAccess, verifyConversationAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -48,11 +48,13 @@ router.get('/conversations', async (req: Request, res: Response, next: NextFunct
       .from('Conversation')
       .select(`
         *,
-        Deal (
+        Deal!inner (
           id,
-          name
+          name,
+          organizationId
         )
       `)
+      .eq('Deal.organizationId', orgId)
       .order('updatedAt', { ascending: false });
 
     if (userId) {
@@ -372,6 +374,12 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
 router.get('/conversations/:id/messages', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const convAccess = await verifyConversationAccess(id, orgId);
+    if (!convAccess) {
+      return res.status(404).json({ error: 'Conversation not found' });
+    }
+
     const { limit, offset } = req.query;
 
     let query = supabase
