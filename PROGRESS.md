@@ -5,6 +5,156 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 43 — March 16, 2026
+
+#### 18:00-20:30 IST — QA Bug Fix Sprint #2 (Pushkar's AI Features Test Report)
+
+**Goal:** Fix all FAIL items and implement all suggestions from Pushkar's "PE OS New Features Test Checklist" (8 features, 33 checks). 4 FAILs, 3 enhancement requests.
+
+---
+
+#### What Was Done
+
+1. **B1: Contact Enrichment — Inflated confidence with hallucinated data (1.3 FAIL)**
+   - **Problem:** AI Enrich returned 95% confidence with fabricated data (fake LinkedIn URLs, invented locations) even for contacts with no LinkedIn or phone number
+   - **Root cause:** LLM (GPT-4o) fabricates data from training data (no real external APIs), then validate node blindly adds +5/+10 per field — easily reaches 95%
+   - **Fix:**
+     - Rewrote research prompt: "set fields to null if uncertain", "do NOT fabricate LinkedIn URLs", "do NOT guess locations unless email/company implies one"
+     - Added input-sparsity confidence cap: name only → max 30%, name+email → max 50%, name+email+company → max 70%, all fields → max 85%
+     - Removed blind boosting for LLM-generated fields. LinkedIn URL no longer boosts score (can't verify without API)
+     - Sources now honestly report "llm_inference" instead of "professional_databases"
+   - **File:** `apps/api/src/services/agents/contactEnrichment/index.ts`
+
+2. **B2: Deal Chat "no financial statements" (5.2 FAIL)**
+   - **Problem:** Financial statements ARE extracted and visible on the deal page, but AI Chat says "no extracted financial statements available"
+   - **Root cause:** `getDealFinancialsTool` in `tools.ts` had `.eq('isActive', true)` filter — hides statements in `needs_review` merge conflict status
+   - **Fix:** Removed isActive filter. Now fetches ALL statements (active + inactive). Inactive statements marked "(pending merge review)" in summary so user understands state
+   - **File:** `apps/api/src/services/agents/dealChatAgent/tools.ts`
+
+3. **B3: Deal Chat comparison broken (5.4 FAIL)**
+   - **Problem:** "Compare this deal with Neen AI" — AI can't find the other deal's data even though it exists
+   - **Root cause:** All 6 deal chat tools were module-level singletons requiring the LLM to pass `dealId` and `orgId` as parameters. The LLM unreliably passed `orgId`. `compare_deals` schema required both but LLM often omitted `orgId`.
+   - **Fix:**
+     - Full rewrite of `tools.ts` — all 6 tools now created inside `getDealChatTools(dealId, orgId)` as closures. `dealId`/`orgId` baked in, not required from LLM.
+     - `compare_deals` now accepts optional `targetDealName` for named comparisons (e.g., "Compare with Neen AI")
+     - Updated system prompt to tell agent tools already know the deal context
+   - **Files:** `apps/api/src/services/agents/dealChatAgent/tools.ts` (full rewrite), `apps/api/src/services/agents/dealChatAgent/index.ts`
+
+4. **B4: Document upload via chat (5.5 FAIL)**
+   - **Problem:** Chat has 📎 attach button but it wasn't wired up. No way to upload docs and ask questions about them.
+   - **Fix:**
+     - Wired `attach-file-btn` to hidden file input (PDF, Excel, CSV, Word, TXT)
+     - On select → upload to VDR via existing `POST /deals/:dealId/documents` endpoint
+     - Shows upload progress chip with spinner → success (green check + remove) or error (red)
+     - On send → prepends `[User attached: filename — search for this document]` to message so agent's `search_documents` tool finds it
+     - Attachment chips clear after sending
+   - **Files:** `apps/web/deal-chat-attachments.js` (new, 114 lines), `apps/web/deal-chat.js`, `apps/web/deal.html`
+
+5. **E1: Meeting Prep improvements (2.4 suggestions)**
+   - **Problem:** Questions too generic ("What is market size?" applies to any deal), no financial detail, no export
+   - **Fix:**
+     - Added `FinancialStatement` table as 5th parallel fetch — line items (revenue, COGS, EBITDA, margins) now in LLM context
+     - Rewrote system prompt: requires specific numbers ("Revenue declined from $80M to $70M — what caused this?"), deal-specific questions, financial summary section
+     - Added "Export to Doc" button → downloads structured `.txt` file with all brief sections
+   - **Files:** `apps/api/src/services/agents/meetingPrep/index.ts`, `apps/web/js/ai-tools.js`
+
+6. **E3: Portfolio Chat quality (6.3, 6.4 issues)**
+   - **Problem:** Inconsistent answers (same question → different results), only uses one-pager data not financials, not clear WHY deals need attention
+   - **Fix:**
+     - Temperature 0.7 → 0.3 (much more deterministic)
+     - Max tokens 500 → 1500 (more detailed responses)
+     - `get_deal_details` tool now fetches extracted `FinancialStatement` data alongside deal metrics
+     - System prompt rewritten: explicit rules for which tool to use, explains WHY deals need attention
+   - **File:** `apps/api/src/routes/ai-portfolio.ts`
+
+#### Items Not Fixed (noted for future)
+- **Signal Monitor grouping** — Pushkar marked "not a NEED but helpful". Skipped.
+- **Portfolio page "Coming Soon"** — Not a test failure, just an observation. Page not built yet.
+- **Competitor financials vs own financials (5.5 sub-issue)** — Extraction pipeline has no concept of "competitor document". Needs document categorization feature.
+
+#### Stats
+- **4 FAIL items → Fixed**, 3 enhancement suggestions → Implemented
+- **8 files changed, 1 new file** (`deal-chat-attachments.js`)
+- **0 TypeScript errors**, all files ≤ 500 lines
+- **33/33 test checks addressed** (29 PASS untouched, 4 FAIL fixed)
+
+---
+
+### Session 42 — March 16, 2026
+
+#### 00:30-04:00 IST — Deep Market Research & Product-Market Fit Analysis
+
+**Goal:** Comprehensive PMF analysis using 10 Claude Skills, 50+ web searches, 100+ sources to validate whether PE OS solves real problems for PE professionals and how to make it more agentic.
+
+---
+
+#### What Was Done
+
+1. **Deep Social Media & Forum Research**
+   - Searched 17 platforms: LinkedIn, Reddit, WSO, Twitter/X, G2, Capterra, SelectHub, Software Advice, Quora, industry reports (PwC, EY, McKinsey, Bain), vendor blogs, PE publications, consulting firms, VDR reviews, startup/VC sites, financial filings, press releases
+   - Compiled 75+ direct quotes and data points from real PE professionals
+   - Created comprehensive search tag checklist for all platforms
+
+2. **Competitive Landscape Verification (March 2026 data)**
+   - **DealCloud/Intapp:** $433M Cloud ARR (+31% YoY), ToltIQ partnership (Feb 23, 2026), 70+ AI features, UX redesign May-Aug 2026
+   - **Affinity:** 10K+ users, Sourcing GA with 200K+ companies, Deal Assist AI, "AI-first" rebuild announced
+   - **Meridian AI:** $7M seed (June 2025), $5M in contracts Dec 2025, ex-Blackstone founder
+   - **NEW: DiligenceSquared** — $5M YC-backed seed (March 7, 2026), ex-Blackstone/BCG, AI voice agents for DD
+   - **NEW: Keye "Odin"** — $8.55M raised, launched Jan 2026, "deterministic" DD co-pilot
+   - **ToltIQ + H.I.G. Capital** ($74B AUM) firm-wide deployment (March 4, 2026)
+   - **4Degrees:** Only $1.1M raised total — not a major threat
+   - **Grata:** Acquired by Datasite (Nov 2024) — no longer independent
+
+3. **10 Claude Skills Executed on PE OS**
+   - `/founder-validate-idea` — Score: 25/35 (Promising). Build it but narrow the wedge
+   - `/pm-swot-analysis` — 7 strengths, 7 weaknesses, 7 opportunities, 7 threats with cross-reference
+   - `/founder-pricing-strategy` — Free → $99 founding → $149 Growth → $249 Enterprise. 83-88% gross margin
+   - `/pm-value-proposition` — "Stop copying numbers from CIMs into Excel"
+   - `/pm-lean-canvas` — Full business model with 5 riskiest assumptions
+   - `/pm-porters-five-forces` — Moderate industry attractiveness. Excel inertia is the real competitor
+   - `/pm-market-sizing` — TAM $400M → SAM $97M → SOM Year 3: $2.3-3.7M
+   - `/pm-market-segments` — 5 segments: Frustrated Mid-Market (#1), Excel Holdouts (#2), DealCloud Defectors, M&A Advisors, Family Offices
+   - `/founder-competitor-matrix` — 8 competitors, feature matrix, 3 positioning gaps, threat ranking
+   - `/founder-go-to-market` — Free CIM Analyzer wedge → LinkedIn outbound → $600-900/mo budget
+   - `/pm-market-segments` — 5 customer segments with fit scores and prioritization
+
+4. **Installed 12 New Claude Skills**
+   - From `emotixco/claude-skills-founder`: validate-idea, competitor-matrix, pricing-strategy, product-brief, go-to-market
+   - From `phuryn/pm-skills`: market-sizing, competitor-analysis, market-segments, lean-canvas, porters-five-forces, value-proposition, swot-analysis
+
+5. **12 Agentic Feature Proposals** (prioritized in 3 tiers)
+   - Tier 1: Email/Calendar Auto-Capture, CIM Full-Document Intelligence, Relationship Intelligence, Deal Scoring
+   - Tier 2: IC Memo Auto-Draft upgrade, Portfolio Monitoring, Deal Sourcing, Compliance Monitor
+   - Tier 3: LP Communication, Cross-Deal Patterns, Market Intelligence, DD Coordinator
+
+#### Key Findings
+
+- **PE OS IS solving a real problem** — hits 6/7 critical PE pain points
+- **Unique position:** Only CRM with built-in AI extraction + VDR + analysis suite
+- **Biggest threat:** ToltIQ + DealCloud partnership (Feb 2026) bundles AI DD into dominant CRM
+- **Biggest weakness:** Zero paying customers — everything is theory until someone pays
+- **Biggest gap:** No email/calendar auto-capture (table stakes for CRM adoption)
+- **Recommended pricing:** $99 founding rate → $149 Growth → $249 Enterprise per user/month
+- **Target segment:** Mid-market PE firms ($300M-$1B AUM, 10-20 people)
+- **Path to $1M ARR:** ~30 firms at $30K ACV, achievable in 18-24 months
+
+#### Files Created
+- `docs/plans/2026-03-16-pe-os-complete-pmf-analysis.md` — Complete mega-document with all 10 skill outputs + research
+- `docs/competitive-landscape-report.md` — Detailed competitor deep dives
+- `.claude/skills/founder-*` — 5 founder skills installed
+- `.claude/skills/pm-*` — 7 PM skills installed
+
+#### Next Steps (from analysis)
+1. Launch "Free CIM Analyzer" landing page (this week)
+2. Record 90-second demo video
+3. Send 200 personalized LinkedIn DMs to PE VP Ops
+4. Sign first paid pilot at $99/user founding rate
+5. Start SOC 2 process (Vanta/Drata, $10-15K)
+6. Build email/calendar auto-capture (biggest feature gap)
+7. Find PE industry co-founder/advisor (distribution is fatal weakness)
+
+---
+
 ### Session 41 — March 12, 2026
 
 #### 22:45 IST — Production Deploy: Merge & Push Sessions 38-40 to Main

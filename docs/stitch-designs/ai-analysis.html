@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PE OS AI Financial Analysis Card</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#003366",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0f1923",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display min-h-screen p-8 flex justify-center items-start">
+<div class="w-full max-w-6xl bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+<!-- Header -->
+<div class="bg-gradient-to-r from-primary to-[#004488] px-6 py-4 flex items-center justify-between text-white">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-white" style="font-size: 24px;">auto_awesome</span>
+<h2 class="text-lg font-bold tracking-tight">AI Financial Analysis</h2>
+</div>
+<div class="flex items-center gap-4 border-l border-white/20 pl-4">
+<div class="flex items-center gap-2">
+<div class="relative w-8 h-4 overflow-hidden rounded-t-full bg-white/20">
+<div class="absolute top-0 left-0 w-8 h-8 rounded-full border-[3px] border-amber-500 clip-bottom-half" style="clip-path: polygon(0 50%, 100% 50%, 100% 100%, 0 100%); transform: rotate(104.4deg);"></div>
+</div>
+<span class="text-sm font-semibold text-amber-400">58/100</span>
+</div>
+<button class="text-white hover:text-white/80 transition-colors">
+<span class="material-symbols-outlined" style="font-size: 20px;">open_in_full</span>
+</button>
+<button class="text-white hover:text-white/80 transition-colors">
+<span class="material-symbols-outlined" style="font-size: 20px;">close</span>
+</button>
+</div>
+</div>
+<!-- Tab Bar -->
+<div class="border-b border-slate-200 dark:border-slate-800 px-6 flex overflow-x-auto no-scrollbar">
+<div class="flex gap-8">
+<a class="flex items-center border-b-2 border-primary text-slate-900 dark:text-white py-4" href="#">
+<span class="text-sm font-semibold tracking-tight">Overview</span>
+</a>
+<a class="flex items-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-4" href="#">
+<span class="text-sm font-medium tracking-tight">Deep Dive</span>
+</a>
+<a class="flex items-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-4" href="#">
+<span class="text-sm font-medium tracking-tight">Cash &amp; Capital</span>
+</a>
+<a class="flex items-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-4" href="#">
+<span class="text-sm font-medium tracking-tight">Valuation</span>
+</a>
+<a class="flex items-center gap-2 border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-4" href="#">
+<span class="text-sm font-medium tracking-tight">Diligence</span>
+<span class="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none">7</span>
+</a>
+<a class="flex items-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-4" href="#">
+<span class="text-sm font-medium tracking-tight">AI Insights</span>
+</a>
+<a class="flex items-center border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 py-4" href="#">
+<span class="text-sm font-medium tracking-tight">Memo</span>
+</a>
+</div>
+</div>
+<!-- Content Area -->
+<div class="flex flex-col md:flex-row p-6 gap-8">
+<!-- Left Column (60%) -->
+<div class="w-full md:w-[60%] flex flex-col gap-8">
+<!-- Main QoE Gauge Section -->
+<div class="flex gap-8 items-center bg-slate-50 dark:bg-slate-800/50 p-6 rounded-lg border border-slate-100 dark:border-slate-800">
+<div class="flex flex-col items-center justify-center relative min-w-[160px]">
+<!-- SVG Gauge representation -->
+<svg class="w-40 h-20 overflow-visible" viewbox="0 0 160 80">
+<!-- Background Arc -->
+<path class="dark:stroke-slate-700" d="M 10,80 A 70,70 0 0,1 150,80" fill="none" stroke="#e2e8f0" stroke-linecap="round" stroke-width="12"></path>
+<!-- Foreground Arc (Amber, roughly 58%) -->
+<path d="M 10,80 A 70,70 0 0,1 125,25" fill="none" stroke="#f59e0b" stroke-linecap="round" stroke-width="12"></path>
+</svg>
+<div class="absolute bottom-0 left-0 right-0 flex flex-col items-center text-center">
+<span class="text-4xl font-bold text-slate-900 dark:text-white leading-none">58</span>
+<span class="text-sm font-medium text-amber-500 mt-1">Moderate</span>
+</div>
+</div>
+<div class="flex-1 flex flex-col gap-4">
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center text-sm">
+<span class="font-medium text-slate-700 dark:text-slate-300">Revenue Quality</span>
+<span class="font-bold text-slate-900 dark:text-white">72</span>
+</div>
+<div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+<div class="h-full bg-green-500 rounded-full" style="width: 72%;"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center text-sm">
+<span class="font-medium text-slate-700 dark:text-slate-300">EBITDA</span>
+<span class="font-bold text-slate-900 dark:text-white">45</span>
+</div>
+<div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+<div class="h-full bg-red-500 rounded-full" style="width: 45%;"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center text-sm">
+<span class="font-medium text-slate-700 dark:text-slate-300">Cash Flow</span>
+<span class="font-bold text-slate-900 dark:text-white">61</span>
+</div>
+<div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+<div class="h-full bg-amber-500 rounded-full" style="width: 61%;"></div>
+</div>
+</div>
+<div class="flex flex-col gap-1.5">
+<div class="flex justify-between items-center text-sm">
+<span class="font-medium text-slate-700 dark:text-slate-300">Working Capital</span>
+<span class="font-bold text-slate-900 dark:text-white">54</span>
+</div>
+<div class="h-1.5 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+<div class="h-full bg-amber-500 rounded-full" style="width: 54%;"></div>
+</div>
+</div>
+</div>
+</div>
+<!-- Key Flags -->
+<div class="flex flex-col gap-3">
+<h3 class="text-sm font-bold text-slate-900 dark:text-white uppercase tracking-wider mb-1">Key Flags</h3>
+<div class="flex gap-3 p-3 bg-red-50 dark:bg-red-900/10 border-l-4 border-red-500 rounded-r-lg">
+<span class="material-symbols-outlined text-red-500" style="font-size: 20px;">error</span>
+<div>
+<p class="text-sm font-semibold text-slate-900 dark:text-white">Critical Discrepancy</p>
+<p class="text-xs text-slate-600 dark:text-slate-400 mt-0.5">$23.8M discrepancy identified in recognized revenue vs cash receipts.</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 bg-amber-50 dark:bg-amber-900/10 border-l-4 border-amber-500 rounded-r-lg">
+<span class="material-symbols-outlined text-amber-500" style="font-size: 20px;">warning</span>
+<div>
+<p class="text-sm font-semibold text-slate-900 dark:text-white">Warning</p>
+<p class="text-xs text-slate-600 dark:text-slate-400 mt-0.5">High concentration: Top 3 customers account for 90.4% margin.</p>
+</div>
+</div>
+<div class="flex gap-3 p-3 bg-blue-50 dark:bg-blue-900/10 border-l-4 border-blue-500 rounded-r-lg">
+<span class="material-symbols-outlined text-blue-500" style="font-size: 20px;">info</span>
+<div>
+<p class="text-sm font-semibold text-slate-900 dark:text-white">Information</p>
+<p class="text-xs text-slate-600 dark:text-slate-400 mt-0.5">Historical Revenue CAGR verified at 5.2% over a 3-year period.</p>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Column (40%) -->
+<div class="w-full md:w-[40%] flex flex-col gap-6">
+<!-- 2x2 Grid Stats -->
+<div class="grid grid-cols-2 gap-4">
+<div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">Revenue CAGR</p>
+<div class="flex items-center gap-2">
+<span class="text-[28px] font-bold text-primary dark:text-blue-400">5.2%</span>
+<span class="material-symbols-outlined text-green-500" style="font-size: 20px;">trending_up</span>
+</div>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">FCF Conversion</p>
+<div class="flex items-center gap-2">
+<span class="text-[28px] font-bold text-primary dark:text-blue-400">32%</span>
+<span class="material-symbols-outlined text-red-500" style="font-size: 20px;">trending_down</span>
+</div>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">Net Leverage</p>
+<div class="flex items-center gap-2">
+<span class="text-[28px] font-bold text-primary dark:text-blue-400">2.8x</span>
+<span class="material-symbols-outlined text-amber-500" style="font-size: 20px;">horizontal_rule</span>
+</div>
+</div>
+<div class="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700">
+<p class="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">LBO IRR</p>
+<div class="flex items-center gap-2">
+<span class="text-[28px] font-bold text-primary dark:text-blue-400">18.5%</span>
+<span class="material-symbols-outlined text-green-500" style="font-size: 20px;">check_circle</span>
+</div>
+</div>
+</div>
+<!-- Waterfall Chart Placeholder -->
+<div class="flex-1 min-h-[200px] bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700 flex flex-col">
+<h3 class="text-sm font-bold text-slate-900 dark:text-white mb-4">EBITDA Waterfall</h3>
+<div class="flex-1 flex items-end justify-between gap-2 pt-4 px-2">
+<!-- Revenue -->
+<div class="w-1/5 flex flex-col items-center gap-2">
+<div class="w-full bg-primary rounded-t-sm" style="height: 100%;"></div>
+<span class="text-[10px] text-slate-500 font-medium">Rev</span>
+</div>
+<!-- COGS -->
+<div class="w-1/5 flex flex-col items-center gap-2">
+<div class="w-full bg-red-600 rounded-sm mb-[60%]" style="height: 40%;"></div>
+<span class="text-[10px] text-slate-500 font-medium">COGS</span>
+</div>
+<!-- Gross Profit -->
+<div class="w-1/5 flex flex-col items-center gap-2">
+<div class="w-full bg-primary rounded-t-sm" style="height: 60%;"></div>
+<span class="text-[10px] text-slate-500 font-medium">GP</span>
+</div>
+<!-- SG&A -->
+<div class="w-1/5 flex flex-col items-center gap-2">
+<div class="w-full bg-red-600 rounded-sm mb-[35%]" style="height: 25%;"></div>
+<span class="text-[10px] text-slate-500 font-medium">SG&amp;A</span>
+</div>
+<!-- EBITDA -->
+<div class="w-1/5 flex flex-col items-center gap-2">
+<div class="w-full bg-primary rounded-t-sm" style="height: 35%;"></div>
+<span class="text-[10px] text-slate-500 font-medium">EBITDA</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</body></html>

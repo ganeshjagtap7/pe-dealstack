@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PE OS Financial Statements Section</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#003366",
+                        "background-light": "#f5f7f8",
+                        "background-dark": "#0f1923",
+                    },
+                    fontFamily: {
+                        "display": ["Inter", "sans-serif"]
+                    },
+                    borderRadius: {"DEFAULT": "0.5rem", "lg": "0.75rem", "xl": "1rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-900 dark:text-slate-100 min-h-screen">
+<div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
+<div class="layout-container flex h-full grow flex-col">
+<header class="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-10 py-3">
+<div class="flex items-center gap-8">
+<div class="flex items-center gap-4 text-primary dark:text-blue-400">
+<div class="size-6">
+<span class="material-symbols-outlined text-2xl">monitoring</span>
+</div>
+<h2 class="text-slate-900 dark:text-slate-100 text-lg font-bold leading-tight tracking-[-0.015em]">PE OS</h2>
+</div>
+<label class="flex flex-col min-w-40 !h-10 max-w-64">
+<div class="flex w-full flex-1 items-stretch rounded-xl h-full bg-slate-100 dark:bg-slate-800">
+<div class="text-slate-500 flex border-none items-center justify-center pl-4 rounded-l-xl border-r-0">
+<span class="material-symbols-outlined">search</span>
+</div>
+<input class="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-slate-900 dark:text-slate-100 focus:outline-0 focus:ring-0 border-none bg-transparent focus:border-none h-full placeholder:text-slate-500 px-4 rounded-l-none border-l-0 pl-2 text-sm font-medium leading-normal" placeholder="Search" value=""/>
+</div>
+</label>
+</div>
+<div class="flex flex-1 justify-end gap-8 items-center">
+<nav class="flex items-center gap-9">
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-blue-400 text-sm font-medium leading-normal transition-colors" href="#">Dashboard</a>
+<a class="text-primary dark:text-blue-400 text-sm font-bold leading-normal border-b-2 border-primary dark:border-blue-400 pb-1" href="#">Deals</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-blue-400 text-sm font-medium leading-normal transition-colors" href="#">Firms</a>
+<a class="text-slate-600 dark:text-slate-400 hover:text-primary dark:hover:text-blue-400 text-sm font-medium leading-normal transition-colors" href="#">Funds</a>
+</nav>
+<button class="flex min-w-[84px] cursor-pointer items-center justify-center overflow-hidden rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold leading-normal hover:bg-primary/90 transition-colors">
+<span class="truncate">New Deal</span>
+</button>
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border border-slate-200 dark:border-slate-700" data-alt="User Profile Picture" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBNpmrhgHgrshRZoipBJ_dW87-yK_G0-Xs4AFOBUPgfsGI8MFMUQLlEW_17RPCfiB1RM0GvNQFnqQmvg0M-XYtKnROUBK2Pe0anEGxqHInDCL4Bi9gzZsOxU6SpEhky6b5se5jB7wulJeKn3EL9Vi0D0I6YWGNLHqDRVzHMdihYGm_AHOEs9X95DAdtSHkIGn3wmb8jZyNbIkWMpu9FHt2OvihNP2VedZpvg7_d4LskJtaz3cqNj6hRT29Cy85u0UBd0hsh081T9cQn");'></div>
+</div>
+</header>
+<main class="px-8 py-8 flex-1 flex justify-center">
+<div class="max-w-[1200px] w-full flex flex-col gap-6">
+<!-- Main Card -->
+<div class="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col">
+<!-- Header Section -->
+<div class="p-6 border-b border-slate-200 dark:border-slate-800">
+<div class="flex flex-wrap justify-between items-center gap-4 mb-6">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-primary dark:text-blue-400 text-3xl">table_chart</span>
+<h1 class="text-primary dark:text-blue-400 text-2xl font-bold leading-tight tracking-tight">Financial Statements</h1>
+</div>
+<div class="flex gap-3">
+<button class="flex items-center justify-center gap-2 rounded-lg h-9 px-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">refresh</span>
+<span>Re-extract</span>
+</button>
+<button class="flex items-center justify-center gap-2 rounded-lg h-9 px-4 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+<span class="material-symbols-outlined text-sm">fullscreen</span>
+<span>Fullscreen</span>
+</button>
+</div>
+</div>
+<!-- Notification Banners -->
+<div class="flex flex-col gap-3">
+<div class="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+<div class="flex items-center gap-3 text-amber-800 dark:text-amber-400">
+<span class="material-symbols-outlined text-lg">warning</span>
+<span class="text-sm font-medium">Validation Alert: 10 flagged items require review.</span>
+</div>
+<button class="text-amber-800 dark:text-amber-400 text-sm font-semibold hover:underline">View Flags</button>
+</div>
+<div class="flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+<div class="flex items-center gap-3 text-blue-800 dark:text-blue-400">
+<span class="material-symbols-outlined text-lg">info</span>
+<span class="text-sm font-medium">Conflict Banner: Overlapping periods detected in source files.</span>
+</div>
+<div class="flex gap-4">
+<button class="text-blue-800 dark:text-blue-400 text-sm font-semibold hover:underline">Review</button>
+<button class="text-blue-800 dark:text-blue-400 text-sm font-semibold hover:underline">Auto-resolve</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Navigation Tabs -->
+<div class="px-6 pt-2 border-b border-slate-200 dark:border-slate-800">
+<div class="flex gap-8">
+<a class="flex items-center justify-center border-b-[3px] border-primary dark:border-blue-400 text-primary dark:text-blue-400 pb-3 pt-2" href="#">
+<span class="text-sm font-bold">Income Statement</span>
+</a>
+<a class="flex items-center justify-center border-b-[3px] border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 pb-3 pt-2 transition-colors" href="#">
+<span class="text-sm font-medium">Balance Sheet</span>
+</a>
+<a class="flex items-center justify-center border-b-[3px] border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300 pb-3 pt-2 transition-colors" href="#">
+<span class="text-sm font-medium">Cash Flow</span>
+</a>
+</div>
+</div>
+<!-- Sub-tabs -->
+<div class="px-6 py-4 flex gap-2">
+<button class="h-8 px-4 rounded-full bg-primary text-white text-xs font-semibold">Revenue</button>
+<button class="h-8 px-4 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Growth</button>
+<button class="h-8 px-4 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 text-xs font-semibold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Composition</button>
+</div>
+<!-- Data Table Container -->
+<div class="flex-1 overflow-x-auto">
+<table class="w-full text-left border-collapse whitespace-nowrap">
+<thead>
+<tr class="bg-slate-50 dark:bg-slate-800/50 border-y border-slate-200 dark:border-slate-800">
+<th class="sticky left-0 bg-slate-50 dark:bg-slate-800/50 z-10 px-6 py-3 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider w-64 shadow-[1px_0_0_0_#e2e8f0] dark:shadow-[1px_0_0_0_#1e293b]">Metric</th>
+<th class="px-6 py-3 text-right">
+<div class="text-sm font-bold text-slate-900 dark:text-slate-100">2007</div>
+<div class="text-[10px] text-slate-500 font-normal">Audited_07.pdf</div>
+</th>
+<th class="px-6 py-3 text-right">
+<div class="text-sm font-bold text-slate-900 dark:text-slate-100">2008</div>
+<div class="text-[10px] text-slate-500 font-normal">Audited_08.pdf</div>
+</th>
+<th class="px-6 py-3 text-right">
+<div class="text-sm font-bold text-slate-900 dark:text-slate-100">2009</div>
+<div class="text-[10px] text-slate-500 font-normal">Audited_09.pdf</div>
+</th>
+<th class="px-6 py-3 text-right">
+<div class="text-sm font-bold text-slate-900 dark:text-slate-100">2010</div>
+<div class="text-[10px] text-slate-500 font-normal">Audited_10.pdf</div>
+</th>
+<th class="px-6 py-3 text-right">
+<div class="text-sm font-bold text-slate-900 dark:text-slate-100">2011</div>
+<div class="text-[10px] text-slate-500 font-normal">Draft_11.pdf</div>
+</th>
+</tr>
+</thead>
+<tbody class="tabular-nums">
+<!-- Key Row -->
+<tr class="bg-[#F0F4F8] dark:bg-blue-900/10 border-b border-slate-200 dark:border-slate-800 group hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<td class="sticky left-0 bg-[#F0F4F8] dark:bg-slate-900 z-10 px-6 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 border-l-4 border-l-primary dark:border-l-blue-400 shadow-[1px_0_0_0_#e2e8f0] dark:shadow-[1px_0_0_0_#1e293b] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50">
+                                            Revenue
+                                        </td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">99%</span>
+                                                $180.2M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">99%</span>
+                                                $195.5M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">98%</span>
+                                                $210.5M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">99%</span>
+                                                $225.8M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">85%</span>
+                                                $240.1M
+                                            </div>
+</td>
+</tr>
+<!-- Standard Row -->
+<tr class="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<td class="sticky left-0 bg-white dark:bg-slate-900 z-10 px-6 py-3 text-sm font-normal text-slate-700 dark:text-slate-300 pl-8 shadow-[1px_0_0_0_#e2e8f0] dark:shadow-[1px_0_0_0_#1e293b]">
+                                            COGS
+                                        </td>
+<td class="px-6 py-3 text-right text-sm text-slate-600 dark:text-slate-400">$105.1M</td>
+<td class="px-6 py-3 text-right text-sm text-slate-600 dark:text-slate-400">$113.1M</td>
+<td class="px-6 py-3 text-right text-sm text-slate-600 dark:text-slate-400">$120.0M</td>
+<td class="px-6 py-3 text-right text-sm text-slate-600 dark:text-slate-400">$127.6M</td>
+<td class="px-6 py-3 text-right text-sm text-slate-600 dark:text-slate-400">$134.5M</td>
+</tr>
+<!-- Key Row -->
+<tr class="bg-[#F0F4F8] dark:bg-blue-900/10 border-b border-slate-200 dark:border-slate-800 group hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<td class="sticky left-0 bg-[#F0F4F8] dark:bg-slate-900 z-10 px-6 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 border-l-4 border-l-primary dark:border-l-blue-400 shadow-[1px_0_0_0_#e2e8f0] dark:shadow-[1px_0_0_0_#1e293b] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50">
+                                            Gross Profit
+                                        </td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $75.1M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $82.4M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $90.5M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $98.2M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $105.6M
+                                            </div>
+</td>
+</tr>
+<!-- Margin Row -->
+<tr class="border-b border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<td class="sticky left-0 bg-white dark:bg-slate-900 z-10 px-6 py-3 text-sm italic text-slate-500 dark:text-slate-400 pl-8 shadow-[1px_0_0_0_#e2e8f0] dark:shadow-[1px_0_0_0_#1e293b]">
+                                            Gross Margin %
+                                        </td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">41.7%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">42.1%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">43.0%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">43.5%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">44.0%</td>
+</tr>
+<!-- Key Row -->
+<tr class="bg-[#F0F4F8] dark:bg-blue-900/10 border-b border-slate-200 dark:border-slate-800 group hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<td class="sticky left-0 bg-[#F0F4F8] dark:bg-slate-900 z-10 px-6 py-3 text-sm font-bold text-slate-900 dark:text-slate-100 border-l-4 border-l-primary dark:border-l-blue-400 shadow-[1px_0_0_0_#e2e8f0] dark:shadow-[1px_0_0_0_#1e293b] group-hover:bg-slate-50 dark:group-hover:bg-slate-800/50">
+                                            EBITDA
+                                        </td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $30.5M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $34.2M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $38.1M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $42.5M
+                                            </div>
+</td>
+<td class="px-6 py-3 text-right text-sm font-medium text-slate-900 dark:text-slate-100">
+<div class="flex items-center justify-end gap-2">
+                                                $46.8M
+                                            </div>
+</td>
+</tr>
+<!-- Margin Row -->
+<tr class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+<td class="sticky left-0 bg-white dark:bg-slate-900 z-10 px-6 py-3 text-sm italic text-slate-500 dark:text-slate-400 pl-8 shadow-[1px_0_0_0_#e2e8f0] dark:shadow-[1px_0_0_0_#1e293b]">
+                                            EBITDA Margin %
+                                        </td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">16.9%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">17.5%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">18.1%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">18.8%</td>
+<td class="px-6 py-3 text-right text-sm italic text-slate-500 dark:text-slate-400">19.5%</td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Footer -->
+<div class="bg-slate-50 dark:bg-slate-800/50 border-t border-slate-200 dark:border-slate-800 p-4 flex items-center gap-4 text-[#94A3B8]">
+<span class="material-symbols-outlined text-sm">description</span>
+<span class="text-[10px] font-medium tracking-wider uppercase">Source Files: Audited_07.pdf, Audited_08.pdf, Audited_09.pdf, Audited_10.pdf, Draft_11.pdf</span>
+</div>
+</div>
+</div>
+</main>
+</div>
+</div>
+</body></html>
