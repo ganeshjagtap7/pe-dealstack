@@ -148,16 +148,24 @@ router.get('/insights/scores', async (req: any, res) => {
       .eq('organizationId', orgId);
     if (cErr) throw cErr;
 
-    // Count interactions per contact
+    // Scope to org contacts only
+    const contactIds = (contacts || []).map((c: any) => c.id);
+    if (contactIds.length === 0) {
+      return res.json({ scores: {} });
+    }
+
+    // Count interactions per contact (org-scoped)
     const { data: interactions, error: iErr } = await supabase
       .from('ContactInteraction')
-      .select('contactId');
+      .select('contactId')
+      .in('contactId', contactIds);
     if (iErr) throw iErr;
 
-    // Count linked deals per contact
+    // Count linked deals per contact (org-scoped)
     const { data: dealLinks, error: dErr } = await supabase
       .from('ContactDeal')
-      .select('contactId');
+      .select('contactId')
+      .in('contactId', contactIds);
     if (dErr) throw dErr;
 
     const interactionCounts: Record<string, number> = {};
@@ -232,16 +240,24 @@ router.get('/insights/network', async (req: any, res) => {
       .eq('organizationId', orgId);
     if (cErr) throw cErr;
 
-    // ContactRelationship table may not exist yet — gracefully default to empty
+    // Scope to org contacts only
+    const contactIds = (contacts || []).map((c: any) => c.id);
+    if (contactIds.length === 0) {
+      return res.json({ totalContacts: 0, byType: {}, totalConnections: 0, mostConnected: [] });
+    }
+
+    // ContactRelationship table may not exist yet — gracefully default to empty (org-scoped)
     let connections: any[] = [];
     const { data: connData, error: rErr } = await supabase
       .from('ContactRelationship')
-      .select('contactId, relatedContactId');
+      .select('contactId, relatedContactId')
+      .in('contactId', contactIds);
     if (!rErr) connections = connData || [];
 
     const { data: dealLinks, error: dErr } = await supabase
       .from('ContactDeal')
-      .select('contactId');
+      .select('contactId')
+      .in('contactId', contactIds);
     if (dErr) throw dErr;
 
     // Type breakdown

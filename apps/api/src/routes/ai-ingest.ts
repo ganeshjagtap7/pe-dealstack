@@ -309,6 +309,9 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
 // POST /api/ai/extract - Extract data from document without creating a deal (preview)
 subRouter.post('/ai/extract', upload.single('file'), async (req, res) => {
   try {
+    // Verify org context for audit trail (no data saved, but ensures authenticated org user)
+    getOrgId(req);
+
     const file = req.file;
     if (!file) {
       return res.status(400).json({ error: 'No file provided' });
