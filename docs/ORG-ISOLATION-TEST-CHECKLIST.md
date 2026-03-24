@@ -1,163 +1,162 @@
-# Org Isolation & Multi-Tenancy — Test Checklist
+# Org Isolation Test Checklist
 
-**Date:** 2026-03-24
-**Commits:** `164fac3`, `f07243a`, `fef3302`
+**What is this?** PE OS supports multiple firms (organizations). Firm A's deals, contacts, documents, and chats must be completely invisible to Firm B. This checklist verifies that.
+
 **Tester:** _______________
+**Date:** _______________
 
 ---
 
-## What Changed
+## Setup (10 min)
 
-We added organization-level data isolation across 11 API route files (33 endpoints). Every API endpoint now verifies that the requesting user's organization owns the resource before returning data. Wrong-org requests get `404 Not Found` (not 403 — to prevent attackers from knowing the resource exists).
+You need 2 browser windows — one for each firm. Use incognito/private window for the second account so sessions don't clash.
 
-## What You Need
+### Step 1: Log in to both accounts
 
-- **2 test accounts in DIFFERENT organizations** (Org A and Org B)
-- **1 deal, 1 contact, 1 document, 1 folder in each org** (minimum)
-- Browser DevTools open (Network tab) to inspect API responses
-- Postman or curl (optional, for direct API testing)
+| | Browser Window 1 | Browser Window 2 |
+|---|---|---|
+| **Account** | Org A credentials | Org B credentials |
+| **Email** | _______________ | _______________ |
 
----
+### Step 2: Create test data in BOTH orgs
 
-## How to Test
+Do these in **both** windows:
 
-For each test below:
-1. Log in as **Org A** user
-2. Copy the UUID of the resource from the URL bar or Network tab
-3. Log in as **Org B** user
-4. Try to access that UUID via the UI or direct API call
-5. **Expected:** 404 Not Found (never see Org A's data)
+1. **Create a deal** — name it `[OrgName] Test Deal` (e.g., "Alpha Test Deal", "Beta Test Deal")
+2. **Add a contact** — name it `[OrgName] Test Contact`
+3. **Upload a document** — any small PDF to the deal's Data Room
+4. **Send a chat message** — open the deal, go to Chat tab, send "Hello"
+5. **Add a team member** — if you have a second user in the org, add them to the deal
 
----
-
-## Test Cases
-
-### P0 — Documents (5 endpoints)
-
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 1 | View document | As Org B, call `GET /api/documents/{orgA-docId}` | 404 |
-| 2 | Download document | As Org B, call `GET /api/documents/{orgA-docId}/download` | 404 |
-| 3 | Edit document | As Org B, call `PATCH /api/documents/{orgA-docId}` with `{"name":"hacked"}` | 404 |
-| 4 | Delete document | As Org B, call `DELETE /api/documents/{orgA-docId}` | 404 |
-| 5 | List folder docs | As Org B, call `GET /api/folders/{orgA-folderId}/documents` | 404 |
-
-**Same-org check:** As Org A user, verify all 5 actions work normally on Org A's documents.
+Note down how many deals/contacts each org has — you'll need this to verify counts later.
 
 ---
 
-### P0 — Deal Chat (3 endpoints)
+## Part 1: Deals Page
 
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 6 | Read chat history | As Org B, call `GET /api/deals/{orgA-dealId}/chat/history` | 404 |
-| 7 | Delete chat history | As Org B, call `DELETE /api/deals/{orgA-dealId}/chat/history` | 404 |
-| 8 | Send AI chat | As Org B, call `POST /api/deals/{orgA-dealId}/chat` with `{"message":"test"}` | 404 |
+**Goal:** Each firm only sees their own deals.
 
-**Same-org check:** Open Deal Chat on your own deal — chat history loads, AI responds.
-
----
-
-### P1 — Deal Team (4 endpoints)
-
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 9 | View team | As Org B, call `GET /api/deals/{orgA-dealId}/team` | 404 |
-| 10 | Add member | As Org B, call `POST /api/deals/{orgA-dealId}/team` with `{"userId":"..."}` | 404 |
-| 11 | Update member role | As Org B, call `PATCH /api/deals/{orgA-dealId}/team/{memberId}` | 404 |
-| 12 | Remove member | As Org B, call `DELETE /api/deals/{orgA-dealId}/team/{memberId}` | 404 |
-
-**Same-org check:** Add/remove a team member on your own deal — works normally.
+| # | Test | Steps | Pass? |
+|---|------|-------|-------|
+| 1 | Deal list is org-scoped | Open Deals page in both windows. Count the deals. | Org A sees only Org A deals. Org B sees only Org B deals. No overlap. |
+| 2 | Deal detail is org-scoped | In Org A window, open "Alpha Test Deal" and copy the deal ID from the URL. In Org B window, paste that URL. | Org B should see "Deal not found" or get redirected — NOT see Alpha's deal. |
 
 ---
 
-### P1 — Contact Connections (6 endpoints)
+## Part 2: Data Room (VDR)
 
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 13 | Add interaction | As Org B, `POST /api/contacts/{orgA-contactId}/interactions` | 404 |
-| 14 | Link to deal | As Org B, `POST /api/contacts/{orgA-contactId}/deals` with `{"dealId":"..."}` | 404 |
-| 15 | Unlink from deal | As Org B, `DELETE /api/contacts/{orgA-contactId}/deals/{dealId}` | 404 |
-| 16 | List connections | As Org B, `GET /api/contacts/{orgA-contactId}/connections` | 404 |
-| 17 | Create connection | As Org B, `POST /api/contacts/{orgA-contactId}/connections` | 404 |
-| 18 | Delete connection | As Org B, `DELETE /api/contacts/{orgA-contactId}/connections/{connId}` | 404 |
+**Goal:** Documents and folders from one firm are invisible to the other.
 
-**Same-org check:** Add an interaction and link a contact to a deal in your own org — works.
+| # | Test | Steps | Pass? |
+|---|------|-------|-------|
+| 3 | Folder list is org-scoped | Open the Data Room on your test deal in both windows. | Each org sees only their own folders. |
+| 4 | Document list is org-scoped | Click into a folder in both windows. | Each org sees only their own uploaded files. |
+| 5 | Document download blocked cross-org | In Org A, right-click a document and copy the download link. Open that link in Org B's browser. | Should fail / show "Document not found". Not download Org A's file. |
+| 6 | Folder insights blocked cross-org | In Org A, click "Generate Insights" on a folder (if available). Then try accessing that folder's URL from Org B's browser. | Org B gets "Folder not found". |
 
 ---
 
-### P2 — Conversations (2 endpoints)
+## Part 3: Deal Chat
 
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 19 | List conversations | As Org B, `GET /api/conversations` | Only sees Org B conversations |
-| 20 | Read messages | As Org B, `GET /api/conversations/{orgA-convId}/messages` | 404 |
+**Goal:** Chat conversations and AI responses are deal-scoped, and deals are org-scoped.
 
----
-
-### P2 — Folders (3 endpoints)
-
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 21 | View folder | As Org B, `GET /api/folders/{orgA-folderId}` | 404 |
-| 22 | Rename folder | As Org B, `PATCH /api/folders/{orgA-folderId}` with `{"name":"hacked"}` | 404 |
-| 23 | Delete folder | As Org B, `DELETE /api/folders/{orgA-folderId}` | 404 |
+| # | Test | Steps | Pass? |
+|---|------|-------|-------|
+| 7 | Chat history is org-scoped | Open Deal Chat on your test deal in both windows. | Each org sees only their own chat messages. |
+| 8 | AI chat blocked cross-org | Copy Org A's deal URL (with deal ID). Paste in Org B's browser window. Try sending a chat message. | Should fail — Org B cannot chat on Org A's deal. |
+| 9 | Chat doesn't leak deal names | In Org A, ask the AI: "What deals do we have?" | Response should only mention Org A deals. No Org B deal names. |
 
 ---
 
-### P2 — Contact Insights (2 endpoints)
+## Part 4: Contacts
 
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 24 | Relationship scores | As Org A, `GET /api/contacts/insights/scores` | Only Org A contact scores (no Org B data in counts) |
-| 25 | Network stats | As Org A, `GET /api/contacts/insights/network` | Only Org A contacts in `mostConnected` list |
+**Goal:** Each firm's contacts, interactions, and relationship data are isolated.
 
-**How to verify:** Check that `totalContacts` matches Org A's contact count, not the total DB count.
-
----
-
-### P2 — Folder Insights (3 endpoints)
-
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 26 | Get insights | As Org B, `GET /api/folders/{orgA-folderId}/insights` | 404 |
-| 27 | Write insights | As Org B, `POST /api/folders/{orgA-folderId}/insights` | 404 |
-| 28 | Generate AI insights | As Org B, `POST /api/folders/{orgA-folderId}/generate-insights` | 404 |
+| # | Test | Steps | Pass? |
+|---|------|-------|-------|
+| 10 | Contact list is org-scoped | Open Contacts page in both windows. | Each org sees only their own contacts. Counts match what you created. |
+| 11 | Contact detail blocked cross-org | Copy Org A contact's URL. Open in Org B's browser. | "Contact not found" or empty page. NOT Org A's contact details. |
+| 12 | Add interaction blocked cross-org | On Org A's contact page, note the contact ID. In Org B, try adding a Note/Call log via API (Postman) to that contact ID. | Should fail with 404. |
+| 13 | Relationship scores are org-scoped | Open Contacts page, check the relationship strength badges (Cold/Warm/Active/Strong). | Scores are based only on your org's interactions — not inflated by other org's data. |
 
 ---
 
-### Portfolio Chat (1 endpoint)
+## Part 5: Deal Team
 
-| # | Action | How to Test | Expected |
-|---|--------|-------------|----------|
-| 29 | Portfolio chat | As Org A, `POST /api/portfolio/chat` with `{"message":"show all deals"}` | Only Org A deals in response |
+**Goal:** Team members on a deal are only visible/editable by that deal's org.
 
-**How to verify:** Response should not mention any Org B deal names.
-
----
-
-## Quick Smoke Test (5 min version)
-
-If short on time, test these 5 critical scenarios:
-
-1. **Document download cross-org** (test #2) — most dangerous if broken
-2. **Deal chat cross-org** (test #8) — AI could leak deal data
-3. **Contact interaction cross-org** (test #13) — writes data to wrong org
-4. **Folder delete cross-org** (test #23) — destructive operation
-5. **Same-org happy path** — log in as Org A, do normal work, nothing broken
+| # | Test | Steps | Pass? |
+|---|------|-------|-------|
+| 14 | Team list blocked cross-org | Open Org A's deal, go to Team tab. Copy the deal URL. Open in Org B's browser. | Org B cannot see Org A's team members. |
+| 15 | Add member blocked cross-org | (Postman) As Org B, try adding a user to Org A's deal via `POST /api/deals/{orgA-dealId}/team` | 404 response. |
 
 ---
 
-## Result Template
+## Part 6: Portfolio & AI Features
+
+**Goal:** AI-powered features only use data from the requesting user's org.
+
+| # | Test | Steps | Pass? |
+|---|------|-------|-------|
+| 16 | Portfolio chat is org-scoped | Open Portfolio/Dashboard. Ask AI: "Summarize all deals" or "Show pipeline". | Response only mentions your org's deals. Zero mention of the other org's deals. |
+| 17 | Contact enrichment is org-scoped | Click "AI Enrich" on a contact. | Results are for your contact only. |
+| 18 | Meeting prep is org-scoped | Open a deal > Menu > Meeting Prep. | Brief only references your deal's data. |
+
+---
+
+## Part 7: Same-Org Happy Path
+
+**Goal:** Normal users within the SAME org can see all shared data (no data hidden within an org).
+
+| # | Test | Steps | Pass? |
+|---|------|-------|-------|
+| 19 | Same-org user sees all deals | If Org A has 2 users, log in as both. | Both see the same deal list. |
+| 20 | Same-org user sees all contacts | Both Org A users open Contacts page. | Same contact list for both. |
+| 21 | Same-org user sees all documents | Both Org A users open Data Room on same deal. | Same files visible. |
+| 22 | Same-org user sees chat history | Both Org A users open Chat on same deal. | Same chat messages visible. |
+
+---
+
+## Quick Smoke Test (5 min)
+
+If short on time, just do these 5:
+
+1. **Test #1** — Deals page shows only your org's deals
+2. **Test #5** — Can't download another org's document
+3. **Test #8** — Can't chat on another org's deal
+4. **Test #10** — Contacts page shows only your org's contacts
+5. **Test #19** — Same-org users see all shared data
+
+---
+
+## Results
 
 | Test # | Status | Notes |
 |--------|--------|-------|
-| 1 | PASS / FAIL | |
-| 2 | PASS / FAIL | |
-| 3 | PASS / FAIL | |
-| ... | ... | |
-| 29 | PASS / FAIL | |
+| 1 | | |
+| 2 | | |
+| 3 | | |
+| 4 | | |
+| 5 | | |
+| 6 | | |
+| 7 | | |
+| 8 | | |
+| 9 | | |
+| 10 | | |
+| 11 | | |
+| 12 | | |
+| 13 | | |
+| 14 | | |
+| 15 | | |
+| 16 | | |
+| 17 | | |
+| 18 | | |
+| 19 | | |
+| 20 | | |
+| 21 | | |
+| 22 | | |
 
-**Overall:** PASS / FAIL
+**Overall Result:** PASS / FAIL
 **Tested by:** _______________
 **Date:** _______________
+**Notes:** _______________
