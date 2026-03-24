@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:org-isolation": "vitest run tests/org-isolation.test.ts --no-file-parallelism",
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
