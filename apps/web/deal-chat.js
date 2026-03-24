@@ -4,6 +4,8 @@
 // Mock responses: deal-chat-responses.js (loaded before this file)
 // ============================================================
 
+// _chatAttachedFiles defined in deal-chat-attachments.js (loaded before this file)
+
 function initChatInterface() {
     const textarea = document.getElementById('chat-input');
     const sendButton = document.getElementById('send-message-btn');
@@ -30,6 +32,9 @@ function initChatInterface() {
 
     // Send button click
     sendButton.addEventListener('click', sendMessage);
+
+    // File attachment button
+    initChatFileAttachment();
 
     // Clear chat history button — opens styled confirmation modal
     const clearChatBtn = document.getElementById('clear-chat-btn');
@@ -82,10 +87,24 @@ function initChatInterface() {
         const message = textarea.value.trim();
         if (!message) return;
 
-        // Add user message to chat
+        // Build the full message — include attachment context if files were attached
+        let fullMessage = message;
+        if (_chatAttachedFiles.length > 0) {
+            const fileNames = _chatAttachedFiles.map(f => f.name).join(', ');
+            fullMessage = `[User attached document(s): ${fileNames}. Search for these documents to answer questions about them.]\n\n${message}`;
+        }
+
+        // Add user message to chat (show only the user's typed text)
         addUserMessage(message);
         textarea.value = '';
         textarea.style.height = 'auto';
+
+        // Clear attachment chips after sending
+        if (_chatAttachedFiles.length > 0) {
+            const attachedContainer = document.getElementById('attached-files');
+            if (attachedContainer) attachedContainer.innerHTML = '';
+            _chatAttachedFiles = [];
+        }
 
         // Show typing indicator
         showTypingIndicator();
@@ -98,7 +117,7 @@ function initChatInterface() {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        message: message,
+                        message: fullMessage,
                         history: state.messages.slice(-10).map(m => ({
                             role: m.role,
                             content: m.content,
@@ -455,3 +474,5 @@ function scrollToBottom() {
         }, 100);
     }
 }
+
+// File attachment functions in deal-chat-attachments.js (loaded before this file)

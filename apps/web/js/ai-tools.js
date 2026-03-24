@@ -244,11 +244,76 @@ function renderMeetingBrief(brief) {
 
     html += `
         </div>
-        <div class="px-6 py-4 border-t border-border-subtle bg-gray-50 flex justify-end">
+        <div class="px-6 py-4 border-t border-border-subtle bg-gray-50 flex justify-between items-center">
+            <button onclick="exportMeetingBrief()" style="background-color: #003366;"
+                class="px-4 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90 transition-opacity flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-[16px]">download</span>
+                Export to Doc
+            </button>
             <button onclick="closeMeetingPrepModal()" class="px-4 py-2 text-sm font-medium text-text-secondary hover:text-text-main transition-colors">Close</button>
         </div>
     `;
     container.innerHTML = html;
+
+    // Store brief data for export
+    container._briefData = brief;
+}
+
+function exportMeetingBrief() {
+    const container = document.getElementById('meeting-prep-results');
+    const brief = container?._briefData;
+    if (!brief) return;
+
+    const lines = [];
+    lines.push(`MEETING PREP BRIEF`);
+    lines.push(`${'='.repeat(50)}`);
+    lines.push(`${brief.headline || 'Meeting Brief'}`);
+    lines.push(`Generated: ${new Date(brief.generatedAt).toLocaleString()}\n`);
+
+    if (brief.dealSummary) {
+        lines.push(`DEAL SUMMARY\n${brief.dealSummary}\n`);
+    }
+    if (brief.contactProfile) {
+        lines.push(`CONTACT PROFILE\n${brief.contactProfile}\n`);
+    }
+    if (brief.keyTalkingPoints?.length) {
+        lines.push(`KEY TALKING POINTS`);
+        brief.keyTalkingPoints.forEach((p, i) => lines.push(`  ${i + 1}. ${p}`));
+        lines.push('');
+    }
+    if (brief.questionsToAsk?.length) {
+        lines.push(`QUESTIONS TO ASK`);
+        brief.questionsToAsk.forEach((q, i) => lines.push(`  ${i + 1}. ${q}`));
+        lines.push('');
+    }
+    if (brief.risksToAddress?.length) {
+        lines.push(`RISKS TO ADDRESS`);
+        brief.risksToAddress.forEach((r, i) => lines.push(`  ${i + 1}. ${r}`));
+        lines.push('');
+    }
+    if (brief.documentHighlights?.length) {
+        lines.push(`DOCUMENT HIGHLIGHTS`);
+        brief.documentHighlights.forEach((d, i) => lines.push(`  ${i + 1}. ${d}`));
+        lines.push('');
+    }
+    if (brief.suggestedAgenda?.length) {
+        lines.push(`SUGGESTED AGENDA`);
+        brief.suggestedAgenda.forEach((a, i) => lines.push(`  ${i + 1}. ${a}`));
+        lines.push('');
+    }
+
+    const text = lines.join('\n');
+    const blob = new Blob([text], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `meeting-prep-${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    if (typeof showNotification === 'function') {
+        showNotification('Exported', 'Meeting brief downloaded', 'success');
+    }
 }
 
 // ============================================================

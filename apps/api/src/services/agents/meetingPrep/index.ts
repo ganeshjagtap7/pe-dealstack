@@ -40,8 +40,8 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
 
   log.info('Generating meeting prep', { dealId: input.dealId, contactId: input.contactId });
 
-  // Parallel fetch: deal + contact + documents + activities
-  const [dealResult, contactResult, docSearchResult, activitiesResult] = await Promise.all([
+  // Parallel fetch: deal + contact + documents + activities + financial statements
+  const [dealResult, contactResult, docSearchResult, activitiesResult, financialsResult] = await Promise.all([
     // 1. Deal with financials
     supabase
       .from('Deal')
@@ -78,6 +78,15 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
       .eq('dealId', input.dealId)
       .order('createdAt', { ascending: false })
       .limit(10),
+
+    // 5. Extracted financial statements (for detailed financial context)
+    supabase
+      .from('FinancialStatement')
+      .select('statementType, period, extractedData, confidence, extractionSource')
+      .eq('dealId', input.dealId)
+      .eq('isActive', true)
+      .order('period', { ascending: false })
+      .limit(15),
   ]);
 
   const deal = dealResult.data;
@@ -86,6 +95,7 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
   const contact = contactResult.data as any;
   const docResults = docSearchResult as any[];
   const activities = activitiesResult.data || [];
+  const financialStatements = financialsResult.data || [];
 
   // Build context for LLM
   const contextParts: string[] = [];
@@ -123,6 +133,29 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
     }
   }
 
+  // Financial statements detail (extracted line items)
+  if (financialStatements.length > 0) {
+    contextParts.push(`\nFINANCIAL STATEMENTS (${financialStatements.length} periods extracted):`);
+    const byType: Record<string, any[]> = {};
+    for (const s of financialStatements) {
+      byType[s.statementType] = byType[s.statementType] || [];
+      byType[s.statementType].push(s);
+    }
+    for (const [type, stmts] of Object.entries(byType)) {
+      contextParts.push(`\n  ${type}:`);
+      for (const s of stmts.slice(0, 3)) {
+        const items = Array.isArray(s.extractedData) ? s.extractedData : [];
+        contextParts.push(`    Period: ${s.period} (${items.length} line items, ${s.confidence}% confidence)`);
+        // Include key line items for the LLM to reference
+        for (const item of items.slice(0, 15)) {
+          if (item.label && item.value !== undefined) {
+            contextParts.push(`      ${item.label}: $${item.value}M`);
+          }
+        }
+      }
+    }
+  }
+
   // Document highlights
   if (docResults.length > 0) {
     const { data: docs } = await supabase.from('Document').select('id, name, type').eq('dealId', input.dealId);
@@ -152,7 +185,15 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
   }));
 
   const brief = await structuredModel.invoke([
-    new SystemMessage(`You are a PE deal team meeting prep assistant. Generate a comprehensive meeting brief that helps the deal team walk in prepared. Use specific numbers and data from the context. Be direct and actionable.`),
+    new SystemMessage(`You are a PE deal team meeting prep assistant. Generate a comprehensive meeting brief that helps the deal team walk in prepared.
+
+CRITICAL REQUIREMENTS:
+- Use SPECIFIC numbers and data from the financial statements (revenue figures, margins, EBITDA, growth rates). Do NOT use generic placeholder questions.
+- Questions to ask must reference actual data points (e.g., "Revenue declined from $80M to $70M between 2023-2024 — what caused this?" NOT "What are your revenue trends?")
+- Include a financial summary section in dealSummary with key metrics and trends from the extracted statements
+- If financial statements show declining margins, negative EBITDA, or concerning trends, highlight these as specific risks
+- Talking points should cite specific numbers from the context
+- If limited financial data is available, acknowledge what data IS available and what's missing`),
     new HumanMessage(`Generate a meeting prep brief for this context:\n\n${contextParts.join('\n')}\n\nMeeting topic: ${input.meetingTopic || 'General deal discussion'}\nMeeting date: ${input.meetingDate || 'Today'}`),
   ]);
 

@@ -39,30 +39,41 @@ async function researchNode(state: typeof EnrichmentState.State) {
 
   const model = getChatModel(0.3, 2000);
 
-  const prompt = `You are a contact enrichment AI for a private equity firm. Given the following contact information, generate a comprehensive professional profile based on what you know.
+  const prompt = `You are a contact enrichment AI for a private equity firm. Given the following contact information, provide ONLY information you can reasonably infer from the provided data.
 
 Contact:
 - Name: ${state.firstName} ${state.lastName}
-- Email: ${state.email || 'Unknown'}
-- Company: ${state.company || 'Unknown'}
-- Title: ${state.title || 'Unknown'}
+- Email: ${state.email || 'Not provided'}
+- Company: ${state.company || 'Not provided'}
+- Title: ${state.title || 'Not provided'}
+
+CRITICAL RULES:
+- Set fields to NULL if you cannot reasonably determine them from the provided data
+- Do NOT fabricate LinkedIn URLs — set to null unless you are certain
+- Do NOT guess locations unless the email domain or company strongly implies one
+- Do NOT invent company info if the company field is "Not provided"
+- Confidence scoring guide:
+  - 0-20: Only a name was provided, everything else is guesswork
+  - 20-40: Name + email OR name + company, some inference possible
+  - 40-60: Name + email + company, reasonable inferences
+  - 60-80: Name + email + company + title, strong profile
+  - 80+: ONLY if this is a well-known public figure you can verify
+- Sources must honestly reflect what you used: "llm_inference" for anything from your training data
 
 Generate a JSON response with:
 {
-  "linkedinUrl": "likely LinkedIn URL or null",
-  "title": "current/likely job title",
-  "company": "current company name",
-  "industry": "industry they work in",
-  "location": "city, state/country",
-  "bio": "2-3 sentence professional bio",
-  "expertise": ["area1", "area2", "area3"],
-  "connections": "estimated network size (small/medium/large)",
-  "dealRelevance": "how relevant they are to PE deals (high/medium/low)",
+  "linkedinUrl": "LinkedIn URL or null if uncertain",
+  "title": "job title or null if not provided and can't be inferred",
+  "company": "company name or null if not provided",
+  "industry": "industry or null if unknown",
+  "location": "location or null if cannot be determined",
+  "bio": "2-3 sentence bio or null if insufficient data",
+  "expertise": ["area1"] or empty array if unknown,
+  "connections": "small/medium/large or null if unknown",
+  "dealRelevance": "high/medium/low",
   "confidence": 0-100,
-  "sources": ["source1", "source2"]
-}
-
-Be conservative with confidence scores. Only claim high confidence for well-known professionals.`;
+  "sources": ["llm_inference"]
+}`;
 
   try {
     const structuredModel = model.withStructuredOutput(z.object({
@@ -114,19 +125,33 @@ async function validateNode(state: typeof EnrichmentState.State) {
   const steps = [...(state.steps || [])];
   const data = state.enrichedData || {};
 
-  // Score based on data completeness
+  // Determine input richness — how much data was provided by the user
+  let inputSignals = 0;
+  if (state.email) inputSignals++;
+  if (state.company) inputSignals++;
+  if (state.title) inputSignals++;
+
+  // Cap confidence based on how much input we had (no real external APIs = limited enrichment)
+  // 0 signals (name only) → max 30, 1 signal → max 50, 2 → max 70, 3 → max 85
+  const maxConfidenceByInput = [30, 50, 70, 85][inputSignals] || 30;
+
   let score = state.confidence;
   const factors: string[] = [];
 
-  if (data.title && data.title !== state.title) { score += 5; factors.push('new title found'); }
-  if (data.company && data.company !== state.company) { score += 5; factors.push('company updated'); }
-  if (data.linkedinUrl) { score += 10; factors.push('LinkedIn found'); }
-  if (data.location) { score += 5; factors.push('location found'); }
-  if (data.bio) { score += 5; factors.push('bio generated'); }
-  if (data.expertise?.length > 0) { score += 5; factors.push(`${data.expertise.length} expertise areas`); }
+  // Only boost for genuinely NEW information (not echoed-back input)
+  if (data.title && data.title !== state.title && state.title) { score += 3; factors.push('title refined'); }
+  if (data.company && data.company !== state.company && state.company) { score += 3; factors.push('company updated'); }
+  // LinkedIn URL gets no boost — we have no API to verify it
+  if (data.industry && state.company) { score += 3; factors.push('industry identified'); }
 
-  score = Math.min(score, 100);
+  // Penalize null/empty fields the LLM should have filled if it had real data
+  if (!data.linkedinUrl) { factors.push('no LinkedIn (expected)'); }
+  if (!data.location && inputSignals < 2) { factors.push('no location (insufficient input)'); }
+
+  // Apply input-based cap
+  score = Math.min(score, maxConfidenceByInput);
   const needsReview = score < 70;
+  factors.push(`input signals: ${inputSignals}, max allowed: ${maxConfidenceByInput}`);
 
   steps.push({
     timestamp: new Date().toISOString(),

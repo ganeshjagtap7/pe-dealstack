@@ -23,6 +23,7 @@
 
 ---
 
+
 ## Test 1: AI Contact Enrichment
 
 **Where:** Contacts page (`/contacts.html`)
