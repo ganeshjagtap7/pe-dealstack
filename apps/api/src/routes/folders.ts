@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
-import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { getOrgId, verifyDealAccess, verifyFolderAccess } from '../middleware/orgScope.js';
 import foldersInsightsRouter from './folders-insights.js';
 
 const router = Router();
@@ -100,6 +100,11 @@ router.get('/deals/:dealId/folders', async (req: Request, res: Response, next: N
 router.get('/folders/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const folderAccess = await verifyFolderAccess(id, orgId);
+    if (!folderAccess) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
 
     const { data: folder, error } = await supabase
       .from('Folder')
@@ -190,6 +195,12 @@ router.post('/deals/:dealId/folders', async (req: Request, res: Response, next: 
 router.patch('/folders/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const folderAccess = await verifyFolderAccess(id, orgId);
+    if (!folderAccess) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
     const validation = updateFolderSchema.safeParse(req.body);
 
     if (!validation.success) {
@@ -226,6 +237,12 @@ router.patch('/folders/:id', async (req: Request, res: Response, next: NextFunct
 router.delete('/folders/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const folderAccess = await verifyFolderAccess(id, orgId);
+    if (!folderAccess) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
     const { cascade } = req.query;
 
     // Check if folder has children

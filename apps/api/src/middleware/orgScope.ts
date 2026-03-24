@@ -102,3 +102,65 @@ export async function verifyDealAccess(dealId: string, orgId: string) {
     .single();
   return data;
 }
+
+/**
+ * Verify a contact belongs to the user's organization.
+ * Returns the contact record or null if not found / not in org.
+ */
+export async function verifyContactAccess(contactId: string, orgId: string) {
+  const { data } = await supabase
+    .from('Contact')
+    .select('id, organizationId')
+    .eq('id', contactId)
+    .eq('organizationId', orgId)
+    .single();
+  return data;
+}
+
+/**
+ * Verify a document belongs to a deal in the user's organization.
+ * Resolves ownership through Document → Deal → organizationId.
+ * Returns the document record or null if not found / not in org.
+ */
+export async function verifyDocumentAccess(documentId: string, orgId: string) {
+  const { data: doc } = await supabase
+    .from('Document')
+    .select('id, dealId')
+    .eq('id', documentId)
+    .single();
+  if (!doc?.dealId) return null;
+  const deal = await verifyDealAccess(doc.dealId, orgId);
+  return deal ? doc : null;
+}
+
+/**
+ * Verify a folder belongs to a deal in the user's organization.
+ * Resolves ownership through Folder → Deal → organizationId.
+ * Returns the folder record or null if not found / not in org.
+ */
+export async function verifyFolderAccess(folderId: string, orgId: string) {
+  const { data: folder } = await supabase
+    .from('Folder')
+    .select('id, dealId')
+    .eq('id', folderId)
+    .single();
+  if (!folder?.dealId) return null;
+  const deal = await verifyDealAccess(folder.dealId, orgId);
+  return deal ? folder : null;
+}
+
+/**
+ * Verify a conversation belongs to a deal in the user's organization.
+ * Resolves ownership through Conversation → Deal → organizationId.
+ * Returns the conversation record or null if not found / not in org.
+ */
+export async function verifyConversationAccess(conversationId: string, orgId: string) {
+  const { data: conv } = await supabase
+    .from('Conversation')
+    .select('id, dealId')
+    .eq('id', conversationId)
+    .single();
+  if (!conv?.dealId) return null;
+  const deal = await verifyDealAccess(conv.dealId, orgId);
+  return deal ? conv : null;
+}

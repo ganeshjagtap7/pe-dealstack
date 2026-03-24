@@ -2,6 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { generateFolderInsights } from '../services/folderInsightsGenerator.js';
+import { getOrgId, verifyFolderAccess } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -9,6 +10,11 @@ const router = Router();
 router.get('/folders/:id/insights', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const folderAccess = await verifyFolderAccess(id, orgId);
+    if (!folderAccess) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
 
     const { data: insights, error } = await supabase
       .from('FolderInsight')
@@ -35,6 +41,12 @@ router.get('/folders/:id/insights', async (req: Request, res: Response, next: Ne
 router.post('/folders/:id/insights', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+    const folderAccess = await verifyFolderAccess(id, orgId);
+    if (!folderAccess) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
+
     const { summary, completionPercent, redFlags, missingDocuments } = req.body;
 
     // Upsert insight (delete old, insert new)
@@ -68,6 +80,11 @@ router.post('/folders/:id/insights', async (req: Request, res: Response, next: N
 router.post('/folders/:id/generate-insights', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id: folderId } = req.params;
+    const orgId = getOrgId(req);
+    const folderAccess = await verifyFolderAccess(folderId, orgId);
+    if (!folderAccess) {
+      return res.status(404).json({ error: 'Folder not found' });
+    }
 
     // 1. Get folder info + its deal
     const { data: folder, error: folderError } = await supabase

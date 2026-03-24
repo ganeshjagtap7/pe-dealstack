@@ -15,116 +15,141 @@ import { getOrgId } from '../middleware/orgScope.js';
 
 const subRouter = Router();
 
-// ─── Portfolio Tools ──────────────────────────────────────────────
+// ─── Portfolio Tools (closure-bound per request) ──────────────────
 
-const getPortfolioSummaryTool = tool(
-  async ({ orgId }) => {
-    const { data: deals } = await supabase
-      .from('Deal')
-      .select('id, name, stage, status, industry, revenue, ebitda, dealSize, irrProjected, mom, aiThesis, createdAt')
-      .eq('organizationId', orgId)
-      .order('updatedAt', { ascending: false });
+function getPortfolioTools(orgId: string) {
+  const getPortfolioSummaryTool = tool(
+    async () => {
+      const { data: deals } = await supabase
+        .from('Deal')
+        .select('id, name, stage, status, industry, revenue, ebitda, dealSize, irrProjected, mom, aiThesis, createdAt')
+        .eq('organizationId', orgId)
+        .order('updatedAt', { ascending: false });
 
-    const active = deals?.filter(d => d.status !== 'PASSED' && d.stage !== 'CLOSED_LOST') || [];
-    const totalRevenue = active.reduce((s, d) => s + (d.revenue || 0), 0);
-    const totalEbitda = active.reduce((s, d) => s + (d.ebitda || 0), 0);
-    const withIRR = active.filter(d => d.irrProjected);
-    const avgIRR = withIRR.length > 0 ? withIRR.reduce((s, d) => s + (d.irrProjected || 0), 0) / withIRR.length : 0;
+      const active = deals?.filter(d => d.status !== 'PASSED' && d.stage !== 'CLOSED_LOST') || [];
+      const totalRevenue = active.reduce((s, d) => s + (d.revenue || 0), 0);
+      const totalEbitda = active.reduce((s, d) => s + (d.ebitda || 0), 0);
+      const withIRR = active.filter(d => d.irrProjected);
+      const avgIRR = withIRR.length > 0 ? withIRR.reduce((s, d) => s + (d.irrProjected || 0), 0) / withIRR.length : 0;
 
-    const stageCount: Record<string, number> = {};
-    const industryCount: Record<string, number> = {};
-    active.forEach(d => {
-      stageCount[d.stage] = (stageCount[d.stage] || 0) + 1;
-      if (d.industry) industryCount[d.industry] = (industryCount[d.industry] || 0) + 1;
-    });
+      const stageCount: Record<string, number> = {};
+      const industryCount: Record<string, number> = {};
+      active.forEach(d => {
+        stageCount[d.stage] = (stageCount[d.stage] || 0) + 1;
+        if (d.industry) industryCount[d.industry] = (industryCount[d.industry] || 0) + 1;
+      });
 
-    const parts: string[] = [
-      `Total Deals: ${deals?.length || 0} (${active.length} active)`,
-      `Total Revenue: $${totalRevenue.toFixed(1)}M`,
-      `Total EBITDA: $${totalEbitda.toFixed(1)}M`,
-      `Average IRR: ${avgIRR.toFixed(1)}%`,
-      `\nBy Stage: ${Object.entries(stageCount).map(([k, v]) => `${k}: ${v}`).join(', ')}`,
-      `By Industry: ${Object.entries(industryCount).map(([k, v]) => `${k}: ${v}`).join(', ')}`,
-      `\nTop 10 Deals:`,
-    ];
-    for (const d of active.slice(0, 10)) {
-      parts.push(`- ${d.name} (${d.industry || 'N/A'}): ${d.stage}, Rev $${d.revenue || 0}M, EBITDA $${d.ebitda || 0}M`);
-    }
-    return parts.join('\n');
-  },
-  {
-    name: 'get_portfolio_summary',
-    description: 'Get full portfolio summary: deal counts, revenue, EBITDA, IRR, stage/industry breakdown, and top deals.',
-    schema: z.object({ orgId: z.string() }),
-  }
-);
-
-const getDealDetailsTool = tool(
-  async ({ dealName, orgId }) => {
-    const { data: deals } = await supabase
-      .from('Deal')
-      .select('id, name, stage, status, industry, revenue, ebitda, dealSize, irrProjected, mom, aiThesis, description, source')
-      .eq('organizationId', orgId)
-      .ilike('name', `%${dealName}%`)
-      .limit(3);
-
-    if (!deals || deals.length === 0) return `No deal found matching "${dealName}".`;
-
-    return deals.map(d => {
-      const parts = [`**${d.name}**`, `Stage: ${d.stage}, Status: ${d.status}`];
-      if (d.industry) parts.push(`Industry: ${d.industry}`);
-      if (d.revenue) parts.push(`Revenue: $${d.revenue}M`);
-      if (d.ebitda) parts.push(`EBITDA: $${d.ebitda}M`);
-      if (d.dealSize) parts.push(`Deal Size: $${d.dealSize}M`);
-      if (d.irrProjected) parts.push(`IRR: ${d.irrProjected}%`);
-      if (d.mom) parts.push(`MoM: ${d.mom}x`);
-      if (d.aiThesis) parts.push(`Thesis: ${d.aiThesis}`);
+      const parts: string[] = [
+        `Total Deals: ${deals?.length || 0} (${active.length} active)`,
+        `Total Revenue: $${totalRevenue.toFixed(1)}M`,
+        `Total EBITDA: $${totalEbitda.toFixed(1)}M`,
+        `Average IRR: ${avgIRR.toFixed(1)}%`,
+        `\nBy Stage: ${Object.entries(stageCount).map(([k, v]) => `${k}: ${v}`).join(', ')}`,
+        `By Industry: ${Object.entries(industryCount).map(([k, v]) => `${k}: ${v}`).join(', ')}`,
+        `\nTop 10 Deals:`,
+      ];
+      for (const d of active.slice(0, 10)) {
+        parts.push(`- ${d.name} (${d.industry || 'N/A'}): ${d.stage}, Rev $${d.revenue || 0}M, EBITDA $${d.ebitda || 0}M`);
+      }
       return parts.join('\n');
-    }).join('\n\n');
-  },
-  {
-    name: 'get_deal_details',
-    description: 'Fetch details for a specific deal by name. Use when user asks about a particular deal.',
-    schema: z.object({
-      dealName: z.string().describe('Name or partial name of the deal to look up'),
-      orgId: z.string(),
-    }),
-  }
-);
-
-const getPipelineAnalysisTool = tool(
-  async ({ orgId }) => {
-    const { data: deals } = await supabase
-      .from('Deal')
-      .select('stage, status, revenue, ebitda, dealSize, createdAt')
-      .eq('organizationId', orgId);
-
-    if (!deals || deals.length === 0) return 'No deals in pipeline.';
-
-    const stages = ['SOURCING', 'SCREENING', 'DUE_DILIGENCE', 'IC_REVIEW', 'LOI', 'CLOSING', 'CLOSED_WON', 'CLOSED_LOST'];
-    const parts: string[] = ['**Pipeline Analysis:**\n'];
-
-    for (const stage of stages) {
-      const stageDeals = deals.filter(d => d.stage === stage);
-      if (stageDeals.length === 0) continue;
-      const totalValue = stageDeals.reduce((s, d) => s + (d.dealSize || 0), 0);
-      parts.push(`${stage}: ${stageDeals.length} deals, $${totalValue.toFixed(1)}M total value`);
+    },
+    {
+      name: 'get_portfolio_summary',
+      description: 'Get full portfolio summary: deal counts, revenue, EBITDA, IRR, stage/industry breakdown, and top deals.',
+      schema: z.object({}),
     }
+  );
 
-    // Conversion metrics
-    const total = deals.length;
-    const won = deals.filter(d => d.stage === 'CLOSED_WON').length;
-    const lost = deals.filter(d => d.stage === 'CLOSED_LOST' || d.status === 'PASSED').length;
-    parts.push(`\nConversion: ${won} won, ${lost} passed/lost out of ${total} total (${total > 0 ? Math.round(won / total * 100) : 0}% win rate)`);
+  const getDealDetailsTool = tool(
+    async ({ dealName }) => {
+      const { data: deals } = await supabase
+        .from('Deal')
+        .select('id, name, stage, status, industry, revenue, ebitda, dealSize, irrProjected, mom, aiThesis, description, source')
+        .eq('organizationId', orgId)
+        .ilike('name', `%${dealName}%`)
+        .limit(3);
 
-    return parts.join('\n');
-  },
-  {
-    name: 'get_pipeline_analysis',
-    description: 'Analyze the deal pipeline — stage distribution, total value per stage, conversion rates.',
-    schema: z.object({ orgId: z.string() }),
-  }
-);
+      if (!deals || deals.length === 0) return `No deal found matching "${dealName}".`;
+
+      const results: string[] = [];
+      for (const d of deals) {
+        const parts = [`**${d.name}**`, `Stage: ${d.stage}, Status: ${d.status}`];
+        if (d.industry) parts.push(`Industry: ${d.industry}`);
+        if (d.revenue) parts.push(`Revenue: $${d.revenue}M`);
+        if (d.ebitda) parts.push(`EBITDA: $${d.ebitda}M`);
+        if (d.dealSize) parts.push(`Deal Size: $${d.dealSize}M`);
+        if (d.irrProjected) parts.push(`IRR: ${d.irrProjected}%`);
+        if (d.mom) parts.push(`MoM: ${d.mom}x`);
+        if (d.aiThesis) parts.push(`Thesis: ${d.aiThesis}`);
+
+        // Fetch extracted financial statements for this deal
+        const { data: statements } = await supabase
+          .from('FinancialStatement')
+          .select('statementType, period, extractedData, confidence')
+          .eq('dealId', d.id)
+          .eq('isActive', true)
+          .order('period', { ascending: false })
+          .limit(6);
+
+        if (statements && statements.length > 0) {
+          parts.push(`\nExtracted Financial Statements (${statements.length} periods):`);
+          for (const s of statements.slice(0, 3)) {
+            const items = Array.isArray(s.extractedData) ? s.extractedData : [];
+            const rev = items.find((i: any) => i.label?.toLowerCase().includes('revenue'));
+            const ebitda = items.find((i: any) => i.label?.toLowerCase().includes('ebitda'));
+            parts.push(`  ${s.statementType} ${s.period}: ${rev ? `Revenue $${rev.value}M` : ''} ${ebitda ? `EBITDA $${ebitda.value}M` : ''} (${s.confidence}% confidence)`);
+          }
+        }
+
+        results.push(parts.join('\n'));
+      }
+      return results.join('\n\n');
+    },
+    {
+      name: 'get_deal_details',
+      description: 'Fetch details for a specific deal by name, including extracted financial statements. Use when user asks about a particular deal.',
+      schema: z.object({
+        dealName: z.string().describe('Name or partial name of the deal to look up'),
+      }),
+    }
+  );
+
+  const getPipelineAnalysisTool = tool(
+    async () => {
+      const { data: deals } = await supabase
+        .from('Deal')
+        .select('stage, status, revenue, ebitda, dealSize, createdAt')
+        .eq('organizationId', orgId);
+
+      if (!deals || deals.length === 0) return 'No deals in pipeline.';
+
+      const stages = ['SOURCING', 'SCREENING', 'DUE_DILIGENCE', 'IC_REVIEW', 'LOI', 'CLOSING', 'CLOSED_WON', 'CLOSED_LOST'];
+      const parts: string[] = ['**Pipeline Analysis:**\n'];
+
+      for (const stage of stages) {
+        const stageDeals = deals.filter(d => d.stage === stage);
+        if (stageDeals.length === 0) continue;
+        const totalValue = stageDeals.reduce((s, d) => s + (d.dealSize || 0), 0);
+        parts.push(`${stage}: ${stageDeals.length} deals, $${totalValue.toFixed(1)}M total value`);
+      }
+
+      // Conversion metrics
+      const total = deals.length;
+      const won = deals.filter(d => d.stage === 'CLOSED_WON').length;
+      const lost = deals.filter(d => d.stage === 'CLOSED_LOST' || d.status === 'PASSED').length;
+      parts.push(`\nConversion: ${won} won, ${lost} passed/lost out of ${total} total (${total > 0 ? Math.round(won / total * 100) : 0}% win rate)`);
+
+      return parts.join('\n');
+    },
+    {
+      name: 'get_pipeline_analysis',
+      description: 'Analyze the deal pipeline — stage distribution, total value per stage, conversion rates.',
+      schema: z.object({}),
+    }
+  );
+
+  return [getPortfolioSummaryTool, getDealDetailsTool, getPipelineAnalysisTool];
+}
 
 // ─── Portfolio Chat Route ─────────────────────────────────────────
 
@@ -141,19 +166,26 @@ subRouter.post('/portfolio/chat', async (req, res) => {
 
     const orgId = getOrgId(req);
 
-    const model = getChatModel(0.7, 500);
-    const tools = [getPortfolioSummaryTool, getDealDetailsTool, getPipelineAnalysisTool];
+    const model = getChatModel(0.3, 1500);
+    const tools = getPortfolioTools(orgId);
 
     const agent = createReactAgent({
       llm: model,
       tools,
     });
 
-    const systemPrompt = `You are an AI portfolio assistant for a Private Equity firm. You have tools to query the firm's deal pipeline and portfolio data. Use these tools to answer questions accurately.
+    const systemPrompt = `You are an AI portfolio assistant for a Private Equity firm. You have tools to query the firm's deal pipeline and portfolio data.
 
-Be concise but insightful. Use specific numbers from tool results. If asked about a specific deal, use get_deal_details. For broad questions, use get_portfolio_summary or get_pipeline_analysis.
+RULES:
+- ALWAYS use tools to get data before answering — never guess or assume
+- Use get_portfolio_summary for questions about the full portfolio, total counts, or overall metrics (no params needed)
+- Use get_deal_details for questions about specific deals (pass the deal name only)
+- Use get_pipeline_analysis for stage distribution, conversion, and pipeline value questions (no params needed)
+- When asked "which deals need attention": explain WHY each deal needs attention (stalled stage, low revenue, missing metrics, long time without activity)
+- Use specific numbers from tool results — cite revenue, EBITDA, stage, and deal names
+- Be consistent: always use the same tool for the same type of question
+- If asked to compare or summarize multiple deals, use get_portfolio_summary first, then get_deal_details for specifics
 
-Organization ID: ${orgId}
 Today's date: ${new Date().toLocaleDateString()}`;
 
     log.info('Portfolio AI query (ReAct agent)', { query: message.substring(0, 50) });
