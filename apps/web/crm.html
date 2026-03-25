@@ -166,18 +166,42 @@
                         class="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative"
                         id="notifications-btn">
                         <span class="material-symbols-outlined text-[20px]">notifications</span>
-                        <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
+                        <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white hidden" id="notification-dot"></span>
                     </button>
                     <div class="h-6 w-px bg-border-subtle"></div>
-                    <button
-                        class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
-                        id="user-menu-btn">
-                        <div
-                            class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm bg-primary flex items-center justify-center text-white text-xs font-bold">
+                    <div class="relative" id="user-menu-container">
+                        <button
+                            class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
+                            id="user-menu-btn" title="Profile & Settings">
+                            <div
+                                class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm bg-primary flex items-center justify-center text-white text-xs font-bold">
+                            </div>
+                            <span class="hidden md:inline">Loading...</span>
+                            <span class="material-symbols-outlined text-[18px] text-text-muted user-menu-chevron transition-transform duration-200">expand_more</span>
+                        </button>
+                        <div id="user-dropdown" class="hidden absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50 bg-white border border-gray-200">
+                            <div class="px-4 py-3 border-b border-gray-200">
+                                <p class="text-sm font-medium text-gray-900" id="dropdown-user-name">Loading...</p>
+                                <p class="text-xs text-gray-500" id="dropdown-user-role"></p>
+                            </div>
+                            <div class="py-1">
+                                <a href="/settings.html" class="flex items-center gap-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">person</span>
+                                    Profile
+                                </a>
+                                <a href="/settings.html" class="flex items-center gap-3 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">settings</span>
+                                    Settings
+                                </a>
+                            </div>
+                            <div class="border-t border-gray-200 py-1">
+                                <button id="logout-btn" class="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-red-600 hover:bg-red-50 transition-colors">
+                                    <span class="material-symbols-outlined text-[18px]">logout</span>
+                                    Log out
+                                </button>
+                            </div>
                         </div>
-                        <span class="hidden md:inline">Loading...</span>
-                        <span class="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
-                    </button>
+                    </div>
                 </div>
             </header>
 
