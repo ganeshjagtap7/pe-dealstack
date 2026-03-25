@@ -92,7 +92,7 @@
         // Verify invitation
         async function verifyInvitation(token) {
             try {
-                const response = await fetch(`${API_BASE_URL}/invitations/verify/${token}`);
+                const response = await fetch(`${API_BASE_URL}/public/invitations/verify/${token}`);
                 const data = await response.json();
 
                 if (!response.ok) {
@@ -141,7 +141,7 @@
             `;
 
             try {
-                const response = await fetch(`${API_BASE_URL}/invitations/accept/${invitationToken}`, {
+                const response = await fetch(`${API_BASE_URL}/public/invitations/accept/${invitationToken}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password, fullName }),

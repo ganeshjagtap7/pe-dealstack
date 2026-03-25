@@ -15,6 +15,7 @@ import notificationsRouter from './routes/notifications.js';
 import ingestRouter from './routes/ingest.js';
 import memosRouter from './routes/memos.js';
 import invitationsRouter from './routes/invitations.js';
+import invitationsAcceptRouter from './routes/invitations-accept.js';
 import templatesRouter from './routes/templates.js';
 import auditRouter from './routes/audit.js';
 import tasksRouter from './routes/tasks.js';
@@ -195,6 +196,12 @@ app.get('/api', (_req, res) => {
 });
 
 // ========================================
+// Public Routes (no auth required)
+// ========================================
+// Invitation verify/accept must be public — invitees don't have accounts yet
+app.use('/api/public/invitations', invitationsAcceptRouter);
+
+// ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
 app.use('/api/deals', authMiddleware, orgMiddleware, dealsRouter);
@@ -208,18 +215,13 @@ app.use('/api/notifications', authMiddleware, orgMiddleware, notificationsRouter
 app.use('/api/ingest', authMiddleware, orgMiddleware, ingestRouter);
 app.use('/api/memos', authMiddleware, orgMiddleware, memosRouter);
 app.use('/api/templates', authMiddleware, orgMiddleware, templatesRouter);
+// Authenticated invitation routes (list, create, revoke, resend)
 app.use('/api/invitations', authMiddleware, orgMiddleware, invitationsRouter);
 app.use('/api/audit', authMiddleware, orgMiddleware, auditRouter);
 app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
-
-// ========================================
-// Public Invitation Routes (no auth for verify/accept)
-// ========================================
-app.get('/api/invitations/verify/:token', invitationsRouter);
-app.post('/api/invitations/accept/:token', invitationsRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
