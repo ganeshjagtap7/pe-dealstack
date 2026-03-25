@@ -5,6 +5,71 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 44 — March 25, 2026
+
+#### 10:00-16:00 IST — Org Isolation Hardening + Invitation Flow Fix
+
+**Goal:** Audit and fix all multi-tenancy / org isolation gaps across the entire API. Fix broken invitation accept flow.
+
+---
+
+#### What Was Done
+
+1. **Full Org Isolation Audit — 11 route files, 33 endpoints secured**
+   - **Problem:** 11 route files had endpoints that allowed cross-org data access via UUID guessing (OWASP A01 Broken Access Control)
+   - **Root cause:** Routes like `GET /documents/:id`, `GET /folders/:id`, deal chat, deal team, contact connections, folder insights, and contact insights queried data without verifying the requesting user's organization owns the resource
+   - **Fix (Commit 1 — `164fac3`):** Added `verifyDealAccess`, `verifyDocumentAccess`, `verifyFolderAccess`, `verifyConversationAccess`, `verifyContactAccess` helpers to `orgScope.ts`. Applied to 25 endpoints across 7 route files: `documents.ts`, `deals-chat.ts`, `deals-chat-ai.ts`, `deals-team.ts`, `contacts-connections.ts`, `chat.ts`, `folders.ts`
+   - **Fix (Commit 2 — `f07243a`):** Scoped remaining gaps: `contacts-insights.ts` (scores + network queries leaked cross-org interaction counts), `folders-insights.ts` (zero org verification on 3 endpoints), `ai-portfolio.ts` (closure-bound tools instead of LLM-passed orgId), `ai-ingest.ts` (org audit context)
+   - **Design decision:** Returns 404 (not 403) on wrong-org access — prevents resource enumeration attacks
+   - **Bonus fix:** `deals-chat-ai.ts` "available users for assignment" query was leaking all users across all orgs — scoped to `.eq('organizationId', orgId)`
+   - **Files:** `orgScope.ts`, `documents.ts`, `deals-chat.ts`, `deals-chat-ai.ts`, `deals-team.ts`, `contacts-connections.ts`, `chat.ts`, `folders.ts`, `contacts-insights.ts`, `folders-insights.ts`, `ai-portfolio.ts`, `ai-ingest.ts`
+
+2. **Automated Org Isolation Test Suite — 34 tests**
+   - Created `apps/api/tests/org-isolation.test.ts` — integration tests hitting live API with real Supabase auth
+   - 26 cross-org blocking tests + 8 same-org access tests
+   - Run: `cd apps/api && npm run test:org-isolation`
+   - Tests: deals, documents, folders, deal chat, deal team, contacts, contact insights, portfolio
+
+3. **QA Test Checklist for Manual Testing**
+   - Created `docs/ORG-ISOLATION-TEST-CHECKLIST.md` — non-technical, UI-based testing guide
+   - Part A: automated API tests (5 min), Part B: 18 manual browser tests (20 min)
+   - Written in plain language for non-developer testers
+
+4. **Invitation Flow Fix — Route Ordering Bug**
+   - **Problem:** Public endpoints `/api/invitations/verify/:token` and `/api/invitations/accept/:token` were blocked by auth middleware. Invitees (who don't have accounts yet) couldn't accept invitations.
+   - **Root cause:** `app.use('/api', authMiddleware, ...)` catch-all routes (for activities, documents, folders, chat, financials, AI) intercepted ALL `/api/*` requests before the public invitation routes were reached. Express matches top-to-bottom.
+   - **Fix:** Imported `invitationsAcceptRouter` directly in `app.ts`. Mounted at `/api/public/invitations` BEFORE all auth-protected routes. Updated `accept-invite.js` frontend to call new public paths.
+   - **Files:** `apps/api/src/app.ts`, `apps/web/accept-invite.js`
+   - **Verified:** Full end-to-end flow working on production (`pe-dealstack.vercel.app`)
+
+5. **Production Environment Setup**
+   - Set `APP_URL=https://pe-dealstack.vercel.app` in Vercel env vars — invite emails now have correct links
+   - Set `RESEND_API_KEY` in Vercel env vars
+   - Confirmed: Vercel hosts both frontend + API (serverless). Render is legacy, no longer used.
+   - **Note:** Resend free plan only sends emails to verified addresses. Manual invite link sharing works as fallback.
+
+6. **Trail of Bits Security Skills Installed**
+   - Installed `~/.claude/skills/trailofbits/` — 35 security plugins for audit workflows, vulnerability detection
+
+#### Commits
+- `164fac3` — fix(security): add org isolation to 7 unscoped route files (25 endpoints)
+- `f07243a` — fix(security): scope remaining org isolation gaps — insights, portfolio tools, ingest
+- `fef3302` — docs: mark org isolation plan as COMPLETED
+- `d710f55` — feat(testing): automated org isolation tests + updated QA checklist
+- `0b87d2e` — docs: rewrite org isolation test checklist in plain language
+- `1ef387c` — fix(invitations): public verify/accept routes were blocked by auth middleware
+
+#### Stats
+- 12 API route files modified
+- 33 endpoints secured with org verification
+- 4 new access verification helpers
+- 34 automated integration tests
+- 1 invitation flow bug fixed
+- Zero TypeScript errors
+- Zero new dependencies
+
+---
+
 ### Session 43 — March 16, 2026
 
 #### 18:00-20:30 IST — QA Bug Fix Sprint #2 (Pushkar's AI Features Test Report)
