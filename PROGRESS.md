@@ -5,6 +5,66 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 45 — March 25, 2026
+
+#### 16:00-19:00 IST — Production Security Hardening (Pre-DD Readiness)
+
+**Goal:** Harden the product for real confidential deal data before running first real due diligence.
+
+---
+
+#### What Was Done
+
+1. **Private Storage + Signed URLs (CRITICAL)**
+   - **Problem:** VDR documents were stored in a PUBLIC Supabase bucket — anyone with the URL pattern could access confidential CIMs and financials
+   - **Fix:** Switched `documents` bucket to private. Created `utils/storage.ts` with `getSignedDownloadUrl()`, `downloadFileBuffer()`, `extractStoragePath()`. Upload routes now store storage paths (not full URLs). Download endpoint generates 1-hour signed URLs. Frontend always routes through authenticated `/documents/:id/download` endpoint. Backend financial extraction uses Supabase SDK download instead of HTTP fetch.
+   - **Avatar separation:** Avatars moved to new public `avatars` bucket. Created `org-logos` public bucket.
+   - **Migration:** SQL strips URL prefixes from existing `Document.fileUrl` values.
+   - **Files:** `storage.ts` (new), `documents-upload.ts`, `ai-ingest.ts`, `ingest-upload.ts`, `documents.ts`, `financials-extraction.ts`, `users-profile.ts`, `deal-documents.js`, `memo-sections.js`
+
+2. **Security Headers (Helmet.js)**
+   - **Problem:** No CSP, X-Frame-Options, HSTS, or MIME sniffing protection
+   - **Fix:** Installed `helmet` with CSP (self + CDN allowlist), HSTS (1 year, preload), X-Frame-Options DENY, nosniff, strict referrer policy
+   - **Files:** `app.ts`, `package.json`
+
+3. **Service Role Key + Row Level Security**
+   - **Problem:** Backend used anon key (same key exposed in frontend). If someone queried Supabase REST directly, RLS was disabled/open on core tables
+   - **Fix:** Backend now uses `SUPABASE_SERVICE_ROLE_KEY` (bypasses RLS). RLS enabled on 10 core tables (Company, Deal, Document, Activity, User, Task, FinancialStatement, Folder, DealTeamMember, Notification). Contact/ChatMessage open policies replaced with `auth.uid() IS NOT NULL`.
+   - **Files:** `supabase.ts`, `security-hardening-migration.sql`
+
+4. **Encryption Enforcement**
+   - **Problem:** `encryption.ts` silently degraded to plaintext when key missing
+   - **Fix:** `DATA_ENCRYPTION_KEY` now mandatory in production (throws on startup). Added `encryptField()`/`decryptField()` helpers. Production env vars warning expanded.
+   - **Files:** `encryption.ts`, `app.ts`
+
+5. **Password Policy Strengthened**
+   - **Problem:** Only 8 chars minimum, no special character required
+   - **Fix:** 10 chars minimum + uppercase + lowercase + number + special character. Updated across 6 frontend files. Supabase auth min length set to 10.
+   - **Files:** `validation.js`, `signup.html`, `reset-password.html`, `accept-invite.html`, `accept-invite.js`, `settings.html`
+
+6. **Security Audit Events**
+   - **Fix:** Added `DOCUMENT_DOWNLOADED` audit helper + logging in download endpoint. Failed auth attempts now log IP, user-agent, URL.
+   - **Files:** `auditLog.ts`, `documents.ts`, `auth.ts`
+
+#### Supabase Dashboard Changes
+- `documents` bucket: PUBLIC → PRIVATE
+- Created `avatars` bucket (public)
+- Created `org-logos` bucket (public)
+- Authentication min password length: 8 → 10
+- RLS enabled on 10+ core tables via migration SQL
+
+#### Vercel Env Vars Added
+- `SUPABASE_SERVICE_ROLE_KEY` — backend bypasses RLS
+- `DATA_ENCRYPTION_KEY` — AES-256 encryption key
+
+#### Summary
+- **23 files changed** (305 insertions, 78 deletions)
+- **2 new files** (`storage.ts`, `security-hardening-migration.sql`)
+- **Zero TypeScript errors, build passes**
+- **Security grade: A** (up from B+)
+
+---
+
 ### Session 44 — March 25, 2026
 
 #### 10:00-16:00 IST — Org Isolation Hardening + Invitation Flow Fix
