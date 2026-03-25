@@ -123,8 +123,13 @@
                 return;
             }
 
-            if (password.length < 8) {
-                showFormError('Password must be at least 8 characters');
+            if (password.length < 10) {
+                showFormError('Password must be at least 10 characters with uppercase, lowercase, number, and special character');
+                return;
+            }
+
+            if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+                showFormError('Password must contain uppercase, lowercase, number, and special character');
                 return;
             }
 

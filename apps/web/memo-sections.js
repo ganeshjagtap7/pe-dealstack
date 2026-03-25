@@ -414,16 +414,26 @@ function addSectionContent(sectionId) {
     }, 2500);
 }
 
-function showCitation(source, page) {
-    // Try to open the actual document if deal has documents
+async function showCitation(source, page) {
+    // Try to open the actual document via authenticated download endpoint
     if (state.memo?.deal?.documents) {
         const doc = state.memo.deal.documents.find(d =>
             d.name.toLowerCase().includes(source.toLowerCase()) ||
             d.type.toLowerCase().includes(source.toLowerCase())
         );
-        if (doc?.fileUrl) {
-            window.open(doc.fileUrl, '_blank');
-            return;
+        if (doc?.id && doc?.fileUrl) {
+            try {
+                const response = await PEAuth.authFetch(`${API_BASE_URL}/documents/${doc.id}/download`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.url) {
+                        window.open(data.url, '_blank');
+                        return;
+                    }
+                }
+            } catch (err) {
+                console.error('Failed to get signed URL for citation', err);
+            }
         }
     }
     showNotification(`Source: ${source}, Page ${page} — Document viewer coming soon`, 'info');

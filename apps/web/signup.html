@@ -136,7 +136,7 @@
                             placeholder="••••••••"
                             type="password"
                             required
-                            minlength="8"
+                            minlength="10"
                         />
                         <button
                             class="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9ca3af] hover:text-[#617289] cursor-pointer"
@@ -303,8 +303,8 @@
             passwordStrength.classList.remove('hidden');
 
             let strength = 0;
-            if (password.length >= 8) strength++;
-            if (/[A-Z]/.test(password)) strength++;
+            if (password.length >= 10) strength++;
+            if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
             if (/[0-9]/.test(password)) strength++;
             if (/[^A-Za-z0-9]/.test(password)) strength++;
 
@@ -382,14 +382,14 @@
                 return;
             }
 
-            if (password.length < 8) {
-                errorMessage.textContent = 'Password must be at least 8 characters.';
+            if (password.length < 10) {
+                errorMessage.textContent = 'Password must be at least 10 characters.';
                 errorMessage.classList.remove('hidden');
                 return;
             }
 
-            if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
-                errorMessage.textContent = 'Password must contain at least one uppercase letter and one number.';
+            if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+                errorMessage.textContent = 'Password must contain uppercase, lowercase, number, and special character.';
                 errorMessage.classList.remove('hidden');
                 return;
             }

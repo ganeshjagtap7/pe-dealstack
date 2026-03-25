@@ -126,11 +126,8 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         log.error('Storage upload error', uploadError);
         // Continue without file URL if storage fails (bucket might not exist)
       } else {
-        // Get public URL
-        const { data: urlData } = supabase.storage
-          .from('documents')
-          .getPublicUrl(filePath);
-        fileUrl = urlData?.publicUrl;
+        // Store the storage path (not full URL) — signed URLs generated on demand
+        fileUrl = filePath;
       }
     }
 

@@ -12,6 +12,7 @@ import type { ClassifiedStatement } from '../services/financialClassifier.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { runFinancialAgent } from '../services/agents/financialAgent/index.js';
 import type { FileType } from '../services/agents/financialAgent/index.js';
+import { downloadFileBuffer, extractStoragePath } from '../utils/storage.js';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
@@ -20,19 +21,12 @@ const router = Router();
 
 // ─── Helpers ─────────────────────────────────────────────────
 
-/** Download a file from a public URL and return its buffer */
-async function fetchBuffer(url: string): Promise<Buffer | null> {
-  try {
-    const res = await fetch(url);
-    if (!res.ok) return null;
-    const arrayBuffer = await res.arrayBuffer();
-    return Buffer.from(arrayBuffer);
-  } catch {
-    return null;
-  }
+/** Download a file from Supabase storage (supports both storage paths and legacy full URLs) */
+async function fetchBuffer(fileUrlOrPath: string): Promise<Buffer | null> {
+  return downloadFileBuffer(fileUrlOrPath);
 }
 
-/** Extract text from a PDF URL */
+/** Extract text from a PDF stored in Supabase */
 async function extractTextFromUrl(fileUrl: string): Promise<string | null> {
   const buffer = await fetchBuffer(fileUrl);
   if (!buffer) return null;

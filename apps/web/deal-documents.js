@@ -33,12 +33,13 @@ function updateDocumentsList(documents) {
         item.addEventListener('click', (e) => {
             e.preventDefault();
             const docName = item.dataset.docName;
-            const docUrl = item.dataset.docUrl;
             const docId = item.dataset.docId;
             const hasAnalysis = item.dataset.docAnalysis === 'true';
+            const hasFile = item.dataset.docUrl && item.dataset.docUrl.length > 0;
 
-            if (docUrl && window.PEDocPreview) {
-                window.PEDocPreview.preview(docUrl, docName);
+            if (hasFile && docId) {
+                // Always fetch signed URL via authenticated download endpoint
+                fetchAndPreviewDocument(docId, docName);
             } else if (hasAnalysis || docName.includes('Deal Overview')) {
                 // AI-generated doc — fetch and show analysis text
                 fetchAndShowAnalysis(docId, docName);

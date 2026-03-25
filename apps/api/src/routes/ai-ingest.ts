@@ -187,10 +187,8 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
 
     let fileUrl = null;
     if (!uploadError) {
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
-      fileUrl = urlData?.publicUrl;
+      // Store the storage path (not full URL) — signed URLs generated on demand
+      fileUrl = filePath;
     }
 
     // Auto-create default VDR folders for the new deal

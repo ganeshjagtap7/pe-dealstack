@@ -68,7 +68,12 @@ export async function authMiddleware(
     const { data: { user }, error } = await supabase.auth.getUser(token);
 
     if (error || !user) {
-      log.warn('Auth token validation failed', { error: error?.message || 'User not found' });
+      log.warn('Auth token validation failed', {
+        error: error?.message || 'User not found',
+        ip: req.ip,
+        userAgent: req.headers['user-agent'],
+        url: req.originalUrl,
+      });
       res.status(401).json({
         error: 'Unauthorized',
         message: 'Invalid or expired token',

@@ -248,11 +248,9 @@ router.post('/', upload.single('file'), async (req, res) => {
     if (uploadError) {
       log.warn('Storage upload warning', { error: uploadError.message });
     } else {
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(filePath);
-      fileUrl = urlData?.publicUrl;
-      log.debug('File uploaded', { fileUrl });
+      // Store the storage path (not full URL) — signed URLs generated on demand
+      fileUrl = filePath;
+      log.debug('File uploaded to storage', { storagePath: filePath });
     }
 
     // Step 6: Create document record with confidence data

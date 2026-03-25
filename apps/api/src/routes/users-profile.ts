@@ -219,11 +219,11 @@ router.post('/me/avatar', avatarUpload.single('avatar'), async (req: Request, re
     // Generate unique filename
     const timestamp = Date.now();
     const ext = file.originalname.split('.').pop() || 'jpg';
-    const filePath = `avatars/${existingUser.id}/${timestamp}.${ext}`;
+    const filePath = `${existingUser.id}/${timestamp}.${ext}`;
 
-    // Upload to Supabase Storage
+    // Upload to separate public 'avatars' bucket (avatars need to be publicly visible)
     const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('documents')
+      .from('avatars')
       .upload(filePath, file.buffer, {
         contentType: file.mimetype,
         upsert: true,
@@ -234,9 +234,9 @@ router.post('/me/avatar', avatarUpload.single('avatar'), async (req: Request, re
       return res.status(500).json({ error: 'Failed to upload avatar' });
     }
 
-    // Get public URL
+    // Get public URL from avatars bucket
     const { data: urlData } = supabase.storage
-      .from('documents')
+      .from('avatars')
       .getPublicUrl(filePath);
 
     const avatarUrl = urlData?.publicUrl;

@@ -11,12 +11,12 @@ window.PEValidation = (function() {
             message: 'Please enter a valid email address',
         },
         password: {
-            minLength: 8,
+            minLength: 10,
             requireUppercase: true,
             requireLowercase: true,
             requireNumber: true,
-            requireSpecial: false,
-            message: 'Password must be at least 8 characters with uppercase, lowercase, and number',
+            requireSpecial: true,
+            message: 'Password must be at least 10 characters with uppercase, lowercase, number, and special character',
         },
         name: {
             minLength: 2,
@@ -93,8 +93,8 @@ window.PEValidation = (function() {
         if (!password) return 0;
 
         let strength = 0;
-        if (password.length >= 8) strength++;
-        if (/[A-Z]/.test(password)) strength++;
+        if (password.length >= 10) strength++;
+        if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
         if (/[0-9]/.test(password)) strength++;
         if (/[^A-Za-z0-9]/.test(password)) strength++;
 

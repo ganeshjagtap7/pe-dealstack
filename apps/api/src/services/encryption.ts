@@ -7,11 +7,16 @@ const AUTH_TAG_LENGTH = 16;
 
 /**
  * Get the encryption key from environment.
- * Returns null if not configured (graceful degradation for dev).
+ * In production, throws if not configured. In dev, returns null (graceful degradation).
  */
 function getKey(): Buffer | null {
   const key = process.env.DATA_ENCRYPTION_KEY;
-  if (!key) return null;
+  if (!key) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('DATA_ENCRYPTION_KEY is required in production. Generate with: openssl rand -hex 32');
+    }
+    return null;
+  }
   if (key.length !== 64) {
     log.warn('DATA_ENCRYPTION_KEY must be 64 hex characters (32 bytes). Encryption disabled.');
     return null;
@@ -21,7 +26,7 @@ function getKey(): Buffer | null {
 
 /**
  * Encrypt a string using AES-256-GCM.
- * Returns the original text if no encryption key is configured.
+ * Returns the original text if no encryption key is configured (dev only).
  * Format: iv:authTag:ciphertext (all hex-encoded)
  */
 export function encrypt(text: string): string {
@@ -74,4 +79,20 @@ export function decrypt(encryptedText: string): string {
  */
 export function isEncryptionEnabled(): boolean {
   return getKey() !== null;
+}
+
+/**
+ * Encrypt a field value if it's non-null. For use on sensitive DB fields.
+ */
+export function encryptField(value: string | null): string | null {
+  if (!value) return value;
+  return encrypt(value);
+}
+
+/**
+ * Decrypt a field value if it's non-null. For use on sensitive DB fields.
+ */
+export function decryptField(value: string | null): string | null {
+  if (!value) return value;
+  return decrypt(value);
 }
