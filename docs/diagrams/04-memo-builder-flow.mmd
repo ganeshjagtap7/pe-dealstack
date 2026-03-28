@@ -1,7 +1,8 @@
 flowchart TD
     Start{Create Memo}
     Start -->|From Template| PickTemplate["Browse Template Library
-    IC Memo, Teaser, Summary"]
+    IC Memo, Teaser, Summary
+    MemoTemplate table"]
     Start -->|From Scratch| BlankMemo["Create Blank Memo"]
     Start -->|Gold Standard| GoldTemplate["Use Gold Standard Template
     Pre-built best practice"]
@@ -14,38 +15,45 @@ flowchart TD
 
     CreateMemo --> LinkDeal{"Link to Deal?"}
     LinkDeal -->|Yes| SelectDeal["Select Deal
-    Enables RAG Context"]
+    Enables RAG Context
+    from VDR documents"]
     LinkDeal -->|No| Standalone["Standalone Memo"]
     SelectDeal --> EditMemo
     Standalone --> EditMemo
 
-    subgraph EditMemo["Edit Memo Sections"]
+    subgraph EditMemo["Edit Memo — 12 Section Types"]
         direction TB
         S1["Executive Summary"]
         S2["Company Overview"]
-        S3["Financial Performance"]
-        S4["Market Dynamics"]
-        S5["Competitive Landscape"]
-        S6["Risk Assessment"]
-        S7["Deal Structure"]
-        S8["Value Creation"]
-        S9["Exit Strategy"]
-        S10["Recommendation"]
+        S3["Market Analysis"]
+        S4["Financial Summary"]
+        S5["Management Assessment"]
+        S6["Investment Thesis"]
+        S7["Risk Factors"]
+        S8["Valuation Analysis"]
+        S9["Deal Structure"]
+        S10["Due Diligence Findings"]
+        S11["ESG Considerations"]
+        S12["Recommendation"]
     end
 
     EditMemo --> WriteMethod{How to Write?}
-    WriteMethod -->|Manual| ManualWrite["Write Content Manually"]
-    WriteMethod -->|AI Generate| AIPrompt["Enter Custom Prompt"]
+    WriteMethod -->|Manual| ManualWrite["Write Content Manually
+    Rich text editor"]
+    WriteMethod -->|AI Generate| AIPrompt["Enter Custom Prompt
+    per section"]
     AIPrompt --> AIGenerate["AI Generates Section
-    Uses Deal Documents as Context"]
+    Uses Deal Docs as RAG Context
+    memos-sections.ts"]
     AIGenerate --> ReviewAI["Review AI Output
     Edit or Regenerate"]
     ReviewAI --> ManualWrite
 
     ManualWrite --> Reorder["Reorder Sections
     Drag and Drop"]
-    Reorder --> MemoChat["Chat with Memo AI
-    Ask Questions, Get Analysis"]
+    Reorder --> MemoChat["Memo Chat AI
+    Ask questions, refine content
+    memos-chat.ts"]
 
     MemoChat --> Status{Memo Status}
     Status --> Draft["DRAFT
@@ -56,11 +64,16 @@ flowchart TD
     Approved"]
     Status --> Archived["ARCHIVED"]
 
+    Final --> Export["Export
+    PDF / Print / Share"]
+
     style Start fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style SelectDeal fill:#003366,color:#fff,stroke:#002855
     style AIGenerate fill:#f59e0b,color:#fff,stroke:#d97706
     style AIPrompt fill:#f59e0b,color:#fff,stroke:#d97706
+    style MemoChat fill:#14b8a6,color:#fff,stroke:#0d9488
     style Draft fill:#6366f1,color:#fff,stroke:#4f46e5
     style Review fill:#3b82f6,color:#fff,stroke:#2563eb
     style Final fill:#10b981,color:#fff,stroke:#059669
     style Archived fill:#6b7280,color:#fff,stroke:#4b5563
-    style MemoChat fill:#14b8a6,color:#fff,stroke:#0d9488
+    style Export fill:#003366,color:#fff,stroke:#002855

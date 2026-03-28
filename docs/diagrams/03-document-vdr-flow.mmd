@@ -1,67 +1,120 @@
 flowchart TD
-    Start{Document Entry Point}
-    Start -->|Direct Upload| Upload["Upload Document
-    PDF, Excel, Word, Images"]
-    Start -->|CIM Ingestion| CIMUpload["Upload CIM or Teaser
-    via Ingest Endpoint"]
-    Start -->|VDR Page| VDRBrowse["Browse Virtual Data Room"]
-
-    Upload --> Validate{"Validation"}
-    CIMUpload --> Validate
-
-    Validate -->|Magic Bytes Check| TypeCheck["File Type Verified
-    MIME + Content Inspection"]
-    Validate -->|Size Check| SizeCheck["Max 100MB"]
-    TypeCheck --> SizeCheck
-    SizeCheck -->|Pass| Store["Store in Supabase Storage"]
-    SizeCheck -->|Fail| Reject["Upload Rejected
-    Show Error"]
-
-    Store --> Classify["AI Classifies Document
-    CIM, Teaser, Financials,
-    Legal, Tax, Other"]
-    Classify --> Extract["AI Extracts Key Data
-    Metrics, Dates, Figures"]
-    Extract --> Index["Document Indexed
-    Available for RAG Chat"]
-
-    VDRBrowse --> FolderTree["Folder Structure"]
-
-    subgraph Folders["Standard VDR Folders"]
-        direction TB
-        F1["Financial Statements"]
-        F2["Legal Documents"]
-        F3["Tax Records"]
-        F4["Operations"]
-        F5["Management"]
-        F6["Market Research"]
+    subgraph Entry["Document Entry Points"]
+        direction LR
+        Upload["Direct Upload
+        POST /api/documents"]
+        CIMIngest["CIM Ingest
+        POST /api/ingest"]
+        URLIngest["URL Ingest
+        POST /api/ingest/url"]
+        EmailIngest["Email Ingest
+        POST /api/ingest/email"]
+        ChatAttach["Chat Attachment
+        deal-chat-attachments.js"]
     end
 
-    FolderTree --> Folders
-    Store --> FolderTree
+    Upload --> Validate
+    CIMIngest --> Validate
+    URLIngest --> Validate
+    EmailIngest --> Validate
+    ChatAttach --> Validate
+
+    Validate["File Validation
+    Magic bytes check
+    100MB size limit
+    fileValidator.ts"]
+
+    Validate -->|Valid| Store["Store in Supabase Storage"]
+    Validate -->|Invalid| Reject["Rejected — Error returned"]
+
+    Store --> AIClassify["AI Classification
+    documentParser.ts"]
+
+    AIClassify --> DocType{Document Type}
+    DocType -->|CIM| CIM["Confidential Info Memo"]
+    DocType -->|Teaser| Teaser["Deal Teaser"]
+    DocType -->|Financial| Financial["Financial Statements"]
+    DocType -->|Legal| Legal["Legal Documents"]
+    DocType -->|Tax| Tax["Tax Returns"]
+    DocType -->|Other| Other["Other Documents"]
+
+    Financial -->|Auto-trigger| FinExtract["Financial Extraction
+    LangGraph 5-Node Agent
+    Azure → PDF text → Vision"]
+
+    Store --> Index["Document Indexed
+    DocumentChunk table
+    Available for RAG Chat"]
+
+    subgraph VDR["Virtual Data Room — React App (vdr.tsx)"]
+        direction TB
+        FolderTree["Folder Tree
+        Hierarchical navigation
+        Drag & drop"]
+        SmartFilters["Smart Filters
+        4 built-in: PDFs, Spreadsheets,
+        AI Warnings, Last 30 Days
+        + 7 custom presets"]
+        FileTable["File Table
+        Sort, select, bulk actions"]
+        Search["Cross-Folder Search
+        Searches ALL folders
+        Blue banner with count"]
+        InsightsPanel["AI Insights Panel
+        Completion %, red flags,
+        missing documents"]
+        ConfirmDialog["Confirm Dialog
+        danger / warning / info"]
+        Toast["Toast Notifications
+        success / error / warning / info"]
+    end
+
+    subgraph DefaultFolders["Default VDR Folders (auto-created)"]
+        direction LR
+        F1["100 Financials"]
+        F2["200 Legal"]
+        F3["300 Commercial"]
+        F4["400 HR & Data"]
+        F5["500 IP"]
+    end
 
     subgraph DocActions["Document Actions"]
         direction LR
-        Preview["Preview Document"]
-        Download["Download File"]
+        Preview["Preview
+        docPreview.js"]
+        Download["Download"]
         Move["Move to Folder"]
-        Tag["Add Tags"]
-        Highlight["Highlight Important"]
-        Delete["Delete Document"]
+        Share["Share Link
+        documents-sharing.ts"]
+        Tag["Tag & Highlight"]
+        Delete["Delete"]
+        RequestDoc["Request Document
+        Resend email + in-app notification"]
     end
 
-    Index --> DocActions
+    CIM --> VDR
+    Teaser --> VDR
+    Financial --> VDR
+    Legal --> VDR
+    Tax --> VDR
+    Other --> VDR
 
-    FolderTree --> Insights["Folder Insights
-    Completeness Score,
-    Missing Documents,
-    Red Flags"]
+    VDR --> DocActions
+    VDR --> DefaultFolders
 
-    style Start fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style Upload fill:#003366,color:#fff,stroke:#002855
+    style CIMIngest fill:#003366,color:#fff,stroke:#002855
+    style URLIngest fill:#003366,color:#fff,stroke:#002855
+    style EmailIngest fill:#003366,color:#fff,stroke:#002855
+    style ChatAttach fill:#003366,color:#fff,stroke:#002855
     style Validate fill:#f59e0b,color:#fff,stroke:#d97706
-    style Store fill:#3b82f6,color:#fff,stroke:#2563eb
-    style Classify fill:#6366f1,color:#fff,stroke:#4f46e5
-    style Extract fill:#6366f1,color:#fff,stroke:#4f46e5
-    style Index fill:#10b981,color:#fff,stroke:#059669
+    style AIClassify fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style FinExtract fill:#6366f1,color:#fff,stroke:#4f46e5
     style Reject fill:#ef4444,color:#fff,stroke:#dc2626
-    style Insights fill:#14b8a6,color:#fff,stroke:#0d9488
+    style Store fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Index fill:#10b981,color:#fff,stroke:#059669
+    style FolderTree fill:#10b981,color:#fff,stroke:#059669
+    style SmartFilters fill:#10b981,color:#fff,stroke:#059669
+    style FileTable fill:#10b981,color:#fff,stroke:#059669
+    style Search fill:#10b981,color:#fff,stroke:#059669
+    style InsightsPanel fill:#10b981,color:#fff,stroke:#059669

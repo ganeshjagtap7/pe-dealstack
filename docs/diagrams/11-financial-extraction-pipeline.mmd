@@ -1,0 +1,146 @@
+flowchart TD
+    Input{Document Input}
+    Input -->|PDF| PDFPath
+    Input -->|Excel| ExcelPath
+    Input -->|Image/Scan| VisionPath
+
+    subgraph PDFPath["PDF Extraction Path"]
+        direction TB
+        PDFParse["pdf-parse
+        Extract raw text"]
+        PDFParse -->|"Text found"| TextClassify["GPT-4o Classifier
+        financialClassifier.ts
+        Identify statement types"]
+        PDFParse -->|"No text / scanned"| FallbackVision["Fallback to Vision"]
+    end
+
+    subgraph ExcelPath["Excel Extraction Path"]
+        direction TB
+        XLSXParse["xlsx library parse
+        excelParser.ts"]
+        XLSXParse --> SheetScore["Sheet Scoring (0-100)
+        excelFinancialExtractor.ts
+        Income Statement=100
+        P and L=95, Summary=50
+        Junk sheets=-1 (skipped)"]
+        SheetScore --> CSVConvert["Convert to CSV text
+        Descending score order"]
+        CSVConvert --> ExcelClassify["GPT-4o Classifier
+        Identify statements"]
+    end
+
+    subgraph VisionPath["Vision Extraction Path"]
+        direction TB
+        ImageExtract["GPT-4o Vision
+        visionExtractor.ts
+        Reads page images"]
+    end
+
+    subgraph AzurePath["Azure DI Path (if configured)"]
+        direction TB
+        AzureDI["Azure Document Intelligence
+        azureDocIntelligence.ts
+        Best for complex CIM layouts"]
+    end
+
+    FallbackVision --> ImageExtract
+
+    subgraph LangGraphAgent["LangGraph Financial Agent — 5-Node StateGraph"]
+        direction TB
+
+        ExtractNode["EXTRACT NODE
+        extractNode.ts
+        3-layer fallback:
+        1. Azure DI
+        2. PDF text + GPT-4o
+        3. GPT-4o Vision"]
+
+        VerifyNode["VERIFY NODE
+        verifyNode.ts
+        Two-pass GPT-4o-mini
+        Cross-check vs source text
+        Catches unit errors, transposed digits
+        Best-effort — continues on failure"]
+
+        ValidateNode["VALIDATE NODE
+        validateNode.ts
+        Non-zero checks
+        Range validation
+        Scale consistency"]
+
+        SelfCorrectNode["SELF-CORRECT NODE
+        selfCorrectNode.ts
+        Targeted re-extraction
+        Only failing statements/periods
+        Merges corrections"]
+
+        StoreNode["STORE NODE
+        storeNode.ts
+        Save to FinancialStatement table
+        Handle merge conflicts"]
+
+        ExtractNode --> VerifyNode
+        VerifyNode --> ValidateNode
+        ValidateNode -->|Pass| StoreNode
+        ValidateNode -->|Fail| SelfCorrectNode
+        SelfCorrectNode -->|"Retry (max 3)"| ValidateNode
+        SelfCorrectNode -->|"Max retries"| StoreNode
+    end
+
+    TextClassify --> ExtractNode
+    ExcelClassify --> ExtractNode
+    ImageExtract --> ExtractNode
+    AzureDI --> ExtractNode
+
+    subgraph Output["Output — FinancialStatement Table"]
+        direction LR
+        Income["INCOME_STATEMENT
+        Revenue, COGS, EBITDA,
+        Net Income"]
+        Balance["BALANCE_SHEET
+        Assets, Liabilities,
+        Equity"]
+        CashFlow["CASH_FLOW
+        Operating, Investing,
+        Financing"]
+    end
+
+    subgraph MergeLogic["Multi-Document Merge"]
+        direction TB
+        UniqueConstraint["UNIQUE on
+        (dealId, statementType,
+        period, documentId)"]
+        MergeStatus["mergeStatus:
+        auto — no conflict
+        needs_review — conflict detected
+        user_resolved — manually resolved"]
+        PartialIndex["Partial unique index
+        WHERE isActive = true
+        One active per period"]
+    end
+
+    StoreNode --> Output
+    StoreNode --> MergeLogic
+
+    subgraph Analysis["PE Analysis Suite — 8 Modules"]
+        direction LR
+        QoE["QoE Score"]
+        Ratios["Financial Ratios"]
+        Operational["Operational"]
+        DebtLBO["Debt and LBO"]
+        RedFlags["Red Flags"]
+    end
+
+    Output --> Analysis
+
+    style Input fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style ExtractNode fill:#003366,color:#fff,stroke:#002855
+    style VerifyNode fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style ValidateNode fill:#f59e0b,color:#fff,stroke:#d97706
+    style SelfCorrectNode fill:#ef4444,color:#fff,stroke:#dc2626
+    style StoreNode fill:#10b981,color:#fff,stroke:#059669
+    style PDFParse fill:#6366f1,color:#fff,stroke:#4f46e5
+    style XLSXParse fill:#6366f1,color:#fff,stroke:#4f46e5
+    style ImageExtract fill:#6366f1,color:#fff,stroke:#4f46e5
+    style AzureDI fill:#3b82f6,color:#fff,stroke:#2563eb
+    style SheetScore fill:#14b8a6,color:#fff,stroke:#0d9488

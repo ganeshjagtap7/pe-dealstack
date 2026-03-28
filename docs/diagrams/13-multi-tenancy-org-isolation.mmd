@@ -1,0 +1,132 @@
+flowchart TB
+    subgraph SignupFlow["Signup — Auto-Provision"]
+        direction TB
+        UserSignup["User signs up
+        name, email, firmName"]
+        SupaAuth["Supabase Auth
+        creates auth user"]
+        FindOrCreate["findOrCreateUser()
+        userService.ts"]
+        CreateOrg["INSERT Organization
+        name=firmName, slug, plan"]
+        CreateUser["INSERT User
+        role=ADMIN, organizationId"]
+        UserSignup --> SupaAuth --> FindOrCreate --> CreateOrg --> CreateUser
+    end
+
+    subgraph InviteFlow["Invitation — Join Existing Org"]
+        direction TB
+        AdminInvite["Admin sends invite
+        POST /api/invitations"]
+        InviteRecord["INSERT Invitation
+        email, role, organizationId, token"]
+        InviteEmail["Resend email
+        accept-invite link"]
+        AcceptInvite["Invitee accepts
+        POST /api/public/invitations/accept"]
+        NewUser["INSERT User
+        organizationId from Invitation
+        role from Invitation"]
+        AdminInvite --> InviteRecord --> InviteEmail --> AcceptInvite --> NewUser
+    end
+
+    subgraph OrgMiddleware["orgMiddleware — Every Request"]
+        direction TB
+        JWTVerify["authMiddleware
+        Verify JWT → authId"]
+        ResolveUser["SELECT User
+        WHERE authId = ?"]
+        SetOrgId["req.organizationId = user.organizationId
+        req.userId = user.id
+        req.userRole = user.role"]
+        JWTVerify --> ResolveUser --> SetOrgId
+    end
+
+    subgraph DirectScope["Direct organizationId FK — 10 Tables"]
+        direction LR
+        T1["User"]
+        T2["Deal"]
+        T3["Company"]
+        T4["Contact"]
+        T5["Task"]
+        T6["Memo"]
+        T7["MemoTemplate"]
+        T8["Invitation"]
+        T9["AuditLog"]
+        T10["Notification"]
+    end
+
+    subgraph IndirectScope["Indirect Scope via Deal — 10 Tables"]
+        direction LR
+        T11["Document"]
+        T12["Folder"]
+        T13["FolderInsight"]
+        T14["Activity"]
+        T15["FinancialStatement"]
+        T16["DocumentChunk"]
+        T17["DealTeamMember"]
+        T18["ChatMessage"]
+        T19["NarrativeInsightCache"]
+        T20["AgentMemory"]
+    end
+
+    subgraph QueryPattern["Query Scoping Pattern"]
+        direction TB
+        DirectQuery[".eq('organizationId', orgId)
+        Used for direct-FK tables"]
+        IndirectQuery["verifyDealAccess(dealId, orgId)
+        Used for deal-child tables
+        Confirms deal belongs to org"]
+        AllRoutes["All 17 route files scoped
+        Zero cross-org data leakage"]
+    end
+
+    subgraph OrgTable["Organization Table"]
+        direction TB
+        OrgFields["id: UUID (PK)
+        name: string
+        slug: string (unique)
+        logo: string
+        industry: string
+        plan: string
+        maxUsers: int
+        isActive: boolean"]
+    end
+
+    subgraph RoleModel["Role-Based Access within Org"]
+        direction LR
+        RoleAdmin["ADMIN
+        Full org access
+        User management
+        Invite/revoke"]
+        RoleMember["MEMBER
+        Standard access
+        Deal operations"]
+        RoleOps["OPS
+        Operations
+        Limited AI"]
+        RoleViewer["VIEWER
+        Read-only
+        No modifications"]
+    end
+
+    SetOrgId --> DirectScope
+    SetOrgId --> IndirectScope
+    DirectScope --> DirectQuery
+    IndirectScope --> IndirectQuery
+    DirectQuery --> AllRoutes
+    IndirectQuery --> AllRoutes
+    CreateOrg --> OrgTable
+    SetOrgId --> RoleModel
+
+    style SignupFlow fill:#003366,color:#fff,stroke:#002855
+    style InviteFlow fill:#6366f1,color:#fff,stroke:#4f46e5
+    style OrgMiddleware fill:#f59e0b,color:#fff,stroke:#d97706
+    style DirectScope fill:#10b981,color:#fff,stroke:#059669
+    style IndirectScope fill:#14b8a6,color:#fff,stroke:#0d9488
+    style AllRoutes fill:#10b981,color:#fff,stroke:#059669
+    style OrgTable fill:#3b82f6,color:#fff,stroke:#2563eb
+    style RoleAdmin fill:#003366,color:#fff,stroke:#002855
+    style RoleMember fill:#6366f1,color:#fff,stroke:#4f46e5
+    style RoleOps fill:#f59e0b,color:#fff,stroke:#d97706
+    style RoleViewer fill:#6b7280,color:#fff,stroke:#4b5563

@@ -1,48 +1,88 @@
-flowchart TD
-    Start([User Visits PE OS]) --> Landing[Landing Page]
-    Landing --> SignUp[Sign Up]
-    Landing --> Login[Log In]
-    Landing --> ForgotPW[Forgot Password]
+sequenceDiagram
+    participant U as User
+    participant FE as Frontend (PEAuth)
+    participant API as Express API
+    participant Auth as Supabase Auth
+    participant DB as Supabase DB
+    participant Org as orgMiddleware
 
-    SignUp --> FillForm["Enter Full Name, Firm Name,
-    Title, Email, Password"]
-    FillForm --> SupaCreate["Supabase Creates User
-    role = ADMIN"]
-    SupaCreate --> VerifyEmail["Verification Email Sent"]
-    VerifyEmail --> ClickLink[User Clicks Email Link]
-    ClickLink --> Verified["Account Verified"]
-    Verified --> Login
+    Note over U,DB: SIGNUP FLOW
+    U->>FE: Fill signup form (name, email, password, firmName)
+    FE->>Auth: supabase.auth.signUp(email, password)
+    Auth-->>FE: Confirmation email sent
+    U->>FE: Click verification link
+    FE->>Auth: Email verified
+    Auth-->>FE: Session + JWT token
 
-    Login --> EnterCreds[Enter Email + Password]
-    EnterCreds --> SupaAuth{Supabase Auth}
-    SupaAuth -->|Success| JWT["JWT Token Stored"]
-    SupaAuth -->|Failure| LoginError["Show Error"]
-    LoginError --> EnterCreds
-    JWT --> RoleCheck{User Role?}
-    RoleCheck -->|ADMIN or PARTNER| AdminDash["Admin Dashboard"]
-    RoleCheck -->|MEMBER or ANALYST| MemberDash["Analyst Dashboard"]
+    Note over U,DB: FIRST LOGIN — AUTO-PROVISION
+    FE->>API: GET /api/users/me (JWT Bearer)
+    API->>Auth: Verify JWT token
+    Auth-->>API: authId (Supabase UUID)
+    API->>Org: orgMiddleware — resolve user
+    Org->>DB: SELECT User WHERE authId = ?
+    DB-->>Org: NOT FOUND (PGRST116)
+    Org->>DB: findOrCreateUser() — INSERT User + Organization
+    DB-->>Org: New User (role=ADMIN) + New Org
+    Org-->>API: req.organizationId set
+    API-->>FE: User profile + org data
 
-    AdminDash --> InviteTeam["Invite Team Member via Email"]
-    InviteTeam --> SendInvite["POST api invitations
-    7-day token generated"]
-    SendInvite --> InviteEmail["Invitation Email Sent"]
-    InviteEmail --> AcceptPage["Invitee Opens accept-invite page"]
-    AcceptPage --> SetPassword[Complete Registration]
-    SetPassword --> AssignRole["Role Assigned
-    ADMIN, MEMBER, or VIEWER"]
-    AssignRole --> Login
+    Note over U,DB: SUBSEQUENT LOGIN
+    U->>FE: Enter email + password
+    FE->>Auth: supabase.auth.signInWithPassword()
+    Auth-->>FE: JWT token + session
+    FE->>FE: Store session (PEAuth singleton)
+    FE->>API: PEAuth.authFetch() — all API calls
+    API->>Auth: Verify JWT
+    Auth-->>API: Valid — authId
+    API->>Org: orgMiddleware
+    Org->>DB: SELECT User WHERE authId = ?
+    DB-->>Org: User found (organizationId, role)
+    Org-->>API: req.organizationId + req.userId set
+    API->>DB: Query with .eq('organizationId', orgId)
+    DB-->>API: Org-scoped results only
+    API-->>FE: Response data
 
-    ForgotPW --> EnterEmail[Enter Email]
-    EnterEmail --> ResetEmail["Reset Link Sent"]
-    ResetEmail --> ResetPage["Reset Password Page"]
-    ResetPage --> NewPW[Set New Password]
-    NewPW --> Login
+    Note over U,DB: INVITATION FLOW
+    U->>FE: Admin clicks Invite Team Member
+    FE->>API: POST /api/invitations (email, role)
+    API->>DB: INSERT Invitation (token, organizationId)
+    API->>API: Send invite email via Resend
+    API-->>FE: Invitation created
 
-    style Start fill:#6366f1,color:#fff,stroke:#4f46e5
-    style AdminDash fill:#10b981,color:#fff,stroke:#059669
-    style MemberDash fill:#3b82f6,color:#fff,stroke:#2563eb
-    style LoginError fill:#ef4444,color:#fff,stroke:#dc2626
-    style Verified fill:#10b981,color:#fff,stroke:#059669
-    style JWT fill:#f59e0b,color:#fff,stroke:#d97706
-    style SupaAuth fill:#8b5cf6,color:#fff,stroke:#7c3aed
-    style RoleCheck fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    Note over U,DB: ACCEPT INVITATION (PUBLIC)
+    U->>FE: Click invite link — accept-invite.html?token=xxx
+    FE->>API: GET /api/public/invitations/verify?token=xxx
+    API->>DB: SELECT Invitation WHERE token = ?
+    DB-->>API: Invitation (org name, logo, role)
+    API-->>FE: Org info displayed
+    U->>FE: Set password + accept
+    FE->>Auth: supabase.auth.signUp(email, password)
+    Auth-->>FE: User created in Supabase Auth
+    FE->>API: POST /api/public/invitations/accept
+    API->>DB: INSERT User (authId, organizationId, role)
+    API->>DB: UPDATE Invitation SET status = ACCEPTED
+    API-->>FE: Success — redirect to login
+
+    Note over U,DB: PASSWORD RESET
+    U->>FE: Click Forgot Password
+    FE->>Auth: supabase.auth.resetPasswordForEmail()
+    Auth-->>U: Reset email sent
+    U->>FE: Click reset link
+    FE->>Auth: supabase.auth.updateUser(newPassword)
+    Auth-->>FE: Password updated
+    FE->>FE: Redirect to login
+
+    Note over U,DB: ROLE-BASED ACCESS
+    FE->>API: Any protected request
+    API->>Org: orgMiddleware resolves role
+
+    alt ADMIN
+        API->>API: Full access + admin features
+    else MEMBER
+        API->>API: Standard access, no admin
+    else OPS
+        API->>API: Operations access, limited AI
+    else VIEWER
+        API->>API: Read-only access
+    end
+    API-->>FE: Role-filtered response

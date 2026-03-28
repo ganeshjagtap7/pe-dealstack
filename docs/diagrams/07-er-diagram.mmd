@@ -1,178 +1,306 @@
 erDiagram
+    ORGANIZATION {
+        uuid id PK
+        string name
+        string slug
+        string logo
+        string industry
+        string plan
+        int maxUsers
+        boolean isActive
+        timestamp createdAt
+    }
+
     USER {
         uuid id PK
-        string email
-        string full_name
-        string firm_name
-        string role
-        string title
-        string avatar_url
-        timestamp created_at
+        string authId UK
+        string email UK
+        string name
+        string role "ADMIN MEMBER VIEWER OPS"
+        uuid organizationId FK
+        jsonb preferences
+        timestamp createdAt
     }
 
     DEAL {
         uuid id PK
+        uuid companyId FK
+        uuid organizationId FK
         string name
-        string description
-        uuid company_id FK
-        string stage
-        string status
-        string industry
-        string priority
-        decimal deal_size
-        decimal ebitda
-        decimal revenue
-        decimal irr_projection
-        uuid assigned_to FK
-        string icon
-        json tags
-        date target_close_date
-        timestamp created_at
+        string stage "7 pipeline stages"
+        string status "ACTIVE CLOSED_WON CLOSED_LOST PASSED"
+        string priority "LOW MEDIUM HIGH URGENT"
+        float dealSize
+        float revenue
+        float ebitda
+        float irrProjected
+        timestamp createdAt
     }
 
     COMPANY {
         uuid id PK
+        uuid organizationId FK
         string name
         string industry
-        string description
         string website
-        timestamp created_at
+        string description
+        timestamp createdAt
+    }
+
+    CONTACT {
+        uuid id PK
+        uuid organizationId FK
+        string firstName
+        string lastName
+        string email
+        string title
+        string company
+        string type "BANKER ADVISOR EXECUTIVE LP LEGAL"
+        timestamp createdAt
+    }
+
+    CONTACT_INTERACTION {
+        uuid id PK
+        uuid contactId FK
+        string type "NOTE MEETING CALL EMAIL"
+        date date
+        string description
+    }
+
+    CONTACT_DEAL {
+        uuid contactId FK
+        uuid dealId FK
+        string role "BANKER ADVISOR BOARD MGMT"
     }
 
     DOCUMENT {
         uuid id PK
+        uuid dealId FK
+        uuid folderId FK
         string name
-        string type
-        uuid deal_id FK
-        uuid folder_id FK
-        uuid uploaded_by FK
-        string file_path
-        integer file_size
-        json extracted_data
-        json ai_analysis
-        boolean is_highlighted
-        json tags
-        timestamp created_at
+        string type "CIM TEASER FINANCIAL LEGAL TAX OTHER"
+        string fileUrl
+        int fileSize
+        jsonb aiAnalysis
+        text extractedText
+        string_arr tags
+        uuid uploadedBy FK
+        timestamp createdAt
     }
 
     FOLDER {
         uuid id PK
-        uuid deal_id FK
-        uuid parent_id FK
+        uuid dealId FK
+        uuid parentId FK
         string name
-        string description
-        boolean is_restricted
-        timestamp created_at
+        boolean isRestricted
+        int sortOrder
+        timestamp createdAt
     }
 
     FOLDER_INSIGHT {
         uuid id PK
-        uuid folder_id FK
-        integer completeness_pct
-        json missing_documents
-        json red_flags
-        timestamp analyzed_at
+        uuid folderId FK
+        text summary
+        int completionPercent
+        string_arr redFlags
+        string_arr missingDocuments
+        timestamp createdAt
+    }
+
+    FINANCIAL_STATEMENT {
+        uuid id PK
+        uuid dealId FK
+        uuid documentId FK
+        string statementType "INCOME BALANCE CASH_FLOW"
+        string period
+        jsonb lineItems
+        string extractionSource "gpt4o azure vision manual"
+        float extractionConfidence
+        boolean isActive
+        string mergeStatus "auto needs_review user_resolved"
+        timestamp createdAt
+    }
+
+    DOCUMENT_CHUNK {
+        uuid id PK
+        uuid documentId FK
+        uuid dealId FK
+        text content
+        jsonb embedding
+        int chunkIndex
     }
 
     MEMO {
         uuid id PK
+        uuid dealId FK
+        uuid organizationId FK
         string title
-        string type
-        uuid deal_id FK
-        uuid created_by FK
-        string status
-        timestamp created_at
+        string type "IC_MEMO TEASER SUMMARY"
+        string status "DRAFT REVIEW FINAL ARCHIVED"
+        uuid createdBy FK
+        timestamp createdAt
     }
 
     MEMO_SECTION {
         uuid id PK
-        uuid memo_id FK
-        string type
-        string title
+        uuid memoId FK
+        string type "12 section types"
         text content
-        boolean ai_generated
-        json citations
-        json table_data
-        json chart_config
-        integer sort_order
+        boolean aiGenerated
+        int sortOrder
     }
 
     MEMO_TEMPLATE {
         uuid id PK
+        uuid organizationId FK
         string name
-        string category
-        boolean is_gold_standard
-        boolean is_active
-        integer usage_count
+        string type
+        jsonb sections
+        timestamp createdAt
     }
 
     ACTIVITY {
         uuid id PK
-        uuid deal_id FK
-        uuid user_id FK
-        string type
+        uuid dealId FK
+        uuid userId FK
+        string type "DOCUMENT_UPLOADED STAGE_CHANGED etc"
         string title
-        string description
-        json metadata
-        timestamp created_at
+        text description
+        timestamp createdAt
     }
 
-    CONVERSATION {
+    CHAT_MESSAGE {
         uuid id PK
-        uuid deal_id FK
-        uuid user_id FK
-        string title
-        timestamp created_at
-    }
-
-    MESSAGE {
-        uuid id PK
-        uuid conversation_id FK
-        uuid user_id FK
+        uuid dealId FK
+        uuid userId FK
+        string role "user assistant system"
         text content
-        string role
-        timestamp created_at
+        jsonb metadata
+        timestamp createdAt
     }
 
     NOTIFICATION {
         uuid id PK
-        uuid user_id FK
+        uuid userId FK
+        uuid organizationId FK
         string type
         string title
-        string message
-        uuid deal_id FK
-        uuid document_id FK
-        boolean is_read
-        timestamp created_at
+        text message
+        boolean isRead
+        timestamp createdAt
     }
 
     INVITATION {
         uuid id PK
+        uuid organizationId FK
         string email
         string role
-        string firm_name
-        string token
-        string status
-        uuid invited_by FK
-        timestamp expires_at
-        timestamp created_at
+        string token UK
+        string status "PENDING ACCEPTED EXPIRED REVOKED"
+        uuid invitedBy FK
+        timestamp createdAt
     }
 
-    USER ||--o{ DEAL : "assigned to"
+    DEAL_TEAM_MEMBER {
+        uuid dealId FK
+        uuid userId FK
+        string accessLevel "view edit admin"
+        uuid addedBy FK
+        timestamp createdAt
+    }
+
+    TASK {
+        uuid id PK
+        uuid dealId FK
+        uuid organizationId FK
+        uuid assignedTo FK
+        string title
+        text description
+        string status
+        date dueDate
+        timestamp createdAt
+    }
+
+    AUDIT_LOG {
+        uuid id PK
+        uuid userId FK
+        uuid organizationId FK
+        string action
+        string resourceType
+        uuid resourceId
+        string severity "INFO WARNING ERROR CRITICAL"
+        string ipAddress
+        jsonb metadata
+        timestamp createdAt
+    }
+
+    AGENT_MEMORY_INDUSTRY {
+        uuid id PK
+        uuid organizationId FK
+        string industry
+        string metric
+        float typicalLow
+        float typicalMid
+        float typicalHigh
+        int sampleSize
+    }
+
+    AGENT_MEMORY_EXTRACTION {
+        uuid id PK
+        uuid organizationId FK
+        string documentPattern
+        string fileType
+        string bestExtractionSource
+        float avgConfidence
+    }
+
+    NARRATIVE_INSIGHT_CACHE {
+        uuid id PK
+        uuid dealId FK
+        uuid organizationId FK
+        string analysisHash
+        jsonb insights
+        timestamp createdAt
+    }
+
+    ORGANIZATION ||--o{ USER : "has members"
+    ORGANIZATION ||--o{ DEAL : "owns"
+    ORGANIZATION ||--o{ COMPANY : "tracks"
+    ORGANIZATION ||--o{ CONTACT : "manages"
+    ORGANIZATION ||--o{ MEMO_TEMPLATE : "shares"
+    ORGANIZATION ||--o{ INVITATION : "sends"
+    ORGANIZATION ||--o{ AUDIT_LOG : "logs"
+    ORGANIZATION ||--o{ NOTIFICATION : "notifies"
+    ORGANIZATION ||--o{ TASK : "assigns"
+    ORGANIZATION ||--o{ AGENT_MEMORY_INDUSTRY : "learns"
+    ORGANIZATION ||--o{ AGENT_MEMORY_EXTRACTION : "learns"
+
     COMPANY ||--o{ DEAL : "has"
     DEAL ||--o{ DOCUMENT : "contains"
-    DEAL ||--o{ FOLDER : "organizes"
+    DEAL ||--o{ FOLDER : "has"
     DEAL ||--o{ ACTIVITY : "logs"
-    DEAL ||--o{ CONVERSATION : "discusses"
-    DEAL ||--o{ MEMO : "analyzes"
-    FOLDER ||--o{ DOCUMENT : "stores"
-    FOLDER ||--o| FOLDER_INSIGHT : "has"
-    FOLDER ||--o{ FOLDER : "nests"
-    MEMO ||--o{ MEMO_SECTION : "contains"
-    CONVERSATION ||--o{ MESSAGE : "has"
+    DEAL ||--o{ FINANCIAL_STATEMENT : "extracted"
+    DEAL ||--o{ CHAT_MESSAGE : "discussed"
+    DEAL ||--o{ DEAL_TEAM_MEMBER : "assigned"
+    DEAL ||--o{ DOCUMENT_CHUNK : "indexed"
+    DEAL ||--o{ MEMO : "reports"
+    DEAL ||--o{ NARRATIVE_INSIGHT_CACHE : "caches"
+
     USER ||--o{ ACTIVITY : "performs"
-    USER ||--o{ CONVERSATION : "participates"
+    USER ||--o{ CHAT_MESSAGE : "sends"
     USER ||--o{ NOTIFICATION : "receives"
-    USER ||--o{ INVITATION : "sends"
-    USER ||--o{ DOCUMENT : "uploads"
+    USER ||--o{ DEAL_TEAM_MEMBER : "member of"
     USER ||--o{ MEMO : "creates"
+
+    DOCUMENT ||--o{ DOCUMENT_CHUNK : "chunked into"
+    DOCUMENT ||--o{ FINANCIAL_STATEMENT : "extracted from"
+    FOLDER ||--o{ DOCUMENT : "contains"
+    FOLDER ||--o{ FOLDER : "has subfolders"
+    FOLDER ||--o{ FOLDER_INSIGHT : "analyzed"
+
+    MEMO ||--o{ MEMO_SECTION : "has"
+
+    CONTACT ||--o{ CONTACT_INTERACTION : "has"
+    CONTACT ||--o{ CONTACT_DEAL : "linked to"
+    DEAL ||--o{ CONTACT_DEAL : "linked to"

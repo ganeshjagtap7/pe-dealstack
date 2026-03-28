@@ -1,113 +1,106 @@
-flowchart LR
-    subgraph Roles["User Roles"]
-        direction TB
-        ADMIN["ADMIN
-        Full System Access"]
-        PARTNER["PARTNER
-        Senior Leadership"]
-        PRINCIPAL["PRINCIPAL
-        Deal Lead"]
-        VP["VP
-        Senior Associate"]
-        ASSOCIATE["ASSOCIATE
-        Deal Team"]
-        ANALYST["ANALYST
-        Junior Team"]
+flowchart TB
+    subgraph Roles["User Roles — 4 Levels"]
+        direction LR
+        Admin["ADMIN
+        Full system access
+        Org management"]
+        Member["MEMBER
+        Standard access
+        Deal operations"]
         OPS["OPS
-        Operations"]
-        VIEWER["VIEWER
-        Read Only"]
+        Operations access
+        Limited AI features"]
+        Viewer["VIEWER
+        Read-only access
+        No modifications"]
     end
 
     subgraph DealPerms["Deal Permissions"]
         direction TB
-        DV["View Deals"]
-        DC["Create Deals"]
-        DE["Edit Deals"]
-        DD["Delete Deals"]
-        DA["Assign Deals"]
-        DX["Export Deals"]
+        DealView["View Deals: ALL ROLES"]
+        DealCreate["Create Deals: ADMIN, MEMBER"]
+        DealEdit["Edit Deals: ADMIN, MEMBER"]
+        DealDelete["Delete Deals: ADMIN only"]
+        DealAssign["Assign Team: ADMIN, MEMBER"]
+        DealStage["Change Stage: ADMIN, MEMBER"]
+        DealPriority["Set Priority: ADMIN, MEMBER, OPS"]
     end
 
     subgraph DocPerms["Document Permissions"]
         direction TB
-        DOV["View Documents"]
-        DOU["Upload Documents"]
-        DOD["Delete Documents"]
-        DOW["Download Documents"]
+        DocView["View Documents: ALL ROLES"]
+        DocUpload["Upload Documents: ADMIN, MEMBER, OPS"]
+        DocMove["Move and Organize: ADMIN, MEMBER"]
+        DocDelete["Delete Documents: ADMIN, MEMBER"]
+        DocShare["Share External Link: ADMIN, MEMBER"]
+        DocRequest["Request from Counterparty: ADMIN, MEMBER"]
+    end
+
+    subgraph FinPerms["Financial Permissions"]
+        direction TB
+        FinView["View Statements: ALL ROLES"]
+        FinExtract["Trigger Extraction: ADMIN, MEMBER"]
+        FinMerge["Resolve Merge Conflicts: ADMIN, MEMBER"]
+        FinManual["Manual Entry: ADMIN, MEMBER"]
+        FinAnalysis["Run PE Analysis: ALL ROLES"]
     end
 
     subgraph MemoPerms["Memo Permissions"]
         direction TB
-        MV["View Memos"]
-        MC["Create Memos"]
-        ME["Edit Memos"]
-        MD["Delete Memos"]
-        MA["Approve Memos"]
-        MX["Export Memos"]
+        MemoView["View Memos: ALL ROLES"]
+        MemoCreate["Create Memos: ADMIN, MEMBER"]
+        MemoEdit["Edit Sections: ADMIN, MEMBER"]
+        MemoAI["AI Generate Sections: ADMIN, MEMBER"]
+        MemoApprove["Finalize and Approve: ADMIN"]
     end
 
-    subgraph UserPerms["User Management"]
+    subgraph AIPerms["AI Feature Permissions"]
         direction TB
-        UV["View Users"]
-        UC["Create Users"]
-        UE["Edit Users"]
-        UD["Delete Users"]
-        UI["Invite Users"]
+        AIChat["Deal Chat: ALL ROLES"]
+        AIPortfolio["Portfolio Chat: ADMIN, MEMBER"]
+        AIEnrich["Contact Enrichment: ADMIN, MEMBER"]
+        AIMeeting["Meeting Prep: ALL ROLES"]
+        AIEmail["Email Drafter: ADMIN, MEMBER"]
+        AISignals["Signal Monitor: ADMIN, MEMBER"]
     end
 
-    subgraph AIPerms["AI Features"]
+    subgraph AdminPerms["Admin-Only Permissions"]
         direction TB
-        AC["AI Chat"]
-        AG["AI Generate"]
-        AI["AI Ingest"]
+        UserMgmt["User Management"]
+        InviteSend["Send Invitations"]
+        InviteRevoke["Revoke Invitations"]
+        AuditView["View Audit Logs"]
+        OrgSettings["Organization Settings"]
+        BulkExport["Bulk Export CSV and JSON"]
+        RoleAssign["Assign User Roles"]
     end
 
-    subgraph AdminPerms["Admin Only"]
+    subgraph ContactPerms["Contact CRM Permissions"]
         direction TB
-        AS["System Settings"]
-        AA["Audit Logs"]
-        AB["Billing"]
+        ContactView["View Contacts: ALL ROLES"]
+        ContactCreate["Add Contacts: ADMIN, MEMBER"]
+        ContactEdit["Edit Contacts: ADMIN, MEMBER"]
+        ContactImport["CSV Import: ADMIN, MEMBER"]
+        ContactExport["CSV Export: ADMIN, MEMBER"]
     end
 
-    ADMIN --> DealPerms
-    ADMIN --> DocPerms
-    ADMIN --> MemoPerms
-    ADMIN --> UserPerms
-    ADMIN --> AIPerms
-    ADMIN --> AdminPerms
+    Admin --> DealPerms
+    Admin --> DocPerms
+    Admin --> FinPerms
+    Admin --> MemoPerms
+    Admin --> AIPerms
+    Admin --> AdminPerms
+    Admin --> ContactPerms
 
-    PARTNER --> DV & DC & DE & DA
-    PARTNER --> DOV & DOU & DOW
-    PARTNER --> MV & MC & ME & MA & MX
-    PARTNER --> UV & UI
-    PARTNER --> AC & AG & AI
+    Member --> DealPerms
+    Member --> DocPerms
+    Member --> FinPerms
+    Member --> MemoPerms
+    Member --> AIPerms
+    Member --> ContactPerms
 
-    PRINCIPAL --> DV & DC & DE & DA
-    PRINCIPAL --> DOV & DOU & DOW
-    PRINCIPAL --> MV & MC & ME
-    PRINCIPAL --> UV
-    PRINCIPAL --> AC & AG
-
-    ASSOCIATE --> DV & DC & DE
-    ASSOCIATE --> DOV & DOU & DOW
-    ASSOCIATE --> MV & MC & ME
-    ASSOCIATE --> AC & AG
-
-    ANALYST --> DV & DC
-    ANALYST --> DOV & DOU
-    ANALYST --> MV & MC & ME
-    ANALYST --> AC & AG
-
-    VIEWER --> DV
-    VIEWER --> DOV & DOW
-    VIEWER --> MV
-
-    style ADMIN fill:#ef4444,color:#fff,stroke:#dc2626
-    style PARTNER fill:#f97316,color:#fff,stroke:#ea580c
-    style PRINCIPAL fill:#f59e0b,color:#fff,stroke:#d97706
-    style VP fill:#eab308,color:#fff,stroke:#ca8a04
-    style ASSOCIATE fill:#10b981,color:#fff,stroke:#059669
-    style ANALYST fill:#3b82f6,color:#fff,stroke:#2563eb
-    style OPS fill:#8b5cf6,color:#fff,stroke:#7c3aed
-    style VIEWER fill:#6b7280,color:#fff,stroke:#4b5563
+    style Admin fill:#003366,color:#fff,stroke:#002855
+    style Member fill:#6366f1,color:#fff,stroke:#4f46e5
+    style OPS fill:#f59e0b,color:#fff,stroke:#d97706
+    style Viewer fill:#6b7280,color:#fff,stroke:#4b5563
+    style AdminPerms fill:#ef4444,color:#fff,stroke:#dc2626

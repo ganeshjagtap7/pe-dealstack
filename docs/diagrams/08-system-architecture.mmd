@@ -1,67 +1,109 @@
 flowchart TB
-    subgraph Client["Frontend - Vite + Vanilla JS - Port 3000"]
-        direction LR
-        Landing["Landing Pages
-        index, pricing, solutions"]
-        Auth["Auth Pages
-        login, signup, verify,
-        reset, accept-invite"]
-        CRM["CRM Page
-        Deal Kanban Board"]
-        DealPage["Deal Intelligence
-        Detail + AI Chat"]
-        AdminDash["Admin Dashboard
-        Command Center"]
-        AnalystDash["Analyst Dashboard
-        Overview"]
-        VDR["Virtual Data Room
-        Document Manager"]
-        MemoBuilder["Memo Builder
-        AI-Powered Editor"]
-        Settings["Settings Page
-        User + Workspace"]
+    subgraph Frontend["Frontend — Vite + Vanilla JS :3000"]
+        direction TB
+        subgraph Pages["29 Pages"]
+            direction LR
+            Dashboard["Dashboard"]
+            CRM["Deal Pipeline"]
+            DealDetail["Deal Detail"]
+            VDR["VDR — React"]
+            Contacts["Contacts CRM"]
+            MemoBuilder["Memo Builder"]
+            Templates["Templates"]
+            AdminDash["Admin Panel"]
+            Settings["Settings"]
+            DealIntake["Deal Intake"]
+        end
+        subgraph SharedModules["34 JS Modules"]
+            direction LR
+            Auth["auth.js — PEAuth"]
+            Config["config.js"]
+            Layout["layout.js — Sidebar"]
+            Formatters["formatters.js"]
+            Notifs["notifications.js"]
+            AITools["ai-tools.js"]
+            FinJS["financials.js"]
+            AnalysisJS["analysis.js + 4 modules"]
+        end
     end
 
-    subgraph API["Backend - Express + TypeScript - Port 3001"]
+    subgraph API["API — Express + TypeScript :3001"]
         direction TB
         subgraph Middleware["Middleware Layer"]
-            AuthMW["Auth Middleware
-            JWT Verification"]
-            RBAC["RBAC Middleware
-            Role Permissions"]
-            RateLimit["Rate Limiter
-            General, AI, Write tiers"]
-            ReqID["Request ID
-            Correlation Tracking"]
-            Validation["Zod Validation
-            Query + Body Schemas"]
-        end
-
-        subgraph Routes["API Routes"]
             direction LR
-            AuthRoutes["Auth Routes"]
-            DealRoutes["Deal Routes"]
-            CompanyRoutes["Company Routes"]
-            DocRoutes["Document Routes"]
-            FolderRoutes["Folder Routes"]
-            MemoRoutes["Memo Routes"]
-            UserRoutes["User Routes"]
-            InviteRoutes["Invitation Routes"]
-            NotifRoutes["Notification Routes"]
-            ConvoRoutes["Conversation Routes"]
-            TemplateRoutes["Template Routes"]
-            AIRoutes["AI Routes"]
-            IngestRoutes["Ingest Routes"]
+            AuthMW["authMiddleware
+            Supabase JWT verify"]
+            OrgMW["orgMiddleware
+            Org resolution + isolation"]
+            RBAC["rbacMiddleware
+            Role-based access"]
+            RateLimit["Rate Limiting
+            200/15min general
+            10/min AI, 30/min write"]
+            ErrHandler["errorHandler
+            ValidationError, NotFoundError"]
+            ReqId["requestId
+            Correlation tracking"]
         end
-
-        subgraph Services["Service Layer"]
+        subgraph Routes["44 Route Files"]
             direction LR
-            AIExtractor["AI Extractor
-            CIM + Teaser Parsing"]
-            FileValidator["File Validator
-            Magic Bytes + Size"]
-            AuditLog["Audit Logger"]
-            AICache["AI Response Cache"]
+            DealRoutes["Deals — 5 files
+            deals, analysis,
+            chat, chat-ai"]
+            DocRoutes["Documents — 4 files
+            docs, upload,
+            sharing, folders"]
+            FinRoutes["Financials — 4 files
+            list, extraction,
+            merge, analysis"]
+            MemoRoutes["Memos — 4 files
+            memos, chat,
+            sections, templates"]
+            AIRoutes["AI — 3 files
+            agents, portfolio,
+            ingest"]
+            IngestRoutes["Ingest — 5 files
+            upload, url,
+            email, text, shared"]
+            UserRoutes["Users — 5 files
+            users, profile,
+            invitations, contacts"]
+            SysRoutes["System — 4 files
+            audit, tasks,
+            export, notifications"]
+        end
+        subgraph Services["33 Service Files"]
+            direction LR
+            LLM["llm.ts — Unified LLM
+            getChatModel, getFastModel,
+            getExtractionModel"]
+            FinServices["Financial Services
+            classifier, orchestrator,
+            validator, vision, azure,
+            excel extractor"]
+            AnalysisEngine["PE Analysis Engine
+            QoE, ratios, operational,
+            debt-LBO, red flags"]
+            DocServices["Doc Services
+            parser, validator,
+            scraper, email parser"]
+        end
+        subgraph Agents["6 AI Agents"]
+            direction LR
+            FinAgent["Financial Agent
+            LangGraph 5-node"]
+            DealChat["Deal Chat
+            ReAct + 6 tools"]
+            PortChat["Portfolio Chat
+            ReAct + 3 tools"]
+            Enrich["Contact Enrichment
+            4-node StateGraph"]
+            MeetPrep["Meeting Prep
+            5-source parallel"]
+            SignalMon["Signal Monitor
+            3-node StateGraph"]
+            EmailDraft["Email Drafter
+            4-node StateGraph"]
         end
     end
 
@@ -69,31 +111,42 @@ flowchart TB
         direction LR
         Supabase["Supabase
         PostgreSQL + Auth + Storage"]
-        OpenAI["OpenAI GPT-4
-        Chat + Generation"]
+        OpenAI["OpenAI
+        GPT-4o + GPT-4o-mini"]
         Gemini["Google Gemini
-        Alternative AI"]
-        SendGrid["SendGrid
-        Email Delivery"]
+        Alt LLM — configurable"]
+        AzureDI["Azure Doc Intelligence
+        Complex PDF layouts"]
+        Resend["Resend
+        Transactional email"]
         Sentry["Sentry
-        Error Tracking"]
-        Render["Render.com
-        Hosting + Deploy"]
+        Error tracking"]
+        Render["Render
+        Production hosting"]
+        Vercel["Vercel
+        Backup hosting"]
     end
 
-    Client -->|"HTTPS + JWT Bearer Token"| API
-    Middleware --> Routes
-    Routes --> Services
-    API -->|"SQL + Auth + Files"| Supabase
-    Services -->|"AI Prompts"| OpenAI
-    Services -->|"AI Prompts"| Gemini
-    API -->|"Invitation + Reset Emails"| SendGrid
-    API -->|"Error Reports"| Sentry
-    Render -->|"Auto-Deploy from main"| API
+    Frontend -->|"PEAuth.authFetch()
+    JWT Bearer token"| API
+    API -->|"Supabase client
+    org-scoped queries"| Supabase
+    API -->|"getChatModel()
+    getExtractionModel()"| OpenAI
+    API -->|"getFastModel()
+    if configured"| Gemini
+    API -->|"Azure DI SDK"| AzureDI
+    API -->|"Resend SDK
+    invites, doc requests"| Resend
+    API -->|"Sentry SDK"| Sentry
 
-    style Client fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Frontend fill:#003366,color:#fff,stroke:#002855
     style API fill:#6366f1,color:#fff,stroke:#4f46e5
-    style External fill:#10b981,color:#fff,stroke:#059669
-    style Middleware fill:#f59e0b,color:#000,stroke:#d97706
-    style Routes fill:#8b5cf6,color:#fff,stroke:#7c3aed
-    style Services fill:#14b8a6,color:#fff,stroke:#0d9488
+    style Supabase fill:#10b981,color:#fff,stroke:#059669
+    style OpenAI fill:#f59e0b,color:#fff,stroke:#d97706
+    style Gemini fill:#3b82f6,color:#fff,stroke:#2563eb
+    style AzureDI fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style Resend fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style Sentry fill:#ef4444,color:#fff,stroke:#dc2626
+    style Render fill:#14b8a6,color:#fff,stroke:#0d9488
+    style Vercel fill:#111827,color:#fff,stroke:#374151

@@ -3,18 +3,25 @@ flowchart TD
     Entry -->|Manual| CreateDeal["Create Deal Manually
     Name, Company, Industry,
     Deal Size, Stage"]
-    Entry -->|Document Upload| Ingest["Upload CIM or Teaser
-    POST api ingest"]
+    Entry -->|CIM Upload| Ingest["Upload CIM / Teaser
+    POST /api/ingest"]
+    Entry -->|URL Ingest| URLIngest["Paste URL
+    POST /api/ingest/url"]
+    Entry -->|Email Ingest| EmailIngest["Forward Email
+    POST /api/ingest/email"]
+
     Ingest --> AIExtract["AI Extracts Data
     Company, Industry, Financials,
     Deal Size, EBITDA"]
+    URLIngest --> AIExtract
+    EmailIngest --> AIExtract
     AIExtract --> AutoCreate["Deal Auto-Created
     with Extracted Data"]
 
     CreateDeal --> InitialReview
     AutoCreate --> InitialReview
 
-    subgraph Pipeline["Deal Pipeline Stages"]
+    subgraph Pipeline["Deal Pipeline — 7 Stages"]
         direction TB
         InitialReview["INITIAL REVIEW
         Screen deal, review teaser"]
@@ -31,7 +38,8 @@ flowchart TD
     end
 
     Closing --> Outcome{Outcome}
-    Outcome -->|Won| ClosedWon["CLOSED WON"]
+    Outcome -->|Won| ClosedWon["CLOSED WON
+    Portfolio company"]
     Outcome -->|Lost| ClosedLost["CLOSED LOST"]
 
     InitialReview -.->|Pass| Passed["PASSED
@@ -40,16 +48,36 @@ flowchart TD
 
     subgraph Actions["Actions at Any Stage"]
         direction LR
-        Assign["Assign Team Members"]
-        Upload["Upload Documents"]
-        Notes["Add Notes and Activities"]
-        Chat["AI Deal Chat"]
-        Memo["Create Investment Memo"]
+        Assign["Assign Team
+        DealTeamMember"]
+        Upload["Upload Docs
+        to VDR"]
+        Notes["Log Activities
+        Notes, Calls, Meetings"]
+        Chat["AI Deal Chat
+        6-tool ReAct Agent"]
+        Memo["IC Memo Builder
+        AI-Generated Sections"]
+        Analysis["PE Analysis Suite
+        QoE, Ratios, Red Flags"]
         Priority["Set Priority
         LOW, MEDIUM, HIGH, URGENT"]
     end
 
+    subgraph Financial["Financial Extraction"]
+        direction LR
+        FastPass["Fast Pass
+        PDF text / Excel parse"]
+        DeepPass["Deep Pass
+        GPT-4o Vision / Azure DI"]
+        Verify["Two-Pass Verify
+        GPT-4o-mini"]
+        Store["Store Statements
+        Merge if multi-doc"]
+    end
+
     Pipeline -.-> Actions
+    Pipeline -.-> Financial
 
     style Entry fill:#8b5cf6,color:#fff,stroke:#7c3aed
     style InitialReview fill:#6366f1,color:#fff,stroke:#4f46e5
@@ -62,3 +90,9 @@ flowchart TD
     style ClosedLost fill:#ef4444,color:#fff,stroke:#dc2626
     style Passed fill:#f97316,color:#fff,stroke:#ea580c
     style AIExtract fill:#f59e0b,color:#fff,stroke:#d97706
+    style URLIngest fill:#f59e0b,color:#fff,stroke:#d97706
+    style EmailIngest fill:#f59e0b,color:#fff,stroke:#d97706
+    style FastPass fill:#003366,color:#fff,stroke:#002855
+    style DeepPass fill:#003366,color:#fff,stroke:#002855
+    style Verify fill:#003366,color:#fff,stroke:#002855
+    style Store fill:#003366,color:#fff,stroke:#002855
