@@ -399,6 +399,64 @@
                                             </button>
                                         </div>
                                     </div>
+
+                                    <!-- Two-Factor Authentication -->
+                                    <div id="mfa-section" class="border-t border-border-subtle pt-4">
+                                        <div id="mfa-status" class="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-border-subtle">
+                                            <div class="flex items-center gap-3">
+                                                <span class="material-symbols-outlined text-text-secondary">security</span>
+                                                <div>
+                                                    <p class="text-sm font-semibold text-text-main">Two-Factor Authentication (2FA)</p>
+                                                    <p id="mfa-status-text" class="text-xs text-text-muted">Loading...</p>
+                                                </div>
+                                            </div>
+                                            <button id="mfa-toggle-btn" class="px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm border border-border-subtle" style="display:none;">
+                                                Enable
+                                            </button>
+                                        </div>
+
+                                        <!-- MFA Enrollment Form (hidden by default) -->
+                                        <div id="mfa-enroll-form" class="hidden mt-4 p-5 bg-gray-50 rounded-lg border border-border-subtle space-y-4">
+                                            <div class="text-center">
+                                                <p class="text-sm font-semibold text-text-main mb-1">Set Up Authenticator App</p>
+                                                <p class="text-xs text-text-muted">Scan this QR code with Google Authenticator, Authy, or any TOTP app</p>
+                                            </div>
+                                            <div class="flex justify-center">
+                                                <img id="mfa-qr-code" src="" alt="MFA QR Code" class="w-48 h-48 rounded-lg border border-border-subtle bg-white p-2">
+                                            </div>
+                                            <div class="text-center">
+                                                <p class="text-xs text-text-muted mb-1">Or enter this key manually:</p>
+                                                <code id="mfa-secret" class="text-xs font-mono bg-white px-3 py-1.5 rounded border border-border-subtle select-all"></code>
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Enter 6-digit code to verify</label>
+                                                <input id="mfa-verify-code" type="text" maxlength="6" inputmode="numeric" class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm text-center tracking-[0.5em] font-mono" placeholder="000000">
+                                            </div>
+                                            <div class="flex items-center gap-3">
+                                                <button id="mfa-confirm-btn" class="px-5 py-2.5 text-white text-sm font-semibold rounded-lg transition-colors shadow-card disabled:opacity-50" style="background-color: #003366;" disabled>
+                                                    Verify & Enable 2FA
+                                                </button>
+                                                <button id="mfa-cancel-btn" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+                                                    Cancel
+                                                </button>
+                                            </div>
+                                            <div id="mfa-enroll-error" class="hidden text-red-500 text-xs bg-red-50 p-2 rounded"></div>
+                                        </div>
+
+                                        <!-- MFA Disable Confirmation (hidden by default) -->
+                                        <div id="mfa-disable-confirm" class="hidden mt-4 p-4 bg-red-50 rounded-lg border border-red-200 space-y-3">
+                                            <p class="text-sm font-semibold text-red-800">Disable Two-Factor Authentication?</p>
+                                            <p class="text-xs text-red-600">This will make your account less secure. You can re-enable it anytime.</p>
+                                            <div class="flex items-center gap-3">
+                                                <button id="mfa-disable-confirm-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                                                    Yes, Disable 2FA
+                                                </button>
+                                                <button id="mfa-disable-cancel-btn" class="px-4 py-2 text-sm text-text-muted hover:text-text-main transition-colors">
+                                                    Keep Enabled
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
 

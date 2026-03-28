@@ -182,7 +182,45 @@
 
                     <!-- Error Message -->
                     <div id="errorMessage" class="hidden text-red-500 text-sm text-center bg-red-50 dark:bg-red-900/20 p-3 rounded-lg"></div>
+                </form>
 
+                <!-- MFA Challenge (hidden by default, shown after password auth if user has MFA) -->
+                <div id="mfaChallenge" class="hidden flex flex-col gap-5">
+                    <div class="flex items-center gap-3 mb-2">
+                        <div class="p-2 bg-blue-50 rounded-lg">
+                            <span class="material-symbols-outlined text-primary text-[24px]">security</span>
+                        </div>
+                        <div>
+                            <h2 class="text-lg font-bold text-[#121417]">Two-Factor Authentication</h2>
+                            <p class="text-sm text-slate-500">Enter the 6-digit code from your authenticator app</p>
+                        </div>
+                    </div>
+                    <div class="flex justify-center gap-2" id="mfaCodeInputs">
+                        <input type="text" maxlength="1" class="mfa-digit w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" data-index="0" inputmode="numeric" autocomplete="one-time-code">
+                        <input type="text" maxlength="1" class="mfa-digit w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" data-index="1" inputmode="numeric">
+                        <input type="text" maxlength="1" class="mfa-digit w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" data-index="2" inputmode="numeric">
+                        <span class="flex items-center text-gray-300 text-xl">-</span>
+                        <input type="text" maxlength="1" class="mfa-digit w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" data-index="3" inputmode="numeric">
+                        <input type="text" maxlength="1" class="mfa-digit w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" data-index="4" inputmode="numeric">
+                        <input type="text" maxlength="1" class="mfa-digit w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" data-index="5" inputmode="numeric">
+                    </div>
+                    <button id="mfaVerifyBtn" class="w-full bg-primary hover:bg-[#15304a] text-white font-medium rounded-lg h-12 shadow-sm transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        <span id="mfaVerifyText">Verify Code</span>
+                        <span id="mfaVerifySpinner" class="hidden">
+                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                        </span>
+                    </button>
+                    <div id="mfaError" class="hidden text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg"></div>
+                    <button id="mfaBackBtn" class="text-sm text-slate-500 hover:text-primary transition-colors text-center">
+                        Back to sign in
+                    </button>
+                </div>
+
+                <!-- Continue login form elements (divider, SSO, signup link) -->
+                <div id="loginExtras" class="flex flex-col gap-5 mt-5">
                     <!-- Divider -->
                     <div class="relative flex py-2 items-center">
                         <div class="flex-grow border-t border-gray-200 dark:border-gray-700"></div>
@@ -207,7 +245,7 @@
                             <a class="text-primary hover:text-blue-700 font-medium transition-colors" href="signup.html">Sign up</a>
                         </p>
                     </div>
-                </form>
+                </div>
 
                 <!-- Footer -->
                 <div class="mt-10 pt-6 border-t border-gray-100 dark:border-gray-800 flex items-center justify-center text-xs text-slate-400">
@@ -263,7 +301,15 @@
                 }
 
                 if (user && session) {
-                    // Get redirect destination or default to CRM
+                    // Check if user has MFA enabled
+                    const { hasMFA, factors } = await PEAuth.getMFAStatus();
+                    if (hasMFA) {
+                        // Show MFA challenge form
+                        showMFAChallenge(factors[0].id);
+                        return;
+                    }
+
+                    // No MFA — redirect directly
                     const redirect = sessionStorage.getItem('authRedirect') || 'crm.html';
                     sessionStorage.removeItem('authRedirect');
                     window.location.href = redirect;
@@ -291,6 +337,101 @@
                 signInIcon.classList.remove('hidden');
                 signInSpinner.classList.add('hidden');
             }
+        });
+
+        // ─── MFA Challenge Flow ───────────────────────────────
+
+        let mfaFactorId = null;
+
+        function showMFAChallenge(factorId) {
+            mfaFactorId = factorId;
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('loginExtras').classList.add('hidden');
+            document.getElementById('mfaChallenge').classList.remove('hidden');
+
+            // Focus first digit input
+            const firstInput = document.querySelector('.mfa-digit[data-index="0"]');
+            if (firstInput) firstInput.focus();
+        }
+
+        // MFA digit inputs — auto-advance, paste support
+        document.querySelectorAll('.mfa-digit').forEach(input => {
+            input.addEventListener('input', (e) => {
+                const val = e.target.value.replace(/[^0-9]/g, '');
+                e.target.value = val;
+                if (val && e.target.dataset.index < 5) {
+                    const next = document.querySelector(`.mfa-digit[data-index="${parseInt(e.target.dataset.index) + 1}"]`);
+                    if (next) next.focus();
+                }
+                updateMFAButton();
+            });
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Backspace' && !e.target.value && e.target.dataset.index > 0) {
+                    const prev = document.querySelector(`.mfa-digit[data-index="${parseInt(e.target.dataset.index) - 1}"]`);
+                    if (prev) { prev.focus(); prev.value = ''; }
+                }
+            });
+            input.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pasted = (e.clipboardData.getData('text') || '').replace(/[^0-9]/g, '').slice(0, 6);
+                document.querySelectorAll('.mfa-digit').forEach((inp, i) => {
+                    inp.value = pasted[i] || '';
+                });
+                updateMFAButton();
+                if (pasted.length === 6) document.getElementById('mfaVerifyBtn').focus();
+            });
+        });
+
+        function getMFACode() {
+            return Array.from(document.querySelectorAll('.mfa-digit')).map(i => i.value).join('');
+        }
+
+        function updateMFAButton() {
+            document.getElementById('mfaVerifyBtn').disabled = getMFACode().length !== 6;
+        }
+
+        // Verify MFA code
+        document.getElementById('mfaVerifyBtn').addEventListener('click', async () => {
+            const code = getMFACode();
+            if (code.length !== 6 || !mfaFactorId) return;
+
+            const btn = document.getElementById('mfaVerifyBtn');
+            const text = document.getElementById('mfaVerifyText');
+            const spinner = document.getElementById('mfaVerifySpinner');
+            const mfaError = document.getElementById('mfaError');
+
+            btn.disabled = true;
+            text.textContent = 'Verifying...';
+            spinner.classList.remove('hidden');
+            mfaError.classList.add('hidden');
+
+            const { error } = await PEAuth.verifyMFA(mfaFactorId, code);
+
+            if (error) {
+                mfaError.textContent = 'Invalid code. Please try again.';
+                mfaError.classList.remove('hidden');
+                document.querySelectorAll('.mfa-digit').forEach(i => i.value = '');
+                document.querySelector('.mfa-digit[data-index="0"]').focus();
+                btn.disabled = false;
+                text.textContent = 'Verify Code';
+                spinner.classList.add('hidden');
+                return;
+            }
+
+            // MFA verified — redirect
+            const redirect = sessionStorage.getItem('authRedirect') || 'crm.html';
+            sessionStorage.removeItem('authRedirect');
+            window.location.href = redirect;
+        });
+
+        // Back to sign in
+        document.getElementById('mfaBackBtn').addEventListener('click', async () => {
+            await PEAuth.signOut();
+            document.getElementById('mfaChallenge').classList.add('hidden');
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('loginExtras').classList.remove('hidden');
+            document.querySelectorAll('.mfa-digit').forEach(i => i.value = '');
+            mfaFactorId = null;
         });
 
         // SSO handler

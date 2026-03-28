@@ -41,6 +41,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         await loadUserProfile();
         initializeEventListeners();
         initializeSlider();
+        initializeMFA();
     } catch (err) {
         console.error('Initialization error:', err);
     }
@@ -400,3 +401,136 @@ function markChanged() {
 // Functions below are provided by js/settingsProfile.js:
 // renderNotificationToggles, initPasswordForm, handleAvatarUpload,
 // saveProfile, showToast
+
+// ─── MFA / Two-Factor Authentication ───────────────────────
+
+let mfaEnrollData = null; // Stores { id, qr_code, secret } during enrollment
+
+async function initializeMFA() {
+    const statusText = document.getElementById('mfa-status-text');
+    const toggleBtn = document.getElementById('mfa-toggle-btn');
+    if (!statusText || !toggleBtn) return;
+
+    const { hasMFA, factors } = await PEAuth.getMFAStatus();
+
+    if (hasMFA) {
+        statusText.textContent = 'Enabled — Your account is protected with 2FA';
+        statusText.classList.add('text-green-600');
+        toggleBtn.textContent = 'Disable';
+        toggleBtn.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm border border-red-200 text-red-600 bg-white hover:bg-red-50';
+        toggleBtn.style.display = '';
+        toggleBtn.onclick = () => showMFADisableConfirm(factors[0].id);
+    } else {
+        statusText.textContent = 'Not enabled — Add an extra layer of security';
+        toggleBtn.textContent = 'Enable';
+        toggleBtn.className = 'px-4 py-2 text-sm font-medium rounded-lg transition-colors shadow-sm border border-border-subtle bg-white hover:bg-gray-50 text-text-main';
+        toggleBtn.style.display = '';
+        toggleBtn.onclick = startMFAEnrollment;
+    }
+
+    // Wire up enrollment form events
+    const verifyCode = document.getElementById('mfa-verify-code');
+    if (verifyCode) {
+        verifyCode.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/[^0-9]/g, '');
+            const confirmBtn = document.getElementById('mfa-confirm-btn');
+            if (confirmBtn) confirmBtn.disabled = e.target.value.length !== 6;
+        });
+    }
+
+    const confirmBtn = document.getElementById('mfa-confirm-btn');
+    if (confirmBtn) confirmBtn.addEventListener('click', confirmMFAEnrollment);
+
+    const cancelBtn = document.getElementById('mfa-cancel-btn');
+    if (cancelBtn) cancelBtn.addEventListener('click', cancelMFAEnrollment);
+
+    const disableConfirmBtn = document.getElementById('mfa-disable-confirm-btn');
+    if (disableConfirmBtn) disableConfirmBtn.addEventListener('click', disableMFA);
+
+    const disableCancelBtn = document.getElementById('mfa-disable-cancel-btn');
+    if (disableCancelBtn) disableCancelBtn.addEventListener('click', () => {
+        document.getElementById('mfa-disable-confirm').classList.add('hidden');
+    });
+}
+
+async function startMFAEnrollment() {
+    const enrollForm = document.getElementById('mfa-enroll-form');
+    const enrollError = document.getElementById('mfa-enroll-error');
+    enrollError.classList.add('hidden');
+
+    const result = await PEAuth.enrollMFA('PE OS');
+    if (result.error) {
+        enrollError.textContent = 'Failed to start enrollment: ' + result.error.message;
+        enrollError.classList.remove('hidden');
+        enrollForm.classList.remove('hidden');
+        return;
+    }
+
+    mfaEnrollData = result;
+    document.getElementById('mfa-qr-code').src = result.qr_code;
+    document.getElementById('mfa-secret').textContent = result.secret;
+    document.getElementById('mfa-verify-code').value = '';
+    document.getElementById('mfa-confirm-btn').disabled = true;
+    enrollForm.classList.remove('hidden');
+}
+
+async function confirmMFAEnrollment() {
+    const code = document.getElementById('mfa-verify-code').value;
+    const enrollError = document.getElementById('mfa-enroll-error');
+    enrollError.classList.add('hidden');
+
+    if (!mfaEnrollData || code.length !== 6) return;
+
+    const confirmBtn = document.getElementById('mfa-confirm-btn');
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Verifying...';
+
+    const { error } = await PEAuth.verifyMFA(mfaEnrollData.id, code);
+
+    if (error) {
+        enrollError.textContent = 'Invalid code. Make sure your authenticator is synced and try again.';
+        enrollError.classList.remove('hidden');
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Verify & Enable 2FA';
+        document.getElementById('mfa-verify-code').value = '';
+        return;
+    }
+
+    // Success — refresh MFA status
+    mfaEnrollData = null;
+    document.getElementById('mfa-enroll-form').classList.add('hidden');
+    if (typeof showToast === 'function') showToast('Two-factor authentication enabled!', 'success');
+    initializeMFA();
+}
+
+function cancelMFAEnrollment() {
+    // If we enrolled but didn't verify, unenroll the pending factor
+    if (mfaEnrollData) {
+        PEAuth.unenrollMFA(mfaEnrollData.id).catch(() => {});
+        mfaEnrollData = null;
+    }
+    document.getElementById('mfa-enroll-form').classList.add('hidden');
+}
+
+let mfaDisableFactorId = null;
+
+function showMFADisableConfirm(factorId) {
+    mfaDisableFactorId = factorId;
+    document.getElementById('mfa-disable-confirm').classList.remove('hidden');
+}
+
+async function disableMFA() {
+    if (!mfaDisableFactorId) return;
+
+    const { error } = await PEAuth.unenrollMFA(mfaDisableFactorId);
+    document.getElementById('mfa-disable-confirm').classList.add('hidden');
+
+    if (error) {
+        if (typeof showToast === 'function') showToast('Failed to disable 2FA: ' + error.message, 'error');
+        return;
+    }
+
+    mfaDisableFactorId = null;
+    if (typeof showToast === 'function') showToast('Two-factor authentication disabled', 'info');
+    initializeMFA();
+}

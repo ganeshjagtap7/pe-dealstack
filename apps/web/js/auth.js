@@ -285,6 +285,86 @@ async function authFetch(url, options = {}) {
   });
 }
 
+// ─── MFA / Two-Factor Authentication ───────────────────────
+
+/**
+ * Check if the current user has MFA enrolled
+ * Returns { hasMFA, factors }
+ */
+async function getMFAStatus() {
+  const client = await initSupabase();
+  const { data, error } = await client.auth.mfa.listFactors();
+  if (error) {
+    console.error('MFA listFactors error:', error);
+    return { hasMFA: false, factors: [] };
+  }
+  const verifiedFactors = (data.totp || []).filter(f => f.status === 'verified');
+  return { hasMFA: verifiedFactors.length > 0, factors: verifiedFactors };
+}
+
+/**
+ * Enroll a new TOTP factor (generates QR code)
+ * Returns { id, qr_code, secret, uri, error }
+ */
+async function enrollMFA(friendlyName = 'PE OS Authenticator') {
+  const client = await initSupabase();
+  const { data, error } = await client.auth.mfa.enroll({
+    factorType: 'totp',
+    friendlyName,
+  });
+  if (error) {
+    console.error('MFA enroll error:', error);
+    return { error };
+  }
+  return {
+    id: data.id,
+    qr_code: data.totp.qr_code,
+    secret: data.totp.secret,
+    uri: data.totp.uri,
+    error: null,
+  };
+}
+
+/**
+ * Verify a TOTP code to complete MFA enrollment or login challenge
+ * factorId: the factor ID from enrollment or listFactors
+ * code: the 6-digit TOTP code from the authenticator app
+ */
+async function verifyMFA(factorId, code) {
+  const client = await initSupabase();
+
+  // Create a challenge first
+  const { data: challenge, error: challengeError } = await client.auth.mfa.challenge({ factorId });
+  if (challengeError) {
+    console.error('MFA challenge error:', challengeError);
+    return { error: challengeError };
+  }
+
+  // Verify the code against the challenge
+  const { data, error } = await client.auth.mfa.verify({
+    factorId,
+    challengeId: challenge.id,
+    code,
+  });
+  if (error) {
+    console.error('MFA verify error:', error);
+    return { error };
+  }
+  return { data, error: null };
+}
+
+/**
+ * Unenroll (disable) an MFA factor
+ */
+async function unenrollMFA(factorId) {
+  const client = await initSupabase();
+  const { error } = await client.auth.mfa.unenroll({ factorId });
+  if (error) {
+    console.error('MFA unenroll error:', error);
+  }
+  return { error };
+}
+
 // Assign all functions to window.PEAuth
 window.PEAuth = {
   initSupabase,
@@ -301,6 +381,10 @@ window.PEAuth = {
   updatePassword,
   resendVerificationEmail,
   authFetch,
+  getMFAStatus,
+  enrollMFA,
+  verifyMFA,
+  unenrollMFA,
   SUPABASE_URL,
 };
 
