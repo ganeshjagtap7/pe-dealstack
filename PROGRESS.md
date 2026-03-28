@@ -5,6 +5,45 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 46 — March 28, 2026
+
+#### 10:00-12:00 IST — MFA/2FA Implementation
+
+**Goal:** Add two-factor authentication (TOTP) to the product — table stakes for financial software handling confidential deal data.
+
+---
+
+#### What Was Done
+
+1. **MFA Auth Module** ([auth.js](apps/web/js/auth.js))
+   - Added 4 MFA functions to the PEAuth singleton: `getMFAStatus()`, `enrollMFA()`, `verifyMFA()`, `unenrollMFA()`
+   - Uses Supabase Auth MFA APIs: `mfa.enroll()`, `mfa.challenge()`, `mfa.verify()`, `mfa.listFactors()`, `mfa.unenroll()`
+
+2. **MFA Challenge on Login** ([login.html](apps/web/login.html))
+   - After password auth succeeds, checks if user has MFA enrolled via `getMFAStatus()`
+   - If MFA enabled → hides login form, shows 6-digit TOTP challenge UI
+   - Individual digit inputs with auto-advance, backspace navigation, and paste support (paste full 6-digit code)
+   - "Back to sign in" signs out and returns to password form
+   - Invalid code shows error, clears inputs, refocuses first digit
+
+3. **MFA Enrollment in Settings** ([settings.html](apps/web/settings.html) + [settings.js](apps/web/settings.js))
+   - New "Two-Factor Authentication" section under Security with status display
+   - **Enable flow:** Click Enable → QR code generated via Supabase → scan with Google Authenticator/Authy → enter 6-digit code to verify → 2FA activated
+   - **Disable flow:** Click Disable → red confirmation prompt → confirm → 2FA removed
+   - Manual secret key shown below QR for manual entry into authenticator apps
+   - Pending enrollment auto-cancelled if user clicks Cancel
+
+#### Activation Required
+- Enable MFA in Supabase Dashboard: Authentication → Settings → Multi-Factor Authentication → Enabled
+- Users then self-enroll via Settings → Security → Enable 2FA
+
+#### Summary
+- **4 files changed** (419 insertions)
+- **Zero build errors**
+- MFA is code-complete, awaiting Supabase dashboard toggle
+
+---
+
 ### Session 45 — March 25, 2026
 
 #### 16:00-19:00 IST — Production Security Hardening (Pre-DD Readiness)
