@@ -92,6 +92,8 @@ const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.t
 const allowedOrigins = [
   'https://pe-os.onrender.com',
   'https://pe-dealstack.vercel.app',
+  'https://lmmos.ai',
+  'https://www.lmmos.ai',
   ...extraOrigins,
   ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
 ];
