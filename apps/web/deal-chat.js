@@ -132,8 +132,12 @@ function initChatInterface() {
                     console.log('[Chat] AI response received:', data.model, data.action ? '(with action)' : '');
                     removeTypingIndicator();
 
-                    // Pass action to the render function if present
-                    addAIResponseFromAPI(data.response, data.action);
+                    // Show error-styled message if agent returned an error
+                    if (data.model === 'error') {
+                        addAIResponseFromAPI(`⚠️ ${data.response}`, null);
+                    } else {
+                        addAIResponseFromAPI(data.response, data.action);
+                    }
 
                     // Store message in history
                     state.messages.push({ role: 'user', content: message });

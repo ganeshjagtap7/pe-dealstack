@@ -3,6 +3,8 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
+import { runContactEnrichment } from '../services/agents/contactEnrichment/index.js';
+import { isLLMAvailable } from '../services/llm.js';
 
 // Sub-routers
 import contactsInsightsRouter from './contacts-insights.js';
@@ -255,6 +257,23 @@ router.post('/', async (req: any, res) => {
     }
 
     log.info('Contact created', { contactId: contact.id, name: `${data.firstName} ${data.lastName}` });
+
+    // Auto-enrich in background (fire-and-forget) — don't block the response
+    if (isLLMAvailable()) {
+      runContactEnrichment({
+        contactId: contact.id,
+        organizationId: orgId,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        email: data.email,
+        company: data.company,
+        title: data.title,
+      }).then(result => {
+        log.info('Auto-enrichment complete', { contactId: contact.id, confidence: result.confidence, status: result.status });
+      }).catch(err => {
+        log.error('Auto-enrichment failed (non-blocking)', { contactId: contact.id, error: err.message });
+      });
+    }
 
     res.status(201).json(contact);
   } catch (error: any) {

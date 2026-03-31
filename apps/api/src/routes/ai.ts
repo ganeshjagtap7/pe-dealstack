@@ -9,6 +9,9 @@ import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import ingestRouter from './ai-ingest.js';
 import portfolioRouter from './ai-portfolio.js';
 import aiAgentsRouter from './ai-agents.js';
+import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
+import { isLLMAvailable } from '../services/llm.js';
+import { classifyAIError } from '../utils/aiErrors.js';
 
 const router = Router();
 
@@ -26,13 +29,13 @@ const chatMessageSchema = z.object({
   })).optional(),
 });
 
-// POST /api/deals/:dealId/chat - Chat with AI about a deal
+// POST /api/deals/:dealId/chat - Chat with AI about a deal (ReAct Agent)
 router.post('/deals/:dealId/chat', async (req, res) => {
   try {
-    if (!isAIEnabled()) {
+    if (!isLLMAvailable()) {
       return res.status(503).json({
         error: 'AI service unavailable',
-        message: 'OpenAI API key not configured',
+        message: 'No LLM API key configured',
       });
     }
 
@@ -46,14 +49,12 @@ router.post('/deals/:dealId/chat', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
-    // Fetch deal data for context
+    // Fetch deal data for context string
     const { data: deal, error: dealError } = await supabase
       .from('Deal')
       .select(`
         *,
-        company:Company(*),
-        documents:Document(*),
-        activities:Activity(*)
+        company:Company(*)
       `)
       .eq('id', dealId)
       .single();
@@ -62,32 +63,20 @@ router.post('/deals/:dealId/chat', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
-    // Build messages array
-    const messages: any[] = [
-      { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
-      { role: 'system', content: `Current Deal Context:\n${generateDealContext(deal)}` },
-    ];
+    // Build deal context string for the agent
+    const dealContext = generateDealContext(deal);
 
-    // Add conversation history
-    history.forEach((msg: any) => {
-      messages.push({ role: msg.role, content: msg.content });
+    // Run the ReAct agent with tools (search_documents, get_deal_financials, compare_deals, etc.)
+    const result = await runDealChatAgent({
+      dealId,
+      orgId,
+      message,
+      dealContext,
+      history,
     });
 
-    // Add current message
-    messages.push({ role: 'user', content: message });
-
-    // Call OpenAI
-    const completion = await openai!.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      temperature: 0.7,
-      max_tokens: 1000,
-    });
-
-    const response = completion.choices[0]?.message?.content || 'No response generated.';
-
-    // Log activity
-    await supabase.from('Activity').insert({
+    // Log activity (fire-and-forget)
+    supabase.from('Activity').insert({
       dealId,
       type: 'NOTE_ADDED',
       title: 'AI Chat Query',
@@ -95,37 +84,26 @@ router.post('/deals/:dealId/chat', async (req, res) => {
       metadata: { type: 'ai_chat' },
     });
 
-    // Save messages to database
+    // Save messages to database (fire-and-forget)
     const userId = req.user?.id || null;
-
-    // Save user message
-    await supabase.from('ChatMessage').insert({
-      dealId,
-      userId,
-      role: 'user',
-      content: message,
-    });
-
-    // Save assistant response
-    await supabase.from('ChatMessage').insert({
-      dealId,
-      userId,
-      role: 'assistant',
-      content: response,
-      metadata: { model: 'gpt-4o' },
-    });
+    supabase.from('ChatMessage').insert([
+      { dealId, userId, role: 'user', content: message },
+      { dealId, userId, role: 'assistant', content: result.response, metadata: { model: result.model } },
+    ]);
 
     res.json({
-      response,
-      model: 'gpt-4o',
+      response: result.response,
+      model: result.model,
       dealId,
+      ...(result.updates && { updates: result.updates }),
+      ...(result.action && { action: result.action }),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     log.error('Error in AI chat', error);
-    res.status(500).json({ error: 'Failed to process AI chat' });
+    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to process AI chat') });
   }
 });
 
@@ -275,7 +253,7 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
     });
   } catch (error) {
     log.error('Error generating thesis', error);
-    res.status(500).json({ error: 'Failed to generate thesis' });
+    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to generate thesis') });
   }
 });
 
@@ -372,7 +350,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
     });
   } catch (error) {
     log.error('Error analyzing risks', error);
-    res.status(500).json({ error: 'Failed to analyze risks' });
+    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to analyze risks') });
   }
 });
 

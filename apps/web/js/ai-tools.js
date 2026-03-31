@@ -90,7 +90,22 @@ function showEnrichmentResults(result) {
     if (data.industry) enrichHTML += `<div class="flex items-center gap-2"><span class="text-text-muted text-xs w-20 shrink-0">Industry</span><span class="text-text-main font-medium">${escapeHtml(data.industry)}</span></div>`;
     if (data.location) enrichHTML += `<div class="flex items-center gap-2"><span class="text-text-muted text-xs w-20 shrink-0">Location</span><span class="text-text-main font-medium">${escapeHtml(data.location)}</span></div>`;
     if (data.dealRelevance) enrichHTML += `<div class="flex items-center gap-2"><span class="text-text-muted text-xs w-20 shrink-0">Relevance</span><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase ${data.dealRelevance === 'high' ? 'bg-secondary-light text-secondary' : data.dealRelevance === 'medium' ? 'bg-amber-50 text-amber-600' : 'bg-gray-100 text-text-muted'}">${escapeHtml(data.dealRelevance)}</span></div>`;
+    if (data.contactType && data.contactType !== 'other') {
+        const typeLabels = { founder_owner: 'Founder / Owner', investment_banker: 'Investment Banker', advisor_consultant: 'Advisor', management_team: 'Management', legal_counsel: 'Legal', lp_investor: 'LP Investor', co_investor: 'Co-Investor', board_member: 'Board Member', intermediary: 'Intermediary' };
+        const typeLabel = typeLabels[data.contactType] || data.contactType.replace(/_/g, ' ');
+        enrichHTML += `<div class="flex items-center gap-2"><span class="text-text-muted text-xs w-20 shrink-0">Type</span><span class="px-2 py-0.5 rounded text-[10px] font-bold uppercase" style="background:#003366; color:white;">${escapeHtml(typeLabel)}</span></div>`;
+    }
+    if (data.keyInsight) enrichHTML += `<div class="flex items-start gap-2 mt-2 p-2 rounded-lg bg-blue-50 border border-blue-100"><span class="material-symbols-outlined text-[14px] text-blue-500 mt-0.5">lightbulb</span><span class="text-xs text-blue-700">${escapeHtml(data.keyInsight)}</span></div>`;
+    if (data.suggestedAction) enrichHTML += `<div class="flex items-start gap-2 mt-1 p-2 rounded-lg bg-green-50 border border-green-100"><span class="material-symbols-outlined text-[14px] text-green-600 mt-0.5">arrow_forward</span><span class="text-xs text-green-700 font-medium">${escapeHtml(data.suggestedAction)}</span></div>`;
+    if (data.staleWarning) enrichHTML += `<div class="flex items-start gap-2 mt-1 p-2 rounded-lg bg-orange-50 border border-orange-200"><span class="material-symbols-outlined text-[14px] text-orange-500 mt-0.5">schedule</span><span class="text-xs text-orange-700">${escapeHtml(data.staleWarning)}</span></div>`;
     if (data.bio) enrichHTML += `<p class="text-xs text-text-secondary mt-1 leading-relaxed italic">${escapeHtml(data.bio)}</p>`;
+    if (data.linkedinUrl) enrichHTML += `<a href="${escapeHtml(data.linkedinUrl)}" target="_blank" class="inline-flex items-center gap-1 mt-2 text-xs text-blue-600 hover:text-blue-800 font-medium"><span class="material-symbols-outlined text-[14px]">open_in_new</span>Find on LinkedIn</a>`;
+    if (data.linkedDeals && data.linkedDeals.length > 0) {
+        enrichHTML += `<div class="mt-2"><span class="text-text-muted text-[10px] font-bold uppercase">Linked Deals</span><div class="flex flex-col gap-1 mt-1">${data.linkedDeals.map(d => `<span class="text-xs text-text-main">• ${escapeHtml(d.name)} <span class="text-text-muted">(${escapeHtml(d.stage)})</span></span>`).join('')}</div></div>`;
+    }
+    if (data.documentMentions && data.documentMentions.length > 0) {
+        enrichHTML += `<div class="mt-2"><span class="text-text-muted text-[10px] font-bold uppercase">Found in Documents</span><div class="flex flex-col gap-1 mt-1">${data.documentMentions.slice(0, 5).map(d => `<span class="text-xs text-text-main">• ${escapeHtml(d)}</span>`).join('')}</div></div>`;
+    }
     if (data.expertise && data.expertise.length > 0) {
         enrichHTML += `<div class="flex flex-wrap gap-1 mt-1">${data.expertise.map(e => `<span class="px-2 py-0.5 rounded-full bg-primary-light text-primary text-[10px] font-medium">${escapeHtml(e)}</span>`).join('')}</div>`;
     }

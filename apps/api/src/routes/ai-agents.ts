@@ -5,6 +5,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
+import { classifyAIError } from '../utils/aiErrors.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { supabase } from '../supabase.js';
 
@@ -55,7 +56,7 @@ router.post('/ai/enrich-contact', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Contact enrichment error', error);
-    res.status(500).json({ error: 'Failed to enrich contact' });
+    res.status(500).json({ error: classifyAIError(error.message || 'Failed to enrich contact') });
   }
 });
 
@@ -87,7 +88,7 @@ router.post('/ai/meeting-prep', async (req, res) => {
     res.json(brief);
   } catch (error: any) {
     log.error('Meeting prep error', error);
-    res.status(500).json({ error: 'Failed to generate meeting prep' });
+    res.status(500).json({ error: classifyAIError(error.message || 'Failed to generate meeting prep') });
   }
 });
 
@@ -105,7 +106,7 @@ router.post('/ai/scan-signals', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Signal scan error', error);
-    res.status(500).json({ error: 'Failed to scan signals' });
+    res.status(500).json({ error: classifyAIError(error.message || 'Failed to scan signals') });
   }
 });
 
@@ -146,7 +147,7 @@ router.post('/ai/draft-email', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Email draft error', error);
-    res.status(500).json({ error: 'Failed to draft email' });
+    res.status(500).json({ error: classifyAIError(error.message || 'Failed to draft email') });
   }
 });
 

@@ -8,6 +8,7 @@ import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages
 import { getChatModel, isLLMAvailable } from '../../llm.js';
 import { getDealChatTools } from './tools.js';
 import { log } from '../../../utils/logger.js';
+import { classifyAIError } from '../../../utils/aiErrors.js';
 
 const DEAL_AGENT_SYSTEM_PROMPT = `You are DealOS AI, an expert Private Equity investment analyst assistant.
 
@@ -143,10 +144,15 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
       ...(updates.length > 0 && { updates }),
       ...(action && { action }),
     };
-  } catch (error) {
-    log.error('Deal chat agent error', error);
+  } catch (error: any) {
+    log.error('Deal chat agent error', { message: error.message, stack: error.stack?.slice(0, 500) });
+
+    // Return specific error message so users know what's wrong
+    const errorMsg = error.message || 'Unknown error';
+    const userMessage = classifyAIError(errorMsg);
+
     return {
-      response: 'I encountered an error processing your request. Please try again.',
+      response: userMessage,
       model: 'error',
     };
   }

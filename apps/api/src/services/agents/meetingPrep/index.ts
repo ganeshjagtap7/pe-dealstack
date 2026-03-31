@@ -41,34 +41,33 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
   log.info('Generating meeting prep', { dealId: input.dealId, contactId: input.contactId });
 
   // Parallel fetch: deal + contact + documents + activities + financial statements
+  // Each query is wrapped to prevent one failure from crashing the whole Promise.all
   const [dealResult, contactResult, docSearchResult, activitiesResult, financialsResult] = await Promise.all([
-    // 1. Deal with financials
+    // 1. Deal basics (no risky joins that could fail)
     supabase
       .from('Deal')
       .select(`
         id, name, stage, status, industry, revenue, ebitda, dealSize,
         irrProjected, mom, aiThesis, description, source,
-        company:Company(name, description, industry),
-        teamMembers:DealTeamMember(role, user:User(name, title))
+        company:Company(name, description, industry)
       `)
       .eq('id', input.dealId)
       .single(),
 
-    // 2. Contact history (if provided)
+    // 2. Contact history (if provided) — skip risky joins
     input.contactId
-      ? supabase
-          .from('Contact')
-          .select(`
-            firstName, lastName, email, title, company, notes, lastContactedAt,
-            interactions:ContactInteraction(type, title, description, date)
-          `)
-          .eq('id', input.contactId)
-          .single()
+      ? Promise.resolve(
+          supabase
+            .from('Contact')
+            .select('firstName, lastName, email, title, company, notes, lastContactedAt')
+            .eq('id', input.contactId)
+            .single()
+        ).catch(() => ({ data: null, error: null }))
       : Promise.resolve({ data: null, error: null }),
 
     // 3. RAG document search for meeting topic
     input.meetingTopic && isRAGEnabled()
-      ? searchDocumentChunks(input.meetingTopic, input.dealId, 5, 0.4)
+      ? searchDocumentChunks(input.meetingTopic, input.dealId, 5, 0.4).catch(() => [])
       : Promise.resolve([]),
 
     // 4. Recent activities
@@ -111,26 +110,12 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
   const company = deal.company as any;
   if (company?.description) contextParts.push(`Company: ${company.description}`);
 
-  // Team
-  const team = deal.teamMembers as any[];
-  if (team?.length > 0) {
-    contextParts.push(`\nTeam: ${team.map((t: any) => `${t.user?.name} (${t.role})`).join(', ')}`);
-  }
-
   // Contact context
   if (contact) {
     contextParts.push(`\nMEETING WITH: ${contact.firstName} ${contact.lastName}`);
     if (contact.title) contextParts.push(`Title: ${contact.title}`);
     if (contact.company) contextParts.push(`Company: ${contact.company}`);
     if (contact.notes) contextParts.push(`Notes: ${contact.notes}`);
-
-    const interactions = contact.interactions as any[];
-    if (interactions?.length > 0) {
-      contextParts.push(`\nPast Interactions (${interactions.length}):`);
-      for (const i of interactions.slice(0, 5)) {
-        contextParts.push(`  - [${i.date}] ${i.type}: ${i.title}${i.description ? ` — ${i.description}` : ''}`);
-      }
-    }
   }
 
   // Financial statements detail (extracted line items)
