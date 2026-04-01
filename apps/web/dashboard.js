@@ -6,17 +6,12 @@
 // ============================================================
 const state = {
     tasks: [],
-    notifications: [
-        { id: 1, type: "alert", title: "New Deal Alert", message: "TechCorp SaaS reached Due Diligence stage", time: "5 min ago", read: false },
-        { id: 2, type: "info", title: "Report Ready", message: "Q3 Market Analysis is now available", time: "1 hour ago", read: false },
-        { id: 3, type: "success", title: "Deal Closed", message: "GreenEnergy Co completed successfully", time: "2 hours ago", read: true },
-        { id: 4, type: "warning", title: "Action Required", message: "LOI response deadline approaching", time: "3 hours ago", read: false }
-    ],
+    notifications: [],
     aiSearchHistory: [
         "What's the average EBITDA margin in our portfolio?",
-        "Show me all healthcare deals",
-        "Recent updates on Project Alpha",
-        "Compare TechCorp vs Nexus Logistics"
+        "Show me all deals in due diligence",
+        "Recent updates on active deals",
+        "Compare revenue growth across deals"
     ]
 };
 
@@ -252,23 +247,13 @@ function showStatDetail(stage) {
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
 
+    // Note: This shows sample data for the stage drill-down modal preview.
+    // In production, this should be replaced with real API data.
     const dealsData = {
-        'Sourcing': [
-            { name: 'CloudTech Solutions', value: '$45M', status: 'Active' },
-            { name: 'DataFlow Systems', value: '$32M', status: 'Active' },
-            { name: 'HealthSync Pro', value: '$78M', status: 'New' }
-        ],
-        'Due Diligence': [
-            { name: 'TechCorp SaaS', value: '$125M', status: 'In Progress' },
-            { name: 'Nexus Logistics', value: '$85M', status: 'In Progress' }
-        ],
-        'LOI / Offer': [
-            { name: 'GreenEnergy Co', value: '$210M', status: 'Pending Response' },
-            { name: 'FinanceAI', value: '$95M', status: 'Negotiating' }
-        ],
-        'Closed': [
-            { name: 'MediCarePlus', value: '$42M', status: 'Completed Q3' }
-        ]
+        'Sourcing': [],
+        'Due Diligence': [],
+        'LOI / Offer': [],
+        'Closed': []
     };
 
     const deals = dealsData[stage] || [];

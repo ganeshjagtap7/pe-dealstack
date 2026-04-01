@@ -98,8 +98,8 @@ function renderMessage(msg) {
     } else {
         return `
             <div class="flex gap-3 flex-row-reverse">
-                <div class="size-8 shrink-0 rounded-full bg-slate-200 border border-white flex items-center justify-center overflow-hidden mt-1">
-                    <img alt="User avatar" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAV31Zl0-ZHzKDQvgazCW09de1WLUDQN-81rWj2ffRFZEpC4pPGzSYaSdT7A1axfBKmDIPC_3wiFDo4hTwQUDd-Ow7ZB50lrLV6MND55clVnnmWDRPX5SP0WNJYU2gHNkEn3rjPdRqwEHupH8qrLotpj-EJeIorbNlmchrTJXBVY7i2VtoVmtfPMZwmtMwgh3Exr08j8jkjaax18yKkqArKfWdLvLyKwvXFjkY4llIT2uuMAPzxsJEd4m3heiJghB3yRKAFlV8cxus"/>
+                <div class="size-8 shrink-0 rounded-full bg-[#003366] border border-white flex items-center justify-center mt-1">
+                    <span class="text-[11px] text-white font-bold">${typeof USER !== 'undefined' && USER?.name ? USER.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) : 'U'}</span>
                 </div>
                 <div class="flex flex-col gap-1 items-end max-w-[85%]">
                     <span class="text-[11px] font-semibold text-slate-500 mr-1">You • ${msg.timestamp}</span>

@@ -147,19 +147,50 @@ function renderTemplates() {
     });
 
     document.querySelectorAll('.template-menu-btn').forEach(btn => {
-        btn.addEventListener('click', async (e) => {
+        btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const templateId = btn.dataset.templateId;
-            const action = window.prompt('Type action: "duplicate" or "delete"');
-            if (!action) return;
-            const normalized = action.trim().toLowerCase();
-            if (normalized === 'duplicate') {
+
+            // Remove any existing action menu
+            document.getElementById('template-action-menu')?.remove();
+
+            const rect = btn.getBoundingClientRect();
+            const menu = document.createElement('div');
+            menu.id = 'template-action-menu';
+            menu.className = 'fixed z-[9999]';
+            menu.style.top = `${rect.bottom + 4}px`;
+            menu.style.left = `${rect.left - 100}px`;
+            menu.innerHTML = `
+                <div class="bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-44 overflow-hidden">
+                    <button data-action="duplicate" class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                        Duplicate
+                    </button>
+                    <button data-action="delete" class="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                        Delete
+                    </button>
+                </div>
+            `;
+            document.body.appendChild(menu);
+
+            menu.querySelector('[data-action="duplicate"]').addEventListener('click', async () => {
+                menu.remove();
                 await duplicateTemplate(templateId);
-            } else if (normalized === 'delete') {
+            });
+            menu.querySelector('[data-action="delete"]').addEventListener('click', async () => {
+                menu.remove();
                 await deleteTemplateById(templateId);
-            } else {
-                showNotification('Unknown action', 'error');
-            }
+            });
+
+            // Close menu on outside click
+            const closeMenu = (ev) => {
+                if (!menu.contains(ev.target)) {
+                    menu.remove();
+                    document.removeEventListener('click', closeMenu, true);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeMenu, true), 0);
         });
     });
 

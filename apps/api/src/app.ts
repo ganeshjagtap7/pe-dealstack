@@ -23,6 +23,7 @@ import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
+import onboardingRouter from './routes/onboarding.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -241,6 +242,7 @@ app.use('/api/invitations', authMiddleware, orgMiddleware, invitationsRouter);
 app.use('/api/audit', authMiddleware, orgMiddleware, auditRouter);
 app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
+app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
 

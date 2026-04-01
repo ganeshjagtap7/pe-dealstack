@@ -166,12 +166,23 @@ function initChatInterface() {
             }
         }
 
-        // Fall back to mock response if API fails
-        console.log('[Chat] Falling back to mock response');
-        setTimeout(() => {
-            removeTypingIndicator();
-            addAIResponse(message);
-        }, 1000);
+        console.error('[Chat] API request failed, showing error to user');
+        removeTypingIndicator();
+        const chatContainer = document.getElementById('chat-messages');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'flex gap-4 max-w-[90%]';
+        errorDiv.innerHTML = `
+            <div class="size-8 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-red-500 text-lg">error</span>
+            </div>
+            <div class="flex flex-col gap-1">
+                <div class="border border-red-200 bg-red-50 rounded-2xl rounded-tl-none p-4 text-sm text-red-700 shadow-sm">
+                    <p>Sorry, I couldn't process your request right now. Please try again.</p>
+                </div>
+            </div>
+        `;
+        chatContainer.appendChild(errorDiv);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 }
 
@@ -241,8 +252,8 @@ function addUserMessageFromHistory(content) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex gap-4 max-w-[80%] self-end flex-row-reverse';
     messageDiv.innerHTML = `
-        <div class="size-8 rounded-full bg-border-subtle border border-white shrink-0 overflow-hidden shadow-sm">
-            <img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk"/>
+        <div class="size-8 rounded-full bg-[#003366] border border-white shrink-0 flex items-center justify-center shadow-sm">
+            <span class="text-[11px] text-white font-bold">${typeof USER !== 'undefined' && USER?.name ? USER.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) : 'U'}</span>
         </div>
         <div class="flex flex-col gap-1 items-end">
             <span class="text-xs font-bold text-text-muted mr-1">You</span>
@@ -280,8 +291,8 @@ function addUserMessage(message) {
     const messageDiv = document.createElement('div');
     messageDiv.className = 'flex gap-4 max-w-[80%] self-end flex-row-reverse animate-fadeIn';
     messageDiv.innerHTML = `
-        <div class="size-8 rounded-full bg-border-subtle border border-white shrink-0 overflow-hidden shadow-sm">
-            <img alt="User" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDztZZcBzY1SDBiF6rrZUV2Uq3M3sq3RNYyna4KXazODqpygVamoT478nqKsofGUiklF7LO4vfeblawPKJND10QK_mGWph7pQy_KzS-ARWQcZhjgKy925pPcsmKqIfnvj0-wNcUIwMIkWVQBCow5BMpnm3C0q_hFoQSgJ5r5aNZit5hjEU9gA0GFz7UQvGfnIwMVEl_mnRGag2umDcEHXDI8dLtE0WeR46Q64G6mwDZu99lbfgscGOi36kf77BFEZOeFx1nCs8uuGk"/>
+        <div class="size-8 rounded-full bg-[#003366] border border-white shrink-0 flex items-center justify-center shadow-sm">
+            <span class="text-[11px] text-white font-bold">${typeof USER !== 'undefined' && USER?.name ? USER.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0,2) : 'U'}</span>
         </div>
         <div class="flex flex-col gap-1 items-end">
             <span class="text-xs font-bold text-text-muted mr-1">You</span>

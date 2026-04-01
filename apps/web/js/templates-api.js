@@ -108,13 +108,13 @@ async function fetchTemplates() {
             if (Array.isArray(data) && data.length > 0) {
                 return data;
             }
-            console.info('Templates API returned empty list, using sample templates for better UX');
-            return SAMPLE_TEMPLATES;
+            console.info('Templates API returned empty list');
+            return [];
         }
         throw new Error('Failed to fetch templates');
     } catch (error) {
-        console.warn('Could not fetch templates from API, using samples:', error);
-        return SAMPLE_TEMPLATES;
+        console.warn('Could not fetch templates from API:', error);
+        return [];
     }
 }
 

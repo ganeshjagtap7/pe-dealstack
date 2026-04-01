@@ -66,6 +66,9 @@
 <p class="text-text-secondary text-sm">Here is your deal flow update and AI market analysis for <span id="current-date" class="font-medium text-primary">January 27, 2026</span>.</p>
 </div>
 
+<!-- Onboarding Checklist (shown for new users) -->
+<div id="onboarding-checklist-container"></div>
+
 <!-- Stats Cards -->
 <div id="stats-cards" data-widget="stats-cards" class="widget-container grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
 <!-- Sourcing Card -->
@@ -214,63 +217,7 @@ Recommended Action: Review Q3 projections for Project Alpha.
 </tr>
 </thead>
 <tbody id="priorities-table" class="divide-y divide-border-subtle bg-white">
-<tr class="hover:bg-primary-light/30 transition-colors group cursor-pointer" onclick="window.location.href='deal.html'">
-<td class="px-5 py-4">
-<div class="flex items-center gap-3">
-<div class="size-8 rounded bg-blue-100 border border-blue-200 flex items-center justify-center text-primary font-bold shadow-sm">T</div>
-<span class="font-semibold text-text-main group-hover:text-primary transition-colors">TechCorp SaaS</span>
-</div>
-</td>
-<td class="px-5 py-4">
-<span class="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">Due Diligence</span>
-</td>
-<td class="px-5 py-4 text-text-main font-medium font-mono">$125M</td>
-<td class="px-5 py-4 text-text-main">Review IP Report</td>
-<td class="px-5 py-4">
-<div class="flex -space-x-2">
-<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCebW-RwYpa4oRE7MZtfAn9drz1rz0jYgSsSo8u_JOJJUXCoBKb_c_2bTNNjsWO9vL3qzwJvW-GZqz5lE9XqDhiFEeMefmL7r23yeKgLuPhiG8F7ZoBT9S8dL8jG0AuDTkwcuaOU-Tn5bOi7B5rsV-0tUKogc8SPi36BE37ahJqXWZU_dhgbQ8FCVuwCSDVGr2f1GLukcCVkrJ8qdEMmTaSXvCEVW9aZFDFheRvVx_Xl3CEO-QncceGhDj4QKdqX5JCe6IgTWZmxlA"/>
-<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD2FHcv8EugHl1MjUMrr_oCoBCYDJC_Q5Md4CM62QwdIteYx_glEaxyLrtpssliB2kMgvC1zLmEfJqPM4Qa9UdK80OQp7n5opwNTLaYXpOL2iD13SeLHs-w3hU8VpmPgqRS1_FudZULMreeN-dp8Gx2aU5OhMDkotQiLa6tvXajWNZziqBXWfAjXFBjEpi84u3V1xuF-0Ygb_BfFGufzikmWPhEuIzreWy637jPOjlGEeNvjR8iI2-wu7M0epV9OpkHUUqARfMDRnM"/>
-</div>
-</td>
-</tr>
-<tr class="hover:bg-primary-light/30 transition-colors group cursor-pointer" onclick="window.location.href='deal.html'">
-<td class="px-5 py-4">
-<div class="flex items-center gap-3">
-<div class="size-8 rounded bg-purple-100 border border-purple-200 flex items-center justify-center text-purple-700 font-bold shadow-sm">N</div>
-<span class="font-semibold text-text-main group-hover:text-primary transition-colors">Nexus Logistics</span>
-</div>
-</td>
-<td class="px-5 py-4">
-<span class="inline-flex items-center rounded-md bg-purple-50 px-2.5 py-1 text-xs font-medium text-purple-700 ring-1 ring-inset ring-purple-700/10">Modelling</span>
-</td>
-<td class="px-5 py-4 text-text-main font-medium font-mono">$85M</td>
-<td class="px-5 py-4 text-text-main">Update LBO Model</td>
-<td class="px-5 py-4">
-<div class="flex -space-x-2">
-<div class="inline-flex h-7 w-7 rounded-full ring-2 ring-white bg-gray-500 items-center justify-center text-[10px] text-white font-medium">AM</div>
-</div>
-</td>
-</tr>
-<tr class="hover:bg-primary-light/30 transition-colors group cursor-pointer" onclick="window.location.href='deal.html'">
-<td class="px-5 py-4">
-<div class="flex items-center gap-3">
-<div class="size-8 rounded bg-secondary-light border border-secondary/20 flex items-center justify-center text-secondary font-bold shadow-sm">G</div>
-<span class="font-semibold text-text-main group-hover:text-primary transition-colors">GreenEnergy Co</span>
-</div>
-</td>
-<td class="px-5 py-4">
-<span class="inline-flex items-center rounded-md bg-green-50 px-2.5 py-1 text-xs font-medium text-secondary ring-1 ring-inset ring-secondary/20">LOI Sent</span>
-</td>
-<td class="px-5 py-4 text-text-main font-medium font-mono">$210M</td>
-<td class="px-5 py-4 text-text-main">Partner Call</td>
-<td class="px-5 py-4">
-<div class="flex -space-x-2">
-<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAEGfi6t03qt9emBQr6fh4sEialBa2nL7fjAiZpd0CVNwYRu_fyhxHmYfDG5vb48zDBZwqPQyFELpecT8kUFm35xDJR1vSuotSMT2vsqEnje3rlfod_vIt5E0yIbH46Bn14PkA67brGbydqlAzCRpfJVvi7DRIs369KBPMIdF9Bei3w_qRBHGpwQrVMD_QTO1qp5y19qPSvPWACv4UeKUHkSDGxbz-i7zYkllwmjeStYtnwkRwtRKeakEBi_-SzLrrNn9lTh3fZx7c"/>
-<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBk6o61R8E_VVc0Vpu5eAWMvxbxwxqbkAB8WZXt0da3qfZSqoG1s87gL73auGtedgS7V8JOGaFtyOuMK0Q11dAG9lWM58zKq0hQItDZ2rznR_hyZPmc29CWD4Kqvhp3ag36zVaVKCve2mCHALBl_Q2I2leawa_pg49iL9TFOF1NSQfUpbEJ3LRLcp3GtqWDQJhI43RBNIhmFHSrAIcfd24n4extZuf598MIetaLpQYu0MD0Zedk5EVpMyj6Qse55lSvKuP-A2fd7xo"/>
-<img alt="Team member" class="inline-block h-7 w-7 rounded-full ring-2 ring-white object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAm6UN_ummd_tjB9MkCLSfzmyRcKJkSPRkNXkrEdG3bXcsVxi38VWfwlvh733gaab9q1061LwPujAxQHTqtNI9wa8K54HiUEF08JDXObrQSOPQkiKqP_1fXDAORkEu5OSERz88-ry6ocD67upoRdLU5ZW7NE2rwJQNK98VrFsfgJ0kqrKVAZe1j8qXy_lHekyvmS2BvoeNP8U-JaAbsdhlchhP7SCPD5tGCIWDoK2Oq82T5ldshqshFEisi9_LAGGxOXSKKsO2UpIk"/>
-</div>
-</td>
-</tr>
+<!-- Populated dynamically by dashboard.js — shows empty state if no deals -->
 </tbody>
 </table>
 </div>
@@ -409,6 +356,13 @@ Scan Signals
 <script src="js/layout.js"></script>
 <script src="js/inviteModal-template.js"></script>
 <script src="js/inviteModal.js"></script>
+<!-- Onboarding modules -->
+<script src="js/onboarding/onboarding-config.js"></script>
+<script src="js/onboarding/onboarding-api.js"></script>
+<script src="js/onboarding/onboarding-empty.js"></script>
+<script src="js/onboarding/onboarding-welcome.js"></script>
+<script src="js/onboarding/onboarding-checklist.js"></script>
+<script src="js/onboarding/onboarding-feedback.js"></script>
 <script>
     // Initialize PE OS Layout with collapsible sidebar
     document.addEventListener('DOMContentLoaded', async function() {
@@ -418,6 +372,11 @@ Scan Signals
         if (!auth) return; // Will redirect to login
 
         PELayout.init('dashboard', { collapsible: true });
+
+        // Initialize onboarding (welcome modal + checklist + feedback button + beta badge)
+        if (window.initWelcomeModal) await initWelcomeModal();
+        if (window.initOnboardingChecklist) await initOnboardingChecklist();
+        if (window.initOnboardingUI) initOnboardingUI();
     });
 </script>
 

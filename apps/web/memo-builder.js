@@ -25,8 +25,8 @@ const DEMO_MEMO = {
     sponsor: 'J. Smith (MD)',
     date: 'October 24, 2023',
     collaborators: [
-        { id: 'u1', name: 'Sarah Chen', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDFSHjMJ9VxUdMFeXx4tKRpfKLJjL-H5Z8SZVtTFp9zX1rxtkTpy3KTkSdzabl2idECVCUKzNu9e10Pa4g3DFZvozoHAV4p0mzL0Elz-00J-Q8GNfm1AscvnzG8lYY6dD61u3QYMn8EAzJe2eybbh0HSMhhmQFUvL6mQyak72Pf31Wq8Ofh3nsp2li1W6-wtsnx-RmQNPGbvyYq1ui4C5tEVwCZ8b5NN97_1CyL2i76UgOcgLWJCT0h36fFKzEXWCNld0VG1kakYUA' },
-        { id: 'u2', name: 'Michael Torres', avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuCuOCHCWbtO8KzFz5f8HO0E-uPd-FPegsqdkrbnj-5gNz_Mcmw9RomhrkKGPu1jDXAc4Qko9m-PP4voAYncq9h-jKps0BsTvzp6VlTkXkV3AGjjwCjXeHEJEnKv01lh1OT4_uwSd_XDrc1MbQxuX_VBZgaBcyFm3Rf1GpG0V9JWuXV2OU1h88eswvXO4xR7K41AM9Ljz28BI0BLsASYhMb0NB4P6-XdaxhVnA8KggpfXXnjfBmsC-GBfB-o9E_9iImbhgZOw6iXNOo' },
+        { id: 'u1', name: 'Sarah Chen', avatar: null },
+        { id: 'u2', name: 'Michael Torres', avatar: null },
     ],
     sections: [
         {
@@ -71,7 +71,7 @@ const DEMO_MEMO = {
                 footnote: 'Source: Management Presentation, Model V4.2'
             },
             hasChart: true,
-            chartImage: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAcaI521dcrRKfCSoAHN-ltDG4p90UC1lCA0hfRQYs2XAiQuA7J_6EVFHBDz22ikOVZoV6jESQV0H2hpqtRtaZmwyTA2VZVLhNfmkR1Qy_CprLZ1tNvU80lKizEZj2Ab3ActdQeqUMhZ8pLYZeglfhzkSgw8WQDt46aUcIaEAMRZf8uf_ZMPAHjyabdDvrh_Ru03mwHw6nUOGOo0Kx9p3O1OI62Y_OdX68pwVaYXF4CE_ZpWH5f-GB8RPu6XBx-qvv7CMwD3gMiMPc',
+            chartImage: null,
             chartCaption: 'Figure 1.2: Quarterly Revenue Growth',
             chartNote: 'Note: Q4 figures are projected.'
         },

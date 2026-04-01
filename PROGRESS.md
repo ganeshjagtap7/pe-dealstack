@@ -5,6 +5,171 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 48 — April 1, 2026
+
+#### 23:00-01:30 IST — Beta Readiness Audit + User Onboarding System
+
+**Goal:** Make PE OS production-ready for beta users — fix all hardcoded/mock data, broken links, and build a complete user onboarding system.
+
+---
+
+#### Part A: Beta Audit & Blocker Fixes (11 issues fixed)
+
+**Problem:** Codebase audit revealed hardcoded mock data, broken CTAs, and unprofessional browser dialogs that would embarrass the product in front of beta users.
+
+**What Was Fixed:**
+
+1. **Removed 15 hardcoded Google avatar URLs** (7 files)
+   - `dashboard.html`, `deal-chat.js`, `memo-builder.js`, `memo-builder.html`, `memo-chat.js`, `login.html`, `crm-dynamic.html`, `index.html`
+   - Replaced with initials-based avatar divs (Banker Blue `#003366`) or CSS gradients for backgrounds
+
+2. **Removed `via.placeholder.com` fallback** in `vdrApi.ts` → empty string (VDR handles missing avatars)
+
+3. **Removed hardcoded dashboard data** — "TechCorp SaaS", "Nexus Logistics", "GreenEnergy Co" rows removed from `dashboard.html`. Sample notifications cleared from `dashboard.js`. Deal drill-down modal emptied of fake data.
+
+4. **Fixed 16 broken `href="#"` links** in `index.html` footer — all now link to real pages (`documentation.html`, `company.html`, `help-center.html`, etc.) or `coming-soon.html?feature=X`
+
+5. **Fixed pricing page CTAs** — Boutique/Mid-Market buttons now link to `signup.html`, Enterprise "Contact Sales" links to `mailto:`
+
+6. **Removed mock chat fallback** in `deal-chat.js` — was silently returning fake responses on API failure. Now shows red error message to user.
+
+7. **Removed sample templates fallback** in `templates-api.js` — was auto-returning `SAMPLE_TEMPLATES` on empty API response. Now returns `[]` and lets UI show empty state.
+
+8. **Replaced `window.prompt()`** in `templates.js` with styled dropdown action menu (Duplicate/Delete buttons)
+
+9. **Replaced `window.confirm()`** in `templates-editor.js` with styled Promise-based confirm dialog (white modal, red Delete button, Cancel option)
+
+10. **Improved CRM empty state** — New users see "Welcome to Your Deal Pipeline" with icon + description + "Create Your First Deal" CTA button (instead of "No deals found — adjust filters")
+
+11. **Updated `vite.config.ts`** — added `statSync` import and subdirectory copying for `js/onboarding/`
+
+#### Part B: User Onboarding System (8 new files)
+
+**Architecture:** Modular, all content editable in one config file.
+
+| File | Purpose | Lines |
+|------|---------|-------|
+| `js/onboarding/onboarding-config.js` | All text, steps, images — edit this to change content | ~130 |
+| `js/onboarding/onboarding-api.js` | API client with caching + optimistic updates | ~100 |
+| `js/onboarding/onboarding-welcome.js` | Welcome modal (first login only) — 3 feature cards + CTA | ~110 |
+| `js/onboarding/onboarding-checklist.js` | Dashboard checklist widget — 5 steps, progress bar, dismissible | ~120 |
+| `js/onboarding/onboarding-empty.js` | Reusable empty state component for any page | ~70 |
+| `js/onboarding/onboarding-feedback.js` | Floating feedback button + BETA badge in sidebar | ~70 |
+| `apps/api/src/routes/onboarding.ts` | 4 endpoints: status, complete-step, welcome-shown, dismiss | ~110 |
+| `apps/api/onboarding-migration.sql` | `onboardingStatus` JSONB column on User table | ~15 |
+
+**Onboarding Flow:**
+1. New user signs up → lands on dashboard
+2. **Welcome Modal** appears (3 feature showcase cards + "Get Started" CTA)
+3. **Checklist Widget** shows at top of dashboard (5 steps with progress bar):
+   - Create first deal → Upload CIM → Review extraction → Try Deal Chat → Invite team member
+4. Steps auto-complete via client-side detection (e.g., CRM page detects deals exist → marks step done)
+5. **BETA badge** appears in sidebar next to "PE OS" logo
+6. **Feedback button** fixed bottom-right on all pages
+7. Checklist is dismissible; welcome modal only shows once
+
+**Backend:**
+- `GET /api/onboarding/status` — returns JSONB status
+- `POST /api/onboarding/complete-step` — marks step done, auto-detects all-complete
+- `POST /api/onboarding/welcome-shown` — prevents re-showing modal
+- `POST /api/onboarding/dismiss` — hides checklist
+
+**Integration Points:**
+- `dashboard.html` — loads all 6 onboarding scripts, has checklist container div
+- `crm.html`, `contacts.html` — loads config + api + feedback scripts
+- `crm.js` — auto-detects `createDeal` step completion when deals load
+- `contacts.js` — initializes feedback button + beta badge
+- `app.ts` — mounts onboarding router at `/api/onboarding`
+
+**DB Migration:** `onboarding-migration.sql` — adds `onboardingStatus` JSONB to User table. **Run on Supabase: DONE.**
+
+#### Files Changed
+
+| Category | Files |
+|----------|-------|
+| **New files (8)** | `onboarding-config.js`, `onboarding-api.js`, `onboarding-welcome.js`, `onboarding-checklist.js`, `onboarding-empty.js`, `onboarding-feedback.js`, `onboarding.ts`, `onboarding-migration.sql` |
+| **Modified — avatar cleanup (7)** | `dashboard.html`, `deal-chat.js`, `memo-builder.js`, `memo-builder.html`, `memo-chat.js`, `login.html`, `crm-dynamic.html` |
+| **Modified — link/CTA fixes (2)** | `index.html`, `pricing.html` |
+| **Modified — mock removal (3)** | `deal-chat.js`, `templates-api.js`, `templates.js` |
+| **Modified — dialog replacement (1)** | `templates-editor.js` |
+| **Modified — empty states (2)** | `crm-cards.js`, `dashboard.js` |
+| **Modified — onboarding integration (5)** | `app.ts`, `crm.html`, `crm.js`, `contacts.html`, `contacts.js` |
+| **Modified — build (2)** | `vite.config.ts`, `vdrApi.ts` |
+| **Total** | 8 new + 22 modified = **30 files** |
+
+#### Verification
+- 0 Google avatar URLs remaining (`grep googleusercontent` → 0)
+- 0 `window.prompt`/`window.confirm` remaining
+- 0 `placeholder.com` references remaining
+- 0 TypeScript errors (`npx tsc --noEmit` clean)
+
+---
+
+### Session 47 — April 1, 2026
+
+#### 21:00-22:30 IST — Deal Chat Fix + AI Error Handling Overhaul
+
+**Goal:** Fix broken deal chatbox returning "I encountered an error processing your request" on all queries.
+
+---
+
+#### Root Cause Investigation
+
+- **Symptom:** Deal chat on production (lmmos.ai) returned generic error for all queries including "compare this deal with X"
+- **Root cause:** OpenAI API key had exceeded billing quota (`429 insufficient_quota`). The old code swallowed the error and returned a generic "I encountered an error" message — making it impossible to diagnose.
+- **Discovery method:** Ran `runDealChatAgent()` directly via Node script → caught `InsufficientQuotaError: 429 You exceeded your current quota`
+- **Additional issue:** Production was running old committed code (direct `openai.chat.completions.create()`) while local had unreleased ReAct agent upgrade
+
+#### What Was Done
+
+1. **Deal Chat upgraded to ReAct Agent** ([ai.ts](apps/api/src/routes/ai.ts))
+   - Replaced direct OpenAI completion call with `runDealChatAgent()` using LangGraph ReAct agent
+   - Agent has 6 closure-bound tools: search_documents, get_deal_financials, compare_deals, get_deal_activity, update_deal_field, suggest_action
+   - Lighter deal query (only Company join, not all Documents + Activities)
+   - Fire-and-forget for Activity logging and ChatMessage saves
+
+2. **Shared AI Error Classifier** ([aiErrors.ts](apps/api/src/utils/aiErrors.ts)) — NEW FILE
+   - `classifyAIError(errorMsg)` maps raw LLM errors to specific user-facing messages
+   - Covers: quota exceeded, invalid API key, auth failure, rate limit, timeout, model not found, context length, content filter, network errors
+   - Fallback: shows truncated actual error message for unrecognized errors
+   - Used by all AI routes for consistent error reporting
+
+3. **All AI routes now return specific errors** ([ai.ts](apps/api/src/routes/ai.ts), [ai-agents.ts](apps/api/src/routes/ai-agents.ts))
+   - Chat, thesis, risk analysis, contact enrichment, meeting prep, signal scan, email draft — all 7 endpoints updated
+   - Before: `"Failed to process AI chat"` → After: `"AI quota exceeded — please check your API billing..."`
+
+4. **Frontend error display** ([deal-chat.js](apps/web/deal-chat.js))
+   - Error responses (model === 'error') now display with ⚠️ prefix
+   - Specific error text shown instead of generic fallback
+
+5. **Contact Enrichment rewritten** ([contactEnrichment/index.ts](apps/api/src/services/agents/contactEnrichment/index.ts))
+   - Now uses real CRM data: document mentions, email domain analysis, linked deals
+   - No more fake LLM-generated enrichment data
+
+6. **Meeting Prep hardened** ([meetingPrep/index.ts](apps/api/src/services/agents/meetingPrep/index.ts))
+   - Per-query error isolation — one failed fetch doesn't crash the whole prep
+
+7. **OpenAI API key updated** — new key with active billing set in local `.env` and Vercel env vars
+
+#### Files Changed
+- `apps/api/src/utils/aiErrors.ts` — NEW (shared error classifier)
+- `apps/api/src/routes/ai.ts` — ReAct agent + specific errors
+- `apps/api/src/routes/ai-agents.ts` — specific errors for all 4 agent routes
+- `apps/api/src/services/agents/dealChatAgent/index.ts` — uses classifyAIError
+- `apps/api/src/services/agents/contactEnrichment/index.ts` — real CRM data enrichment
+- `apps/api/src/services/agents/meetingPrep/index.ts` — error isolation
+- `apps/web/deal-chat.js` — error display with warning icon
+- `apps/web/js/ai-tools.js` — minor updates
+- `package.json` / `package-lock.json` — added @langchain/anthropic (future use)
+
+#### Summary
+- **11 files changed** (639 insertions, 176 deletions)
+- **Zero TS errors**
+- **Commit:** `7ddeac3` — pushed to main, Vercel auto-deploying
+- **Tested:** 5 chat scenarios passed locally (simple question, financials, compare deals, document search, with history)
+
+---
+
 ### Session 46 — March 28, 2026
 
 #### 10:00-12:00 IST — MFA/2FA Implementation

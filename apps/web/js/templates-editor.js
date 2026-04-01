@@ -13,6 +13,26 @@
  * Depends on globals from templates-sections.js: renderSections
  */
 
+function showSimpleConfirm(message) {
+    return new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
+                <p class="text-sm text-gray-700 mb-4">${message}</p>
+                <div class="flex justify-end gap-3">
+                    <button id="confirm-cancel" class="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Cancel</button>
+                    <button id="confirm-ok" class="px-4 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style="background-color: #dc2626;">Delete</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#confirm-cancel').onclick = () => { overlay.remove(); resolve(false); };
+        overlay.querySelector('#confirm-ok').onclick = () => { overlay.remove(); resolve(true); };
+        overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
+    });
+}
+
 // ============================================================
 // Editor Rendering
 // ============================================================
@@ -299,7 +319,26 @@ async function duplicateTemplate(templateId) {
 async function deleteTemplateById(templateId) {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
-    if (!window.confirm(`Delete template "${template.name}"?`)) return;
+
+    const confirmed = await new Promise((resolve) => {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/50 flex items-center justify-center z-[9999]';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-xl p-6 max-w-sm mx-4 shadow-2xl">
+                <h3 class="font-semibold text-[#111418] mb-2">Delete Template</h3>
+                <p class="text-sm text-slate-600 mb-4">Are you sure you want to delete "${template.name}"? This action cannot be undone.</p>
+                <div class="flex justify-end gap-3">
+                    <button id="tpl-confirm-cancel" class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Cancel</button>
+                    <button id="tpl-confirm-delete" class="px-4 py-2 text-sm font-medium text-white rounded-lg hover:opacity-90" style="background-color: #dc2626;">Delete</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.querySelector('#tpl-confirm-cancel').onclick = () => { overlay.remove(); resolve(false); };
+        overlay.querySelector('#tpl-confirm-delete').onclick = () => { overlay.remove(); resolve(true); };
+        overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); resolve(false); } };
+    });
+    if (!confirmed) return;
 
     if (!template.id.startsWith('sample-') && !template.id.startsWith('local-')) {
         const deleted = await deleteTemplateAPI(template.id);

@@ -94,6 +94,11 @@
                 const deals = await response.json();
                 allDeals = deals; // Store for bulk operations
 
+                // Onboarding: mark createDeal step as complete if user has deals
+                if (deals.length > 0 && window.OnboardingAPI) {
+                    OnboardingAPI.completeStep('createDeal');
+                }
+
                 // Update industry filter with actual industries from deals
                 updateIndustryFilter(deals);
 
@@ -218,4 +223,7 @@
             initializeUploadCard();
             initializeKeyboardShortcuts();
             initializeBulkActions();
+
+            // Onboarding: feedback button + beta badge + step detection
+            if (window.initOnboardingUI) initOnboardingUI();
         });

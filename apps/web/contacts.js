@@ -415,6 +415,9 @@ document.addEventListener('DOMContentLoaded', async function() {
 
         PELayout.init('crm', { collapsible: true });
         initializeFilters();
+
+        // Onboarding: feedback button + beta badge
+        if (window.initOnboardingUI) initOnboardingUI();
     } catch (err) {
         console.error('Init error:', err);
     }

@@ -507,7 +507,7 @@ export function transformDocument(apiDoc: APIDocument): import('../types/vdr.typ
     },
     author: {
       name: apiDoc.uploader?.fullName || 'Unknown',
-      avatar: apiDoc.uploader?.avatar || 'https://via.placeholder.com/40',
+      avatar: apiDoc.uploader?.avatar || '',
     },
     date: new Date(apiDoc.createdAt).toLocaleDateString('en-US', {
       month: 'short',

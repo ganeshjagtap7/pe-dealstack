@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv, Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import { resolve } from 'path'
-import { copyFileSync, mkdirSync, readdirSync, existsSync } from 'fs'
+import { copyFileSync, mkdirSync, readdirSync, existsSync, statSync } from 'fs'
 
 // Plugin to inject environment variables into all HTML pages
 // This allows plain <script> files (like auth.js) to access env config via window.__ENV
@@ -50,8 +50,20 @@ function copyStaticFiles() {
       if (existsSync(jsDir)) {
         mkdirSync(distJsDir, { recursive: true })
         readdirSync(jsDir).forEach(file => {
+          const fullPath = resolve(jsDir, file)
           if (file.endsWith('.js')) {
-            copyFileSync(resolve(jsDir, file), resolve(distJsDir, file))
+            copyFileSync(fullPath, resolve(distJsDir, file))
+          }
+          // Copy subdirectories (e.g., js/onboarding/)
+          if (existsSync(fullPath) && statSync(fullPath).isDirectory()) {
+            const subDistDir = resolve(distJsDir, file)
+            mkdirSync(subDistDir, { recursive: true })
+            readdirSync(fullPath).forEach((subFile: string) => {
+              if (subFile.endsWith('.js')) {
+                copyFileSync(resolve(fullPath, subFile), resolve(subDistDir, subFile))
+              }
+            })
+            console.log(`Copied js/${file}/ subdirectory to dist/js/${file}/`)
           }
         })
         console.log('Copied js/ folder to dist/js/')
