@@ -5,6 +5,9 @@ import { openai, isAIEnabled } from '../openai.js';
 import { log } from '../utils/logger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
+import { runMemoChatAgent } from '../services/agents/memoAgent/index.js';
+import { isLLMAvailable } from '../services/llm.js';
+import { classifyAIError } from '../utils/aiErrors.js';
 
 const router = Router();
 
@@ -19,6 +22,7 @@ const generateSectionSchema = z.object({
 const chatMessageSchema = z.object({
   content: z.string().min(1),
   sectionId: z.string().uuid().optional(),
+  activeSectionId: z.string().uuid().optional(),
 });
 
 // ============================================================
@@ -176,147 +180,87 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 // POST /api/memos/:id/chat - Send message to AI assistant
 router.post('/:id/chat', async (req, res) => {
   try {
-    const { id } = req.params;
-    const user = req.user;
+    const { id: memoId } = req.params;
     const orgId = getOrgId(req);
-    const validation = chatMessageSchema.safeParse(req.body);
+    const userId = req.user?.id || null;
+    const { content, activeSectionId } = chatMessageSchema.parse(req.body);
 
-    if (!validation.success) {
-      return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
-    }
+    // Verify memo exists and belongs to org
+    const { data: memo } = await supabase
+      .from('Memo')
+      .select('id, dealId, title, projectName')
+      .eq('id', memoId)
+      .eq('organizationId', orgId)
+      .single();
 
-    // Verify memo belongs to org
-    const { data: memoCheck } = await supabase.from('Memo').select('id').eq('id', id).eq('organizationId', orgId).single();
-    if (!memoCheck) return res.status(404).json({ error: 'Memo not found' });
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
 
-    if (!isAIEnabled()) {
-      // Return a fallback response
-      return res.json({
-        role: 'assistant',
-        content: `<p>AI features are currently disabled. To enable AI, please set the OPENAI_API_KEY environment variable.</p>
-        <p>In the meantime, I can help you navigate the memo builder interface. What would you like to know?</p>`,
-        timestamp: new Date().toISOString(),
-      });
+    if (!isLLMAvailable()) {
+      return res.status(503).json({ error: 'AI service unavailable' });
     }
 
     // Get or create conversation
-    let { data: existingConversation } = await supabase
+    let conversationId: string;
+    const { data: existingConv } = await supabase
       .from('MemoConversation')
       .select('id')
-      .eq('memoId', id)
-      .eq('userId', user?.id)
-      .order('updatedAt', { ascending: false })
+      .eq('memoId', memoId)
+      .eq('userId', userId)
+      .order('createdAt', { ascending: false })
       .limit(1)
       .single();
 
-    let conversationId: string;
-
-    if (existingConversation) {
-      conversationId = existingConversation.id;
+    if (existingConv) {
+      conversationId = existingConv.id;
     } else {
-      const { data: newConv, error: convError } = await supabase
+      const { data: newConv } = await supabase
         .from('MemoConversation')
-        .insert({ memoId: id, userId: user?.id })
-        .select()
+        .insert({ memoId, userId, title: 'AI Analyst Chat' })
+        .select('id')
         .single();
-
-      if (convError || !newConv) throw convError || new Error('Failed to create conversation');
-      conversationId = newConv.id;
+      conversationId = newConv!.id;
     }
 
     // Save user message
-    const { error: userMsgError } = await supabase
-      .from('MemoChatMessage')
-      .insert({
-        conversationId,
-        role: 'user',
-        content: validation.data.content,
-      });
+    await supabase.from('MemoChatMessage').insert({
+      conversationId,
+      role: 'user',
+      content,
+    });
 
-    if (userMsgError) throw userMsgError;
-
-    // Get memo context
-    const { data: memo } = await supabase
-      .from('Memo')
-      .select(`
-        *,
-        sections:MemoSection(*),
-        deal:Deal(
-          name, stage, industry, dealSize, revenue, ebitda,
-          company:Company(name),
-          documents:Document(name, type)
-        )
-      `)
-      .eq('id', id)
-      .single();
-
-    // Get recent messages for context (ascending order for chronological history)
-    // Note: the user message we just saved above is included, so we fetch 11 and drop the last one
-    const { data: recentMessages } = await supabase
+    // Get conversation history
+    const { data: historyMessages } = await supabase
       .from('MemoChatMessage')
       .select('role, content')
       .eq('conversationId', conversationId)
-      .order('createdAt', { ascending: true });
+      .order('createdAt', { ascending: true })
+      .limit(16);
 
-    // Build context with more section detail for better AI responses
-    const memoContext = [];
-    memoContext.push(`Memo: ${memo?.title || 'Untitled'}`);
-    memoContext.push(`Project: ${memo?.projectName || 'N/A'}`);
+    const history = (historyMessages || [])
+      .filter((m: any) => m.role === 'user' || m.role === 'assistant')
+      .map((m: any) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-    if (memo?.sections) {
-      memoContext.push('\nCurrent Sections:');
-      memo.sections.forEach((s: any) => {
-        memoContext.push(`- ${s.title}: ${s.content?.substring(0, 500) || '(empty)'}`);
-      });
-    }
-
-    if (memo?.deal) {
-      memoContext.push(`\nDeal: ${memo.deal.name}`);
-      memoContext.push(`Industry: ${memo.deal.industry || 'N/A'}`);
-      if (memo.deal.revenue) memoContext.push(`Revenue: $${memo.deal.revenue}M`);
-      if (memo.deal.ebitda) memoContext.push(`EBITDA: $${memo.deal.ebitda}M`);
-      if (memo.deal.dealSize) memoContext.push(`Deal Size: $${memo.deal.dealSize}M`);
-    }
-
-    // Call OpenAI
-    const messages: any[] = [
-      { role: 'system', content: MEMO_ANALYST_PROMPT },
-      { role: 'system', content: `Memo Context:\n${memoContext.join('\n')}\n\nProvide specific, actionable responses. Reference deal data when available.` },
-    ];
-
-    // Add conversation history (exclude the just-saved user message — we add it explicitly below)
-    if (recentMessages && recentMessages.length > 0) {
-      const history = recentMessages.slice(0, -1).slice(-8);
-      history.forEach((msg: any) => {
-        messages.push({ role: msg.role, content: msg.content });
-      });
-    }
-
-    // Add current message
-    messages.push({ role: 'user', content: validation.data.content });
-
-    const response = await openai!.chat.completions.create({
-      model: 'gpt-4o',
-      messages,
-      temperature: 0.7,
-      max_tokens: 1500,
+    // Run ReAct agent
+    const result = await runMemoChatAgent({
+      memoId,
+      dealId: memo.dealId,
+      orgId,
+      message: content,
+      activeSectionId,
+      history,
     });
 
-    const aiContent = response.choices[0].message.content;
-
     // Save AI response
-    const { data: aiMessage, error: aiMsgError } = await supabase
-      .from('MemoChatMessage')
-      .insert({
-        conversationId,
-        role: 'assistant',
-        content: aiContent,
-        metadata: { model: 'gpt-4o' },
-      })
-      .select()
-      .single();
-
-    if (aiMsgError) throw aiMsgError;
+    await supabase.from('MemoChatMessage').insert({
+      conversationId,
+      role: 'assistant',
+      content: result.message,
+      metadata: {
+        model: result.model,
+        action: result.action,
+        sectionId: result.sectionId,
+      },
+    });
 
     // Update conversation timestamp
     await supabase
@@ -324,18 +268,26 @@ router.post('/:id/chat', async (req, res) => {
       .update({ updatedAt: new Date().toISOString() })
       .eq('id', conversationId);
 
-    // Audit log AI chat
-    await AuditLog.aiChat(req, `Memo: ${memo?.title || id}`);
-
     res.json({
-      id: aiMessage.id,
+      id: conversationId,
       role: 'assistant',
-      content: aiContent,
-      timestamp: aiMessage.createdAt,
+      content: result.message,
+      model: result.model,
+      timestamp: new Date().toISOString(),
+      action: result.action,
+      sectionId: result.sectionId,
+      preview: result.preview,
+      tableData: result.tableData,
+      chartConfig: result.chartConfig,
+      insertPosition: result.insertPosition,
+      type: result.type,
     });
-  } catch (error) {
-    log.error('Error in chat', error);
-    res.status(500).json({ error: 'Failed to process chat message' });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    log.error('Memo chat error', error);
+    res.status(500).json({ error: classifyAIError(error.message || 'Failed to process chat') });
   }
 });
 
