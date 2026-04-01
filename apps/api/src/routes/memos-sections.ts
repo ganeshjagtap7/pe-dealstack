@@ -215,4 +215,78 @@ router.post('/:id/sections/reorder', async (req, res) => {
   }
 });
 
+// POST /api/memos/:id/sections/:sectionId/apply - Apply a confirmed chat action
+const applySectionSchema = z.object({
+  content: z.string().optional(),
+  tableData: z.any().optional(),
+  chartConfig: z.any().optional(),
+  insertPosition: z.enum(['append', 'prepend', 'replace']).optional().default('replace'),
+});
+
+router.post('/:id/sections/:sectionId/apply', async (req, res) => {
+  try {
+    const { id: memoId, sectionId } = req.params;
+    const orgId = getOrgId(req);
+    const { content, tableData, chartConfig, insertPosition } = applySectionSchema.parse(req.body);
+
+    // Verify memo ownership
+    const { data: memo } = await supabase
+      .from('Memo')
+      .select('id')
+      .eq('id', memoId)
+      .eq('organizationId', orgId)
+      .single();
+
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
+
+    // Get current section (for undo data)
+    const { data: section } = await supabase
+      .from('MemoSection')
+      .select('id, content, tableData, chartConfig')
+      .eq('id', sectionId)
+      .eq('memoId', memoId)
+      .single();
+
+    if (!section) return res.status(404).json({ error: 'Section not found' });
+
+    // Build update
+    const updateData: any = { updatedAt: new Date().toISOString() };
+
+    if (content) {
+      if (insertPosition === 'append') {
+        updateData.content = (section.content || '') + '\n' + content;
+      } else if (insertPosition === 'prepend') {
+        updateData.content = content + '\n' + (section.content || '');
+      } else {
+        updateData.content = content;
+      }
+    }
+    if (tableData !== undefined) updateData.tableData = tableData;
+    if (chartConfig !== undefined) updateData.chartConfig = chartConfig;
+
+    const { data: updated, error } = await supabase
+      .from('MemoSection')
+      .update(updateData)
+      .eq('id', sectionId)
+      .select('id, type, title, content, tableData, chartConfig, sortOrder')
+      .single();
+
+    if (error) throw error;
+
+    // Return updated section + previous state for undo
+    res.json({
+      section: updated,
+      previousContent: section.content,
+      previousTableData: section.tableData,
+      previousChartConfig: section.chartConfig,
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    log.error('Apply section error', error);
+    res.status(500).json({ error: 'Failed to apply section update' });
+  }
+});
+
 export default router;
