@@ -26,6 +26,8 @@ async function createMemoAPI(options = {}) {
                 type: options.type || 'IC_MEMO',
                 status: 'DRAFT',
                 sponsor: options.sponsor || '',
+                autoGenerate: options.autoGenerate !== undefined ? options.autoGenerate : !!options.dealId,
+                templatePreset: options.templatePreset || 'comprehensive',
             }),
         });
 
@@ -293,7 +295,7 @@ async function regenerateSectionAPI(sectionId, customPrompt = null) {
     }
 }
 
-async function sendChatMessageAPI(content) {
+async function sendChatMessageAPI(content, activeSectionId) {
     if (!state.memo?.id || state.memo.id.startsWith('demo-')) {
         return null;
     }
@@ -302,7 +304,10 @@ async function sendChatMessageAPI(content) {
         const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/chat`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content }),
+            body: JSON.stringify({
+                content,
+                activeSectionId: activeSectionId || undefined,
+            }),
         });
 
         if (!response.ok) {
@@ -339,6 +344,48 @@ async function checkAIStatus() {
         return false;
     } catch {
         return false;
+    }
+}
+
+/**
+ * Generate all sections for an existing memo
+ * POST /api/memos/:id/generate-all
+ */
+async function generateAllSectionsAPI(memoId) {
+    if (!memoId || memoId.startsWith('demo-')) return null;
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${memoId}/generate-all`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (response.ok) return await response.json();
+        const err = await response.json().catch(() => ({}));
+        console.error('[Memo] Generate-all failed:', err);
+        return null;
+    } catch (error) {
+        console.error('[Memo] Generate-all error:', error);
+        return null;
+    }
+}
+
+/**
+ * Apply a confirmed chat action to a section
+ * POST /api/memos/:id/sections/:sectionId/apply
+ */
+async function applySectionActionAPI(memoId, sectionId, data) {
+    if (!memoId || memoId.startsWith('demo-')) return null;
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/memos/${memoId}/sections/${sectionId}/apply`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+        });
+        if (response.ok) return await response.json();
+        console.error('[Memo] Apply section failed:', response.status);
+        return null;
+    } catch (error) {
+        console.error('[Memo] Apply section error:', error);
+        return null;
     }
 }
 
