@@ -5,6 +5,9 @@ import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { getOrgId } from '../middleware/orgScope.js';
+import { generateAllSections, COMPREHENSIVE_IC_SECTIONS, STANDARD_IC_SECTIONS, SEARCH_FUND_SECTIONS, SCREENING_NOTE_SECTIONS } from '../services/agents/memoAgent/index.js';
+import { isLLMAvailable } from '../services/llm.js';
+import { classifyAIError } from '../utils/aiErrors.js';
 
 // Sub-routers
 import memoSectionsRouter from './memos-sections.js';
@@ -29,6 +32,8 @@ const createMemoSchema = z.object({
   status: z.enum(['DRAFT', 'REVIEW', 'FINAL', 'ARCHIVED']).default('DRAFT'),
   sponsor: z.string().optional(),
   memoDate: z.string().optional(),
+  autoGenerate: z.boolean().optional().default(false),
+  templatePreset: z.enum(['comprehensive', 'standard', 'search_fund', 'screening']).optional(),
 });
 
 // Map template section titles to memo section types
@@ -207,8 +212,8 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid data', details: validation.error.errors });
     }
 
-    // Strip templateId from memoData (not a Memo table column)
-    const { templateId, ...memoFields } = validation.data;
+    // Strip templateId, autoGenerate, templatePreset from memoData (not Memo table columns)
+    const { templateId, autoGenerate, templatePreset, ...memoFields } = validation.data;
     const memoData = {
       ...memoFields,
       createdBy: user?.id,
@@ -281,6 +286,50 @@ router.post('/', async (req, res) => {
       if (sectionsError) throw sectionsError;
     }
 
+    // Auto-generate section content if requested and AI is available
+    let generationStatus = null;
+
+    if (autoGenerate && memoFields.dealId && isLLMAvailable()) {
+      try {
+        const presetMap: Record<string, any> = {
+          comprehensive: COMPREHENSIVE_IC_SECTIONS,
+          standard: STANDARD_IC_SECTIONS,
+          search_fund: SEARCH_FUND_SECTIONS,
+          screening: SCREENING_NOTE_SECTIONS,
+        };
+        const sectionTypes = templatePreset ? presetMap[templatePreset] : undefined;
+        const { sections: generated } = await generateAllSections(memoFields.dealId, orgId, sectionTypes);
+
+        let completed = 0;
+        const errors: string[] = [];
+        for (const gen of generated) {
+          const { data: existingSection } = await supabase
+            .from('MemoSection')
+            .select('id')
+            .eq('memoId', memo.id)
+            .eq('type', gen.type)
+            .single();
+
+          if (existingSection) {
+            const updateData: any = {
+              content: gen.content,
+              aiGenerated: gen.aiGenerated,
+              aiModel: gen.aiModel,
+              updatedAt: new Date().toISOString(),
+            };
+            if (gen.tableData) updateData.tableData = gen.tableData;
+            if (gen.chartConfig) updateData.chartConfig = gen.chartConfig;
+            await supabase.from('MemoSection').update(updateData).eq('id', existingSection.id);
+            completed++;
+          }
+        }
+        generationStatus = { completed, total: generated.length, errors };
+      } catch (error: any) {
+        log.error('Auto-generation failed', { memoId: memo.id, error: error.message });
+        generationStatus = { completed: 0, total: 0, errors: [error.message] };
+      }
+    }
+
     // Fetch the memo with sections
     const { data: fullMemo, error: fetchError } = await supabase
       .from('Memo')
@@ -296,7 +345,10 @@ router.post('/', async (req, res) => {
     await AuditLog.memoCreated(req, memo.id, memo.title);
     log.debug('Memo created successfully', { memoId: memo.id });
 
-    res.status(201).json(fullMemo);
+    res.status(201).json({
+      ...fullMemo,
+      ...(generationStatus && { generationStatus }),
+    });
   } catch (error: any) {
     log.error('Error creating memo', error);
     // Return detailed error in development for debugging
@@ -379,6 +431,62 @@ router.delete('/:id', requirePermission(PERMISSIONS.MEMO_DELETE), async (req, re
   } catch (error) {
     log.error('Error deleting memo', error);
     res.status(500).json({ error: 'Failed to delete memo' });
+  }
+});
+
+// POST /api/memos/:id/generate-all - Regenerate all sections
+router.post('/:id/generate-all', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    const { data: memo } = await supabase
+      .from('Memo')
+      .select('id, dealId')
+      .eq('id', id)
+      .eq('organizationId', orgId)
+      .single();
+
+    if (!memo) return res.status(404).json({ error: 'Memo not found' });
+    if (!memo.dealId) return res.status(400).json({ error: 'Memo has no associated deal' });
+    if (!isLLMAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
+
+    const { sections: generated } = await generateAllSections(memo.dealId, orgId);
+
+    let completed = 0;
+    for (const gen of generated) {
+      const { data: existing } = await supabase
+        .from('MemoSection')
+        .select('id')
+        .eq('memoId', id)
+        .eq('type', gen.type)
+        .single();
+
+      const updateData: any = {
+        content: gen.content,
+        aiGenerated: gen.aiGenerated,
+        aiModel: gen.aiModel,
+        updatedAt: new Date().toISOString(),
+      };
+      if (gen.tableData) updateData.tableData = gen.tableData;
+      if (gen.chartConfig) updateData.chartConfig = gen.chartConfig;
+
+      if (existing) {
+        await supabase.from('MemoSection').update(updateData).eq('id', existing.id);
+      } else {
+        await supabase.from('MemoSection').insert({
+          memoId: id, type: gen.type, title: gen.title,
+          sortOrder: (gen as any).sortOrder || completed + 1,
+          status: 'DRAFT', ...updateData,
+        });
+      }
+      completed++;
+    }
+
+    res.json({ success: true, completed, total: generated.length });
+  } catch (error: any) {
+    log.error('Generate-all failed', error);
+    res.status(500).json({ error: classifyAIError(error.message || 'Failed to regenerate memo') });
   }
 });
 
