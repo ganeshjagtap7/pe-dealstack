@@ -8,6 +8,140 @@
  *             showEditDataModal/showEditSectionModal/closeEditSectionModal (memo-editor.js)
  */
 
+// Banker blue palette for all charts
+const CHART_PALETTE = {
+    primary: '#003366',
+    secondary: '#004488',
+    tertiary: '#0066AA',
+    quaternary: '#3399CC',
+    light: '#66BBDD',
+    accent: '#E8B931',
+    bg: ['#003366', '#004488', '#0066AA', '#3399CC', '#66BBDD', '#E8B931'],
+};
+
+/**
+ * Render a Chart.js chart from a chartConfig object
+ * @param {string} containerId - DOM element ID to render into
+ * @param {object} config - Chart config from AI (type, title, data, options)
+ * @returns {Chart|null} Chart instance
+ */
+function renderChart(containerId, config) {
+    if (!config || !config.data) return null;
+    const container = document.getElementById(containerId);
+    if (!container) return null;
+
+    container.innerHTML = '';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'my-4';
+
+    if (config.title) {
+        const titleEl = document.createElement('p');
+        titleEl.className = 'text-sm font-semibold text-gray-700 mb-2 text-center';
+        titleEl.textContent = config.title;
+        wrapper.appendChild(titleEl);
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.style.maxHeight = '300px';
+    wrapper.appendChild(canvas);
+
+    if (config.options?.footnote) {
+        const footnote = document.createElement('p');
+        footnote.className = 'text-xs text-gray-400 italic mt-1 text-center';
+        footnote.textContent = config.options.footnote;
+        wrapper.appendChild(footnote);
+    }
+
+    container.appendChild(wrapper);
+
+    // Apply palette to datasets without explicit colors
+    const datasets = (config.data.datasets || []).map((ds, i) => ({
+        backgroundColor: ds.backgroundColor || CHART_PALETTE.bg[i % CHART_PALETTE.bg.length],
+        borderColor: ds.borderColor || CHART_PALETTE.bg[i % CHART_PALETTE.bg.length],
+        borderWidth: ds.borderWidth || (ds.type === 'line' ? 2 : 0),
+        tension: ds.tension || 0.3,
+        ...ds,
+    }));
+
+    const chartType = config.options?.horizontal ? 'bar' : (config.type || 'bar');
+    const chartJsConfig = {
+        type: chartType,
+        data: { labels: config.data.labels || [], datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            indexAxis: config.options?.horizontal ? 'y' : 'x',
+            plugins: {
+                legend: {
+                    display: datasets.length > 1,
+                    position: 'bottom',
+                    labels: { font: { family: 'Inter', size: 11 }, color: '#666' },
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) {
+                            const fmt = config.options?.format;
+                            const val = ctx.parsed.y ?? ctx.parsed.x ?? ctx.raw;
+                            if (fmt === 'currency') return `${ctx.dataset.label}: $${val}M`;
+                            if (fmt === 'percentage') return `${ctx.dataset.label}: ${val}%`;
+                            if (fmt === 'multiple') return `${ctx.dataset.label}: ${val}x`;
+                            return `${ctx.dataset.label}: ${val}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { font: { family: 'Inter', size: 11 }, color: '#666' }, stacked: config.options?.stacked || false },
+                y: {
+                    grid: { color: '#f0f0f0' },
+                    ticks: {
+                        font: { family: 'Inter', size: 11 }, color: '#666',
+                        callback: function(value) {
+                            const fmt = config.options?.format;
+                            if (fmt === 'currency') return '$' + value + 'M';
+                            if (fmt === 'percentage') return value + '%';
+                            if (fmt === 'multiple') return value + 'x';
+                            return value;
+                        }
+                    },
+                    stacked: config.options?.stacked || false,
+                },
+            },
+        },
+    };
+
+    // Dual axis support
+    if (config.options?.dualAxis) {
+        chartJsConfig.options.scales.y1 = {
+            position: 'right',
+            grid: { display: false },
+            ticks: { font: { family: 'Inter', size: 11 }, color: CHART_PALETTE.accent, callback: (v) => v + '%' },
+        };
+    }
+
+    try {
+        return new Chart(canvas, chartJsConfig);
+    } catch (error) {
+        console.error('[Memo] Chart render error:', error);
+        container.innerHTML = '<p class="text-xs text-red-400 text-center py-2">Chart rendering failed</p>';
+        return null;
+    }
+}
+
+/**
+ * Render charts for all sections that have chartConfig
+ * Call this AFTER sections HTML has been rendered to the DOM
+ */
+function renderChartsForAllSections() {
+    if (!state || !state.sections) return;
+    for (const section of state.sections) {
+        if (section.chartConfig) {
+            const containerId = `chart-${section.id}`;
+            renderChart(containerId, section.chartConfig);
+        }
+    }
+}
+
 // ============================================================
 // Document Content Rendering
 // ============================================================
@@ -17,6 +151,9 @@ function renderSections() {
 
     // Add event handlers for section buttons
     setupSectionButtons();
+
+    // Render Chart.js charts after DOM is updated
+    setTimeout(() => renderChartsForAllSections(), 100);
 }
 
 function renderSection(section, index) {
@@ -44,6 +181,9 @@ function renderSection(section, index) {
             ${section.chartNote ? `<p class="text-xs text-slate-400 italic mb-2">${section.chartNote}</p>` : ''}
         `;
     }
+
+    // Chart.js chart container (rendered dynamically after DOM update)
+    const chartConfigHtml = section.chartConfig ? `<div id="chart-${section.id}" class="my-4 px-4"></div>` : '';
 
     let placeholderHtml = '';
     if (section.hasPlaceholder) {
@@ -97,6 +237,7 @@ function renderSection(section, index) {
             ${section.content}
             ${tableHtml}
             ${chartHtml}
+            ${chartConfigHtml}
             ${placeholderHtml}
         </section>
     `;
