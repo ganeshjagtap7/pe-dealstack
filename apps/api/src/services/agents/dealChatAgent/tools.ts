@@ -339,11 +339,11 @@ export function getDealChatTools(dealId: string, orgId: string) {
   const suggestActionTool = tool(
     async ({ actionType, label, description }) => {
       const urlMap: Record<string, string> = {
-        create_memo: `/memo-builder.html?dealId=${dealId}`,
-        open_data_room: `/vdr.html?dealId=${dealId}`,
-        upload_document: `/vdr.html?dealId=${dealId}&action=upload`,
-        view_financials: `/deal.html?id=${dealId}#financials`,
-        change_stage: `/deal.html?id=${dealId}&action=change_stage`,
+        create_memo: `/memo-builder?dealId=${dealId}`,
+        open_data_room: `/vdr?dealId=${dealId}`,
+        upload_document: `/vdr?dealId=${dealId}&action=upload`,
+        view_financials: `/deal?id=${dealId}#financials`,
+        change_stage: `/deal?id=${dealId}&action=change_stage`,
       };
 
       return JSON.stringify({

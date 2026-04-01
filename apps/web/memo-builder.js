@@ -233,6 +233,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         hideLoadingState();
     }
 
+    // Auto-generate content if all sections are empty and we have a dealId
+    await autoGenerateIfEmpty();
+
     // Render UI
     renderSidebar();
     renderSections();
@@ -542,6 +545,37 @@ function pushUndo(sectionId, previousContent, previousTableData, previousChartCo
 
 function popUndo() {
     return state.undoStack.pop();
+}
+
+// ============================================================
+// Auto-generate content for empty sections
+// ============================================================
+async function autoGenerateIfEmpty() {
+    if (!state.memo?.id || !state.memo?.dealId) return;
+
+    // Check if ALL sections have no content
+    const allEmpty = state.sections.every(s => !s.content || s.content.trim() === '');
+    if (!allEmpty || state.sections.length === 0) return;
+
+    console.log('[Memo] All sections empty — triggering auto-generation');
+    state.isGenerating = true;
+    showGeneratingOverlay();
+
+    try {
+        const result = await generateAllSectionsAPI(state.memo.id);
+        if (result && result.completed > 0) {
+            console.log('[Memo] Auto-generated', result.completed, 'sections');
+            // Reload memo to get generated content
+            await loadMemoFromAPI(state.memo.id);
+        } else {
+            console.log('[Memo] Auto-generation returned no content');
+        }
+    } catch (error) {
+        console.error('[Memo] Auto-generation failed:', error);
+    }
+
+    state.isGenerating = false;
+    hideGeneratingOverlay();
 }
 
 console.log('PE OS Memo Builder script loaded');
