@@ -164,27 +164,62 @@ async function sendMessage() {
     showTypingIndicator();
 
     // Try real API first
-    const apiResponse = await sendChatMessageAPI(content);
+    const apiResponse = await sendChatMessageAPI(content, state.activeSection);
 
     // Hide typing indicator
     hideTypingIndicator();
 
     if (apiResponse) {
-        // Use real API response
-        const aiMsg = {
-            id: apiResponse.id || `m${Date.now()}`,
-            role: 'assistant',
-            content: apiResponse.content.startsWith('<') ? apiResponse.content : `<p>${apiResponse.content}</p>`,
-            timestamp: apiResponse.timestamp ? formatTime(new Date(apiResponse.timestamp)) : 'Just now'
-        };
-        state.messages.push(aiMsg);
+        const action = apiResponse.action;
+
+        if (action === 'applied') {
+            // Render AI message then refresh the affected section and show undo toast
+            const aiMsg = {
+                id: apiResponse.id || `m${Date.now()}`,
+                role: 'assistant',
+                content: (() => {
+                    const text = apiResponse.content || apiResponse.message || '';
+                    return text.startsWith('<') ? text : `<p>${text}</p>`;
+                })(),
+                timestamp: apiResponse.timestamp ? formatTime(new Date(apiResponse.timestamp)) : 'Just now'
+            };
+            state.messages.push(aiMsg);
+            renderMessages();
+
+            const sectionId = apiResponse.sectionId;
+            if (sectionId) {
+                if (typeof pushUndo === 'function') {
+                    pushUndo(sectionId, apiResponse.previousContent, apiResponse.previousTableData, apiResponse.previousChartConfig);
+                }
+                await refreshSection(sectionId);
+            }
+            showUndoToast('Section updated');
+
+        } else if (action === 'confirm') {
+            // Render confirm message with Apply/Discard buttons (do NOT push to state.messages)
+            renderMessages();
+            renderConfirmMessage(apiResponse);
+
+        } else {
+            // info / undefined — render normally
+            const aiMsg = {
+                id: apiResponse.id || `m${Date.now()}`,
+                role: 'assistant',
+                content: (() => {
+                    const text = apiResponse.content || apiResponse.message || '';
+                    return text.startsWith('<') ? text : `<p>${text}</p>`;
+                })(),
+                timestamp: apiResponse.timestamp ? formatTime(new Date(apiResponse.timestamp)) : 'Just now'
+            };
+            state.messages.push(aiMsg);
+            renderMessages();
+        }
     } else {
         // Fall back to simulated response
         const aiResponse = generateAIResponse(content);
         state.messages.push(aiResponse);
+        renderMessages();
     }
-
-    renderMessages();
 }
 
 // ============================================================
@@ -389,6 +424,118 @@ function handleFileAttachment(e) {
 
     // Reset file input
     e.target.value = '';
+}
+
+// ============================================================
+// Confirm Message (Apply / Discard)
+// ============================================================
+function renderConfirmMessage(response) {
+    const chatContainer = document.getElementById('chat-messages');
+    if (!chatContainer) return;
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'flex gap-3 max-w-[85%]';
+
+    const typeLabel = response.type === 'table' ? 'table' :
+                      response.type === 'chart' ? 'chart' :
+                      response.type === 'new_section' ? 'new section' : 'content';
+
+    messageDiv.innerHTML =
+        '<div class="size-8 rounded-full bg-[#003366] shrink-0 flex items-center justify-center">' +
+            '<span class="material-symbols-rounded text-white text-sm">smart_toy</span>' +
+        '</div>' +
+        '<div class="flex flex-col gap-2">' +
+            '<span class="text-xs font-medium text-gray-500">AI Analyst</span>' +
+            '<div class="bg-white border border-gray-200 rounded-2xl rounded-tl-none p-4 shadow-sm">' +
+                '<p class="text-sm text-gray-800 mb-3">' + escapeHtml(response.content || response.message || '') + '</p>' +
+                '<div class="bg-gray-50 rounded-lg p-3 mb-3 text-xs text-gray-600 border">' +
+                    '<span class="font-medium">Proposed ' + typeLabel + '</span>' +
+                '</div>' +
+                '<div class="flex gap-2">' +
+                    '<button class="memo-apply-btn px-3 py-1.5 text-xs font-medium text-white rounded-lg" style="background-color: #003366">Apply</button>' +
+                    '<button class="memo-discard-btn px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">Discard</button>' +
+                '</div>' +
+            '</div>' +
+        '</div>';
+
+    chatContainer.appendChild(messageDiv);
+    chatContainer.scrollTop = chatContainer.scrollHeight;
+
+    // Wire up buttons
+    const applyBtn = messageDiv.querySelector('.memo-apply-btn');
+    const discardBtn = messageDiv.querySelector('.memo-discard-btn');
+
+    applyBtn.addEventListener('click', async () => {
+        applyBtn.disabled = true;
+        applyBtn.textContent = 'Applying...';
+        await applyConfirmedAction(response.sectionId, response);
+        applyBtn.textContent = 'Applied';
+        discardBtn.remove();
+    });
+
+    discardBtn.addEventListener('click', () => {
+        const actions = messageDiv.querySelector('.flex.gap-2');
+        if (actions) actions.innerHTML = '<span class="text-xs text-gray-400">Discarded</span>';
+    });
+}
+
+// ============================================================
+// Apply / Undo Helpers
+// ============================================================
+async function applyConfirmedAction(sectionId, response) {
+    if (!state.memo?.id || !sectionId) return;
+    const result = await applySectionActionAPI(state.memo.id, sectionId, {
+        content: response.preview,
+        tableData: response.tableData,
+        chartConfig: response.chartConfig,
+        insertPosition: response.insertPosition || 'replace',
+    });
+    if (result) {
+        if (typeof pushUndo === 'function') {
+            pushUndo(sectionId, result.previousContent, result.previousTableData, result.previousChartConfig);
+        }
+        await refreshSection(sectionId);
+        showUndoToast('Section updated');
+    }
+}
+
+async function refreshSection(sectionId) {
+    if (state.memo?.id) {
+        await loadMemoFromAPI(state.memo.id);
+        if (typeof renderSections === 'function') renderSections();
+        if (typeof renderSidebar === 'function') renderSidebar();
+    }
+}
+
+function showUndoToast(message) {
+    const existing = document.getElementById('undo-toast');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'undo-toast';
+    toast.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 bg-[#003366] text-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-3 z-50 text-sm';
+    toast.innerHTML = '<span>' + escapeHtml(message) + '</span>' +
+        '<button id="undo-btn" class="underline font-medium hover:text-blue-200">Undo</button>';
+    document.body.appendChild(toast);
+
+    document.getElementById('undo-btn').addEventListener('click', handleUndo);
+    setTimeout(() => { if (toast.parentNode) toast.remove(); }, 30000);
+}
+
+async function handleUndo() {
+    const undo = typeof popUndo === 'function' ? popUndo() : null;
+    if (!undo || !state.memo?.id) return;
+    await applySectionActionAPI(state.memo.id, undo.sectionId, {
+        content: undo.previousContent,
+        tableData: undo.previousTableData,
+        chartConfig: undo.previousChartConfig,
+        insertPosition: 'replace',
+    });
+    await refreshSection(undo.sectionId);
+    const toast = document.getElementById('undo-toast');
+    if (toast) toast.remove();
+    if (typeof showNotification === 'function') {
+        showNotification('Undo', 'Section reverted', 'success');
+    }
 }
 
 console.log('PE OS Memo Chat module loaded');
