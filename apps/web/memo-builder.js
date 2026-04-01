@@ -156,6 +156,8 @@ const state = {
     editingSection: null,
     aiPanelWidth: 400, // Default width
     isResizing: false,
+    undoStack: [],         // For undo on auto-applied changes (max 5)
+    isGenerating: false,   // True during auto-generation
 };
 
 // ============================================================
@@ -217,8 +219,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                 loadDemoData();
             }
         } else {
-            // Create new memo for this deal
+            // Create new memo for this deal — auto-generate sections from deal data
+            state.isGenerating = true;
+            hideLoadingState();
+            showGeneratingOverlay();
             const created = await createNewMemo({ dealId });
+            state.isGenerating = false;
+            hideGeneratingOverlay();
             if (!created) {
                 loadDemoData();
             }
@@ -346,13 +353,27 @@ function renderSidebar() {
 
 function setActiveSection(sectionId) {
     state.activeSection = sectionId;
-    renderSidebar();
+    // Update sidebar highlighting
+    document.querySelectorAll('[data-section-id]').forEach(el => {
+        const isActive = el.dataset.sectionId === sectionId;
+        el.classList.toggle('bg-blue-50', isActive);
+        el.classList.toggle('border-l-2', isActive);
+        el.classList.toggle('border-[#003366]', isActive);
+    });
+    // Update chat input placeholder
+    const section = (state.sections || []).find(s => s.id === sectionId);
+    const chatInput = document.getElementById('chat-input') || document.querySelector('textarea');
+    if (chatInput && section) {
+        chatInput.placeholder = `Ask about ${section.title}...`;
+    }
 
     // Scroll to section in editor
     const sectionEl = document.querySelector(`[data-content-section="${sectionId}"]`);
     if (sectionEl) {
         sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
+
+    renderSidebar();
 }
 
 // ============================================================
@@ -487,6 +508,40 @@ function getDragAfterElement(container, y) {
             return closest;
         }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+// ============================================================
+// Generating Overlay
+// ============================================================
+function showGeneratingOverlay() {
+    const overlay = document.createElement('div');
+    overlay.id = 'generating-overlay';
+    overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm';
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl p-8 shadow-2xl max-w-md text-center">
+            <div class="animate-spin rounded-full h-12 w-12 border-4 border-[#003366] border-t-transparent mx-auto mb-4"></div>
+            <h3 class="text-lg font-semibold text-[#003366] mb-2">Generating Investment Memo</h3>
+            <p class="text-sm text-gray-500" id="gen-status">Analyzing deal data and documents...</p>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+}
+
+function hideGeneratingOverlay() {
+    const overlay = document.getElementById('generating-overlay');
+    if (overlay) overlay.remove();
+}
+
+// ============================================================
+// Undo Stack
+// ============================================================
+function pushUndo(sectionId, previousContent, previousTableData, previousChartConfig) {
+    state.undoStack.push({ sectionId, previousContent, previousTableData, previousChartConfig, timestamp: Date.now() });
+    if (state.undoStack.length > 5) state.undoStack.shift();
+}
+
+function popUndo() {
+    return state.undoStack.pop();
 }
 
 console.log('PE OS Memo Builder script loaded');
