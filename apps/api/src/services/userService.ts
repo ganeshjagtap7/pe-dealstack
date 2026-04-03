@@ -1,5 +1,6 @@
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
+import { createSampleDeal } from './sampleDealService.js';
 
 /**
  * Find user by authId (or legacy id), or create if not exists.
@@ -70,6 +71,10 @@ export async function findOrCreateUser(authUser: {
         }
         organizationId = newOrg.id;
         log.info('Organization created on signup', { orgId: newOrg.id, name: authUser.firmName });
+        // Create sample deal for new org (fire-and-forget — never blocks signup)
+        createSampleDeal(newOrg.id, authUser.id).catch(err => {
+          log.error('Sample deal creation failed', err, { orgId: newOrg.id });
+        });
       }
     }
 
