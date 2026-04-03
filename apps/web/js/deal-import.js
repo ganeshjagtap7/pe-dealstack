@@ -30,6 +30,8 @@ function resetDealImport() {
   document.getElementById('import-file-name').classList.add('hidden');
   document.getElementById('import-upload-error').classList.add('hidden');
   document.getElementById('deal-import-file').value = '';
+  document.getElementById('import-result-errors').classList.add('hidden');
+  document.getElementById('import-result-errors').innerHTML = '';
   switchImportTab('upload');
 }
 
@@ -291,6 +293,7 @@ function updateMapping(select) {
 
 // ============================================
 // Step 2 → Step 3: Apply Mapping & Preview
+// SYNC: Transform logic duplicated from dealImportMapper.ts — keep both in sync
 // ============================================
 
 function applyMappingAndPreview() {
@@ -305,10 +308,10 @@ function applyMappingAndPreview() {
       if (!m) continue;
 
       let transformed = value;
-      if (m.transform === 'multiply_1000000') transformed = parseFloat(String(value).replace(/[$€£,]/g, '')) * 1000000 || null;
-      else if (m.transform === 'multiply_1000000000') transformed = parseFloat(String(value).replace(/[$€£,]/g, '')) * 1000000000 || null;
-      else if (m.transform === 'percentage_to_decimal') transformed = parseFloat(String(value).replace(/%/g, '')) / 100 || null;
-      else if (m.transform === 'strip_x_suffix') transformed = parseFloat(String(value).replace(/x$/i, '')) || null;
+      if (m.transform === 'multiply_1000000') { const n = parseFloat(String(value).replace(/[$€£,]/g, '')) * 1000000; transformed = isNaN(n) ? null : n; }
+      else if (m.transform === 'multiply_1000000000') { const n = parseFloat(String(value).replace(/[$€£,]/g, '')) * 1000000000; transformed = isNaN(n) ? null : n; }
+      else if (m.transform === 'percentage_to_decimal') { const n = parseFloat(String(value).replace(/%/g, '')) / 100; transformed = isNaN(n) ? null : n; }
+      else if (m.transform === 'strip_x_suffix') { const n = parseFloat(String(value).replace(/x$/i, '')); transformed = isNaN(n) ? null : n; }
 
       if (transformed === null || transformed === '') continue;
 

@@ -46,11 +46,14 @@ router.post('/analyze', upload.single('file'), async (req: Request, res: Respons
   try {
     let rows: Record<string, string>[];
     let source: 'csv' | 'excel' | 'paste';
+    let parseWarnings: string[] = [];
 
     if (req.file) {
       // Excel file upload
       source = 'excel';
-      rows = parseExcel(req.file.buffer);
+      const parsed = parseExcel(req.file.buffer);
+      rows = parsed.rows;
+      parseWarnings = parsed.warnings;
     } else {
       // CSV or pasted text (JSON body)
       const validation = analyzeTextSchema.safeParse(req.body);
@@ -74,6 +77,9 @@ router.post('/analyze', upload.single('file'), async (req: Request, res: Respons
     }
 
     const result = await analyzeImportData(rows, source);
+
+    // Merge parse-level warnings (e.g., multi-sheet Excel) with AI warnings
+    result.warnings = [...parseWarnings, ...result.warnings];
 
     res.json({
       success: true,

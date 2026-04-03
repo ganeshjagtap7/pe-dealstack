@@ -62,7 +62,7 @@ export function parseCSV(text: string): Record<string, string>[] {
   }
 }
 
-export function parseExcel(buffer: Buffer): Record<string, string>[] {
+export function parseExcel(buffer: Buffer): { rows: Record<string, string>[]; warnings: string[] } {
   try {
     const workbook = XLSX.read(buffer, { type: 'buffer' });
     const sheetName = workbook.SheetNames[0];
@@ -73,11 +73,13 @@ export function parseExcel(buffer: Buffer): Record<string, string>[] {
       raw: false,
     });
 
+    const warnings: string[] = [];
     if (workbook.SheetNames.length > 1) {
+      warnings.push(`Excel file has ${workbook.SheetNames.length} sheets — using first sheet "${sheetName}"`);
       log.info(`Excel file has ${workbook.SheetNames.length} sheets, using first: "${sheetName}"`);
     }
 
-    return rows;
+    return { rows, warnings };
   } catch (err) {
     log.error('Excel parse error', err);
     throw new Error('Failed to parse Excel file. Please check the file format.');
@@ -231,6 +233,7 @@ Map each column to our Deal schema. Return JSON only.`;
 
 // ============================================
 // Row Transformation
+// SYNC: Transform logic duplicated in apps/web/js/deal-import.js — keep both in sync
 // ============================================
 
 const VALID_STAGES = [
@@ -247,16 +250,24 @@ function applyTransform(value: string, transform?: string): any {
   let cleaned = value.replace(/[$€£,]/g, '').trim();
 
   switch (transform) {
-    case 'multiply_1000000':
-      return parseFloat(cleaned) * 1_000_000 || null;
-    case 'multiply_1000000000':
-      return parseFloat(cleaned) * 1_000_000_000 || null;
-    case 'percentage_to_decimal':
+    case 'multiply_1000000': {
+      const num = parseFloat(cleaned) * 1_000_000;
+      return isNaN(num) ? null : num;
+    }
+    case 'multiply_1000000000': {
+      const num = parseFloat(cleaned) * 1_000_000_000;
+      return isNaN(num) ? null : num;
+    }
+    case 'percentage_to_decimal': {
       cleaned = cleaned.replace(/%/g, '');
-      return parseFloat(cleaned) / 100 || null;
-    case 'strip_x_suffix':
+      const num = parseFloat(cleaned) / 100;
+      return isNaN(num) ? null : num;
+    }
+    case 'strip_x_suffix': {
       cleaned = cleaned.replace(/x$/i, '');
-      return parseFloat(cleaned) || null;
+      const num = parseFloat(cleaned);
+      return isNaN(num) ? null : num;
+    }
     default:
       return value.trim();
   }
