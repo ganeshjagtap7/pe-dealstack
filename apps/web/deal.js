@@ -200,17 +200,7 @@ function populateDealPage(deal) {
     const iconContainer = document.getElementById('deal-icon');
     if (iconContainer && deal.icon) iconContainer.textContent = deal.icon;
 
-    // Update stage badge
-    const stageBadge = document.getElementById('deal-stage-badge');
-    if (stageBadge) {
-        stageBadge.textContent = getStageLabel(deal.stage);
-    }
-
-    // Update industry badge
-    const industryBadge = document.getElementById('deal-industry-badge');
-    if (industryBadge && deal.industry) {
-        industryBadge.textContent = deal.industry;
-    }
+    // Stage and industry are shown in breadcrumb and pipeline — no duplicate badges needed
 
     // Update financial metrics with graceful empty states
     const revenueEl = document.getElementById('deal-revenue');

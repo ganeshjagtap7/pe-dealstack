@@ -263,6 +263,11 @@ function initContextSettings() {
 }
 
 function showContextSettings() {
+    // Load saved preferences
+    const saved = JSON.parse(localStorage.getItem('pe-ai-settings') || '{}');
+    const responseStyle = saved.responseStyle || 'detailed';
+    const includeCitations = saved.includeCitations !== false;
+
     const modal = document.createElement('div');
     modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4';
     modal.innerHTML = `
@@ -279,46 +284,46 @@ function showContextSettings() {
                 <div class="space-y-4">
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">AI Model</label>
-                        <select class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm">
-                            <option selected>GPT-4 Turbo (Recommended)</option>
-                            <option>GPT-4</option>
-                            <option>Claude 3 Opus</option>
-                        </select>
+                        <div class="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg">
+                            <span class="material-symbols-outlined text-primary text-lg">smart_toy</span>
+                            <span class="text-sm font-medium text-slate-700">GPT-4o (ReAct Agent)</span>
+                            <span class="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-green-50 text-green-600 border border-green-200">Active</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1.5">Model is configured by your admin. Contact your organization admin to change.</p>
                     </div>
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Response Style</label>
-                        <select class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm">
-                            <option selected>Detailed Analysis</option>
-                            <option>Concise Summaries</option>
-                            <option>Executive Briefing</option>
+                        <select id="ai-response-style" class="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+                            <option value="detailed" ${responseStyle === 'detailed' ? 'selected' : ''}>Detailed Analysis</option>
+                            <option value="concise" ${responseStyle === 'concise' ? 'selected' : ''}>Concise Summaries</option>
+                            <option value="executive" ${responseStyle === 'executive' ? 'selected' : ''}>Executive Briefing</option>
                         </select>
                     </div>
                     <div>
                         <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked class="rounded border-slate-300 text-primary">
-                            <span class="text-sm text-slate-700">Include citations</span>
-                        </label>
-                    </div>
-                    <div>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" checked class="rounded border-slate-300 text-primary">
-                            <span class="text-sm text-slate-700">Auto-analyze new documents</span>
-                        </label>
-                    </div>
-                    <div>
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" class="rounded border-slate-300 text-primary">
-                            <span class="text-sm text-slate-700">Enable voice input</span>
+                            <input type="checkbox" id="ai-citations" ${includeCitations ? 'checked' : ''} class="rounded border-slate-300 text-primary">
+                            <span class="text-sm text-slate-700">Include citations from documents</span>
                         </label>
                     </div>
                 </div>
-                <button onclick="this.closest('.fixed').remove(); showNotification('Settings Saved', 'AI context settings updated', 'success');" class="w-full mt-6 bg-primary hover:bg-blue-600 text-white font-semibold py-2.5 rounded-lg transition-colors">
+                <button id="ai-settings-save" class="w-full mt-6 text-white font-semibold py-2.5 rounded-lg transition-colors" style="background-color: #003366;">
                     Save Settings
                 </button>
             </div>
         </div>
     `;
     document.body.appendChild(modal);
+
+    // Save handler
+    modal.querySelector('#ai-settings-save').addEventListener('click', () => {
+        const settings = {
+            responseStyle: modal.querySelector('#ai-response-style').value,
+            includeCitations: modal.querySelector('#ai-citations').checked,
+        };
+        localStorage.setItem('pe-ai-settings', JSON.stringify(settings));
+        modal.remove();
+        showNotification('Settings Saved', 'AI preferences updated', 'success');
+    });
 
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.remove();

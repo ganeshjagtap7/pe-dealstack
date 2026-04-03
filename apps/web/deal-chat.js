@@ -134,9 +134,9 @@ function initChatInterface() {
 
                     // Show error-styled message if agent returned an error
                     if (data.model === 'error') {
-                        addAIResponseFromAPI(`⚠️ ${data.response}`, null);
+                        addAIResponseFromAPI(`⚠️ ${data.response}`, null, null);
                     } else {
-                        addAIResponseFromAPI(data.response, data.action);
+                        addAIResponseFromAPI(data.response, data.action, data.model);
                         // Onboarding: mark tryDealChat step on first successful chat
                         if (window.OnboardingAPI) {
                             OnboardingAPI.completeStep('tryDealChat');
@@ -281,7 +281,7 @@ function addAIResponseFromHistory(content) {
             <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
         </div>
         <div class="flex flex-col gap-1">
-            <span class="text-xs font-bold text-text-muted ml-1">PE OS AI <span class="text-primary/60 font-normal">• GPT-4</span></span>
+            <span class="text-xs font-bold text-text-muted ml-1">PE OS AI</span>
             <div class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
                 ${formattedResponse}
             </div>
@@ -354,7 +354,7 @@ function addSystemMessage(message, icon = 'info') {
     scrollToBottom();
 }
 
-function addAIResponseFromAPI(responseText, action = null) {
+function addAIResponseFromAPI(responseText, action = null, modelName = null) {
     const chatContainer = document.getElementById('chat-messages');
 
     // Format the response with markdown parsing
@@ -393,7 +393,7 @@ function addAIResponseFromAPI(responseText, action = null) {
             <span class="material-symbols-outlined text-white text-lg">smart_toy</span>
         </div>
         <div class="flex flex-col gap-1">
-            <span class="text-xs font-bold text-text-muted ml-1">PE OS AI <span class="text-primary/60 font-normal">• GPT-4</span></span>
+            <span class="text-xs font-bold text-text-muted ml-1">PE OS AI${modelName ? ` <span class="text-primary/60 font-normal">• ${modelName}</span>` : ''}</span>
             <div class="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
                 ${formattedResponse}
                 ${actionButtonHtml}
