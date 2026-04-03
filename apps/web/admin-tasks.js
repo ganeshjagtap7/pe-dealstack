@@ -8,6 +8,9 @@
 
 // ─── Task Table ──────────────────────────────────────────────
 
+let showAllTasks = false;
+const TASK_PAGE_SIZE = 20;
+
 function renderTaskTable() {
     const tbody = document.getElementById('task-table-body');
     if (!tbody) return;
@@ -18,36 +21,88 @@ function renderTaskTable() {
                 <td colspan="6" class="px-5 py-12 text-center text-text-muted">
                     <span class="material-symbols-outlined text-[32px] mb-2 block">task_alt</span>
                     <p class="text-sm font-medium">No tasks yet</p>
-                    <p class="text-xs mt-1">Create a task to get started</p>
+                    <p class="text-xs mt-1 mb-3">Create your first task to start tracking work</p>
+                    <button onclick="document.getElementById('create-task-btn')?.click()" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors" style="background-color: #003366">
+                        <span class="material-symbols-outlined text-[16px]">add_task</span>
+                        Create Task
+                    </button>
                 </td>
             </tr>`;
+        updateToggleAllButton();
         return;
     }
 
-    tbody.innerHTML = allTasks.map(task => {
-        const isOverdue = task.dueDate && new Date(task.dueDate) < new Date() && task.status !== 'COMPLETED';
+    const displayTasks = showAllTasks ? allTasks : allTasks.slice(0, TASK_PAGE_SIZE);
+    const now = new Date();
+
+    tbody.innerHTML = displayTasks.map(task => {
+        const isOverdue = task.dueDate && new Date(task.dueDate) < now && task.status !== 'COMPLETED';
         const assignee = task.assignee;
         const deal = task.deal;
         const initials = assignee ? getInitials(assignee.name || assignee.email) : '?';
 
         return `
             <tr class="hover:bg-gray-50 transition-colors ${isOverdue ? 'bg-red-50/30' : ''}">
-                <td class="px-5 py-4 font-medium text-text-main">${escapeHtml(task.title)}</td>
+                <td class="px-5 py-4 font-medium text-text-main">
+                    ${deal
+                        ? `<a href="/deal.html?id=${deal.id}" class="hover:text-primary hover:underline transition-colors">${escapeHtml(task.title)}</a>`
+                        : escapeHtml(task.title)}
+                </td>
                 <td class="px-5 py-4">${renderPriorityBadge(task.priority)}</td>
                 <td class="px-5 py-4 ${isOverdue ? 'text-accent-danger font-medium' : 'text-text-main'}">${formatDueDate(task.dueDate, isOverdue)}</td>
                 <td class="px-5 py-4">
                     ${assignee ? `
                     <div class="flex items-center gap-2">
-                        <div class="w-6 h-6 rounded-full bg-primary text-white text-[10px] font-medium flex items-center justify-center">${initials}</div>
+                        <div class="w-6 h-6 rounded-full text-white text-[10px] font-medium flex items-center justify-center" style="background-color: #003366">${initials}</div>
                         <span class="text-text-secondary">${escapeHtml(assignee.name || assignee.email?.split('@')[0] || 'Unknown')}</span>
                     </div>` : '<span class="text-text-muted text-xs">Unassigned</span>'}
                 </td>
                 <td class="px-5 py-4">
-                    ${deal ? `<span class="text-primary font-medium cursor-pointer hover:underline" onclick="window.location.href='/deal.html?id=${deal.id}'">${escapeHtml(deal.name)}</span>` : '<span class="text-text-muted text-xs">\u2014</span>'}
+                    ${deal ? `<a href="/deal.html?id=${deal.id}" class="text-primary font-medium hover:underline">${escapeHtml(deal.name)}</a>` : '<span class="text-text-muted text-xs">&mdash;</span>'}
                 </td>
-                <td class="px-5 py-4">${renderStatusBadge(task.status, isOverdue)}</td>
+                <td class="px-5 py-4">
+                    <div class="relative inline-block">
+                        <button onclick="toggleStatusDropdown(event, '${task.id}')" class="cursor-pointer hover:opacity-80 transition-opacity">
+                            ${renderStatusBadge(task.status, isOverdue)}
+                        </button>
+                        <div id="status-dropdown-${task.id}" class="hidden absolute right-0 top-full mt-1 w-40 bg-white rounded-lg border border-border-subtle shadow-lg z-50">
+                            <div class="py-1">
+                                ${['PENDING', 'IN_PROGRESS', 'COMPLETED', 'STUCK'].map(s => `
+                                    <button onclick="updateTaskStatus('${task.id}', '${s}')" class="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 transition-colors ${task.status === s ? 'text-primary font-medium bg-primary-light/30' : 'text-text-main'}">
+                                        ${renderStatusBadge(s, false)}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </td>
             </tr>`;
     }).join('');
+
+    updateToggleAllButton();
+}
+
+function updateToggleAllButton() {
+    const btn = document.getElementById('toggle-all-tasks');
+    if (!btn) return;
+    if (allTasks.length <= TASK_PAGE_SIZE) {
+        btn.style.display = 'none';
+    } else {
+        btn.style.display = '';
+        btn.innerHTML = showAllTasks
+            ? 'Show recent <span class="material-symbols-outlined text-[16px]">expand_less</span>'
+            : `View all ${allTasks.length} tasks <span class="material-symbols-outlined text-[16px]">arrow_forward</span>`;
+    }
+}
+
+function initToggleAllTasks() {
+    const btn = document.getElementById('toggle-all-tasks');
+    if (btn) {
+        btn.addEventListener('click', () => {
+            showAllTasks = !showAllTasks;
+            renderTaskTable();
+        });
+    }
 }
 
 function renderPriorityBadge(priority) {
@@ -346,3 +401,54 @@ function applyTaskFilterSort() {
             </tr>`;
     }).join('');
 }
+
+// ─── Inline Status Update ────────────────────────────────────
+
+function toggleStatusDropdown(event, taskId) {
+    event.stopPropagation();
+    // Close all other dropdowns
+    document.querySelectorAll('[id^="status-dropdown-"]').forEach(d => d.classList.add('hidden'));
+    const dropdown = document.getElementById(`status-dropdown-${taskId}`);
+    if (dropdown) dropdown.classList.toggle('hidden');
+}
+
+async function updateTaskStatus(taskId, newStatus) {
+    // Close dropdown
+    document.querySelectorAll('[id^="status-dropdown-"]').forEach(d => d.classList.add('hidden'));
+
+    // Optimistic update: update local task immediately
+    const task = allTasks.find(t => t.id === taskId);
+    if (!task) return;
+    const oldStatus = task.status;
+    task.status = newStatus;
+    renderTaskTable();
+    renderStatsCards();
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/tasks/${taskId}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: newStatus }),
+        });
+
+        if (!response.ok) {
+            // Revert on failure
+            task.status = oldStatus;
+            renderTaskTable();
+            renderStatsCards();
+            showNotification('Failed to update task status', 'error');
+        } else {
+            showNotification(`Task marked as ${newStatus.replace('_', ' ').toLowerCase()}`, 'success');
+        }
+    } catch (e) {
+        task.status = oldStatus;
+        renderTaskTable();
+        renderStatsCards();
+        showNotification('Failed to update task status', 'error');
+    }
+}
+
+// Close status dropdowns on outside click
+document.addEventListener('click', () => {
+    document.querySelectorAll('[id^="status-dropdown-"]').forEach(d => d.classList.add('hidden'));
+});

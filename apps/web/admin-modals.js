@@ -105,6 +105,7 @@ function initModals() {
 
     // Task filter/sort buttons (defined in admin-tasks.js)
     initTaskFilterSort();
+    initToggleAllTasks();
 
     // Escape key
     document.addEventListener('keydown', (e) => {
