@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { classifyAIError } from '../utils/aiErrors.js';
-import { getOrgId } from '../middleware/orgScope.js';
+import { getOrgId, verifyDealAccess, verifyContactAccess } from '../middleware/orgScope.js';
 import { supabase } from '../supabase.js';
 
 // Agent imports
@@ -75,6 +75,16 @@ router.post('/ai/meeting-prep', async (req, res) => {
     const orgId = getOrgId(req);
     const input = meetingPrepSchema.parse(req.body);
 
+    // Verify deal belongs to user's org
+    const deal = await verifyDealAccess(input.dealId, orgId);
+    if (!deal) return res.status(404).json({ error: 'Deal not found' });
+
+    // Verify contact if provided
+    if (input.contactId) {
+      const contact = await verifyContactAccess(input.contactId, orgId);
+      if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    }
+
     log.info('Generating meeting prep', { dealId: input.dealId });
 
     const brief = await generateMeetingPrep({
@@ -131,6 +141,18 @@ router.post('/ai/draft-email', async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const input = emailDraftSchema.parse(req.body);
+
+    // Verify deal belongs to user's org (if provided)
+    if (input.dealId) {
+      const deal = await verifyDealAccess(input.dealId, orgId);
+      if (!deal) return res.status(404).json({ error: 'Deal not found' });
+    }
+
+    // Verify contact belongs to user's org (if provided)
+    if (input.contactId) {
+      const contact = await verifyContactAccess(input.contactId, orgId);
+      if (!contact) return res.status(404).json({ error: 'Contact not found' });
+    }
 
     log.info('Drafting email', { purpose: input.purpose, dealId: input.dealId });
 
