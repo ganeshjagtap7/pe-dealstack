@@ -12,6 +12,7 @@ import { AICache } from '../services/aiCache.js';
 import { log } from '../utils/logger.js';
 import { notifyDealTeam, resolveUserId } from './notifications.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { tryCompleteOnboardingStep } from './onboarding.js';
 
 // Use createRequire to load CommonJS pdf-parse v1.x module
 const require = createRequire(import.meta.url);
@@ -373,6 +374,12 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         .catch(err => {
           log.error('RAG embedding error', err, { documentName });
         });
+    }
+
+    // Onboarding: mark uploadDocument step complete (fire-and-forget)
+    const uploadUserId = (req as any).userId;
+    if (uploadUserId) {
+      tryCompleteOnboardingStep(uploadUserId, 'uploadDocument');
     }
 
     res.status(201).json({ ...document, dealUpdated, updatedFields });
