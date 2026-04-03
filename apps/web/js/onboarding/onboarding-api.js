@@ -58,6 +58,19 @@ window.OnboardingAPI = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ step: stepId }),
             });
+
+            // Check if all steps are now complete — trigger celebration
+            if (this._cache && this._cache.steps) {
+                const allDone = Object.values(this._cache.steps).every(Boolean);
+                if (allDone) {
+                    if (window.triggerOnboardingCelebration) {
+                        triggerOnboardingCelebration();
+                    }
+                    if (window.showNotification) {
+                        showNotification('Onboarding Complete!', 'You\'re all set — PE OS is ready for action.', 'success');
+                    }
+                }
+            }
         } catch (error) {
             console.warn('[Onboarding] Failed to save step:', stepId, error.message);
         }
