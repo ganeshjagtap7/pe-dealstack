@@ -157,6 +157,14 @@
                     </div>
                 </div>
                 <div class="flex items-center gap-4">
+                    <button id="import-deals-btn"
+                        class="flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-colors text-sm font-medium border-2"
+                        style="border-color: #003366; color: #003366; background: white;"
+                        onmouseover="this.style.background='#003366'; this.style.color='white';"
+                        onmouseout="this.style.background='white'; this.style.color='#003366';">
+                        <span class="material-symbols-outlined text-[18px]">upload_file</span>
+                        Import Deals
+                    </button>
                     <button id="ingest-btn"
                         class="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
                         <span class="material-symbols-outlined text-[18px]">smart_toy</span>
@@ -499,6 +507,139 @@
         </div>
     </div>
 
+    <!-- Deal Import Modal -->
+    <div id="deal-import-modal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div class="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-[slideIn_0.2s_ease-out]">
+        <!-- Header -->
+        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-[22px]" style="color: #003366;">upload_file</span>
+            <h2 class="text-lg font-bold text-slate-900">Import Deals</h2>
+          </div>
+          <button onclick="closeDealImportModal()" class="p-1 rounded-lg hover:bg-slate-100 transition-colors">
+            <span class="material-symbols-outlined text-slate-400">close</span>
+          </button>
+        </div>
+
+        <!-- Step Indicator -->
+        <div class="px-6 pt-4">
+          <div id="import-steps-indicator" class="flex items-center gap-2 text-xs font-medium text-slate-400">
+            <span id="step-ind-1" class="px-2 py-1 rounded" style="background: #003366; color: white;">1. Upload</span>
+            <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+            <span id="step-ind-2" class="px-2 py-1 rounded bg-slate-100">2. Map Columns</span>
+            <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+            <span id="step-ind-3" class="px-2 py-1 rounded bg-slate-100">3. Preview</span>
+            <span class="material-symbols-outlined text-[14px]">chevron_right</span>
+            <span id="step-ind-4" class="px-2 py-1 rounded bg-slate-100">4. Result</span>
+          </div>
+        </div>
+
+        <!-- Step 1: Upload -->
+        <div id="import-step-1" class="p-6">
+          <!-- Tabs -->
+          <div class="flex gap-2 mb-4">
+            <button id="tab-upload" onclick="switchImportTab('upload')" class="px-4 py-2 text-sm font-medium rounded-lg" style="background: #003366; color: white;">
+              Upload File
+            </button>
+            <button id="tab-paste" onclick="switchImportTab('paste')" class="px-4 py-2 text-sm font-medium rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-200">
+              Paste Data
+            </button>
+          </div>
+
+          <!-- Upload Tab -->
+          <div id="upload-tab-content">
+            <div id="import-dropzone"
+              class="border-2 border-dashed border-slate-300 rounded-xl p-10 text-center hover:border-blue-400 transition-colors cursor-pointer"
+              onclick="document.getElementById('deal-import-file').click()"
+              ondragover="event.preventDefault(); this.classList.add('border-blue-500', 'bg-blue-50');"
+              ondragleave="this.classList.remove('border-blue-500', 'bg-blue-50');"
+              ondrop="event.preventDefault(); this.classList.remove('border-blue-500', 'bg-blue-50'); handleDealImportFile(event.dataTransfer.files[0]);">
+              <span class="material-symbols-outlined text-slate-400 text-4xl mb-3">cloud_upload</span>
+              <p class="text-sm font-medium text-slate-900 mb-1">Drop your CSV or Excel file here, or click to browse</p>
+              <p class="text-xs text-slate-400">Supports .csv and .xlsx files up to 5MB</p>
+            </div>
+            <input id="deal-import-file" type="file" accept=".csv,.xlsx" class="hidden" onchange="handleDealImportFile(this.files[0])" />
+            <div id="import-file-name" class="hidden mt-3 flex items-center gap-2 text-sm text-slate-600">
+              <span class="material-symbols-outlined text-[16px]">description</span>
+              <span id="import-file-label"></span>
+              <button onclick="clearDealImportFile()" class="ml-auto text-slate-400 hover:text-red-500">
+                <span class="material-symbols-outlined text-[16px]">close</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Paste Tab -->
+          <div id="paste-tab-content" class="hidden">
+            <textarea id="import-paste-area"
+              class="w-full h-48 p-4 border border-slate-300 rounded-xl text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-300"
+              placeholder="Paste your deal data here — from Notion, Excel, Google Sheets, or any table.
+
+Example:
+Company	Deal Size	Stage	Industry
+Acme Corp	$50M	Due Diligence	Technology
+Beta Inc	$25M	Initial Review	Healthcare"></textarea>
+          </div>
+
+          <!-- Error message -->
+          <div id="import-upload-error" class="hidden mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+
+          <!-- Analyze button -->
+          <div class="mt-4 flex justify-end">
+            <button id="import-analyze-btn" onclick="analyzeDealImport()" class="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white transition-colors" style="background: #003366;">
+              <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
+              Analyze with AI
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 2: Column Mapping -->
+        <div id="import-step-2" class="hidden p-6">
+          <p class="text-sm text-slate-500 mb-4">AI mapped your columns. Review and adjust if needed. Unmapped columns will be saved as custom fields.</p>
+          <div id="mapping-container" class="space-y-3 max-h-[400px] overflow-y-auto"></div>
+          <div class="mt-4 flex justify-between">
+            <button onclick="goToImportStep(1)" class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Back</button>
+            <button id="import-continue-btn" onclick="applyMappingAndPreview()" class="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white" style="background: #003366;">
+              Continue to Preview
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 3: Data Preview -->
+        <div id="import-step-3" class="hidden p-6">
+          <div id="preview-summary" class="mb-4 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm"></div>
+          <div class="overflow-x-auto max-h-[350px] overflow-y-auto border border-slate-200 rounded-lg">
+            <table class="w-full text-sm">
+              <thead id="preview-thead" class="bg-slate-50 sticky top-0"></thead>
+              <tbody id="preview-tbody"></tbody>
+            </table>
+          </div>
+          <div class="mt-4 flex justify-between">
+            <button onclick="goToImportStep(2)" class="px-4 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200">Back</button>
+            <button id="import-submit-btn" onclick="submitDealImport()" class="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium text-white" style="background: #003366;">
+              <span class="material-symbols-outlined text-[18px]">upload</span>
+              <span id="import-submit-label">Import Deals</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Step 4: Result -->
+        <div id="import-step-4" class="hidden p-6 text-center">
+          <span id="import-result-icon" class="material-symbols-outlined text-5xl mb-3" style="color: #003366;">check_circle</span>
+          <h3 id="import-result-title" class="text-lg font-bold text-slate-900 mb-2"></h3>
+          <p id="import-result-detail" class="text-sm text-slate-500 mb-2"></p>
+          <div id="import-result-errors" class="hidden mt-3 text-left max-h-[200px] overflow-y-auto"></div>
+          <div class="mt-6 flex justify-center gap-3">
+            <button onclick="closeDealImportModal(); location.reload();" class="px-5 py-2.5 rounded-lg text-sm font-medium text-white" style="background: #003366;">
+              View in Pipeline
+            </button>
+            <button onclick="resetDealImport()" class="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200">
+              Import More
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Load shared layout and auth -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
@@ -521,6 +662,7 @@
 <script src="crm-filters.js"></script>
 <script src="crm-cards.js"></script>
 <script src="crm-actions.js"></script>
+<script src="js/deal-import.js"></script>
 <script src="crm.js"></script>
 </body>
 
