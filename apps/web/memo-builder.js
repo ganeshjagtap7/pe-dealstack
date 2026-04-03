@@ -260,6 +260,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     renderSidebar();
     renderSections();
+    if (typeof renderChartsForAllSections === 'function') renderChartsForAllSections();
     renderMessages();
     renderPromptChips();
 

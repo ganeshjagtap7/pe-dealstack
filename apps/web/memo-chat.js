@@ -455,6 +455,7 @@ async function refreshSection(sectionId) {
     if (state.memo?.id) {
         await loadMemoFromAPI(state.memo.id);
         if (typeof renderSections === 'function') renderSections();
+        if (typeof renderChartsForAllSections === 'function') renderChartsForAllSections();
         if (typeof renderSidebar === 'function') renderSidebar();
     }
 }
