@@ -318,20 +318,48 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
   // ── 9. generate_chart ────────────────────────────────────────────────────
 
   const generateChartTool = tool(
-    async ({ sectionId, chartDescription }) => {
+    async ({ sectionId, chartType, title, labels, datasets }) => {
+      // Build a real Chart.js config from the structured input
+      const chartConfig = {
+        type: chartType || 'bar',
+        title: title || 'Chart',
+        data: {
+          labels: labels || [],
+          datasets: (datasets || []).map((ds: any, i: number) => ({
+            label: ds.label || `Series ${i + 1}`,
+            data: ds.data || [],
+            ...(ds.type ? { type: ds.type } : {}),
+            ...(ds.yAxisID ? { yAxisID: ds.yAxisID } : {}),
+          })),
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { position: 'bottom' as const } },
+        },
+      };
+
       return JSON.stringify({
         action: 'confirm',
         sectionId,
-        chartDescription,
+        chartConfig,
+        preview: `<p><em>Proposed chart: ${title || chartType + ' chart'}</em></p>`,
         type: 'chart',
       });
     },
     {
       name: 'generate_chart',
-      description: 'Propose generating a Chart.js chart for a memo section (e.g., revenue trend bar chart, EBITDA margin line chart, returns sensitivity). Returns a confirmation request before the chart config is created.',
+      description: 'Generate a Chart.js chart for a memo section. You MUST provide the actual data labels and datasets with numeric values. Query financial data first using get_deal_financials if needed.',
       schema: z.object({
         sectionId: z.string().describe('UUID of the memo section where the chart will be inserted'),
-        chartDescription: z.string().describe('Description of the chart to generate (e.g., "Bar chart showing Revenue and EBITDA margin trend from FY2021 to LTM")'),
+        chartType: z.enum(['bar', 'line', 'pie', 'doughnut']).describe('Chart type'),
+        title: z.string().describe('Chart title (e.g., "Revenue & EBITDA Trend")'),
+        labels: z.array(z.string()).describe('X-axis labels (e.g., ["FY2021", "FY2022", "FY2023"])'),
+        datasets: z.array(z.object({
+          label: z.string().describe('Dataset label (e.g., "Revenue")'),
+          data: z.array(z.number()).describe('Numeric data points matching labels'),
+          type: z.string().optional().describe('Override chart type for this dataset (e.g., "line" for mixed charts)'),
+          yAxisID: z.string().optional().describe('Y-axis ID for dual-axis charts'),
+        })).describe('One or more data series to plot'),
       }),
     }
   );

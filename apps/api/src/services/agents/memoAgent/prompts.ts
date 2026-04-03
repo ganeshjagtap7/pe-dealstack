@@ -14,7 +14,7 @@ export const MEMO_SYSTEM_PROMPT = `You are a senior private equity analyst at a 
 - Section headers: use <h3> tags
 - Highlight critical findings in <strong> tags
 - Use <span class="highlight-positive"> for positive signals and <span class="highlight-negative"> for risks
-- Never fabricate data. If data is missing or unavailable, write "[Data needed: description of what is required]"
+- Never fabricate data. If data is missing, write around it gracefully — use phrases like "based on available data", "subject to confirmation", or simply omit the metric. Do NOT insert bracketed placeholders like "[Data needed: ...]" in the memo body
 - Write in third-person professional tone ("The Company", "Management", "The Target")
 - Cite source documents when referencing specific figures (e.g., "(per FY2023 CIM)")`;
 
@@ -82,7 +82,7 @@ export const SECTION_PROMPTS: Record<SectionType, SectionPromptConfig> = {
 4. **Critical Risks**: The 1-2 most significant risks and how they are mitigated
 5. **Recommendation**: Clear BUY / PASS / CONDITIONAL recommendation with one-line rationale
 
-Format as HTML with <strong> tags on key metrics. Use "[Data needed: ...]" for any missing figures. Do not exceed 400 words.`,
+Format as HTML with <strong> tags on key metrics. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for any missing figures. Do not exceed 400 words.`,
     requiresFinancials: true,
     requiresDocuments: false,
     includeTableData: false,
@@ -100,7 +100,7 @@ Format as HTML with <strong> tags on key metrics. Use "[Data needed: ...]" for a
 5. **Geographic Footprint**: Where the company operates, revenue by geography if applicable
 6. **Headcount & Org Structure**: Total employees, key hires, and any notable organizational gaps
 
-Format with <h3> subheadings for each area. Use "[Data needed: ...]" for missing information. Write in third-person ("The Company", "Management").`,
+Format with <h3> subheadings for each area. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing information. Write in third-person ("The Company", "Management").`,
     requiresFinancials: false,
     requiresDocuments: true,
     includeTableData: false,
@@ -160,7 +160,7 @@ The content HTML should cover:
 - Working capital dynamics and CapEx intensity
 - Any seasonality or cyclicality patterns
 
-Use "[Data needed: ...]" for missing figures. Always use $M and FY labels.`,
+Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing figures. Always use $M and FY labels.`,
     requiresFinancials: true,
     requiresDocuments: false,
     includeTableData: true,
@@ -179,7 +179,7 @@ Cover:
 5. **Working Capital Normalization**: Identify any working capital manipulation (e.g., stretching payables, accelerating collections pre-close)
 6. **QoE Score**: Provide an overall quality score — High / Medium / Low — with one-sentence rationale
 
-Format with <h3> subheadings. Flag any concerns in <span class="highlight-negative"> tags. Use "[Data needed: ...]" for missing data. Never fabricate add-back amounts.`,
+Format with <h3> subheadings. Flag any concerns in <span class="highlight-negative"> tags. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing data. Never fabricate add-back amounts.`,
     requiresFinancials: true,
     requiresDocuments: true,
     includeTableData: true,
@@ -198,7 +198,7 @@ Format with <h3> subheadings. Flag any concerns in <span class="highlight-negati
 6. **Pricing Dynamics**: Pricing power in the market, commodity vs. differentiated pricing, inflation pass-through ability
 7. **Regulatory Environment**: Key regulations affecting the market, pending regulatory changes, compliance costs
 
-Use data from the deal documents where available. Use "[Data needed: ...]" for missing market data. Format with <h3> subheadings and <ul>/<li> for lists of drivers/headwinds.`,
+Use data from the deal documents where available. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing market data. Format with <h3> subheadings and <ul>/<li> for lists of drivers/headwinds.`,
     requiresFinancials: false,
     requiresDocuments: true,
     includeTableData: false,
@@ -222,7 +222,7 @@ Use data from the deal documents where available. Use "[Data needed: ...]" for m
 5. **Positioning**: How the company is positioned (cost leader / differentiator / niche specialist) and whether that positioning is defensible
 6. **Win/Loss Dynamics**: Any data on competitive win rates, reasons for losses, switching trends
 
-Format with <h3> subheadings. Use <strong> on the company's key moats. Use "[Data needed: ...]" for missing competitive data.`,
+Format with <h3> subheadings. Use <strong> on the company's key moats. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing competitive data.`,
     requiresFinancials: false,
     requiresDocuments: true,
     includeTableData: false,
@@ -243,7 +243,7 @@ Cover:
 7. **PE Experience**: Has management worked with PE sponsors before? Any concerns about PE ownership dynamics?
 8. **Assessment Rating**: Strong / Adequate / Concerns — with one-sentence rationale
 
-Format with <h3> subheadings. Highlight concerns in <span class="highlight-negative">. Use "[Data needed: ...]" for missing management information.`,
+Format with <h3> subheadings. Highlight concerns in <span class="highlight-negative">. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing management information.`,
     requiresFinancials: false,
     requiresDocuments: true,
     includeTableData: false,
@@ -264,7 +264,7 @@ Cover:
 7. **Quick Wins**: Operational improvements achievable within 12-18 months post-close (low-hanging fruit)
 8. **Strategic Initiatives**: Longer-term operational transformations required to achieve the investment thesis
 
-Use specific numbers where available. Use "[Data needed: ...]" for missing operational data. Format with <h3> subheadings and <ul>/<li> for lists.`,
+Use specific numbers where available. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing operational data. Format with <h3> subheadings and <ul>/<li> for lists.`,
     requiresFinancials: true,
     requiresDocuments: true,
     includeTableData: false,
@@ -297,7 +297,7 @@ Identify 8-12 key risks across these categories:
 For Severity and Likelihood, use: High / Medium / Low
 The narrative content should summarize the overall risk profile and call out the 2-3 most critical risks.
 
-Use "[Data needed: ...]" for risks that cannot be assessed without additional information. Never understate risks to make the deal look better.`,
+Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for risks that cannot be assessed without additional information. Never understate risks to make the deal look better.`,
     requiresFinancials: true,
     requiresDocuments: true,
     includeTableData: true,
@@ -330,7 +330,7 @@ Cover:
 
 5. **100-Day Plan Highlights**: The most critical actions in the first 100 days post-close
 
-Format with <h3> subheadings. Use <strong> for dollar impact figures. Be realistic — flag initiatives as "Upside" vs. "Base Case" where appropriate. Use "[Data needed: ...]" for missing data.`,
+Format with <h3> subheadings. Use <strong> for dollar impact figures. Be realistic — flag initiatives as "Upside" vs. "Base Case" where appropriate. Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for missing data.`,
     requiresFinancials: true,
     requiresDocuments: false,
     includeTableData: false,
@@ -362,7 +362,7 @@ The narrative content should cover:
 4. **Key Deal Terms**: Any reps & warranties, earnouts, escrows, working capital peg, or other notable terms
 5. **Valuation Justification**: Why the entry multiple is appropriate given growth profile, margin, and comparables
 
-Use "[Data needed: ...]" for unknown financing terms. Never fabricate purchase price or debt amounts.`,
+Omit metrics gracefully if data is unavailable. Do not use bracketed placeholders for unknown financing terms. Never fabricate purchase price or debt amounts.`,
     requiresFinancials: true,
     requiresDocuments: true,
     includeTableData: true,
