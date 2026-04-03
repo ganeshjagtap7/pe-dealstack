@@ -117,64 +117,52 @@
 
 <!-- Stats Cards Row -->
 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-    <!-- Active Analysts Card -->
-    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+    <!-- Team Card -->
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer" data-scroll-to="resource-allocation" id="card-team">
         <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Team</span>
             <span class="material-symbols-outlined text-text-muted text-[20px]">groups</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
             <h3 class="text-3xl font-bold text-text-main tracking-tight" id="analyst-count">&mdash;</h3>
-            <span class="text-xs text-text-secondary mb-1.5">Active analysts</span>
         </div>
-        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-            <div class="bg-primary h-1.5 rounded-full" style="width: 80%"></div>
-        </div>
+        <p class="text-xs text-text-muted mt-1" id="analyst-subtitle">Loading...</p>
     </div>
 
     <!-- Deal Volume Card -->
-    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer" data-scroll-to="resource-allocation" id="card-deals">
         <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Deal Volume</span>
             <span class="material-symbols-outlined text-text-muted text-[20px]">payments</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
             <h3 class="text-3xl font-bold text-text-main tracking-tight" id="deal-volume">&mdash;</h3>
-            <span class="text-xs text-text-secondary mb-1.5">Total pipeline</span>
         </div>
-        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-            <div class="bg-primary h-1.5 rounded-full" style="width: 75%"></div>
-        </div>
+        <p class="text-xs text-text-muted mt-1" id="deal-subtitle">Loading...</p>
     </div>
 
-    <!-- Critical Tasks Card -->
-    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+    <!-- Overdue Card -->
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer" data-scroll-to="task-table-body" id="card-overdue">
         <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Overdue</span>
             <span class="material-symbols-outlined text-text-muted text-[20px]">pending_actions</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
-            <h3 class="text-3xl font-bold text-text-main tracking-tight" id="overdue-tasks">&mdash;</h3>
-            <span class="text-xs text-text-secondary mb-1.5">Tasks pending</span>
+            <h3 class="text-3xl font-bold tracking-tight" id="overdue-tasks" style="color: #003366">&mdash;</h3>
         </div>
-        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-            <div class="bg-orange-400 h-1.5 rounded-full" style="width: 30%"></div>
-        </div>
+        <p class="text-xs text-text-muted mt-1" id="overdue-subtitle">Loading...</p>
     </div>
 
     <!-- Utilization Card -->
-    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all">
+    <div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer" data-scroll-to="resource-allocation" id="card-utilization">
         <div class="flex items-center justify-between">
             <span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Utilization</span>
             <span class="material-symbols-outlined text-text-muted text-[20px]">speed</span>
         </div>
         <div class="flex items-end gap-2 mt-3">
             <h3 class="text-3xl font-bold text-text-main tracking-tight" id="utilization">&mdash;</h3>
-            <span class="text-xs text-text-secondary mb-1.5">Capacity used</span>
         </div>
-        <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-            <div class="bg-secondary h-1.5 rounded-full" style="width: 82%"></div>
-        </div>
+        <p class="text-xs text-text-muted mt-1" id="utilization-subtitle">Loading...</p>
     </div>
 </div>
 
