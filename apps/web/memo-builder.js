@@ -182,11 +182,33 @@ document.addEventListener('DOMContentLoaded', async function() {
         loadDemoData();
     } else if (memoId) {
         showLoadingState('Loading memo...');
-        const loaded = await loadMemoFromAPI(memoId);
+        let loaded = await loadMemoFromAPI(memoId);
         hideLoadingState();
         if (!loaded) {
-            showErrorState('Memo not found');
-            return;
+            // The "id" might actually be a dealId (from deal chat link) — try to find/create memo for that deal
+            console.log('[Memo] ID not found as memo, trying as dealId...');
+            showLoadingState('Creating memo for deal...');
+            const memos = await listMemosAPI({ dealId: memoId });
+            if (memos.length > 0) {
+                loaded = await loadMemoFromAPI(memos[0].id);
+                hideLoadingState();
+                if (loaded) {
+                    updateURLWithMemoId(memos[0].id);
+                } else {
+                    showErrorState('Memo not found');
+                    return;
+                }
+            } else {
+                // No memo exists — create one with auto-generation
+                hideLoadingState();
+                showGeneratingOverlay();
+                const created = await createNewMemo({ dealId: memoId, autoGenerate: true });
+                hideGeneratingOverlay();
+                if (!created) {
+                    showErrorState('Failed to create memo');
+                    return;
+                }
+            }
         }
     } else if (dealId) {
         showLoadingState('Loading memo...');
@@ -208,7 +230,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         } else {
             state.isGenerating = true;
             showGeneratingOverlay();
-            const created = await createNewMemo({ dealId });
+            const created = await createNewMemo({ dealId, autoGenerate: true });
             state.isGenerating = false;
             hideGeneratingOverlay();
             if (!created) {
