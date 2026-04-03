@@ -53,6 +53,13 @@
                     </button>
                 </div>
             </div>
+            ${deal.tags && deal.tags.includes('sample') ? `
+                <button onclick="event.preventDefault(); event.stopPropagation(); removeSampleDeal('${deal.id}')"
+                        class="absolute top-2 right-2 z-10 px-2 py-1 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 text-[10px] font-medium transition-colors shadow-sm"
+                        title="Remove sample deal">
+                    <span class="material-symbols-outlined text-[14px] align-middle">close</span> Remove Sample
+                </button>
+            ` : ''}
             <a href="deal.html?id=${deal.id}" class="block">
                 <article class="bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden ${isPassed ? 'opacity-70 hover:opacity-100' : ''} ${isSelected ? 'ring-2 ring-primary border-primary' : ''}">
                     <div class="flex justify-between items-start mb-4">
@@ -66,6 +73,7 @@
                             </div>
                         </div>
                         <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider mr-8">${style.label}</span>
+                        ${deal.tags && deal.tags.includes('sample') ? '<span class="ml-1 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-wider">Sample</span>' : ''}
                     </div>
                 <div class="grid ${gridCols} gap-3 mb-4">
                     ${metricsGrid}
@@ -412,3 +420,18 @@
                 showNotification('Error', 'Failed to update deal stage', 'error');
             }
         }
+
+        // Remove sample deal
+        window.removeSampleDeal = async function(dealId) {
+            try {
+                const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`, {
+                    method: 'DELETE',
+                });
+                if (response.ok) {
+                    if (window.showNotification) showNotification('Removed', 'Sample deal removed from your pipeline.', 'success');
+                    if (window.loadDeals) loadDeals();
+                }
+            } catch (err) {
+                console.error('Failed to remove sample deal', err);
+            }
+        };
