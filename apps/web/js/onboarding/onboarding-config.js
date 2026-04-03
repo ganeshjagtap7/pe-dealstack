@@ -119,8 +119,7 @@ window.ONBOARDING_CONFIG = {
     feedback: {
         buttonText: 'Feedback',
         buttonIcon: 'rate_review',
-        // Replace this URL with your actual feedback form
-        formUrl: 'https://forms.gle/placeholder-replace-me',
+        formUrl: 'https://docs.google.com/forms/d/e/1FAIpQLSet_GfebuKpdspK7aQ8yAFUF_l5yXeFczBRoKauGEg2GlpS5g/viewform',
         show: true,
     },
 
