@@ -24,6 +24,7 @@ import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
+import dealImportRouter from './routes/deal-import.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -226,6 +227,7 @@ app.use('/api/public/invitations', invitationsAcceptRouter);
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
+app.use('/api/deals/import', authMiddleware, orgMiddleware, dealImportRouter);
 app.use('/api/deals', authMiddleware, orgMiddleware, dealsRouter);
 app.use('/api/companies', authMiddleware, orgMiddleware, companiesRouter);
 app.use('/api', authMiddleware, orgMiddleware, activitiesRouter);
