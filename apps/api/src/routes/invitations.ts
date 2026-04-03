@@ -285,9 +285,8 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     });
 
     // Onboarding: mark inviteTeamMember step complete (fire-and-forget)
-    const inviteUserId = (req as any).userId;
-    if (inviteUserId) {
-      tryCompleteOnboardingStep(inviteUserId, 'inviteTeamMember');
+    if (req.user?.id) {
+      tryCompleteOnboardingStep(req.user.id, 'inviteTeamMember');
     }
 
     res.status(201).json({

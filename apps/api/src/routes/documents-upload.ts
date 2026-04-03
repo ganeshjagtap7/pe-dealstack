@@ -377,9 +377,8 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     }
 
     // Onboarding: mark uploadDocument step complete (fire-and-forget)
-    const uploadUserId = (req as any).userId;
-    if (uploadUserId) {
-      tryCompleteOnboardingStep(uploadUserId, 'uploadDocument');
+    if (req.user?.id) {
+      tryCompleteOnboardingStep(req.user.id, 'uploadDocument');
     }
 
     res.status(201).json({ ...document, dealUpdated, updatedFields });

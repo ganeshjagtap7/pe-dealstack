@@ -53,7 +53,7 @@ export async function tryCompleteOnboardingStep(userId: string, step: string): P
     const { data: user } = await supabase
       .from('User')
       .select('onboardingStatus')
-      .eq('id', userId)
+      .eq('authId', userId)
       .single();
 
     const status = user?.onboardingStatus || { ...DEFAULT_STATUS };
@@ -70,7 +70,7 @@ export async function tryCompleteOnboardingStep(userId: string, step: string): P
     await supabase
       .from('User')
       .update({ onboardingStatus: status })
-      .eq('id', userId);
+      .eq('authId', userId);
   } catch (e) {
     // Silent — never block core routes
   }
@@ -79,12 +79,13 @@ export async function tryCompleteOnboardingStep(userId: string, step: string): P
 // GET /api/onboarding/status
 router.get('/status', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.id;
+    if (!userId) return res.json(DEFAULT_STATUS);
     const orgId = getOrgId(req);
     const { data, error } = await supabase
       .from('User')
       .select('onboardingStatus')
-      .eq('id', userId)
+      .eq('authId', userId)
       .single();
 
     if (error) throw error;
@@ -100,7 +101,7 @@ router.get('/status', async (req: Request, res: Response) => {
         await supabase
           .from('User')
           .update({ onboardingStatus: COMPLETED_STATUS })
-          .eq('id', userId);
+          .eq('authId', userId);
         return res.json(COMPLETED_STATUS);
       }
     }
@@ -115,7 +116,7 @@ router.get('/status', async (req: Request, res: Response) => {
 // POST /api/onboarding/complete-step
 router.post('/complete-step', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.id;
     const { step } = req.body;
 
     if (!step || !VALID_STEPS.includes(step)) {
@@ -126,7 +127,7 @@ router.post('/complete-step', async (req: Request, res: Response) => {
     const { data: user, error: fetchError } = await supabase
       .from('User')
       .select('onboardingStatus')
-      .eq('id', userId)
+      .eq('authId', userId)
       .single();
 
     if (fetchError) throw fetchError;
@@ -144,7 +145,7 @@ router.post('/complete-step', async (req: Request, res: Response) => {
     const { error: updateError } = await supabase
       .from('User')
       .update({ onboardingStatus: status })
-      .eq('id', userId);
+      .eq('authId', userId);
 
     if (updateError) throw updateError;
 
@@ -158,12 +159,12 @@ router.post('/complete-step', async (req: Request, res: Response) => {
 // POST /api/onboarding/welcome-shown
 router.post('/welcome-shown', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.id;
 
     const { data: user } = await supabase
       .from('User')
       .select('onboardingStatus')
-      .eq('id', userId)
+      .eq('authId', userId)
       .single();
 
     const status = user?.onboardingStatus || { ...DEFAULT_STATUS };
@@ -172,7 +173,7 @@ router.post('/welcome-shown', async (req: Request, res: Response) => {
     await supabase
       .from('User')
       .update({ onboardingStatus: status })
-      .eq('id', userId);
+      .eq('authId', userId);
 
     res.json({ success: true });
   } catch (error: any) {
@@ -184,12 +185,12 @@ router.post('/welcome-shown', async (req: Request, res: Response) => {
 // POST /api/onboarding/dismiss
 router.post('/dismiss', async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.user?.id;
 
     const { data: user } = await supabase
       .from('User')
       .select('onboardingStatus')
-      .eq('id', userId)
+      .eq('authId', userId)
       .single();
 
     const status = user?.onboardingStatus || { ...DEFAULT_STATUS };
@@ -198,7 +199,7 @@ router.post('/dismiss', async (req: Request, res: Response) => {
     await supabase
       .from('User')
       .update({ onboardingStatus: status })
-      .eq('id', userId);
+      .eq('authId', userId);
 
     res.json({ success: true });
   } catch (error: any) {
