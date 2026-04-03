@@ -727,23 +727,21 @@ async function postProactiveWelcome() {
 
     const dealName = deal.name || state.memo.projectName || 'this deal';
     const docs = deal.documents || [];
-    const financials = deal.financialStatements || [];
     const docCount = docs.length;
-    const periodCount = financials.length;
+    const hasRevenue = deal.revenue || deal.dealSize;
+    const hasEbitda = deal.ebitda;
 
     const missing = [];
     if (!deal.industry) missing.push('**Industry** — needed for market dynamics section');
-    if (!deal.dealSize && !deal.revenue) missing.push('**Revenue / Deal Size** — needed for valuation analysis');
-    if (!deal.ebitda) missing.push('**EBITDA** — needed for financial performance and deal structure');
-    if (periodCount === 0) missing.push('**Financial statements** — upload a CIM or Excel model for detailed analysis');
+    if (!hasRevenue) missing.push('**Revenue / Deal Size** — needed for valuation analysis');
+    if (!hasEbitda) missing.push('**EBITDA** — needed for financial performance and deal structure');
     if (docCount === 0) missing.push('**Documents** — upload CIMs, teasers, or models to the Data Room for richer analysis');
 
     const sectionCount = state.sections.filter(s => s.content && s.content.trim()).length;
 
     let messageHtml = `<p class="font-medium text-primary">Memo generated for ${dealName}</p>`;
     messageHtml += `<p class="mt-2">I've created <strong>${sectionCount} sections</strong>`;
-    if (periodCount > 0) messageHtml += ` using <strong>${periodCount} financial periods</strong>`;
-    if (docCount > 0) messageHtml += ` and <strong>${docCount} documents</strong>`;
+    if (docCount > 0) messageHtml += ` using <strong>${docCount} documents</strong>`;
     messageHtml += ` from the deal data.</p>`;
 
     if (missing.length > 0) {

@@ -36,7 +36,7 @@ export interface MemoContext {
   financials: Array<{
     statementType: string;
     period: string;
-    extractedData: any;
+    lineItems: any;
     confidence: number | null;
     extractionSource: string | null;
     isActive: boolean;
@@ -123,7 +123,7 @@ export async function buildMemoContext(dealId: string, orgId: string): Promise<M
     // 2. Financial statements (all active, most recent first)
     supabase
       .from('FinancialStatement')
-      .select('statementType, period, extractedData, confidence, extractionSource, isActive')
+      .select('statementType, period, lineItems, confidence, extractionSource, isActive')
       .eq('dealId', dealId)
       .eq('isActive', true)
       .order('period', { ascending: false })
@@ -207,7 +207,7 @@ export async function buildMemoContext(dealId: string, orgId: string): Promise<M
   const financials: MemoContext['financials'] = ((financialsResult as any).data || []).map((s: any) => ({
     statementType: s.statementType,
     period: s.period,
-    extractedData: s.extractedData,
+    lineItems: s.lineItems,
     confidence: s.confidence ?? null,
     extractionSource: s.extractionSource ?? null,
     isActive: s.isActive,
@@ -370,12 +370,11 @@ export function formatContextForLLM(ctx: MemoContext): string {
     for (const [type, stmts] of Object.entries(byType)) {
       parts.push(`\n### ${type}`);
       for (const s of stmts.slice(0, 5)) {
-        const items = Array.isArray(s.extractedData) ? s.extractedData : [];
-        parts.push(`\nPeriod: ${s.period} (${items.length} line items, confidence: ${s.confidence ?? 'N/A'}%)`);
-        for (const item of items.slice(0, 20)) {
-          if (item.label && item.value !== undefined) {
-            parts.push(`  ${item.label}: $${item.value}M`);
-          }
+        const items = s.lineItems && typeof s.lineItems === 'object' ? s.lineItems : {};
+        const entries = Object.entries(items).filter(([, v]) => v !== null && v !== undefined);
+        parts.push(`\nPeriod: ${s.period} (${entries.length} line items, confidence: ${s.confidence ?? 'N/A'}%)`);
+        for (const [label, value] of entries.slice(0, 20)) {
+          parts.push(`  ${label}: $${value}M`);
         }
       }
     }

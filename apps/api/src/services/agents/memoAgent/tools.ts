@@ -113,7 +113,7 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
       try {
         const { data: statements, error } = await supabase
           .from('FinancialStatement')
-          .select('statementType, period, extractedData, confidence, extractionSource, isActive')
+          .select('statementType, period, lineItems, confidence, extractionSource, isActive')
           .eq('dealId', dealId)
           .order('period', { ascending: false });
 
@@ -136,20 +136,20 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
         for (const [type, stmts] of Object.entries(byType)) {
           summary.push(`\n**${type}** (${stmts.length} period${stmts.length > 1 ? 's' : ''}):`);
           for (const s of stmts.slice(0, 6)) {
-            const items: any[] = Array.isArray(s.extractedData) ? s.extractedData : [];
-            const revenue = items.find((i: any) =>
-              i.label?.toLowerCase().includes('revenue') ||
-              i.label?.toLowerCase().includes('net sales')
+            const items = s.lineItems && typeof s.lineItems === 'object' ? s.lineItems as Record<string, number | null> : {};
+            const entries = Object.entries(items).filter(([, v]) => v !== null && v !== undefined);
+            const revenue = entries.find(([k]) =>
+              k.toLowerCase().includes('revenue') || k.toLowerCase().includes('net sales')
             );
-            const ebitda = items.find((i: any) =>
-              i.label?.toLowerCase().includes('ebitda')
+            const ebitda = entries.find(([k]) =>
+              k.toLowerCase().includes('ebitda')
             );
             const statusNote = s.isActive ? '' : ' (pending merge review)';
             summary.push(
-              `  - ${s.period}: ${items.length} line items, confidence ${s.confidence ?? 'N/A'}%, source: ${s.extractionSource}${statusNote}`
+              `  - ${s.period}: ${entries.length} line items, confidence ${s.confidence ?? 'N/A'}%, source: ${s.extractionSource}${statusNote}`
             );
-            if (revenue) summary.push(`    Revenue: $${revenue.value}M`);
-            if (ebitda) summary.push(`    EBITDA: $${ebitda.value}M`);
+            if (revenue) summary.push(`    ${revenue[0]}: $${revenue[1]}M`);
+            if (ebitda) summary.push(`    ${ebitda[0]}: $${ebitda[1]}M`);
           }
         }
 
