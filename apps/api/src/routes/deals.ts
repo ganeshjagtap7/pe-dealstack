@@ -315,6 +315,19 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) =>
       }).catch(err => log.error('Notification error (deal create)', err));
     }
 
+    // Auto-archive sample deals when user creates their first real deal
+    if (!data.tags?.includes('sample')) {
+      void supabase
+        .from('Deal')
+        .update({ status: 'ARCHIVED' })
+        .eq('organizationId', orgId)
+        .contains('tags', ['sample'])
+        .then(({ error: archiveErr }) => {
+          if (archiveErr) log.error('Failed to archive sample deal', archiveErr);
+          else log.info('Sample deal archived after real deal creation', { orgId });
+        }, () => {}); // Fire-and-forget
+    }
+
     res.status(201).json(deal);
   } catch (error) {
     if (error instanceof z.ZodError) {
