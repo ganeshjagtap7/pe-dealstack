@@ -166,12 +166,10 @@ const state = {
 document.addEventListener('DOMContentLoaded', async function() {
     console.log('PE OS Memo Builder initialized');
 
-    // Initialize auth and check if user is logged in
     await PEAuth.initSupabase();
     const auth = await PEAuth.checkAuth();
-    if (!auth) return; // Will redirect to login
+    if (!auth) return;
 
-    // Check for memo ID or action in URL
     const urlParams = new URLSearchParams(window.location.search);
     const memoId = urlParams.get('id');
     const createNew = urlParams.get('new') === 'true';
@@ -180,73 +178,70 @@ document.addEventListener('DOMContentLoaded', async function() {
     const templateId = urlParams.get('templateId');
     const demoMode = urlParams.get('demo') === 'true';
 
-    if (memoId) {
-        // Try to load memo from API
-        const loaded = await loadMemoFromAPI(memoId);
-        if (!loaded) {
-            // Fall back to demo data
-            console.log('Failed to load memo from API, using demo data');
-            loadDemoData();
-        }
-    } else if (demoMode) {
-        // Explicitly requested demo mode
+    if (demoMode) {
         loadDemoData();
-    } else if (createNew || !dealId) {
-        // Create a new memo automatically for new projects
-        console.log('Creating new memo...', templateId ? `from template ${templateId}` : '');
-        showLoadingState(templateId ? 'Creating memo from template...' : 'Creating your memo...');
-        const created = await createNewMemo({
-            dealId: dealId || undefined,
-            projectName: projectName || 'New Investment Memo',
-            templateId: templateId || undefined,
-        });
+    } else if (memoId) {
+        showLoadingState('Loading memo...');
+        const loaded = await loadMemoFromAPI(memoId);
         hideLoadingState();
-        if (!created) {
-            console.log('Failed to create memo, using demo data');
-            loadDemoData();
+        if (!loaded) {
+            showErrorState('Memo not found');
+            return;
         }
-    } else {
-        // Has dealId but no memo ID - find or create memo for deal
-        console.log('Looking for existing memo for deal:', dealId);
+    } else if (dealId) {
         showLoadingState('Loading memo...');
         const memos = await listMemosAPI({ dealId });
-        if (memos.length > 0) {
-            // Load existing memo for this deal
+        hideLoadingState();
+
+        if (memos.length > 1) {
+            showMemoPicker(memos, dealId);
+            return;
+        } else if (memos.length === 1) {
+            showLoadingState('Loading memo...');
             const loaded = await loadMemoFromAPI(memos[0].id);
-            if (loaded) {
-                updateURLWithMemoId(memos[0].id);
-            } else {
-                loadDemoData();
-            }
-        } else {
-            // Create new memo for this deal — auto-generate sections from deal data
-            state.isGenerating = true;
             hideLoadingState();
+            if (!loaded) {
+                showErrorState('Failed to load memo');
+                return;
+            }
+            updateURLWithMemoId(memos[0].id);
+        } else {
+            state.isGenerating = true;
             showGeneratingOverlay();
             const created = await createNewMemo({ dealId });
             state.isGenerating = false;
             hideGeneratingOverlay();
             if (!created) {
-                loadDemoData();
+                showErrorState('Failed to create memo. Make sure the memo database tables are set up.');
+                return;
             }
         }
+    } else if (createNew) {
+        showLoadingState('Creating memo...');
+        const created = await createNewMemo({
+            projectName: projectName || 'New Investment Memo',
+            templateId: templateId || undefined,
+        });
         hideLoadingState();
+        if (!created) {
+            showErrorState('Failed to create memo');
+            return;
+        }
+    } else {
+        showErrorState('No deal or memo specified. Open this page from a deal.');
+        return;
     }
 
-    // Auto-generate content if all sections are empty and we have a dealId
     await autoGenerateIfEmpty();
 
-    // Render UI
     renderSidebar();
     renderSections();
     renderMessages();
     renderPromptChips();
 
-    // Setup event handlers
     setupEventHandlers();
     setupDragDrop();
 
-    // Update AI status indicator
     updateModeIndicators();
 });
 
@@ -272,6 +267,119 @@ function showLoadingState(message = 'Loading...') {
 function hideLoadingState() {
     const overlay = document.getElementById('loading-overlay');
     if (overlay) overlay.remove();
+}
+
+function showErrorState(message = 'Failed to load memo') {
+    const editor = document.getElementById('document-editor');
+    if (editor) {
+        editor.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-20 text-center">
+                <div class="size-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
+                    <span class="material-symbols-outlined text-red-500 text-3xl">error</span>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-2">${message}</h3>
+                <p class="text-sm text-slate-500 mb-6 max-w-md">This could be because the memo tables haven't been set up yet, or the deal data is unavailable.</p>
+                <div class="flex gap-3">
+                    <button onclick="window.location.reload()" class="px-4 py-2 rounded-lg text-sm font-medium text-white" style="background:#003366">
+                        <span class="material-symbols-outlined text-[16px] align-middle mr-1">refresh</span>Try Again
+                    </button>
+                    <button onclick="history.back()" class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50">
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function showMemoPicker(memos, dealId) {
+    const overlay = document.createElement('div');
+    overlay.id = 'memo-picker-overlay';
+    overlay.className = 'fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm';
+
+    const statusColors = {
+        DRAFT: 'bg-amber-100 text-amber-700',
+        REVIEW: 'bg-blue-100 text-blue-700',
+        FINAL: 'bg-green-100 text-green-700',
+        ARCHIVED: 'bg-gray-100 text-gray-500',
+    };
+
+    const memoCards = memos.map(m => {
+        const sc = statusColors[m.status] || statusColors.DRAFT;
+        const edited = m.updatedAt ? formatRelativeTime(new Date(m.updatedAt)) : 'Unknown';
+        return `
+            <button class="memo-pick-btn w-full text-left p-4 rounded-lg border border-slate-200 hover:border-primary/40 hover:shadow-sm transition-all group"
+                    data-memo-id="${m.id}">
+                <div class="flex items-center justify-between mb-2">
+                    <h4 class="font-bold text-slate-900 group-hover:text-primary transition-colors">${m.projectName || m.title || 'Untitled Memo'}</h4>
+                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${sc}">${m.status}</span>
+                </div>
+                <p class="text-xs text-slate-500">${m.title || 'Investment Committee Memo'} &middot; Last edited ${edited}</p>
+            </button>
+        `;
+    }).join('');
+
+    overlay.innerHTML = `
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100">
+                <h3 class="text-lg font-bold text-slate-900">Select Memo</h3>
+                <p class="text-sm text-slate-500 mt-1">This deal has ${memos.length} memos. Pick one to open or create a new one.</p>
+            </div>
+            <div class="p-6 flex flex-col gap-3 max-h-[50vh] overflow-y-auto">
+                ${memoCards}
+            </div>
+            <div class="px-6 py-4 border-t border-slate-100 flex justify-between">
+                <button onclick="history.back()" class="text-sm text-slate-500 hover:text-slate-700">Cancel</button>
+                <button id="create-new-memo-btn" class="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-white" style="background:#003366">
+                    <span class="material-symbols-outlined text-[16px]">add</span>
+                    New Memo
+                </button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    overlay.querySelectorAll('.memo-pick-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            overlay.remove();
+            showLoadingState('Loading memo...');
+            const loaded = await loadMemoFromAPI(btn.dataset.memoId);
+            hideLoadingState();
+            if (loaded) {
+                updateURLWithMemoId(btn.dataset.memoId);
+                renderSidebar();
+                renderSections();
+                renderMessages();
+                renderPromptChips();
+                setupEventHandlers();
+                setupDragDrop();
+                updateModeIndicators();
+            } else {
+                showErrorState('Failed to load memo');
+            }
+        });
+    });
+
+    document.getElementById('create-new-memo-btn').addEventListener('click', async () => {
+        overlay.remove();
+        state.isGenerating = true;
+        showGeneratingOverlay();
+        const created = await createNewMemo({ dealId });
+        state.isGenerating = false;
+        hideGeneratingOverlay();
+        if (created) {
+            renderSidebar();
+            renderSections();
+            renderMessages();
+            renderPromptChips();
+            setupEventHandlers();
+            setupDragDrop();
+            updateModeIndicators();
+        } else {
+            showErrorState('Failed to create memo');
+        }
+    });
 }
 
 // ============================================================
