@@ -46,6 +46,7 @@ async function initAdminDashboard() {
     }
 
     initModals();
+    initCardScrollLinks();
     updateLastUpdated();
     setInterval(updateLastUpdated, 60000);
 
@@ -103,37 +104,50 @@ async function loadTasks() {
 // ─── Stats Cards ─────────────────────────────────────────────
 
 function renderStatsCards() {
-    // Team count
-    const teamCount = teamMembers.length;
-    setCardValue('analyst-count', teamCount);
+    const activeMembers = teamMembers.filter(m => m.isActive !== false);
+    const totalMembers = teamMembers.length;
 
-    // Deal volume (dealSize is stored in millions)
+    // Team count — show active / total
+    setCardValue('analyst-count', activeMembers.length);
+    setCardSubtitle('analyst-subtitle', `${activeMembers.length} active / ${totalMembers} total`);
+
+    // Deal volume
     const totalVolume = allDeals.reduce((sum, d) => sum + (d.dealSize || 0), 0);
     setCardValue('deal-volume', formatCurrency(totalVolume));
+    setCardSubtitle('deal-subtitle', `across ${allDeals.length} deal${allDeals.length !== 1 ? 's' : ''}`);
 
-    // Overdue / pending tasks
+    // Overdue tasks
     const now = new Date();
-    const pendingTasks = allTasks.filter(t => t.status === 'PENDING' || t.status === 'STUCK');
     const overdueTasks = allTasks.filter(t =>
         t.dueDate && new Date(t.dueDate) < now && t.status !== 'COMPLETED'
     );
-    setCardValue('overdue-tasks', overdueTasks.length || pendingTasks.length);
+    const dueThisWeek = allTasks.filter(t => {
+        if (!t.dueDate || t.status === 'COMPLETED') return false;
+        const due = new Date(t.dueDate);
+        const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return due >= now && due <= weekFromNow;
+    });
+    setCardValue('overdue-tasks', overdueTasks.length);
+    if (overdueTasks.length > 0) {
+        document.getElementById('overdue-tasks')?.setAttribute('style', 'color: #ef4444');
+        setCardSubtitle('overdue-subtitle', `${dueThisWeek.length} due this week`);
+    } else {
+        document.getElementById('overdue-tasks')?.setAttribute('style', 'color: #003366');
+        setCardSubtitle('overdue-subtitle', `${dueThisWeek.length} due this week`);
+    }
 
-    // Utilization: (members with at least 1 deal assignment / total members)
+    // Utilization
     const membersWithDeals = new Set();
     allDeals.forEach(d => {
         if (d.teamMembers) d.teamMembers.forEach(tm => membersWithDeals.add(tm.userId));
     });
-    const utilization = teamCount > 0 ? Math.round((membersWithDeals.size / teamCount) * 100) : 0;
+    const assignedCount = membersWithDeals.size;
+    const utilization = totalMembers > 0 ? Math.round((assignedCount / totalMembers) * 100) : 0;
     setCardValue('utilization', `${Math.min(100, utilization)}%`);
+    setCardSubtitle('utilization-subtitle', `${assignedCount}/${totalMembers} members assigned`);
 
-    // Update progress bars
-    updateProgressBar('analyst-count', Math.min(100, teamCount * 10));
-    updateProgressBar('deal-volume', Math.min(100, (totalVolume / 1000) * 10));
-    updateProgressBar('overdue-tasks', overdueTasks.length > 0 ? Math.min(100, overdueTasks.length * 20) : 10);
-    updateProgressBar('utilization', Math.min(100, utilization));
-
-    // Pending count badge
+    // Pending count badge in task table header
+    const pendingTasks = allTasks.filter(t => t.status === 'PENDING' || t.status === 'STUCK');
     const pendingEl = document.getElementById('pending-count');
     if (pendingEl) pendingEl.textContent = `${pendingTasks.length} Pending`;
 }
@@ -143,18 +157,33 @@ function setCardValue(id, value) {
     if (el) el.textContent = value;
 }
 
-function updateProgressBar(cardId, percent) {
-    const card = document.getElementById(cardId)?.closest('.rounded-lg');
-    if (!card) return;
-    const bars = card.querySelectorAll('.rounded-full');
-    // Find the colored bar (not the gray track)
-    for (const bar of bars) {
-        if (bar.classList.contains('bg-gray-100') || bar.classList.contains('overflow-hidden')) continue;
-        if (bar.classList.contains('h-1.5') || bar.style.width) {
-            bar.style.width = `${percent}%`;
-            break;
-        }
-    }
+function setCardSubtitle(id, text) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = text;
+}
+
+// ─── Card Click → Scroll to Section ─────────────────────────
+
+function initCardScrollLinks() {
+    document.querySelectorAll('[data-scroll-to]').forEach(card => {
+        card.addEventListener('click', () => {
+            const targetId = card.getAttribute('data-scroll-to');
+            const target = document.getElementById(targetId);
+            if (target) {
+                target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+            // If clicking overdue card, auto-filter tasks to overdue
+            if (card.id === 'card-overdue') {
+                taskFilter = 'OVERDUE';
+                applyTaskFilterSort();
+                const filterBtn = document.getElementById('task-filter-btn');
+                if (filterBtn) {
+                    filterBtn.classList.add('text-primary', 'bg-primary-light/30');
+                    filterBtn.classList.remove('text-text-muted');
+                }
+            }
+        });
+    });
 }
 
 // ─── Resource Allocation ─────────────────────────────────────
