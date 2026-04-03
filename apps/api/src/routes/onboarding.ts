@@ -18,10 +18,34 @@ const DEFAULT_STATUS = {
   },
 };
 
+// Check if user is genuinely new (no existing deals/activity)
+async function isNewUser(userId: string, orgId: string): Promise<boolean> {
+  const { count } = await supabase
+    .from('Deal')
+    .select('id', { count: 'exact', head: true })
+    .eq('organizationId', orgId);
+  return (count ?? 0) === 0;
+}
+
+// Auto-mark existing users as onboarded (they don't need the flow)
+const COMPLETED_STATUS = {
+  welcomeShown: true,
+  checklistDismissed: true,
+  completedAt: new Date().toISOString(),
+  steps: {
+    createDeal: true,
+    uploadDocument: true,
+    reviewExtraction: true,
+    tryDealChat: true,
+    inviteTeamMember: true,
+  },
+};
+
 // GET /api/onboarding/status
 router.get('/status', async (req: Request, res: Response) => {
   try {
     const userId = (req as any).userId;
+    const orgId = getOrgId(req);
     const { data, error } = await supabase
       .from('User')
       .select('onboardingStatus')
@@ -30,7 +54,23 @@ router.get('/status', async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    res.json(data?.onboardingStatus || DEFAULT_STATUS);
+    const status = data?.onboardingStatus || DEFAULT_STATUS;
+
+    // If welcome hasn't been shown yet, check if this is really a new user
+    // Existing users with deals/activity should skip onboarding entirely
+    if (!status.welcomeShown) {
+      const newUser = await isNewUser(userId, orgId);
+      if (!newUser) {
+        // Auto-complete onboarding for existing users
+        await supabase
+          .from('User')
+          .update({ onboardingStatus: COMPLETED_STATUS })
+          .eq('id', userId);
+        return res.json(COMPLETED_STATUS);
+      }
+    }
+
+    res.json(status);
   } catch (error: any) {
     console.error('[Onboarding] Failed to get status:', error.message);
     res.json(DEFAULT_STATUS);

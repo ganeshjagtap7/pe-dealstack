@@ -27,10 +27,10 @@ window.OnboardingAPI = {
             return data;
         } catch (error) {
             console.warn('[Onboarding] Failed to fetch status:', error.message);
-            // Return default status if API fails (graceful degradation)
+            // If API fails, suppress onboarding (don't show to potentially existing users)
             return {
-                welcomeShown: false,
-                checklistDismissed: false,
+                welcomeShown: true,
+                checklistDismissed: true,
                 steps: {
                     createDeal: false,
                     uploadDocument: false,
