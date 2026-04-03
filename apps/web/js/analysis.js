@@ -401,7 +401,7 @@ function renderMemoTab(data) {
       </p>
       ${qoeScore != null ? `<span class="analysis-badge" style="background:${BANKER_BLUE_MUTED};color:${BANKER_BLUE};margin-bottom:20px;display:inline-flex;">QoE Score: ${qoeScore}/100</span>` : ''}
       <div style="margin-top:16px;">
-        <a href="/memo-builder.html?id=${dealId}"
+        <a href="/memo-builder.html?dealId=${dealId}"
           style="display:inline-flex;align-items:center;gap:8px;padding:12px 28px;font-size:13px;font-weight:700;color:#fff;background:linear-gradient(135deg,${BANKER_BLUE},${BANKER_BLUE_LIGHT});border-radius:10px;text-decoration:none;box-shadow:0 2px 8px rgba(0,51,102,0.25);transition:all 0.2s ease;font-family:'Inter',system-ui,sans-serif;"
           onmouseover="this.style.boxShadow='0 4px 16px rgba(0,51,102,0.35)';this.style.transform='translateY(-1px)';"
           onmouseout="this.style.boxShadow='0 2px 8px rgba(0,51,102,0.25)';this.style.transform='none';">
