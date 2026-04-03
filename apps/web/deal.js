@@ -361,6 +361,9 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Initialize shared layout with collapsible sidebar
     PELayout.init('deals', { collapsible: true });
 
+    // Initialize notifications (auth is ready now)
+    if (window.PENotifications) PENotifications.init();
+
     // Load deal data first (sets state.dealId needed by chat)
     await loadDealData();
     initializeFeatures();
