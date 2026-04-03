@@ -37,7 +37,7 @@ export interface MemoContext {
     statementType: string;
     period: string;
     lineItems: any;
-    confidence: number | null;
+    extractionConfidence: number | null;
     extractionSource: string | null;
     isActive: boolean;
   }>;
@@ -123,7 +123,7 @@ export async function buildMemoContext(dealId: string, orgId: string): Promise<M
     // 2. Financial statements (all active, most recent first)
     supabase
       .from('FinancialStatement')
-      .select('statementType, period, lineItems, confidence, extractionSource, isActive')
+      .select('statementType, period, lineItems, extractionConfidence, extractionSource, isActive')
       .eq('dealId', dealId)
       .eq('isActive', true)
       .order('period', { ascending: false })
@@ -208,7 +208,7 @@ export async function buildMemoContext(dealId: string, orgId: string): Promise<M
     statementType: s.statementType,
     period: s.period,
     lineItems: s.lineItems,
-    confidence: s.confidence ?? null,
+    extractionConfidence: s.extractionConfidence ?? null,
     extractionSource: s.extractionSource ?? null,
     isActive: s.isActive,
   }));
@@ -372,7 +372,7 @@ export function formatContextForLLM(ctx: MemoContext): string {
       for (const s of stmts.slice(0, 5)) {
         const items = s.lineItems && typeof s.lineItems === 'object' ? s.lineItems : {};
         const entries = Object.entries(items).filter(([, v]) => v !== null && v !== undefined);
-        parts.push(`\nPeriod: ${s.period} (${entries.length} line items, confidence: ${s.confidence ?? 'N/A'}%)`);
+        parts.push(`\nPeriod: ${s.period} (${entries.length} line items, confidence: ${s.extractionConfidence ?? 'N/A'}%)`);
         for (const [label, value] of entries.slice(0, 20)) {
           parts.push(`  ${label}: $${value}M`);
         }

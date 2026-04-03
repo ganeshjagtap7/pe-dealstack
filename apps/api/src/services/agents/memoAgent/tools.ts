@@ -113,7 +113,7 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
       try {
         const { data: statements, error } = await supabase
           .from('FinancialStatement')
-          .select('statementType, period, lineItems, confidence, extractionSource, isActive')
+          .select('statementType, period, lineItems, extractionConfidence, extractionSource, isActive')
           .eq('dealId', dealId)
           .order('period', { ascending: false });
 
@@ -146,7 +146,7 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
             );
             const statusNote = s.isActive ? '' : ' (pending merge review)';
             summary.push(
-              `  - ${s.period}: ${entries.length} line items, confidence ${s.confidence ?? 'N/A'}%, source: ${s.extractionSource}${statusNote}`
+              `  - ${s.period}: ${entries.length} line items, confidence ${s.extractionConfidence ?? 'N/A'}%, source: ${s.extractionSource}${statusNote}`
             );
             if (revenue) summary.push(`    ${revenue[0]}: $${revenue[1]}M`);
             if (ebitda) summary.push(`    ${ebitda[0]}: $${ebitda[1]}M`);
