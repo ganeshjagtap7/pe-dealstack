@@ -215,9 +215,15 @@ async function sendMessage() {
             renderMessages();
         }
     } else {
-        // Fall back to simulated response
-        const aiResponse = generateAIResponse(content);
-        state.messages.push(aiResponse);
+        // AI unavailable — show offline message instead of simulated response
+        const offlineMsg = {
+            id: `m${Date.now()}`,
+            role: 'assistant',
+            content: `<p class="text-amber-700"><span class="material-symbols-outlined text-[16px] align-middle mr-1">cloud_off</span> <strong>AI Analyst is offline.</strong></p>
+            <p class="mt-1 text-sm text-amber-600">The AI service is currently unavailable. Check that your OpenAI API key is configured and try again.</p>`,
+            timestamp: 'Just now'
+        };
+        state.messages.push(offlineMsg);
         renderMessages();
     }
 }
@@ -252,59 +258,6 @@ function showTypingIndicator() {
 function hideTypingIndicator() {
     const indicator = document.getElementById('typing-indicator');
     if (indicator) indicator.remove();
-}
-
-// ============================================================
-// AI Response (Simulated fallback)
-// ============================================================
-function generateAIResponse(userInput) {
-    const lowercaseInput = userInput.toLowerCase();
-
-    let response = {
-        id: `m${Date.now()}`,
-        role: 'assistant',
-        timestamp: 'Just now'
-    };
-
-    if (lowercaseInput.includes('tone') || lowercaseInput.includes('rewrite')) {
-        response.content = `<p>I've rewritten the section with a more formal tone, emphasizing quantitative data and removing subjective language.</p>
-        <p class="mt-2">The revised version now uses industry-standard PE terminology and maintains objectivity throughout. Should I apply this to other sections as well?</p>`;
-    } else if (lowercaseInput.includes('ebitda') || lowercaseInput.includes('bridge')) {
-        response.content = `<p>I've added an EBITDA bridge analysis showing the walk from FY22 to FY23:</p>
-        <ul class="list-disc list-inside mt-2 text-slate-600">
-            <li>FY22 EBITDA: $43.5M</li>
-            <li>Revenue growth impact: +$6.5M</li>
-            <li>Margin expansion: +$3.4M</li>
-            <li>FY23 EBITDA: $53.4M</li>
-        </ul>
-        <p class="mt-2">Shall I insert this as a new visual in the Financial Performance section?</p>`;
-        response.quickActions = [
-            { label: 'Yes, add visual', action: 'add_ebitda_visual' },
-            { label: 'Add as text only', action: 'add_ebitda_text' }
-        ];
-    } else if (lowercaseInput.includes('risk')) {
-        response.content = `<p>Here's a summary of the key risks identified:</p>
-        <ul class="list-disc list-inside mt-2 text-slate-600">
-            <li><strong>High:</strong> Customer concentration (35% in top 3)</li>
-            <li><strong>Medium:</strong> Technology obsolescence, integration complexity</li>
-            <li><strong>Low:</strong> Regulatory changes, market competition</li>
-        </ul>
-        <p class="mt-2">All risks have documented mitigants in the full Risk Assessment section.</p>`;
-    } else if (lowercaseInput.includes('chart') || lowercaseInput.includes('visual')) {
-        response.content = `<p>I can create several visualizations for this memo:</p>
-        <ul class="list-disc list-inside mt-2 text-slate-600">
-            <li>Revenue waterfall chart</li>
-            <li>Competitive market share comparison</li>
-            <li>IRR sensitivity analysis</li>
-            <li>Exit valuation scenarios</li>
-        </ul>
-        <p class="mt-2">Which would you like me to generate?</p>`;
-    } else {
-        response.content = `<p>I understand you'd like help with "${escapeHtml(userInput.substring(0, 50))}${userInput.length > 50 ? '...' : ''}"</p>
-        <p class="mt-2">I can help you refine this section, add supporting data, or generate additional analysis. What specific aspect would you like me to focus on?</p>`;
-    }
-
-    return response;
 }
 
 // ============================================================
