@@ -137,6 +137,10 @@ function initChatInterface() {
                         addAIResponseFromAPI(`⚠️ ${data.response}`, null);
                     } else {
                         addAIResponseFromAPI(data.response, data.action);
+                        // Onboarding: mark tryDealChat step on first successful chat
+                        if (window.OnboardingAPI) {
+                            OnboardingAPI.completeStep('tryDealChat');
+                        }
                     }
 
                     // Store message in history

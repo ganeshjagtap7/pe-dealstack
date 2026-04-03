@@ -39,6 +39,11 @@ async function loadFinancials(dealId) {
 
   renderFinancialSection();
   renderFinStatusBadge();
+
+  // Onboarding: mark reviewExtraction step when user views extracted financials
+  if (finState.statements.length > 0 && window.OnboardingAPI) {
+    OnboardingAPI.completeStep('reviewExtraction');
+  }
 }
 
 // ─── Render the full section ───────────────────────────────────
