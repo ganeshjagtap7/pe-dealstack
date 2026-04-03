@@ -233,6 +233,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     }
 
     await autoGenerateIfEmpty();
+    // Post proactive welcome with data completeness assessment
+    await postProactiveWelcome();
 
     renderSidebar();
     renderSections();
@@ -684,6 +686,62 @@ async function autoGenerateIfEmpty() {
 
     state.isGenerating = false;
     hideGeneratingOverlay();
+}
+
+// ============================================================
+// Proactive AI — Assess data completeness after memo load
+// ============================================================
+async function postProactiveWelcome() {
+    if (!state.memo?.dealId) return;
+
+    let deal = null;
+    try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals/${state.memo.dealId}`);
+        if (resp.ok) deal = await resp.json();
+    } catch (e) { /* ignore */ }
+
+    if (!deal) return;
+
+    const dealName = deal.name || state.memo.projectName || 'this deal';
+    const docs = deal.documents || [];
+    const financials = deal.financialStatements || [];
+    const docCount = docs.length;
+    const periodCount = financials.length;
+
+    const missing = [];
+    if (!deal.industry) missing.push('**Industry** — needed for market dynamics section');
+    if (!deal.dealSize && !deal.revenue) missing.push('**Revenue / Deal Size** — needed for valuation analysis');
+    if (!deal.ebitda) missing.push('**EBITDA** — needed for financial performance and deal structure');
+    if (periodCount === 0) missing.push('**Financial statements** — upload a CIM or Excel model for detailed analysis');
+    if (docCount === 0) missing.push('**Documents** — upload CIMs, teasers, or models to the Data Room for richer analysis');
+
+    const sectionCount = state.sections.filter(s => s.content && s.content.trim()).length;
+
+    let messageHtml = `<p class="font-medium text-primary">Memo generated for ${dealName}</p>`;
+    messageHtml += `<p class="mt-2">I've created <strong>${sectionCount} sections</strong>`;
+    if (periodCount > 0) messageHtml += ` using <strong>${periodCount} financial periods</strong>`;
+    if (docCount > 0) messageHtml += ` and <strong>${docCount} documents</strong>`;
+    messageHtml += ` from the deal data.</p>`;
+
+    if (missing.length > 0) {
+        messageHtml += `<p class="mt-3 font-medium text-amber-700">Missing data that would strengthen the memo:</p>`;
+        messageHtml += `<ul class="mt-1 list-disc pl-5 text-sm text-slate-600">`;
+        missing.forEach(m => { messageHtml += `<li>${m}</li>`; });
+        messageHtml += `</ul>`;
+        messageHtml += `<p class="mt-2 text-sm text-slate-500">You can add this data on the deal page or ask me to work with what we have.</p>`;
+    } else {
+        messageHtml += `<p class="mt-2 text-sm text-slate-500">All key data looks good. Ask me to refine sections, add charts, or rewrite for tone.</p>`;
+    }
+
+    if (state.messages.length <= 1) {
+        state.messages = [{
+            id: 'proactive-welcome',
+            role: 'assistant',
+            content: messageHtml,
+            timestamp: formatTime(new Date()),
+        }];
+        renderMessages();
+    }
 }
 
 console.log('PE OS Memo Builder script loaded');
