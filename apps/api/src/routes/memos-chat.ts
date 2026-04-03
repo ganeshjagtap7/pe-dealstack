@@ -182,8 +182,19 @@ router.post('/:id/chat', async (req, res) => {
   try {
     const { id: memoId } = req.params;
     const orgId = getOrgId(req);
-    const userId = req.user?.id || null;
+    const authId = req.user?.id || null;
     const { content, activeSectionId } = chatMessageSchema.parse(req.body);
+
+    // Resolve internal User ID from auth ID (MemoConversation.userId FK references User.id)
+    let userId: string | null = null;
+    if (authId) {
+      const { data: userRecord } = await supabase
+        .from('User')
+        .select('id')
+        .eq('authId', authId)
+        .single();
+      userId = userRecord?.id || null;
+    }
 
     // Verify memo exists and belongs to org
     const { data: memo } = await supabase
