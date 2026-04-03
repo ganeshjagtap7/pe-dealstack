@@ -47,6 +47,7 @@ async function initAdminDashboard() {
 
     initModals();
     initCardScrollLinks();
+    initResourceToggle();
     updateLastUpdated();
     setInterval(updateLastUpdated, 60000);
 
@@ -58,7 +59,19 @@ async function initAdminDashboard() {
     ]);
 
     renderStatsCards();
-    renderResourceAllocation();
+    try {
+        await renderResourceAllocation();
+    } catch (e) {
+        const container = document.getElementById('resource-allocation');
+        if (container) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-text-muted">
+                    <span class="material-symbols-outlined text-[32px] mb-2 block">cloud_off</span>
+                    <p class="text-sm font-medium">Could not load team data</p>
+                    <button onclick="renderResourceAllocation()" class="mt-3 text-sm text-primary font-medium hover:text-primary-hover transition-colors">Retry</button>
+                </div>`;
+        }
+    }
     renderTaskTable();
     renderUpcomingReviews();
     loadActivityFeed();
@@ -188,6 +201,8 @@ function initCardScrollLinks() {
 
 // ─── Resource Allocation ─────────────────────────────────────
 
+let resourceExpanded = false;
+
 async function renderResourceAllocation() {
     const container = document.getElementById('resource-allocation');
     if (!container) return;
@@ -196,14 +211,21 @@ async function renderResourceAllocation() {
         container.innerHTML = `
             <div class="text-center py-8 text-text-muted">
                 <span class="material-symbols-outlined text-[32px] mb-2 block">groups</span>
-                <p class="text-sm">No team members found</p>
+                <p class="text-sm font-medium">No team members yet</p>
+                <p class="text-xs mt-1 mb-3">Invite your first team member to get started</p>
+                <a href="/settings.html" class="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors" style="background-color: #003366">
+                    <span class="material-symbols-outlined text-[16px]">person_add</span>
+                    Invite Team
+                </a>
             </div>`;
         return;
     }
 
-    // Fetch deal assignments for each member (limit to first 8)
+    const displayLimit = resourceExpanded ? teamMembers.length : 8;
+    const membersToShow = teamMembers.slice(0, displayLimit);
     const memberHtml = [];
-    for (const member of teamMembers.slice(0, 8)) {
+
+    for (const member of membersToShow) {
         let dealNames = [];
         let taskCount = 0;
 
@@ -213,15 +235,16 @@ async function renderResourceAllocation() {
                 const deals = await resp.json();
                 dealNames = (Array.isArray(deals) ? deals : []).slice(0, 3).map(d => d.name || d.dealName || 'Unknown');
             }
-        } catch (e) { /* ignore */ }
+        } catch (e) { /* ignore per-member failure */ }
 
         taskCount = allTasks.filter(t => t.assignedTo === member.id && t.status !== 'COMPLETED').length;
-        const capacity = Math.min(100, dealNames.length * 25 + taskCount * 10);
+        const capacity = Math.min(100, Math.round((dealNames.length / 5) * 100));
         const initials = getInitials(member.name || member.email);
+        const capacityColor = capacity >= 80 ? '#ef4444' : capacity >= 50 ? '#f59e0b' : '#003366';
 
         memberHtml.push(`
             <div class="flex items-center gap-4 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                <div class="w-10 h-10 rounded-full bg-primary text-white text-sm font-medium flex items-center justify-center flex-shrink-0">${initials}</div>
+                <div class="w-10 h-10 rounded-full text-white text-sm font-medium flex items-center justify-center flex-shrink-0" style="background-color: #003366">${initials}</div>
                 <div class="w-28 flex-shrink-0">
                     <p class="text-sm font-medium text-text-main">${escapeHtml(member.name || member.email.split('@')[0])}</p>
                     <p class="text-xs text-text-muted">${escapeHtml(member.title || member.role || 'Member')}</p>
@@ -238,7 +261,7 @@ async function renderResourceAllocation() {
                     <div>
                         <p class="text-xs text-text-muted mb-1.5">Capacity (${capacity}%)</p>
                         <div class="w-full bg-gray-100 h-2 rounded-full overflow-hidden">
-                            <div class="bg-primary h-full rounded-full" style="width: ${capacity}%"></div>
+                            <div class="h-full rounded-full transition-all" style="width: ${capacity}%; background-color: ${capacityColor}"></div>
                         </div>
                     </div>
                 </div>
@@ -250,6 +273,27 @@ async function renderResourceAllocation() {
     }
 
     container.innerHTML = memberHtml.join('');
+
+    // Update toggle button text
+    const toggleBtn = document.getElementById('toggle-resource-detail');
+    if (toggleBtn) {
+        if (teamMembers.length <= 8) {
+            toggleBtn.style.display = 'none';
+        } else {
+            toggleBtn.style.display = '';
+            toggleBtn.textContent = resourceExpanded ? 'Show Less' : `View All (${teamMembers.length})`;
+        }
+    }
+}
+
+function initResourceToggle() {
+    const toggleBtn = document.getElementById('toggle-resource-detail');
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', () => {
+            resourceExpanded = !resourceExpanded;
+            renderResourceAllocation();
+        });
+    }
 }
 
 // ─── Activity Feed ───────────────────────────────────────────
