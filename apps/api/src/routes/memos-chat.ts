@@ -213,12 +213,17 @@ router.post('/:id/chat', async (req, res) => {
     if (existingConv) {
       conversationId = existingConv.id;
     } else {
-      const { data: newConv } = await supabase
+      const { data: newConv, error: convError } = await supabase
         .from('MemoConversation')
         .insert({ memoId, userId, title: 'AI Analyst Chat' })
         .select('id')
         .single();
-      conversationId = newConv!.id;
+
+      if (convError || !newConv) {
+        log.error('Failed to create conversation:', convError);
+        return res.status(500).json({ error: 'Failed to create chat conversation' });
+      }
+      conversationId = newConv.id;
     }
 
     // Save user message

@@ -116,6 +116,91 @@
         body.resizing-panel * {
             cursor: col-resize !important;
         }
+
+        /* ── Document canvas — Google Docs-style ── */
+        #editor-container {
+            background-color: #e8eaed;
+        }
+        #memo-content {
+            /* Stretches to cover all content, never clips white */
+            min-height: calc(100vh - 120px);
+            /* Crisper document shadow */
+            box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.10);
+            border-radius: 2px;
+            border: none;
+        }
+        /* Document header typography */
+        #memo-content h1#doc-title {
+            font-size: 26px;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: #1a1a2e;
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+        /* Section headings inside the document body */
+        #sections-content h2 {
+            font-size: 15px;
+            font-weight: 700;
+            color: #003366;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-top: 0;
+            margin-bottom: 10px;
+            padding-bottom: 6px;
+            border-bottom: 2px solid #003366;
+        }
+        #sections-content h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 6px;
+        }
+        #sections-content p {
+            font-size: 13.5px;
+            line-height: 1.75;
+            color: #374151;
+        }
+        #sections-content ul,
+        #sections-content ol {
+            font-size: 13.5px;
+            line-height: 1.75;
+            color: #374151;
+            padding-left: 1.4em;
+        }
+        #sections-content li {
+            margin-bottom: 4px;
+        }
+        /* Tables inside document */
+        #sections-content table {
+            font-size: 12.5px;
+            border-collapse: collapse;
+            width: 100%;
+        }
+        #sections-content th {
+            background-color: #f0f4f8;
+            color: #003366;
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 8px 12px;
+            border: 1px solid #e2e8f0;
+            text-align: left;
+        }
+        #sections-content td {
+            padding: 7px 12px;
+            border: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+        #sections-content tr:nth-child(even) td {
+            background-color: #fafafa;
+        }
+        /* Document footer */
+        #memo-content > div:last-child {
+            background-color: #f9fafb;
+            border-top: 1px solid #e5e7eb;
+        }
     </style>
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#0d131b] h-screen overflow-hidden flex font-display selection:bg-primary/20 selection:text-primary">
@@ -162,12 +247,6 @@
             </div>
         </div>
         <div class="flex items-center gap-3">
-            <!-- Collaborators -->
-            <div id="collaborators" class="flex -space-x-2 mr-2">
-                <div class="size-8 rounded-full border-2 border-white bg-[#003366] flex items-center justify-center"><span class="text-[10px] text-white font-bold">SC</span></div>
-                <div class="size-8 rounded-full border-2 border-white bg-[#004488] flex items-center justify-center"><span class="text-[10px] text-white font-bold">MT</span></div>
-                <div class="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-[10px] font-medium text-slate-500 hover:bg-slate-200 cursor-pointer transition-colors">+2</div>
-            </div>
             <button id="share-btn" class="flex items-center justify-center rounded-lg h-9 px-3 bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors gap-2">
                 <span class="material-symbols-outlined text-[20px]">share</span>
                 <span>Share</span>
@@ -224,28 +303,28 @@
         </aside>
 
         <!-- Center: Document Editor -->
-        <main id="editor-container" class="flex-1 overflow-y-auto bg-slate-100/50 p-4 md:p-8 flex justify-center custom-scrollbar">
-            <div id="memo-content" class="w-full max-w-[850px] bg-white min-h-[1100px] shadow-[0_2px_12px_-4px_rgba(0,0,0,0.1)] rounded-lg border border-slate-200 flex flex-col group/document">
+        <main id="editor-container" class="flex-1 overflow-y-auto p-8 flex justify-center items-start custom-scrollbar">
+            <div id="memo-content" class="w-full max-w-[850px] bg-white flex flex-col group/document">
 
                 <!-- Document Header -->
-                <div class="px-12 pt-12 pb-4 border-b border-transparent hover:border-slate-100 transition-colors">
-                    <h1 id="doc-title" class="text-3xl font-bold text-[#0d131b] tracking-tight mb-2">Investment Committee Memo</h1>
-                    <div class="flex items-center gap-6 text-sm text-slate-500">
-                        <span id="doc-project" class="font-medium text-slate-900">Project Apollo</span>
-                        <span>|</span>
+                <div class="px-14 pt-14 pb-6 border-b border-slate-200">
+                    <h1 id="doc-title" class="text-[26px] font-bold text-[#1a1a2e] tracking-tight mb-3 leading-tight">Investment Committee Memo</h1>
+                    <div class="flex items-center flex-wrap gap-x-5 gap-y-1 text-[13px] text-slate-500">
+                        <span id="doc-project" class="font-semibold text-slate-800">Project Apollo</span>
+                        <span class="text-slate-300">|</span>
                         <span id="doc-date">Date: October 24, 2023</span>
-                        <span>|</span>
+                        <span class="text-slate-300">|</span>
                         <span id="doc-sponsor">Sponsor: J. Smith (MD)</span>
                     </div>
                 </div>
 
                 <!-- Document Body -->
-                <div id="sections-content" class="px-12 py-8 flex-1 flex flex-col gap-8">
+                <div id="sections-content" class="px-14 py-10 flex-1 flex flex-col gap-10">
                     <!-- Sections will be rendered here by JS -->
                 </div>
 
                 <!-- Footer of Document -->
-                <div class="px-12 py-8 border-t border-slate-100 mt-auto bg-slate-50/50 rounded-b-lg">
+                <div class="px-14 py-6 border-t border-slate-200 mt-auto bg-slate-50/50">
                     <div class="flex justify-between text-xs text-slate-400">
                         <span>CONFIDENTIAL - FOR INTERNAL USE ONLY</span>
                         <span id="page-indicator">Page 1 of 12</span>

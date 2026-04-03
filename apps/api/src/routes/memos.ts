@@ -214,6 +214,19 @@ router.post('/', async (req, res) => {
 
     // Strip templateId, autoGenerate, templatePreset from memoData (not Memo table columns)
     const { templateId, autoGenerate, templatePreset, ...memoFields } = validation.data;
+
+    // Fetch deal name if dealId provided and no explicit project name
+    if (memoFields.dealId && (!memoFields.projectName || memoFields.projectName === 'New Project')) {
+      const { data: deal } = await supabase
+        .from('Deal')
+        .select('name')
+        .eq('id', memoFields.dealId)
+        .single();
+      if (deal?.name) {
+        memoFields.projectName = deal.name;
+      }
+    }
+
     const memoData = {
       ...memoFields,
       createdBy: user?.id,
