@@ -38,6 +38,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Initialize shared layout
         PELayout.init('settings', { collapsible: true });
 
+        // Initialize notifications (auth is ready now)
+        if (window.PENotifications) PENotifications.init();
+
         await loadUserProfile();
         initializeEventListeners();
         initializeSlider();

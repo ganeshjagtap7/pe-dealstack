@@ -101,10 +101,8 @@ function updateUserDisplay() {
     // Update header avatar
     const headerAvatar = document.querySelector('#user-menu-btn > div');
     if (headerAvatar) {
-        if (USER.avatar) {
-            headerAvatar.style.backgroundImage = `url('${USER.avatar}')`;
-        } else {
-            const initials = USER.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const initials = USER.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const showInitials = () => {
             headerAvatar.style.backgroundImage = '';
             headerAvatar.style.backgroundColor = PE_COLORS.primary;
             headerAvatar.style.display = 'flex';
@@ -114,6 +112,19 @@ function updateUserDisplay() {
             headerAvatar.style.fontSize = '12px';
             headerAvatar.style.fontWeight = 'bold';
             headerAvatar.innerHTML = initials;
+        };
+
+        if (USER.avatar) {
+            // Test if avatar URL loads, fallback to initials if broken
+            const testImg = new Image();
+            testImg.onload = () => {
+                headerAvatar.style.backgroundImage = `url('${USER.avatar}')`;
+                headerAvatar.innerHTML = '';
+            };
+            testImg.onerror = showInitials;
+            testImg.src = USER.avatar;
+        } else {
+            showInitials();
         }
     }
 
