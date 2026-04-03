@@ -686,9 +686,9 @@ function popUndo() {
 async function autoGenerateIfEmpty() {
     if (!state.memo?.id || !state.memo?.dealId) return;
 
-    // Check if ALL sections have no content
-    const allEmpty = state.sections.every(s => !s.content || s.content.trim() === '');
-    if (!allEmpty || state.sections.length === 0) return;
+    // Trigger generation if no sections exist OR all sections are empty
+    const allEmpty = state.sections.length === 0 || state.sections.every(s => !s.content || s.content.trim() === '');
+    if (!allEmpty) return;
 
     console.log('[Memo] All sections empty — triggering auto-generation');
     state.isGenerating = true;
