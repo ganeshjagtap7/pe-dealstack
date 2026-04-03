@@ -48,6 +48,7 @@ async function initAdminDashboard() {
     initModals();
     initCardScrollLinks();
     initResourceToggle();
+    initLoadMoreActivity();
     updateLastUpdated();
     setInterval(updateLastUpdated, 60000);
 
@@ -298,53 +299,135 @@ function initResourceToggle() {
 
 // ─── Activity Feed ───────────────────────────────────────────
 
-async function loadActivityFeed() {
+let activityOffset = 0;
+const ACTIVITY_PAGE_SIZE = 10;
+let allActivityLogs = [];
+
+async function loadActivityFeed(append = false) {
     const container = document.querySelector('.activity-timeline .space-y-5');
     if (!container) return;
 
+    if (!append) {
+        activityOffset = 0;
+        allActivityLogs = [];
+    }
+
     try {
-        const response = await PEAuth.authFetch(`${API_BASE_URL}/audit?limit=10`);
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/audit?limit=${ACTIVITY_PAGE_SIZE}&offset=${activityOffset}`);
         if (!response.ok) throw new Error('Failed to fetch audit logs');
 
         const data = await response.json();
         const logs = data.logs || [];
+        allActivityLogs = append ? allActivityLogs.concat(logs) : logs;
+        activityOffset += logs.length;
 
-        if (logs.length === 0) {
+        if (allActivityLogs.length === 0) {
             container.innerHTML = `
                 <div class="text-center py-8 text-text-muted">
-                    <span class="material-symbols-outlined text-[24px] mb-2 block">rss_feed</span>
-                    <p class="text-sm">No recent activity</p>
+                    <span class="material-symbols-outlined text-[32px] mb-2 block">rss_feed</span>
+                    <p class="text-sm font-medium">No activity yet</p>
+                    <p class="text-xs mt-1">Actions across your org will appear here</p>
                 </div>`;
+            updateLoadMoreButton(false);
             return;
         }
 
-        container.innerHTML = logs.map(log => {
-            const userName = log.userEmail?.split('@')[0] || 'System';
-            const initials = getInitials(userName);
-            const { text, icon } = formatAuditAction(log);
-            const timeAgo = getTimeAgo(log.createdAt);
-            const isAI = log.action?.startsWith('AI_');
+        // Group logs by day
+        const grouped = groupLogsByDay(allActivityLogs);
+        let html = '';
 
-            return `
-                <div class="flex gap-3 relative z-10">
-                    <div class="relative flex-shrink-0">
-                        <div class="w-9 h-9 rounded-full bg-primary text-white text-xs font-medium flex items-center justify-center">
-                            ${isAI ? '<span class="material-symbols-outlined text-[18px]">auto_awesome</span>' : initials}
-                        </div>
-                        <div class="absolute -bottom-0.5 -right-0.5 bg-primary rounded-full w-4 h-4 flex items-center justify-center border-2 border-white">
-                            <span class="material-symbols-outlined text-white text-[10px]">${icon}</span>
-                        </div>
-                    </div>
-                    <div class="flex-1 pt-0.5">
-                        <p class="text-sm text-text-main">
-                            <span class="font-semibold${isAI ? ' text-primary' : ''}">${isAI ? 'PE OS AI' : escapeHtml(userName)}</span> ${text}
-                        </p>
-                        <p class="text-xs text-text-muted mt-1">${timeAgo}</p>
-                    </div>
-                </div>`;
-        }).join('');
+        for (const [dayLabel, dayLogs] of grouped) {
+            html += `<p class="text-[10px] font-bold uppercase tracking-wider text-text-muted mt-2 mb-2 first:mt-0">${dayLabel}</p>`;
+            html += dayLogs.map(log => renderActivityItem(log)).join('');
+        }
+
+        container.innerHTML = html;
+
+        // Show/hide load more button
+        const hasMore = logs.length === ACTIVITY_PAGE_SIZE;
+        updateLoadMoreButton(hasMore);
+
     } catch (e) {
         console.warn('Could not load activity feed:', e);
+        if (!append) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-text-muted">
+                    <span class="material-symbols-outlined text-[32px] mb-2 block">cloud_off</span>
+                    <p class="text-sm font-medium">Could not load activity</p>
+                    <button onclick="loadActivityFeed()" class="mt-3 text-sm text-primary font-medium hover:text-primary-hover transition-colors">Retry</button>
+                </div>`;
+        }
+    }
+}
+
+function groupLogsByDay(logs) {
+    const groups = new Map();
+    const now = new Date();
+    const today = now.toDateString();
+    const yesterday = new Date(now.getTime() - 86400000).toDateString();
+
+    for (const log of logs) {
+        const date = new Date(log.createdAt);
+        const dateStr = date.toDateString();
+        let label;
+
+        if (dateStr === today) label = 'Today';
+        else if (dateStr === yesterday) label = 'Yesterday';
+        else label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        if (!groups.has(label)) groups.set(label, []);
+        groups.get(label).push(log);
+    }
+
+    return groups;
+}
+
+function renderActivityItem(log) {
+    const userName = log.userEmail?.split('@')[0] || 'System';
+    const initials = getInitials(userName);
+    const { text, icon } = formatAuditAction(log);
+    const timeAgo = getTimeAgo(log.createdAt);
+    const isAI = log.action?.startsWith('AI_');
+
+    return `
+        <div class="flex gap-3 relative z-10 mb-4">
+            <div class="relative flex-shrink-0">
+                <div class="w-9 h-9 rounded-full text-white text-xs font-medium flex items-center justify-center" style="background-color: #003366">
+                    ${isAI ? '<span class="material-symbols-outlined text-[18px]">auto_awesome</span>' : initials}
+                </div>
+                <div class="absolute -bottom-0.5 -right-0.5 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white" style="background-color: #003366">
+                    <span class="material-symbols-outlined text-white text-[10px]">${icon}</span>
+                </div>
+            </div>
+            <div class="flex-1 pt-0.5">
+                <p class="text-sm text-text-main">
+                    <span class="font-semibold${isAI ? ' text-primary' : ''}">${isAI ? 'PE OS AI' : escapeHtml(userName)}</span> ${text}
+                </p>
+                <p class="text-xs text-text-muted mt-1">${timeAgo}</p>
+            </div>
+        </div>`;
+}
+
+function updateLoadMoreButton(hasMore) {
+    const btn = document.getElementById('load-more-activity');
+    if (!btn) return;
+    if (hasMore) {
+        btn.style.display = '';
+        btn.textContent = 'VIEW FULL HISTORY';
+        btn.disabled = false;
+    } else {
+        btn.style.display = 'none';
+    }
+}
+
+function initLoadMoreActivity() {
+    const btn = document.getElementById('load-more-activity');
+    if (btn) {
+        btn.addEventListener('click', async () => {
+            btn.textContent = 'LOADING...';
+            btn.disabled = true;
+            await loadActivityFeed(true);
+        });
     }
 }
 
