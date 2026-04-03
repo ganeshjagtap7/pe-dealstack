@@ -41,6 +41,41 @@ const COMPLETED_STATUS = {
   },
 };
 
+/**
+ * Fire-and-forget helper to mark an onboarding step complete.
+ * Used by other routes (documents, invitations) to auto-detect steps.
+ * Never throws — onboarding must never block core functionality.
+ */
+export async function tryCompleteOnboardingStep(userId: string, step: string): Promise<void> {
+  try {
+    if (!VALID_STEPS.includes(step)) return;
+
+    const { data: user } = await supabase
+      .from('User')
+      .select('onboardingStatus')
+      .eq('id', userId)
+      .single();
+
+    const status = user?.onboardingStatus || { ...DEFAULT_STATUS };
+    if (!status.steps) status.steps = { ...DEFAULT_STATUS.steps };
+    if (status.steps[step]) return; // Already complete
+
+    status.steps[step] = true;
+
+    const allComplete = VALID_STEPS.every(s => status.steps[s]);
+    if (allComplete && !status.completedAt) {
+      status.completedAt = new Date().toISOString();
+    }
+
+    await supabase
+      .from('User')
+      .update({ onboardingStatus: status })
+      .eq('id', userId);
+  } catch (e) {
+    // Silent — never block core routes
+  }
+}
+
 // GET /api/onboarding/status
 router.get('/status', async (req: Request, res: Response) => {
   try {
