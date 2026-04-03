@@ -42,6 +42,7 @@ const createDealSchema = z.object({
   tags: z.array(z.string()).optional(),
   targetCloseDate: z.string().nullable().optional(),
   source: z.string().nullable().optional(),
+  customFields: z.record(z.string(), z.any()).optional().default({}),
 });
 
 const updateDealSchema = createDealSchema.partial();
@@ -279,6 +280,7 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) =>
         tags: data.tags,
         targetCloseDate: data.targetCloseDate,
         source: data.source,
+        customFields: data.customFields || {},
         organizationId: orgId,
       })
       .select(`
