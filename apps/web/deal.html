@@ -288,86 +288,8 @@
                     </div>
                 </div>
 
-                <!-- Financial Metrics -->
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
-                    <!-- Revenue Card -->
-                    <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div
-                            class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all">
-                        </div>
-                        <p
-                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
-                            Revenue (LTM)</p>
-                        <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-revenue" class="text-lg font-bold text-text-muted leading-none">Not
-                                available</span>
-                            <span id="revenue-growth-badge"
-                                class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">
-                                <span class="material-symbols-outlined text-[12px]">arrow_upward</span><span
-                                    id="revenue-growth-value"></span>
-                            </span>
-                        </div>
-                        <div id="revenue-chart" class="h-10 mt-3 w-full flex items-end gap-1 opacity-80">
-                        </div>
-                    </div>
-                    <!-- EBITDA Card -->
-                    <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div
-                            class="absolute -right-4 -top-4 size-20 bg-primary/5 rounded-full blur-xl group-hover:bg-primary/10 transition-all">
-                        </div>
-                        <p
-                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
-                            EBITDA Margin</p>
-                        <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-ebitda" class="text-lg font-bold text-text-muted leading-none">Not
-                                available</span>
-                            <span id="ebitda-trend-badge"
-                                class="text-[10px] font-bold text-text-muted bg-background-body border border-border-subtle px-1.5 py-0.5 rounded inline-flex items-center hidden"></span>
-                        </div>
-                        <div class="h-10 mt-3 w-full flex items-center">
-                            <div class="w-full h-2 bg-border-subtle rounded-full overflow-hidden">
-                                <div id="ebitda-bar" class="h-full bg-primary rounded-full transition-all"
-                                    style="width: 0%"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <!-- Deal Size Card -->
-                    <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div
-                            class="absolute -right-4 -top-4 size-20 bg-purple-500/5 rounded-full blur-xl group-hover:bg-purple-500/10 transition-all">
-                        </div>
-                        <p
-                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
-                            Deal Size</p>
-                        <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-size" class="text-lg font-bold text-text-muted leading-none">Not
-                                available</span>
-                        </div>
-                        <div class="h-10 mt-3 flex items-center">
-                            <p id="deal-multiple"
-                                class="text-xs text-text-muted font-medium leading-tight italic opacity-50">Add via Edit
-                                Deal</p>
-                        </div>
-                    </div>
-                    <!-- IRR Card -->
-                    <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
-                        <div
-                            class="absolute -right-4 -top-4 size-20 bg-secondary/5 rounded-full blur-xl group-hover:bg-secondary/10 transition-all">
-                        </div>
-                        <p
-                            class="text-[11px] text-text-muted font-bold uppercase tracking-wide h-4 whitespace-nowrap overflow-hidden">
-                            Projected IRR</p>
-                        <div class="flex items-center gap-2 mt-3 h-9">
-                            <span id="deal-irr" class="text-lg font-bold text-text-muted leading-none">Not
-                                available</span>
-                            <span id="irr-target-badge"
-                                class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded inline-flex items-center hidden">Target</span>
-                        </div>
-                        <div class="h-10 mt-3 flex items-center gap-2">
-                            <span class="text-xs text-text-muted font-medium">MoM:</span>
-                            <span id="deal-mom" class="text-sm font-bold text-text-main">&mdash;</span>
-                        </div>
-                    </div>
+                <!-- Dynamic Financial Metrics (only shows metrics that have data) -->
+                <div id="deal-metrics-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
                 </div>
 
                 <!-- Financials Section -->

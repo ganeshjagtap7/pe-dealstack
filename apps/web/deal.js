@@ -197,97 +197,8 @@ function populateDealPage(deal) {
     const iconContainer = document.getElementById('deal-icon');
     if (iconContainer && deal.icon) iconContainer.textContent = deal.icon;
 
-    // Stage and industry are shown in breadcrumb and pipeline — no duplicate badges needed
-
-    // Update financial metrics with graceful empty states
-    const revenueEl = document.getElementById('deal-revenue');
-    if (revenueEl) {
-        if (deal.revenue != null) {
-            revenueEl.textContent = formatCurrency(deal.revenue);
-            revenueEl.classList.remove('text-text-muted', 'text-lg');
-            revenueEl.classList.add('text-text-main', 'text-2xl');
-        } else {
-            revenueEl.textContent = 'Not available';
-            revenueEl.classList.remove('text-text-main', 'text-2xl');
-            revenueEl.classList.add('text-text-muted', 'text-lg');
-        }
-    }
-    // Revenue chart placeholder
-    const revenueChart = document.getElementById('revenue-chart');
-    if (revenueChart) {
-        if (deal.revenue != null) {
-            revenueChart.innerHTML = '<div class="flex-1 bg-secondary/60 h-[40%] rounded-t-sm"></div><div class="flex-1 bg-secondary/60 h-[50%] rounded-t-sm"></div><div class="flex-1 bg-secondary/60 h-[45%] rounded-t-sm"></div><div class="flex-1 bg-secondary/60 h-[60%] rounded-t-sm"></div><div class="flex-1 bg-secondary h-[80%] rounded-t-sm"></div>';
-        } else {
-            revenueChart.innerHTML = '<p class="text-[10px] text-text-muted/50 italic self-center">Add via Edit Deal</p>';
-        }
-    }
-
-    const ebitdaEl = document.getElementById('deal-ebitda');
-    if (ebitdaEl) {
-        if (deal.ebitda && deal.revenue) {
-            const margin = ((deal.ebitda / deal.revenue) * 100).toFixed(0);
-            ebitdaEl.textContent = margin + '%';
-            ebitdaEl.classList.remove('text-text-muted', 'text-lg');
-            ebitdaEl.classList.add('text-text-main', 'text-2xl');
-            const ebitdaBar = document.getElementById('ebitda-bar');
-            if (ebitdaBar) ebitdaBar.style.width = Math.min(parseInt(margin), 100) + '%';
-        } else {
-            ebitdaEl.textContent = 'Not available';
-            ebitdaEl.classList.remove('text-text-main', 'text-2xl');
-            ebitdaEl.classList.add('text-text-muted', 'text-lg');
-        }
-    }
-
-    const dealSizeEl = document.getElementById('deal-size');
-    if (dealSizeEl) {
-        if (deal.dealSize != null) {
-            dealSizeEl.textContent = formatCurrency(deal.dealSize);
-            dealSizeEl.classList.remove('text-text-muted', 'text-lg');
-            dealSizeEl.classList.add('text-text-main', 'text-2xl');
-        } else {
-            dealSizeEl.textContent = 'Not available';
-            dealSizeEl.classList.remove('text-text-main', 'text-2xl');
-            dealSizeEl.classList.add('text-text-muted', 'text-lg');
-        }
-    }
-
-    // Update EBITDA multiple
-    const multipleEl = document.getElementById('deal-multiple');
-    if (multipleEl) {
-        if (deal.dealSize && deal.ebitda) {
-            const multiple = (deal.dealSize / deal.ebitda).toFixed(1);
-            multipleEl.textContent = `~${multiple}x EBITDA Multiple`;
-        } else {
-            multipleEl.textContent = 'Add via Edit Deal';
-            multipleEl.classList.add('italic', 'opacity-50');
-        }
-    }
-
-    // Update IRR
-    const irrEl = document.getElementById('deal-irr');
-    if (irrEl) {
-        if (deal.irrProjected) {
-            irrEl.textContent = deal.irrProjected.toFixed(1) + '%';
-            irrEl.classList.remove('text-text-muted', 'text-lg');
-            irrEl.classList.add('text-text-main', 'text-2xl');
-            const irrBadge = document.getElementById('irr-target-badge');
-            if (irrBadge) irrBadge.classList.remove('hidden');
-        } else {
-            irrEl.textContent = 'Not available';
-            irrEl.classList.remove('text-text-main', 'text-2xl');
-            irrEl.classList.add('text-text-muted', 'text-lg');
-        }
-    }
-
-    // Update MoM
-    const momEl = document.getElementById('deal-mom');
-    if (momEl) {
-        if (deal.mom) {
-            momEl.textContent = deal.mom.toFixed(1) + 'x';
-        } else {
-            momEl.textContent = '\u2014';
-        }
-    }
+    // Dynamic financial metrics — only show cards with data, prioritized by relevance
+    renderDynamicMetrics(deal);
 
     // Update last updated
     const lastUpdated = document.getElementById('deal-updated');
@@ -462,5 +373,148 @@ style.textContent = `
     }
 `;
 document.head.appendChild(style);
+
+// ============================================================
+// Dynamic Financial Metrics
+// ============================================================
+function renderDynamicMetrics(deal) {
+    const grid = document.getElementById('deal-metrics-grid');
+    if (!grid) return;
+
+    // Define all possible metrics in priority order
+    const allMetrics = [
+        {
+            key: 'revenue',
+            label: 'Revenue (LTM)',
+            value: deal.revenue,
+            format: () => formatCurrency(deal.revenue),
+            color: 'secondary',
+            extra: () => {
+                // Mini bar chart
+                return '<div class="h-8 mt-2 w-full flex items-end gap-1 opacity-80">' +
+                    '<div class="flex-1 bg-secondary/60 h-[40%] rounded-t-sm"></div>' +
+                    '<div class="flex-1 bg-secondary/60 h-[50%] rounded-t-sm"></div>' +
+                    '<div class="flex-1 bg-secondary/60 h-[45%] rounded-t-sm"></div>' +
+                    '<div class="flex-1 bg-secondary/60 h-[60%] rounded-t-sm"></div>' +
+                    '<div class="flex-1 bg-secondary h-[80%] rounded-t-sm"></div></div>';
+            }
+        },
+        {
+            key: 'ebitdaMargin',
+            label: 'EBITDA Margin',
+            value: (deal.ebitda && deal.revenue) ? deal.ebitda : null,
+            format: () => ((deal.ebitda / deal.revenue) * 100).toFixed(0) + '%',
+            color: 'primary',
+            extra: () => {
+                const margin = Math.min(Math.round((deal.ebitda / deal.revenue) * 100), 100);
+                return '<div class="h-8 mt-2 w-full flex items-center">' +
+                    '<div class="w-full h-2 bg-border-subtle rounded-full overflow-hidden">' +
+                    `<div class="h-full rounded-full transition-all" style="width:${margin}%;background-color:#003366;"></div>` +
+                    '</div></div>';
+            }
+        },
+        {
+            key: 'ebitda',
+            label: 'EBITDA',
+            value: deal.ebitda,
+            format: () => formatCurrency(deal.ebitda),
+            color: 'primary',
+        },
+        {
+            key: 'dealSize',
+            label: 'Deal Size',
+            value: deal.dealSize,
+            format: () => formatCurrency(deal.dealSize),
+            color: 'purple-500',
+            extra: () => {
+                if (deal.dealSize && deal.ebitda) {
+                    const multiple = (deal.dealSize / deal.ebitda).toFixed(1);
+                    return `<p class="text-xs text-text-muted font-medium mt-2">~${multiple}x EBITDA Multiple</p>`;
+                }
+                return '';
+            }
+        },
+        {
+            key: 'irr',
+            label: 'Projected IRR',
+            value: deal.irrProjected,
+            format: () => deal.irrProjected.toFixed(1) + '%',
+            color: 'secondary',
+            badge: 'Target',
+            extra: () => {
+                if (deal.mom) {
+                    return `<p class="text-xs text-text-muted font-medium mt-2">MoM: <span class="font-bold text-text-main">${deal.mom.toFixed(1)}x</span></p>`;
+                }
+                return '';
+            }
+        },
+        {
+            key: 'mom',
+            label: 'Money Multiple',
+            value: deal.mom,
+            format: () => deal.mom.toFixed(1) + 'x',
+            color: 'secondary',
+        },
+        {
+            key: 'grossMargin',
+            label: 'Gross Margin',
+            value: (deal.revenue && deal.ebitda && deal.revenue > deal.ebitda) ? deal.revenue : null,
+            format: () => {
+                // Estimate: if we have EBITDA margin, gross is typically higher
+                const ebitdaMargin = (deal.ebitda / deal.revenue) * 100;
+                const estimated = Math.min(ebitdaMargin + 15, 95);
+                return estimated.toFixed(0) + '%';
+            },
+            color: 'secondary',
+            badge: 'Est.',
+        },
+    ];
+
+    // Filter to only metrics with data, take up to 4
+    const available = allMetrics.filter(m => m.value != null);
+
+    // If EBITDA + revenue both exist, prefer ebitdaMargin over raw ebitda
+    const hasMargin = available.some(m => m.key === 'ebitdaMargin');
+    const filtered = available.filter(m => !(m.key === 'ebitda' && hasMargin));
+
+    // If IRR exists, skip standalone MoM (it's shown as sub-text under IRR)
+    const hasIRR = filtered.some(m => m.key === 'irr');
+    const final = filtered.filter(m => !(m.key === 'mom' && hasIRR));
+
+    // Skip estimated gross margin if we already have 4+ real metrics
+    const realMetrics = final.filter(m => m.key !== 'grossMargin');
+    const metrics = realMetrics.length >= 4 ? realMetrics.slice(0, 4) : final.slice(0, 4);
+
+    if (metrics.length === 0) {
+        grid.innerHTML = `
+            <div class="col-span-full glass-panel p-6 rounded-xl text-center">
+                <span class="material-symbols-outlined text-text-muted text-3xl mb-2">analytics</span>
+                <p class="text-text-muted text-sm">No financial metrics yet. Upload a CIM or edit the deal to add data.</p>
+            </div>`;
+        return;
+    }
+
+    // Adjust grid columns based on how many metrics we have
+    const cols = metrics.length <= 2 ? 'grid-cols-2' : 'grid-cols-2 lg:grid-cols-' + Math.min(metrics.length, 4);
+    grid.className = `grid ${cols} gap-4 mb-8 items-stretch`;
+
+    grid.innerHTML = metrics.map(m => {
+        const badgeHtml = m.badge
+            ? `<span class="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded">${m.badge}</span>`
+            : '';
+        const extraHtml = m.extra ? m.extra() : '';
+
+        return `
+            <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
+                <div class="absolute -right-4 -top-4 size-20 bg-${m.color}/5 rounded-full blur-xl group-hover:bg-${m.color}/10 transition-all"></div>
+                <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide">${m.label}</p>
+                <div class="flex items-center gap-2 mt-3">
+                    <span class="text-2xl font-bold text-text-main leading-none">${m.format()}</span>
+                    ${badgeHtml}
+                </div>
+                ${extraHtml}
+            </div>`;
+    }).join('');
+}
 
 console.log('PE OS Deal Intelligence page fully initialized');
