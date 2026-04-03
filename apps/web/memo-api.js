@@ -141,6 +141,7 @@ async function loadMemoFromAPI(memoId) {
         // Transform API data to match our state structure
         state.memo = {
             id: memo.id,
+            dealId: memo.dealId || null,
             title: memo.title,
             projectName: memo.projectName || memo.deal?.name || 'Untitled Project',
             type: memo.type,
