@@ -189,9 +189,6 @@ function populateDealPage(deal) {
     const breadcrumbDeal = document.getElementById('breadcrumb-deal');
     if (breadcrumbDeal) breadcrumbDeal.textContent = deal.name || 'Untitled Deal';
 
-    const breadcrumbIndustry = document.getElementById('breadcrumb-industry');
-    if (breadcrumbIndustry) breadcrumbIndustry.textContent = deal.industry || 'Deal';
-
     // Update deal header
     const dealTitle = document.getElementById('deal-title');
     if (dealTitle) dealTitle.textContent = deal.name;
