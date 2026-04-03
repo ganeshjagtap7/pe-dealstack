@@ -69,73 +69,61 @@
 <!-- Onboarding Checklist (shown for new users) -->
 <div id="onboarding-checklist-container"></div>
 
-<!-- Stats Cards -->
+<!-- Pipeline Stats (loaded dynamically from real deal data) -->
 <div id="stats-cards" data-widget="stats-cards" class="widget-container grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-<!-- Sourcing Card -->
-<div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
-<div class="flex items-center justify-between">
-<span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Sourcing</span>
-<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">travel_explore</span>
+    <div class="col-span-full text-center py-4 text-text-muted text-sm">Loading pipeline...</div>
 </div>
-<div class="flex items-end gap-2 mt-3">
-<span class="text-3xl font-bold text-primary tracking-tight">18</span>
-<span class="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">
-<span class="material-symbols-outlined text-[14px] mr-0.5">arrow_upward</span> 2 new
-</span>
-</div>
-<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-<div class="bg-blue-400 h-1.5 rounded-full" style="width: 75%"></div>
-</div>
-</div>
+<script>
+(async function loadPipelineStats() {
+    const container = document.getElementById('stats-cards');
+    if (!container) return;
+    // Wait for auth
+    const waitForAuth = () => new Promise(resolve => {
+        const check = setInterval(() => {
+            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
+        }, 100);
+        setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+    });
+    await waitForAuth();
+    try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
+        if (!resp.ok) throw new Error('Failed');
+        const deals = await resp.json();
+        const active = deals.filter(d => d.status !== 'ARCHIVED');
 
-<!-- Due Diligence Card (Active) -->
-<div class="relative flex flex-col gap-1 rounded-lg border border-primary bg-surface-card p-5 shadow-glow cursor-pointer group">
-<div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-3xl"></div>
-<div class="flex items-center justify-between relative z-10">
-<span class="text-xs font-bold uppercase tracking-wider text-primary">Due Diligence</span>
-<span class="material-symbols-outlined text-primary text-[20px]">saved_search</span>
-</div>
-<div class="flex items-end gap-2 mt-3 relative z-10">
-<span class="text-3xl font-bold text-text-main tracking-tight">4</span>
-<span class="text-xs font-medium text-text-secondary mb-1.5">Active deals</span>
-</div>
-<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden relative z-10">
-<div class="bg-primary h-1.5 rounded-full" style="width: 100%"></div>
-</div>
-</div>
+        const stages = [
+            { label: 'Sourcing', key: 'INITIAL_REVIEW', icon: 'travel_explore', color: 'blue-400' },
+            { label: 'Due Diligence', key: 'DUE_DILIGENCE', icon: 'saved_search', color: 'primary' },
+            { label: 'LOI / Offer', key: 'LOI_SUBMITTED', icon: 'description', color: 'orange-400', also: ['IOI_SUBMITTED'] },
+            { label: 'Closed', key: 'CLOSED_WON', icon: 'verified', color: 'secondary', also: ['CLOSING', 'NEGOTIATION'] },
+        ];
 
-<!-- LOI / Offer Card -->
-<div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
-<div class="flex items-center justify-between">
-<span class="text-xs font-bold uppercase tracking-wider text-text-secondary">LOI / Offer</span>
-<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">description</span>
-</div>
-<div class="flex items-end gap-2 mt-3">
-<span class="text-3xl font-bold text-text-main tracking-tight">2</span>
-<span class="text-xs font-medium text-text-secondary mb-1.5">Waiting response</span>
-</div>
-<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-<div class="bg-orange-400 h-1.5 rounded-full" style="width: 40%"></div>
-</div>
-</div>
-
-<!-- Closed Card -->
-<div class="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
-<div class="flex items-center justify-between">
-<span class="text-xs font-bold uppercase tracking-wider text-text-secondary">Closed (Q4)</span>
-<span class="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">verified</span>
-</div>
-<div class="flex items-end gap-2 mt-3">
-<span class="text-3xl font-bold text-text-main tracking-tight">$42M</span>
-<span class="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">
-+12% vs Q3
-</span>
-</div>
-<div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-<div class="bg-secondary h-1.5 rounded-full" style="width: 100%"></div>
-</div>
-</div>
-</div>
+        const total = Math.max(active.length, 1);
+        container.innerHTML = stages.map(s => {
+            const keys = [s.key, ...(s.also || [])];
+            const count = active.filter(d => keys.includes(d.stage)).length;
+            const pct = Math.round((count / total) * 100);
+            const isHighlight = s.key === 'DUE_DILIGENCE' && count > 0;
+            return `
+                <div class="relative flex flex-col gap-1 rounded-lg border ${isHighlight ? 'border-primary shadow-glow' : 'border-border-subtle shadow-card hover:shadow-card-hover hover:border-primary/30'} bg-surface-card p-5 transition-all cursor-pointer group">
+                    <div class="flex items-center justify-between">
+                        <span class="text-xs font-bold uppercase tracking-wider ${isHighlight ? 'text-primary' : 'text-text-secondary'}">${s.label}</span>
+                        <span class="material-symbols-outlined ${isHighlight ? 'text-primary' : 'text-text-muted group-hover:text-primary'} transition-colors text-[20px]">${s.icon}</span>
+                    </div>
+                    <div class="flex items-end gap-2 mt-3">
+                        <span class="text-3xl font-bold ${count > 0 ? 'text-text-main' : 'text-text-muted'} tracking-tight">${count}</span>
+                        <span class="text-xs font-medium text-text-secondary mb-1.5">${count === 1 ? 'deal' : 'deals'}</span>
+                    </div>
+                    <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
+                        <div class="bg-${s.color} h-1.5 rounded-full transition-all" style="width: ${pct}%"></div>
+                    </div>
+                </div>`;
+        }).join('');
+    } catch (e) {
+        container.innerHTML = '<div class="col-span-full text-center py-4 text-text-muted text-sm">No pipeline data yet</div>';
+    }
+})();
+</script>
 
 <!-- Main Content Grid -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
