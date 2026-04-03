@@ -145,6 +145,16 @@
                     openDealIntakeModal();
                 });
             }
+
+            // Wire up the "Import Deals" button
+            const importBtn = document.getElementById('import-deals-btn');
+            if (importBtn) {
+                importBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    openDealImportModal();
+                });
+            }
         }
 
         // Initialize view toggle
