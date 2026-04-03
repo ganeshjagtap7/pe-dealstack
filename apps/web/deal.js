@@ -35,6 +35,11 @@ function parseMarkdown(text) {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
 
+    // Headings: ### text, ## text, # text
+    html = html.replace(/^#{3}\s+(.+)$/gm, '<h4 class="font-bold text-text-main text-sm mt-3 mb-1">$1</h4>');
+    html = html.replace(/^#{2}\s+(.+)$/gm, '<h3 class="font-bold text-text-main text-base mt-3 mb-1">$1</h3>');
+    html = html.replace(/^#{1}\s+(.+)$/gm, '<h3 class="font-bold text-text-main text-base mt-3 mb-1">$1</h3>');
+
     // Bold: **text** or __text__
     html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     html = html.replace(/__(.+?)__/g, '<strong>$1</strong>');
@@ -222,7 +227,9 @@ function populateDealPage(deal) {
 
     const leadPartnerName = document.getElementById('lead-partner-name');
     if (leadPartnerName) {
-        leadPartnerName.textContent = leadPartner?.user?.name || '\u2014';
+        // Fallback: if no LEAD team member, show assignedUser (deal creator)
+        const leadName = leadPartner?.user?.name || deal.assignedUser?.name || null;
+        leadPartnerName.textContent = leadName || '\u2014';
     }
 
     const analystName = document.getElementById('analyst-name');
