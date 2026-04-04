@@ -295,8 +295,8 @@ function renderTable(tableData) {
                     ${rows}
                 </tbody>
             </table>
-            <div class="bg-slate-50 border-t border-slate-200 px-4 py-2">
-                <p class="text-[10px] text-slate-500">${tableData.footnote} <span class="underline cursor-pointer hover:text-primary ml-1">[Link to Source]</span></p>
+            ${tableData.footnote ? `<div class="bg-slate-50 border-t border-slate-200 px-4 py-2">
+                <p class="text-[10px] text-slate-500">${tableData.footnote}</p>` : `<div>`}
             </div>
         </div>
     `;

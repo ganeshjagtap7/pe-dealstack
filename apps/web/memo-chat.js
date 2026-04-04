@@ -60,6 +60,26 @@ function renderPromptChips() {
 }
 
 // ============================================================
+// Simple Markdown → HTML converter for AI chat responses
+// ============================================================
+function mdToHtml(text) {
+    if (!text) return '';
+    if (text.trim().startsWith('<')) return text; // Already HTML
+    return text
+        .replace(/### (.+)/g, '<h4 class="font-bold text-slate-800 mt-3 mb-1">$1</h4>')
+        .replace(/## (.+)/g, '<h3 class="font-bold text-slate-800 mt-3 mb-1">$1</h3>')
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.+?)\*/g, '<em>$1</em>')
+        .replace(/^- (.+)/gm, '<li>$1</li>')
+        .replace(/(<li>.*<\/li>)/s, '<ul class="list-disc pl-5 my-1">$1</ul>')
+        .replace(/^\d+\. (.+)/gm, '<li>$1</li>')
+        .replace(/\n{2,}/g, '</p><p class="mt-2">')
+        .replace(/\n/g, '<br>')
+        .replace(/^(?!<)/, '<p>')
+        .replace(/(?!>)$/, '</p>');
+}
+
+// ============================================================
 // Chat Rendering
 // ============================================================
 function renderMessages() {
@@ -179,7 +199,7 @@ async function sendMessage() {
                 role: 'assistant',
                 content: (() => {
                     const text = apiResponse.content || apiResponse.message || '';
-                    return text.startsWith('<') ? text : `<p>${text}</p>`;
+                    return mdToHtml(text);
                 })(),
                 timestamp: apiResponse.timestamp ? formatTime(new Date(apiResponse.timestamp)) : 'Just now'
             };
@@ -207,7 +227,7 @@ async function sendMessage() {
                 role: 'assistant',
                 content: (() => {
                     const text = apiResponse.content || apiResponse.message || '';
-                    return text.startsWith('<') ? text : `<p>${text}</p>`;
+                    return mdToHtml(text);
                 })(),
                 timestamp: apiResponse.timestamp ? formatTime(new Date(apiResponse.timestamp)) : 'Just now'
             };
@@ -399,7 +419,7 @@ function renderConfirmMessage(response) {
         '<div class="flex flex-col gap-2">' +
             '<span class="text-xs font-medium text-gray-500">AI Analyst</span>' +
             '<div class="bg-white border border-gray-200 rounded-2xl rounded-tl-none p-4 shadow-sm">' +
-                '<p class="text-sm text-gray-800 mb-3">' + escapeHtml(response.content || response.message || '') + '</p>' +
+                '<div class="text-sm text-gray-800 mb-3">' + mdToHtml(response.content || response.message || '') + '</div>' +
                 '<div class="bg-gray-50 rounded-lg p-3 mb-3 text-xs text-gray-600 border">' +
                     '<span class="font-medium">Proposed ' + typeLabel + '</span>' +
                 '</div>' +
