@@ -248,24 +248,38 @@ function renderSection(section, index) {
 }
 
 function renderTable(tableData) {
+    if (!tableData) return '';
+
+    // Handle both formats: {headers, rows} and raw key-value objects
+    if (!tableData.headers || !tableData.rows) {
+        // Try to render as a simple key-value table
+        if (typeof tableData === 'object') {
+            const entries = Object.entries(tableData).filter(([k]) => k !== 'footnote');
+            if (entries.length === 0) return '';
+            const rows = entries.map(([k, v]) => `<tr class="hover:bg-slate-50/50"><td class="px-4 py-2.5 font-medium text-slate-800">${k}</td><td class="px-4 py-2.5 text-right text-slate-600 font-mono">${v}</td></tr>`).join('');
+            return `<div class="my-4 rounded-lg border border-slate-200 overflow-hidden"><table class="w-full text-sm"><tbody>${rows}</tbody></table></div>`;
+        }
+        return '';
+    }
+
     const headerCells = tableData.headers.map((h, i) => {
-        const isHighlight = h === 'FY23E';
-        return `<th class="px-4 py-3 font-semibold ${i === 0 ? 'w-1/3' : 'text-right'} ${isHighlight ? 'text-primary bg-blue-50/50' : ''}">${h}</th>`;
+        return `<th class="px-4 py-3 font-semibold ${i === 0 ? 'w-1/3' : 'text-right'}">${h}</th>`;
     }).join('');
 
     const rows = tableData.rows.map(row => {
         const metricClass = row.isBold ? 'font-bold text-slate-900' : (row.isSubMetric ? 'pl-8 text-slate-500 italic' : 'font-medium text-slate-800');
         const rowClass = row.isBold ? 'hover:bg-slate-50/50 bg-slate-50/30' : 'hover:bg-slate-50/50';
 
-        const valueCells = row.values.map((v, i) => {
-            const isHighlightCol = tableData.headers[i + 1] === row.highlight;
+        // Handle both array values and missing values gracefully
+        const values = Array.isArray(row.values) ? row.values : [];
+        const valueCells = values.map((v, i) => {
             const valueClass = row.isBold ? 'text-slate-800' : (row.isSubMetric ? 'text-slate-500' : 'text-slate-600');
-            return `<td class="px-4 py-2.5 text-right ${valueClass} font-mono ${isHighlightCol ? 'bg-blue-50/30' : ''} ${row.isBold && isHighlightCol ? 'font-bold text-slate-900' : ''}">${v}</td>`;
+            return `<td class="px-4 py-2.5 text-right ${valueClass} font-mono">${v ?? ''}</td>`;
         }).join('');
 
         return `
             <tr class="${rowClass}">
-                <td class="px-4 py-2.5 ${metricClass}">${row.metric}</td>
+                <td class="px-4 py-2.5 ${metricClass}">${row.metric || ''}</td>
                 ${valueCells}
             </tr>
         `;
