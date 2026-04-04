@@ -18,7 +18,7 @@ function renderTaskTable() {
     if (allTasks.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="px-5 py-12 text-center text-text-muted">
+                <td colspan="7" class="px-5 py-12 text-center text-text-muted">
                     <span class="material-symbols-outlined text-[32px] mb-2 block">task_alt</span>
                     <p class="text-sm font-medium">No tasks yet</p>
                     <p class="text-xs mt-1 mb-3">Create your first task to start tracking work</p>
@@ -75,6 +75,11 @@ function renderTaskTable() {
                             </div>
                         </div>
                     </div>
+                </td>
+                <td class="px-5 py-4">
+                    <button onclick="deleteTask(event, '${task.id}', '${escapeHtml(task.title).replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-accent-danger hover:bg-red-50 rounded-lg transition-colors" title="Delete task">
+                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
                 </td>
             </tr>`;
     }).join('');
@@ -368,7 +373,7 @@ function applyTaskFilterSort() {
     if (filtered.length === 0) {
         tbody.innerHTML = `
             <tr>
-                <td colspan="6" class="px-5 py-12 text-center text-text-muted">
+                <td colspan="7" class="px-5 py-12 text-center text-text-muted">
                     <span class="material-symbols-outlined text-[32px] mb-2 block">filter_list_off</span>
                     <p class="text-sm font-medium">No tasks match this filter</p>
                 </td>
@@ -398,6 +403,11 @@ function applyTaskFilterSort() {
                     ${deal ? `<span class="text-primary font-medium cursor-pointer hover:underline" onclick="window.location.href='/deal.html?id=${deal.id}'">${escapeHtml(deal.name)}</span>` : '<span class="text-text-muted text-xs">\u2014</span>'}
                 </td>
                 <td class="px-5 py-4">${renderStatusBadge(task.status, isOverdue)}</td>
+                <td class="px-5 py-4">
+                    <button onclick="deleteTask(event, '${task.id}', '${escapeHtml(task.title).replace(/'/g, "\\'")}')" class="p-1.5 text-text-muted hover:text-accent-danger hover:bg-red-50 rounded-lg transition-colors" title="Delete task">
+                        <span class="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                </td>
             </tr>`;
     }).join('');
 }
@@ -452,3 +462,31 @@ async function updateTaskStatus(taskId, newStatus) {
 document.addEventListener('click', () => {
     document.querySelectorAll('[id^="status-dropdown-"]').forEach(d => d.classList.add('hidden'));
 });
+
+// ─── Delete Task ─────────────────────────────────────────────
+
+async function deleteTask(event, taskId, taskTitle) {
+    event.stopPropagation();
+
+    if (!confirm(`Delete task "${taskTitle}"? This cannot be undone.`)) return;
+
+    try {
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/tasks/${taskId}`, {
+            method: 'DELETE',
+        });
+
+        if (response.ok) {
+            // Remove from local array
+            allTasks = allTasks.filter(t => t.id !== taskId);
+            renderTaskTable();
+            renderStatsCards();
+            renderUpcomingReviews();
+            showNotification('Task deleted', 'success');
+        } else {
+            const err = await response.json().catch(() => ({}));
+            showNotification(err.error || 'Failed to delete task', 'error');
+        }
+    } catch (e) {
+        showNotification('Failed to delete task', 'error');
+    }
+}
