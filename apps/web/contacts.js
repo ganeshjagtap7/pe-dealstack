@@ -159,14 +159,6 @@ async function fetchScores() {
 
 // fetchConnections, createConnection, deleteConnection — moved to contacts-detail.js
 
-async function fetchNetworkInsights() {
-    try {
-        const res = await PEAuth.authFetch(`${API_BASE}/contacts/insights/network`);
-        if (!res.ok) return null;
-        return await res.json();
-    } catch { return null; }
-}
-
 // renderContactCard, renderEmptyState, renderContactRow, renderListView,
 // setViewMode, renderContactsView, toggleGroupByCompany,
 // renderGroupedByCompany, renderLoadingState, renderErrorState
@@ -431,6 +423,4 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (grid) grid.innerHTML = renderErrorState(err.message);
     }
 
-    // Load insights panels (timeline, stale, duplicates) in parallel
-    loadInsights();
 });

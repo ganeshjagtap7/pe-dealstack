@@ -334,4 +334,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 1500);
 });
 
+// Also listen for layout-ready event (handles async auth flows where layout init is delayed)
+window.addEventListener('pe-layout-ready', () => {
+    setTimeout(() => {
+        if (window.PENotifications) {
+            window.PENotifications.init();
+            window.PENotifications.setupButton();
+        }
+    }, 100);
+});
+
 console.log('PENotifications loaded successfully');

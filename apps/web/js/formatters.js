@@ -78,7 +78,10 @@
     var minutes = Math.floor(seconds / 60);
     var hours = Math.floor(minutes / 60);
     var days = Math.floor(hours / 24);
-    if (days > 30) return date.toLocaleDateString();
+    if (days > 30) {
+      var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return months[date.getMonth()] + ' ' + date.getDate() + ', ' + date.getFullYear();
+    }
     if (days > 0) return days + (days === 1 ? ' day ago' : ' days ago');
     if (hours > 0) return hours + (hours === 1 ? ' hour ago' : ' hours ago');
     if (minutes > 0) return minutes + (minutes === 1 ? ' min ago' : ' mins ago');

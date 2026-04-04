@@ -194,72 +194,6 @@
     </div>
 </div>
 
-<!-- Insights Bar -->
-<div id="insights-bar" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-
-    <!-- Stale Contacts / Reminders -->
-    <div id="stale-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-amber-50/50">
-            <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-amber-600 text-[18px]">notifications_active</span>
-                <h3 class="text-sm font-bold text-text-main">Needs Attention</h3>
-            </div>
-            <span id="stale-count" class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">0</span>
-        </div>
-        <div id="stale-list" class="max-h-[200px] overflow-y-auto custom-scrollbar">
-            <div class="flex items-center justify-center py-6">
-                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Recent Timeline -->
-    <div id="timeline-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-primary-light/50">
-            <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-primary text-[18px]">history</span>
-                <h3 class="text-sm font-bold text-text-main">Recent Activity</h3>
-            </div>
-        </div>
-        <div id="timeline-list" class="max-h-[200px] overflow-y-auto custom-scrollbar">
-            <div class="flex items-center justify-center py-6">
-                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Duplicates -->
-    <div id="duplicates-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-red-50/50">
-            <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-red-500 text-[18px]">content_copy</span>
-                <h3 class="text-sm font-bold text-text-main">Possible Duplicates</h3>
-            </div>
-            <span id="dup-count" class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">0</span>
-        </div>
-        <div id="dup-list" class="max-h-[200px] overflow-y-auto custom-scrollbar">
-            <div class="flex items-center justify-center py-6">
-                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Network Stats -->
-    <div id="network-section" class="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div class="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-emerald-50/50">
-            <div class="flex items-center gap-2">
-                <span class="material-symbols-outlined text-emerald-600 text-[18px]">hub</span>
-                <h3 class="text-sm font-bold text-text-main">Network Stats</h3>
-            </div>
-        </div>
-        <div id="network-stats-content" class="max-h-[200px] overflow-y-auto custom-scrollbar">
-            <div class="flex items-center justify-center py-6">
-                <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
-            </div>
-        </div>
-    </div>
-
-</div>
 
 <!-- Contacts Grid -->
 <div id="contacts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-2">
@@ -297,23 +231,25 @@
         <!-- Content injected by JS -->
     </div>
     <!-- Detail Actions -->
-    <div id="detail-actions" class="shrink-0 border-t border-border-subtle px-6 py-4 flex items-center gap-2 flex-wrap">
-        <button id="action-add-note" onclick="showAddInteraction()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
-            <span class="material-symbols-outlined text-[16px]">edit_note</span>
-            Add Note
-        </button>
-        <button id="action-link-deal" onclick="showLinkDealModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
-            <span class="material-symbols-outlined text-[16px]">link</span>
-            Link Deal
-        </button>
-        <button id="action-edit" onclick="editCurrentContact()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
-            <span class="material-symbols-outlined text-[16px]">edit</span>
-            Edit
-        </button>
-        <button id="action-delete" onclick="deleteCurrentContact()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-all ml-auto">
-            <span class="material-symbols-outlined text-[16px]">delete</span>
-            Delete
-        </button>
+    <div id="detail-actions" class="shrink-0 border-t border-border-subtle px-6 py-3 flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+            <button id="action-add-note" onclick="showAddInteraction()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+                <span class="material-symbols-outlined text-[16px]">edit_note</span>
+                Add Note
+            </button>
+            <button id="action-link-deal" onclick="showLinkDealModal()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+                <span class="material-symbols-outlined text-[16px]">link</span>
+                Link Deal
+            </button>
+            <button id="action-edit" onclick="editCurrentContact()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+                <span class="material-symbols-outlined text-[16px]">edit</span>
+                Edit
+            </button>
+            <button id="action-delete" onclick="deleteCurrentContact()" class="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-all">
+                <span class="material-symbols-outlined text-[16px]">delete</span>
+                Delete
+            </button>
+        </div>
     </div>
 </div>
 
@@ -610,6 +546,7 @@
 <script src="js/notifications.js"></script>
 <script src="js/layoutComponents.js"></script>
 <script src="js/layout.js"></script>
+<script src="js/notificationCenter.js"></script>
 <script src="contacts-csv.js"></script>
 <script src="contacts-render.js"></script>
 <script src="contacts-modals.js"></script>

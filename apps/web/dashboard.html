@@ -209,37 +209,80 @@
 <div id="portfolio-widget" data-widget="portfolio-allocation" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden p-6 gap-5 group">
 <div class="flex items-center justify-between">
 <h3 class="font-bold text-text-main">Portfolio Allocation</h3>
-<div class="flex items-center gap-2">
 <span class="material-symbols-outlined text-text-muted">pie_chart</span>
 </div>
-</div>
-<div class="flex items-center gap-6">
-<div class="size-28 rounded-full border-[10px] border-primary border-r-secondary border-b-gray-300 rotate-45 shadow-inner"></div>
-<div class="flex flex-col gap-3 flex-1">
-<div class="flex items-center justify-between text-xs">
-<div class="flex items-center gap-2">
-<div class="size-2.5 rounded-sm bg-primary shadow-sm"></div>
-<span class="text-text-secondary font-medium">SaaS</span>
-</div>
-<span class="text-text-main font-bold">55%</span>
-</div>
-<div class="flex items-center justify-between text-xs">
-<div class="flex items-center gap-2">
-<div class="size-2.5 rounded-sm bg-secondary shadow-sm"></div>
-<span class="text-text-secondary font-medium">Healthcare</span>
-</div>
-<span class="text-text-main font-bold">30%</span>
-</div>
-<div class="flex items-center justify-between text-xs">
-<div class="flex items-center gap-2">
-<div class="size-2.5 rounded-sm bg-gray-300 shadow-sm"></div>
-<span class="text-text-secondary font-medium">Others</span>
-</div>
-<span class="text-text-main font-bold">15%</span>
+<div id="portfolio-allocation-content" class="flex items-center gap-6">
+    <div class="flex items-center justify-center py-4 w-full">
+        <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
+    </div>
 </div>
 </div>
-</div>
-</div>
+<script>
+(async function loadPortfolioAllocation() {
+    const content = document.getElementById('portfolio-allocation-content');
+    if (!content) return;
+    const waitForAuth = () => new Promise(resolve => {
+        const check = setInterval(() => {
+            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
+        }, 100);
+        setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+    });
+    await waitForAuth();
+    try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
+        if (!resp.ok) throw new Error('Failed');
+        const deals = await resp.json();
+        const active = deals.filter(d => d.status !== 'ARCHIVED');
+
+        if (active.length === 0) {
+            content.innerHTML = '<div class="flex flex-col items-center justify-center py-4 w-full text-text-muted"><span class="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span><p class="text-xs">No deals yet</p></div>';
+            return;
+        }
+
+        // Count by industry
+        const counts = {};
+        active.forEach(d => {
+            const ind = (d.industry || '').trim() || 'Uncategorized';
+            counts[ind] = (counts[ind] || 0) + 1;
+        });
+
+        // Sort by count descending, take top 4, group rest as "Others"
+        const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+        const top = sorted.slice(0, 4);
+        const othersCount = sorted.slice(4).reduce((sum, [, c]) => sum + c, 0);
+        if (othersCount > 0) top.push(['Others', othersCount]);
+
+        const total = active.length;
+        const colors = ['#003366', '#059669', '#F59E0B', '#8B5CF6', '#9CA3AF'];
+
+        // Build pie chart segments (CSS conic-gradient)
+        let gradientParts = [];
+        let cumPct = 0;
+        top.forEach(([, count], i) => {
+            const pct = (count / total) * 100;
+            gradientParts.push(`${colors[i]} ${cumPct}% ${cumPct + pct}%`);
+            cumPct += pct;
+        });
+
+        const legendHTML = top.map(([label, count], i) => {
+            const pct = Math.round((count / total) * 100);
+            return `<div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-2">
+                    <div class="size-2.5 rounded-sm shadow-sm" style="background:${colors[i]}"></div>
+                    <span class="text-text-secondary font-medium">${label}</span>
+                </div>
+                <span class="text-text-main font-bold">${pct}%</span>
+            </div>`;
+        }).join('');
+
+        content.innerHTML = `
+            <div class="size-28 rounded-full shrink-0 shadow-inner" style="background: conic-gradient(${gradientParts.join(', ')}); mask: radial-gradient(circle at center, transparent 40%, black 41%); -webkit-mask: radial-gradient(circle at center, transparent 40%, black 41%);"></div>
+            <div class="flex flex-col gap-3 flex-1">${legendHTML}</div>`;
+    } catch (e) {
+        content.innerHTML = '<div class="text-xs text-text-muted text-center w-full py-4">Unable to load allocation</div>';
+    }
+})();
+</script>
 
 <!-- AI Deal Signals Widget -->
 <div id="signals-widget" data-widget="ai-signals" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">

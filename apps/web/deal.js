@@ -226,15 +226,22 @@ function populateDealPage(deal) {
     console.log('[Deal] Analyst:', analyst?.user?.name);
 
     const leadPartnerName = document.getElementById('lead-partner-name');
+    const leadPartnerDot = document.querySelector('#lead-partner-container .rounded-full');
     if (leadPartnerName) {
-        // Fallback: if no LEAD team member, show assignedUser (deal creator)
         const leadName = leadPartner?.user?.name || deal.assignedUser?.name || null;
-        leadPartnerName.textContent = leadName || '\u2014';
+        leadPartnerName.textContent = leadName || 'Not assigned';
+        leadPartnerName.className = leadName ? 'text-sm text-text-main font-bold' : 'text-sm text-text-muted font-medium italic';
+        if (leadPartnerDot) leadPartnerDot.style.display = leadName ? '' : 'none';
     }
 
     const analystName = document.getElementById('analyst-name');
+    const analystDot = document.querySelector('#analyst-container .rounded-full');
     if (analystName) {
-        analystName.textContent = analyst?.user?.name || '\u2014';
+        // Fallback: if no MEMBER role, use deal creator as analyst
+        const aName = analyst?.user?.name || deal.assignedUser?.name || null;
+        analystName.textContent = aName || 'Not assigned';
+        analystName.className = aName ? 'text-sm text-text-main font-bold' : 'text-sm text-text-muted font-medium italic';
+        if (analystDot) analystDot.style.display = aName ? '' : 'none';
     }
 
     // Update AI Thesis in chat intro
