@@ -5,6 +5,269 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 50 — April 4-5, 2026
+
+#### 🕐 Timestamp: April 4-5, 2026 — IST
+
+#### Goal: UI Cleanup Sprint + Real Investment Memo Builder
+
+**Part 1: UI Cleanup Sprint (13 fixes)**
+
+1. **Removed Portfolio nav link** — Sidebar no longer shows "Portfolio" (was pointing to coming-soon page)
+2. **Cleaned up Contacts page** — Removed 4 insight cards (Needs Attention, Recent Activity, Possible Duplicates, Network Stats). Filtered out `enriched:*` system tags from contact cards
+3. **Fixed date format** — `formatRelativeTime` now shows "Mar 3, 2026" instead of "3/3/2026" for dates >30 days old
+4. **Fixed deal page analyst name** — Falls back to deal creator instead of showing blank em-dash. Shows "Not assigned" in muted italic when truly empty
+5. **Fixed notification bell on contacts page** — Added missing `notificationCenter.js` script + `pe-layout-ready` event listener for async layout init
+6. **Made delete button visible** — Contact detail panel delete button was hidden behind Feedback overlay, moved to inline
+7. **Removed AI Preferences + Interface sections from Settings** — Non-functional UI that confused users
+8. **Removed Templates nav link** — Template page still exists but not exposed in sidebar
+9. **Real Portfolio Allocation on dashboard** — Replaced hardcoded SaaS 55%/Healthcare 30% with real deal industry breakdown using CSS conic-gradient donut chart
+10. **Removed fake collaborator avatars** — SC/MT/+2 circles removed from memo builder header
+
+**Part 2: Real Investment Memo Builder (17 commits)**
+
+**Problem:** "Open Memo Builder" from deal page showed hardcoded "Project Apollo" demo data. Root cause: URL passed `?id=dealId` but memo builder expected `?dealId=dealId`, causing API lookup to fail and fall back to demo.
+
+**What was built:**
+- **Fixed URL parameter** — `?id=` → `?dealId=` in analysis.js
+- **Removed demo data fallback** — Error states replace demo data on failures. Demo only loads with `?demo=true`
+- **Memo picker modal** — When a deal has multiple memos, shows selection UI with status badges
+- **Fixed broken chart images** — Null chartImage shows placeholder instead of broken `<img>`
+- **Removed simulated AI responses** — "AI Offline" message replaces fake EBITDA/risk responses
+- **Proactive AI welcome** — Assesses data completeness, tells user what's missing
+- **DB migration** — Added `organizationId` to Memo table for org-scoping
+- **Deal name in memo** — Backend fetches `Deal.name` as projectName (no more "New Project")
+- **Chat FK fix** — Resolved internal User ID from auth ID for MemoConversation FK constraint
+- **Google Docs styling** — Grey background, white document card with shadow, professional typography with Banker Blue section headings
+- **Column name fixes** — `extractedData` → `lineItems`, `confidence` → `extractionConfidence` (matched actual FinancialStatement table schema)
+- **Auto-generation fix** — Triggers when memo has zero sections (was returning early)
+- **Table renderer** — Handles 3 formats: array-of-arrays (from GPT-4o), {metric, values} objects, and raw key-value objects
+- **Markdown in chat** — Added `mdToHtml()` converter for AI responses (headings, bold, lists)
+- **Chart rendering pipeline** — `renderChartsForAllSections()` called after section render and after chat applies changes
+
+**Result:** Memo builder now uses real deal financial data (30 periods loaded from 156 FinancialStatement rows), generates 12 sections with actual revenue/EBITDA/margins, AI chat answers questions using real data, and the document looks professional.
+
+**Files changed:** 20+ files across apps/web/ and apps/api/
+
+---
+
+#### 🕐 Timestamp: April 5, 2026 — IST
+
+#### Goal: AI-Powered Bulk Deal Import (CSV/Excel/Paste)
+
+**Problem:**
+PE firms have existing deal pipelines in Notion, Airtable, Excel, Google Sheets, and other tools. No way to bring that data into PE OS without manually creating each deal. Column names and data structures vary wildly across firms.
+
+**Solution — AI-Powered Universal Import (3 new files + 4 modified):**
+
+1. **`apps/api/src/services/dealImportMapper.ts`** (NEW) — Core service:
+   - CSV parsing via `csv-parse`, Excel via `xlsx`, pasted text (auto-detects tab/comma)
+   - GPT-4o column mapping with confidence scores
+   - Financial value transforms: `$50M` → 50,000,000, `25%` → 0.25, `2.5x` → 2.5
+   - Stage normalization: "DD" → `DUE_DILIGENCE`, "Passed" → `PASSED`, etc.
+   - Unmapped columns → `customFields` JSONB with camelCase keys
+
+2. **`apps/api/src/routes/deal-import.ts`** (NEW) — Two endpoints:
+   - `POST /api/deals/import/analyze` — GPT-4o mapping + parsed preview
+   - `POST /api/deals/import` — Bulk create deals + auto-create companies + duplicate detection
+   - Company lookup cache, max 500 deals, org-scoped
+
+3. **`apps/web/js/deal-import.js`** (NEW) — 4-step modal:
+   - Step 1: Upload File (CSV/Excel, 5MB max) or Paste Data
+   - Step 2: Column Mapping (AI pre-filled, color-coded confidence)
+   - Step 3: Data Preview (table + validation summary)
+   - Step 4: Result (imported/failed/companies created)
+
+4. Modified: `crm.html` (button + modal), `crm.js` (wiring), `app.ts` (route), `deals.ts` (customFields schema)
+
+**DB Migration:** `ALTER TABLE "Deal" ADD COLUMN "customFields" JSONB DEFAULT '{}'` — already run.
+
+**Code Review Fixes:** Zero-value transform bug (|| null → isNaN), multi-sheet warning surfaced, error container reset.
+
+**Result:**
+- ✅ Import from any source (Notion export, Airtable CSV, Excel, copy-paste)
+- ✅ AI maps any column naming to our schema (~$0.01/import)
+- ✅ Unmapped fields preserved in customFields — no data lost
+- ✅ Zero TypeScript errors, 10 commits
+
+---
+
+#### 🕐 Timestamp: April 5, 2026 — Late Night IST
+
+#### Goal: Production-Ready Admin Command Center for Ops Managers
+
+**Problem:**
+The Admin Dashboard (`admin-dashboard.html`) had a polished UI but was not usable by a real ops manager. Issues: fake progress bars with meaningless percentages, dead "View Detailed Report" / "View all tasks" / "View full history" links, infinite spinners on API failures (no error states), no empty states for new orgs, no inline task management, hardcoded "12 Pending" badge.
+
+**What was built (6 tasks, 6 commits):**
+
+1. **Stats Cards — Real context subtitles**
+   - Removed fake progress bars from all 4 cards
+   - Team: shows "3 active / 5 total" (filters by isActive)
+   - Deal Volume: shows "across 8 deals" count
+   - Overdue: count turns red (#ef4444) when > 0, shows "2 due this week"
+   - Utilization: shows "4/5 members assigned" (members with deal assignments)
+   - All cards clickable — scroll to relevant section below
+   - Overdue card auto-filters task table to overdue tasks
+
+2. **Resource Allocation — Error/empty states + expand/collapse**
+   - Empty state: "No team members yet" + "Invite Team" CTA button
+   - Error state: "Could not load team data" + Retry button (replaces infinite spinner)
+   - Capacity formula: meaningful `(dealCount / 5) * 100`, color-coded (blue <50%, amber 50-80%, red 80%+)
+   - "View Detailed Report" now expands to show ALL team members (was capped at 8), toggles to "Show Less"
+
+3. **Activity Feed — Day grouping + pagination**
+   - Error state with Retry button
+   - Empty state: "No activity yet — actions across your org will appear here"
+   - Entries grouped by day: "Today", "Yesterday", "Apr 2"
+   - "View full history" loads next 10 audit entries (paginated via offset), shows "Loading..." during fetch
+
+4. **Task Table — Empty state + expand + inline status + delete**
+   - Empty state: "No tasks yet" + "Create Task" CTA
+   - "View all tasks" toggles between 20-item limit and full list, changes to "Show recent"
+   - Task titles link to deal page when deal is linked
+   - **Inline status update:** Click any status badge → dropdown (Pending/In Progress/Completed/Stuck). Optimistic PATCH to `/api/tasks/:id` with revert on failure
+   - **Delete task:** Trash icon on each row, confirmation dialog, calls `DELETE /api/tasks/:id`
+
+5. **All dead links eliminated** — Every button, link, and action now does something real
+
+**Files changed:** 3 (`admin-dashboard.html`, `admin-dashboard.js`, `admin-tasks.js`, `admin-modals.js`)
+
+**Commits:**
+- `56f0166` refactor(admin): replace stats card progress bars with context subtitles
+- `a3f7d94` feat(admin): meaningful stats subtitles + click-to-scroll cards
+- `bfb56d9` feat(admin): resource allocation error/empty states + expand/collapse
+- `ec52931` feat(admin): activity feed error states, day grouping, paginated load-more
+- `95772e3` feat(admin): task table empty state, view-all toggle, inline status updates
+- (+ task delete addition)
+
+**Result:**
+- ✅ Every section shows real data with meaningful context
+- ✅ Error states with Retry on all API-dependent sections (no infinite spinners)
+- ✅ Empty states with CTA buttons for new orgs
+- ✅ Inline task status updates (the #1 ops manager action)
+- ✅ Task deletion with confirmation
+- ✅ All dead links wired or removed
+- ✅ Page usable by a real PE/search fund ops manager in production
+
+---
+
+### Session 49 — April 3, 2026
+
+#### 🕐 Timestamp: April 3, 2026 — IST
+
+#### Goal: Fix onboarding flow to only trigger for new users (not existing ones)
+
+**Problem:**
+The onboarding system (built in Session 48) set `welcomeShown: false` as the DB default for ALL users — including existing users who were already using the platform. This caused every existing user to see the welcome modal and onboarding checklist, which should only appear for genuinely new signups and invited users.
+
+**Root Cause:**
+The `onboarding-migration.sql` added `onboardingStatus` JSONB column with `welcomeShown: false` default to the entire User table, without distinguishing between existing and new users.
+
+**Fix (3 files changed + 1 new migration):**
+
+1. **`apps/api/src/routes/onboarding.ts`** — Added smart detection in `GET /status`:
+   - New `isNewUser()` helper checks if the user's org has any deals
+   - If user hasn't seen welcome AND has existing deals → auto-marks as fully onboarded (persists to DB)
+   - Only genuinely new users (no deals in org) see the onboarding flow
+   - Added `COMPLETED_STATUS` constant for auto-completion
+
+2. **`apps/web/js/onboarding/onboarding-api.js`** — Fixed graceful degradation fallback:
+   - Changed API failure fallback from `welcomeShown: false` → `welcomeShown: true`
+   - Prevents existing users from accidentally seeing onboarding if API is temporarily down
+
+3. **`apps/api/onboarding-fix-existing-users.sql`** (NEW) — One-time migration:
+   - Bulk-updates all users whose org already has deals to `welcomeShown: true, checklistDismissed: true`
+   - Uses `EXISTS` subquery on Deal table to identify active orgs
+   - **Run on Supabase: DONE**
+
+**Result:**
+- ✅ Existing users with deals → onboarding fully skipped (auto-completed)
+- ✅ New signups → see welcome modal + checklist as intended
+- ✅ Invited users joining existing org → checked at API level (org has deals → skip)
+- ✅ API failure → defaults to suppressing onboarding (safe fallback)
+- ✅ 0 TypeScript errors
+
+---
+
+#### 🕐 Timestamp: April 3, 2026 — Evening IST
+
+#### Goal: Full onboarding enhancement — sample deal, auto-detection, celebration, extended pages
+
+**What Was Built:**
+
+##### Part A: Lukhtara Sample Deal (Auto-Created for New Orgs)
+
+**Problem:** New users sign up and see an empty dashboard with no data — bad first impression.
+
+**Solution:** When a new organization is created during signup, a fully-loaded "Lukhtara Industries" sample deal is auto-created with:
+- Company record (Manufacturing & Distribution)
+- Deal with real financials ($125M revenue, $27.5M EBITDA, 22.5% IRR)
+- 3 VDR folders (Financials, Legal, Company Overview)
+- 7 financial statements (3 years Income Statement, 2 years Balance Sheet + Cash Flow)
+- 2 activity records
+
+**Files:**
+| File | Change |
+|------|--------|
+| `apps/api/src/services/sampleDealService.ts` (NEW) | `createSampleDeal(orgId, userId)` — creates Company + Deal + Folders + Statements + Activities |
+| `apps/api/src/services/userService.ts` | Calls `createSampleDeal()` after new org creation (fire-and-forget) |
+| `apps/api/src/routes/deals.ts` | Auto-archives sample deals when first real deal is created |
+| `apps/web/js/crm-cards.js` | Amber "Sample" badge + "Remove Sample" button on sample deal cards |
+
+**Key design:** Uses existing `tags: ['sample']` field — no DB migration needed. Sample deal auto-archives when user creates their first real deal. Manual "Remove Sample" button also available.
+
+##### Part B: Auto-Detection for All 5 Onboarding Steps
+
+**Problem:** Only `createDeal` was auto-detected; other 4 steps required manual triggers.
+
+**Solution:** Wired up all 5 steps:
+
+| Step | Detection Location | Trigger |
+|------|-------------------|---------|
+| `createDeal` | `crm.js` (frontend) | Already working — detects deals on load |
+| `uploadDocument` | `documents-upload.ts` (API) | After successful document upload |
+| `reviewExtraction` | `financials.js` (frontend) | When financial statements render on deal page |
+| `tryDealChat` | `deal-chat.js` (frontend) | After first successful AI chat response |
+| `inviteTeamMember` | `invitations.ts` (API) | After successful invitation creation |
+
+**Files:**
+| File | Change |
+|------|--------|
+| `apps/api/src/routes/onboarding.ts` | Exported `tryCompleteOnboardingStep()` helper |
+| `apps/api/src/routes/documents-upload.ts` | Calls helper after upload success |
+| `apps/api/src/routes/invitations.ts` | Calls helper after invite success |
+| `apps/web/js/financials.js` | Calls `OnboardingAPI.completeStep('reviewExtraction')` |
+| `apps/web/js/deal-chat.js` | Calls `OnboardingAPI.completeStep('tryDealChat')` |
+
+All API-side calls are fire-and-forget — onboarding never blocks core functionality.
+
+##### Part C: Celebration + Polish
+
+- **Confetti animation** (`onboarding-celebrate.js` NEW): CSS-only confetti with 40 particles, 6 colors (Banker Blue palette), 3-second duration. Triggers when all 5 steps complete.
+- **Success toast**: "Onboarding Complete! You're all set — PE OS is ready for action."
+- **Extended page coverage**: Added onboarding scripts to `deal.html` and `settings.html` (were missing)
+- **Celebrate script**: Added to all pages (dashboard, crm, deal, settings)
+- **Feedback URL**: Updated to real Google Forms link
+
+#### Files Changed Summary
+
+| Category | Files |
+|----------|-------|
+| **New (2)** | `sampleDealService.ts`, `onboarding-celebrate.js` |
+| **Modified — API (5)** | `onboarding.ts`, `documents-upload.ts`, `invitations.ts`, `deals.ts`, `userService.ts` |
+| **Modified — Frontend (3)** | `onboarding-api.js`, `financials.js`, `deal-chat.js`, `crm-cards.js` |
+| **Modified — HTML (4)** | `deal.html`, `settings.html`, `dashboard.html`, `crm.html` |
+| **Total** | 2 new + 12 modified = **14 files** |
+
+#### Verification
+- 0 TypeScript errors (`npx tsc --noEmit` clean)
+- Vite build succeeds
+- All 7 onboarding frontend files present
+- 10 commits (1 per task + docs)
+
+---
+
 ### Session 48 — April 1, 2026
 
 #### 23:00-01:30 IST — Beta Readiness Audit + User Onboarding System
