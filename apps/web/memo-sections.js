@@ -267,19 +267,42 @@ function renderTable(tableData) {
     }).join('');
 
     const rows = tableData.rows.map(row => {
-        const metricClass = row.isBold ? 'font-bold text-slate-900' : (row.isSubMetric ? 'pl-8 text-slate-500 italic' : 'font-medium text-slate-800');
-        const rowClass = row.isBold ? 'hover:bg-slate-50/50 bg-slate-50/30' : 'hover:bg-slate-50/50';
+        // Handle 3 formats:
+        // 1. Array of strings: ["Revenue", "12.5", "15.0"] (from GPT-4o JSON)
+        // 2. Object with values array: {metric: "Revenue", values: ["12.5", "15.0"]}
+        // 3. Object with no values: {metric: "Revenue"} (broken)
+        let metric = '';
+        let values = [];
+        let isBold = false;
+        let isSubMetric = false;
 
-        // Handle both array values and missing values gracefully
-        const values = Array.isArray(row.values) ? row.values : [];
-        const valueCells = values.map((v, i) => {
-            const valueClass = row.isBold ? 'text-slate-800' : (row.isSubMetric ? 'text-slate-500' : 'text-slate-600');
+        if (Array.isArray(row)) {
+            // Format 1: plain array — first element is metric, rest are values
+            metric = row[0] || '';
+            values = row.slice(1);
+            // Bold EBITDA, Revenue, Net Income rows
+            const ml = metric.toLowerCase();
+            isBold = ml.includes('ebitda') || ml.includes('total') || ml.includes('net income');
+            isSubMetric = ml.includes('margin') || ml.includes('growth') || ml.includes('%');
+        } else if (row && typeof row === 'object') {
+            // Format 2/3: object
+            metric = row.metric || row.label || '';
+            values = Array.isArray(row.values) ? row.values : [];
+            isBold = !!row.isBold;
+            isSubMetric = !!row.isSubMetric;
+        }
+
+        const metricClass = isBold ? 'font-bold text-slate-900' : (isSubMetric ? 'pl-8 text-slate-500 italic' : 'font-medium text-slate-800');
+        const rowClass = isBold ? 'hover:bg-slate-50/50 bg-slate-50/30' : 'hover:bg-slate-50/50';
+
+        const valueCells = values.map(v => {
+            const valueClass = isBold ? 'font-semibold text-slate-800' : (isSubMetric ? 'text-slate-500' : 'text-slate-600');
             return `<td class="px-4 py-2.5 text-right ${valueClass} font-mono">${v ?? ''}</td>`;
         }).join('');
 
         return `
             <tr class="${rowClass}">
-                <td class="px-4 py-2.5 ${metricClass}">${row.metric || ''}</td>
+                <td class="px-4 py-2.5 ${metricClass}">${metric}</td>
                 ${valueCells}
             </tr>
         `;
