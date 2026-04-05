@@ -5,6 +5,48 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 51 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST
+
+#### Goal: Fix Deal Chat "Math Failure" Bug + Chat History Fix
+
+**Problem:** The Deal Chat AI was hallucinating financial numbers because it had no table data in its prompt context. Users asking "What's the EBITDA margin?" or "Calculate revenue growth" got fabricated answers or "no data available" responses — even though financial statements were visible on the deal page.
+
+**Root Cause:** The ReAct agent relied on a `get_deal_financials` tool call to fetch data on-demand, but the tool used the wrong column name (`extractedData` instead of `lineItems`), so every fetch silently returned empty. The agent had zero financial context.
+
+**Fix 1: Financial Context Injection into System Prompt**
+- **Route** (`apps/api/src/routes/deals-chat-ai.ts`):
+  - Added `buildFinancialMarkdown()` utility that fetches all `FinancialStatement` rows (using correct `lineItems` column) and transforms raw JSONB into LLM-optimized Markdown tables grouped by statement type (Income Statement, Balance Sheet, Cash Flow) with periods as columns
+  - Format: `| Metric | 2007 | 2008 | ... | 2021 |` — clean, parseable by GPT-4o
+  - Handles empty state: "No extracted financial data available yet"
+  - Error handling for Supabase fetch failures (logs error, continues gracefully)
+- **Agent** (`apps/api/src/services/agents/dealChatAgent/index.ts`):
+  - Replaced soft guidelines with strict **Financial Data Protocol** in system prompt
+  - Tables labeled as "VERIFIED SOURCE OF TRUTH"
+  - 4 strict rules: (1) always quote exact numbers and show work, (2) never guess/hallucinate, (3) fall back to tool only if data missing, (4) cite every cell for multi-period calculations
+  - `get_deal_financials` tool kept as fallback for edge cases
+
+**Fix 2: Chat History Loading Most Recent Messages**
+- **Problem:** Chat history loaded oldest 50 messages (`ORDER BY createdAt ASC LIMIT 50`). Deals with 50+ messages lost recent conversations on page refresh.
+- **Root cause:** Query in `apps/api/src/routes/deals-chat.ts` fetched first 50 chronologically
+- **Fix:** Changed to fetch most recent messages (`ORDER BY createdAt DESC`), then reverse to chronological order for display. Increased default from 50 → 200, max cap from 100 → 500.
+
+**Verified Results (UI tested):**
+- ✅ "Compare COGS across all years" — listed all 15 years (2007-2021) with exact numbers
+- ✅ "What's the debt-to-equity ratio?" — quoted Long-term Debt ($0M) / Total Equity ($672.2M) = 0
+- ✅ "Calculate revenue growth from 2012 to 2016" — $299.4M → $431.3M = 44.04%, showed formula
+- ✅ "What's the EBITDA margin for 2023?" — correctly quoted $7.6M / $28.1M = 27.0%
+- ✅ "Revenue growth 2021 to 2023" — correctly said 2023 data doesn't exist (deal has 2007-2021 only)
+
+**Files Changed:** 4 files (3 modified + 1 new spec)
+- `apps/api/src/routes/deals-chat-ai.ts` — financial context injection + Markdown table builder
+- `apps/api/src/services/agents/dealChatAgent/index.ts` — Financial Data Protocol in system prompt
+- `apps/api/src/routes/deals-chat.ts` — chat history: most recent 200 messages
+- `docs/superpowers/specs/2026-04-06-financial-context-injection-design.md` — design spec
+
+---
+
 ### Session 50 — April 4-5, 2026
 
 #### 🕐 Timestamp: April 4-5, 2026 — IST
