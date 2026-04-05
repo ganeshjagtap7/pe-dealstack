@@ -5,6 +5,10 @@ import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess, verifyDocumentAccess, verifyFolderAccess } from '../middleware/orgScope.js';
 import { getSignedDownloadUrl, extractStoragePath } from '../utils/storage.js';
+import { extractTextFromPDF } from '../services/pdfExtractor.js';
+import { excelToMarkdown } from '../services/excelToMarkdown.js';
+import { isExcelFile } from '../services/excelFinancialExtractor.js';
+import { embedDocument } from '../rag.js';
 
 // Sub-routers
 import documentsUploadRouter from './documents-upload.js';
@@ -327,6 +331,88 @@ router.get('/documents/:id/download', async (req, res) => {
   } catch (error) {
     log.error('Error getting download URL', error);
     res.status(500).json({ error: 'Failed to get download URL' });
+  }
+});
+
+// ─── POST /api/documents/:id/analyze — Re-analyze a document ───
+
+router.post('/documents/:id/analyze', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+    const docAccess = await verifyDocumentAccess(id, orgId);
+    if (!docAccess) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    // Fetch document record
+    const { data: doc, error: fetchError } = await supabase
+      .from('Document')
+      .select('id, name, fileUrl, mimeType, dealId')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !doc) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+
+    if (!doc.fileUrl) {
+      return res.status(400).json({ error: 'No file stored for this document' });
+    }
+
+    // Download file from Supabase Storage
+    const storagePath = extractStoragePath(doc.fileUrl);
+    const { data: fileData, error: dlError } = await supabase.storage
+      .from('documents')
+      .download(storagePath);
+
+    if (dlError || !fileData) {
+      log.error('Failed to download file for re-analysis', { id, error: dlError });
+      return res.status(500).json({ error: 'Failed to download file' });
+    }
+
+    const buffer = Buffer.from(await fileData.arrayBuffer());
+    let extractedText: string | null = null;
+
+    // Route by file type
+    if (doc.mimeType === 'application/pdf') {
+      const pdfResult = await extractTextFromPDF(buffer);
+      extractedText = pdfResult?.text?.replace(/\u0000/g, '') || null;
+    } else if (isExcelFile(doc.mimeType, doc.name)) {
+      extractedText = excelToMarkdown(buffer)?.replace(/\u0000/g, '') || null;
+    }
+
+    if (!extractedText) {
+      return res.status(422).json({
+        error: 'Could not extract text from this file type. Only PDF and Excel files are supported.',
+      });
+    }
+
+    // Update document with extracted text
+    const { data: updated, error: updateError } = await supabase
+      .from('Document')
+      .update({
+        extractedText,
+        status: 'completed',
+        updatedAt: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (updateError) throw updateError;
+
+    // Trigger RAG embedding (fire-and-forget)
+    embedDocument(id, doc.dealId, extractedText).catch(err =>
+      log.error('RAG re-analyze embed error', err)
+    );
+
+    log.info('Document re-analyzed', { id, name: doc.name, textLength: extractedText.length });
+
+    res.json(updated);
+  } catch (error) {
+    log.error('Error re-analyzing document', error);
+    res.status(500).json({ error: 'Failed to analyze document' });
   }
 });
 

@@ -38,13 +38,13 @@ const HIGH_SCORE_PATTERNS: [RegExp, number][] = [
 ];
 
 /** Junk sheets to always skip */
-const SKIP_PATTERNS = [
+export const SKIP_PATTERNS = [
   /^(cover|title|toc|table\s*of\s*contents|disclaimer|glossary|appendix|notes\s*to|footnote)$/i,
   /^(assumptions|inputs|drivers|scenarios|sensitivity|instructions|template|blank|sheet\d+)$/i,
   /^(formatting|print|macro|hidden|chart\d*|graph|pivot|dashboard)$/i,
 ];
 
-function scoreSheet(name: string): number {
+export function scoreSheet(name: string): number {
   const trimmed = name.trim();
 
   // Skip junk
@@ -73,7 +73,7 @@ function scoreSheet(name: string): number {
  * Scan the first few rows of a sheet for unit indicators.
  * Returns a human-readable string like "Units: $000s (thousands)" or null.
  */
-function detectUnitScale(sheet: XLSX.WorkSheet): string | null {
+export function detectUnitScale(sheet: XLSX.WorkSheet): string | null {
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
   const maxRow = Math.min(range.e.r, 8); // check first 8 rows only
 

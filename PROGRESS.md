@@ -45,6 +45,41 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 - `apps/api/src/routes/deals-chat.ts` — chat history: most recent 200 messages
 - `docs/superpowers/specs/2026-04-06-financial-context-injection-design.md` — design spec
 
+**Part 2: Fix "Pending Analysis" VDR Bottleneck**
+
+**Problem:** Non-PDF files (Excel, Word) uploaded to VDR were permanently stuck in "Pending Analysis" because no text extraction ran on them. The AI was blind to spreadsheet data.
+
+**Root Cause:** Only PDFs had inline extraction via `pdf-parse`. Excel files were stored but `extractedText` stayed null, so the frontend showed "Pending Analysis" forever.
+
+**Fix 1: Excel Auto-Extraction to Markdown Tables on Upload**
+- Created `excelToMarkdown.ts` utility — converts Excel sheets to LLM-optimized Markdown tables with `## Sheet: Name` headings, pipe-delimited tables, unit scale detection
+- Reuses sheet-scoring logic from `excelFinancialExtractor.ts` (exported `scoreSheet`, `detectUnitScale`, `SKIP_PATTERNS`)
+- Added Excel branch in `documents-upload.ts` — detects Excel MIME types, converts to Markdown, stores in `extractedText`, triggers RAG embedding automatically
+
+**Fix 2: Three-State Badge in VDR UI**
+- **Before:** Only "Pending Analysis" (gray) and "Analysis Complete" (blue)
+- **After:** "Pending Analysis" (gray hourglass) → "✅ Ready for AI" (green checkmark) → "AI Analyzed" (blue sparkle)
+- New `ready` analysis type checks for `extractedText` presence without `aiAnalysis`
+- Added "Ready for AI" smart filter preset in FiltersBar
+
+**Fix 3: Re-analyze Button for Old Files**
+- Added "Re-analyze" button (Banker Blue) on files stuck in "Pending Analysis"
+- Backend: `POST /api/documents/:id/analyze` — downloads file from Supabase Storage, routes by MIME type (PDF → pdf-parse, Excel → excelToMarkdown), updates `extractedText`, triggers RAG
+- Extracted `pdfExtractor.ts` shared utility (was inline in documents-upload.ts)
+- Returns 422 for unsupported types (Word, etc.)
+
+**Files Changed:** 10 files (2 new + 8 modified)
+- `apps/api/src/services/excelToMarkdown.ts` — **NEW** Excel → Markdown converter
+- `apps/api/src/services/pdfExtractor.ts` — **NEW** shared PDF extraction utility
+- `apps/api/src/services/excelFinancialExtractor.ts` — exported 3 helpers
+- `apps/api/src/routes/documents-upload.ts` — Excel extraction branch on upload
+- `apps/api/src/routes/documents.ts` — POST /documents/:id/analyze endpoint
+- `apps/web/src/types/vdr.types.ts` — added 'ready' type + 'green' color
+- `apps/web/src/services/vdrApi.ts` — "Ready for AI" badge + analyzeDocument() API
+- `apps/web/src/components/FileTable.tsx` — ready style + re-analyze button
+- `apps/web/src/components/FiltersBar.tsx` — "Ready for AI" filter preset
+- `apps/web/src/vdr.tsx` — handleReanalyze callback
+
 ---
 
 ### Session 50 — April 4-5, 2026

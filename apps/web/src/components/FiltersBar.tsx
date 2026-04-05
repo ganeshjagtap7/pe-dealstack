@@ -64,10 +64,16 @@ const customFilterPresets: Array<{ id: string; label: string; icon: string; filt
     filterFn: (file) => file.analysis.type === 'key-insight' || file.analysis.type === 'complete',
   },
   {
+    id: 'ready-for-ai',
+    label: 'Ready for AI',
+    icon: 'check_circle',
+    filterFn: (file) => file.analysis.type === 'ready',
+  },
+  {
     id: 'pending-analysis',
     label: 'Pending Analysis',
     icon: 'hourglass_top',
-    filterFn: (file) => file.analysis.type === 'standard' && file.analysis.label.toLowerCase().includes('pending'),
+    filterFn: (file) => file.analysis.type === 'standard',
   },
 ];
 

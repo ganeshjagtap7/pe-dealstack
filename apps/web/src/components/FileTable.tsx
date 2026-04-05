@@ -10,9 +10,10 @@ interface FileTableProps {
   onRenameFile?: (fileId: string, newName: string) => void;
   onLinkToDeal?: (file: VDRFile) => void;
   onExtractFinancials?: (file: VDRFile) => void;
+  onReanalyze?: (file: VDRFile) => void;
 }
 
-export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile, onLinkToDeal, onExtractFinancials }) => {
+export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folder', onFileClick, onDeleteFile, onRenameFile, onLinkToDeal, onExtractFinancials, onReanalyze }) => {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [menuPos, setMenuPos] = useState<{ top: number; left: number } | null>(null);
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
@@ -110,8 +111,10 @@ export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folde
       return { className: 'text-primary', icon: 'auto_awesome' };
     } else if (type === 'warning') {
       return { className: 'text-orange-600', icon: 'warning' };
+    } else if (type === 'ready') {
+      return { className: 'text-green-600', icon: 'check_circle' };
     }
-    return { className: 'text-slate-400', icon: 'check_circle' };
+    return { className: 'text-slate-400', icon: 'hourglass_top' };
   };
 
   return (
@@ -206,6 +209,16 @@ export const FileTable: React.FC<FileTableProps> = ({ files, folderName = 'Folde
                           <p className="text-xs leading-relaxed text-slate-600 line-clamp-2">
                             {file.analysis.description}
                           </p>
+                          {file.analysis.type === 'standard' && onReanalyze && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); onReanalyze(file); }}
+                              className="mt-1 inline-flex items-center gap-1 text-xs font-medium rounded px-2 py-1 transition-colors hover:bg-slate-100"
+                              style={{ color: '#003366' }}
+                            >
+                              <span className="material-symbols-outlined text-[14px]">refresh</span>
+                              Re-analyze
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">

@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import multer from 'multer';
-import { createRequire } from 'module';
 import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';
 import { mergeIntoExistingDeal } from '../services/dealMerger.js';
 import { AuditLog } from '../services/auditLog.js';
@@ -13,27 +12,11 @@ import { log } from '../utils/logger.js';
 import { notifyDealTeam, resolveUserId } from './notifications.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { tryCompleteOnboardingStep } from './onboarding.js';
-
-// Use createRequire to load CommonJS pdf-parse v1.x module
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { excelToMarkdown } from '../services/excelToMarkdown.js';
+import { isExcelFile } from '../services/excelFinancialExtractor.js';
+import { extractTextFromPDF } from '../services/pdfExtractor.js';
 
 const router = Router();
-
-// Helper function to extract text from PDF
-async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string; numPages: number } | null> {
-  try {
-    // pdf-parse v1.x: just call the function with the buffer
-    const data = await pdfParse(buffer);
-    return {
-      text: data.text || '',
-      numPages: data.numpages || 1,
-    };
-  } catch (error) {
-    log.error('PDF extraction error', error);
-    return null;
-  }
-}
 
 // Configure multer for memory storage (we'll upload to Supabase)
 // Initial filter based on MIME type, deep validation happens after upload
@@ -201,8 +184,25 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         extractionStatus = 'failed';
         log.warn('PDF extraction failed', { documentName });
       }
+    } else if (file && isExcelFile(mimeType, documentName)) {
+      // Excel extraction — convert sheets to Markdown tables
+      extractionStatus = 'processing';
+      log.info('Starting Excel-to-Markdown extraction', { documentName });
+      try {
+        const markdownText = excelToMarkdown(file.buffer);
+        if (markdownText) {
+          extractedText = markdownText.replace(/\u0000/g, '');
+          log.info('Excel extraction completed', { documentName, textLength: extractedText.length });
+        } else {
+          log.info('Excel extraction: no meaningful content', { documentName });
+        }
+        extractionStatus = 'completed';
+      } catch (excelError) {
+        log.error('Excel extraction failed', excelError, { documentName });
+        extractionStatus = 'completed'; // don't block upload
+      }
     } else if (file) {
-      // Non-PDF files don't need text extraction
+      // Other non-PDF files (Word, etc.) — no extraction yet
       extractionStatus = 'completed';
     }
 
