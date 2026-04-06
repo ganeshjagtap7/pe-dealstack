@@ -134,14 +134,15 @@
 })();
 </script>
 
-<!-- Main Content — flex row so columns size to their own content -->
-<!-- (was grid-cols-3 which forced both columns to match the tallest column's height) -->
-<div class="flex flex-col lg:flex-row gap-6 items-start">
-<!-- Left Column (2/3 width) -->
-<div class="w-full lg:basis-2/3 lg:flex-1 flex flex-col gap-6 min-w-0">
+<!-- Main Content — single CSS Grid where all widgets tile uniformly.
+     Active Priorities spans the full row (col-span-full) because it's a wide
+     5-column table; other widgets are 1 column each on lg, 2 cols on md.
+     This replaces the old 2-column layout that left a tall empty space below
+     Active Priorities when the right column had many more widgets. -->
+<div id="dashboard-widget-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min items-start">
 
-<!-- Active Priorities Table — fills the column width but doesn't stretch vertically -->
-<div id="priorities-widget" data-widget="active-priorities" class="widget-container w-full flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
+<!-- Active Priorities Table — full-width hero row -->
+<div id="priorities-widget" data-widget="active-priorities" class="widget-container col-span-full flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
 <div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
 <h3 class="font-bold text-text-main text-base">Active Priorities</h3>
 <div class="flex gap-2">
@@ -169,13 +170,7 @@
 </table>
 </div>
 </div>
-</div>
 
-<!-- Right Column (1/3 width) -->
-<div class="w-full lg:basis-1/3 flex flex-col gap-6 min-w-0">
-<!-- Widget list — buttons live OUTSIDE this list so applyWidgetOrder
-     and the drag editor can't move widgets past them. -->
-<div id="right-widget-list" class="flex flex-col gap-6">
 <!-- My Tasks Widget -->
 <div id="tasks-widget" data-widget="my-tasks" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
 <div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
@@ -405,20 +400,21 @@ Scan Signals
 </div>
 </div>
 
-</div><!-- /right-widget-list -->
+</div><!-- /dashboard-widget-grid -->
 
-<!-- Add Widget Button — opens the widget picker modal -->
-<button id="add-widget-btn" class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
+<!-- Footer row — Add Widget + Customize Dashboard buttons live OUTSIDE
+     the grid so the layout editor can't drag widgets past them. -->
+<div class="flex flex-col sm:flex-row gap-3 mt-2">
+<button id="add-widget-btn" class="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
 <span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
 <span class="text-sm font-semibold">Add Widget</span>
 </button>
 
 <!-- Customize Dashboard Button — drag-and-drop layout editor. Hidden on mobile. -->
-<button id="widget-settings-btn" class="hidden md:flex items-center justify-center gap-2 rounded-lg border border-border-subtle p-3 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50">
+<button id="widget-settings-btn" class="hidden md:flex flex-1 items-center justify-center gap-2 rounded-lg border border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50">
 <span class="material-symbols-outlined text-[18px]">tune</span>
-<span class="text-xs font-medium">Customize Dashboard</span>
+<span class="text-sm font-medium">Customize Dashboard</span>
 </button>
-</div>
 </div>
 </div>
 </div>
