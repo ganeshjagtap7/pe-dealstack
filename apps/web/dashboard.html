@@ -125,10 +125,11 @@
 })();
 </script>
 
-<!-- Main Content Grid -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-<!-- Left Column (2/3) -->
-<div class="lg:col-span-2 flex flex-col gap-6">
+<!-- Main Content — flex row so columns size to their own content -->
+<!-- (was grid-cols-3 which forced both columns to match the tallest column's height) -->
+<div class="flex flex-col lg:flex-row gap-6 items-start">
+<!-- Left Column (2/3 width) -->
+<div class="w-full lg:basis-2/3 lg:flex-1 flex flex-col gap-6 min-w-0">
 
 <!-- Active Priorities Table — sized to content (no h-full so empty state doesn't waste space) -->
 <div id="priorities-widget" data-widget="active-priorities" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden self-start group">
@@ -161,8 +162,11 @@
 </div>
 </div>
 
-<!-- Right Column (1/3) -->
-<div class="flex flex-col gap-6">
+<!-- Right Column (1/3 width) -->
+<div class="w-full lg:basis-1/3 flex flex-col gap-6 min-w-0">
+<!-- Widget list — buttons live OUTSIDE this list so applyWidgetOrder
+     and the drag editor can't move widgets past them. -->
+<div id="right-widget-list" class="flex flex-col gap-6">
 <!-- My Tasks Widget -->
 <div id="tasks-widget" data-widget="my-tasks" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
 <div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
@@ -388,6 +392,8 @@ Scan Signals
 <h3 class="font-bold text-text-main text-base">Market Multiples</h3>
 </div>
 </div>
+
+</div><!-- /right-widget-list -->
 
 <!-- Add Widget Button — opens the widget picker modal -->
 <button id="add-widget-btn" class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
