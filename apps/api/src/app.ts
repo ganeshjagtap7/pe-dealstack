@@ -97,7 +97,7 @@ const allowedOrigins = [
   'https://lmmos.ai',
   'https://www.lmmos.ai',
   ...extraOrigins,
-  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:5173'] : []),
 ];
 app.use(cors({
   origin: (origin, callback) => {

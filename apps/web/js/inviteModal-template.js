@@ -68,7 +68,7 @@ function createInviteModalHTML() {
 
           <!-- Action Buttons -->
           <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-6 gap-4 border-t border-[#EBEBEB] pt-6 pb-2">
-            <button id="add-invite-row-btn" class="flex items-center gap-2 text-[#1269e2] hover:text-blue-700 font-medium text-sm transition-colors group px-2 py-1 rounded-md hover:bg-[#1269e2]/10">
+            <button id="add-invite-row-btn" class="flex items-center gap-2 text-[#003366] hover:text-blue-700 font-medium text-sm transition-colors group px-2 py-1 rounded-md hover:bg-[#003366]/10">
               <span class="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">add_circle</span>
               Add another team member
             </button>
@@ -79,8 +79,8 @@ function createInviteModalHTML() {
           </div>
 
           <!-- Access Control Info -->
-          <div class="mt-4 bg-[#1269e2]/5 border border-[#1269e2]/10 rounded-lg p-3 flex gap-3 items-start">
-            <span class="material-symbols-outlined text-[#1269e2] text-xl mt-0.5">info</span>
+          <div class="mt-4 bg-[#003366]/5 border border-[#003366]/10 rounded-lg p-3 flex gap-3 items-start">
+            <span class="material-symbols-outlined text-[#003366] text-xl mt-0.5">info</span>
             <div class="text-sm text-[#868E96]">
               <span class="text-[#343A40] font-medium">Access Control:</span> Analysts have <span class="text-[#343A40]">view-only</span> access to assigned deal workspaces. Associates can edit models but cannot invite external guests.
             </div>
@@ -96,7 +96,7 @@ function createInviteModalHTML() {
             <button id="invite-modal-cancel" class="flex-1 sm:flex-none px-6 py-3 rounded-lg border border-[#EBEBEB] text-[#343A40] font-medium text-sm hover:bg-black/5 transition-colors focus:outline-none focus:ring-2 focus:ring-black/10">
               Cancel
             </button>
-            <button id="invite-submit-btn" class="flex-1 sm:flex-none px-6 py-3 rounded-lg bg-[#1269e2] hover:bg-blue-600 text-white font-medium text-sm shadow-lg shadow-[#1269e2]/20 transition-all transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-[#1269e2] flex items-center justify-center gap-2">
+            <button id="invite-submit-btn" class="flex-1 sm:flex-none px-6 py-3 rounded-lg bg-[#003366] hover:bg-blue-600 text-white font-medium text-sm shadow-lg shadow-[#003366]/20 transition-all transform active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white focus:ring-[#003366] flex items-center justify-center gap-2">
               <span class="material-symbols-outlined text-lg">send</span>
               Send Invitations
             </button>

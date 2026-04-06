@@ -60,6 +60,7 @@
   <body class="bg-background-light text-text-main font-sans overflow-hidden h-screen flex">
     <!-- PE OS Sidebar (injected by layout.js) -->
     <div id="sidebar-root"></div>
+    <script>try{var _s=sessionStorage.getItem('pe-sb');if(_s)document.getElementById('sidebar-root').outerHTML=_s}catch(e){}</script>
 
     <!-- React VDR App Root -->
     <div id="root" class="flex-1 flex overflow-hidden"></div>
