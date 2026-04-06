@@ -43,7 +43,6 @@ function initializeFeatures() {
     initMobileMenu();
     initAISearch();
     initNotifications();
-    initSettings();
     initTasks();
     initNewDealModal();
     initStatCards();
@@ -51,6 +50,13 @@ function initializeFeatures() {
     initWidgetManagement();
     updateGreeting();
     updateTaskCount();
+
+    // Initialize all dashboard widgets via the registry.
+    // Each widget is opt-in: only widgets with a <div data-widget="..."> element
+    // AND a non-hidden user preference will fetch data + render.
+    if (window.WidgetRegistry) {
+        WidgetRegistry.initAll();
+    }
 
     // Update greeting when user data loads (async from layout.js)
     window.addEventListener('pe-user-loaded', () => {
@@ -74,65 +80,6 @@ function initMobileMenu() {
             sidebar.classList.toggle('z-50');
         });
     }
-}
-
-// ============================================================
-// User Menu Dropdown
-// ============================================================
-function initSettings() {
-    const userMenuButton = document.getElementById('user-menu-btn');
-    if (!userMenuButton) return;
-
-    const dropdown = document.createElement('div');
-    dropdown.id = 'user-menu-dropdown';
-    dropdown.className = 'absolute top-full right-0 mt-2 w-56 bg-white rounded-lg border border-border-subtle shadow-card-hover z-50 hidden';
-    dropdown.innerHTML = `
-        <div class="p-2">
-            <button class="w-full text-left px-3 py-2 hover:bg-gray-50 rounded-md transition-colors text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">person</span>
-                Profile Settings
-            </button>
-            <button class="w-full text-left px-3 py-2 hover:bg-gray-50 rounded-md transition-colors text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">notifications</span>
-                Notification Preferences
-            </button>
-            <button class="w-full text-left px-3 py-2 hover:bg-gray-50 rounded-md transition-colors text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">palette</span>
-                Appearance
-            </button>
-            <div class="border-t border-border-subtle my-2"></div>
-            <button class="w-full text-left px-3 py-2 hover:bg-gray-50 rounded-md transition-colors text-sm flex items-center gap-2">
-                <span class="material-symbols-outlined text-[18px]">help</span>
-                Help & Support
-            </button>
-            <button class="w-full text-left px-3 py-2 hover:bg-red-50 rounded-md transition-colors text-sm flex items-center gap-2 text-red-600">
-                <span class="material-symbols-outlined text-[18px]">logout</span>
-                Sign Out
-            </button>
-        </div>
-    `;
-
-    userMenuButton.parentElement.style.position = 'relative';
-    userMenuButton.parentElement.appendChild(dropdown);
-
-    userMenuButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        dropdown.classList.toggle('hidden');
-    });
-
-    document.addEventListener('click', (e) => {
-        if (!dropdown.contains(e.target) && e.target !== userMenuButton) {
-            dropdown.classList.add('hidden');
-        }
-    });
-
-    dropdown.querySelectorAll('button').forEach(btn => {
-        btn.addEventListener('click', () => {
-            const text = btn.textContent.trim();
-            showNotification('Settings', `${text} clicked`, 'info');
-            dropdown.classList.add('hidden');
-        });
-    });
 }
 
 // ============================================================

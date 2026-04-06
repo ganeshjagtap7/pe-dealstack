@@ -130,8 +130,8 @@
 <!-- Left Column (2/3) -->
 <div class="lg:col-span-2 flex flex-col gap-6">
 
-<!-- Active Priorities Table -->
-<div id="priorities-widget" data-widget="active-priorities" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden h-full group">
+<!-- Active Priorities Table — sized to content (no h-full so empty state doesn't waste space) -->
+<div id="priorities-widget" data-widget="active-priorities" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden self-start group">
 <div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
 <h3 class="font-bold text-text-main text-base">Active Priorities</h3>
 <div class="flex gap-2">
@@ -150,7 +150,11 @@
 </tr>
 </thead>
 <tbody id="priorities-table" class="divide-y divide-border-subtle bg-white">
-<!-- Populated dynamically by dashboard.js — shows empty state if no deals -->
+<tr><td colspan="5" class="px-5 py-10 text-center">
+<span class="material-symbols-outlined text-text-muted text-[32px] mb-2 block opacity-60">priority_high</span>
+<p class="text-sm font-medium text-text-main">No active priorities</p>
+<p class="text-xs text-text-muted mt-1">Deals needing immediate attention will appear here</p>
+</td></tr>
 </tbody>
 </table>
 </div>
@@ -304,14 +308,95 @@ Scan Signals
 </div>
 </div>
 
-<!-- Add Widget Button -->
+<!-- ============================================================ -->
+<!-- 12 EXPANSION WIDGETS — opt-in via Customize Dashboard modal  -->
+<!-- ============================================================ -->
+
+<div id="quick-actions-widget" data-widget="quick-actions" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">bolt</span>
+<h3 class="font-bold text-text-main text-base">Quick Actions</h3>
+</div>
+</div>
+
+<div id="quick-notes-widget" data-widget="notes-memo" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">sticky_note_2</span>
+<h3 class="font-bold text-text-main text-base">Quick Notes</h3>
+</div>
+</div>
+
+<div id="deal-funnel-widget" data-widget="deal-funnel" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">filter_alt</span>
+<h3 class="font-bold text-text-main text-base">Deal Funnel</h3>
+</div>
+</div>
+
+<div id="recent-activity-widget" data-widget="recent-activity" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">history</span>
+<h3 class="font-bold text-text-main text-base">Recent Activity</h3>
+</div>
+</div>
+
+<div id="upcoming-deadlines-widget" data-widget="upcoming-deadlines" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">event_upcoming</span>
+<h3 class="font-bold text-text-main text-base">Upcoming Deadlines</h3>
+</div>
+</div>
+
+<div id="calendar-widget" data-widget="calendar" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">calendar_month</span>
+<h3 class="font-bold text-text-main text-base">This Week</h3>
+</div>
+</div>
+
+<div id="key-contacts-widget" data-widget="key-contacts" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">contacts</span>
+<h3 class="font-bold text-text-main text-base">Key Contacts</h3>
+</div>
+</div>
+
+<div id="team-performance-widget" data-widget="team-performance" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">groups</span>
+<h3 class="font-bold text-text-main text-base">Team Performance</h3>
+</div>
+</div>
+
+<div id="document-alerts-widget" data-widget="document-alerts" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">report</span>
+<h3 class="font-bold text-text-main text-base">Document Alerts</h3>
+</div>
+</div>
+
+<div id="watchlist-widget" data-widget="watchlist" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">visibility</span>
+<h3 class="font-bold text-text-main text-base">Watchlist</h3>
+</div>
+</div>
+
+<div id="market-multiples-widget" data-widget="market-multiples" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">insert_chart</span>
+<h3 class="font-bold text-text-main text-base">Market Multiples</h3>
+</div>
+</div>
+
+<!-- Add Widget Button — opens the widget picker modal -->
 <button id="add-widget-btn" class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
 <span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
 <span class="text-sm font-semibold">Add Widget</span>
 </button>
 
-<!-- Widget Settings Button (for managing all widgets) -->
-<button id="widget-settings-btn" class="flex items-center justify-center gap-2 rounded-lg border border-border-subtle p-3 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50">
+<!-- Customize Dashboard Button — drag-and-drop layout editor. Hidden on mobile. -->
+<button id="widget-settings-btn" class="hidden md:flex items-center justify-center gap-2 rounded-lg border border-border-subtle p-3 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50">
 <span class="material-symbols-outlined text-[18px]">tune</span>
 <span class="text-xs font-medium">Customize Dashboard</span>
 </button>
@@ -389,5 +474,25 @@ Scan Signals
 <script src="dashboard-tasks.js"></script>
 <script src="dashboard-widgets.js"></script>
 <script src="dashboard-search.js"></script>
+
+<!-- Dashboard Widgets — Phase 0 foundations + 12 widget files + registry -->
+<script src="js/widgets/widget-base.js"></script>
+<script src="js/widgets/activity-formatters.js"></script>
+<script src="js/widgets/market-multiples-data.js"></script>
+<script src="js/widgets/quick-actions.js"></script>
+<script src="js/widgets/quick-notes.js"></script>
+<script src="js/widgets/deal-funnel.js"></script>
+<script src="js/widgets/recent-activity.js"></script>
+<script src="js/widgets/upcoming-deadlines.js"></script>
+<script src="js/widgets/calendar.js"></script>
+<script src="js/widgets/key-contacts.js"></script>
+<script src="js/widgets/team-performance.js"></script>
+<script src="js/widgets/document-alerts.js"></script>
+<script src="js/widgets/market-multiples.js"></script>
+<script src="js/widgets/watchlist-modal.js"></script>
+<script src="js/widgets/watchlist.js"></script>
+<script src="js/widgets/layout-editor.js"></script>
+<script src="js/widgets/index.js"></script>
+
 <script src="dashboard.js"></script>
 </body></html>
