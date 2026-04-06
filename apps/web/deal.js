@@ -531,4 +531,26 @@ function renderDynamicMetrics(deal) {
     }).join('');
 }
 
+// ============================================================
+// Hash-scroll — when arriving with #section in URL, wait for
+// dynamically rendered element then scroll to it smoothly.
+// Used by the onboarding checklist (e.g. #financials-section).
+// ============================================================
+(function scrollToHashWhenReady() {
+    const hash = window.location.hash?.slice(1);
+    if (!hash) return;
+
+    let attempts = 0;
+    const maxAttempts = 40; // ~8 seconds
+    const interval = setInterval(() => {
+        const el = document.getElementById(hash);
+        if (el) {
+            clearInterval(interval);
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (++attempts >= maxAttempts) {
+            clearInterval(interval);
+        }
+    }, 200);
+})();
+
 console.log('PE OS Deal Intelligence page fully initialized');
