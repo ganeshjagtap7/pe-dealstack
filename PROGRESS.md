@@ -5,6 +5,43 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 53 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST (Late Evening)
+
+#### Goal: Help & Support Modal — Booking Call + Written Feedback
+
+**Problem:** The "Help & Support" button in the user dropdown (top-right avatar menu) opened a Google form directly in a new tab. Users had no way to book a live support call, and the single-action behavior gave no choice between async vs synchronous help.
+
+**Solution:** Replaced the direct link with a clean professional modal offering two clear options.
+
+**Modal design (480px wide, Banker Blue theme):**
+- **Header:** Banker Blue help icon + "Help & Support" title + close button
+- **Two large clickable cards:**
+  1. **Book a Support Call** (calendar icon) → opens Google Calendar appointment schedule (`https://calendar.app.google/vRexQ5AmhivWx2PH6`)
+  2. **Send Written Feedback** (edit_note icon) → opens existing Google form
+- **Footer:** Urgent contact emails (`tech@pocketfund.org` or `hello@pocketfund.org`) as clickable mailto links
+
+**Behavior:**
+- Closes on ✕ button, backdrop click, or Escape key
+- Hover state on cards: Banker Blue border + soft slate background + shadow
+- Both URLs and emails are configurable in `onboarding-config.js` — no hardcoded values in component code
+- Modal injected once per page after the header is built (idempotent — checks `getElementById` first)
+
+**Why this approach:**
+- Modal lives in `layoutComponents.js` (shared header component) so **every page that uses the layout gets it for free** — dashboard, CRM, contacts, deal page, settings, VDR, admin. Zero per-page wiring.
+- Config-driven: change booking URL, form URL, or urgent emails in one file (`onboarding-config.js`) without touching component code
+- `urgentEmails` is an array — adding more emails later just means appending to the array; modal renders them with " or " between
+
+**Files Changed:** 3 files modified
+- `apps/web/js/onboarding/onboarding-config.js` — new `support` block with `bookingUrl`, `formUrl` (fallback to `feedback.formUrl`), `urgentEmails` array
+- `apps/web/js/layoutComponents.js` — new `generateHelpSupportModal()` function returns the full modal HTML
+- `apps/web/js/layout.js` — modal injection in `injectLayout()` + click handlers (open/close, backdrop, Escape, both card buttons, dynamic email link rendering)
+
+**Verification:** All 3 JS files pass `node -c` syntax check.
+
+---
+
 ### Session 52 — April 6, 2026
 
 #### 🕐 Timestamp: April 6, 2026 — IST (Evening)

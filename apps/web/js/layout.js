@@ -262,6 +262,11 @@ function initPELayout(activePage, options = {}) {
         headerRoot.outerHTML = generateHeader(options);
     }
 
+    // Inject Help & Support modal once per page (after header is in place)
+    if (typeof generateHelpSupportModal === 'function' && !document.getElementById('help-support-modal')) {
+        document.body.insertAdjacentHTML('beforeend', generateHelpSupportModal());
+    }
+
     // Setup sidebar collapse toggle
     if (collapsible) {
         const collapseBtn = document.getElementById('sidebar-collapse-btn');
@@ -334,6 +339,57 @@ function initPELayout(activePage, options = {}) {
                 if (userMenuChevron) userMenuChevron.classList.remove('open');
             }
         });
+    }
+
+    // Setup Help & Support button — opens modal with two options
+    const helpBtn = document.getElementById('help-support-btn');
+    const helpModal = document.getElementById('help-support-modal');
+    if (helpBtn && helpModal) {
+        const supportCfg = window.ONBOARDING_CONFIG?.support || {};
+        const feedbackCfg = window.ONBOARDING_CONFIG?.feedback || {};
+        const bookingUrl = supportCfg.bookingUrl || 'https://calendar.app.google/vRexQ5AmhivWx2PH6';
+        const formUrl = supportCfg.formUrl || feedbackCfg.formUrl || 'mailto:hello@pocketfund.org';
+        // Accept either urgentEmails (array) or legacy urgentEmail (string)
+        const urgentEmails = Array.isArray(supportCfg.urgentEmails)
+            ? supportCfg.urgentEmails
+            : (supportCfg.urgentEmail ? [supportCfg.urgentEmail] : ['hello@pocketfund.org']);
+
+        const openModal = () => {
+            helpModal.classList.remove('hidden');
+            helpModal.classList.add('flex');
+            if (userDropdown) userDropdown.classList.add('hidden');
+        };
+        const closeModal = () => {
+            helpModal.classList.add('hidden');
+            helpModal.classList.remove('flex');
+        };
+
+        helpBtn.addEventListener('click', openModal);
+
+        document.getElementById('help-support-close')?.addEventListener('click', closeModal);
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !helpModal.classList.contains('hidden')) closeModal();
+        });
+
+        document.getElementById('help-support-book')?.addEventListener('click', () => {
+            window.open(bookingUrl, '_blank', 'noopener,noreferrer');
+            closeModal();
+        });
+        document.getElementById('help-support-form')?.addEventListener('click', () => {
+            window.open(formUrl, '_blank', 'noopener,noreferrer');
+            closeModal();
+        });
+
+        // Render the urgent emails — each is a clickable mailto link
+        const emailsContainer = document.getElementById('help-support-emails');
+        if (emailsContainer) {
+            emailsContainer.innerHTML = urgentEmails
+                .map(e => `<a href="mailto:${e}" class="font-semibold" style="color: ${PE_COLORS.primary};">${e}</a>`)
+                .join(' or ');
+        }
     }
 
     // Setup logout button

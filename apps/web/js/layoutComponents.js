@@ -172,6 +172,10 @@ function generateHeader(options = {}) {
                                 <span class="material-symbols-outlined text-[18px]">settings</span>
                                 Settings
                             </a>
+                            <button id="help-support-btn" class="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm w-full text-left transition-colors" style="color: ${PE_COLORS.textSecondary};">
+                                <span class="material-symbols-outlined text-[18px]">help</span>
+                                Help & Support
+                            </button>
                         </div>
                         <div class="border-t py-1" style="border-color: ${PE_COLORS.borderSubtle};">
                             <button id="logout-btn" class="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm w-full text-left transition-colors" style="color: #DC2626;">
@@ -183,6 +187,77 @@ function generateHeader(options = {}) {
                 </div>
             </div>
         </header>
+    `;
+}
+
+/**
+ * Generate the Help & Support modal HTML.
+ * Injected once per page; opened by the user-dropdown "Help & Support" button.
+ */
+function generateHelpSupportModal() {
+    return `
+        <div id="help-support-modal" class="fixed inset-0 z-50 hidden items-center justify-center" style="background-color: rgba(0,0,0,0.5);">
+            <div class="rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden" style="background-color: ${PE_COLORS.surfaceCard}; border: 1px solid ${PE_COLORS.borderSubtle};">
+                <!-- Header -->
+                <div class="px-6 py-4 flex items-center justify-between" style="border-bottom: 1px solid ${PE_COLORS.borderSubtle}; background-color: ${PE_COLORS.backgroundBody};">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-lg flex items-center justify-center" style="background-color: ${PE_COLORS.primary};">
+                            <span class="material-symbols-outlined text-white text-[20px]">help</span>
+                        </div>
+                        <div>
+                            <h3 class="text-base font-bold" style="color: ${PE_COLORS.textMain};">Help & Support</h3>
+                            <p class="text-xs" style="color: ${PE_COLORS.textMuted};">Choose how you'd like to reach our team.</p>
+                        </div>
+                    </div>
+                    <button id="help-support-close" class="p-1.5 rounded-md transition-colors" style="color: ${PE_COLORS.textMuted};" onmouseover="this.style.backgroundColor='${PE_COLORS.backgroundBody}'" onmouseout="this.style.backgroundColor='transparent'" title="Close">
+                        <span class="material-symbols-outlined text-[20px]">close</span>
+                    </button>
+                </div>
+
+                <!-- Options -->
+                <div class="p-6 space-y-3">
+                    <!-- Book a Call -->
+                    <button id="help-support-book" type="button"
+                            class="w-full text-left p-4 rounded-lg flex items-start gap-4 transition-all hover:shadow-md"
+                            style="background-color: ${PE_COLORS.surfaceCard}; border: 1.5px solid ${PE_COLORS.borderSubtle};"
+                            onmouseover="this.style.borderColor='${PE_COLORS.primary}'; this.style.backgroundColor='#F8FAFC';"
+                            onmouseout="this.style.borderColor='${PE_COLORS.borderSubtle}'; this.style.backgroundColor='${PE_COLORS.surfaceCard}';">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style="background-color: #E6EEF5; color: ${PE_COLORS.primary};">
+                            <span class="material-symbols-outlined text-[22px]">event</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-bold" style="color: ${PE_COLORS.textMain};">Book a Support Call</p>
+                            <p class="text-xs mt-0.5" style="color: ${PE_COLORS.textMuted};">30-min video call with our team. Pick a time that works for you.</p>
+                        </div>
+                        <span class="material-symbols-outlined text-[20px] shrink-0" style="color: ${PE_COLORS.textMuted};">chevron_right</span>
+                    </button>
+
+                    <!-- Written Feedback -->
+                    <button id="help-support-form" type="button"
+                            class="w-full text-left p-4 rounded-lg flex items-start gap-4 transition-all hover:shadow-md"
+                            style="background-color: ${PE_COLORS.surfaceCard}; border: 1.5px solid ${PE_COLORS.borderSubtle};"
+                            onmouseover="this.style.borderColor='${PE_COLORS.primary}'; this.style.backgroundColor='#F8FAFC';"
+                            onmouseout="this.style.borderColor='${PE_COLORS.borderSubtle}'; this.style.backgroundColor='${PE_COLORS.surfaceCard}';">
+                        <div class="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style="background-color: #E6EEF5; color: ${PE_COLORS.primary};">
+                            <span class="material-symbols-outlined text-[22px]">edit_note</span>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-bold" style="color: ${PE_COLORS.textMain};">Send Written Feedback</p>
+                            <p class="text-xs mt-0.5" style="color: ${PE_COLORS.textMuted};">Quick form for bug reports, feature requests, or general feedback.</p>
+                        </div>
+                        <span class="material-symbols-outlined text-[20px] shrink-0" style="color: ${PE_COLORS.textMuted};">chevron_right</span>
+                    </button>
+                </div>
+
+                <!-- Footer -->
+                <div class="px-6 py-3 text-center" style="border-top: 1px solid ${PE_COLORS.borderSubtle}; background-color: ${PE_COLORS.backgroundBody};">
+                    <p class="text-xs" style="color: ${PE_COLORS.textMuted};">
+                        Need urgent help? Email
+                        <span id="help-support-emails"></span>
+                    </p>
+                </div>
+            </div>
+        </div>
     `;
 }
 
