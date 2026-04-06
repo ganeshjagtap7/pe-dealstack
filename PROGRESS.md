@@ -5,6 +5,99 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 52 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST (Evening)
+
+#### Goal: Onboarding Checklist Bug Fixes + Team Invitation UI
+
+**Part 1: Onboarding Checklist Items Not Clickable**
+
+**Problem:** On the dashboard's "Getting Started" checklist, only "Create your first deal" was clickable. Three of five rows (Upload CIM, Review extraction, Try Deal Chat) did nothing on click and had no cursor pointer.
+
+**Root cause:** `onboarding-config.js` had `href: null` on those steps with a comment "navigates to deal page" — but no logic was ever written to resolve that. The renderer at `onboarding-checklist.js:46-47` only attached click handlers when `step.href` was truthy, so the rows were silently inert.
+
+**Fix:** Added `resolveStepHrefs()` in the checklist init flow that fetches the user's most recent deal once per render and points each `null`-href step at the right section of `/deal.html?id={dealId}`:
+- `uploadDocument` → `#documents-list`
+- `reviewExtraction` → `#financials-section`
+- `tryDealChat` → `#chat-messages`
+- Falls back to `/crm.html` if no deal exists yet
+
+Config file unchanged — `href: null` is now the marker for "resolve at runtime".
+
+**Part 2: Steps Not Auto-Checking on Return**
+
+**Problem:** After visiting a linked page (or even uploading a document via the VDR), the checklist didn't reflect completion when returning to the dashboard. Manual check-off was also impossible — clicking the empty circle did nothing.
+
+**Root cause:** Backend hooks fired on `documents-upload.ts` and `invitations.ts`, but:
+1. Users coming through alternative paths (e.g. existing data, deal intake flow) bypassed those hooks
+2. No backfill from actual activity ever ran on the status endpoint
+3. The circle was a `<div>`, not a button — no click handler
+
+**Fix 1: Backend backfill in `GET /api/onboarding/status`**
+- Added `backfillStepsFromActivity()` that checks all 5 steps against real data on every dashboard load:
+  - `createDeal` → Deal exists in org
+  - `uploadDocument` → Document exists for any deal in org
+  - `reviewExtraction` → FinancialStatement exists
+  - `tryDealChat` → ChatMessage exists
+  - `inviteTeamMember` → Invitation exists
+- Persists changes immediately so subsequent loads are fast
+- Best-effort — never blocks status fetch on individual query failure
+
+**Fix 2: Manual check-off**
+- Converted the circle from `<div>` to `<button>` with `data-step-toggle` attribute
+- Click stops propagation, calls `OnboardingAPI.completeStep(stepId)`, re-renders
+- Forward-only (no un-check) to keep state intuitive
+- Row click separated from circle click via `e.target.closest('[data-step-toggle]')` check
+
+**Part 3: Missing Invite Modal in Settings**
+
+**Problem:** "Invite a team member" checklist item routed to `/settings.html` but the page had zero invite UI. `POST /api/invitations` existed and even auto-completed the onboarding step, but there was no way to trigger it from the UI.
+
+**Fix:** Added complete Team & Invitations section to settings:
+- New "Team" sidebar nav entry (`#section-team`)
+- Section card with "Invite Team Member" button + invitation list
+- Two-panel modal: form panel (email + role: Member/Viewer/Admin) → after sending, swaps to **link panel** with read-only invite URL + Copy button
+- Modal auto-opens when settings.html loads with `#invite` hash
+- Updated `inviteTeamMember` checklist href → `/settings.html#invite`
+- Closes on backdrop click or Escape
+
+**Part 4: Manual Invite Link Sharing**
+
+**User feedback:** "When inviting team member we can't send auto links → user should be able to copy the invite link manually and send to teammates also."
+
+**Backend changes** (`apps/api/src/routes/invitations.ts`):
+- `POST /api/invitations` now **always** returns `inviteUrl` (was only on email failure)
+- `GET /api/invitations` now selects `token` and decorates each PENDING row with a full `inviteUrl`; tokens are stripped from accepted/expired rows so they aren't leaked
+
+**Frontend changes** (`apps/web/js/settingsInvite.js` + `settings.html`):
+- Modal success state shows the link in a read-only input + Copy button (with green "Copied" feedback for 1.5s)
+- Footer has Done + "Invite Another" buttons (no more auto-close)
+- Each PENDING row in the invitation list has an inline "Copy Link" button next to the status badge
+- Uses `navigator.clipboard.writeText` with `document.execCommand('copy')` fallback for non-HTTPS contexts
+- Banner explains email send status and the manual fallback path
+
+**Part 5: Deal Card "INITIAL REVIEW" Badge Wrapping**
+
+**Problem:** The stage badge on deal cards was wrapping "INITIAL REVIEW" to two lines, looking misaligned.
+
+**Root cause:** [crm-cards.js:75](apps/web/crm-cards.js#L75) — badge was missing `whitespace-nowrap` and `shrink-0`, so flexbox squeezed it and the text wrapped.
+
+**Fix:** Added `inline-flex items-center whitespace-nowrap shrink-0 leading-none px-2.5` to the badge — single-line, properly centered, slightly more horizontal padding.
+
+**Files Changed:** 8 files (1 new + 7 modified)
+- `apps/api/src/routes/onboarding.ts` — added `backfillStepsFromActivity()` helper, integrated into GET /status
+- `apps/api/src/routes/invitations.ts` — always return `inviteUrl` on POST, decorate GET list with `inviteUrl`, strip token from non-pending
+- `apps/web/js/onboarding/onboarding-checklist.js` — `resolveStepHrefs()` + manual click-off button + row/button click separation
+- `apps/web/js/onboarding/onboarding-config.js` — changed `inviteTeamMember` href to `/settings.html#invite`
+- `apps/web/settings.html` — Team section, invite modal with two-panel design, Team sidebar nav
+- `apps/web/js/settingsInvite.js` — **NEW** modal logic, invite list rendering, copy-to-clipboard with fallback, hash auto-open
+- `apps/web/crm-cards.js` — fixed stage badge wrapping (whitespace-nowrap + shrink-0)
+
+**Verification:** Zero TypeScript errors, all JS files pass `node -c` syntax check.
+
+---
+
 ### Session 51 — April 6, 2026
 
 #### 🕐 Timestamp: April 6, 2026 — IST

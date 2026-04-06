@@ -72,7 +72,7 @@ window.ONBOARDING_CONFIG = {
             {
                 id: 'inviteTeamMember',
                 label: 'Invite a team member',
-                href: '/settings.html',
+                href: '/settings.html#invite',
                 icon: 'person_add',
                 description: 'Add an analyst or partner to your organization'
             }

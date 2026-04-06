@@ -72,7 +72,7 @@
                                 <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
                             </div>
                         </div>
-                        <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider mr-8">${style.label}</span>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider whitespace-nowrap shrink-0 mr-8 leading-none">${style.label}</span>
                         ${deal.tags && deal.tags.includes('sample') ? '<span class="ml-1 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-wider">Sample</span>' : ''}
                     </div>
                 <div class="grid ${gridCols} gap-3 mb-4">

@@ -152,6 +152,10 @@
                                     <span class="material-symbols-outlined text-[20px]">notifications</span>
                                     <span class="text-sm font-medium">Notifications</span>
                                 </a>
+                                <a href="#section-team" data-section="team" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">group</span>
+                                    <span class="text-sm font-medium">Team</span>
+                                </a>
                             </nav>
                         </aside>
 
@@ -333,6 +337,30 @@
                                 </div>
                             </section>
 
+                            <!-- Team & Invitations -->
+                            <section id="section-team" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="px-6 py-5 border-b border-border-subtle flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="p-2 bg-primary-light rounded-lg text-primary border border-primary/20">
+                                            <span class="material-symbols-outlined text-[20px] block">group</span>
+                                        </div>
+                                        <div>
+                                            <h2 class="text-base font-bold text-text-main">Team & Invitations</h2>
+                                            <p class="text-xs text-text-muted">Invite analysts and partners to your organization.</p>
+                                        </div>
+                                    </div>
+                                    <button id="open-invite-modal" class="px-4 py-2 text-white text-sm font-semibold rounded-lg shadow-card transition-colors flex items-center gap-2" style="background-color: #003366;">
+                                        <span class="material-symbols-outlined text-[18px]">person_add</span>
+                                        Invite Team Member
+                                    </button>
+                                </div>
+                                <div class="p-6">
+                                    <div id="invitations-list" class="space-y-2">
+                                        <p class="text-sm text-text-muted text-center py-4">Loading invitations...</p>
+                                    </div>
+                                </div>
+                            </section>
+
                             <!-- Deactivate Account -->
                             <div class="flex items-center justify-between p-5 bg-red-50 border border-red-200 rounded-xl">
                                 <div>
@@ -376,6 +404,72 @@
         </div>
     </div>
 
+    <!-- Invite Team Member Modal -->
+    <div id="invite-modal" class="fixed inset-0 bg-black/50 z-50 hidden items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden border border-border-subtle">
+            <div class="px-6 py-4 border-b border-border-subtle flex items-center justify-between bg-gray-50">
+                <h3 class="font-bold text-text-main flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-[20px]">person_add</span>
+                    Invite Team Member
+                </h3>
+                <button id="close-invite-modal" class="text-text-muted hover:text-text-main transition-colors p-1 hover:bg-gray-200 rounded">
+                    <span class="material-symbols-outlined text-[20px]">close</span>
+                </button>
+            </div>
+            <div class="p-6">
+                <!-- Form Panel -->
+                <div id="invite-form-panel" class="space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Email Address</label>
+                        <input id="invite-email" type="email" autocomplete="off"
+                               class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm"
+                               placeholder="colleague@firm.com">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Role</label>
+                        <select id="invite-role"
+                                class="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm">
+                            <option value="MEMBER">Member — Can view and edit deals</option>
+                            <option value="VIEWER">Viewer — Read-only access</option>
+                            <option value="ADMIN">Admin — Full access including team management</option>
+                        </select>
+                    </div>
+                    <div id="invite-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3"></div>
+                    <button id="send-invite-btn" class="w-full py-2.5 text-white text-sm font-semibold rounded-lg shadow-card transition-colors flex items-center justify-center gap-2 disabled:opacity-50" style="background-color: #003366;">
+                        <span id="send-invite-spinner" class="material-symbols-outlined text-[18px] hidden animate-spin">sync</span>
+                        Send Invitation
+                    </button>
+                </div>
+
+                <!-- Link Panel (shown after successful invite) -->
+                <div id="invite-link-panel" class="hidden space-y-4">
+                    <div id="invite-link-message" class="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-3"></div>
+                    <div>
+                        <label class="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">Invite Link</label>
+                        <div class="flex items-center gap-2">
+                            <input id="invite-link-input" type="text" readonly
+                                   class="flex-1 min-w-0 rounded-lg border border-border-subtle bg-gray-50 text-text-main text-xs font-mono focus:border-primary focus:ring-1 focus:ring-primary h-11 px-3 shadow-sm select-all">
+                            <button id="invite-link-copy-btn" type="button"
+                                    class="shrink-0 inline-flex items-center gap-1.5 px-4 h-11 text-sm font-semibold rounded-lg border border-border-subtle bg-white text-text-main hover:bg-gray-50 transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">content_copy</span>
+                                Copy
+                            </button>
+                        </div>
+                        <p class="text-xs text-text-muted mt-2">This link expires in 7 days. Anyone with the link can join your organization.</p>
+                    </div>
+                    <div class="flex items-center gap-3 pt-2">
+                        <button id="invite-link-done-btn" type="button" class="flex-1 py-2.5 text-white text-sm font-semibold rounded-lg shadow-card transition-colors" style="background-color: #003366;">
+                            Done
+                        </button>
+                        <button id="invite-link-another-btn" type="button" class="flex-1 py-2.5 bg-white border border-border-subtle text-text-main text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                            Invite Another
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Notification Toast -->
     <div id="toast" class="fixed bottom-6 right-6 bg-white border border-border-subtle rounded-xl shadow-card-hover p-4 flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
         <span id="toast-icon" class="material-symbols-outlined text-secondary">check_circle</span>
@@ -393,6 +487,7 @@
     <script src="js/notificationCenter.js"></script>
     <script src="js/globalSearch.js"></script>
     <script src="js/settingsProfile.js"></script>
+    <script src="js/settingsInvite.js"></script>
     <script src="settings.js"></script>
 
     <!-- Onboarding modules -->

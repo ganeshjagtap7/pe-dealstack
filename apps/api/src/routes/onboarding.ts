@@ -76,6 +76,109 @@ export async function tryCompleteOnboardingStep(userId: string, step: string): P
   }
 }
 
+/**
+ * Backfill onboarding steps from actual user data.
+ * Catches cases where the backend auto-complete hooks were missed
+ * (e.g. user existed before hooks were added, or used a path that bypassed them).
+ */
+async function backfillStepsFromActivity(orgId: string, status: any): Promise<{ status: any; changed: boolean }> {
+  if (!status.steps) status.steps = { ...DEFAULT_STATUS.steps };
+  let changed = false;
+
+  const checks: Array<{ step: string; query: () => Promise<boolean> }> = [
+    {
+      step: 'createDeal',
+      query: async () => {
+        const { count } = await supabase
+          .from('Deal')
+          .select('id', { count: 'exact', head: true })
+          .eq('organizationId', orgId);
+        return (count ?? 0) > 0;
+      },
+    },
+    {
+      step: 'uploadDocument',
+      query: async () => {
+        // Document table has no organizationId — scope via Deal
+        const { data: deals } = await supabase
+          .from('Deal')
+          .select('id')
+          .eq('organizationId', orgId);
+        const dealIds = (deals || []).map(d => d.id);
+        if (dealIds.length === 0) return false;
+        const { count } = await supabase
+          .from('Document')
+          .select('id', { count: 'exact', head: true })
+          .in('dealId', dealIds);
+        return (count ?? 0) > 0;
+      },
+    },
+    {
+      step: 'reviewExtraction',
+      query: async () => {
+        const { data: deals } = await supabase
+          .from('Deal')
+          .select('id')
+          .eq('organizationId', orgId);
+        const dealIds = (deals || []).map(d => d.id);
+        if (dealIds.length === 0) return false;
+        const { count } = await supabase
+          .from('FinancialStatement')
+          .select('id', { count: 'exact', head: true })
+          .in('dealId', dealIds);
+        return (count ?? 0) > 0;
+      },
+    },
+    {
+      step: 'tryDealChat',
+      query: async () => {
+        const { data: deals } = await supabase
+          .from('Deal')
+          .select('id')
+          .eq('organizationId', orgId);
+        const dealIds = (deals || []).map(d => d.id);
+        if (dealIds.length === 0) return false;
+        const { count } = await supabase
+          .from('ChatMessage')
+          .select('id', { count: 'exact', head: true })
+          .in('dealId', dealIds);
+        return (count ?? 0) > 0;
+      },
+    },
+    {
+      step: 'inviteTeamMember',
+      query: async () => {
+        const { count } = await supabase
+          .from('Invitation')
+          .select('id', { count: 'exact', head: true })
+          .eq('organizationId', orgId);
+        return (count ?? 0) > 0;
+      },
+    },
+  ];
+
+  for (const { step, query } of checks) {
+    if (status.steps[step]) continue;
+    try {
+      if (await query()) {
+        status.steps[step] = true;
+        changed = true;
+      }
+    } catch {
+      // Best-effort — never block status fetch
+    }
+  }
+
+  if (changed) {
+    const allComplete = VALID_STEPS.every(s => status.steps[s]);
+    if (allComplete && !status.completedAt) {
+      status.completedAt = new Date().toISOString();
+    }
+  }
+
+  return { status, changed };
+}
+
 // GET /api/onboarding/status
 router.get('/status', async (req: Request, res: Response) => {
   try {
@@ -90,7 +193,7 @@ router.get('/status', async (req: Request, res: Response) => {
 
     if (error) throw error;
 
-    const status = data?.onboardingStatus || DEFAULT_STATUS;
+    let status = data?.onboardingStatus || { ...DEFAULT_STATUS };
 
     // If welcome hasn't been shown yet, check if this is really a new user
     // Existing users with deals/activity should skip onboarding entirely
@@ -103,6 +206,19 @@ router.get('/status', async (req: Request, res: Response) => {
           .update({ onboardingStatus: COMPLETED_STATUS })
           .eq('authId', userId);
         return res.json(COMPLETED_STATUS);
+      }
+    }
+
+    // Backfill any steps the user has actually completed via activity
+    // (handles missed hook fires + manual check-off persistence)
+    if (!status.checklistDismissed) {
+      const { status: updated, changed } = await backfillStepsFromActivity(orgId, status);
+      if (changed) {
+        status = updated;
+        await supabase
+          .from('User')
+          .update({ onboardingStatus: status })
+          .eq('authId', userId);
       }
     }
 

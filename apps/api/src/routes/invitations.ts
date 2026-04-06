@@ -129,6 +129,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
         status,
         firmName,
         organizationId,
+        token,
         createdAt,
         expiresAt,
         acceptedAt,
@@ -145,7 +146,17 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (error) throw error;
 
-    res.json(invitations || []);
+    // Decorate with full invite URL for pending invites; strip token from accepted/expired
+    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const decorated = (invitations || []).map((inv: any) => {
+      const isPending = inv.status === 'PENDING';
+      const url = isPending && inv.token ? `${baseUrl}/accept-invite.html?token=${inv.token}` : null;
+      // Don't leak the raw token for non-pending invites
+      const { token, ...rest } = inv;
+      return { ...rest, inviteUrl: url };
+    });
+
+    res.json(decorated);
   } catch (error) {
     next(error);
   }
@@ -293,7 +304,9 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       ...invitation,
       emailSent: emailResult.success,
       emailError: emailResult.success ? undefined : emailResult.error,
-      inviteUrl: emailResult.success ? undefined : inviteUrl,
+      // Always return inviteUrl so the inviter can copy/share manually,
+      // even when the email was sent successfully.
+      inviteUrl,
     });
   } catch (error) {
     next(error);
