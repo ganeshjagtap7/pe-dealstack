@@ -5,6 +5,249 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 54 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST (Late Night)
+
+#### Goal: Dashboard Widget Expansion (12 widgets) + Admin Team Activity Bug Fix + Drag-and-Drop Layout Editor + UX cleanup sprint
+
+This session was a marathon — covered 6 distinct workstreams. Documented in roughly chronological order.
+
+---
+
+#### 1. Removed "Enter URL" Tab from Deal Intake Modal
+
+**Problem:** The deal intake modal at `/deal-intake.html` had three tabs (Upload File / Paste Text / Enter URL), but URL scraping wasn't a requested feature for v1.
+
+**Fix:** Removed the Enter URL tab button + panel + extractFromURL JS handler. Updated header copy to "Upload a document or paste text to create a new deal."
+
+**Files Changed:** 2 files
+- `apps/web/deal-intake.html` — removed tab button + URL panel
+- `apps/web/js/deal-intake.js` — removed `extractFromURL`, `urlInput` listeners, and `resetForm` references
+
+---
+
+#### 2. Profile Dropdown Cleanup — Help & Support + Sign Out wired to real handlers
+
+**Problem:** On the dashboard, clicking any item in the user-menu dropdown (top-right avatar) would just fire a `showNotification('Settings', 'X clicked')` toast. The buttons were stubs that did nothing real. Also: TWO dropdowns existed (`#user-dropdown` from layoutComponents + `#user-menu-dropdown` from dashboard.js), both bound to the same `#user-menu-btn` — they would toggle simultaneously, with the dashboard one rendering on top.
+
+**Root cause:** Dashboard.js's `initSettings()` created a duplicate dropdown that was never wired to real navigation. Layout.js already had a working dropdown for the rest of the app.
+
+**Fix:**
+- **Deleted** the duplicate `initSettings()` in `dashboard.js` entirely
+- **Added Help & Support** to the shared layout dropdown (`layoutComponents.js`) so every page gets it
+- Wired Help & Support → opens `ONBOARDING_CONFIG.feedback.formUrl` in new tab
+- (Layer 2: in a follow-on commit, Help & Support became a modal with Book a Call + Written Feedback options — that work was completed in Session 53.)
+
+**Files Changed:** 3 files
+- `apps/web/dashboard.js` — removed `initSettings()` function and its call site (~80 lines deleted)
+- `apps/web/js/layoutComponents.js` — added Help & Support button to user dropdown
+- `apps/web/js/layout.js` — wired Help & Support click to open feedback URL
+
+---
+
+#### 3. Onboarding Checklist Navigation Fix
+
+**Problem:** Clicking a checklist step on the dashboard navigated to `/deal.html?id={dealId}#financials-section`, but the deal page renders content dynamically — the browser's native hash-scroll fired BEFORE the target element existed, so users landed at the top of the deal page instead of scrolling to financials/chat/documents.
+
+**Fix:** Added a polling hash-scroller at the bottom of `deal.js` that waits up to 8 seconds for the target element to appear, then smooth-scrolls to it.
+
+**Files Changed:** 1 file
+- `apps/web/deal.js` — added `scrollToHashWhenReady` IIFE (~20 lines)
+
+---
+
+#### 4. Admin Dashboard Slow Load (N+1 Query Fix)
+
+**Problem:** The admin dashboard's stats cards rendered fast, but Resource Allocation, Global Task Management, Team Activity, and Upcoming Reviews all sat at "Loading..." for several seconds.
+
+**Root cause:** `renderResourceAllocation()` was making **N sequential `await` fetches** (one per team member) to `/users/${id}/deals`, AND `initAdminDashboard` was awaiting the whole thing before rendering everything below it. With 5 team members that's 5 serial round-trips gating the rest of the page render.
+
+**Fix:**
+1. **Replaced N HTTP calls with a client-side map** built from already-loaded `allDeals` (each Deal has `teamMembers` joined inline via `DealTeamMember` → `User`). Zero extra requests, runs in microseconds.
+2. Made `renderResourceAllocation` synchronous and dropped the `await` so task table / reviews / activity feed render immediately in parallel.
+3. Handles both data shapes: `tm.user?.id` (joined) and `tm.userId` (flat) for safety.
+
+**Files Changed:** 1 file
+- `apps/web/admin-dashboard.js` — `renderResourceAllocation()` now sync, no per-member API calls
+
+---
+
+#### 5. ⭐ Major Feature: Dashboard Widget Expansion (12 new widgets) + Admin Team Activity Bug Fix
+
+**Goal:** The Customize Dashboard modal advertised 20 widgets but only 5 actually rendered — the other 15 showed a "Soon" badge. Built 12 of the 15 missing widgets and hardened the audit logging system that powers the admin Team Activity feed.
+
+##### 5a. Root cause: Admin Team Activity always showed "No activity yet"
+
+**Bug:** `apps/api/src/services/auditLog.ts` `logAuditEvent()` inserts into the `AuditLog` table on every audited action — but it **never set `organizationId`** in the insert payload. Meanwhile `getAuditLogs()` filters by `organizationId`. Result: every audit row had `organizationId = NULL`, every org-scoped query returned zero rows. The Team Activity card was permanently empty.
+
+The schema column **already existed** (added by `apps/api/organization-migration.sql:65`). The middleware **already populated** `req.user.organizationId` (`orgScope.ts:50`). The fix was a 3-line patch to `auditLog.ts`: add `organizationId` to `AuditLogEntry` interface, include it in the insert payload, and pass it via `logFromRequest`.
+
+**One-shot backfill SQL** (user runs in Supabase SQL editor):
+```sql
+UPDATE "AuditLog" a
+SET "organizationId" = u."organizationId"
+FROM "User" u
+WHERE a."userId" = u.id AND a."organizationId" IS NULL;
+```
+
+##### 5b. 12 New Widgets — Full List
+
+| # | Widget | Data source | Special notes |
+|---|---|---|---|
+| 1 | **Quick Actions** | UI only — links to existing pages | Hides "Create Task" for non-admin roles |
+| 2 | **Quick Notes** | `localStorage`, namespaced as `pe-quick-notes:${userId}` | Per-user namespacing prevents cross-user leak on shared browsers |
+| 3 | **Deal Funnel** | `GET /api/deals` → group by stage | Horizontal bars per stage with count + share-of-pipeline % |
+| 4 | **Recent Activity** | `GET /api/audit?limit=10` | Reuses the same renderer as admin Team Activity |
+| 5 | **Upcoming Deadlines** | `GET /api/tasks?limit=100` | Filters to dueDate ≤ 14 days, color-coded overdue/this-week/later |
+| 6 | **Calendar (This Week)** | Union of `Task.dueDate` + `Deal.targetCloseDate` | Day-grouped list, next 7 days, user-local timezone |
+| 7 | **Key Contacts** | `GET /api/contacts` + `GET /api/contacts/insights/scores` | Two-fetch merge, top 5 by relationship score, initials avatars |
+| 8 | **Team Performance** | `GET /api/users` + `GET /api/deals` | Reuses `Deal.teamMembers` join — no new endpoint |
+| 9 | **Document Alerts** | **NEW** `GET /api/documents/alerts` | Cross-deal docs needing review (no extracted text or no AI analysis) |
+| 10 | **Watchlist** | **NEW** `GET/POST/DELETE /api/watchlist` + new `Watchlist` table | Add/delete via inline modal (`watchlist-modal.js`) |
+| 11 | **Market Multiples** | Static reference data file | Date-stamped + disclaimer footer to prevent users treating illustrative numbers as live data |
+
+**Deal Sources** stayed in "Coming Soon" — Deal table has no `source` column, so shipping it honestly would have required a schema migration + per-deal UI to set source values.
+
+**Tier C "Coming Soon" remains:** Market News, Capital Deployed, Fund Performance, Exit Tracker, Co-Investor Activity, AI Market Sentiment, Deal Sources.
+
+##### 5c. Architecture — `apps/web/js/widgets/` directory
+
+To prevent ~200 lines of duplicated plumbing across 12 widgets, built a shared foundations layer:
+
+**`widget-base.js`** — leaf utility module exposing `window.WidgetBase`:
+- `waitForAuth()` — replaces the 6-line auth poll previously duplicated in dashboard inline scripts
+- `getJSON(path)` — wraps `PEAuth.authFetch` + JSON parse + error normalization
+- `dealsCache()` / `tasksCache()` — **request coalescing**: multiple widgets requesting `/deals` share a single in-flight promise per page load. Fixes the "4 widgets each fetching /deals independently" perf cliff.
+- `getOrCreateBody(container)` / `setBody(container, html)` — lazily creates a `.widget-body` div under the static title bar so widget JS files don't wipe the title bar when rendering content
+- `renderEmpty` / `renderError` / `renderLoading` — consistent fallback states
+- `getCurrentUserId()` — for localStorage namespacing
+- `isWidgetVisible(widgetId)` — checks user prefs before fetching to avoid wasted requests on hidden widgets
+
+**`activity-formatters.js`** — extracted `groupLogsByDay`, `renderActivityItem`, `formatAuditAction`, `getInitials`, `getTimeAgo` from `admin-dashboard.js`. Both the admin Team Activity feed AND the new Recent Activity widget use these globals — single source of truth.
+
+**`widgets/index.js`** — registry mapping `widgetId → initFn`. `dashboard.js` calls `WidgetRegistry.initAll()` during page load. Registry is **idempotent** (tracks initialized widgets in a `Set`) so re-running it after the user enables a new widget doesn't double-initialize.
+
+**12 widget files** — one per widget, each ~30-100 lines. Each file exports `init<Name>Widget(container)` and uses only `WidgetBase` + (where relevant) `activity-formatters` globals. No circular imports possible — registry is the single fan-out point.
+
+##### 5d. Backend additions
+
+**New routes:**
+- `apps/api/src/routes/watchlist.ts` — `GET`, `POST`, `DELETE /api/watchlist/:id`. All org-scoped via `getOrgId(req)`. DELETE returns 404 (not 403) on org mismatch to prevent enumeration.
+- `apps/api/src/routes/documents-alerts.ts` — `GET /api/documents/alerts`. Joins `Document` to `Deal` to filter by `Deal.organizationId`, returns docs where `extractedText IS NULL OR aiAnalyzedAt IS NULL`. Limit 20.
+
+**New table:**
+- `apps/api/watchlist-migration.sql` — `Watchlist(id, organizationId, companyName, industry, notes, addedBy, createdAt, updatedAt)` + RLS policies + index on `organizationId`. **User ran this migration successfully in Supabase before testing.**
+
+**Mounting:**
+- `apps/api/src/app.ts` — mounted both new routes through `authMiddleware + orgMiddleware`
+
+##### 5e. Two compounding bugs found during initial QA
+
+**Bug A — Widgets showed only their static title bar after user enabled them.**
+
+Root cause: registry's `initAll()` only ran at page load. Since all 12 new widgets default to `defaultVisible: false`, `isWidgetVisible()` returned `false` at boot → init was skipped. When the user enabled them via the Customize modal, `applyWidgetPreferences()` removed `display:none` but **never re-invoked the init functions**, so the containers stayed empty.
+
+Fix: Made the registry idempotent and called `WidgetRegistry.initAll()` at the end of `saveWidgetSelection()` so newly-enabled widgets initialize on save.
+
+**Bug B — Widget files would wipe the static title bar.**
+
+Even after fixing Bug A, every widget did `container.innerHTML = ...` which overwrites everything inside the `<div data-widget>` container — including the static title bar from `dashboard.html`.
+
+Fix: Added `WidgetBase.getOrCreateBody(container)` and `WidgetBase.setBody(container, html)`. They lazily create a `<div class="widget-body">` UNDER the static title bar and write content there. All 11 widget files updated to use `WidgetBase.setBody()` instead of `container.innerHTML`. `renderEmpty`/`renderError`/`renderLoading` automatically target the body.
+
+##### 5f. Document Alerts icon bug
+
+**Bug:** The Document Alerts entry in the Customize Dashboard modal showed "_ALERT" in big text where the icon should have been. Cause: `WIDGET_CONFIG['document-alerts'].icon` was `'folder_alert'` — **not a real Material Symbols icon name**. When Material Symbols can't find a name in its font, it falls back to rendering the literal text.
+
+**Fix:** Changed icon to `'report'` (a real Material Symbols name) in both `dashboard-widgets.js` and the widget's title bar in `dashboard.html`.
+
+---
+
+#### 6. ⭐ Drag-and-Drop Dashboard Layout Editor
+
+**Goal:** Two buttons sat below the widget list — "Add Widget" and "Customize Dashboard" — but they opened the same widget picker modal. User asked: Add Widget should remain the picker (choose what appears), and Customize Dashboard should let users **drag and drop** widgets to reorder.
+
+**Brainstormed scope and chose v1 = "reorder within columns only"** (option A). Resize, cross-column moves, and free positioning explicitly deferred to v2/v3 if usage shows demand.
+
+**Spec written and committed:** `docs/superpowers/specs/2026-04-06-dashboard-layout-editor-design.md`
+
+##### 6a. UX flow
+
+```
+[Normal] → click "Customize Dashboard"
+       → [Edit mode ON]
+         • Every visible widget gets dotted blue outline + drag handle
+         • Banner at top: "Drag widgets by the handle to reorder · Click Done"
+         • Customize button transforms → "Done" (filled blue)
+       → drag widget by handle → drop in new position → instant save to localStorage
+       → click Done or Esc → exit edit mode → toast: "Layout saved"
+```
+
+##### 6b. Architecture
+
+**New file:** `apps/web/js/widgets/layout-editor.js` (~250 lines, no dependencies, native HTML5 drag-and-drop)
+- `LayoutEditor.{enter, exit, toggle, isEditing}` — public API
+- Self-contained: knows nothing about widgets, preferences, or the registry
+- **Two handle strategies**:
+  1. **Inline handle** (inside the widget's title bar) for widgets that have one — uses `findTitleBar()` heuristic that checks for `h1`-`h4` or `border-b` class
+  2. **Floating handle** (absolute-positioned top-right with white pill background and shadow) for widgets WITHOUT a title bar (Pipeline Stats grid) — sets `position: relative` on the widget temporarily so the handle anchors correctly, restores it on exit
+
+**Modified files:**
+- `apps/web/dashboard-widgets.js` — added 3 new functions: `getWidgetOrder()`, `saveWidgetOrder(orderArray)`, `applyWidgetOrder()`. Wired the existing `widget-settings-btn` to call `LayoutEditor.toggle()`. Calls `applyWidgetOrder()` after `applyWidgetPreferences()` on init.
+- `apps/web/dashboard.html` — loads `layout-editor.js` and hides Customize button on mobile via `hidden md:flex`
+
+##### 6c. Data model
+
+Two **separate** localStorage keys, by design:
+```js
+localStorage["pe-dashboard-widgets"]      // existing — visibility only
+localStorage["pe-dashboard-widget-order"] // NEW — array of widget IDs in display order
+```
+
+**`applyWidgetOrder()` algorithm:** groups saved widget IDs by their parent DOM container, then re-appends children in order WITHIN each parent. Cross-container moves are not supported in v1 (column widths differ — left col 2/3, right col 1/3 — dropping a narrow widget into the wide column would break the layout).
+
+##### 6d. Constraints honored
+- **Same-parent reorder only.** `onDragOver` returns early if `target.parentNode !== dragSrc.parentNode`.
+- **Mobile hidden.** HTML5 D&D has spotty touch support, so the Customize Dashboard button is `hidden md:flex` (desktop only).
+- **Esc exits cleanly.**
+- **Widget alone in its parent** (Pipeline Stats and Active Priorities) → handle visible but drag is no-op — visually editable but no siblings to swap with.
+
+---
+
+#### 7. Active Priorities Sizing Fix
+
+**Problem:** Active Priorities table on the dashboard was stretching to fill the entire 2/3-width left column even when the table body was empty. Looked broken.
+
+**Root cause:** Two issues compounded:
+1. The widget had `h-full` class forcing it to match the right column's height
+2. The `<tbody>` was completely empty — `dashboard.js initPriorityTable()` doesn't actually fetch deals or render rows, it just adds cursor styling
+
+**Fix:**
+1. Removed `h-full`, added `self-start` so the widget sizes to its content
+2. Added a real empty state inside the `<tbody>` with the `priority_high` icon
+
+**Files Changed:** 1 file
+- `apps/web/dashboard.html` — table sizing + empty state row
+
+---
+
+### Session 54 Summary
+
+| Workstream | Files New | Files Modified |
+|---|---|---|
+| Deal intake URL removal | 0 | 2 |
+| Profile dropdown cleanup | 0 | 3 |
+| Checklist hash-scroll | 0 | 1 |
+| Admin N+1 fix | 0 | 1 |
+| Widget expansion + audit fix | 19 | 7 |
+| Layout editor | 2 | 2 |
+| Active Priorities sizing | 0 | 1 |
+
+**Verification:** TypeScript `tsc --noEmit` clean. All 17 widget JS files pass `node --check`. `dashboard.html` parses cleanly.
+
+---
+
 ### Session 53 — April 6, 2026
 
 #### 🕐 Timestamp: April 6, 2026 — IST (Late Evening)
