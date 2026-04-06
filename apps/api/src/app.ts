@@ -8,6 +8,8 @@ import dealsRouter from './routes/deals.js';
 import companiesRouter from './routes/companies.js';
 import activitiesRouter from './routes/activities.js';
 import documentsRouter from './routes/documents.js';
+import documentsAlertsRouter from './routes/documents-alerts.js';
+import watchlistRouter from './routes/watchlist.js';
 import aiRouter from './routes/ai.js';
 import foldersRouter from './routes/folders.js';
 import usersRouter from './routes/users.js';
@@ -246,6 +248,8 @@ app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
+app.use('/api/documents', authMiddleware, orgMiddleware, documentsAlertsRouter);
+app.use('/api/watchlist', authMiddleware, orgMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
 
 // ========================================
