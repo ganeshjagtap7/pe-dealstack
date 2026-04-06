@@ -77,29 +77,17 @@
 (async function loadPipelineStats() {
     const container = document.getElementById('stats-cards');
     if (!container) return;
-    // Wait for auth
-    const waitForAuth = () => new Promise(resolve => {
-        const check = setInterval(() => {
-            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
-        }, 100);
-        setTimeout(() => { clearInterval(check); resolve(); }, 3000);
-    });
-    await waitForAuth();
-    try {
-        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
-        if (!resp.ok) throw new Error('Failed');
-        const deals = await resp.json();
-        const active = deals.filter(d => d.status !== 'ARCHIVED');
 
-        const stages = [
-            { label: 'Sourcing', key: 'INITIAL_REVIEW', icon: 'travel_explore', color: 'blue-400' },
-            { label: 'Due Diligence', key: 'DUE_DILIGENCE', icon: 'saved_search', color: 'primary' },
-            { label: 'LOI / Offer', key: 'LOI_SUBMITTED', icon: 'description', color: 'orange-400', also: ['IOI_SUBMITTED'] },
-            { label: 'Closed', key: 'CLOSED_WON', icon: 'verified', color: 'secondary', also: ['CLOSING', 'NEGOTIATION'] },
-        ];
+    const STAGES = [
+        { label: 'Sourcing', key: 'INITIAL_REVIEW', icon: 'travel_explore', color: 'blue-400' },
+        { label: 'Due Diligence', key: 'DUE_DILIGENCE', icon: 'saved_search', color: 'primary' },
+        { label: 'LOI / Offer', key: 'LOI_SUBMITTED', icon: 'description', color: 'orange-400', also: ['IOI_SUBMITTED'] },
+        { label: 'Closed', key: 'CLOSED_WON', icon: 'verified', color: 'secondary', also: ['CLOSING', 'NEGOTIATION'] },
+    ];
 
+    function renderCards(active) {
         const total = Math.max(active.length, 1);
-        container.innerHTML = stages.map(s => {
+        container.innerHTML = STAGES.map(s => {
             const keys = [s.key, ...(s.also || [])];
             const count = active.filter(d => keys.includes(d.stage)).length;
             const pct = Math.round((count / total) * 100);
@@ -119,8 +107,29 @@
                     </div>
                 </div>`;
         }).join('');
+    }
+
+    // Render zero-count cards immediately so the layout never collapses
+    renderCards([]);
+
+    // Wait for auth, then fetch real data and re-render
+    const waitForAuth = () => new Promise(resolve => {
+        const check = setInterval(() => {
+            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
+        }, 100);
+        setTimeout(() => { clearInterval(check); resolve(); }, 5000);
+    });
+    await waitForAuth();
+    try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
+        if (!resp.ok) return; // keep the zero-count cards
+        const deals = await resp.json();
+        const list = Array.isArray(deals) ? deals : (deals?.deals || []);
+        const active = list.filter(d => d.status !== 'ARCHIVED');
+        renderCards(active);
     } catch (e) {
-        container.innerHTML = '<div class="col-span-full text-center py-4 text-text-muted text-sm">No pipeline data yet</div>';
+        // Keep the zero-count cards already rendered above
+        console.warn('Pipeline stats fetch failed:', e);
     }
 })();
 </script>
@@ -233,14 +242,15 @@
         const check = setInterval(() => {
             if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
         }, 100);
-        setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+        setTimeout(() => { clearInterval(check); resolve(); }, 5000);
     });
     await waitForAuth();
     try {
         const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
         if (!resp.ok) throw new Error('Failed');
         const deals = await resp.json();
-        const active = deals.filter(d => d.status !== 'ARCHIVED');
+        const list = Array.isArray(deals) ? deals : (deals?.deals || []);
+        const active = list.filter(d => d.status !== 'ARCHIVED');
 
         if (active.length === 0) {
             content.innerHTML = '<div class="flex flex-col items-center justify-center py-4 w-full text-text-muted"><span class="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span><p class="text-xs">No deals yet</p></div>';
@@ -287,7 +297,9 @@
             <div class="size-28 rounded-full shrink-0 shadow-inner" style="background: conic-gradient(${gradientParts.join(', ')}); mask: radial-gradient(circle at center, transparent 40%, black 41%); -webkit-mask: radial-gradient(circle at center, transparent 40%, black 41%);"></div>
             <div class="flex flex-col gap-3 flex-1">${legendHTML}</div>`;
     } catch (e) {
-        content.innerHTML = '<div class="text-xs text-text-muted text-center w-full py-4">Unable to load allocation</div>';
+        // Friendly fallback — same shape as the real chart so the layout doesn't collapse
+        content.innerHTML = '<div class="flex flex-col items-center justify-center py-4 w-full text-text-muted"><span class="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span><p class="text-xs">No deals yet</p></div>';
+        console.warn('Portfolio allocation fetch failed:', e);
     }
 })();
 </script>
