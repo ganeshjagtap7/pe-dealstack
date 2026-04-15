@@ -291,37 +291,42 @@ function generateStyles() {
             .user-menu-chevron.open {
                 transform: rotate(180deg);
             }
-            /* Cross-document View Transitions — smooth page switches */
-            @view-transition {
-                navigation: auto;
-            }
-            /* Keep sidebar & header persistent across navigations */
-            #pe-sidebar {
-                view-transition-name: sidebar;
-            }
-            #pe-header {
-                view-transition-name: header;
-            }
-            /* Only animate the main content area */
-            ::view-transition-old(sidebar),
-            ::view-transition-new(sidebar),
-            ::view-transition-old(header),
-            ::view-transition-new(header) {
-                animation: none;
-            }
-            ::view-transition-old(root) {
-                animation: fade-out 120ms ease-in;
-            }
-            ::view-transition-new(root) {
-                animation: fade-in 180ms ease-out;
-            }
-            @keyframes fade-out {
-                from { opacity: 1; }
-                to   { opacity: 0; }
-            }
-            @keyframes fade-in {
-                from { opacity: 0; }
-                to   { opacity: 1; }
+            /* Cross-document View Transitions — smooth page switches.
+             * Chromium-only as of early 2026; Safari/Firefox ignore these rules
+             * and fall back to instant hard navigations (no layout break). The
+             * @supports guard below makes that intent explicit. */
+            @supports (view-transition-name: auto) {
+                @view-transition {
+                    navigation: auto;
+                }
+                /* Keep sidebar & header persistent across navigations */
+                #pe-sidebar {
+                    view-transition-name: sidebar;
+                }
+                #pe-header {
+                    view-transition-name: header;
+                }
+                /* Don't animate sidebar/header — only the main content area */
+                ::view-transition-old(sidebar),
+                ::view-transition-new(sidebar),
+                ::view-transition-old(header),
+                ::view-transition-new(header) {
+                    animation: none;
+                }
+                ::view-transition-old(root) {
+                    animation: fade-out 120ms ease-in;
+                }
+                ::view-transition-new(root) {
+                    animation: fade-in 180ms ease-out;
+                }
+                @keyframes fade-out {
+                    from { opacity: 1; }
+                    to   { opacity: 0; }
+                }
+                @keyframes fade-in {
+                    from { opacity: 0; }
+                    to   { opacity: 1; }
+                }
             }
         </style>
     `;

@@ -1,202 +1,284 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
-import { formatRelativeTime, formatFileSize } from "@/lib/formatters";
-import { cn } from "@/lib/cn";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
 
 interface Deal {
   id: string;
-  name: string;
-  stage: string;
-}
-
-interface Document {
-  id: string;
-  name: string;
-  fileUrl: string;
-  fileSize?: number;
-  mimeType?: string;
+  name?: string;
+  companyName?: string;
+  industry?: string;
+  stage?: string;
   createdAt: string;
-  dealId?: string;
+  updatedAt?: string;
+  Company?: { industry?: string };
 }
 
-export default function DataRoomPage() {
+const STAGE_BADGE: Record<string, string> = {
+  DUE_DILIGENCE: "bg-blue-100 text-blue-700",
+  IOI_SUBMITTED: "bg-purple-100 text-purple-700",
+  SCREENING: "bg-amber-100 text-amber-700",
+  INITIAL_REVIEW: "bg-amber-100 text-amber-700",
+};
+
+export default function DataRoomOverviewPage() {
+  const router = useRouter();
   const [deals, setDeals] = useState<Deal[]>([]);
-  const [selectedDeal, setSelectedDeal] = useState<string>("");
-  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
-  const [uploading, setUploading] = useState(false);
+  const [showCreate, setShowCreate] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [creating, setCreating] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const createInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    async function loadDeals() {
+    (async () => {
       try {
-        const res = await api.get<{ deals: Deal[] }>("/deals?limit=50");
-        setDeals(res.deals || []);
-        if (res.deals?.length > 0) {
-          setSelectedDeal(res.deals[0].id);
-        }
-      } catch {
-        // ignore
+        const data = await api.get<Deal[] | { deals: Deal[] }>("/deals?limit=100");
+        const list = Array.isArray(data) ? data : data.deals || [];
+        setDeals(list);
+      } catch (err) {
+        console.warn("[data-room] failed to load deals:", err);
       } finally {
         setLoading(false);
       }
-    }
-    loadDeals();
+    })();
   }, []);
 
   useEffect(() => {
-    if (!selectedDeal) return;
-    setLoading(true);
-    api
-      .get<{ documents: Document[] } | Document[]>(`/deals/${selectedDeal}/documents`)
-      .then((res) => {
-        setDocuments(Array.isArray(res) ? res : res.documents || []);
-      })
-      .catch(() => setDocuments([]))
-      .finally(() => setLoading(false));
-  }, [selectedDeal]);
+    if (showCreate) createInputRef.current?.focus();
+  }, [showCreate]);
 
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedDeal) return;
-    setUploading(true);
+  const handleCreate = async () => {
+    const name = newName.trim();
+    if (!name || creating) return;
+    setCreating(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const supabase = createClient();
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-      await fetch(`/api/deals/${selectedDeal}/documents`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
+      const newDeal = await api.post<Deal>("/deals", {
+        name,
+        companyName: name,
+        status: "ACTIVE",
+        stage: "SCREENING",
       });
-      // Reload documents
-      const res = await api.get<{ documents: Document[] } | Document[]>(
-        `/deals/${selectedDeal}/documents`
+      if (newDeal?.id) {
+        router.push(`/data-room/${newDeal.id}`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed to create data room";
+      setErrorMsg(
+        msg.includes("403")
+          ? "You need Associate role or higher to create data rooms. Contact your admin."
+          : msg,
       );
-      setDocuments(Array.isArray(res) ? res : res.documents || []);
-    } catch {
-      // ignore
+      setTimeout(() => setErrorMsg(null), 5000);
     } finally {
-      setUploading(false);
+      setCreating(false);
+      setShowCreate(false);
+      setNewName("");
     }
   };
 
-  const getDocIcon = (name: string) => {
-    const ext = name?.split(".").pop()?.toLowerCase();
-    if (ext === "pdf") return "picture_as_pdf";
-    if (ext === "xlsx" || ext === "xls") return "table_chart";
-    if (ext === "csv") return "table_view";
-    if (ext === "docx" || ext === "doc") return "article";
-    return "description";
-  };
-
-  const getDocColor = (name: string) => {
-    const ext = name?.split(".").pop()?.toLowerCase();
-    if (ext === "pdf") return "text-red-500 bg-red-50";
-    if (ext === "xlsx" || ext === "xls") return "text-emerald-500 bg-emerald-50";
-    if (ext === "csv") return "text-blue-500 bg-blue-50";
-    if (ext === "docx" || ext === "doc") return "text-indigo-500 bg-indigo-50";
-    return "text-gray-500 bg-gray-50";
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-slate-50">
+        <div className="text-center">
+          <div
+            className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
+            style={{ borderColor: "#003366" }}
+          />
+          <p className="text-slate-500">Loading Data Rooms...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex h-full">
-      {/* Deal selector sidebar */}
-      <div className="w-64 border-r border-border-subtle bg-surface-card flex flex-col shrink-0">
-        <div className="p-4 border-b border-border-subtle">
-          <h2 className="text-sm font-bold text-text-main">Data Room</h2>
-          <p className="text-xs text-text-muted mt-0.5">Select a deal to view documents</p>
-        </div>
-        <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {deals.map((deal) => (
-            <button
-              key={deal.id}
-              onClick={() => setSelectedDeal(deal.id)}
-              className={cn(
-                "w-full text-left px-4 py-3 text-sm border-b border-border-subtle transition-colors",
-                selectedDeal === deal.id
-                  ? "bg-primary-light text-primary font-medium"
-                  : "text-text-secondary hover:bg-background-body"
-              )}
-            >
-              {deal.name}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Document area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between p-4 border-b border-border-subtle bg-surface-card">
-          <div>
-            <h1 className="text-lg font-bold text-text-main">
-              {deals.find((d) => d.id === selectedDeal)?.name || "Documents"}
-            </h1>
-            <p className="text-xs text-text-muted">
-              {documents.length} document{documents.length !== 1 ? "s" : ""}
-            </p>
-          </div>
-          <label
-            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium cursor-pointer transition-colors hover:opacity-90"
-            style={{ backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[18px]">upload_file</span>
-            {uploading ? "Uploading..." : "Upload"}
-            <input type="file" className="hidden" onChange={handleUpload} disabled={uploading} />
-          </label>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          {loading ? (
-            <div className="text-center py-16 text-text-muted text-sm">Loading documents...</div>
-          ) : documents.length === 0 ? (
-            <div className="text-center py-16 border border-dashed border-border-subtle rounded-lg">
-              <span className="material-symbols-outlined text-4xl text-text-muted">
-                folder_open
-              </span>
-              <p className="mt-2 text-sm text-text-muted">No documents yet</p>
-              <p className="text-xs text-text-muted mt-1">Upload files to get started</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-2">
-              {documents.map((doc) => (
+    <div className="flex flex-col h-full w-full bg-slate-50">
+      {showCreate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            onClick={() => {
+              setShowCreate(false);
+              setNewName("");
+            }}
+          />
+          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-slate-200">
+              <div className="flex items-center gap-3">
                 <div
-                  key={doc.id}
-                  className="flex items-center gap-3 p-3 rounded-lg border border-border-subtle bg-surface-card hover:shadow-card transition-all group"
+                  className="flex items-center justify-center w-10 h-10 rounded-lg"
+                  style={{ backgroundColor: "#E6EEF5" }}
                 >
-                  <div
-                    className={cn(
-                      "size-10 rounded-lg flex items-center justify-center shrink-0",
-                      getDocColor(doc.name)
-                    )}
-                  >
-                    <span className="material-symbols-outlined text-[20px]">
-                      {getDocIcon(doc.name)}
+                  <span className="material-symbols-outlined text-primary">add_box</span>
+                </div>
+                <h3 className="text-lg font-semibold text-slate-900">Create Data Room</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreate(false);
+                  setNewName("");
+                }}
+                className="p-1 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                <span className="material-symbols-outlined text-slate-400">close</span>
+              </button>
+            </div>
+            <div className="p-5">
+              <label className="block text-sm font-medium text-slate-600 mb-2">
+                Data Room Name
+              </label>
+              <input
+                ref={createInputRef}
+                type="text"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleCreate();
+                  } else if (e.key === "Escape") {
+                    setShowCreate(false);
+                    setNewName("");
+                  }
+                }}
+                placeholder="e.g., Project Apollo, Acme Corp Acquisition"
+                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-slate-900 placeholder:text-slate-400"
+              />
+              <p className="mt-2 text-xs text-slate-400">
+                A new data room will be created with default folders for due diligence.
+              </p>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200 bg-slate-50/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowCreate(false);
+                  setNewName("");
+                }}
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleCreate}
+                disabled={!newName.trim() || creating}
+                className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 flex items-center gap-2"
+              >
+                {creating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                    Creating...
+                  </>
+                ) : (
+                  "Create Data Room"
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
+        <div>
+          <h1 className="text-xl font-bold text-slate-900">All Data Rooms</h1>
+          <p className="text-sm text-slate-500">{deals.length} active deals</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowCreate(true)}
+          className="flex items-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-800 transition-colors"
+        >
+          <span className="material-symbols-outlined text-[18px]">add</span>
+          Create Data Room
+        </button>
+      </header>
+
+      <div className="flex-1 overflow-auto p-6 custom-scrollbar">
+        {deals.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full">
+            <span className="material-symbols-outlined text-6xl text-slate-300 mb-4">
+              folder_open
+            </span>
+            <h3 className="text-lg font-semibold text-slate-700 mb-2">No Data Rooms Yet</h3>
+            <p className="text-slate-500 mb-6">
+              Create your first data room to get started with due diligence
+            </p>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreate(true)}
+                className="flex items-center gap-2 px-5 py-2.5 bg-slate-900 text-white rounded-lg hover:bg-slate-800 transition-colors font-medium"
+              >
+                <span className="material-symbols-outlined text-[18px]">add</span>
+                Create Data Room
+              </button>
+              <span className="text-slate-400">or</span>
+              <Link
+                href="/deals"
+                className="px-4 py-2 text-slate-600 hover:text-slate-900 transition-colors font-medium"
+              >
+                Go to Deals
+              </Link>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {deals.map((deal) => {
+              const stage = deal.stage || "SCREENING";
+              const badge = STAGE_BADGE[stage] || "bg-slate-100 text-slate-600";
+              const industry = deal.Company?.industry || deal.industry || "—";
+              return (
+                <Link
+                  key={deal.id}
+                  href={`/data-room/${deal.id}`}
+                  className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer group block"
+                >
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-primary/10 transition-colors shrink-0">
+                      <span className="material-symbols-outlined text-slate-600 group-hover:text-primary">
+                        folder_open
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-slate-900 truncate">
+                        {deal.name || deal.companyName || "Untitled Deal"}
+                      </h3>
+                      <p className="text-sm text-slate-500 truncate">{industry}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${badge}`}>
+                      {stage.replace(/_/g, " ")}
+                    </span>
+                    <span className="text-slate-400 text-xs">
+                      {new Date(deal.updatedAt || deal.createdAt).toLocaleDateString()}
                     </span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-text-main truncate">{doc.name}</p>
-                    <p className="text-xs text-text-muted">
-                      {formatFileSize(doc.fileSize)} &middot; {formatRelativeTime(doc.createdAt)}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => window.open(`/api/documents/${doc.id}/download`, "_blank")}
-                    className="opacity-0 group-hover:opacity-100 p-2 rounded-md hover:bg-primary-light text-text-muted hover:text-primary transition-all"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">download</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
+
+      {errorMsg && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border max-w-sm bg-red-50 border-red-200">
+          <span className="material-symbols-outlined text-xl text-red-600">error</span>
+          <p className="text-sm text-slate-800 flex-1">{errorMsg}</p>
+          <button
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            <span className="material-symbols-outlined text-lg">close</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 }

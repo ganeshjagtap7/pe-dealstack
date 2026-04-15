@@ -4,13 +4,18 @@ import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { useUser } from "@/providers/UserProvider";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { NotificationsDropdown } from "./NotificationsDropdown";
 
 export function Header() {
   const { signOut } = useAuth();
   const { user } = useUser();
+  const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+
+  const showDealActions = pathname === "/deals";
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -59,10 +64,27 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-4">
-        {/* Notifications */}
-        <button className="flex items-center justify-center rounded-lg p-2 text-text-secondary hover:text-primary hover:bg-primary-light transition-colors relative">
-          <span className="material-symbols-outlined text-[20px]">notifications</span>
-        </button>
+        {showDealActions && (
+          <>
+            <Link
+              href="/deal-intake"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-colors text-sm font-medium border-2 border-primary text-primary bg-white hover:bg-primary hover:text-white"
+            >
+              <span className="material-symbols-outlined text-[18px]">upload_file</span>
+              Import Deals
+            </Link>
+            <Link
+              href="/deal-intake"
+              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium"
+            >
+              <span className="material-symbols-outlined text-[18px]">smart_toy</span>
+              Ingest Deal Data
+            </Link>
+          </>
+        )}
+
+        {/* Notifications — real-data dropdown */}
+        <NotificationsDropdown />
 
         <div className="h-6 w-px bg-border-subtle" />
 

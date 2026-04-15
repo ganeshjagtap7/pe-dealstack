@@ -115,7 +115,7 @@ export default function ContactsPage() {
       const supabase = createClient();
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "/api";
+      const apiBase = "/api";
       const res = await fetch(`${apiBase}/contacts/export`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error("Export failed");
       const blob = await res.blob();
@@ -137,7 +137,7 @@ export default function ContactsPage() {
       const supabase = createClient();
       const { data } = await supabase.auth.getSession();
       const token = data.session?.access_token;
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "/api";
+      const apiBase = "/api";
       const res = await fetch(`${apiBase}/contacts/import`, {
         method: "POST", body: formData,
         headers: token ? { Authorization: `Bearer ${token}` } : {},

@@ -1,8 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { useAuth } from "./AuthProvider";
 import { api } from "@/lib/api";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 import type { AppUser } from "@/types";
 
 interface UserContextType {
@@ -17,25 +18,31 @@ const UserContext = createContext<UserContextType>({
   refetch: async () => {},
 });
 
-const USER_CACHE_KEY = "pe-user-cache";
-
 function getCachedUser(): AppUser | null {
   try {
-    const cached = sessionStorage.getItem(USER_CACHE_KEY);
-    if (cached) {
-      const parsed = JSON.parse(cached);
-      if (parsed?.name && parsed.name !== "Loading...") return parsed;
-    }
+    const cached = sessionStorage.getItem(STORAGE_KEYS.userCache);
+    if (!cached) return null;
+    const parsed = JSON.parse(cached) as Partial<AppUser>;
+    // Minimum viable record: we need an id and a non-empty name/email to render.
+    if (!parsed?.id || !parsed?.name) return null;
+    return parsed as AppUser;
   } catch {
-    // ignore
+    return null;
   }
-  return null;
 }
 
 export function UserProvider({ children }: { children: ReactNode }) {
   const { session } = useAuth();
-  const [user, setUser] = useState<AppUser | null>(getCachedUser);
-  const [loading, setLoading] = useState(!getCachedUser());
+  const [user, setUser] = useState<AppUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const cached = getCachedUser();
+    if (cached) {
+      setUser(cached);
+      setLoading(false);
+    }
+  }, []);
 
   const fetchUser = async () => {
     try {
@@ -61,20 +68,29 @@ export function UserProvider({ children }: { children: ReactNode }) {
 
       setUser(appUser);
       try {
-        sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(appUser));
+        sessionStorage.setItem(STORAGE_KEYS.userCache, JSON.stringify(appUser));
       } catch {
-        // ignore
+        // sessionStorage full or blocked — safe to skip
       }
-    } catch {
-      // API not available yet
+    } catch (err) {
+      console.warn("[UserProvider] /users/me failed:", err);
     } finally {
       setLoading(false);
     }
   };
 
+  // onAuthStateChange fires on silent token refresh (~1/hr). Skip re-fetching if
+  // the authenticated user hasn't actually changed.
+  const lastUserIdRef = useRef<string | null>(null);
+  const userId = session?.user?.id;
   useEffect(() => {
-    if (session) fetchUser();
-  }, [session]);
+    if (userId && userId !== lastUserIdRef.current) {
+      lastUserIdRef.current = userId;
+      fetchUser();
+    } else if (!userId) {
+      lastUserIdRef.current = null;
+    }
+  }, [userId]);
 
   return (
     <UserContext.Provider value={{ user, loading, refetch: fetchUser }}>

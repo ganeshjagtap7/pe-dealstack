@@ -13,6 +13,7 @@ import {
   PRIORITY_LABELS,
 } from "@/lib/constants";
 import { cn } from "@/lib/cn";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
 import Link from "next/link";
 import type { Deal, DealFilters } from "@/types";
 import {
@@ -42,11 +43,11 @@ export default function DealsPage() {
     sortBy: "updatedAt",
     sortOrder: "desc",
   });
-  const searchTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Load view preference from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem("crm-view");
+    const saved = localStorage.getItem(STORAGE_KEYS.dealsView);
     if (saved === "kanban" || saved === "list") setView(saved);
   }, []);
 
@@ -83,7 +84,7 @@ export default function DealsPage() {
   // Helpers
   const toggleView = (v: "list" | "kanban") => {
     setView(v);
-    localStorage.setItem("crm-view", v);
+    localStorage.setItem(STORAGE_KEYS.dealsView, v);
   };
 
   const toggleSelect = (id: string) => {
@@ -127,11 +128,16 @@ export default function DealsPage() {
 
   const handleBulkDelete = async () => {
     const ids = [...selected];
-    for (const id of ids) {
-      try {
-        await api.delete(`/deals/${id}`);
-        setDeals((prev) => prev.filter((d) => d.id !== id));
-      } catch { /* continue */ }
+    const results = await Promise.allSettled(ids.map((id) => api.delete(`/deals/${id}`)));
+    const succeededIds = ids.filter((_, i) => results[i].status === "fulfilled");
+    const failed = results.filter((r) => r.status === "rejected");
+    if (succeededIds.length > 0) {
+      const succeededSet = new Set(succeededIds);
+      setDeals((prev) => prev.filter((d) => !succeededSet.has(d.id)));
+    }
+    if (failed.length > 0) {
+      console.warn("[deals] bulk delete failures:", failed.map((r) => (r as PromiseRejectedResult).reason));
+      setError(`${failed.length} of ${ids.length} deletes failed.`);
     }
     setSelected(new Set());
     setDeleteTarget(null);
@@ -139,10 +145,11 @@ export default function DealsPage() {
 
   const handleBulkStage = async (stage: string) => {
     const ids = [...selected];
-    for (const id of ids) {
-      try {
-        await api.patch(`/deals/${id}`, { stage });
-      } catch { /* continue */ }
+    const results = await Promise.allSettled(ids.map((id) => api.patch(`/deals/${id}`, { stage })));
+    const failed = results.filter((r) => r.status === "rejected");
+    if (failed.length > 0) {
+      console.warn("[deals] bulk stage-change failures:", failed.map((r) => (r as PromiseRejectedResult).reason));
+      setError(`${failed.length} of ${ids.length} stage updates failed.`);
     }
     setStageModal(false);
     clearSelection();
@@ -164,44 +171,20 @@ export default function DealsPage() {
   return (
     <div className="p-6 mx-auto max-w-[1600px] flex flex-col gap-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Pipeline</h1>
-          <p className="text-text-secondary text-sm mt-0.5 flex items-center gap-2">
-            {!loading && (
-              <>
-                <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(5,150,105,0.4)]" />
-                {deals.filter((d) => d.status !== "PASSED").length} Active Opportunities
-              </>
-            )}
-          </p>
-        </div>
-        <Link
-          href="/deal-intake"
-          className="flex items-center gap-2 px-4 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-medium"
-          style={{ backgroundColor: "#003366" }}
-        >
-          <span className="material-symbols-outlined text-[18px]">add</span>
-          New Deal
-        </Link>
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Pipeline</h1>
+        <p className="text-text-secondary text-sm mt-0.5 flex items-center gap-2">
+          {!loading && (
+            <>
+              <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(5,150,105,0.4)]" />
+              {deals.filter((d) => d.status !== "PASSED").length} Active Opportunities
+            </>
+          )}
+        </p>
       </div>
 
-      {/* Filter Bar + Search + Sort + View Toggle */}
-      <div className="flex flex-wrap items-center gap-2">
-        {/* Search */}
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <span className="material-symbols-outlined text-text-muted text-[18px]">search</span>
-          </div>
-          <input
-            type="text"
-            defaultValue={filters.search}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="block w-56 rounded-lg border border-border-subtle bg-surface-card py-1.5 pl-9 pr-3 text-xs text-text-main placeholder-text-muted focus:ring-1 focus:ring-[#003366] focus:border-[#003366] transition-all shadow-sm"
-            placeholder="Search deals..."
-          />
-        </div>
-
+      {/* Filter Bar */}
+      <div className="flex flex-wrap items-center gap-3">
         {/* Stage Filter */}
         <FilterDropdown label={filters.stage ? `Stage: ${STAGE_LABELS[filters.stage]}` : "Stage: All"} active={!!filters.stage}>
           {(close) => (
@@ -303,11 +286,52 @@ export default function DealsPage() {
           </button>
         )}
 
+      </div>
+
+      {/* View + Sort Row */}
+      <div className="flex flex-wrap items-center gap-1">
+        {/* View Toggle (icon-only) */}
+        <button
+          onClick={() => toggleView("list")}
+          title="List View"
+          className={cn(
+            "p-2 rounded-md transition-all",
+            view === "list"
+              ? "text-primary bg-primary/10"
+              : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+          )}
+        >
+          <span className="material-symbols-outlined text-[20px]">view_list</span>
+        </button>
+        <button
+          onClick={() => toggleView("kanban")}
+          title="Kanban View"
+          className={cn(
+            "p-2 rounded-md transition-all",
+            view === "kanban"
+              ? "text-primary bg-primary/10"
+              : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+          )}
+        >
+          <span className="material-symbols-outlined text-[20px]">view_kanban</span>
+        </button>
+        <button
+          title="Customize Metrics"
+          className="p-2 rounded-md text-text-muted hover:text-text-secondary hover:bg-gray-100 transition-all"
+        >
+          <span className="material-symbols-outlined text-[20px]">tune</span>
+        </button>
+
         <div className="flex-1" />
 
         {/* Sort (hidden in kanban) */}
         {view === "list" && (
-          <FilterDropdown label={`Sort: ${sortLabel}`} active={false}>
+          <FilterDropdown
+            label={`Sort by: ${sortLabel}`}
+            active={false}
+            icon="sort"
+            borderless
+          >
             {(close) =>
               SORT_OPTIONS.map((opt) => (
                 <button
@@ -327,30 +351,6 @@ export default function DealsPage() {
             }
           </FilterDropdown>
         )}
-
-        {/* View Toggle */}
-        <div className="flex items-center border border-border-subtle rounded-lg overflow-hidden">
-          <button
-            onClick={() => toggleView("list")}
-            className={cn(
-              "flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors",
-              view === "list" ? "text-[#003366] bg-blue-50" : "text-text-muted hover:text-text-secondary hover:bg-gray-50"
-            )}
-          >
-            <span className="material-symbols-outlined text-[16px]">grid_view</span>
-            List
-          </button>
-          <button
-            onClick={() => toggleView("kanban")}
-            className={cn(
-              "flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors",
-              view === "kanban" ? "text-[#003366] bg-blue-50" : "text-text-muted hover:text-text-secondary hover:bg-gray-50"
-            )}
-          >
-            <span className="material-symbols-outlined text-[16px]">view_kanban</span>
-            Kanban
-          </button>
-        </div>
       </div>
 
       {/* Bulk Actions Bar */}
@@ -400,11 +400,36 @@ export default function DealsPage() {
           </button>
         </div>
       ) : deals.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <span className="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
-          <p className="text-text-main font-medium mb-2">No deals found</p>
-          <p className="text-text-muted text-sm">Try adjusting your filters or search query</p>
-        </div>
+        hasActiveFilters || filters.search ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <span className="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
+            <p className="text-text-main font-medium mb-2">No deals found</p>
+            <p className="text-text-muted text-sm">Try adjusting your filters or search query</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5"
+              style={{ backgroundColor: "#E6EEF5" }}
+            >
+              <span className="material-symbols-outlined text-[32px]" style={{ color: "#003366" }}>
+                rocket_launch
+              </span>
+            </div>
+            <p className="text-text-main font-semibold text-lg mb-2">Welcome to Your Deal Pipeline</p>
+            <p className="text-text-muted text-sm text-center max-w-md mb-6">
+              Start building your deal flow. Create your first deal to track it through sourcing, due diligence, and close.
+            </p>
+            <Link
+              href="/deal-intake"
+              className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-lg shadow-sm hover:opacity-90 transition-all text-sm font-semibold"
+              style={{ backgroundColor: "#003366" }}
+            >
+              <span className="material-symbols-outlined text-[18px]">add_circle</span>
+              Create Your First Deal
+            </Link>
+          </div>
+        )
       ) : view === "list" ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
           {deals.map((deal) => (

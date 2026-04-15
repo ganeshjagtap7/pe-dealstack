@@ -16,7 +16,6 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "crm", label: "CRM", icon: "groups", href: "/contacts", memberOnly: true },
   { id: "portfolio", label: "Portfolio", icon: "pie_chart", href: "/coming-soon?feature=portfolio", memberOnly: true },
   { id: "admin", label: "Admin", icon: "admin_panel_settings", href: "/admin", adminOnly: true },
-  { id: "templates", label: "Templates", icon: "description", href: "/templates", memberOnly: true },
   { id: "divider", label: "", icon: "", href: "", divider: true },
   { id: "ai-reports", label: "AI Reports", icon: "auto_awesome", href: "/memo-builder", isAI: true, memberOnly: true },
 ];

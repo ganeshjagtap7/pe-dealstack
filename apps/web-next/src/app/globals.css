@@ -66,3 +66,12 @@ body {
     transform: translateY(0);
   }
 }
+
+@keyframes welcomeFadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.welcome-fade-in {
+  animation: welcomeFadeInUp 0.3s ease-out;
+}

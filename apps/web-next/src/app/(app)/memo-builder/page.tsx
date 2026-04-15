@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { renderMarkdown } from "@/lib/markdown";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -608,7 +609,14 @@ export default function MemoBuilderPage() {
                             : "bg-background-body text-text-main border border-border-subtle rounded-bl-sm"
                         )}
                       >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
+                        {msg.role === "user" ? (
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        ) : (
+                          <div
+                            className="chat-markdown space-y-1"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                          />
+                        )}
                         <p
                           className={cn(
                             "text-[10px] mt-1.5",

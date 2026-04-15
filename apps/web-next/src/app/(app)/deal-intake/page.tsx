@@ -62,7 +62,7 @@ const TEXT_SOURCE_TYPES = [
 /*  Helper: raw authed fetch (for FormData — no JSON content-type)     */
 /* ------------------------------------------------------------------ */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+const API_BASE_URL = "/api";
 
 async function authFetchRaw(path: string, options: RequestInit = {}): Promise<Response> {
   const supabase = createClient();

@@ -223,8 +223,7 @@ export default function DealDetailPage() {
       const formData = new FormData();
       Array.from(files).forEach((f) => formData.append("files", f));
 
-      const apiBase = process.env.NEXT_PUBLIC_API_URL || "/api";
-      const res = await fetch(`${apiBase}/deals/${dealId}/documents`, {
+      const res = await fetch(`/api/deals/${dealId}/documents`, {
         method: "POST",
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
@@ -322,7 +321,7 @@ export default function DealDetailPage() {
     );
   }
 
-  const stageStyle = STAGE_STYLES[deal.stage] || STAGE_STYLES.SOURCING;
+  const stageStyle = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
   const currentStageIndex = PIPELINE_STAGES.findIndex((s) => s.key === deal.stage);
   const isTerminal = TERMINAL_STAGES.includes(deal.stage);
 

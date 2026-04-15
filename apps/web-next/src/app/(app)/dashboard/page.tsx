@@ -8,6 +8,8 @@ import { STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
+import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
 
 function getGreeting() {
   const hour = new Date().getHours();
@@ -35,10 +37,39 @@ interface Task {
   category?: string;
 }
 
+// Stage groupings mirror apps/web/dashboard.html's inline loader so the two
+// dashboards count the same deals. "Closed" covers the late funnel (advanced
+// negotiation through won) because those are the deals worth celebrating on a
+// top-level card.
 const SOURCING_STAGES = ["INITIAL_REVIEW"];
 const DD_STAGES = ["DUE_DILIGENCE"];
-const LOI_STAGES = ["IOI_SUBMITTED", "LOI_SUBMITTED", "NEGOTIATION"];
-const CLOSED_STAGES = ["CLOSED_WON"];
+const LOI_STAGES = ["IOI_SUBMITTED", "LOI_SUBMITTED"];
+const CLOSED_STAGES = ["NEGOTIATION", "CLOSING", "CLOSED_WON"];
+
+const SECTOR_COLORS = ["#003366", "#059669", "#F59E0B", "#8B5CF6", "#9CA3AF"];
+
+interface MarketSentiment {
+  headline: string;
+  analysis: string;
+  sentiment: "BULLISH" | "NEUTRAL" | "BEARISH";
+  confidenceScore: number;
+  recommendation: string;
+  indicators: { name: string; trend: "up" | "down" | "stable"; detail: string }[];
+  topSector: string;
+  riskFactor: string;
+}
+
+const SENTIMENT_STYLES: Record<MarketSentiment["sentiment"], { label: string; tone: string }> = {
+  BULLISH: { label: "Bullish trend", tone: "text-secondary font-semibold" },
+  NEUTRAL: { label: "Neutral outlook", tone: "text-text-main font-semibold" },
+  BEARISH: { label: "Bearish signal", tone: "text-red-600 font-semibold" },
+};
+
+const TREND_ICONS: Record<"up" | "down" | "stable", { icon: string; tone: string }> = {
+  up: { icon: "trending_up", tone: "bg-secondary-light text-secondary border-secondary/10" },
+  down: { icon: "trending_down", tone: "bg-red-50 text-red-600 border-red-100" },
+  stable: { icon: "show_chart", tone: "bg-blue-50 text-blue-600 border-blue-100" },
+};
 
 const AVATAR_COLORS = [
   "bg-blue-100 border-blue-200 text-primary",
@@ -57,6 +88,9 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [stageModal, setStageModal] = useState<{ label: string; stages: string[] } | null>(null);
+  const [sentiment, setSentiment] = useState<MarketSentiment | null>(null);
+  const [sentimentLoading, setSentimentLoading] = useState(true);
+  const [sentimentError, setSentimentError] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -68,39 +102,92 @@ export default function DashboardPage() {
         if (dealsRes.status === "fulfilled") {
           setAllDeals(dealsRes.value.deals || []);
           setDeals((dealsRes.value.deals || []).slice(0, 5));
+        } else {
+          console.warn("[dashboard] failed to load deals:", dealsRes.reason);
         }
         if (tasksRes.status === "fulfilled") {
           const t = tasksRes.value;
           setTasks(Array.isArray(t) ? t : t.tasks || []);
+        } else {
+          console.warn("[dashboard] failed to load tasks:", tasksRes.reason);
         }
-      } catch { /* ignore */ }
-      finally { setLoading(false); }
+      } catch (err) {
+        console.warn("[dashboard] load error:", err);
+      } finally { setLoading(false); }
     }
     load();
+
+    (async () => {
+      try {
+        const data = await api.get<MarketSentiment>("/ai/market-sentiment");
+        setSentiment(data);
+      } catch (err) {
+        console.warn("[dashboard] market-sentiment failed:", err);
+        setSentimentError(true);
+      } finally {
+        setSentimentLoading(false);
+      }
+    })();
   }, []);
+
+  const [taskError, setTaskError] = useState<string | null>(null);
 
   const toggleTask = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === "COMPLETED" ? "PENDING" : "COMPLETED";
     setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
     try {
       await api.patch(`/tasks/${taskId}`, { status: newStatus });
-    } catch {
+    } catch (err) {
+      console.warn("[dashboard] toggleTask failed:", err);
       setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus } : t)));
+      setTaskError("Couldn't update task — please try again.");
+      setTimeout(() => setTaskError(null), 3500);
     }
   };
 
   const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const sourcingCount = allDeals.filter((d) => SOURCING_STAGES.includes(d.stage)).length;
-  const ddCount = allDeals.filter((d) => DD_STAGES.includes(d.stage)).length;
-  const loiCount = allDeals.filter((d) => LOI_STAGES.includes(d.stage)).length;
-  const closedTotal = allDeals.filter((d) => CLOSED_STAGES.includes(d.stage)).reduce((sum, d) => sum + (d.dealSize || 0), 0);
+  const activeDeals = allDeals.filter((d) => (d as { status?: string }).status !== "PASSED");
+  const activeTotal = Math.max(activeDeals.length, 1);
+  const sourcingCount = activeDeals.filter((d) => SOURCING_STAGES.includes(d.stage)).length;
+  const ddCount = activeDeals.filter((d) => DD_STAGES.includes(d.stage)).length;
+  const loiCount = activeDeals.filter((d) => LOI_STAGES.includes(d.stage)).length;
+  const closedCount = activeDeals.filter((d) => CLOSED_STAGES.includes(d.stage)).length;
+  const closedTotal = activeDeals
+    .filter((d) => CLOSED_STAGES.includes(d.stage))
+    .reduce((sum, d) => sum + (d.dealSize || 0), 0);
+  const pct = (n: number) => Math.round((n / activeTotal) * 100);
   const pendingTasks = tasks.filter((t) => t.status !== "COMPLETED");
   const firstName = user?.name?.split(" ")[0] || "there";
+
+  // Portfolio allocation: group active deals by industry, take top 4, rest → "Others"
+  const industryCounts = activeDeals.reduce<Record<string, number>>((acc, d) => {
+    const key = (d.industry?.trim() || "Uncategorized");
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+  const sortedSectors = Object.entries(industryCounts).sort((a, b) => b[1] - a[1]);
+  const topSectors = sortedSectors.slice(0, 4);
+  const othersCount = sortedSectors.slice(4).reduce((sum, [, c]) => sum + c, 0);
+  if (othersCount > 0) topSectors.push(["Others", othersCount]);
+  const sectorTotal = topSectors.reduce((sum, [, c]) => sum + c, 0);
+  const allocation = topSectors.map(([label, count], i) => ({
+    label,
+    count,
+    pct: sectorTotal > 0 ? Math.round((count / sectorTotal) * 100) : 0,
+    color: SECTOR_COLORS[i] || SECTOR_COLORS[SECTOR_COLORS.length - 1],
+  }));
+  let cumPct = 0;
+  const gradientParts = allocation.map((a) => {
+    const start = cumPct;
+    cumPct += a.pct;
+    return `${a.color} ${start}% ${cumPct}%`;
+  });
 
   const stageModalDeals = stageModal ? allDeals.filter((d) => stageModal.stages.includes(d.stage)) : [];
 
   return (
     <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+      <WelcomeModal />
       <div className="mx-auto max-w-[1600px] flex flex-col gap-6">
         {/* Welcome */}
         <div className="flex flex-col gap-1">
@@ -113,7 +200,10 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {/* Stats Cards */}
+        {/* Onboarding Checklist */}
+        <OnboardingChecklist />
+
+        {/* Stats Cards — real-data progress derived from active deal counts */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
           {/* Sourcing */}
           <button onClick={() => setStageModal({ label: "Sourcing", stages: SOURCING_STAGES })} className="text-left relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
@@ -123,28 +213,26 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-end gap-2 mt-3">
               <span className="text-3xl font-bold text-primary tracking-tight">{loading ? "—" : sourcingCount}</span>
-              <span className="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">
-                <span className="material-symbols-outlined text-[14px] mr-0.5">arrow_upward</span> new
-              </span>
+              <span className="text-xs font-medium text-text-secondary mb-1.5">{sourcingCount === 1 ? "deal" : "deals"}</span>
             </div>
             <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-              <div className="bg-blue-400 h-1.5 rounded-full" style={{ width: `${Math.min(sourcingCount * 10, 100)}%` }} />
+              <div className="bg-blue-400 h-1.5 rounded-full transition-all" style={{ width: `${pct(sourcingCount)}%` }} />
             </div>
           </button>
 
           {/* Due Diligence */}
-          <button onClick={() => setStageModal({ label: "Due Diligence", stages: DD_STAGES })} className="text-left relative flex flex-col gap-1 rounded-lg border border-primary bg-surface-card p-5 shadow-glow cursor-pointer group">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-3xl" />
+          <button onClick={() => setStageModal({ label: "Due Diligence", stages: DD_STAGES })} className={cn("text-left relative flex flex-col gap-1 rounded-lg bg-surface-card p-5 transition-all cursor-pointer group", ddCount > 0 ? "border border-primary shadow-glow" : "border border-border-subtle shadow-card hover:shadow-card-hover hover:border-primary/30")}>
+            {ddCount > 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-3xl" />}
             <div className="flex items-center justify-between relative z-10">
-              <span className="text-xs font-bold uppercase tracking-wider text-primary">Due Diligence</span>
-              <span className="material-symbols-outlined text-primary text-[20px]">saved_search</span>
+              <span className={cn("text-xs font-bold uppercase tracking-wider", ddCount > 0 ? "text-primary" : "text-text-secondary")}>Due Diligence</span>
+              <span className={cn("material-symbols-outlined text-[20px]", ddCount > 0 ? "text-primary" : "text-text-muted group-hover:text-primary")}>saved_search</span>
             </div>
             <div className="flex items-end gap-2 mt-3 relative z-10">
               <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "—" : ddCount}</span>
-              <span className="text-xs font-medium text-text-secondary mb-1.5">Active deals</span>
+              <span className="text-xs font-medium text-text-secondary mb-1.5">{ddCount === 1 ? "active" : "active"}</span>
             </div>
             <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden relative z-10">
-              <div className="bg-primary h-1.5 rounded-full" style={{ width: "100%" }} />
+              <div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${pct(ddCount)}%` }} />
             </div>
           </button>
 
@@ -156,27 +244,29 @@ export default function DashboardPage() {
             </div>
             <div className="flex items-end gap-2 mt-3">
               <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "—" : loiCount}</span>
-              <span className="text-xs font-medium text-text-secondary mb-1.5">Waiting response</span>
+              <span className="text-xs font-medium text-text-secondary mb-1.5">Awaiting response</span>
             </div>
             <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-              <div className="bg-orange-400 h-1.5 rounded-full" style={{ width: `${Math.min(loiCount * 20, 100)}%` }} />
+              <div className="bg-orange-400 h-1.5 rounded-full transition-all" style={{ width: `${pct(loiCount)}%` }} />
             </div>
           </button>
 
           {/* Closed */}
-          <button onClick={() => setStageModal({ label: "Closed Won", stages: CLOSED_STAGES })} className="text-left relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
+          <button onClick={() => setStageModal({ label: "Closed", stages: CLOSED_STAGES })} className="text-left relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card hover:shadow-card-hover hover:border-primary/30 transition-all cursor-pointer group">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Closed (Q4)</span>
+              <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Closed</span>
               <span className="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">verified</span>
             </div>
             <div className="flex items-end gap-2 mt-3">
               <span className="text-3xl font-bold text-text-main tracking-tight">
-                {loading ? "—" : closedTotal > 0 ? formatCurrency(closedTotal) : "$0"}
+                {loading ? "—" : closedTotal > 0 ? formatCurrency(closedTotal) : closedCount}
               </span>
-              <span className="text-xs font-medium text-secondary mb-1.5 flex items-center bg-secondary-light px-1.5 py-0.5 rounded">+12% vs Q3</span>
+              <span className="text-xs font-medium text-text-secondary mb-1.5">
+                {closedTotal > 0 ? `${closedCount} ${closedCount === 1 ? "deal" : "deals"}` : closedCount === 1 ? "deal" : "deals"}
+              </span>
             </div>
             <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
-              <div className="bg-secondary h-1.5 rounded-full" style={{ width: "100%" }} />
+              <div className="bg-secondary h-1.5 rounded-full transition-all" style={{ width: `${pct(closedCount)}%` }} />
             </div>
           </button>
         </div>
@@ -185,48 +275,82 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Left Column */}
           <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* AI Market Sentiment */}
+            {/* AI Market Sentiment — GET /api/ai/market-sentiment */}
             <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card">
               <div className="p-6 border-b border-border-subtle flex items-start justify-between gap-4 bg-gradient-to-r from-white to-gray-50/50">
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 min-w-0">
                   <div className="flex items-center gap-2">
                     <div className="p-1.5 bg-secondary-light rounded text-secondary border border-secondary/20">
                       <span className="material-symbols-outlined text-[20px] block">psychology</span>
                     </div>
                     <h2 className="text-lg font-bold text-primary">AI Market Sentiment</h2>
                   </div>
-                  <p className="text-text-secondary text-sm max-w-2xl leading-relaxed">
-                    <span className="text-text-main font-semibold">Analysis:</span> SaaS valuations are stabilizing in the mid-market sector. The proprietary algorithm indicates a{" "}
-                    <span className="text-secondary font-semibold">Bullish trend</span> for enterprise software.
-                    <br />
-                    <Link href="/deals" className="text-primary font-medium mt-2 inline-flex items-center gap-1 hover:underline">
-                      Recommended Action: Review Q3 projections for Project Alpha.
-                      <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
-                    </Link>
-                  </p>
+                  {sentimentLoading ? (
+                    <p className="text-text-muted text-sm flex items-center gap-2">
+                      <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
+                      Generating market analysis…
+                    </p>
+                  ) : sentimentError || !sentiment ? (
+                    <p className="text-text-muted text-sm max-w-2xl leading-relaxed">
+                      Market analysis is unavailable right now. Add more active deals or try again later.
+                    </p>
+                  ) : (
+                    <>
+                      {sentiment.headline && (
+                        <p className="text-sm font-semibold text-text-main leading-snug">{sentiment.headline}</p>
+                      )}
+                      <p className="text-text-secondary text-sm max-w-2xl leading-relaxed">
+                        <span className="text-text-main font-semibold">Analysis:</span> {sentiment.analysis}{" "}
+                        <span className={SENTIMENT_STYLES[sentiment.sentiment].tone}>
+                          ({SENTIMENT_STYLES[sentiment.sentiment].label})
+                        </span>
+                        {sentiment.recommendation && (
+                          <>
+                            <br />
+                            <Link href="/deals" className="text-primary font-medium mt-2 inline-flex items-center gap-1 hover:underline">
+                              Recommended Action: {sentiment.recommendation}
+                              <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
+                            </Link>
+                          </>
+                        )}
+                      </p>
+                    </>
+                  )}
                 </div>
-                <div className="hidden sm:flex flex-col items-end border-l border-border-subtle pl-6 py-1">
-                  <div className="text-4xl font-bold text-secondary">78</div>
-                  <div className="text-[10px] text-text-muted uppercase tracking-wider font-bold">Confidence</div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border-subtle bg-gray-50/30">
-                {[
-                  { icon: "trending_up", title: "Tech Recovery", sub: "+15% sector avg", color: "bg-secondary-light text-secondary border-secondary/10" },
-                  { icon: "show_chart", title: "Low Volatility", sub: "Private mkts stable", color: "bg-blue-50 text-blue-600 border-blue-100" },
-                  { icon: "hub", title: "Sector Focus", sub: "B2B Enterprise", color: "bg-orange-50 text-orange-600 border-orange-100" },
-                ].map((item) => (
-                  <div key={item.title} className="p-4 flex items-center gap-3 hover:bg-white transition-colors cursor-pointer group">
-                    <div className={cn("p-2 rounded-md border", item.color)}>
-                      <span className="material-symbols-outlined">{item.icon}</span>
+                {sentiment && !sentimentError && (
+                  <div className="hidden sm:flex flex-col items-end border-l border-border-subtle pl-6 py-1">
+                    <div
+                      className={cn(
+                        "text-4xl font-bold tracking-tight",
+                        sentiment.sentiment === "BULLISH" ? "text-secondary"
+                          : sentiment.sentiment === "BEARISH" ? "text-red-600"
+                            : "text-primary",
+                      )}
+                    >
+                      {sentiment.confidenceScore}
                     </div>
-                    <div>
-                      <div className="text-sm font-bold text-text-main">{item.title}</div>
-                      <div className="text-xs text-text-secondary font-medium">{item.sub}</div>
-                    </div>
+                    <div className="text-[10px] text-text-muted uppercase tracking-wider font-bold">Confidence</div>
                   </div>
-                ))}
+                )}
               </div>
+              {sentiment && !sentimentError && sentiment.indicators?.length > 0 && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-border-subtle bg-gray-50/30">
+                  {sentiment.indicators.slice(0, 3).map((item) => {
+                    const style = TREND_ICONS[item.trend] || TREND_ICONS.stable;
+                    return (
+                      <div key={item.name} className="p-4 flex items-center gap-3 hover:bg-white transition-colors">
+                        <div className={cn("p-2 rounded-md border", style.tone)}>
+                          <span className="material-symbols-outlined">{style.icon}</span>
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-bold text-text-main truncate">{item.name}</div>
+                          <div className="text-xs text-text-secondary font-medium truncate">{item.detail}</div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Active Priorities */}
@@ -295,6 +419,11 @@ export default function DashboardPage() {
                 </div>
                 <span className="bg-primary-light text-primary text-xs font-bold px-2.5 py-1 rounded-full border border-primary/10">{pendingTasks.length} Pending</span>
               </div>
+              {taskError && (
+                <div className="px-5 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">
+                  {taskError}
+                </div>
+              )}
               <div>
                 {loading ? (
                   <div className="p-6 text-center text-text-muted text-sm">Loading...</div>
@@ -321,26 +450,44 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Portfolio Allocation */}
+            {/* Portfolio Allocation — computed from active deals by industry */}
             <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden p-6 gap-5">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
                 <span className="material-symbols-outlined text-text-muted">pie_chart</span>
               </div>
-              <div className="flex items-center gap-6">
-                <div className="size-28 rounded-full border-[10px] border-primary border-r-secondary border-b-gray-300 rotate-45 shadow-inner" />
-                <div className="flex flex-col gap-3 flex-1">
-                  {[{ label: "SaaS", pct: "55%", color: "bg-primary" }, { label: "Healthcare", pct: "30%", color: "bg-secondary" }, { label: "Others", pct: "15%", color: "bg-gray-300" }].map((item) => (
-                    <div key={item.label} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <div className={cn("size-2.5 rounded-sm shadow-sm", item.color)} />
-                        <span className="text-text-secondary font-medium">{item.label}</span>
-                      </div>
-                      <span className="text-text-main font-bold">{item.pct}</span>
-                    </div>
-                  ))}
+              {loading ? (
+                <div className="flex items-center justify-center py-4 text-text-muted text-xs">
+                  <span className="material-symbols-outlined text-xl animate-spin">sync</span>
                 </div>
-              </div>
+              ) : allocation.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-4 text-text-muted">
+                  <span className="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span>
+                  <p className="text-xs">No deals yet</p>
+                </div>
+              ) : (
+                <div className="flex items-center gap-6">
+                  <div
+                    className="size-28 rounded-full shrink-0 shadow-inner"
+                    style={{
+                      background: `conic-gradient(${gradientParts.join(", ")})`,
+                      mask: "radial-gradient(circle at center, transparent 40%, black 41%)",
+                      WebkitMask: "radial-gradient(circle at center, transparent 40%, black 41%)",
+                    }}
+                  />
+                  <div className="flex flex-col gap-3 flex-1">
+                    {allocation.map((item) => (
+                      <div key={item.label} className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="size-2.5 rounded-sm shadow-sm shrink-0" style={{ background: item.color }} />
+                          <span className="text-text-secondary font-medium truncate">{item.label}</span>
+                        </div>
+                        <span className="text-text-main font-bold ml-2">{item.pct}%</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* AI Deal Signals */}
@@ -351,7 +498,18 @@ export default function DashboardPage() {
                   <h3 className="font-bold text-text-main text-base">AI Deal Signals</h3>
                 </div>
                 <button
-                  onClick={async () => { setScanning(true); try { await api.get("/ai/scan-signals"); } catch {} finally { setScanning(false); } }}
+                  onClick={async () => {
+                    setScanning(true);
+                    try {
+                      await api.get("/ai/scan-signals");
+                    } catch (err) {
+                      console.warn("[dashboard] scan-signals failed:", err);
+                      setTaskError("Couldn't scan signals — please try again.");
+                      setTimeout(() => setTaskError(null), 3500);
+                    } finally {
+                      setScanning(false);
+                    }
+                  }}
                   disabled={scanning}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-60"
                   style={{ backgroundColor: "#003366" }}

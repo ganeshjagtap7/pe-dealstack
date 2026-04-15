@@ -1,17 +1,20 @@
 import type { NextConfig } from "next";
 
+// Single source of truth for the API origin. All client code calls /api/* and
+// Next's rewrite proxies to this URL server-side — keeping requests same-origin
+// and avoiding CORS. Set API_PROXY_URL in production env; localhost is dev-only.
+const API_PROXY_URL = process.env.API_PROXY_URL || "http://localhost:3001";
+
 const nextConfig: NextConfig = {
-  // Map root .env vars to NEXT_PUBLIC_ so all apps share one .env
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
-    NEXT_PUBLIC_API_URL: process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001/api",
   },
   async rewrites() {
     return [
       {
         source: "/api/:path*",
-        destination: "http://localhost:3001/api/:path*",
+        destination: `${API_PROXY_URL}/api/:path*`,
       },
     ];
   },

@@ -7,6 +7,8 @@ import { Logo } from "./Logo";
 import { useUser } from "@/providers/UserProvider";
 import { NAV_ITEMS, type NavItem } from "@/lib/constants";
 import { cn } from "@/lib/cn";
+import { STORAGE_KEYS } from "@/lib/storageKeys";
+import { InviteTeamModal } from "./InviteTeamModal";
 
 function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
   return (
@@ -38,15 +40,16 @@ export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
   const [collapsed, setCollapsed] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
-    setCollapsed(localStorage.getItem("pe-sidebar-collapsed") === "true");
+    setCollapsed(localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === "true");
   }, []);
 
   const toggleCollapse = () => {
     const next = !collapsed;
     setCollapsed(next);
-    localStorage.setItem("pe-sidebar-collapsed", String(next));
+    localStorage.setItem(STORAGE_KEYS.sidebarCollapsed, String(next));
   };
 
   const isAdmin = user?.systemRole === "ADMIN";
@@ -118,6 +121,17 @@ export function Sidebar() {
 
         {/* Bottom actions */}
         <div className={cn("flex flex-col gap-2 mt-4 pt-4 border-t border-border-subtle", collapsed && "hidden")}>
+          {isMember && (
+            <button
+              type="button"
+              onClick={() => setInviteOpen(true)}
+              title="Invite Team Members"
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm text-text-secondary hover:bg-secondary-light hover:text-secondary"
+            >
+              <span className="material-symbols-outlined text-[20px] text-secondary">person_add</span>
+              <span className="font-medium">Invite Team</span>
+            </button>
+          )}
           <Link
             href="/settings"
             className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm text-text-secondary hover:bg-primary-light hover:text-primary"
@@ -155,6 +169,7 @@ export function Sidebar() {
           </Link>
         </div>
       </div>
+      {inviteOpen && <InviteTeamModal onClose={() => setInviteOpen(false)} />}
     </aside>
   );
 }

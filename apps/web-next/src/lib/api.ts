@@ -1,6 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "/api";
+// All API calls go through Next's rewrite at /api/* → API origin (configured via
+// API_PROXY_URL in next.config.ts). This keeps fetches same-origin in every
+// environment so no CORS config is needed. Do NOT point this at an absolute
+// cross-origin URL unless you've also configured CORS on the API.
+const API_BASE_URL = "/api";
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient();

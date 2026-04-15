@@ -15,10 +15,14 @@ export function FilterDropdown({
   label,
   active,
   children,
+  icon,
+  borderless,
 }: {
   label: string;
   active: boolean;
   children: (close: () => void) => React.ReactNode;
+  icon?: string;
+  borderless?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -31,22 +35,35 @@ export function FilterDropdown({
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
 
+  const buttonClass = borderless
+    ? cn(
+        "flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-all",
+        active
+          ? "text-[#003366] bg-blue-50"
+          : "text-text-secondary hover:bg-primary-light"
+      )
+    : cn(
+        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3.5 text-sm font-medium transition-all group",
+        active
+          ? "border-[#003366]/30 bg-blue-50 text-[#003366]"
+          : "border-border-subtle bg-surface-card text-text-secondary hover:border-primary/30 hover:shadow-sm"
+      );
+
   return (
     <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className={cn(
-          "flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all",
-          active
-            ? "border-[#003366]/30 bg-blue-50 text-[#003366]"
-            : "border-border-subtle bg-surface-card text-text-secondary hover:border-primary/30"
+      <button onClick={() => setOpen((o) => !o)} className={buttonClass}>
+        {icon && (
+          <span className="material-symbols-outlined text-text-muted text-[18px]">{icon}</span>
         )}
-      >
         {label}
-        <span className="material-symbols-outlined text-[16px]">expand_more</span>
+        {!borderless && (
+          <span className="material-symbols-outlined text-text-muted text-[16px]">
+            keyboard_arrow_down
+          </span>
+        )}
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
           {children(() => setOpen(false))}
         </div>
       )}

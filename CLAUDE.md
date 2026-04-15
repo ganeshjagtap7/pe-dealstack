@@ -5,9 +5,10 @@
 ```
 apps/
   api/          Express + TypeScript API (Supabase PostgreSQL)
-  web/          Vanilla JS frontend + React VDR (Vite)
+  web/          Legacy vanilla JS frontend + React VDR (Vite) — :3003
+  web-next/     Next.js 16 + React 19 + Tailwind v4 app (primary) — :3000
 docs/           Architecture docs, planning, diagrams
-packages/       (future) Shared types/utilities
+packages/       ui/ (shared React components/styles), etc.
 ```
 
 ## Coding Standards
@@ -44,18 +45,22 @@ packages/       (future) Shared types/utilities
 ## Key Commands
 ```bash
 # Development
-cd apps/api && npm run dev    # API on :3001
-cd apps/web && npm run dev    # Web on :3000
+cd apps/api && npm run dev        # API on :3001
+cd apps/web-next && npm run dev   # Next.js app on :3000 (primary)
+cd apps/web && npm run dev        # Legacy vanilla app on :3003
+                                  # (moved from :3000 so web-next takes the primary port)
 
 # Type check
 cd apps/api && npx tsc --noEmit
+cd apps/web-next && npx tsc --noEmit
 
 # Build
-npm run build                 # Turborepo builds both
+npm run build                 # Turborepo builds all apps
 ```
 
 ## Common Gotchas
 - `overflow-x-auto` clips dropdown menus — use `flex-wrap` instead.
 - Tailwind opacity on dark colors (`bg-primary/[0.05]`) is invisible on white — use hex.
 - Partial unique index `WHERE isActive = true` enforces one active financial statement per period.
-- Port 3000 conflict: Vite auto-picks 3001, then API fails. Kill processes first.
+- Dev ports: web-next owns :3000, web owns :3003, api owns :3001. If web-next can't bind :3000 it'll pick :3001 and collide with api — kill stale processes first.
+- `apps/web-next/` runs Next.js 16 + React 19 + Tailwind v4 (bleeding-edge). APIs and conventions may differ from older Next docs — read `node_modules/next/dist/docs/` before guessing.
