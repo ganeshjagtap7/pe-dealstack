@@ -8,6 +8,7 @@ import { log } from '../utils/logger.js';
 import { NotFoundError } from '../middleware/errorHandler.js';
 import type { SortableByDate } from '../types/index.js';
 import { createNotification, notifyDealTeam, resolveUserId } from './notifications.js';
+import { generateFollowUpQuestions } from '../services/followUpQuestions.js';
 
 // Sub-routers
 import dealsTeamRouter from './deals-team.js';
@@ -42,6 +43,7 @@ const createDealSchema = z.object({
   tags: z.array(z.string()).optional(),
   targetCloseDate: z.string().nullable().optional(),
   source: z.string().nullable().optional(),
+  currency: z.string().optional().default('USD'),
   customFields: z.record(z.string(), z.any()).optional().default({}),
 });
 
@@ -337,6 +339,31 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) =>
     }
     log.error('Error creating deal', error);
     res.status(500).json({ error: 'Failed to create deal' });
+  }
+});
+
+// POST /api/deals/:id/follow-up-questions - Generate AI follow-up questions
+router.post('/:id/follow-up-questions', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // Verify deal access
+    const { data: deal } = await supabase
+      .from('Deal')
+      .select('id')
+      .eq('id', id)
+      .eq('organizationId', orgId)
+      .single();
+
+    if (!deal) return res.status(404).json({ error: 'Deal not found' });
+
+    const extraction = req.body.extraction || req.body;
+    const questions = await generateFollowUpQuestions(extraction);
+    res.json({ questions });
+  } catch (error) {
+    log.error('Follow-up questions error', error);
+    res.status(500).json({ error: 'Failed to generate follow-up questions' });
   }
 });
 

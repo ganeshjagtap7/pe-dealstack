@@ -10,6 +10,7 @@ import { getIconForIndustry } from '../services/dealMerger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
+import { resolveUserId } from './notifications.js';
 
 const subRouter = Router();
 

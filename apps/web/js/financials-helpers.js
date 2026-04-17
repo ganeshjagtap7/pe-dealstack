@@ -67,12 +67,23 @@ const SUBTOTAL_KEYS = new Set([
 ]);
 
 // ─── Formatters ───────────────────────────────────────────────
-function fmtMoney(val, unitScale) {
+function fmtMoney(val, unitScale, currency) {
   if (val === null || val === undefined) return '—';
   const n = Number(val);
   if (isNaN(n)) return '—';
+  const sym = getCurrencySymbol(currency);
+  const code = (currency || 'USD').toUpperCase();
+  // For INR with MILLIONS unitScale, show in Cr (1 Cr = 10M, so divide by 10)
+  if (code === 'INR' && unitScale === 'MILLIONS') {
+    const crores = n / 10;
+    return sym + crores.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'Cr';
+  }
+  if (code === 'INR' && unitScale === 'THOUSANDS') {
+    const lakhs = n / 100;
+    return sym + lakhs.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + 'L';
+  }
   const suffix = unitScale === 'MILLIONS' ? 'M' : unitScale === 'THOUSANDS' ? 'K' : '';
-  return '$' + n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + suffix;
+  return sym + n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + suffix;
 }
 
 function fmtPct(val) {

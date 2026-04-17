@@ -11,24 +11,37 @@ let modalSelectedDealId = null; // For "Update Existing Deal" mode
 let modalIntakeMode = 'new'; // 'new' or 'existing'
 let modalDealSearchTimeout = null;
 
-// Format a value stored in millions USD to the most natural display unit
-function formatCurrencyValue(valueInMillions) {
+// Format a value stored in millions to the most natural display unit
+// Uses Cr/L for INR, B/M/K for USD/EUR/others
+function formatCurrencyValue(valueInMillions, currency) {
     if (valueInMillions == null) return '—';
+    const sym = getCurrencySymbol(currency);
     const abs = Math.abs(valueInMillions);
     const sign = valueInMillions < 0 ? '-' : '';
+    const code = (currency || 'USD').toUpperCase();
+
+    if (code === 'INR') {
+        const crores = abs / 10;
+        if (crores >= 1) return `${sign}${sym}${crores >= 100 ? crores.toFixed(0) : crores >= 10 ? crores.toFixed(1) : crores.toFixed(2)}Cr`;
+        const lakhs = abs * 10;
+        if (lakhs >= 1) return `${sign}${sym}${lakhs >= 100 ? lakhs.toFixed(0) : lakhs >= 10 ? lakhs.toFixed(1) : lakhs.toFixed(2)}L`;
+        const rupees = abs * 1000000;
+        return `${sign}${sym}${rupees.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+    }
+
     if (abs >= 1000) {
         const b = abs / 1000;
-        return `${sign}$${b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
+        return `${sign}${sym}${b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
     }
     if (abs >= 1) {
-        return `${sign}$${abs >= 100 ? abs.toFixed(0) : abs >= 10 ? abs.toFixed(1) : abs.toFixed(2)}M`;
+        return `${sign}${sym}${abs >= 100 ? abs.toFixed(0) : abs >= 10 ? abs.toFixed(1) : abs.toFixed(2)}M`;
     }
     const k = abs * 1000;
     if (k >= 1) {
-        return `${sign}$${k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
+        return `${sign}${sym}${k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
     }
-    const dollars = abs * 1000000;
-    return `${sign}$${dollars.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+    const base = abs * 1000000;
+    return `${sign}${sym}${base.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
 }
 
 /**
@@ -125,6 +138,59 @@ function initDealIntakeModal(apiBaseURL) {
                                 <span class="material-symbols-outlined text-[18px]">close</span>
                             </button>
                         </div>
+                        <!-- Deal Context Questions (optional) -->
+                        <div id="intake-context-section" class="hidden mt-4">
+                            <button type="button" onclick="document.getElementById('intake-context-fields').classList.toggle('hidden');this.querySelector('.ctx-chevron').classList.toggle('rotate-180');" class="w-full flex items-center gap-2 text-left text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors py-1">
+                                <span class="material-symbols-outlined text-sm">question_answer</span>
+                                Add context about this deal <span class="text-gray-400 font-normal">(optional)</span>
+                                <span class="material-symbols-outlined text-sm ml-auto ctx-chevron transition-transform">expand_more</span>
+                            </button>
+                            <div id="intake-context-fields" class="hidden mt-3 space-y-3 p-3 rounded-lg bg-gray-50 border border-gray-100">
+                                <div>
+                                    <label class="block text-[11px] font-medium text-gray-500 mb-1">How did you source this deal?</label>
+                                    <select id="intake-ctx-source" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-primary/30 focus:border-primary bg-white">
+                                        <option value="">Select...</option>
+                                        <option value="Proprietary">Proprietary / Direct</option>
+                                        <option value="Broker">Broker / Intermediary</option>
+                                        <option value="Network">Network / Referral</option>
+                                        <option value="Cold Outreach">Cold Outreach</option>
+                                        <option value="Inbound">Inbound</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-gray-500 mb-1">What's your initial take on this deal?</label>
+                                    <textarea id="intake-ctx-thesis" rows="2" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-primary/30 focus:border-primary resize-none" placeholder="e.g., Strong margins, interesting market position, founder looking to exit..."></textarea>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-[11px] font-medium text-gray-500 mb-1">Priority</label>
+                                        <select id="intake-ctx-priority" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-primary/30 focus:border-primary bg-white">
+                                            <option value="">Select...</option>
+                                            <option value="HIGH">High — review ASAP</option>
+                                            <option value="MEDIUM">Medium — standard review</option>
+                                            <option value="LOW">Low — when time permits</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-[11px] font-medium text-gray-500 mb-1">Target close timeline</label>
+                                        <select id="intake-ctx-timeline" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-primary/30 focus:border-primary bg-white">
+                                            <option value="">Select...</option>
+                                            <option value="30 days">30 days</option>
+                                            <option value="60 days">60 days</option>
+                                            <option value="90 days">90 days</option>
+                                            <option value="6 months">6 months</option>
+                                            <option value="No timeline">No specific timeline</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-medium text-gray-500 mb-1">Any specific concerns or questions?</label>
+                                    <input type="text" id="intake-ctx-concerns" class="w-full px-3 py-1.5 border border-gray-200 rounded-lg text-xs focus:ring-1 focus:ring-primary/30 focus:border-primary" placeholder="e.g., Customer concentration, regulatory risk, management depth..." />
+                                </div>
+                            </div>
+                        </div>
+
                         <button id="intake-upload-btn" onclick="intakeUploadFile()" disabled class="mt-4 w-full py-2.5 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
                             <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
                             Extract & Create Deal
@@ -183,6 +249,22 @@ function initDealIntakeModal(apiBaseURL) {
                         </div>
                         <p class="text-sm font-medium text-text-main">Extracting deal data...</p>
                         <p class="text-xs text-text-secondary mt-1">AI is analyzing the content and extracting company information</p>
+                    </div>
+                </div>
+
+                <!-- Warning State (file size, format issues) -->
+                <div id="intake-warning-state" class="hidden">
+                    <div class="rounded-lg border border-amber-300 bg-amber-50 p-5">
+                        <div class="flex items-start gap-3">
+                            <span class="material-symbols-outlined text-amber-500 mt-0.5">warning</span>
+                            <div class="flex-1">
+                                <p class="text-sm font-medium text-amber-800" id="intake-warning-title">File too large</p>
+                                <p class="text-xs text-amber-600 mt-1" id="intake-warning-message"></p>
+                            </div>
+                            <button onclick="hideIntakeWarning()" class="text-amber-400 hover:text-amber-600">
+                                <span class="material-symbols-outlined text-[18px]">close</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -276,6 +358,22 @@ function initDealIntakeModal(apiBaseURL) {
                             <p class="text-xs font-medium text-yellow-800 mb-1">Review needed:</p>
                             <ul id="intake-review-reasons-list" class="text-xs text-yellow-700 list-disc list-inside"></ul>
                         </div>
+
+                        <!-- AI Follow-Up Questions -->
+                        <div id="intake-followup-section" class="hidden mt-5">
+                            <div class="h-px bg-gray-100 mb-5"></div>
+                            <div class="flex items-center gap-2 mb-4">
+                                <span class="material-symbols-outlined text-base" style="color:#003366;">psychology</span>
+                                <p class="text-xs font-semibold tracking-wide uppercase" style="color:#003366;">Quick context</p>
+                                <span class="text-[10px] text-gray-400 font-normal normal-case ml-0.5">helps AI serve you better</span>
+                            </div>
+                            <div id="intake-followup-questions" class="space-y-5"></div>
+                            <div id="intake-followup-loading" class="hidden py-4 flex items-center justify-center gap-2">
+                                <span class="material-symbols-outlined text-gray-300 text-sm animate-spin">progress_activity</span>
+                                <span class="text-[11px] text-gray-400">Generating questions...</span>
+                            </div>
+                        </div>
+
                         <!-- Actions -->
                         <div class="flex gap-3 mt-5">
                             <button id="intake-view-deal-btn" onclick="intakeGoToDeal()" class="flex-1 py-2.5 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover transition-all flex items-center justify-center gap-2">

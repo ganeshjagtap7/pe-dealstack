@@ -11,6 +11,7 @@ import { validateFinancials } from '../services/financialValidator.js';
 import { mergeIntoExistingDeal, getIconForIndustry } from '../services/dealMerger.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
+import { resolveUserId } from './notifications.js';
 
 const router = Router();
 
@@ -22,6 +23,7 @@ function transformDeepResultToExtractedDealData(result: DeepExtractionResult): E
     companyName: { value: d.companyName, confidence: d.companyName ? highConf : 0 },
     industry: { value: d.industry, confidence: d.industry ? highConf : 0 },
     description: { value: [d.companyName, d.industry].filter(Boolean).join(' — ') || 'Extracted via deep analysis', confidence: highConf },
+    currency: (d as any).currency || 'USD',
     revenue: { value: d.revenue, confidence: d.revenue != null ? highConf : 0 },
     ebitda: { value: d.ebitda, confidence: d.ebitda != null ? highConf : 0 },
     ebitdaMargin: { value: d.ebitdaMargin, confidence: d.ebitdaMargin != null ? highConf : 0 },
@@ -197,6 +199,13 @@ router.post('/', upload.single('file'), async (req, res) => {
       const dealIcon = getIconForIndustry(aiData.industry.value);
       const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
 
+      // User-provided deal context (optional fields from ingest form)
+      const userSource = req.body?.source || null;
+      const userThesis = req.body?.userThesis || null;
+      const userPriority = req.body?.priority || 'MEDIUM';
+      const userTimeline = req.body?.targetTimeline || null;
+      const userConcerns = req.body?.concerns || null;
+
       const { data: newDeal, error: dealError } = await supabase
         .from('Deal')
         .insert({
@@ -205,19 +214,24 @@ router.post('/', upload.single('file'), async (req, res) => {
           organizationId: orgId,
           stage: 'INITIAL_REVIEW',
           status: dealStatus,
+          priority: userPriority,
           industry: aiData.industry.value,
           description: aiData.description.value,
           revenue: aiData.revenue.value,
           ebitda: aiData.ebitda.value,
+          currency: aiData.currency || 'USD',
           dealSize: aiData.revenue.value,
-          aiThesis: aiData.summary,
+          aiThesis: userThesis || aiData.summary,
           icon: dealIcon,
+          ...(userSource ? { source: userSource } : {}),
           lastDocument: documentName,
           lastDocumentUpdated: new Date().toISOString(),
           extractionConfidence: aiData.overallConfidence,
           needsReview: aiData.needsReview,
           reviewReasons: aiData.reviewReasons,
           aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
+          ...(userTimeline ? { targetCloseDate: userTimeline } : {}),
+          ...(userConcerns ? { customFields: { concerns: userConcerns } } : {}),
         })
         .select()
         .single();
@@ -372,11 +386,14 @@ router.post('/', upload.single('file'), async (req, res) => {
 
       // Auto-assign creator as analyst (only for new deals)
       if (req.user?.id) {
-        await supabase.from('DealTeamMember').insert({
-          dealId: deal.id,
-          userId: req.user.id,
-          role: 'MEMBER',
-        });
+        const internalUserId = await resolveUserId(req.user.id);
+        if (internalUserId) {
+          await supabase.from('DealTeamMember').insert({
+            dealId: deal.id,
+            userId: internalUserId,
+            role: 'MEMBER',
+          }).then(({ error }) => { if (error) log.warn('Auto-assign analyst failed', error); });
+        }
       }
     }
 
@@ -413,6 +430,7 @@ router.post('/', upload.single('file'), async (req, res) => {
       extraction: {
         companyName: aiData.companyName,
         industry: aiData.industry,
+        currency: aiData.currency || 'USD',
         revenue: aiData.revenue,
         ebitda: aiData.ebitda,
         overallConfidence: aiData.overallConfidence,
@@ -422,7 +440,8 @@ router.post('/', upload.single('file'), async (req, res) => {
     });
   } catch (error) {
     log.error('Ingest error', error);
-    res.status(500).json({ error: 'Failed to process document' });
+    const message = error instanceof Error ? error.message : 'Failed to process document';
+    res.status(500).json({ error: 'Failed to process document', message });
   }
 });
 

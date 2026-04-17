@@ -145,7 +145,8 @@ app.use('/api/memos/*/chat', aiLimiter);
 app.use('/api/memos/*/sections/*/generate', aiLimiter);
 app.use('/api/ingest', writeLimiter);
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request ID for error correlation
 app.use(requestIdMiddleware);

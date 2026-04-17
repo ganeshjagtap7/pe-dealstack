@@ -33,6 +33,18 @@ function initChatInterface() {
     // Send button click
     sendButton.addEventListener('click', sendMessage);
 
+    // Suggested prompt chips
+    document.querySelectorAll('.chat-suggestion-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+            textarea.value = chip.dataset.prompt;
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 128) + 'px';
+            sendMessage();
+            // Hide suggestions after first use
+            document.getElementById('chat-suggestions')?.classList.add('hidden');
+        });
+    });
+
     // File attachment button
     initChatFileAttachment();
 
@@ -230,6 +242,8 @@ async function loadChatHistory() {
                 });
 
                 scrollToBottom();
+                // Hide suggestion chips when there's existing chat history
+                document.getElementById('chat-suggestions')?.classList.add('hidden');
             } else {
                 console.log('[Chat] No messages in history');
                 // Show intro message when there's no history

@@ -157,6 +157,7 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
         industry: industryValue,
         revenue: revenueValue,
         ebitda: ebitdaValue,
+        currency: extractedData.currency || 'USD',
         description: descriptionValue,
         aiThesis: extractedData.summary,
         icon: 'business_center',
@@ -249,6 +250,18 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
       },
     });
 
+    // Auto-assign uploader as analyst
+    if (req.user?.id) {
+      const internalUserId = await resolveUserId(req.user.id);
+      if (internalUserId) {
+        await supabase.from('DealTeamMember').insert({
+          dealId: deal.id,
+          userId: internalUserId,
+          role: 'MEMBER',
+        }).then(({ error }) => { if (error) log.warn('Auto-assign analyst failed', error); });
+      }
+    }
+
     // Audit log
     await AuditLog.aiIngest(req, safeName, deal.id);
 
@@ -288,6 +301,7 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
       extraction: {
         companyName: extractedData.companyName,
         industry: extractedData.industry,
+        currency: extractedData.currency || 'USD',
         revenue: extractedData.revenue,
         ebitda: extractedData.ebitda,
         summary: extractedData.summary,

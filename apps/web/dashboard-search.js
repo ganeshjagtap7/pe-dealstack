@@ -270,7 +270,9 @@ function initNotifications() {
     notifButton.addEventListener('click', (e) => {
         e.stopPropagation();
         dropdown.classList.toggle('hidden');
-        updateNotificationsList();
+        if (!dropdown.classList.contains('hidden')) {
+            fetchNotifications();
+        }
     });
 
     // Close on outside click
@@ -280,66 +282,175 @@ function initNotifications() {
         }
     });
 
-    updateNotificationBadge();
+    // Fetch unread count on load (once user is ready)
+    window.addEventListener('pe-user-loaded', () => fetchNotificationBadge());
+    if (typeof USER !== 'undefined' && USER.id) fetchNotificationBadge();
 }
 
-function updateNotificationsList() {
+const NOTIF_ICON_MAP = {
+    DEAL_UPDATE: 'swap_horiz',
+    DOCUMENT_UPLOADED: 'upload_file',
+    MENTION: 'alternate_email',
+    AI_INSIGHT: 'psychology',
+    TASK_ASSIGNED: 'assignment',
+    COMMENT: 'chat_bubble',
+    SYSTEM: 'info',
+};
+const NOTIF_COLOR_MAP = {
+    DEAL_UPDATE: 'text-blue-600 bg-blue-50',
+    DOCUMENT_UPLOADED: 'text-emerald-600 bg-emerald-50',
+    MENTION: 'text-purple-600 bg-purple-50',
+    AI_INSIGHT: 'text-amber-600 bg-amber-50',
+    TASK_ASSIGNED: 'text-orange-600 bg-orange-50',
+    COMMENT: 'text-sky-600 bg-sky-50',
+    SYSTEM: 'text-slate-600 bg-slate-50',
+};
+
+function formatNotifTime(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - d;
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1) return 'Just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDays = Math.floor(diffHr / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+async function fetchNotifications() {
     const list = document.getElementById('notification-list');
     if (!list) return;
 
-    const iconMap = {
-        alert: 'campaign',
-        info: 'info',
-        success: 'check_circle',
-        warning: 'warning'
-    };
+    const userId = (typeof USER !== 'undefined' && USER.id) ? USER.id : null;
+    if (!userId) {
+        list.innerHTML = '<div class="p-6 text-center text-sm text-text-muted">Loading...</div>';
+        return;
+    }
 
-    const colorMap = {
-        alert: 'text-red-600 bg-red-50',
-        info: 'text-blue-600 bg-blue-50',
-        success: 'text-secondary bg-secondary-light',
-        warning: 'text-orange-600 bg-orange-50'
-    };
+    list.innerHTML = '<div class="p-6 text-center"><span class="material-symbols-outlined animate-spin text-text-muted">sync</span></div>';
 
-    list.innerHTML = state.notifications.map(notif => `
-        <div class="p-4 hover:bg-gray-50 transition-colors border-b border-border-subtle/50 cursor-pointer ${notif.read ? 'opacity-60' : ''}" onclick="markNotificationRead(${notif.id})">
-            <div class="flex items-start gap-3">
-                <div class="p-2 ${colorMap[notif.type]} rounded-lg">
-                    <span class="material-symbols-outlined text-[18px]">${iconMap[notif.type]}</span>
-                </div>
-                <div class="flex-1 min-w-0">
-                    <div class="flex items-start justify-between gap-2 mb-1">
-                        <h4 class="font-semibold text-sm text-text-main">${notif.title}</h4>
-                        ${!notif.read ? '<span class="w-2 h-2 bg-blue-500 rounded-full mt-1.5"></span>' : ''}
-                    </div>
-                    <p class="text-xs text-text-secondary mb-1">${notif.message}</p>
-                    <span class="text-xs text-text-muted">${notif.time}</span>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-function markNotificationRead(id) {
-    const notif = state.notifications.find(n => n.id === id);
-    if (notif) {
-        notif.read = true;
-        updateNotificationsList();
-        updateNotificationBadge();
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE_URL}/notifications?userId=${userId}&limit=20`);
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        state.notifications = data.notifications || [];
+        renderNotificationsList();
+        updateNotificationBadge(data.unreadCount || 0);
+    } catch (e) {
+        console.warn('Failed to fetch notifications:', e);
+        list.innerHTML = '<div class="p-6 text-center text-sm text-text-muted">Could not load notifications</div>';
     }
 }
 
-function markAllRead() {
-    state.notifications.forEach(n => n.read = true);
-    updateNotificationsList();
-    updateNotificationBadge();
+async function fetchNotificationBadge() {
+    const userId = (typeof USER !== 'undefined' && USER.id) ? USER.id : null;
+    if (!userId) return;
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE_URL}/notifications?userId=${userId}&isRead=false&limit=1`);
+        if (!res.ok) return;
+        const data = await res.json();
+        updateNotificationBadge(data.unreadCount || 0);
+    } catch (e) {
+        // silent
+    }
 }
 
-function updateNotificationBadge() {
-    const badge = document.querySelector('.absolute.top-2.right-2.h-2.w-2');
-    const unreadCount = state.notifications.filter(n => !n.read).length;
+function renderNotificationsList() {
+    const list = document.getElementById('notification-list');
+    if (!list) return;
 
-    if (badge) {
-        badge.style.display = unreadCount > 0 ? 'block' : 'none';
+    const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    if (state.notifications.length === 0) {
+        list.innerHTML = `
+            <div class="p-8 text-center">
+                <span class="material-symbols-outlined text-text-muted text-2xl mb-2 block opacity-40">notifications_none</span>
+                <p class="text-sm text-text-muted">No notifications yet</p>
+            </div>`;
+        return;
+    }
+
+    list.innerHTML = state.notifications.map(notif => {
+        const icon = NOTIF_ICON_MAP[notif.type] || 'info';
+        const color = NOTIF_COLOR_MAP[notif.type] || 'text-slate-600 bg-slate-50';
+        const time = formatNotifTime(notif.createdAt);
+        const dealLink = notif.Deal ? `<span class="text-xs text-primary font-medium">${escHtml(notif.Deal.name)}</span>` : '';
+
+        return `
+            <div class="p-4 hover:bg-gray-50 transition-colors border-b border-border-subtle/50 cursor-pointer ${notif.isRead ? 'opacity-60' : ''}" onclick="markNotificationRead('${notif.id}')">
+                <div class="flex items-start gap-3">
+                    <div class="p-2 ${color} rounded-lg shrink-0">
+                        <span class="material-symbols-outlined text-[18px]">${icon}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-start justify-between gap-2 mb-1">
+                            <h4 class="font-semibold text-sm text-text-main">${escHtml(notif.title)}</h4>
+                            ${!notif.isRead ? '<span class="w-2 h-2 bg-blue-500 rounded-full mt-1.5 shrink-0"></span>' : ''}
+                        </div>
+                        <p class="text-xs text-text-secondary mb-1">${escHtml(notif.message || '')}</p>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs text-text-muted">${time}</span>
+                            ${dealLink}
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
+}
+
+async function markNotificationRead(id) {
+    // Optimistic update
+    const notif = state.notifications.find(n => n.id === id);
+    if (notif) {
+        notif.isRead = true;
+        renderNotificationsList();
+        const unread = state.notifications.filter(n => !n.isRead).length;
+        updateNotificationBadge(unread);
+    }
+    // Persist
+    try {
+        await PEAuth.authFetch(`${API_BASE_URL}/notifications/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ isRead: true }),
+        });
+    } catch (e) {
+        console.warn('Failed to mark notification read:', e);
+    }
+}
+
+async function markAllRead() {
+    const userId = (typeof USER !== 'undefined' && USER.id) ? USER.id : null;
+    if (!userId) return;
+
+    // Optimistic update
+    state.notifications.forEach(n => n.isRead = true);
+    renderNotificationsList();
+    updateNotificationBadge(0);
+
+    // Persist
+    try {
+        await PEAuth.authFetch(`${API_BASE_URL}/notifications/mark-all-read`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        });
+    } catch (e) {
+        console.warn('Failed to mark all read:', e);
+    }
+}
+
+function updateNotificationBadge(unreadCount) {
+    const dot = document.getElementById('notification-dot');
+    if (dot) {
+        if (unreadCount > 0) {
+            dot.classList.remove('hidden');
+        } else {
+            dot.classList.add('hidden');
+        }
     }
 }

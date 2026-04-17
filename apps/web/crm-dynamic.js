@@ -90,24 +90,9 @@
                 renderUploadCard();
         }
 
-        // Format currency — values stored in millions USD
-        function formatCurrency(value) {
-            if (value === null || value === undefined) return 'N/A';
-            const absValue = Math.abs(value);
-            const sign = value < 0 ? '-' : '';
-            if (absValue >= 1000) {
-                const b = absValue / 1000;
-                return `${sign}$${b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
-            }
-            if (absValue >= 1) {
-                return `${sign}$${absValue >= 100 ? absValue.toFixed(0) : absValue >= 10 ? absValue.toFixed(1) : absValue.toFixed(2)}M`;
-            }
-            const k = absValue * 1000;
-            if (k >= 1) {
-                return `${sign}$${k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
-            }
-            const dollars = absValue * 1000000;
-            return `${sign}$${dollars.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+        // Format currency — use global formatCurrency with deal currency support
+        function fmtDealCurrency(value, currency) {
+            return window.formatCurrency(value, currency);
         }
 
         function renderDealCard(deal) {
@@ -142,11 +127,11 @@
                     </div>
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>
-                        <span class="text-${deal.ebitda < 0 ? 'red' : 'text'}-${deal.ebitda < 0 ? '500' : 'main'} font-bold text-lg tabular-nums">${formatCurrency(deal.ebitda)}</span>
+                        <span class="text-${deal.ebitda < 0 ? 'red' : 'text'}-${deal.ebitda < 0 ? '500' : 'main'} font-bold text-lg tabular-nums">${fmtDealCurrency(deal.ebitda, deal.currency)}</span>
                     </div>
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">Revenue</span>
-                        <span class="text-text-main font-bold text-lg tabular-nums">${formatCurrency(deal.revenue)}</span>
+                        <span class="text-text-main font-bold text-lg tabular-nums">${fmtDealCurrency(deal.revenue, deal.currency)}</span>
                     </div>
                 </div>
                 <div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto">

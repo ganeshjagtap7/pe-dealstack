@@ -18,7 +18,7 @@
                 return `
                     <div class="bg-background-body rounded-md p-3">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">${config.label}</span>
-                        <span class="${colorClass} font-bold text-lg">${config.format(value)}</span>
+                        <span class="${colorClass} font-bold text-lg">${config.format(value, deal)}</span>
                     </div>
                 `;
             }).join('');
@@ -295,7 +295,7 @@
                 return `
                     <div class="flex-1 bg-background-body rounded px-2 py-1.5">
                         <span class="text-[9px] text-text-muted font-medium uppercase block">${config.kanbanLabel}</span>
-                        <span class="text-xs font-bold ${colorClass}">${config.format(value)}</span>
+                        <span class="text-xs font-bold ${colorClass}">${config.format(value, deal)}</span>
                     </div>
                 `;
             }).join('');

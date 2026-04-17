@@ -5,6 +5,107 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 56 — April 17, 2026
+
+#### 🕐 Timestamp: April 17, 2026 — 9:40 PM IST
+
+#### Goal: Fix Ingest Deal Modal — file size limit + upload error
+
+---
+
+#### 1. Fix File Size Limit (4.5MB → 50MB)
+
+**Problem:** Ingest Deal Data modal showed "Max 4.5MB" and rejected files larger than 4.5MB, even though the backend (multer + Express) already accepts up to 50MB.
+
+**Root cause:** Frontend had a hardcoded `MAX_FILE_SIZE = 4.5 * 1024 * 1024` from an old Vercel limit assumption. Backend was already configured for 50MB (`ingest-shared.ts` multer config).
+
+**Fix:** Updated all 4 frontend references from 4.5MB to 50MB:
+- `deal-intake-actions.js:35` — `MAX_FILE_SIZE` constant
+- `deal-intake-actions.js:41` — validation warning message
+- `deal-intake-actions.js:130` — 413 error message
+- `deal-intake-template.js:127` — UI label text
+
+**Files Modified:** 2 files
+- `apps/web/js/deal-intake-actions.js`
+- `apps/web/js/deal-intake-template.js`
+
+---
+
+#### 2. Fix "Upload Failed — Failed to process document" Error
+
+**Problem:** Uploading a PDF in the Ingest Deal modal returned a 500 error with unhelpful message "Failed to process document".
+
+**Fix:** Improved error reporting in both backend and frontend:
+- `ingest-upload.ts:443` — catch block now returns the actual `error.message` in the response
+- `deal-intake-actions.js:134` — frontend now shows `data.message` (detailed error) instead of generic "Failed to process document"
+
+**Files Modified:** 2 files
+- `apps/api/src/routes/ingest-upload.ts`
+- `apps/web/js/deal-intake-actions.js`
+
+---
+
+#### 3. AI Follow-Up Questions Service (new)
+
+**Context:** `followUpQuestions.ts` was already created — generates 3-4 contextual follow-up questions after deal extraction using GPT-4o-mini (~$0.003/call). Endpoint: `POST /api/deals/:id/follow-up-questions`. Uses LangChain structured output with Zod schema. Falls back to 4 default questions if LLM unavailable.
+
+**Files:** `apps/api/src/services/followUpQuestions.ts` (new), `apps/api/src/routes/deals.ts` (modified)
+
+---
+
+### Session 55 — April 17, 2026
+
+#### 🕐 Timestamp: April 17, 2026 — IST
+
+#### Goal: Deal Import QA Test Guide + Dashboard "undefined Deals" bug fix
+
+---
+
+#### 1. Deal Import QA Testing Guide
+
+Created `docs/DEAL-IMPORT-TEST-GUIDE.md` — a comprehensive testing document for team members to test the Deal Import feature end-to-end.
+
+**Contents:**
+- How to export from Notion (CSV export or copy-paste)
+- Full step-by-step walkthrough of all 4 import steps
+- Post-import verification checklist (deal names, companies, stages, financials, custom fields)
+- 14 edge cases to test (empty files, wrong types, duplicates, large files, special characters, etc.)
+- Column mapping reference table (Notion column → CRM field)
+- Pipeline stage mapping table
+- Supported input formats
+- Troubleshooting guide
+- 23-item pass/fail checklist
+
+**Files Created:** 1 file
+- `docs/DEAL-IMPORT-TEST-GUIDE.md`
+
+---
+
+#### 2. Fix Dashboard "undefined Deals" Modal Bug
+
+**Problem:** Clicking on ANY dashboard widget opened a modal titled "undefined Deals" with an empty body.
+
+**Root cause:** The old `initStatCards()` function used the CSS selector `.grid.grid-cols-1.md:grid-cols-2 > div` to attach click handlers to stat cards. After the dashboard layout refactor (Session 54), this selector matched **every widget container** in the dashboard grid — not just the 4 pipeline stat cards. When clicking any widget beyond index 3, `stages[index]` returned `undefined`, producing the "undefined Deals" modal title.
+
+**Fix:** The local code already had a `return;` early exit in `initStatCards()`, but the dead `showStatDetail()` function (with its hardcoded sample data) remained. Removed the entire dead code path — `showStatDetail()` and its `dealsData` object (~45 lines). Synced to `dist/`.
+
+**Note:** The fix was already partially applied locally but had NOT been deployed to production (immos.ai). This commit + push deploys the fix.
+
+**Files Changed:** 2 files
+- `apps/web/dashboard.js` — removed `showStatDetail()` dead code, kept `initStatCards()` as no-op
+- `apps/web/dist/dashboard.js` — synced
+
+---
+
+#### 3. Route Ordering Fix (app.ts)
+
+Moved `documentsAlertsRouter` mount above the general `documentsRouter` to ensure `/api/documents/alerts` is matched before the catch-all `/api/documents` routes.
+
+**Files Changed:** 1 file
+- `apps/api/src/app.ts`
+
+---
+
 ### Session 54 — April 6, 2026
 
 #### 🕐 Timestamp: April 6, 2026 — IST (Late Night)

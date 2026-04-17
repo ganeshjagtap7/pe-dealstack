@@ -359,9 +359,12 @@
                         <span class="material-symbols-outlined text-amber-500 text-lg">sticky_note_2</span>
                         Add Note
                     </h3>
-                    <div class="flex gap-2">
-                        <input type="text" id="note-input" placeholder="Add a note about this deal..."
-                            class="flex-1 px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                    <div class="flex gap-2 relative">
+                        <div class="flex-1 relative">
+                            <input type="text" id="note-input" placeholder="Add a note about this deal... (type @ to mention)"
+                                class="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" autocomplete="off" />
+                            <div id="mention-dropdown" class="hidden absolute left-0 bottom-full mb-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto"></div>
+                        </div>
                         <button id="add-note-btn"
                             class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
                             <span class="material-symbols-outlined text-lg">add</span>
@@ -451,8 +454,27 @@
                     </div>
                 </div>
 
+                <!-- Suggested Prompts -->
+                <div id="chat-suggestions" class="px-4 pt-3 pb-1 bg-surface-card border-t border-border-subtle flex gap-2 flex-wrap">
+                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="Summarize key risks and red flags">
+                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">warning</span> Key Risks
+                    </button>
+                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="Analyze revenue trends and growth trajectory">
+                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">trending_up</span> Revenue Trends
+                    </button>
+                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="What are the EBITDA margins and how do they compare to industry benchmarks?">
+                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">analytics</span> Margins
+                    </button>
+                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="Write a brief investment thesis for this deal">
+                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">lightbulb</span> Investment Thesis
+                    </button>
+                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="What due diligence questions should we ask the management team?">
+                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">checklist</span> DD Questions
+                    </button>
+                </div>
+
                 <!-- Chat Input -->
-                <div class="p-4 bg-surface-card border-t border-border-subtle relative z-30">
+                <div class="p-4 bg-surface-card border-t-0 relative z-30">
                     <div id="attached-files" class="flex gap-2 mb-3 overflow-x-auto custom-scrollbar">
                         <!-- Attached files will be inserted here -->
                     </div>

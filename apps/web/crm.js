@@ -46,19 +46,19 @@
             ebitda: {
                 label: 'EBITDA',
                 kanbanLabel: 'EBITDA',
-                format: (val) => formatCurrency(val),
+                format: (val, deal) => formatCurrency(val, deal?.currency),
                 colorFn: (val) => val < 0 ? 'text-red-600' : 'text-text-main',
             },
             revenue: {
                 label: 'Revenue',
                 kanbanLabel: 'Revenue',
-                format: (val) => formatCurrency(val),
+                format: (val, deal) => formatCurrency(val, deal?.currency),
                 colorFn: () => 'text-text-main',
             },
             dealSize: {
                 label: 'Deal Size',
                 kanbanLabel: 'Size',
-                format: (val) => formatCurrency(val),
+                format: (val, deal) => formatCurrency(val, deal?.currency),
                 colorFn: () => 'text-text-main',
             },
         };

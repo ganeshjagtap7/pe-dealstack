@@ -28,22 +28,27 @@ function naturalToMillions(value, unit) {
 }
 
 // Build a currency input with value + unit selector
-function buildCurrencyInput(id, label, valueInMillions, placeholder) {
+function buildCurrencyInput(id, label, valueInMillions, placeholder, currencyCode) {
     const natural = millionsToNatural(valueInMillions);
+    const sym = getCurrencySymbol(currencyCode);
+    const code = (currencyCode || 'USD').toUpperCase();
     const displayVal = natural.value !== '' ? (typeof natural.value === 'number' ? parseFloat(natural.value.toPrecision(10)) : natural.value) : '';
+    const unitLabels = code === 'INR'
+        ? { base: sym.trim(), K: sym.trim() + 'K', M: sym.trim() + 'L', B: sym.trim() + 'Cr' }
+        : { base: sym.trim(), K: sym.trim() + 'K', M: sym.trim() + 'M', B: sym.trim() + 'B' };
     return `
         <div>
             <label class="block text-sm font-semibold text-slate-700 mb-2">${label}</label>
             <div class="flex gap-1.5">
-                <select id="${id}-unit" class="px-2 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-slate-50 font-medium text-slate-600 shrink-0" style="width: 60px">
-                    <option value="$" ${natural.unit === '$' ? 'selected' : ''}>$</option>
-                    <option value="K" ${natural.unit === 'K' ? 'selected' : ''}>$K</option>
-                    <option value="M" ${natural.unit === 'M' ? 'selected' : ''}>$M</option>
-                    <option value="B" ${natural.unit === 'B' ? 'selected' : ''}>$B</option>
+                <select id="${id}-unit" class="edit-currency-unit px-2 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm bg-slate-50 font-medium text-slate-600 shrink-0" style="width: 70px" data-currency="${code}">
+                    <option value="$" ${natural.unit === '$' ? 'selected' : ''}>${unitLabels.base}</option>
+                    <option value="K" ${natural.unit === 'K' ? 'selected' : ''}>${unitLabels.K}</option>
+                    <option value="M" ${natural.unit === 'M' ? 'selected' : ''}>${unitLabels.M}</option>
+                    <option value="B" ${natural.unit === 'B' ? 'selected' : ''}>${unitLabels.B}</option>
                 </select>
                 <input type="number" id="${id}" value="${displayVal}" step="any" class="flex-1 px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="${placeholder}">
             </div>
-            <p class="text-[10px] text-slate-400 mt-1">${displayVal !== '' ? 'Currently: ' + formatCurrency(valueInMillions) : 'No value set'}</p>
+            <p class="text-[10px] text-slate-400 mt-1">${displayVal !== '' ? 'Currently: ' + formatCurrency(valueInMillions, currencyCode) : 'No value set'}</p>
         </div>
     `;
 }
@@ -86,9 +91,17 @@ function showEditDealModal() {
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Industry</label>
                         <input type="text" id="edit-deal-industry" value="${deal.industry || ''}" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
                     </div>
-                    ${buildCurrencyInput('edit-deal-revenue', 'Revenue', deal.revenue, 'e.g., 1800')}
-                    ${buildCurrencyInput('edit-deal-ebitda', 'EBITDA', deal.ebitda, 'e.g., 500')}
-                    ${buildCurrencyInput('edit-deal-size', 'Deal Size', deal.dealSize, 'e.g., 6000')}
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">Currency</label>
+                        <select id="edit-deal-currency" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm">
+                            ${Object.entries(CURRENCY_SYMBOLS).map(([code, sym]) =>
+                                `<option value="${code}" ${(deal.currency || 'USD') === code ? 'selected' : ''}>${sym.trim()} — ${code}</option>`
+                            ).join('')}
+                        </select>
+                    </div>
+                    ${buildCurrencyInput('edit-deal-revenue', 'Revenue', deal.revenue, 'e.g., 1800', deal.currency)}
+                    ${buildCurrencyInput('edit-deal-ebitda', 'EBITDA', deal.ebitda, 'e.g., 500', deal.currency)}
+                    ${buildCurrencyInput('edit-deal-size', 'Deal Size', deal.dealSize, 'e.g., 6000', deal.currency)}
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">Projected IRR (%)</label>
                         <input type="number" id="edit-deal-irr" value="${deal.irrProjected || ''}" step="0.1" class="w-full px-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm" placeholder="e.g., 24">
@@ -121,6 +134,20 @@ function showEditDealModal() {
         await saveDealChangesFromModal();
     });
 
+    // Currency dropdown → update unit selector labels dynamically
+    document.getElementById('edit-deal-currency').addEventListener('change', (e) => {
+        const newCurrency = e.target.value;
+        const sym = getCurrencySymbol(newCurrency).trim();
+        const isINR = newCurrency === 'INR';
+        const labels = { '$': sym, K: sym + 'K', M: isINR ? sym + 'L' : sym + 'M', B: isINR ? sym + 'Cr' : sym + 'B' };
+        document.querySelectorAll('.edit-currency-unit').forEach(select => {
+            select.dataset.currency = newCurrency;
+            select.querySelectorAll('option').forEach(opt => {
+                opt.textContent = labels[opt.value] || sym + opt.value;
+            });
+        });
+    });
+
     modal.addEventListener('click', (e) => {
         if (e.target === modal) modal.remove();
     });
@@ -142,6 +169,7 @@ async function saveDealChangesFromModal() {
         name: document.getElementById('edit-deal-name').value,
         stage: newStage,
         industry: document.getElementById('edit-deal-industry').value || null,
+        currency: document.getElementById('edit-deal-currency').value || 'USD',
         revenue: naturalToMillions(document.getElementById('edit-deal-revenue').value, document.getElementById('edit-deal-revenue-unit').value),
         ebitda: naturalToMillions(document.getElementById('edit-deal-ebitda').value, document.getElementById('edit-deal-ebitda-unit').value),
         dealSize: naturalToMillions(document.getElementById('edit-deal-size').value, document.getElementById('edit-deal-size-unit').value),

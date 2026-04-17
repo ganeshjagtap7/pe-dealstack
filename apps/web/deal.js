@@ -401,7 +401,7 @@ function renderDynamicMetrics(deal) {
             key: 'revenue',
             label: 'Revenue (LTM)',
             value: deal.revenue,
-            format: () => formatCurrency(deal.revenue),
+            format: () => formatCurrency(deal.revenue, deal.currency || window.finState?.currency),
             color: 'secondary',
             extra: () => {
                 // Mini bar chart
@@ -431,14 +431,14 @@ function renderDynamicMetrics(deal) {
             key: 'ebitda',
             label: 'EBITDA',
             value: deal.ebitda,
-            format: () => formatCurrency(deal.ebitda),
+            format: () => formatCurrency(deal.ebitda, deal.currency || window.finState?.currency),
             color: 'primary',
         },
         {
             key: 'dealSize',
             label: 'Deal Size',
             value: deal.dealSize,
-            format: () => formatCurrency(deal.dealSize),
+            format: () => formatCurrency(deal.dealSize, deal.currency || window.finState?.currency),
             color: 'purple-500',
             extra: () => {
                 if (deal.dealSize && deal.ebitda) {

@@ -8,6 +8,7 @@ import { validateFinancials } from '../services/financialValidator.js';
 import { mergeIntoExistingDeal, getIconForIndustry } from '../services/dealMerger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
+import { resolveUserId } from './notifications.js';
 
 const subRouter = Router();
 
@@ -105,6 +106,7 @@ subRouter.post('/text', async (req, res) => {
           description: aiData.description.value,
           revenue: aiData.revenue.value,
           ebitda: aiData.ebitda.value,
+          currency: aiData.currency || 'USD',
           dealSize: aiData.revenue.value,
           aiThesis: aiData.summary,
           icon: dealIcon,
@@ -165,11 +167,14 @@ subRouter.post('/text', async (req, res) => {
       });
 
       if (req.user?.id) {
-        await supabase.from('DealTeamMember').insert({
-          dealId: deal.id,
-          userId: req.user.id,
-          role: 'MEMBER',
-        });
+        const internalUserId = await resolveUserId(req.user.id);
+        if (internalUserId) {
+          await supabase.from('DealTeamMember').insert({
+            dealId: deal.id,
+            userId: internalUserId,
+            role: 'MEMBER',
+          }).then(({ error }) => { if (error) log.warn('Auto-assign analyst failed', error); });
+        }
       }
     }
 
@@ -195,6 +200,7 @@ subRouter.post('/text', async (req, res) => {
       extraction: {
         companyName: aiData.companyName,
         industry: aiData.industry,
+        currency: aiData.currency || 'USD',
         revenue: aiData.revenue,
         ebitda: aiData.ebitda,
         overallConfidence: aiData.overallConfidence,
