@@ -233,6 +233,7 @@ app.use('/api/deals/import', authMiddleware, orgMiddleware, dealImportRouter);
 app.use('/api/deals', authMiddleware, orgMiddleware, dealsRouter);
 app.use('/api/companies', authMiddleware, orgMiddleware, companiesRouter);
 app.use('/api', authMiddleware, orgMiddleware, activitiesRouter);
+app.use('/api/documents', authMiddleware, orgMiddleware, documentsAlertsRouter);
 app.use('/api', authMiddleware, orgMiddleware, documentsRouter);
 app.use('/api', authMiddleware, orgMiddleware, foldersRouter);
 app.use('/api/users', authMiddleware, orgMiddleware, usersRouter);
@@ -248,7 +249,6 @@ app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
-app.use('/api/documents', authMiddleware, orgMiddleware, documentsAlertsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
 
