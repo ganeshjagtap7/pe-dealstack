@@ -408,6 +408,37 @@ function expandAIPanel() {
 }
 
 // ============================================================
+// Export Dropdown
+// ============================================================
+function setupExportDropdown() {
+    const dropdownBtn = document.getElementById('export-dropdown');
+    const menu = document.getElementById('export-menu');
+    if (!dropdownBtn || !menu) return;
+
+    dropdownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menu.classList.toggle('hidden');
+    });
+
+    // Close dropdown on outside click
+    document.addEventListener('click', () => menu.classList.add('hidden'));
+
+    // Menu item handlers
+    document.getElementById('export-pdf')?.addEventListener('click', () => {
+        menu.classList.add('hidden');
+        exportToPDF();
+    });
+    document.getElementById('export-markdown')?.addEventListener('click', () => {
+        menu.classList.add('hidden');
+        exportToMarkdown();
+    });
+    document.getElementById('export-clipboard')?.addEventListener('click', () => {
+        menu.classList.add('hidden');
+        exportToClipboard();
+    });
+}
+
+// ============================================================
 // Export to PDF
 // ============================================================
 async function exportToPDF() {
@@ -417,12 +448,16 @@ async function exportToPDF() {
     btn.disabled = true;
 
     try {
+        if (typeof html2pdf === 'undefined') {
+            throw new Error('PDF library not loaded. Please refresh and try again.');
+        }
+
         const element = document.getElementById('memo-content');
         const opt = {
             margin: [0.5, 0.5, 0.5, 0.5],
-            filename: `${state.memo.projectName}_IC_Memo.pdf`,
+            filename: `${state.memo.projectName || 'IC_Memo'}_IC_Memo.pdf`,
             image: { type: 'jpeg', quality: 0.98 },
-            html2canvas: { scale: 2, useCORS: true },
+            html2canvas: { scale: 2, useCORS: true, logging: false },
             jsPDF: { unit: 'in', format: 'letter', orientation: 'portrait' }
         };
 
@@ -438,7 +473,120 @@ async function exportToPDF() {
         console.error('Export error:', error);
         btn.textContent = originalText;
         btn.disabled = false;
-        alert('Export failed. Please try again.');
+        showNotification('Export Failed', error.message || 'Could not generate PDF. Please try again.', 'error');
+    }
+}
+
+// ============================================================
+// Export to Markdown
+// ============================================================
+function exportToMarkdown() {
+    try {
+        const sections = state.sections || [];
+        const title = state.memo?.projectName || 'Investment Memo';
+        let md = `# ${title} — Investment Committee Memo\n\n`;
+        md += `**Date:** ${new Date().toLocaleDateString()}\n\n---\n\n`;
+
+        sections.forEach((section, i) => {
+            md += `## ${i + 1}. ${section.title}\n\n`;
+            if (section.content) {
+                // Strip HTML tags for Markdown
+                const text = section.content
+                    .replace(/<br\s*\/?>/gi, '\n')
+                    .replace(/<\/p>/gi, '\n\n')
+                    .replace(/<\/li>/gi, '\n')
+                    .replace(/<li>/gi, '- ')
+                    .replace(/<\/h[1-6]>/gi, '\n')
+                    .replace(/<h[1-6][^>]*>/gi, '### ')
+                    .replace(/<strong>/gi, '**').replace(/<\/strong>/gi, '**')
+                    .replace(/<em>/gi, '*').replace(/<\/em>/gi, '*')
+                    .replace(/<[^>]+>/g, '')
+                    .replace(/&amp;/g, '&')
+                    .replace(/&lt;/g, '<')
+                    .replace(/&gt;/g, '>')
+                    .replace(/&nbsp;/g, ' ')
+                    .replace(/\n{3,}/g, '\n\n')
+                    .trim();
+                md += text + '\n\n';
+            }
+            if (section.tableData) {
+                const headers = section.tableData.headers || [];
+                md += '| ' + headers.join(' | ') + ' |\n';
+                md += '| ' + headers.map(() => '---').join(' | ') + ' |\n';
+                (section.tableData.rows || []).forEach(row => {
+                    md += '| ' + row.metric + ' | ' + (row.values || []).join(' | ') + ' |\n';
+                });
+                md += '\n';
+            }
+        });
+
+        // Download as .md file
+        const blob = new Blob([md], { type: 'text/markdown' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${title}_IC_Memo.md`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showNotification('Export Complete', 'Memo exported as Markdown.', 'success');
+    } catch (error) {
+        console.error('Markdown export error:', error);
+        showNotification('Export Failed', 'Could not export Markdown.', 'error');
+    }
+}
+
+// ============================================================
+// Copy to Clipboard
+// ============================================================
+async function exportToClipboard() {
+    try {
+        const element = document.getElementById('memo-content');
+        const text = element?.innerText || '';
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+        } else {
+            // Fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+        }
+        showNotification('Copied', 'Memo content copied to clipboard.', 'success');
+    } catch (error) {
+        console.error('Clipboard error:', error);
+        showNotification('Copy Failed', 'Could not copy to clipboard.', 'error');
+    }
+}
+
+// ============================================================
+// Share Memo
+// ============================================================
+function shareMemo() {
+    const memoUrl = window.location.href;
+    const title = state.memo?.projectName || 'Investment Memo';
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(memoUrl).then(() => {
+            showNotification('Link Copied', `Share link for "${title}" copied to clipboard.`, 'success');
+        }).catch(() => {
+            showNotification('Share', `Copy this link to share: ${memoUrl}`, 'info');
+        });
+    } else {
+        // Fallback
+        const textarea = document.createElement('textarea');
+        textarea.value = memoUrl;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        showNotification('Link Copied', `Share link for "${title}" copied to clipboard.`, 'success');
     }
 }
 

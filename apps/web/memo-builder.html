@@ -251,13 +251,30 @@
                 <span class="material-symbols-outlined text-[20px]">share</span>
                 <span>Share</span>
             </button>
-            <div class="flex items-center rounded-lg border border-primary overflow-hidden">
-                <button id="export-btn" class="flex items-center justify-center h-9 px-4 bg-primary text-white text-sm font-bold hover:bg-primary-hover transition-colors">
-                    Export to PDF
-                </button>
-                <button id="export-dropdown" class="flex items-center justify-center h-9 px-2 bg-primary border-l border-primary-hover text-white hover:bg-primary-hover transition-colors">
-                    <span class="material-symbols-outlined text-[20px]">arrow_drop_down</span>
-                </button>
+            <div class="relative">
+                <div class="flex items-center rounded-lg border border-primary overflow-visible">
+                    <button id="export-btn" class="flex items-center justify-center h-9 px-4 bg-primary text-white text-sm font-bold hover:bg-primary-hover transition-colors rounded-l-lg" style="background-color: #003366;">
+                        Export to PDF
+                    </button>
+                    <button id="export-dropdown" class="flex items-center justify-center h-9 px-2 border-l border-white/20 text-white hover:bg-primary-hover transition-colors rounded-r-lg" style="background-color: #003366;">
+                        <span class="material-symbols-outlined text-[20px]">arrow_drop_down</span>
+                    </button>
+                </div>
+                <!-- Export Dropdown Menu -->
+                <div id="export-menu" class="hidden absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                    <button id="export-pdf" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px] text-red-500">picture_as_pdf</span>
+                        Export as PDF
+                    </button>
+                    <button id="export-markdown" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px] text-slate-500">code</span>
+                        Export as Markdown
+                    </button>
+                    <button id="export-clipboard" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px] text-blue-500">content_copy</span>
+                        Copy to Clipboard
+                    </button>
+                </div>
             </div>
         </div>
     </header>
@@ -522,7 +539,7 @@
     <script src="js/inviteModal-template.js"></script>
     <script src="js/inviteModal.js"></script>
     <!-- html2pdf for export -->
-    <script src="https://cdnjs.cloudflare.com/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Initialize Layout -->
     <script>
         document.addEventListener('DOMContentLoaded', async function() {

@@ -529,7 +529,8 @@ function setupEventHandlers() {
     document.getElementById('close-ai-panel').addEventListener('click', toggleAIPanel);
     document.getElementById('expand-ai-panel').addEventListener('click', expandAIPanel);
     document.getElementById('export-btn').addEventListener('click', exportToPDF);
-    document.getElementById('share-btn').addEventListener('click', () => alert('Share functionality coming soon!'));
+    document.getElementById('share-btn').addEventListener('click', shareMemo);
+    setupExportDropdown();
     document.getElementById('attach-btn').addEventListener('click', () => document.getElementById('file-input').click());
     document.getElementById('file-input').addEventListener('change', handleFileAttachment);
 
