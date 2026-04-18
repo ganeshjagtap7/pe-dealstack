@@ -49,6 +49,159 @@ function applyEnrichmentToForm(state, profile) {
 }
 
 /**
+ * Show a detailed profile report modal with all collected data.
+ */
+function showProfileReport(firmProfile, personProfile) {
+  // Remove existing report modal if any
+  const existing = document.getElementById('ob-report-modal');
+  if (existing) existing.remove();
+
+  const modal = document.createElement('div');
+  modal.id = 'ob-report-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(17,24,39,0.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;';
+  modal.innerHTML = `
+    <div style="animation:modalIn 260ms cubic-bezier(0.16,1,0.3,1) both;background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.15);width:100%;max-width:600px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;">
+      <div style="display:flex;align-items:center;justify-content:between;padding:20px 24px;border-bottom:1px solid #E5E7EB;flex-shrink:0;">
+        <div style="flex:1">
+          <h3 style="font-family:Manrope,Inter,sans-serif;font-size:18px;font-weight:700;color:#111827;margin:0;">Research Report</h3>
+          <p style="font-size:12px;color:#9CA3AF;margin:4px 0 0 0;">AI-generated from website, LinkedIn, and web search</p>
+        </div>
+        <button id="ob-report-close" style="color:#9CA3AF;cursor:pointer;background:none;border:none;padding:4px;">
+          <span class="material-symbols-outlined">close</span>
+        </button>
+      </div>
+      <div style="padding:24px;overflow-y:auto;" id="ob-report-body"></div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Build report content
+  const body = document.getElementById('ob-report-body');
+  let html = '';
+
+  // Firm section
+  if (firmProfile) {
+    html += `<div style="margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="width:32px;height:32px;border-radius:8px;background:#E6EEF5;display:flex;align-items:center;justify-content:center;">
+          <span class="material-symbols-outlined" style="font-size:18px;color:#003366;">business</span>
+        </div>
+        <h4 style="font-size:15px;font-weight:700;color:#111827;margin:0;">Firm Profile</h4>
+      </div>`;
+
+    const firmFields = [
+      ['Description', firmProfile.description],
+      ['Strategy', firmProfile.strategy],
+      ['Sectors', firmProfile.sectors?.join(', ')],
+      ['Check Size', firmProfile.checkSizeRange],
+      ['AUM', firmProfile.aum],
+      ['Team Size', firmProfile.teamSize],
+      ['HQ', firmProfile.headquarters],
+      ['Founded', firmProfile.foundedYear],
+      ['Investment Criteria', firmProfile.investmentCriteria],
+      ['Key Differentiators', firmProfile.keyDifferentiators],
+    ];
+
+    for (const [label, value] of firmFields) {
+      if (value) {
+        html += `<div style="display:flex;gap:8px;margin-bottom:8px;font-size:13px;line-height:1.5;">
+          <span style="color:#9CA3AF;min-width:110px;flex-shrink:0;">${label}</span>
+          <span style="color:#111827;">${value}</span>
+        </div>`;
+      }
+    }
+
+    // Portfolio companies
+    if (firmProfile.portfolioCompanies?.length > 0) {
+      html += `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #E5E7EB;">
+        <div style="font-size:12px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Portfolio Companies</div>`;
+      for (const co of firmProfile.portfolioCompanies) {
+        html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;">
+          <span style="color:#003366;font-weight:600;">${co.name}</span>
+          ${co.sector ? `<span style="color:#9CA3AF;">· ${co.sector}</span>` : ''}
+          ${co.status === 'exited' ? '<span style="font-size:11px;color:#059669;background:#D1FAE5;padding:1px 6px;border-radius:4px;">Exited</span>' : ''}
+          ${co.verified ? '<span class="material-symbols-outlined" style="font-size:14px;color:#059669;font-variation-settings:\'FILL\' 1">verified</span>' : ''}
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    // Recent deals
+    if (firmProfile.recentDeals?.length > 0) {
+      html += `<div style="margin-top:12px;padding-top:12px;border-top:1px solid #E5E7EB;">
+        <div style="font-size:12px;font-weight:600;color:#9CA3AF;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Recent Deals</div>`;
+      for (const deal of firmProfile.recentDeals) {
+        html += `<div style="font-size:13px;margin-bottom:4px;color:#111827;">
+          ${deal.title} ${deal.date ? `<span style="color:#9CA3AF;">(${deal.date})</span>` : ''}
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    html += `</div>`;
+  }
+
+  // Person section
+  if (personProfile) {
+    html += `<div style="padding-top:16px;border-top:2px solid #E5E7EB;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+        <div style="width:32px;height:32px;border-radius:8px;background:#E6EEF5;display:flex;align-items:center;justify-content:center;">
+          <span class="material-symbols-outlined" style="font-size:18px;color:#003366;">person</span>
+        </div>
+        <h4 style="font-size:15px;font-weight:700;color:#111827;margin:0;">Your Profile</h4>
+      </div>`;
+
+    const personFields = [
+      ['Title', personProfile.title],
+      ['Role', personProfile.role],
+      ['Bio', personProfile.bio],
+      ['Education', personProfile.education],
+      ['Years in PE', personProfile.yearsInPE],
+      ['Expertise', personProfile.expertise?.join(', ')],
+      ['Experience', personProfile.experience?.join(' → ')],
+    ];
+
+    for (const [label, value] of personFields) {
+      if (value) {
+        html += `<div style="display:flex;gap:8px;margin-bottom:8px;font-size:13px;line-height:1.5;">
+          <span style="color:#9CA3AF;min-width:110px;flex-shrink:0;">${label}</span>
+          <span style="color:#111827;">${value}</span>
+        </div>`;
+      }
+    }
+
+    if (personProfile.notableDeals?.length > 0) {
+      html += `<div style="margin-top:8px;font-size:13px;">
+        <span style="color:#9CA3AF;">Notable Deals</span>
+        <span style="color:#111827;margin-left:8px;">${personProfile.notableDeals.join(', ')}</span>
+      </div>`;
+    }
+
+    html += `</div>`;
+  }
+
+  // Sources
+  if (firmProfile?.sources?.length > 0) {
+    html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #E5E7EB;">
+      <div style="font-size:11px;color:#9CA3AF;display:flex;align-items:center;gap:4px;">
+        <span class="material-symbols-outlined" style="font-size:14px;">info</span>
+        Sources: ${firmProfile.sources.join(', ')}
+      </div>
+    </div>`;
+  }
+
+  body.innerHTML = html;
+
+  // Close handlers
+  document.getElementById('ob-report-close').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  document.addEventListener('keydown', function handler(e) {
+    if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', handler); }
+  });
+}
+
+/**
  * Auto-enrich firm profile from website + LinkedIn.
  * Calls POST /api/onboarding/enrich-firm, pre-fills fund size + sectors.
  */
@@ -101,21 +254,21 @@ async function triggerEnrichment(state) {
                 <span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:'FILL' 1">check_circle</span>
                 Profile researched${profile.confidence === 'low' ? ' <span class="text-amber-600">(low confidence)</span>' : ''}
               </div>
-              <button id="ob-use-profile" class="text-[11px] font-semibold text-white px-3 py-1 rounded-md" style="background:#003366">
-                Use this profile
-              </button>
+              <div class="flex items-center gap-2">
+                <button id="ob-view-report" class="text-[11px] font-medium text-primary px-2 py-1 rounded-md border border-primary/30 hover:bg-primary-light transition cursor-pointer bg-white">
+                  View full report
+                </button>
+                <button id="ob-use-profile" class="text-[11px] font-semibold text-white px-3 py-1 rounded-md cursor-pointer" style="background:#003366">
+                  Use this profile
+                </button>
+              </div>
             </div>
             <div class="text-[12px] text-text-main space-y-1">`;
 
-        if (profile.description) previewHtml += `<div><span class="text-text-muted">Firm:</span> ${profile.description}</div>`;
-        if (profile.strategy) previewHtml += `<div><span class="text-text-muted">Strategy:</span> ${profile.strategy}</div>`;
-        if (profile.sectors?.length) previewHtml += `<div><span class="text-text-muted">Sectors:</span> ${profile.sectors.join(', ')}</div>`;
-        if (profile.checkSizeRange) previewHtml += `<div><span class="text-text-muted">Check size:</span> ${profile.checkSizeRange}</div>`;
-        if (profile.aum) previewHtml += `<div><span class="text-text-muted">AUM:</span> ${profile.aum}</div>`;
+        // Short preview — just the key facts
+        if (profile.description) previewHtml += `<div><span class="text-text-muted">Firm:</span> ${profile.description.slice(0, 120)}${profile.description.length > 120 ? '...' : ''}</div>`;
         if (profile.headquarters) previewHtml += `<div><span class="text-text-muted">HQ:</span> ${profile.headquarters}</div>`;
-        if (profile.portfolioCompanies?.length) previewHtml += `<div><span class="text-text-muted">Portfolio:</span> ${profile.portfolioCompanies.map(c => c.name).join(', ')}</div>`;
-        if (person?.title) previewHtml += `<div class="mt-1 pt-1 border-t border-secondary/20"><span class="text-text-muted">You:</span> ${person.title}${person.bio ? ' — ' + person.bio : ''}</div>`;
-        if (person?.expertise?.length) previewHtml += `<div><span class="text-text-muted">Expertise:</span> ${person.expertise.join(', ')}</div>`;
+        if (person?.title) previewHtml += `<div><span class="text-text-muted">You:</span> ${person.title}${person.bio ? ' — ' + person.bio.slice(0, 80) : ''}</div>`;
 
         previewHtml += `</div>
             <div id="ob-phase2-status" class="mt-2 pt-2 border-t border-secondary/20">
@@ -158,6 +311,12 @@ async function triggerEnrichment(state) {
               </div>`;
           }
         };
+
+        // "View full report" button opens detailed modal
+        const viewBtn = document.getElementById('ob-view-report');
+        if (viewBtn) {
+          viewBtn.addEventListener('click', () => showProfileReport(profile, person));
+        }
 
         // "Use this profile" button saves to memory and pre-fills form
         const useBtn = document.getElementById('ob-use-profile');
