@@ -5,10 +5,34 @@ import { log } from '../../../../utils/logger.js';
 import { isLinkedInUrl, extractLinkedInSlug } from '../../../../utils/urlHelpers.js';
 
 const MAX_SEARCH_CHARS = 5000;
-const NODE_TIMEOUT_MS = 15000;
+const NODE_TIMEOUT_MS = 60000; // 60s — Apify LinkedIn scraping needs startup time
 
 function step(message: string, detail?: string): AgentStep {
   return { timestamp: new Date().toISOString(), node: 'searchPerson', message, detail };
+}
+
+function buildLinkedInSnippet(profile: any): string {
+  let snippet = `\n--- LINKEDIN PROFILE (direct) ---\n`;
+  snippet += `Name: ${profile.name}\n`;
+  snippet += `Headline: ${profile.headline}\n`;
+  if (profile.summary) snippet += `About: ${profile.summary}\n`;
+  if (profile.location) snippet += `Location: ${profile.location}\n`;
+  if (profile.experience?.length > 0) {
+    snippet += `\nExperience:\n`;
+    for (const exp of profile.experience) {
+      snippet += `  - ${exp.title} at ${exp.company} (${exp.duration})\n`;
+    }
+  }
+  if (profile.education?.length > 0) {
+    snippet += `\nEducation:\n`;
+    for (const edu of profile.education) {
+      snippet += `  - ${edu.degree} ${edu.field} — ${edu.school}\n`;
+    }
+  }
+  if (profile.skills?.length > 0) {
+    snippet += `\nSkills: ${profile.skills.join(', ')}\n`;
+  }
+  return snippet;
 }
 
 export async function searchPersonNode(
@@ -21,7 +45,6 @@ export async function searchPersonNode(
     return { personSearchResults: '', steps };
   }
 
-  // Validate LinkedIn URL format
   if (!isLinkedInUrl(state.linkedinUrl)) {
     steps.push(step('Invalid LinkedIn URL format, skipping', state.linkedinUrl));
     return { personSearchResults: '', steps };
@@ -30,65 +53,21 @@ export async function searchPersonNode(
   const slug = extractLinkedInSlug(state.linkedinUrl);
   steps.push(step('Starting person search', `slug: ${slug || 'unknown'}`));
 
-  // Try direct LinkedIn profile scrape via Apify (richest data source)
-  let linkedinSnippet = '';
-  try {
-    const linkedinProfile = await scrapeLinkedInProfile(state.linkedinUrl);
-    if (linkedinProfile) {
-      steps.push(step('LinkedIn profile scraped via Apify', linkedinProfile.name));
-      linkedinSnippet = `\n--- LINKEDIN PROFILE (direct) ---\n`;
-      linkedinSnippet += `Name: ${linkedinProfile.name}\n`;
-      linkedinSnippet += `Headline: ${linkedinProfile.headline}\n`;
-      if (linkedinProfile.summary) linkedinSnippet += `About: ${linkedinProfile.summary}\n`;
-      if (linkedinProfile.location) linkedinSnippet += `Location: ${linkedinProfile.location}\n`;
-      if (linkedinProfile.experience.length > 0) {
-        linkedinSnippet += `\nExperience:\n`;
-        for (const exp of linkedinProfile.experience) {
-          linkedinSnippet += `  - ${exp.title} at ${exp.company} (${exp.duration})\n`;
-        }
-      }
-      if (linkedinProfile.education.length > 0) {
-        linkedinSnippet += `\nEducation:\n`;
-        for (const edu of linkedinProfile.education) {
-          linkedinSnippet += `  - ${edu.degree} ${edu.field} — ${edu.school}\n`;
-        }
-      }
-      if (linkedinProfile.skills.length > 0) {
-        linkedinSnippet += `\nSkills: ${linkedinProfile.skills.join(', ')}\n`;
-      }
-    }
-  } catch (error) {
-    steps.push(step('LinkedIn scrape skipped', (error as Error).message));
-  }
-
+  // Build search queries
   const queries: string[] = [];
-
   if (slug) {
-    // Convert slug to readable name: "john-doe" → "John Doe", "devlikesbizness" stays as-is
     const splitName = slug.replace(/-/g, ' ').replace(/\d+/g, '').trim();
     const capitalizedName = splitName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-    // Query 1: slug + linkedin (most reliable — DDG indexes LinkedIn profiles)
     queries.push(`${slug} linkedin`);
-
-    // Query 2: slug + bio/about (catches Twitter/X bios, personal sites)
     queries.push(`"${slug}" bio OR about`);
-
-    // Query 3: slug on social platforms (twitter, youtube, etc.)
     queries.push(`${slug} site:x.com OR site:twitter.com OR site:youtube.com`);
 
-    // Queries that need firm name
     if (state.firmName) {
-      // Query 4: name + firm + linkedin (cached profile with education, experience)
-      if (capitalizedName.length > 2) {
-        queries.push(`"${capitalizedName}" "${state.firmName}" linkedin`);
-      }
-      // Query 5: person + firm combination (press mentions)
+      if (capitalizedName.length > 2) queries.push(`"${capitalizedName}" "${state.firmName}" linkedin`);
       queries.push(`${slug} "${state.firmName}"`);
-      // Query 6: firm team search
       queries.push(`"${state.firmName}" founder OR team OR CEO OR partner`);
     } else {
-      // No firm name — add extra person-only queries
       queries.push(`${slug} founder OR CEO OR investor`);
       if (capitalizedName.length > 2 && capitalizedName !== slug) {
         queries.push(`"${capitalizedName}" linkedin OR investor OR founder`);
@@ -98,49 +77,62 @@ export async function searchPersonNode(
     queries.push(state.linkedinUrl);
   }
 
-  const timeoutPromise = new Promise<null>((resolve) =>
-    setTimeout(() => resolve(null), NODE_TIMEOUT_MS)
-  );
-
-  const searchPromise = async (): Promise<{ snippets: string; newSources: string[] }> => {
-    let allSnippets = '';
-    const newSources: string[] = [];
-
-    for (let i = 0; i < queries.length; i++) {
-      const query = queries[i];
+  // Run LinkedIn scrape + search queries IN PARALLEL
+  const [linkedinResult, searchResult] = await Promise.all([
+    // Task 1: LinkedIn direct scrape (Apify — may take 30-40s)
+    (async () => {
       try {
-        const results = await searchWeb(query, 5);
-        if (results.length > 0) {
-          allSnippets += `\n--- SEARCH: ${query} ---\n`;
-          for (const r of results) {
-            allSnippets += `${r.title}\n${r.snippet}\nSource: ${r.url}\n\n`;
-          }
-          newSources.push(`ddg:person_q${i + 1}`);
-          steps.push(step(`Query ${i + 1}: ${results.length} results`, query));
-        } else {
-          steps.push(step(`Query ${i + 1}: no results`, query));
+        const profile = await scrapeLinkedInProfile(state.linkedinUrl);
+        if (profile) {
+          steps.push(step('LinkedIn profile scraped via Apify', profile.name));
+          return buildLinkedInSnippet(profile);
         }
+        steps.push(step('LinkedIn scrape returned no data'));
+        return '';
       } catch (error) {
-        steps.push(step(`Query ${i + 1} failed`, (error as Error).message));
+        steps.push(step('LinkedIn scrape failed', (error as Error).message));
+        return '';
       }
-    }
+    })(),
 
-    return { snippets: allSnippets.slice(0, MAX_SEARCH_CHARS), newSources };
-  };
+    // Task 2: Web search queries (Apify Google or DDG — faster)
+    (async () => {
+      let allSnippets = '';
+      const newSources: string[] = [];
+      for (let i = 0; i < queries.length; i++) {
+        try {
+          const results = await searchWeb(queries[i], 5);
+          if (results.length > 0) {
+            allSnippets += `\n--- SEARCH: ${queries[i]} ---\n`;
+            for (const r of results) {
+              allSnippets += `${r.title}\n${r.snippet}\nSource: ${r.url}\n\n`;
+            }
+            newSources.push(`search:person_q${i + 1}`);
+            steps.push(step(`Query ${i + 1}: ${results.length} results`, queries[i]));
+          } else {
+            steps.push(step(`Query ${i + 1}: no results`, queries[i]));
+          }
+        } catch (error) {
+          steps.push(step(`Query ${i + 1} failed`, (error as Error).message));
+        }
+      }
+      return { snippets: allSnippets, newSources };
+    })(),
+  ]);
 
-  const result = await Promise.race([searchPromise(), timeoutPromise]);
+  const allPersonData = (linkedinResult + searchResult.snippets).slice(0, MAX_SEARCH_CHARS + 2000);
+  const allSources = [...(state.sources || []), ...searchResult.newSources];
+  if (linkedinResult) allSources.push('linkedin:direct');
 
   log.info('Firm research: person search complete', {
     linkedinUrl: state.linkedinUrl,
-    resultChars: result?.snippets?.length || 0,
+    hasLinkedInProfile: !!linkedinResult,
+    searchResults: searchResult.newSources.length,
+    totalChars: allPersonData.length,
   });
 
-  const allPersonData = linkedinSnippet + (result?.snippets || '');
-  const allSources = [...(state.sources || []), ...(result?.newSources || [])];
-  if (linkedinSnippet) allSources.push('linkedin:direct');
-
   return {
-    personSearchResults: allPersonData.slice(0, MAX_SEARCH_CHARS + 2000), // Extra room for LinkedIn data
+    personSearchResults: allPersonData,
     sources: allSources,
     steps,
   };

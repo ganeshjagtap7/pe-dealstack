@@ -20,7 +20,7 @@ export interface FirmResearchResult {
   error: string | null;
 }
 
-const AGENT_TIMEOUT_MS = 60000;
+const AGENT_TIMEOUT_MS = 120000; // 2 minutes — Apify actors need startup time
 
 // Best-effort concurrency lock — works for single-instance (local dev, single Vercel instance).
 // Does NOT prevent concurrent runs across multiple serverless instances.
