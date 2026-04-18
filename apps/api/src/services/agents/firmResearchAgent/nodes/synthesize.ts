@@ -5,8 +5,6 @@ import { FirmResearchStateType, AgentStep, FirmProfile, PersonProfile } from '..
 import { getExtractionModel } from '../../../llm.js';
 import { log } from '../../../../utils/logger.js';
 
-const NODE_TIMEOUT_MS = 15000;
-
 function step(message: string, detail?: string): AgentStep {
   return { timestamp: new Date().toISOString(), node: 'synthesize', message, detail };
 }

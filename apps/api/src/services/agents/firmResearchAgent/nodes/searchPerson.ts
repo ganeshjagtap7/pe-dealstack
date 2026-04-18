@@ -33,22 +33,27 @@ export async function searchPersonNode(
   const queries: string[] = [];
 
   if (slug) {
-    // Query 1: slug + "linkedin" (most reliable — DDG indexes LinkedIn profiles this way)
+    // Convert slug to readable name: "john-doe" → "John Doe", "devlikesbizness" stays as-is
+    const splitName = slug.replace(/-/g, ' ').replace(/\d+/g, '').trim();
+    const capitalizedName = splitName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+    // Query 1: slug + linkedin (most reliable — DDG indexes LinkedIn profiles this way)
     queries.push(`${slug} linkedin`);
 
-    // Query 2: split slug into words for broader search
-    // "devlikesbizness" stays as-is, "john-doe" → "john doe"
-    const splitName = slug.replace(/-/g, ' ').replace(/\d+/g, '').trim();
-    if (splitName !== slug && splitName.length > 2) {
-      queries.push(`${splitName} linkedin`);
+    // Query 2: capitalized name + firm + linkedin (gets cached profile data: title, education, experience)
+    if (state.firmName && capitalizedName.length > 2) {
+      queries.push(`"${capitalizedName}" "${state.firmName}" linkedin`);
     }
 
-    // Query 3: person + firm combination
+    // Query 3: slug + bio/about (catches Twitter/X bios, personal sites)
+    queries.push(`"${slug}" bio OR about`);
+
+    // Query 4: person + firm combination (press mentions, articles)
     if (state.firmName) {
       queries.push(`${slug} "${state.firmName}"`);
     }
 
-    // Query 4: firm founder/team search (catches people not indexed by slug)
+    // Query 5: firm founder/team search (catches people not indexed by slug)
     if (state.firmName) {
       queries.push(`"${state.firmName}" founder OR team OR CEO OR partner`);
     }
@@ -56,11 +61,11 @@ export async function searchPersonNode(
     queries.push(state.linkedinUrl);
   }
 
-  const timeoutPromise = new Promise<string>((resolve) =>
-    setTimeout(() => resolve(''), NODE_TIMEOUT_MS)
+  const timeoutPromise = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), NODE_TIMEOUT_MS)
   );
 
-  const searchPromise = async (): Promise<string> => {
+  const searchPromise = async (): Promise<{ snippets: string; newSources: string[] }> => {
     let allSnippets = '';
     const newSources: string[] = [];
 
@@ -83,22 +88,19 @@ export async function searchPersonNode(
       }
     }
 
-    const existingSources = state.sources || [];
-    state.sources = [...existingSources, ...newSources];
-
-    return allSnippets.slice(0, MAX_SEARCH_CHARS);
+    return { snippets: allSnippets.slice(0, MAX_SEARCH_CHARS), newSources };
   };
 
   const result = await Promise.race([searchPromise(), timeoutPromise]);
 
   log.info('Firm research: person search complete', {
     linkedinUrl: state.linkedinUrl,
-    resultChars: result?.length || 0,
+    resultChars: result?.snippets?.length || 0,
   });
 
   return {
-    personSearchResults: result || '',
-    sources: state.sources,
+    personSearchResults: result?.snippets || '',
+    sources: [...(state.sources || []), ...(result?.newSources || [])],
     steps,
   };
 }

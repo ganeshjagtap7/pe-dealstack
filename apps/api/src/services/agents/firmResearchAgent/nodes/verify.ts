@@ -71,16 +71,17 @@ export async function verifyNode(
   }
 
   // 3. Verify person-firm match
-  if (state.personProfile && state.firmName && state.personProfile.title) {
+  const updatedPerson = state.personProfile ? { ...state.personProfile } : null;
+  if (updatedPerson && state.firmName && updatedPerson.title) {
     totalChecks++;
     // Check if person's name/title co-occurs with firm name in search results
     const personInFirmContext = state.personSearchResults?.toLowerCase().includes(state.firmName.toLowerCase());
     if (personInFirmContext) {
-      state.personProfile.verified = true;
+      updatedPerson.verified = true;
       verifiedCount++;
       steps.push(step('Person-firm match verified'));
     } else {
-      state.personProfile.verified = false;
+      updatedPerson.verified = false;
       steps.push(step('Person-firm match NOT verified — person may not work at this firm'));
     }
   }
@@ -88,7 +89,7 @@ export async function verifyNode(
   // 4. Verify sectors have source backing
   if (profile.sectors.length > 0) {
     totalChecks++;
-    const allText = (state.websiteText + ' ' + state.firmSearchResults).toLowerCase();
+    const allText = ((state.websiteText || '') + ' ' + (state.firmSearchResults || '')).toLowerCase();
     const verifiedSectors = profile.sectors.filter(sector =>
       allText.includes(sector.toLowerCase())
     );
@@ -124,7 +125,7 @@ export async function verifyNode(
 
   return {
     firmProfile: profile,
-    personProfile: state.personProfile,
+    personProfile: updatedPerson,
     status: 'saving',
     steps,
   };

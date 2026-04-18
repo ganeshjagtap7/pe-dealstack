@@ -22,7 +22,9 @@ export interface FirmResearchResult {
 
 const AGENT_TIMEOUT_MS = 60000;
 
-// Concurrent enrichment lock per org
+// Best-effort concurrency lock — works for single-instance (local dev, single Vercel instance).
+// Does NOT prevent concurrent runs across multiple serverless instances.
+// For stronger guarantees, use a DB-level lock (enrichmentStartedAt timestamp).
 const runningEnrichments = new Set<string>();
 
 export async function runFirmResearch(input: FirmResearchInput): Promise<FirmResearchResult> {

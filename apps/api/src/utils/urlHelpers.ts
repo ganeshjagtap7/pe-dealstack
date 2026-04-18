@@ -65,23 +65,25 @@ export function isPrivateUrl(url: string): boolean {
   try {
     const parsed = new URL(normalized);
     const hostname = parsed.hostname.toLowerCase();
-    return (
+    if (
       hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
       hostname.startsWith('127.') ||
       hostname.startsWith('10.') ||
       hostname.startsWith('192.168.') ||
-      hostname.startsWith('172.16.') ||
-      hostname.startsWith('172.17.') ||
-      hostname.startsWith('172.18.') ||
-      hostname.startsWith('172.19.') ||
-      hostname.startsWith('172.2') ||
-      hostname.startsWith('172.30.') ||
-      hostname.startsWith('172.31.') ||
       hostname === '0.0.0.0' ||
       hostname.endsWith('.local') ||
       hostname.endsWith('.internal')
-    );
+    ) return true;
+
+    // Check 172.16.0.0/12 range properly
+    const parts172 = hostname.split('.');
+    if (parts172[0] === '172') {
+      const second = parseInt(parts172[1], 10);
+      if (second >= 16 && second <= 31) return true;
+    }
+
+    return false;
   } catch {
     return true;
   }

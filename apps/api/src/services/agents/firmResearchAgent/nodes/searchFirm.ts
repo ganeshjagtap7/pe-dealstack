@@ -29,11 +29,11 @@ export async function searchFirmNode(
     `"${firmName}" fund raise announcement`,
   ];
 
-  const timeoutPromise = new Promise<string>((resolve) =>
-    setTimeout(() => resolve(''), NODE_TIMEOUT_MS)
+  const timeoutPromise = new Promise<null>((resolve) =>
+    setTimeout(() => resolve(null), NODE_TIMEOUT_MS)
   );
 
-  const searchPromise = async (): Promise<string> => {
+  const searchPromise = async (): Promise<{ snippets: string; newSources: string[] }> => {
     let allSnippets = '';
     const newSources: string[] = [];
 
@@ -56,11 +56,7 @@ export async function searchFirmNode(
       }
     }
 
-    // Update sources
-    const existingSources = state.sources || [];
-    state.sources = [...existingSources, ...newSources];
-
-    return allSnippets.slice(0, MAX_SEARCH_CHARS);
+    return { snippets: allSnippets.slice(0, MAX_SEARCH_CHARS), newSources };
   };
 
   const result = await Promise.race([searchPromise(), timeoutPromise]);
@@ -71,12 +67,12 @@ export async function searchFirmNode(
 
   log.info('Firm research: firm search complete', {
     firmName,
-    resultChars: result?.length || 0,
+    resultChars: result?.snippets?.length || 0,
   });
 
   return {
-    firmSearchResults: result || '',
-    sources: state.sources,
+    firmSearchResults: result?.snippets || '',
+    sources: [...(state.sources || []), ...(result?.newSources || [])],
     steps,
   };
 }

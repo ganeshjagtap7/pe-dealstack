@@ -91,9 +91,6 @@ async function triggerEnrichment(state) {
       // Store the full result for preview
       state._enrichmentResult = result;
 
-      // Start polling for Phase 2 deep research
-      if (window._startDeepResearchPolling) window._startDeepResearchPolling();
-
       // Build preview card with collected data
       if (statusEl) {
         const person = result.personProfile;
@@ -349,6 +346,27 @@ window.OnboardingTasks = {
           document.querySelectorAll('[data-sample]').forEach(b => b.classList.remove('selected'));
           btn.classList.add('selected');
           state.data.sampleDeal = btn.dataset.sample;
+
+          // Update dropzone to show selected sample deal
+          const sampleNames = {
+            luktara: 'Luktara Industries — Specialty Chemicals CIM',
+            pinecrest: 'Pinecrest Dermatology — Healthcare Roll-up',
+          };
+          if (dropzone) {
+            dropzone.innerHTML = `
+              <div class="flex items-center gap-3 text-left">
+                <div class="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                  <span class="material-symbols-outlined text-secondary" style="font-size:20px;font-variation-settings:'FILL' 1">check_circle</span>
+                </div>
+                <div>
+                  <div class="text-[13.5px] font-semibold text-text-main">${sampleNames[btn.dataset.sample] || 'Sample deal selected'}</div>
+                  <div class="text-[12px] text-text-muted">Demo data will be loaded into your workspace</div>
+                </div>
+              </div>
+            `;
+            dropzone.classList.remove('border-dashed');
+            dropzone.classList.add('border-secondary/30', 'bg-secondary-light/10');
+          }
         });
       });
     },

@@ -318,19 +318,33 @@ export async function runDeepResearch(input: DeepResearchInput): Promise<void> {
       }
     }
 
-    // 2. Execute queries + follow threads
+    // 2. Execute queries in parallel batches + follow threads
     let allSnippets = '';
     let followUpsUsed = 0;
     const highValueUrls: string[] = [];
+    const batchSize = 3;
 
-    for (const q of queries) {
+    for (let i = 0; i < queries.length; i += batchSize) {
       if (Date.now() > timeoutAt) {
         log.warn('Deep research: timeout reached during query execution');
         break;
       }
 
-      try {
-        const results = await searchWeb(q.query, 5);
+      const batch = queries.slice(i, i + batchSize);
+      const batchResults = await Promise.all(
+        batch.map(async (q) => {
+          try {
+            const results = await searchWeb(q.query, 5);
+            return { q, results };
+          } catch (error) {
+            log.warn('Deep research: query failed', { query: q.query, error: (error as Error).message });
+            return { q, results: [] as Awaited<ReturnType<typeof searchWeb>> };
+          }
+        })
+      );
+
+      // Process batch results
+      for (const { q, results } of batchResults) {
         queriesRun++;
 
         if (results.length > 0) {
@@ -369,8 +383,6 @@ export async function runDeepResearch(input: DeepResearchInput): Promise<void> {
             }
           }
         }
-      } catch (error) {
-        log.warn('Deep research: query failed', { query: q.query, error: (error as Error).message });
       }
 
       // Update progress periodically
@@ -458,7 +470,7 @@ export async function runDeepResearch(input: DeepResearchInput): Promise<void> {
         settings.firmProfile = mergedProfile;
 
         // Merge person profile additions
-        const existingPerson = settings.firmProfile ? null : null; // person is on User, not org
+        // Person profile is stored on User, not Organization — see step 6 below
         settings.deepResearch = {
           status: 'complete',
           startedAt,

@@ -43,7 +43,6 @@ export async function saveNode(
         fieldsPopulated: Object.entries(state.firmProfile)
           .filter(([, v]) => v && (typeof v === 'string' ? v.length > 0 : true))
           .map(([k]) => k),
-        duration: Date.now(), // Will be calculated by caller
       });
 
       const updatedSettings = {
