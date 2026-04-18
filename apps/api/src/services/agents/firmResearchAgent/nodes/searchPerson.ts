@@ -1,6 +1,6 @@
 // apps/api/src/services/agents/firmResearchAgent/nodes/searchPerson.ts
 import { FirmResearchStateType, AgentStep } from '../state.js';
-import { searchWeb } from '../../../webSearch.js';
+import { searchWeb, scrapeLinkedInProfile } from '../../../webSearch.js';
 import { log } from '../../../../utils/logger.js';
 import { isLinkedInUrl, extractLinkedInSlug } from '../../../../utils/urlHelpers.js';
 
@@ -29,6 +29,37 @@ export async function searchPersonNode(
 
   const slug = extractLinkedInSlug(state.linkedinUrl);
   steps.push(step('Starting person search', `slug: ${slug || 'unknown'}`));
+
+  // Try direct LinkedIn profile scrape via Apify (richest data source)
+  let linkedinSnippet = '';
+  try {
+    const linkedinProfile = await scrapeLinkedInProfile(state.linkedinUrl);
+    if (linkedinProfile) {
+      steps.push(step('LinkedIn profile scraped via Apify', linkedinProfile.name));
+      linkedinSnippet = `\n--- LINKEDIN PROFILE (direct) ---\n`;
+      linkedinSnippet += `Name: ${linkedinProfile.name}\n`;
+      linkedinSnippet += `Headline: ${linkedinProfile.headline}\n`;
+      if (linkedinProfile.summary) linkedinSnippet += `About: ${linkedinProfile.summary}\n`;
+      if (linkedinProfile.location) linkedinSnippet += `Location: ${linkedinProfile.location}\n`;
+      if (linkedinProfile.experience.length > 0) {
+        linkedinSnippet += `\nExperience:\n`;
+        for (const exp of linkedinProfile.experience) {
+          linkedinSnippet += `  - ${exp.title} at ${exp.company} (${exp.duration})\n`;
+        }
+      }
+      if (linkedinProfile.education.length > 0) {
+        linkedinSnippet += `\nEducation:\n`;
+        for (const edu of linkedinProfile.education) {
+          linkedinSnippet += `  - ${edu.degree} ${edu.field} — ${edu.school}\n`;
+        }
+      }
+      if (linkedinProfile.skills.length > 0) {
+        linkedinSnippet += `\nSkills: ${linkedinProfile.skills.join(', ')}\n`;
+      }
+    }
+  } catch (error) {
+    steps.push(step('LinkedIn scrape skipped', (error as Error).message));
+  }
 
   const queries: string[] = [];
 
@@ -104,9 +135,13 @@ export async function searchPersonNode(
     resultChars: result?.snippets?.length || 0,
   });
 
+  const allPersonData = linkedinSnippet + (result?.snippets || '');
+  const allSources = [...(state.sources || []), ...(result?.newSources || [])];
+  if (linkedinSnippet) allSources.push('linkedin:direct');
+
   return {
-    personSearchResults: result?.snippets || '',
-    sources: [...(state.sources || []), ...(result?.newSources || [])],
+    personSearchResults: allPersonData.slice(0, MAX_SEARCH_CHARS + 2000), // Extra room for LinkedIn data
+    sources: allSources,
     steps,
   };
 }

@@ -1,4 +1,5 @@
 // apps/api/src/services/webSearch.ts
+import { ApifyClient } from 'apify-client';
 import { log } from '../utils/logger.js';
 
 export interface SearchResult {
@@ -7,39 +8,149 @@ export interface SearchResult {
   url: string;
 }
 
-// Rotate user agents to reduce fingerprinting
+const APIFY_API_KEY = process.env.APIFY_API_KEY || '';
+
+/**
+ * Search the web using Apify Google Search actor (primary)
+ * with DuckDuckGo Lite as free fallback.
+ */
+export async function searchWeb(query: string, maxResults = 8): Promise<SearchResult[]> {
+  // Primary: Apify Google Search (reliable, no rate limits)
+  if (APIFY_API_KEY) {
+    const results = await searchViaApify(query, maxResults);
+    if (results.length > 0) return results;
+    log.warn('Apify search returned 0 results, falling back to DDG', { query });
+  }
+
+  // Fallback: DuckDuckGo Lite (free, no API key, but rate-limited)
+  const results = await fetchDDGLite(query, maxResults);
+  if (results.length > 0) return results;
+
+  // Last resort: DDG HTML endpoint
+  return fetchDDGHtml(query, maxResults);
+}
+
+// ==========================================
+// Apify Google Search
+// ==========================================
+
+async function searchViaApify(query: string, maxResults: number): Promise<SearchResult[]> {
+  try {
+    const client = new ApifyClient({ token: APIFY_API_KEY });
+
+    const run = await client.actor('apify/google-search-scraper').call({
+      queries: query,
+      maxPagesPerQuery: 1,
+      resultsPerPage: maxResults,
+      languageCode: 'en',
+      countryCode: 'us',
+    }, {
+      timeout: 30, // seconds
+      memory: 256, // MB — minimum to save credits
+    });
+
+    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+
+    const results: SearchResult[] = [];
+    const firstItem = items[0] as Record<string, any>;
+    if (firstItem?.organicResults) {
+      for (const r of (firstItem.organicResults as any[]).slice(0, maxResults)) {
+        results.push({
+          title: r.title || '',
+          snippet: r.description || '',
+          url: r.url || '',
+        });
+      }
+    }
+
+    log.info('Apify search complete', { query, results: results.length });
+    return results;
+  } catch (error) {
+    log.error('Apify search failed', { query, error: (error as Error).message });
+    return [];
+  }
+}
+
+// ==========================================
+// Apify LinkedIn Profile Scraper
+// ==========================================
+
+export interface LinkedInProfile {
+  name: string;
+  headline: string;
+  summary: string;
+  location: string;
+  profileUrl: string;
+  experience: Array<{ title: string; company: string; duration: string; description: string }>;
+  education: Array<{ school: string; degree: string; field: string }>;
+  skills: string[];
+}
+
+/**
+ * Scrape a LinkedIn profile using Apify.
+ * Returns structured profile data or null if unavailable.
+ */
+export async function scrapeLinkedInProfile(linkedinUrl: string): Promise<LinkedInProfile | null> {
+  if (!APIFY_API_KEY) {
+    log.warn('LinkedIn scrape skipped — no Apify API key');
+    return null;
+  }
+
+  try {
+    const client = new ApifyClient({ token: APIFY_API_KEY });
+
+    const run = await client.actor('anchor/linkedin-profile-scraper').call({
+      profileUrls: [linkedinUrl],
+    }, {
+      timeout: 45,
+      memory: 512,
+    });
+
+    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+
+    if (items.length === 0) return null;
+
+    const profile = items[0] as Record<string, any>;
+    const result: LinkedInProfile = {
+      name: profile.fullName || profile.name || '',
+      headline: profile.headline || profile.title || '',
+      summary: profile.summary || profile.about || '',
+      location: profile.location || '',
+      profileUrl: linkedinUrl,
+      experience: (profile.experience || profile.positions || []).map((e: any) => ({
+        title: e.title || e.position || '',
+        company: e.companyName || e.company || '',
+        duration: e.duration || e.dateRange || '',
+        description: e.description || '',
+      })).slice(0, 10),
+      education: (profile.education || []).map((e: any) => ({
+        school: e.schoolName || e.school || '',
+        degree: e.degree || e.degreeName || '',
+        field: e.fieldOfStudy || e.field || '',
+      })).slice(0, 5),
+      skills: (profile.skills || []).map((s: any) => typeof s === 'string' ? s : s.name || '').slice(0, 15),
+    };
+
+    log.info('LinkedIn profile scraped', { name: result.name, experience: result.experience.length });
+    return result;
+  } catch (error) {
+    log.error('LinkedIn scrape failed', { linkedinUrl, error: (error as Error).message });
+    return null;
+  }
+}
+
+// ==========================================
+// DuckDuckGo Fallback (free, no API key)
+// ==========================================
+
 const USER_AGENTS = [
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36',
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15',
-  'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
 ];
 
-/**
- * Search DuckDuckGo and extract result snippets.
- * Tries Lite endpoint first, falls back to HTML endpoint.
- * No API key required.
- */
-export async function searchWeb(query: string, maxResults = 8): Promise<SearchResult[]> {
-  const ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
-
-  // Attempt 1: DDG Lite
-  let results = await fetchDDGLite(query, maxResults, ua);
-  if (results.length > 0) return results;
-
-  // Attempt 2: DDG HTML (fallback — different endpoint may not be rate-limited)
-  results = await fetchDDGHtml(query, maxResults, ua);
-  if (results.length > 0) return results;
-
-  // Attempt 3: Retry Lite after 2s delay with different UA
-  await new Promise(r => setTimeout(r, 2000));
-  const ua2 = USER_AGENTS[(USER_AGENTS.indexOf(ua) + 1) % USER_AGENTS.length];
-  results = await fetchDDGLite(query, maxResults, ua2);
-
-  return results;
-}
-
-async function fetchDDGLite(query: string, maxResults: number, ua: string): Promise<SearchResult[]> {
+async function fetchDDGLite(query: string, maxResults: number): Promise<SearchResult[]> {
   try {
+    const ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
@@ -52,25 +163,35 @@ async function fetchDDGLite(query: string, maxResults: number, ua: string): Prom
     if (!response.ok) return [];
 
     const html = await response.text();
-    return parseLiteResults(html, maxResults);
-  } catch (error) {
-    log.warn('DDG Lite search failed', { query, error: (error as Error).message });
+    const results: SearchResult[] = [];
+    const linkMatches = [...html.matchAll(/<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/gi)];
+    const snippetMatches = [...html.matchAll(/<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/gi)];
+
+    for (let i = 0; i < Math.min(linkMatches.length, maxResults); i++) {
+      let resultUrl = linkMatches[i][1] || '';
+      const title = decodeEntities(linkMatches[i][2].replace(/<[^>]+>/g, '').trim());
+      const snippet = snippetMatches[i] ? decodeEntities(snippetMatches[i][1].replace(/<[^>]+>/g, '').trim()) : '';
+      if (resultUrl.includes('uddg=')) {
+        const m = resultUrl.match(/uddg=([^&]+)/);
+        if (m) resultUrl = decodeURIComponent(m[1]);
+      }
+      if (title || snippet) results.push({ title, snippet, url: resultUrl });
+    }
+    return results;
+  } catch {
     return [];
   }
 }
 
-async function fetchDDGHtml(query: string, maxResults: number, ua: string): Promise<SearchResult[]> {
+async function fetchDDGHtml(query: string, maxResults: number): Promise<SearchResult[]> {
   try {
+    const ua = USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(`https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`, {
       method: 'POST',
-      headers: {
-        'User-Agent': ua,
-        'Accept': 'text/html',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
+      headers: { 'User-Agent': ua, 'Accept': 'text/html', 'Content-Type': 'application/x-www-form-urlencoded' },
       body: `q=${encodeURIComponent(query)}`,
       signal: controller.signal,
     });
@@ -79,64 +200,31 @@ async function fetchDDGHtml(query: string, maxResults: number, ua: string): Prom
     if (!response.ok) return [];
 
     const html = await response.text();
-    return parseHtmlResults(html, maxResults);
-  } catch (error) {
-    log.warn('DDG HTML search failed', { query, error: (error as Error).message });
+    const results: SearchResult[] = [];
+    const blocks = html.split(/class="result results_links/g).slice(1);
+    for (const block of blocks) {
+      if (results.length >= maxResults) break;
+      const titleMatch = block.match(/class="result__a"[^>]*>([^<]+)</);
+      const title = titleMatch ? decodeEntities(titleMatch[1].trim()) : '';
+      const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
+      const snippet = snippetMatch ? decodeEntities(snippetMatch[1].replace(/<[^>]+>/g, '').trim()) : '';
+      const hrefMatch = block.match(/class="result__a"[^>]*href="([^"]+)"/);
+      let resultUrl = hrefMatch ? hrefMatch[1] : '';
+      if (resultUrl.includes('uddg=')) {
+        const m = resultUrl.match(/uddg=([^&]+)/);
+        if (m) resultUrl = decodeURIComponent(m[1]);
+      }
+      if (title || snippet) results.push({ title, snippet, url: resultUrl });
+    }
+    return results;
+  } catch {
     return [];
   }
 }
 
-function parseLiteResults(html: string, maxResults: number): SearchResult[] {
-  const results: SearchResult[] = [];
-  const linkMatches = [...html.matchAll(/<a[^>]*class=['"]result-link['"][^>]*href=['"]([^'"]+)['"][^>]*>([\s\S]*?)<\/a>/gi)];
-  const snippetMatches = [...html.matchAll(/<td[^>]*class=['"]result-snippet['"][^>]*>([\s\S]*?)<\/td>/gi)];
-
-  for (let i = 0; i < Math.min(linkMatches.length, maxResults); i++) {
-    let resultUrl = linkMatches[i][1] || '';
-    const title = decodeEntities(linkMatches[i][2].replace(/<[^>]+>/g, '').trim());
-    const snippet = snippetMatches[i]
-      ? decodeEntities(snippetMatches[i][1].replace(/<[^>]+>/g, '').trim())
-      : '';
-    resultUrl = extractRealUrl(resultUrl);
-    if (title || snippet) results.push({ title, snippet, url: resultUrl });
-  }
-  return results;
-}
-
-function parseHtmlResults(html: string, maxResults: number): SearchResult[] {
-  const results: SearchResult[] = [];
-  const blocks = html.split(/class="result results_links/g).slice(1);
-
-  for (const block of blocks) {
-    if (results.length >= maxResults) break;
-    const titleMatch = block.match(/class="result__a"[^>]*>([^<]+)</);
-    const title = titleMatch ? decodeEntities(titleMatch[1].trim()) : '';
-    const snippetMatch = block.match(/class="result__snippet"[^>]*>([\s\S]*?)<\/a>/);
-    const snippet = snippetMatch ? decodeEntities(snippetMatch[1].replace(/<[^>]+>/g, '').trim()) : '';
-    const hrefMatch = block.match(/class="result__a"[^>]*href="([^"]+)"/);
-    let resultUrl = hrefMatch ? hrefMatch[1] : '';
-    resultUrl = extractRealUrl(resultUrl);
-    if (title || snippet) results.push({ title, snippet, url: resultUrl });
-  }
-  return results;
-}
-
-function extractRealUrl(url: string): string {
-  if (url.includes('uddg=')) {
-    const match = url.match(/uddg=([^&]+)/);
-    if (match) return decodeURIComponent(match[1]);
-  }
-  return url;
-}
-
 function decodeEntities(text: string): string {
   return text
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
