@@ -83,7 +83,7 @@ export async function synthesizeNode(
   const hasData = state.websiteText || state.firmSearchResults || state.personSearchResults;
   if (!hasData) {
     steps.push(step('No data gathered, skipping synthesis'));
-    return { status: 'failed', error: 'No data could be gathered from website or search', steps };
+    return { status: 'failed', error: 'Could not gather data — search may be temporarily unavailable. Please fill in manually and try "Refresh profile" later from Settings.', steps };
   }
 
   steps.push(step('Starting GPT-4o structured extraction'));
