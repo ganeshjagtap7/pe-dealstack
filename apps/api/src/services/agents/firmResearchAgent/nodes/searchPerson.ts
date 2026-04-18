@@ -37,25 +37,31 @@ export async function searchPersonNode(
     const splitName = slug.replace(/-/g, ' ').replace(/\d+/g, '').trim();
     const capitalizedName = splitName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 
-    // Query 1: slug + linkedin (most reliable — DDG indexes LinkedIn profiles this way)
+    // Query 1: slug + linkedin (most reliable — DDG indexes LinkedIn profiles)
     queries.push(`${slug} linkedin`);
 
-    // Query 2: capitalized name + firm + linkedin (gets cached profile data: title, education, experience)
-    if (state.firmName && capitalizedName.length > 2) {
-      queries.push(`"${capitalizedName}" "${state.firmName}" linkedin`);
-    }
-
-    // Query 3: slug + bio/about (catches Twitter/X bios, personal sites)
+    // Query 2: slug + bio/about (catches Twitter/X bios, personal sites)
     queries.push(`"${slug}" bio OR about`);
 
-    // Query 4: person + firm combination (press mentions, articles)
-    if (state.firmName) {
-      queries.push(`${slug} "${state.firmName}"`);
-    }
+    // Query 3: slug on social platforms (twitter, youtube, etc.)
+    queries.push(`${slug} site:x.com OR site:twitter.com OR site:youtube.com`);
 
-    // Query 5: firm founder/team search (catches people not indexed by slug)
+    // Queries that need firm name
     if (state.firmName) {
+      // Query 4: name + firm + linkedin (cached profile with education, experience)
+      if (capitalizedName.length > 2) {
+        queries.push(`"${capitalizedName}" "${state.firmName}" linkedin`);
+      }
+      // Query 5: person + firm combination (press mentions)
+      queries.push(`${slug} "${state.firmName}"`);
+      // Query 6: firm team search
       queries.push(`"${state.firmName}" founder OR team OR CEO OR partner`);
+    } else {
+      // No firm name — add extra person-only queries
+      queries.push(`${slug} founder OR CEO OR investor`);
+      if (capitalizedName.length > 2 && capitalizedName !== slug) {
+        queries.push(`"${capitalizedName}" linkedin OR investor OR founder`);
+      }
     }
   } else {
     queries.push(state.linkedinUrl);
