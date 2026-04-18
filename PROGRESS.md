@@ -5,6 +5,181 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 57-58 — April 18-19, 2026
+
+#### Timestamp: April 18-19, 2026 — 5:00 PM to 12:30 AM IST
+
+#### Goal: New Onboarding Flow + Firm Research Agent + Deep Research
+
+---
+
+#### 1. New Onboarding Flow (from Claude Design handoff)
+
+**Problem:** Users were confused about what PE OS does and how to get started. The existing onboarding (welcome modal + 5-step checklist on dashboard) was passive and didn't teach the product.
+
+**Solution:** Built a standalone onboarding page (`/onboarding.html`) with a 3-step guided checklist that replaces the old flow entirely.
+
+**Flow:** Signup (Name, Email, Firm, Password) → Onboarding Welcome Screen → 3-Step Checklist → Completion with AI Findings
+
+**Steps:**
+1. **Define your investment focus** — Firm website, LinkedIn, fund size, sectors. Auto-enriched by AI research agent.
+2. **Upload your first deal** — CIM dropzone + sample demo deals (Luktara Industries, Pinecrest Dermatology).
+3. **Invite your team** — Optional. Email + role rows.
+
+**Signup redesigned:** Removed Title dropdown (redundant with onboarding). Clean design matching onboarding aesthetic (Manrope/Inter, navy #003366). Redirects to `/onboarding.html` after account creation.
+
+**Auth redirect:** Dashboard checks `onboardingStatus.welcomeShown` — new users (never seen welcome) get redirected to onboarding. Default post-login redirect changed from `/crm.html` to `/dashboard.html`.
+
+**Files Created (3):**
+- `apps/web/onboarding.html` — standalone page with welcome + checklist + modals + completion CTA
+- `apps/web/js/onboarding/onboarding-flow.js` — flow controller, state, progress, confetti, dynamic findings
+- `apps/web/js/onboarding/onboarding-tasks.js` — modal body renderers + hydrators for 3 tasks
+
+**Files Modified (4):**
+- `apps/web/signup.html` — complete redesign, removed Title, redirects to onboarding
+- `apps/web/dashboard.html` — added onboarding redirect check for new users
+- `apps/web/js/auth.js` — default post-login redirect changed to `/dashboard.html`
+- `apps/web/settings.html` + `apps/web/settings.js` — added Firm Profile section
+
+---
+
+#### 2. Firm Research Agent (LangGraph, 6 nodes)
+
+**Problem:** Users enter their firm website + LinkedIn during onboarding, but the system did nothing meaningful with those URLs. The deal chat agent had zero knowledge of the firm's strategy, sectors, fund size, or portfolio.
+
+**Solution:** Built a LangGraph research agent that scrapes websites, searches DuckDuckGo, extracts profiles via GPT-4o, cross-validates, and stores for AI context.
+
+**Architecture:** `scrape → searchFirm → searchPerson → synthesize → verify → save`
+
+**Nodes:**
+- **scrape** — Fetches homepage + 10 subpages (/about, /team, /portfolio, etc.), 15s timeout, SSRF prevention, 20K char cap
+- **searchFirm** — 3 DuckDuckGo Lite queries (firm + PE, portfolio/deals, fund raise)
+- **searchPerson** — 4 DuckDuckGo queries (slug + linkedin, slug + firm, firm founder/team). Fixed LinkedIn country subdomain issue (in.linkedin.com, uk.linkedin.com).
+- **synthesize** — GPT-4o structured extraction with Zod schemas. 8 strict accuracy rules (no guessing, verbatim only, empty > wrong).
+- **verify** — Cross-validates portfolio companies (DDG co-occurrence), person-firm match, sector source backing. Sets confidence: high/medium/low.
+- **save** — Stores FirmProfile on `Organization.settings.firmProfile` (JSONB), PersonProfile on `User.onboardingStatus.personProfile`. Audit trail (last 5 runs). Manual override protection.
+
+**Entry point:** `runFirmResearch(input)` with 60s timeout + concurrent lock per org.
+
+**Web Search:** `apps/api/src/services/webSearch.ts` — DuckDuckGo Lite scraper (NOT html.duckduckgo.com which is broken). No API key. Retry on failure.
+
+**Frontend:** Auto-triggers on URL blur in onboarding. Shows preview card with "Use this profile" button. Pre-fills fund size + sector chips from enrichment results.
+
+**Files Created (10):**
+- `apps/api/src/services/webSearch.ts`
+- `apps/api/src/services/agents/firmResearchAgent/state.ts`
+- `apps/api/src/services/agents/firmResearchAgent/graph.ts`
+- `apps/api/src/services/agents/firmResearchAgent/index.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/scrape.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/searchFirm.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/searchPerson.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/synthesize.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/verify.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/save.ts`
+
+---
+
+#### 3. Phase 2 Deep Research (Background, 60-120s)
+
+**Problem:** Phase 1 runs 5 fixed queries and stops. Shallow results. Doesn't follow leads.
+
+**Solution:** After Phase 1 returns to the user, Phase 2 fires in the background. GPT-4o reads Phase 1 results and generates 8-12 targeted follow-up queries across 6 categories.
+
+**Categories:** Person deep-dive, deal history, portfolio deep-dive, firm reputation, social presence, network/community.
+
+**Follow-the-thread:** After each search batch, extracts new capitalized names via regex. If a name appears 2+ times, spawns a follow-up query. Max 6 follow-ups, max 18 total searches.
+
+**URL scraping:** Scrapes up to 3 high-value article URLs (Crunchbase, TechCrunch, Forbes, press pages).
+
+**Final synthesis:** GPT-4o merges Phase 1 + Phase 2 into enriched profile. Never overwrites Phase 1 data — only adds.
+
+**Enriched fields (Phase 2 adds):** socialPresence (twitter, youtube, newsletter, podcast, blog), pressArticles[], communityMentions[], coInvestors[], competitorFirms[], socialHandles, interviews[], publicContent[], networkConnections[].
+
+**Frontend:** Polls `/api/onboarding/research-status` every 5s. Shows "Researching deeper..." spinner in preview card. Slide-in notification on completion screen. 90s safety timeout on spinner.
+
+**Files Created (1):**
+- `apps/api/src/services/agents/firmResearchAgent/deepResearch.ts`
+
+---
+
+#### 4. Deal Chat Context Injection
+
+**Problem:** Deal chat agent had no knowledge of the firm's investment strategy, sectors, or portfolio. Couldn't say "this deal doesn't match your criteria."
+
+**Fix:** Added firm profile injection to `deals-chat-ai.ts`. System prompt now includes:
+```
+=== YOUR FIRM CONTEXT ===
+Firm: {description}
+Strategy: {strategy}
+Sectors: {sectors}
+Check Size: {checkSizeRange}
+Investment Criteria: {investmentCriteria}
+Portfolio: {portfolioCompanies}
+Your Role: {personProfile.title} — {personProfile.bio}
+```
+
+**Files Modified:** `apps/api/src/routes/deals-chat-ai.ts`
+
+---
+
+#### 5. Shared URL Helpers
+
+**Problem:** LinkedIn URLs with country subdomains (`in.linkedin.com` for India, `uk.linkedin.com` for UK) were silently rejected by URL validation regex across the codebase.
+
+**Root cause:** Regex `(www\.)?linkedin\.com` only accepted `www.` or bare `linkedin.com`. Country subdomains like `in.` were rejected.
+
+**Fix:** Created shared utility `apps/api/src/utils/urlHelpers.ts` with 8 functions:
+- `normalizeUrl()` — adds https://, validates via URL constructor
+- `isLinkedInUrl()` — accepts ANY LinkedIn subdomain
+- `extractLinkedInSlug()` — extracts profile slug
+- `isPrivateUrl()` — SSRF prevention (full RFC 1918 range)
+- `extractBaseDomain()` — strips subdomains
+- `extractNameFromDomain()` — readable name from domain
+- `isSocialMediaUrl()` — checks social domains
+- `isHighValueUrl()` — checks if URL worth scraping
+
+Updated 5 files across the codebase to use shared utility.
+
+---
+
+#### 6. Bug Fixes During Session
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| DuckDuckGo search returned 0 results | `html.duckduckgo.com` endpoint broken for server-side requests | Switched to `lite.duckduckgo.com` |
+| LinkedIn enrichment skipped silently | URL validation rejected country subdomains (`in.linkedin.com`) | Created `urlHelpers.ts` with proper URL parsing |
+| Enrichment endpoint 500 error for new users | `getOrgId()` throws when org not resolved yet | Fallback: direct DB lookup → auto-create as last resort |
+| Phase 2 spinner never stops | No frontend timeout; Phase 2 may fail silently | Added 90s safety timeout on spinner |
+
+---
+
+#### 7. Documentation Created (4 files)
+
+- `docs/onboarding-agent-architecture.md` — 3 Mermaid diagrams (user flow, agent pipeline, system integration)
+- `docs/firm-research-agent-documentation.md` — Technical docs (API, schemas, guardrails, troubleshooting)
+- `docs/testing-guide-onboarding-flow.md` — 11 test scenarios for non-tech team member
+- `docs/testing-guide-firm-research-agent.md` — 10 test scenarios for non-tech team member
+
+---
+
+#### 8. Specs & Plans Created (4 files)
+
+- `docs/superpowers/specs/2026-04-18-firm-research-agent-design.md`
+- `docs/superpowers/specs/2026-04-19-deep-research-agent-design.md`
+- `docs/superpowers/plans/2026-04-18-firm-research-agent.md`
+- `docs/superpowers/plans/2026-04-19-deep-research-agent.md`
+
+---
+
+#### Summary
+
+- **31 files changed**, 8,036 insertions
+- **13 new files** (agent nodes, web search, URL helpers, onboarding pages)
+- **0 TypeScript errors**
+- **Commit:** `3a796c8` — `feat(onboarding): new 3-step onboarding flow + firm research agent`
+
+---
+
 ### Session 56 — April 17, 2026
 
 #### 🕐 Timestamp: April 17, 2026 — 9:40 PM IST
