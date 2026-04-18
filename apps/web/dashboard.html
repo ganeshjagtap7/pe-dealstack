@@ -447,6 +447,26 @@ Scan Signals
         const auth = await PEAuth.checkAuth();
         if (!auth) return; // Will redirect to login
 
+        // Check if user needs onboarding (new users who haven't completed setup)
+        try {
+            const obResp = await PEAuth.authFetch(`${API_BASE_URL}/onboarding/status`);
+            if (obResp.ok) {
+                const obData = await obResp.json();
+                const steps = obData.steps || {};
+                const allDone = Object.values(steps).every(v => v === true);
+                const dismissed = obData.checklistDismissed === true;
+                const welcomeShown = obData.welcomeShown === true;
+                // Redirect to onboarding if: not all steps done, not dismissed, and welcome never shown
+                // (welcome never shown = brand new user who hasn't seen the app yet)
+                if (!allDone && !dismissed && !welcomeShown) {
+                    window.location.href = '/onboarding.html';
+                    return;
+                }
+            }
+        } catch {
+            // If check fails, continue to dashboard normally
+        }
+
         PELayout.init('dashboard', { collapsible: true });
 
         // Initialize onboarding (welcome modal + checklist + feedback button + beta badge)

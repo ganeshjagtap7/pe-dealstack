@@ -164,6 +164,48 @@ router.post('/:dealId/chat', async (req, res) => {
       }
     }
 
+    // ─── Firm Profile Context Injection ─────────────────────────────
+    // Load the firm's enriched profile so the agent knows investment criteria
+    try {
+      const { data: orgData } = await supabase
+        .from('Organization')
+        .select('settings')
+        .eq('id', orgId)
+        .single();
+
+      const firmProfile = (orgData?.settings as any)?.firmProfile;
+      if (firmProfile) {
+        contextParts.push('\n=== YOUR FIRM CONTEXT ===');
+        if (firmProfile.description) contextParts.push(`Firm: ${firmProfile.description}`);
+        if (firmProfile.strategy) contextParts.push(`Strategy: ${firmProfile.strategy}`);
+        if (firmProfile.sectors?.length) contextParts.push(`Sectors: ${firmProfile.sectors.join(', ')}`);
+        if (firmProfile.checkSizeRange) contextParts.push(`Check Size: ${firmProfile.checkSizeRange}`);
+        if (firmProfile.investmentCriteria) contextParts.push(`Investment Criteria: ${firmProfile.investmentCriteria}`);
+        if (firmProfile.portfolioCompanies?.length) {
+          const names = firmProfile.portfolioCompanies.map((c: any) => c.name).join(', ');
+          contextParts.push(`Portfolio: ${names}`);
+        }
+        if (firmProfile.recentDeals?.length) {
+          const deals = firmProfile.recentDeals.map((d: any) => d.title).join(', ');
+          contextParts.push(`Recent Deals: ${deals}`);
+        }
+      }
+
+      // Also inject person context if available
+      const { data: userData } = await supabase
+        .from('User')
+        .select('onboardingStatus')
+        .eq('authId', req.user?.id)
+        .single();
+
+      const personProfile = (userData?.onboardingStatus as any)?.personProfile;
+      if (personProfile?.title) {
+        contextParts.push(`\nYour Role: ${personProfile.title}${personProfile.bio ? ' — ' + personProfile.bio : ''}`);
+      }
+    } catch {
+      // Non-blocking — firm context is supplementary
+    }
+
     // ─── Financial Context Injection ─────────────────────────────────
     // Fetch extracted financial statements and format as LLM-optimized
     // Markdown tables so the agent can do math without tool calls.

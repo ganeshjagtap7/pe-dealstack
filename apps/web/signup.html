@@ -1,494 +1,319 @@
 <!DOCTYPE html>
-<html class="light" lang="en">
+<html lang="en">
 <head>
-    <meta charset="utf-8"/>
-    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-    <title>Firm Registration & Signup - PE OS</title>
-    <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=Noto+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <script>
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#003366",
-                        "background-light": "#f8f9fa",
-                        "background-dark": "#101822",
-                    },
-                    fontFamily: {
-                        "display": ["Manrope", "Noto Sans", "sans-serif"],
-                        "body": ["Manrope", "Noto Sans", "sans-serif"]
-                    },
-                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
-                },
-            },
-        }
-    </script>
-    <style>
-        body {
-            font-family: 'Manrope', sans-serif;
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-        }
-    </style>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Create your workspace — PE OS</title>
+<link rel="icon" type="image/svg+xml" href="favicon.svg"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        "primary": "#003366",
+        "primary-hover": "#002855",
+        "primary-light": "#E6EEF5",
+        "secondary": "#059669",
+        "secondary-light": "#D1FAE5",
+        "background-body": "#F8F9FA",
+        "surface-card": "#FFFFFF",
+        "border-subtle": "#E5E7EB",
+        "border-focus": "#CBD5E1",
+        "text-main": "#111827",
+        "text-secondary": "#4B5563",
+        "text-muted": "#9CA3AF",
+      },
+      fontFamily: {
+        "sans": ["Inter", "sans-serif"],
+        "display": ["Manrope", "Inter", "sans-serif"],
+      },
+      boxShadow: {
+        "card": "0 1px 3px 0 rgba(0,0,0,0.05), 0 1px 2px -1px rgba(0,0,0,0.05)",
+      },
+    },
+  },
+}
+</script>
+<style>
+  body { font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+</style>
 </head>
-<body class="bg-background-light dark:bg-background-dark min-h-screen flex flex-col font-display text-[#111418] dark:text-white transition-colors duration-200">
-    <!-- Loading Screen -->
-    <div id="loadingScreen" class="fixed inset-0 bg-white flex items-center justify-center z-50">
-        <div class="flex flex-col items-center gap-3">
-            <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-            <span class="text-sm text-gray-500">Loading...</span>
-        </div>
+<body class="bg-background-body text-text-main font-sans min-h-screen flex flex-col">
+
+<!-- Loading Screen -->
+<div id="loadingScreen" class="fixed inset-0 bg-background-body flex items-center justify-center z-50">
+  <div class="flex flex-col items-center gap-3">
+    <div class="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+    <span class="text-sm text-text-muted">Loading...</span>
+  </div>
+</div>
+
+<!-- Top Nav -->
+<header class="bg-white border-b border-border-subtle">
+  <div class="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#003366"/>
+      </svg>
+      <span class="font-display font-bold text-[15px] tracking-tight text-primary">PE OS</span>
     </div>
+    <div class="flex items-center gap-4">
+      <span class="text-[13px] text-text-secondary hidden sm:inline">Already have an account?</span>
+      <a href="login.html" class="text-[13px] font-semibold text-primary hover:text-primary-hover transition">Log in</a>
+    </div>
+  </div>
+</header>
+
+<!-- Main -->
+<main class="flex-1 flex items-center justify-center px-6 py-12">
+  <div class="w-full max-w-[440px]">
 
     <!-- Header -->
-    <header class="w-full border-b border-[#e5e7eb] dark:border-gray-800 bg-white dark:bg-[#1a202c] sticky top-0 z-50">
-        <div class="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-            <a href="index.html" class="flex items-center gap-3 text-[#111418] dark:text-white cursor-pointer select-none">
-                <div class="size-8 rounded bg-primary/10 flex items-center justify-center text-primary">
-                    <span class="material-symbols-outlined text-2xl">bar_chart</span>
-                </div>
-                <h2 class="text-xl font-bold leading-tight tracking-tight">PE OS</h2>
-            </a>
-            <div class="flex items-center gap-4">
-                <span class="text-sm font-medium text-[#617289] dark:text-gray-400 hidden sm:block">Already have an account?</span>
-                <a href="login.html" class="text-primary hover:text-primary/80 font-bold text-sm transition-colors">
-                    Log in
-                </a>
-            </div>
+    <div class="mb-8 text-center">
+      <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary-light text-primary text-[11px] font-semibold uppercase tracking-wider mb-5">
+        <span class="w-1.5 h-1.5 rounded-full bg-secondary"></span>
+        Secure registration
+      </div>
+      <h1 class="font-display text-[32px] leading-[1.15] font-bold tracking-tight text-text-main">
+        Create your workspace
+      </h1>
+      <p class="mt-2 text-[14px] text-text-secondary">
+        Set up your PE OS account in under a minute.
+      </p>
+    </div>
+
+    <!-- Form Card -->
+    <div class="bg-white border border-border-subtle rounded-xl shadow-card p-6">
+      <form id="signupForm" class="space-y-4">
+
+        <!-- Full Name -->
+        <div>
+          <label class="block text-[12px] font-medium text-text-secondary mb-1.5" for="fullname">Full name</label>
+          <input id="fullname" name="fullname" type="text" required placeholder="Jane Smith"
+            class="w-full px-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" />
         </div>
-    </header>
 
-    <!-- Main Content -->
-    <main class="flex-1 flex flex-col items-center justify-center px-4 py-12 sm:px-6 lg:px-8">
-        <div class="w-full max-w-[520px] bg-white dark:bg-[#1a202c] rounded-xl shadow-[0_2px_8px_rgba(0,0,0,0.04)] dark:shadow-none border border-[#e5e7eb] dark:border-gray-700 p-8 sm:p-10 relative overflow-hidden">
-            <!-- Top accent bar -->
-            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary/80 to-primary"></div>
-
-            <!-- Header Section -->
-            <div class="mb-8 text-center">
-                <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/5 dark:bg-primary/20 text-primary text-xs font-semibold mb-4 border border-primary/10">
-                    <span class="w-2 h-2 rounded-full bg-primary"></span>
-                    Secure Firm Registration
-                </div>
-                <h1 class="text-2xl sm:text-[32px] font-bold text-[#111418] dark:text-white leading-tight mb-3">
-                    Initialize your Firm Workspace
-                </h1>
-                <p class="text-[#617289] dark:text-gray-400 text-sm sm:text-base">
-                    Secure, AI-native operating system for Private Equity.
-                </p>
-            </div>
-
-            <!-- Registration Form -->
-            <form id="signupForm" class="flex flex-col gap-5">
-                <!-- Full Name -->
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="fullname">Full Name</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
-                            <span class="material-symbols-outlined text-[20px]">person</span>
-                        </div>
-                        <input
-                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
-                            id="fullname"
-                            name="fullname"
-                            placeholder="John Doe"
-                            type="text"
-                            required
-                        />
-                    </div>
-                </div>
-
-                <!-- Work Email -->
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="email">Work Email</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
-                            <span class="material-symbols-outlined text-[20px]">mail</span>
-                        </div>
-                        <input
-                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm invalid:border-red-500 invalid:text-red-600 focus:invalid:border-red-500 focus:invalid:ring-red-500"
-                            id="email"
-                            name="email"
-                            placeholder="name@firm.com"
-                            type="email"
-                            required
-                        />
-                    </div>
-                    <p class="text-xs text-[#617289] dark:text-gray-500 mt-1">Please use your professional email address.</p>
-                </div>
-
-                <!-- Password -->
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="password">Password</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
-                            <span class="material-symbols-outlined text-[20px]">lock</span>
-                        </div>
-                        <input
-                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-10 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
-                            id="password"
-                            name="password"
-                            placeholder="••••••••"
-                            type="password"
-                            required
-                            minlength="10"
-                        />
-                        <button
-                            class="absolute inset-y-0 right-0 pr-3 flex items-center text-[#9ca3af] hover:text-[#617289] cursor-pointer"
-                            type="button"
-                            onclick="togglePasswordVisibility('password', this)"
-                        >
-                            <span class="material-symbols-outlined text-[20px]">visibility</span>
-                        </button>
-                    </div>
-                    <p class="text-xs text-[#617289] dark:text-gray-500 mt-1">Min 8 characters, one uppercase, one number</p>
-                    <!-- Password strength indicator -->
-                    <div id="passwordStrength" class="hidden">
-                        <div class="flex gap-1 mt-2">
-                            <div id="strength1" class="h-1 flex-1 rounded bg-gray-200"></div>
-                            <div id="strength2" class="h-1 flex-1 rounded bg-gray-200"></div>
-                            <div id="strength3" class="h-1 flex-1 rounded bg-gray-200"></div>
-                            <div id="strength4" class="h-1 flex-1 rounded bg-gray-200"></div>
-                        </div>
-                        <p id="strengthText" class="text-xs mt-1 text-gray-500"></p>
-                    </div>
-                </div>
-
-                <!-- Confirm Password -->
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="confirm_password">Confirm Password</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
-                            <span class="material-symbols-outlined text-[20px]">lock_reset</span>
-                        </div>
-                        <input
-                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
-                            id="confirm_password"
-                            name="confirm_password"
-                            placeholder="••••••••"
-                            type="password"
-                            required
-                        />
-                    </div>
-                    <p id="passwordMatch" class="hidden text-xs mt-1"></p>
-                </div>
-
-                <!-- Firm Name -->
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="firmname">Firm Name</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
-                            <span class="material-symbols-outlined text-[20px]">business</span>
-                        </div>
-                        <input
-                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-3 py-3 text-sm placeholder:text-[#9ca3af] focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm"
-                            id="firmname"
-                            name="firmname"
-                            placeholder="Acme Capital"
-                            type="text"
-                            required
-                        />
-                    </div>
-                </div>
-
-                <!-- Title -->
-                <div class="space-y-2">
-                    <label class="text-sm font-semibold text-[#111418] dark:text-gray-200" for="title">Your Title</label>
-                    <div class="relative">
-                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#9ca3af]">
-                            <span class="material-symbols-outlined text-[20px]">badge</span>
-                        </div>
-                        <select
-                            class="block w-full rounded-lg border-[#dbe0e6] dark:border-gray-600 bg-white dark:bg-gray-800 text-[#111418] dark:text-white pl-10 pr-10 py-3 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-sm appearance-none cursor-pointer"
-                            id="title"
-                            name="title"
-                            required
-                        >
-                            <option disabled selected value="">Select your title</option>
-                            <option value="partner">Partner / Managing Director</option>
-                            <option value="principal">Principal</option>
-                            <option value="vp">Vice President</option>
-                            <option value="associate">Associate</option>
-                            <option value="analyst">Analyst</option>
-                            <option value="ops">Operations / Admin</option>
-                        </select>
-                        <div class="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none text-[#9ca3af]">
-                            <span class="material-symbols-outlined text-[20px]">expand_more</span>
-                        </div>
-                    </div>
-                    <p class="text-xs text-[#617289] dark:text-gray-500 mt-1">You'll be the workspace admin. You can invite teammates later.</p>
-                </div>
-
-                <!-- Error Message -->
-                <div id="errorMessage" class="hidden text-red-500 text-sm text-center bg-red-50 dark:bg-red-900/20 p-3 rounded-lg"></div>
-
-                <!-- Success Message -->
-                <div id="successMessage" class="hidden text-green-600 text-sm text-center bg-green-50 dark:bg-green-900/20 p-3 rounded-lg"></div>
-
-                <!-- Submit Button -->
-                <div class="pt-2">
-                    <button
-                        id="submitBtn"
-                        class="group relative w-full flex justify-center py-3.5 px-4 border border-transparent text-sm font-bold rounded-lg text-white bg-primary hover:bg-[#002855] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-all shadow-[0_1px_2px_rgba(0,0,0,0.1)] hover:shadow-[0_4px_12px_rgba(0,51,102,0.2)] disabled:opacity-50 disabled:cursor-not-allowed"
-                        type="submit"
-                    >
-                        <span id="submitText">Create Firm Workspace</span>
-                        <span id="submitSpinner" class="hidden ml-2">
-                            <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                        </span>
-                    </button>
-                </div>
-
-                <!-- Security Badge -->
-                <div class="flex items-center justify-center gap-2 mt-2">
-                    <span class="material-symbols-outlined text-green-600 text-lg">lock</span>
-                    <span class="text-xs text-[#617289] dark:text-gray-400 font-medium">AES-256 Encryption</span>
-                </div>
-
-                <!-- Terms -->
-                <p class="text-xs text-center text-[#9ca3af] dark:text-gray-500 mt-2 leading-relaxed">
-                    By clicking "Create Firm Workspace", you agree to our
-                    <a class="text-primary hover:underline" href="#">Terms of Service</a> and
-                    <a class="text-primary hover:underline" href="#">Privacy Policy</a>.
-                </p>
-            </form>
+        <!-- Work Email -->
+        <div>
+          <label class="block text-[12px] font-medium text-text-secondary mb-1.5" for="email">Work email</label>
+          <input id="email" name="email" type="email" required placeholder="jane@meridian.com"
+            class="w-full px-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" />
         </div>
-    </main>
+
+        <!-- Firm Name -->
+        <div>
+          <label class="block text-[12px] font-medium text-text-secondary mb-1.5" for="firmname">Firm name</label>
+          <input id="firmname" name="firmname" type="text" required placeholder="Meridian Capital Partners"
+            class="w-full px-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" />
+        </div>
+
+        <!-- Password -->
+        <div>
+          <label class="block text-[12px] font-medium text-text-secondary mb-1.5" for="password">Password</label>
+          <div class="relative">
+            <input id="password" name="password" type="password" required minlength="10" placeholder="Min 10 chars, upper + lower + number + special"
+              class="w-full px-3 py-2.5 pr-10 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" />
+            <button type="button" id="toggle-pw" class="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary transition">
+              <span class="material-symbols-outlined" style="font-size:18px">visibility</span>
+            </button>
+          </div>
+          <!-- Strength bar -->
+          <div id="pw-strength" class="hidden mt-2">
+            <div class="flex gap-1">
+              <div id="s1" class="h-1 flex-1 rounded bg-gray-200 transition-colors"></div>
+              <div id="s2" class="h-1 flex-1 rounded bg-gray-200 transition-colors"></div>
+              <div id="s3" class="h-1 flex-1 rounded bg-gray-200 transition-colors"></div>
+              <div id="s4" class="h-1 flex-1 rounded bg-gray-200 transition-colors"></div>
+            </div>
+            <p id="pw-label" class="text-[11px] mt-1 text-text-muted"></p>
+          </div>
+        </div>
+
+        <!-- Confirm Password -->
+        <div>
+          <label class="block text-[12px] font-medium text-text-secondary mb-1.5" for="confirm_password">Confirm password</label>
+          <input id="confirm_password" name="confirm_password" type="password" required placeholder="Re-enter password"
+            class="w-full px-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none transition" />
+          <p id="pw-match" class="hidden text-[11px] mt-1"></p>
+        </div>
+
+        <!-- Error / Success -->
+        <div id="errorMsg" class="hidden text-[13px] text-red-600 bg-red-50 p-3 rounded-lg text-center"></div>
+        <div id="successMsg" class="hidden text-[13px] text-secondary bg-secondary-light p-3 rounded-lg text-center"></div>
+
+        <!-- Submit -->
+        <button id="submitBtn" type="submit"
+          class="w-full flex items-center justify-center gap-2 py-3 px-4 text-[14px] font-semibold text-white rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          style="background:#003366">
+          <span id="submitText">Create workspace</span>
+          <span id="submitSpinner" class="hidden">
+            <svg class="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          </span>
+        </button>
+
+      </form>
+    </div>
 
     <!-- Footer -->
-    <footer class="w-full py-6 text-center text-xs text-[#9ca3af] dark:text-gray-600">
-        © 2026 PE OS. All rights reserved.
-    </footer>
+    <p class="text-[11px] text-center text-text-muted mt-4 leading-relaxed">
+      By creating a workspace you agree to our
+      <a class="text-primary hover:underline" href="terms-of-service.html">Terms</a> and
+      <a class="text-primary hover:underline" href="privacy-policy.html">Privacy Policy</a>.
+    </p>
 
-    <!-- Supabase Client -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-    <!-- Auth Helper -->
-    <script src="js/auth.js"></script>
+    <!-- Stats row -->
+    <div class="mt-8 pt-6 border-t border-border-subtle grid grid-cols-3 gap-4 text-center">
+      <div>
+        <div class="font-display text-[18px] font-bold text-primary">&lt; 3min</div>
+        <div class="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">To first insight</div>
+      </div>
+      <div>
+        <div class="font-display text-[18px] font-bold text-primary">No prompts</div>
+        <div class="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Pre-loaded context</div>
+      </div>
+      <div>
+        <div class="font-display text-[18px] font-bold text-primary">SOC 2</div>
+        <div class="text-[10px] text-text-muted uppercase tracking-wider mt-0.5">Enterprise ready</div>
+      </div>
+    </div>
 
-    <script>
-        // Toggle password visibility
-        function togglePasswordVisibility(inputId, button) {
-            const input = document.getElementById(inputId);
-            const icon = button.querySelector('.material-symbols-outlined');
-            if (input.type === 'password') {
-                input.type = 'text';
-                icon.textContent = 'visibility_off';
-            } else {
-                input.type = 'password';
-                icon.textContent = 'visibility';
-            }
-        }
+  </div>
+</main>
 
-        // Password strength checker
-        const passwordInput = document.getElementById('password');
-        const passwordStrength = document.getElementById('passwordStrength');
-        const strengthBars = [
-            document.getElementById('strength1'),
-            document.getElementById('strength2'),
-            document.getElementById('strength3'),
-            document.getElementById('strength4')
-        ];
-        const strengthText = document.getElementById('strengthText');
+<!-- Scripts -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="js/auth.js"></script>
 
-        passwordInput.addEventListener('input', function() {
-            const password = this.value;
-            passwordStrength.classList.remove('hidden');
+<script>
+(function() {
+  const $ = id => document.getElementById(id);
 
-            let strength = 0;
-            if (password.length >= 10) strength++;
-            if (/[A-Z]/.test(password) && /[a-z]/.test(password)) strength++;
-            if (/[0-9]/.test(password)) strength++;
-            if (/[^A-Za-z0-9]/.test(password)) strength++;
+  // Toggle password visibility
+  $('toggle-pw').addEventListener('click', () => {
+    const pw = $('password');
+    const icon = $('toggle-pw').querySelector('.material-symbols-outlined');
+    if (pw.type === 'password') { pw.type = 'text'; icon.textContent = 'visibility_off'; }
+    else { pw.type = 'password'; icon.textContent = 'visibility'; }
+  });
 
-            // Reset bars
-            strengthBars.forEach(bar => {
-                bar.className = 'h-1 flex-1 rounded bg-gray-200';
-            });
+  // Password strength
+  $('password').addEventListener('input', function() {
+    const pw = this.value;
+    $('pw-strength').classList.toggle('hidden', pw.length === 0);
+    let str = 0;
+    if (pw.length >= 10) str++;
+    if (/[A-Z]/.test(pw) && /[a-z]/.test(pw)) str++;
+    if (/[0-9]/.test(pw)) str++;
+    if (/[^A-Za-z0-9]/.test(pw)) str++;
 
-            // Color based on strength
-            const colors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500'];
-            const texts = ['Weak', 'Fair', 'Good', 'Strong'];
+    const colors = ['bg-red-500','bg-orange-500','bg-yellow-500','bg-green-500'];
+    const labels = ['Weak','Fair','Good','Strong'];
+    for (let i = 1; i <= 4; i++) {
+      $('s'+i).className = `h-1 flex-1 rounded transition-colors ${i <= str ? colors[str-1] : 'bg-gray-200'}`;
+    }
+    $('pw-label').textContent = str > 0 ? labels[str-1] : '';
+  });
 
-            for (let i = 0; i < strength; i++) {
-                strengthBars[i].className = `h-1 flex-1 rounded ${colors[strength - 1]}`;
-            }
+  // Password match
+  $('confirm_password').addEventListener('input', function() {
+    const el = $('pw-match');
+    if (this.value.length === 0) { el.classList.add('hidden'); return; }
+    el.classList.remove('hidden');
+    if (this.value === $('password').value) {
+      el.textContent = 'Passwords match';
+      el.className = 'text-[11px] mt-1 text-green-600';
+    } else {
+      el.textContent = 'Passwords do not match';
+      el.className = 'text-[11px] mt-1 text-red-500';
+    }
+  });
 
-            strengthText.textContent = strength > 0 ? texts[strength - 1] : '';
-            strengthText.className = `text-xs mt-1 ${strength <= 1 ? 'text-red-500' : strength === 2 ? 'text-orange-500' : strength === 3 ? 'text-yellow-600' : 'text-green-500'}`;
+  // Form submit
+  $('signupForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const fullname = $('fullname').value.trim();
+    const email = $('email').value.trim();
+    const password = $('password').value;
+    const confirmPass = $('confirm_password').value;
+    const firmname = $('firmname').value.trim();
 
-            if (password.length === 0) {
-                passwordStrength.classList.add('hidden');
-            }
-        });
+    $('errorMsg').classList.add('hidden');
+    $('successMsg').classList.add('hidden');
 
-        // Password match checker
-        const confirmPassword = document.getElementById('confirm_password');
-        const passwordMatch = document.getElementById('passwordMatch');
+    if (password !== confirmPass) {
+      $('errorMsg').textContent = 'Passwords do not match.';
+      $('errorMsg').classList.remove('hidden');
+      return;
+    }
+    if (password.length < 10) {
+      $('errorMsg').textContent = 'Password must be at least 10 characters.';
+      $('errorMsg').classList.remove('hidden');
+      return;
+    }
+    if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+      $('errorMsg').textContent = 'Password needs uppercase, lowercase, number, and special character.';
+      $('errorMsg').classList.remove('hidden');
+      return;
+    }
 
-        confirmPassword.addEventListener('input', function() {
-            if (this.value.length > 0) {
-                passwordMatch.classList.remove('hidden');
-                if (this.value === passwordInput.value) {
-                    passwordMatch.textContent = 'Passwords match';
-                    passwordMatch.className = 'text-xs mt-1 text-green-500';
-                    this.classList.remove('border-red-500');
-                    this.classList.add('border-green-500');
-                } else {
-                    passwordMatch.textContent = 'Passwords do not match';
-                    passwordMatch.className = 'text-xs mt-1 text-red-500';
-                    this.classList.remove('border-green-500');
-                    this.classList.add('border-red-500');
-                }
-            } else {
-                passwordMatch.classList.add('hidden');
-                this.classList.remove('border-red-500', 'border-green-500');
-            }
-        });
+    $('submitBtn').disabled = true;
+    $('submitText').textContent = 'Creating workspace...';
+    $('submitSpinner').classList.remove('hidden');
 
-        // Form submission
-        const signupForm = document.getElementById('signupForm');
-        const submitBtn = document.getElementById('submitBtn');
-        const submitText = document.getElementById('submitText');
-        const submitSpinner = document.getElementById('submitSpinner');
-        const errorMessage = document.getElementById('errorMessage');
-        const successMessage = document.getElementById('successMessage');
+    try {
+      const { user, session, error } = await PEAuth.signUp(email, password, {
+        fullName: fullname,
+        firmName: firmname,
+      });
 
-        signupForm.addEventListener('submit', async function(e) {
-            e.preventDefault();
+      if (error) throw error;
+      if (!user) throw new Error('Failed to create account');
 
-            // Get form values
-            const fullname = document.getElementById('fullname').value.trim();
-            const email = document.getElementById('email').value.trim();
-            const password = passwordInput.value;
-            const confirmPass = confirmPassword.value;
-            const firmname = document.getElementById('firmname').value.trim();
-            const title = document.getElementById('title').value;
+      if (session) {
+        $('successMsg').textContent = 'Account created! Redirecting to setup...';
+        $('successMsg').classList.remove('hidden');
+        setTimeout(() => { window.location.href = 'onboarding.html'; }, 1200);
+      } else {
+        $('successMsg').textContent = 'Check your email to verify your account, then log in.';
+        $('successMsg').classList.remove('hidden');
+        $('submitBtn').disabled = true;
+        $('submitText').textContent = 'Check your email';
+        $('submitSpinner').classList.add('hidden');
+      }
+    } catch (err) {
+      let msg = 'An error occurred. Please try again.';
+      if (err.message) {
+        if (err.message.includes('already registered')) msg = 'An account with this email already exists. Please log in.';
+        else msg = err.message;
+      }
+      $('errorMsg').textContent = msg;
+      $('errorMsg').classList.remove('hidden');
+      $('submitBtn').disabled = false;
+      $('submitText').textContent = 'Create workspace';
+      $('submitSpinner').classList.add('hidden');
+    }
+  });
 
-            // Validate
-            errorMessage.classList.add('hidden');
-            successMessage.classList.add('hidden');
-
-            if (password !== confirmPass) {
-                errorMessage.textContent = 'Passwords do not match.';
-                errorMessage.classList.remove('hidden');
-                return;
-            }
-
-            if (password.length < 10) {
-                errorMessage.textContent = 'Password must be at least 10 characters.';
-                errorMessage.classList.remove('hidden');
-                return;
-            }
-
-            if (!/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
-                errorMessage.textContent = 'Password must contain uppercase, lowercase, number, and special character.';
-                errorMessage.classList.remove('hidden');
-                return;
-            }
-
-            if (!title) {
-                errorMessage.textContent = 'Please select your title.';
-                errorMessage.classList.remove('hidden');
-                return;
-            }
-
-            // Show loading state
-            submitBtn.disabled = true;
-            submitText.textContent = 'Creating workspace...';
-            submitSpinner.classList.remove('hidden');
-
-            try {
-                // Sign up with Supabase (workspace creator = auto ADMIN)
-                const { user, session, error } = await PEAuth.signUp(email, password, {
-                    fullName: fullname,
-                    firmName: firmname,
-                    title: title,  // Display title (Partner, Analyst, etc.) - role is auto-assigned as ADMIN
-                });
-
-                if (error) {
-                    throw error;
-                }
-
-                if (user) {
-                    // Show success message
-                    if (session) {
-                        // Email confirmation disabled - user is logged in
-                        successMessage.textContent = 'Account created successfully! Redirecting...';
-                        successMessage.classList.remove('hidden');
-
-                        // Redirect to CRM after short delay
-                        setTimeout(() => {
-                            window.location.href = 'crm.html';
-                        }, 1500);
-                    } else {
-                        // Email confirmation enabled - show message
-                        successMessage.textContent = 'Account created! Please check your email to verify your account, then log in.';
-                        successMessage.classList.remove('hidden');
-                        submitBtn.disabled = true;
-                        submitText.textContent = 'Check your email';
-                    }
-                } else {
-                    throw new Error('Failed to create account');
-                }
-
-            } catch (error) {
-                // Show error message
-                let message = 'An error occurred. Please try again.';
-                if (error.message) {
-                    if (error.message.includes('User already registered')) {
-                        message = 'An account with this email already exists. Please log in instead.';
-                    } else if (error.message.includes('Password')) {
-                        message = error.message;
-                    } else {
-                        message = error.message;
-                    }
-                }
-                errorMessage.textContent = message;
-                errorMessage.classList.remove('hidden');
-            } finally {
-                if (!successMessage.classList.contains('hidden') && successMessage.textContent.includes('Check your email')) {
-                    // Keep button disabled if waiting for email confirmation
-                } else {
-                    submitBtn.disabled = false;
-                    submitText.textContent = 'Create Firm Workspace';
-                }
-                submitSpinner.classList.add('hidden');
-            }
-        });
-
-        // Check if already logged in on page load
-        document.addEventListener('DOMContentLoaded', async function() {
-            // Force light mode
-            document.documentElement.classList.remove('dark');
-
-            try {
-                // Initialize auth and check if already logged in
-                await PEAuth.initSupabase();
-                const notAuth = await PEAuth.checkNotAuth();
-
-                // If user is NOT authenticated, show the signup form
-                if (notAuth) {
-                    document.getElementById('loadingScreen').style.display = 'none';
-                }
-                // If user is authenticated, checkNotAuth will redirect - don't show anything
-            } catch (err) {
-                console.error('Auth initialization error:', err);
-                document.getElementById('loadingScreen').style.display = 'none';
-                const banner = document.createElement('div');
-                banner.style.cssText = 'background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;padding:12px 16px;border-radius:8px;margin-bottom:16px;text-align:center;font-size:14px;';
-                banner.textContent = 'Unable to connect to authentication service. Please check your internet connection and refresh the page.';
-                const form = document.querySelector('form');
-                if (form) form.parentNode.insertBefore(banner, form);
-            }
-        });
-    </script>
+  // Auth check on load
+  document.addEventListener('DOMContentLoaded', async function() {
+    try {
+      await PEAuth.initSupabase();
+      const notAuth = await PEAuth.checkNotAuth();
+      if (notAuth) $('loadingScreen').style.display = 'none';
+    } catch {
+      $('loadingScreen').style.display = 'none';
+    }
+  });
+})();
+</script>
 </body>
 </html>

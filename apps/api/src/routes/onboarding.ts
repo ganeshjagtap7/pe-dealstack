@@ -1,6 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { supabase } from '../supabase.js';
 import { getOrgId } from '../middleware/orgScope.js';
+import { runFirmResearch, runDeepResearch } from '../services/agents/firmResearchAgent/index.js';
+import { log } from '../utils/logger.js';
+import { extractNameFromDomain } from '../utils/urlHelpers.js';
 
 const router = Router();
 
@@ -321,6 +324,134 @@ router.post('/dismiss', async (req: Request, res: Response) => {
   } catch (error: any) {
     console.error('[Onboarding] Failed to dismiss:', error.message);
     res.status(500).json({ error: 'Failed to update' });
+  }
+});
+
+// POST /api/onboarding/enrich-firm
+// Runs firm research agent → scrapes, searches, synthesizes, verifies, saves
+router.post('/enrich-firm', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+    const { websiteUrl, linkedinUrl } = req.body;
+    if (!websiteUrl && !linkedinUrl) {
+      return res.status(400).json({ error: 'Provide at least a websiteUrl or linkedinUrl' });
+    }
+
+    // Try to resolve org — but don't block if it's not available yet (new users)
+    let orgId: string = '';
+    let firmName = '';
+    try {
+      orgId = req.user?.organizationId || '';
+      if (!orgId) {
+        const { data: userData } = await supabase
+          .from('User')
+          .select('organizationId')
+          .eq('authId', userId)
+          .single();
+        orgId = userData?.organizationId || '';
+      }
+      if (orgId) {
+        const { data: org } = await supabase
+          .from('Organization')
+          .select('id, name, website, settings')
+          .eq('id', orgId)
+          .single();
+        firmName = org?.name || '';
+
+        // Rate limit check (only if org exists)
+        const settings = (org?.settings || {}) as Record<string, any>;
+        const history = settings.enrichmentHistory || [];
+        const oneHourAgo = Date.now() - 3600000;
+        const recentRuns = history.filter((h: any) => new Date(h.timestamp).getTime() > oneHourAgo);
+        if (recentRuns.length >= 3) {
+          return res.status(429).json({ error: 'Max 3 enrichment runs per hour. Try again later.' });
+        }
+      }
+    } catch {
+      // Org not available yet — agent will still scrape and search, just won't save to org
+      log.warn('Enrichment: org not available, running without save', { userId });
+    }
+
+    // Extract firm name from website URL as fallback
+    if (!firmName && websiteUrl) {
+      firmName = extractNameFromDomain(websiteUrl) || '';
+    }
+
+    // Run the research agent — works even without org (just won't save to DB)
+    const result = await runFirmResearch({
+      websiteUrl: websiteUrl || '',
+      linkedinUrl: linkedinUrl || '',
+      firmName,
+      userId,
+      organizationId: orgId,
+    });
+
+    log.info('Firm enrichment complete', { orgId: orgId || 'none', success: result.success, confidence: result.firmProfile?.confidence });
+
+    res.json(result);
+
+    // Fire Phase 2 deep research in background (not awaited)
+    if (result.success && result.firmProfile && (websiteUrl || linkedinUrl)) {
+      runDeepResearch({
+        phase1Profile: result.firmProfile,
+        phase1PersonProfile: result.personProfile,
+        websiteUrl: websiteUrl || '',
+        linkedinUrl: linkedinUrl || '',
+        firmName,
+        userId,
+        organizationId: orgId,
+      }).catch(err => log.error('Deep research background task failed', { error: err.message }));
+    }
+  } catch (error: any) {
+    log.error('Firm enrichment endpoint failed', { error: error.message, stack: error.stack });
+    res.status(500).json({ success: false, error: `Enrichment failed: ${error.message}` });
+  }
+});
+
+// GET /api/onboarding/research-status
+// Polled by frontend to check Phase 2 deep research progress
+router.get('/research-status', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.json({ phase: 1, status: 'complete', newInsightsCount: 0 });
+
+    let orgId: string = req.user?.organizationId || '';
+    if (!orgId) {
+      const { data: userData } = await supabase
+        .from('User')
+        .select('organizationId')
+        .eq('authId', userId)
+        .single();
+      orgId = userData?.organizationId || '';
+    }
+    if (!orgId) {
+      return res.json({ phase: 1, status: 'complete', newInsightsCount: 0 });
+    }
+
+    const { data: org } = await supabase
+      .from('Organization')
+      .select('settings')
+      .eq('id', orgId)
+      .single();
+
+    const settings = (org?.settings || {}) as Record<string, any>;
+    const deepResearch = settings.deepResearch;
+
+    if (!deepResearch) {
+      return res.json({ phase: 1, status: 'complete', newInsightsCount: 0 });
+    }
+
+    res.json({
+      phase: 2,
+      status: deepResearch.status,
+      newInsightsCount: deepResearch.insightsFound || 0,
+      completedAt: deepResearch.completedAt || null,
+    });
+  } catch (error: any) {
+    log.error('Research status check failed', { error: error.message });
+    res.json({ phase: 1, status: 'complete', newInsightsCount: 0 });
   }
 });
 

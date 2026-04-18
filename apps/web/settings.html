@@ -156,6 +156,10 @@
                                     <span class="material-symbols-outlined text-[20px]">group</span>
                                     <span class="text-sm font-medium">Team</span>
                                 </a>
+                                <a href="#section-firm-profile" data-section="firm-profile" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                    <span class="material-symbols-outlined text-[20px]">domain</span>
+                                    <span class="text-sm font-medium">Firm Profile</span>
+                                </a>
                             </nav>
                         </aside>
 
@@ -357,6 +361,33 @@
                                 <div class="p-6">
                                     <div id="invitations-list" class="space-y-2">
                                         <p class="text-sm text-text-muted text-center py-4">Loading invitations...</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <!-- Firm Profile Section -->
+                            <section id="section-firm-profile" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="px-6 py-5 border-b border-border-subtle flex items-center justify-between gap-3">
+                                    <div class="flex items-center gap-3">
+                                        <div class="p-2 bg-primary-light rounded-lg text-primary border border-primary/20">
+                                            <span class="material-symbols-outlined text-[20px] block">domain</span>
+                                        </div>
+                                        <div>
+                                            <h2 class="text-base font-bold text-text-main">Firm Profile</h2>
+                                            <p class="text-xs text-text-muted">AI-researched profile of your firm. Used as context across deal analysis.</p>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-3">
+                                        <div id="firm-refresh-status"></div>
+                                        <button id="firm-refresh-btn" onclick="refreshFirmProfile()" class="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-border-subtle hover:bg-gray-50 transition-colors shadow-sm" style="color: #003366;">
+                                            <span class="material-symbols-outlined text-[16px]">refresh</span>
+                                            Refresh profile
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="p-6">
+                                    <div id="firm-profile-content">
+                                        <p class="text-sm text-text-muted">Loading firm profile...</p>
                                     </div>
                                 </div>
                             </section>

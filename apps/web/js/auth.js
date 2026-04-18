@@ -181,8 +181,8 @@ async function checkNotAuth() {
   const { user, session } = await getUser();
 
   if (user && session) {
-    // Get redirect destination or default to CRM
-    const redirect = sessionStorage.getItem('authRedirect') || '/crm.html';
+    // Get redirect destination or default to dashboard (which checks onboarding)
+    const redirect = sessionStorage.getItem('authRedirect') || '/dashboard.html';
     sessionStorage.removeItem('authRedirect');
     window.location.href = redirect;
     return false;
