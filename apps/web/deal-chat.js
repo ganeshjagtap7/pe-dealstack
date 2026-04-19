@@ -104,7 +104,7 @@ function renderSuggestionChips() {
 
     const prompts = buildSuggestionPrompts();
     container.innerHTML = prompts.map(p => `
-        <button class="chat-suggestion-chip group flex items-start gap-2 px-3.5 py-2.5 text-left text-xs font-medium rounded-xl border border-primary/15 text-primary bg-primary/[0.03] hover:bg-primary/10 hover:border-primary/30 transition-all" data-prompt="${escapeHtml(p.prompt)}">
+        <button class="chat-suggestion-chip group flex items-start gap-2 px-3.5 py-2.5 text-left text-xs font-medium rounded-xl transition-all cursor-pointer" style="border: 1px solid #00336622; color: #003366; background: #f0f4f8;" onmouseover="this.style.background='#e0e8f0';this.style.borderColor='#00336644'" onmouseout="this.style.background='#f0f4f8';this.style.borderColor='#00336622'" data-prompt="${escapeHtml(p.prompt)}">
             <span class="material-symbols-outlined text-sm mt-px shrink-0">${p.icon}</span>
             <span class="leading-relaxed">${escapeHtml(p.label)}</span>
         </button>
@@ -198,9 +198,6 @@ function initChatInterface() {
                                 </div>
                             </div>
                         </div>`;
-                    // Re-show suggestion chips after clearing chat
-                    const sugEl = document.getElementById('chat-suggestions');
-                    if (sugEl) { sugEl.classList.remove('hidden'); renderSuggestionChips(); }
                     showNotification('Chat Cleared', 'Conversation history has been cleared', 'success');
                 }
             } catch (error) {
@@ -220,10 +217,6 @@ function initChatInterface() {
             const fileNames = _chatAttachedFiles.map(f => f.name).join(', ');
             fullMessage = `[User attached document(s): ${fileNames}. Search for these documents to answer questions about them.]\n\n${message}`;
         }
-
-        // Hide suggestion chips once user sends a message
-        const suggestionsEl = document.getElementById('chat-suggestions');
-        if (suggestionsEl) suggestionsEl.classList.add('hidden');
 
         // Add user message to chat (show only the user's typed text)
         addUserMessage(message);
@@ -342,10 +335,6 @@ async function loadChatHistory() {
             if (data.messages && data.messages.length > 0) {
                 // Clear the default intro message and any hardcoded content
                 chatContainer.querySelectorAll('.ai-intro-message').forEach(el => el.remove());
-
-                // Hide suggestion chips when history exists
-                const suggestionsEl = document.getElementById('chat-suggestions');
-                if (suggestionsEl) suggestionsEl.classList.add('hidden');
 
                 // Add conversation history divider
                 const headerDiv = document.createElement('div');
