@@ -455,4 +455,59 @@ router.get('/research-status', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/onboarding/create-demo-deal
+// Creates the Luktara Industries sample deal when user selects it during onboarding
+router.post('/create-demo-deal', async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ error: 'Not authenticated' });
+
+    const { sampleId } = req.body;
+    if (sampleId !== 'luktara' && sampleId !== 'pinecrest') {
+      return res.status(400).json({ error: 'Invalid sample deal ID' });
+    }
+
+    // Resolve org
+    let orgId: string = req.user?.organizationId || '';
+    if (!orgId) {
+      const { data: userData } = await supabase
+        .from('User')
+        .select('organizationId')
+        .eq('authId', userId)
+        .single();
+      orgId = userData?.organizationId || '';
+    }
+    if (!orgId) {
+      return res.status(400).json({ error: 'Organization not set up yet' });
+    }
+
+    // Check if sample deal already exists (prevent duplicates)
+    const { data: existing } = await supabase
+      .from('Deal')
+      .select('id')
+      .eq('organizationId', orgId)
+      .contains('tags', ['sample'])
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      // Already has a sample deal — return its ID
+      return res.json({ success: true, dealId: existing[0].id, alreadyExists: true });
+    }
+
+    // Create the sample deal
+    const { createSampleDeal } = await import('../services/sampleDealService.js');
+    const dealId = await createSampleDeal(orgId, userId);
+
+    if (!dealId) {
+      return res.status(500).json({ error: 'Failed to create demo deal' });
+    }
+
+    log.info('Demo deal created from onboarding', { orgId, dealId, sampleId });
+    res.json({ success: true, dealId });
+  } catch (error: any) {
+    log.error('Create demo deal failed', { error: error.message });
+    res.status(500).json({ error: 'Failed to create demo deal. Please try again.' });
+  }
+});
+
 export default router;

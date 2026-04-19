@@ -1,7 +1,5 @@
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
-import { createSampleDeal } from './sampleDealService.js';
-
 /**
  * Find user by authId (or legacy id), or create if not exists.
  * On first signup: also creates the Organization if firmName is provided.
@@ -87,10 +85,8 @@ export async function findOrCreateUser(authUser: {
         }
         organizationId = newOrg.id;
         log.info('Organization created on signup', { orgId: newOrg.id, name: authUser.firmName });
-        // Create sample deal for new org (fire-and-forget — never blocks signup)
-        createSampleDeal(newOrg.id, authUser.id).catch(err => {
-          log.error('Sample deal creation failed', err, { orgId: newOrg.id });
-        });
+        // Sample deal is now created during onboarding (POST /api/onboarding/create-demo-deal)
+        // instead of auto-creating on signup
       }
     }
 

@@ -309,10 +309,31 @@
     state.activeTaskId = null;
   }
 
-  function completeTask() {
+  async function completeTask() {
     if (!state.activeTaskId) return;
 
     const taskId = state.activeTaskId;
+
+    // If completing CIM task with a sample deal selected, create the demo deal
+    if (taskId === 'cim' && state.data.sampleDeal) {
+      const btn = $('modal-complete');
+      if (btn) { btn.textContent = 'Creating demo deal...'; btn.disabled = true; }
+
+      try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/onboarding/create-demo-deal`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sampleId: state.data.sampleDeal }),
+        });
+        if (resp.ok) {
+          const result = await resp.json();
+          if (result.dealId) state.data.dealId = result.dealId;
+        }
+      } catch {
+        // Non-blocking — deal creation is best-effort
+      }
+    }
+
     state.completed.add(taskId);
 
     // Persist to backend
