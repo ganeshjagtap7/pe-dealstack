@@ -356,12 +356,14 @@
 
   async function markWelcomeShown() {
     try {
+      // Also set a local flag as backup (in case API fails)
+      sessionStorage.setItem('pe_onboarding_seen', 'true');
       await PEAuth.authFetch(`${API_BASE_URL}/onboarding/welcome-shown`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
       });
     } catch {
-      // Non-blocking
+      // Non-blocking — sessionStorage flag is the backup
     }
   }
 
