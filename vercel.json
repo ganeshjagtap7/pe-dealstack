@@ -5,7 +5,7 @@
   "functions": {
     "api/index.ts": {
       "includeFiles": "apps/api/dist/**",
-      "maxDuration": 60
+      "maxDuration": 300
     }
   },
   "rewrites": [
