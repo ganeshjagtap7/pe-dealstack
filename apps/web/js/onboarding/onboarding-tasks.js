@@ -535,13 +535,13 @@ window.OnboardingTasks = {
         const wrap = document.getElementById('ob-team-rows');
         if (!wrap) return;
         const row = document.createElement('div');
-        row.className = 'flex items-center gap-2';
+        row.className = 'flex items-center gap-3';
         row.innerHTML = `
-          <input type="email" placeholder="name@firm.com" class="flex-1 px-3 py-2 text-[13.5px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none">
-          <select class="px-2.5 py-2 text-[13px] rounded-lg border border-border-subtle bg-white">
+          <input type="email" placeholder="name@firm.com" class="flex-1 min-w-0 px-3 py-2.5 text-[13.5px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+          <select class="w-[110px] flex-shrink-0 px-3 py-2.5 text-[13px] rounded-lg border border-border-subtle bg-white focus:border-primary focus:ring-1 focus:ring-primary outline-none appearance-none cursor-pointer" style="background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2212%22 height=%2212%22 viewBox=%220 0 24 24%22 fill=%22%239CA3AF%22><path d=%22M7 10l5 5 5-5z%22/></svg>');background-repeat:no-repeat;background-position:right 10px center;">
             <option>Analyst</option><option>VP</option><option>Partner</option><option>Admin</option>
           </select>
-          <button class="text-text-muted hover:text-red-500 p-1 ob-remove-row bg-transparent border-none cursor-pointer">
+          <button class="text-text-muted hover:text-red-500 flex-shrink-0 ob-remove-row bg-transparent border-none cursor-pointer p-1">
             <span class="material-symbols-outlined" style="font-size:18px">close</span>
           </button>
         `;
