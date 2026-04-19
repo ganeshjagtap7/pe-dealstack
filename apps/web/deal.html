@@ -166,15 +166,43 @@
                     <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
                 </button>
                 <div class="h-6 w-px bg-border-subtle"></div>
-                <button
-                    class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
-                    id="user-menu-btn">
-                    <div
-                        class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm bg-primary flex items-center justify-center text-white text-xs font-bold">
+                <div class="relative" id="user-menu-container">
+                    <button
+                        class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
+                        id="user-menu-btn" title="Profile & Settings">
+                        <div
+                            class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm bg-primary flex items-center justify-center text-white text-xs font-bold">
+                        </div>
+                        <span class="hidden md:inline">Loading...</span>
+                        <span class="material-symbols-outlined text-[18px] text-text-muted user-menu-chevron transition-transform duration-200">expand_more</span>
+                    </button>
+                    <div id="user-dropdown" class="hidden absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50 bg-white border border-border-subtle">
+                        <div class="px-4 py-3 border-b border-border-subtle">
+                            <p class="text-sm font-medium text-text-main" id="dropdown-user-name">Loading...</p>
+                            <p class="text-xs truncate text-text-muted" id="dropdown-user-role"></p>
+                        </div>
+                        <div class="py-1">
+                            <a href="/settings.html" class="flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">person</span>
+                                Profile
+                            </a>
+                            <a href="/settings.html" class="flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">settings</span>
+                                Settings
+                            </a>
+                            <button id="help-support-btn" class="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">help</span>
+                                Help & Support
+                            </button>
+                        </div>
+                        <div class="border-t border-border-subtle py-1">
+                            <button id="logout-btn" class="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-red-600 hover:bg-red-50 transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">logout</span>
+                                Log out
+                            </button>
+                        </div>
                     </div>
-                    <span class="hidden md:inline">Loading...</span>
-                    <span class="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
-                </button>
+                </div>
             </div>
         </header>
 
@@ -454,24 +482,8 @@
                     </div>
                 </div>
 
-                <!-- Suggested Prompts -->
-                <div id="chat-suggestions" class="px-4 pt-3 pb-1 bg-surface-card border-t border-border-subtle flex gap-2 flex-wrap">
-                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="Summarize key risks and red flags">
-                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">warning</span> Key Risks
-                    </button>
-                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="Analyze revenue trends and growth trajectory">
-                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">trending_up</span> Revenue Trends
-                    </button>
-                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="What are the EBITDA margins and how do they compare to industry benchmarks?">
-                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">analytics</span> Margins
-                    </button>
-                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="Write a brief investment thesis for this deal">
-                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">lightbulb</span> Investment Thesis
-                    </button>
-                    <button class="chat-suggestion-chip px-3 py-1.5 text-[11px] font-medium rounded-full border border-primary/20 text-primary bg-primary/5 hover:bg-primary/10 transition-colors whitespace-nowrap" data-prompt="What due diligence questions should we ask the management team?">
-                        <span class="material-symbols-outlined text-xs align-middle mr-0.5">checklist</span> DD Questions
-                    </button>
-                </div>
+                <!-- Suggested Prompts (populated dynamically by deal-chat.js) -->
+                <div id="chat-suggestions" class="px-4 pt-3 pb-2 bg-surface-card border-t border-border-subtle flex gap-2 flex-wrap"></div>
 
                 <!-- Chat Input -->
                 <div class="p-4 bg-surface-card border-t-0 relative z-30">
