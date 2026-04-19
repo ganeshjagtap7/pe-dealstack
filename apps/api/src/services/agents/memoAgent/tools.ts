@@ -367,20 +367,51 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
   // ── 10. add_section ──────────────────────────────────────────────────────
 
   const addSectionTool = tool(
-    async ({ sectionType, title }) => {
-      return JSON.stringify({
-        action: 'confirm',
-        sectionType,
-        title,
-        type: 'new_section',
-      });
+    async ({ sectionType, title, content }) => {
+      try {
+        // Get max sortOrder
+        const { data: existingSections } = await supabase
+          .from('MemoSection')
+          .select('sortOrder')
+          .eq('memoId', memoId)
+          .order('sortOrder', { ascending: false })
+          .limit(1);
+
+        const maxSortOrder = existingSections?.[0]?.sortOrder ?? -1;
+
+        const { data: section, error } = await supabase
+          .from('MemoSection')
+          .insert({
+            memoId,
+            type: sectionType,
+            title,
+            content: content || '',
+            aiGenerated: true,
+            sortOrder: maxSortOrder + 1,
+          })
+          .select('id, title')
+          .single();
+
+        if (error) throw error;
+
+        return JSON.stringify({
+          action: 'applied',
+          sectionId: section.id,
+          title: section.title,
+          type: 'new_section',
+        });
+      } catch (error) {
+        log.error('addSection tool error', error);
+        return JSON.stringify({ success: false, error: 'Failed to create section' });
+      }
     },
     {
       name: 'add_section',
-      description: 'Propose adding a new section to the memo. Returns a confirmation request before the section is created. Use when the user asks to add a section that does not yet exist (e.g., "Add a Market Dynamics section").',
+      description: `Add a new section to the memo with AI-generated content. You MUST provide the full HTML content for the section — do NOT leave it empty. Use <h3> sub-headings, <p> paragraphs, <ul>/<li> lists, and <strong> for key metrics. The content should be professional PE memo quality.`,
       schema: z.object({
-        sectionType: z.string().describe('Section type key (e.g., EXECUTIVE_SUMMARY, FINANCIAL_PERFORMANCE, RISK_ASSESSMENT, MARKET_DYNAMICS, EXIT_ANALYSIS, etc.)'),
-        title: z.string().describe('Display title for the new section (e.g., "Market Dynamics")'),
+        sectionType: z.string().describe('Section type key (e.g., EXECUTIVE_SUMMARY, FINANCIAL_PERFORMANCE, RISK_ASSESSMENT, MARKET_DYNAMICS, EXIT_ANALYSIS, COMPETITIVE_LANDSCAPE, VALUE_CREATION_PLAN, CUSTOM)'),
+        title: z.string().describe('Display title for the new section (e.g., "Exit Strategy", "Strategic Initiatives")'),
+        content: z.string().describe('Full HTML content for the section. Must include <h3> sub-headings and <p> paragraphs. Write 3-5 detailed sub-sections with real analysis based on deal data.'),
       }),
     }
   );

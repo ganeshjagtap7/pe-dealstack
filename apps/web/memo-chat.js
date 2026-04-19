@@ -457,7 +457,7 @@ function renderConfirmMessage(response) {
 async function applyConfirmedAction(sectionId, response) {
     if (!state.memo?.id) return;
 
-    // Handle new section creation (add_section tool returns no sectionId)
+    // Handle new section creation (fallback — add_section now auto-applies)
     if (response.type === 'new_section' || !sectionId) {
         const sectionType = response.sectionType || 'CUSTOM';
         const title = response.title || 'New Section';
@@ -468,33 +468,13 @@ async function applyConfirmedAction(sectionId, response) {
                 body: JSON.stringify({
                     type: sectionType,
                     title: title,
-                    content: '<p><em>Generating content...</em></p>',
+                    content: response.preview || '<p>Click the refresh icon to generate AI content for this section.</p>',
                     aiGenerated: true,
                 }),
             });
             if (createResp.ok) {
-                const savedSection = await createResp.json();
                 await refreshSection(null);
-                showUndoToast('Section added — generating content...');
-
-                // Auto-generate AI content in background (don't block UI)
-                if (savedSection.id && typeof regenerateSectionAPI === 'function') {
-                    regenerateSectionAPI(savedSection.id).then(async (generated) => {
-                        if (generated) {
-                            await refreshSection(savedSection.id);
-                            showUndoToast(`${title} content generated`);
-                        } else {
-                            // Generation failed — update section with fallback message
-                            await applySectionActionAPI(state.memo.id, savedSection.id, {
-                                content: `<p><em>AI content generation failed. Click the refresh icon (<span class="material-symbols-outlined text-[14px] align-middle">refresh</span>) to try again, or type your content directly.</em></p>`,
-                                insertPosition: 'replace',
-                            });
-                            await refreshSection(savedSection.id);
-                        }
-                    }).catch(async () => {
-                        await refreshSection(savedSection.id);
-                    });
-                }
+                showUndoToast('Section added');
             }
         } catch (error) {
             console.error('[Memo] Failed to create new section:', error);
