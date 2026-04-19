@@ -9,7 +9,7 @@
  * so the rest of the pipeline is unchanged.
  */
 
-import { openai, isAIEnabled } from '../openai.js';
+import { openaiDirect } from '../openai.js';
 import { log } from '../utils/logger.js';
 import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, StatementType, PeriodType, UnitScale } from './financialClassifier.js';
 
@@ -87,8 +87,8 @@ export async function classifyFinancialsVision(
   pdfBuffer: Buffer,
   filename: string = 'document.pdf',
 ): Promise<ClassificationResult | null> {
-  if (!isAIEnabled() || !openai) {
-    log.warn('Vision extractor: OpenAI not configured, skipping');
+  if (!openaiDirect) {
+    log.warn('Vision extractor: direct OpenAI key not configured (Responses API requires it, OpenRouter does not proxy /v1/responses), skipping');
     return null;
   }
 
@@ -107,8 +107,9 @@ export async function classifyFinancialsVision(
     const base64 = pdfBuffer.toString('base64');
     const fileDataUrl = `data:application/pdf;base64,${base64}`;
 
-    // Use the Responses API which natively supports PDF file inputs
-    const response = await (openai as any).responses.create({
+    // Use the Responses API which natively supports PDF file inputs.
+    // Must hit OpenAI directly — OpenRouter does not proxy /v1/responses.
+    const response = await (openaiDirect as any).responses.create({
       model: 'gpt-4o',
       instructions: VISION_SYSTEM_PROMPT,
       input: [

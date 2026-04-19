@@ -6,6 +6,8 @@ import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages
 import { getChatModel, isLLMAvailable } from '../../llm.js';
 import { getMemoAgentTools } from './tools.js';
 import { MEMO_CHAT_SYSTEM_PROMPT } from './prompts.js';
+import { MODEL_REASONING } from '../../../utils/aiModels.js';
+import { SHARED_GUARDRAILS } from '../guardrails.js';
 import { log } from '../../../utils/logger.js';
 import { classifyAIError } from '../../../utils/aiErrors.js';
 
@@ -68,7 +70,7 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
     // ── Build messages ───────────────────────────────────────────────────────
 
     const messages: (SystemMessage | HumanMessage | AIMessage)[] = [
-      new SystemMessage(MEMO_CHAT_SYSTEM_PROMPT),
+      new SystemMessage(MEMO_CHAT_SYSTEM_PROMPT + '\n' + SHARED_GUARDRAILS),
     ];
 
     if (input.activeSectionId) {
@@ -161,7 +163,7 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
 
     return {
       message,
-      model: 'gpt-4o (ReAct agent)',
+      model: `${MODEL_REASONING} (ReAct agent)`,
       ...(action !== undefined && { action }),
       ...(sectionId !== undefined && { sectionId }),
       ...(preview !== undefined && { preview }),

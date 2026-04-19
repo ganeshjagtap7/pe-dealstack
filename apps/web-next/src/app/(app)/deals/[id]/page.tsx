@@ -4,89 +4,26 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatRelativeTime, formatFileSize, getDocIcon } from "@/lib/formatters";
 import { STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { useUser } from "@/providers/UserProvider";
 import Link from "next/link";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-interface DealDetail {
-  id: string;
-  name: string;
-  companyName?: string;
-  stage: string;
-  industry?: string;
-  dealSize?: number;
-  revenue?: number;
-  ebitda?: number;
-  targetReturn?: number;
-  evMultiple?: number;
-  priority?: string;
-  status?: string;
-  aiThesis?: string;
-  aiRisks?: { keyRisks?: string[]; investmentHighlights?: string[] };
-  description?: string;
-  assignee?: string;
-  createdAt: string;
-  updatedAt: string;
-  documents?: DocItem[];
-  team?: TeamMember[];
-}
-
-interface DocItem {
-  id: string;
-  name: string;
-  type?: string;
-  fileSize?: number;
-  createdAt: string;
-  url?: string;
-}
-
-interface TeamMember {
-  id: string;
-  name: string;
-  email?: string;
-  avatar?: string;
-  role?: string;
-}
-
-interface ChatMessage {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  createdAt?: string;
-}
-
-interface Activity {
-  id: string;
-  action: string;
-  description?: string;
-  userName?: string;
-  createdAt: string;
-  metadata?: Record<string, unknown>;
-}
-
-// ---------------------------------------------------------------------------
-// Stage pipeline config (matches the constants used in the old app)
-// ---------------------------------------------------------------------------
-
-const PIPELINE_STAGES = [
-  { key: "SOURCING", label: "Sourcing", icon: "search" },
-  { key: "SCREENING", label: "Screening", icon: "filter_alt" },
-  { key: "DILIGENCE", label: "Due Diligence", icon: "fact_check" },
-  { key: "IC_REVIEW", label: "IC Review", icon: "groups" },
-  { key: "CLOSING", label: "Closing", icon: "gavel" },
-  { key: "CLOSED", label: "Closed", icon: "check_circle" },
-];
-
-const TERMINAL_STAGES = ["CLOSED", "PASSED"];
-
-const TABS = ["Overview", "Documents", "Chat", "Activity"] as const;
-type Tab = (typeof TABS)[number];
+import {
+  type DealDetail,
+  type DocItem,
+  type ChatMessage,
+  type Activity,
+  type Tab,
+  PIPELINE_STAGES,
+  TERMINAL_STAGES,
+  TABS,
+  OverviewTab,
+  DocumentsTab,
+  ChatTab,
+  ActivityTab,
+  StageChangeModal,
+} from "./components";
 
 // ---------------------------------------------------------------------------
 // Page component
@@ -191,17 +128,20 @@ export default function DealDetailPage() {
     setStageNote("");
   };
 
+  const [stageError, setStageError] = useState("");
+
   const confirmStageChange = async () => {
     if (!stageModal || !deal) return;
     setStageChanging(true);
+    setStageError("");
     try {
       const updated = await api.patch<DealDetail>(`/deals/${dealId}`, {
         stage: stageModal.to,
       });
       setDeal(updated);
       setStageModal(null);
-    } catch {
-      // keep modal open
+    } catch (err) {
+      setStageError(err instanceof Error ? err.message : "Failed to update deal stage");
     } finally {
       setStageChanging(false);
     }
@@ -270,13 +210,17 @@ export default function DealDetailPage() {
       if (assistantMsg?.content) {
         setMessages((prev) => [...prev, { ...assistantMsg, role: "assistant" }]);
       }
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Something went wrong";
+      const isServerError = msg.includes("API error 5") || msg.includes("API error 429");
       setMessages((prev) => [
         ...prev,
         {
           id: `err-${Date.now()}`,
           role: "assistant",
-          content: "Sorry, something went wrong. Please try again.",
+          content: isServerError
+            ? "The server is temporarily unavailable. Please try again in a moment."
+            : `Sorry, I couldn't process your request. ${msg}`,
         },
       ]);
     } finally {
@@ -512,553 +456,11 @@ export default function DealDetailPage() {
           note={stageNote}
           setNote={setStageNote}
           loading={stageChanging}
+          error={stageError}
           onConfirm={confirmStageChange}
-          onClose={() => setStageModal(null)}
+          onClose={() => { setStageModal(null); setStageError(""); }}
         />
       )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Overview Tab
-// ---------------------------------------------------------------------------
-
-function OverviewTab({ deal }: { deal: DealDetail }) {
-  const metrics = [
-    { label: "Deal Size", value: formatCurrency(deal.dealSize), icon: "payments" },
-    { label: "Revenue", value: formatCurrency(deal.revenue), icon: "trending_up" },
-    { label: "EBITDA", value: formatCurrency(deal.ebitda), icon: "analytics" },
-    {
-      label: "Target Return",
-      value: deal.targetReturn != null ? `${deal.targetReturn}%` : "N/A",
-      icon: "target",
-    },
-    {
-      label: "EV Multiple",
-      value: deal.evMultiple != null ? `${deal.evMultiple}x` : "N/A",
-      icon: "calculate",
-    },
-  ];
-
-  const risks = deal.aiRisks?.keyRisks || [];
-  const highlights = deal.aiRisks?.investmentHighlights || [];
-
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left column: metrics + thesis */}
-      <div className="lg:col-span-2 flex flex-col gap-6">
-        {/* Metric cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {metrics.map((m) => (
-            <div
-              key={m.label}
-              className="bg-surface-card border border-border-subtle rounded-lg p-3 shadow-card"
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="material-symbols-outlined text-[16px] text-text-muted">
-                  {m.icon}
-                </span>
-                <span className="text-[10px] text-text-muted uppercase tracking-wider">
-                  {m.label}
-                </span>
-              </div>
-              <p className="text-lg font-bold text-text-main">{m.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* AI Thesis */}
-        <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[20px] text-primary">auto_awesome</span>
-            <h3 className="text-sm font-semibold text-text-main">AI Investment Thesis</h3>
-          </div>
-          {deal.aiThesis ? (
-            <p className="text-sm text-text-secondary leading-relaxed">{deal.aiThesis}</p>
-          ) : (
-            <p className="text-sm text-text-muted italic">
-              No AI thesis generated yet. Upload documents and use the chat to analyze this deal.
-            </p>
-          )}
-        </div>
-
-        {/* Description */}
-        {deal.description && (
-          <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-            <h3 className="text-sm font-semibold text-text-main mb-3">Description</h3>
-            <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-              {deal.description}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Right column: risks + highlights */}
-      <div className="flex flex-col gap-6">
-        <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[20px] text-red-400">shield</span>
-            <h3 className="text-sm font-semibold text-text-main">Key Risks</h3>
-          </div>
-          {risks.length === 0 && highlights.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-text-muted">
-              <span className="material-symbols-outlined text-2xl mb-2">shield</span>
-              <p className="text-sm">No risks identified yet</p>
-              <p className="text-xs mt-1">Upload documents or use AI chat to analyze risks</p>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {risks.map((risk, i) => (
-                <li
-                  key={i}
-                  className={cn(
-                    "bg-white border border-border-subtle p-3 rounded-lg",
-                    i === 0 ? "border-l-2 border-l-red-400" : "border-l-2 border-l-orange-300"
-                  )}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className={cn(
-                        "material-symbols-outlined text-base mt-0.5 shrink-0",
-                        i === 0 ? "text-red-400" : "text-orange-400"
-                      )}
-                    >
-                      {i === 0 ? "error" : "warning"}
-                    </span>
-                    <p className="text-xs text-text-secondary leading-snug">{risk}</p>
-                  </div>
-                </li>
-              ))}
-              {highlights.map((h, i) => (
-                <li
-                  key={`h-${i}`}
-                  className="bg-white border border-border-subtle border-l-2 border-l-emerald-500 p-3 rounded-lg"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span className="material-symbols-outlined text-emerald-500 text-base mt-0.5 shrink-0">
-                      check_circle
-                    </span>
-                    <p className="text-xs text-text-secondary leading-snug">{h}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Deal info */}
-        <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-          <h3 className="text-sm font-semibold text-text-main mb-3">Deal Info</h3>
-          <dl className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-text-muted">Created</dt>
-              <dd className="text-text-main font-medium">{formatRelativeTime(deal.createdAt)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-text-muted">Updated</dt>
-              <dd className="text-text-main font-medium">{formatRelativeTime(deal.updatedAt)}</dd>
-            </div>
-            {deal.assignee && (
-              <div className="flex justify-between">
-                <dt className="text-text-muted">Assignee</dt>
-                <dd className="text-text-main font-medium">{deal.assignee}</dd>
-              </div>
-            )}
-            {deal.priority && (
-              <div className="flex justify-between">
-                <dt className="text-text-muted">Priority</dt>
-                <dd className="text-text-main font-medium capitalize">{deal.priority}</dd>
-              </div>
-            )}
-          </dl>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Documents Tab
-// ---------------------------------------------------------------------------
-
-function DocumentsTab({
-  documents,
-  uploading,
-  fileInputRef,
-  onUpload,
-}: {
-  documents: DocItem[];
-  uploading: boolean;
-  fileInputRef: React.RefObject<HTMLInputElement | null>;
-  onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-text-main">
-          Documents ({documents.length})
-        </h3>
-        <div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            multiple
-            className="hidden"
-            onChange={onUpload}
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-60"
-            style={{ backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              {uploading ? "progress_activity" : "upload_file"}
-            </span>
-            {uploading ? "Uploading..." : "Upload"}
-          </button>
-        </div>
-      </div>
-
-      {documents.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-border-subtle rounded-lg">
-          <span className="material-symbols-outlined text-4xl text-text-muted">folder_open</span>
-          <p className="mt-2 text-sm text-text-muted">No documents yet</p>
-          <p className="text-xs text-text-muted mt-1">Upload files to get started</p>
-        </div>
-      ) : (
-        <div className="bg-surface-card border border-border-subtle rounded-xl shadow-card divide-y divide-border-subtle">
-          {documents.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[22px] text-text-muted">
-                {getDocIcon(doc.name)}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-main truncate">{doc.name}</p>
-                <p className="text-xs text-text-muted">
-                  {formatFileSize(doc.fileSize)}{" "}
-                  {doc.createdAt && <>· {formatRelativeTime(doc.createdAt)}</>}
-                </p>
-              </div>
-              {doc.url && (
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 text-text-muted hover:text-primary transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[20px]">download</span>
-                </a>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Chat Tab
-// ---------------------------------------------------------------------------
-
-function ChatTab({
-  messages,
-  chatInput,
-  setChatInput,
-  chatSending,
-  onSend,
-  chatEndRef,
-}: {
-  messages: ChatMessage[];
-  chatInput: string;
-  setChatInput: (v: string) => void;
-  chatSending: boolean;
-  onSend: () => void;
-  chatEndRef: React.RefObject<HTMLDivElement | null>;
-}) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      onSend();
-    }
-  };
-
-  return (
-    <div className="flex flex-col bg-surface-card border border-border-subtle rounded-xl shadow-card overflow-hidden" style={{ height: "500px" }}>
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
-        {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-text-muted">
-            <span className="material-symbols-outlined text-4xl mb-2">auto_awesome</span>
-            <p className="text-sm font-medium">AI Deal Assistant</p>
-            <p className="text-xs mt-1">Ask questions about this deal, request analysis, or get insights.</p>
-          </div>
-        )}
-        {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "flex gap-3 max-w-[85%]",
-              msg.role === "user" ? "ml-auto flex-row-reverse" : ""
-            )}
-          >
-            <div
-              className={cn(
-                "size-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold",
-                msg.role === "user"
-                  ? "bg-primary text-white"
-                  : "bg-purple-100 text-purple-700"
-              )}
-            >
-              {msg.role === "user" ? "U" : "AI"}
-            </div>
-            <div
-              className={cn(
-                "rounded-lg px-3.5 py-2.5 text-sm leading-relaxed",
-                msg.role === "user"
-                  ? "bg-primary text-white"
-                  : "bg-gray-50 border border-border-subtle text-text-main"
-              )}
-            >
-              {msg.content}
-            </div>
-          </div>
-        ))}
-        {chatSending && (
-          <div className="flex gap-3">
-            <div className="size-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 text-xs font-semibold text-purple-700">
-              AI
-            </div>
-            <div className="bg-gray-50 border border-border-subtle rounded-lg px-3.5 py-2.5">
-              <span className="material-symbols-outlined text-sm animate-spin text-text-muted">
-                progress_activity
-              </span>
-            </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="border-t border-border-subtle p-3">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            className="flex-1 rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted resize-none focus:ring-1 focus:ring-primary focus:border-primary transition-all"
-            placeholder="Ask about this deal..."
-            rows={1}
-          />
-          <button
-            onClick={onSend}
-            disabled={!chatInput.trim() || chatSending}
-            className="p-2 rounded-lg text-white disabled:opacity-40 transition-colors"
-            style={{ backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[20px]">send</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Activity Tab
-// ---------------------------------------------------------------------------
-
-function ActivityTab({
-  activities,
-  loading,
-}: {
-  activities: Activity[];
-  loading: boolean;
-}) {
-  if (loading) {
-    return (
-      <div className="text-center py-16 text-text-muted">
-        <span className="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
-        <p className="mt-2 text-sm">Loading activity...</p>
-      </div>
-    );
-  }
-
-  if (activities.length === 0) {
-    return (
-      <div className="text-center py-16 border border-dashed border-border-subtle rounded-lg">
-        <span className="material-symbols-outlined text-4xl text-text-muted">history</span>
-        <p className="mt-2 text-sm text-text-muted">No activity recorded yet</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-surface-card border border-border-subtle rounded-xl shadow-card p-5">
-      <div className="relative">
-        <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-border-subtle" />
-        <div className="space-y-6">
-          {activities.map((activity) => (
-            <div key={activity.id} className="flex gap-4 relative">
-              <div className="size-6 rounded-full bg-blue-100 border-2 border-white z-10 shrink-0 flex items-center justify-center shadow-sm">
-                <span className="material-symbols-outlined text-[12px] text-primary">circle</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-text-main">
-                  {activity.userName && (
-                    <span className="font-semibold">{activity.userName} </span>
-                  )}
-                  {activity.description || activity.action}
-                </p>
-                <p className="text-xs text-text-muted mt-0.5">
-                  {formatRelativeTime(activity.createdAt)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Stage Change Modal
-// ---------------------------------------------------------------------------
-
-function StageChangeModal({
-  from,
-  to,
-  note,
-  setNote,
-  loading,
-  onConfirm,
-  onClose,
-}: {
-  from: string;
-  to: string;
-  note: string;
-  setNote: (v: string) => void;
-  loading: boolean;
-  onConfirm: () => void;
-  onClose: () => void;
-}) {
-  const fromLabel = STAGE_LABELS[from] || from;
-  const toLabel = STAGE_LABELS[to] || to;
-  const fromIdx = PIPELINE_STAGES.findIndex((s) => s.key === from);
-  const toIdx = PIPELINE_STAGES.findIndex((s) => s.key === to);
-  const isMovingBack = toIdx < fromIdx;
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-        <div className="p-5 border-b border-border-subtle">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-text-main text-lg flex items-center gap-2">
-              <span className="material-symbols-outlined text-primary">swap_horiz</span>
-              Change Deal Stage
-            </h3>
-            <button onClick={onClose} className="text-text-muted hover:text-text-main transition-colors">
-              <span className="material-symbols-outlined">close</span>
-            </button>
-          </div>
-        </div>
-        <div className="p-5">
-          <div className="flex items-center justify-center gap-4 mb-5">
-            <div className="text-center">
-              <div className="size-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-2">
-                <span className="material-symbols-outlined text-gray-500">circle</span>
-              </div>
-              <span className="text-sm font-medium text-text-secondary">{fromLabel}</span>
-            </div>
-            <span
-              className={cn(
-                "material-symbols-outlined text-2xl",
-                isMovingBack ? "text-amber-500" : "text-primary"
-              )}
-            >
-              {isMovingBack ? "arrow_back" : "arrow_forward"}
-            </span>
-            <div className="text-center">
-              <div
-                className={cn(
-                  "size-12 rounded-full flex items-center justify-center mx-auto mb-2",
-                  isMovingBack ? "bg-amber-100" : "bg-blue-50"
-                )}
-              >
-                <span
-                  className={cn(
-                    "material-symbols-outlined",
-                    isMovingBack ? "text-amber-600" : "text-primary"
-                  )}
-                >
-                  circle
-                </span>
-              </div>
-              <span
-                className={cn(
-                  "text-sm font-bold",
-                  isMovingBack ? "text-amber-600" : "text-primary"
-                )}
-              >
-                {toLabel}
-              </span>
-            </div>
-          </div>
-
-          {isMovingBack && (
-            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-              <div className="flex items-start gap-2">
-                <span className="material-symbols-outlined text-amber-500 text-sm mt-0.5">
-                  warning
-                </span>
-                <p className="text-sm text-amber-700">
-                  You are moving this deal backwards in the pipeline. This will be logged in the
-                  activity feed.
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-4">
-            <label className="block text-sm font-medium text-text-main mb-2">
-              Add a note (optional)
-            </label>
-            <textarea
-              value={note}
-              onChange={(e) => setNote(e.target.value)}
-              className="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-1 focus:ring-primary focus:border-primary resize-none"
-              rows={2}
-              placeholder="Reason for stage change..."
-            />
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-border-subtle rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={onConfirm}
-              disabled={loading}
-              className="flex-1 px-4 py-2.5 text-white rounded-lg font-medium text-sm disabled:opacity-60 transition-colors"
-              style={{ backgroundColor: "#003366" }}
-            >
-              {loading ? "Updating..." : "Confirm Change"}
-            </button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

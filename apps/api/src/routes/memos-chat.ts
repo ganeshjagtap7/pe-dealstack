@@ -7,6 +7,7 @@ import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { runMemoChatAgent } from '../services/agents/memoAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
+import { MODEL_REASONING } from '../utils/aiModels.js';
 import { classifyAIError } from '../utils/aiErrors.js';
 
 const router = Router();
@@ -135,7 +136,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 
     // Call OpenAI
     const response = await openai!.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_REASONING,
       messages: [
         { role: 'system', content: MEMO_ANALYST_PROMPT },
         { role: 'system', content: `Context:\n${context}` },
@@ -153,7 +154,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
       .update({
         content: generatedContent,
         aiGenerated: true,
-        aiModel: 'gpt-4o',
+        aiModel: MODEL_REASONING,
         aiPrompt: sectionPrompt,
         updatedAt: new Date().toISOString(),
       })

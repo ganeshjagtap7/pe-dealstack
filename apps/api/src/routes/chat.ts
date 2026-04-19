@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_REASONING } from '../utils/aiModels.js';
+import { SHARED_GUARDRAILS } from '../services/agents/guardrails.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess, verifyConversationAccess } from '../middleware/orgScope.js';
 
@@ -318,7 +320,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
 
         // Build message history
         const messages: any[] = [
-          { role: 'system', content: DEAL_ANALYST_PROMPT + contextMessage }
+          { role: 'system', content: DEAL_ANALYST_PROMPT + '\n' + SHARED_GUARDRAILS + contextMessage }
         ];
 
         // Add previous messages (last 10 for context)
@@ -331,7 +333,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
         messages.push({ role: 'user', content });
 
         const completion = await openai.chat.completions.create({
-          model: 'gpt-4o',
+          model: MODEL_REASONING,
           messages,
           max_tokens: 1000,
           temperature: 0.7,
@@ -354,7 +356,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
         conversationId: id,
         role: 'assistant',
         content: aiResponseContent,
-        metadata: { model: isAIEnabled() ? 'gpt-4o' : 'fallback' }
+        metadata: { model: isAIEnabled() ? MODEL_REASONING : 'fallback' }
       })
       .select()
       .single();

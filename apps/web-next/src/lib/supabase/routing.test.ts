@@ -39,11 +39,12 @@ describe("isAppRouteRequiringAuth", () => {
   });
 
   it("doesn't get tricked by auth-prefix lookalikes", () => {
-    // A deal page named 'login-acquisition' or similar shouldn't bypass auth just
-    // because the string starts with 'login' — but the current heuristic uses
-    // startsWith, so '/login-acquisition' *would* bypass. This test documents
-    // that limitation so a regression is caught if the behavior ever changes.
-    expect(isAppRouteRequiringAuth("/logindata")).toBe(false);
+    // Paths that start with an auth prefix but aren't actual auth routes
+    // should still require auth (e.g. a deal named 'login-acquisition').
+    expect(isAppRouteRequiringAuth("/logindata")).toBe(true);
+    expect(isAppRouteRequiringAuth("/login-acquisition")).toBe(true);
+    expect(isAppRouteRequiringAuth("/signups")).toBe(true);
+    expect(isAppRouteRequiringAuth("/apikeys")).toBe(true);
   });
 });
 
@@ -59,9 +60,14 @@ describe("isAuthOnlyPage", () => {
     expect(isAuthOnlyPage("/verify-email")).toBe(false);
   });
 
-  it("doesn't match sub-paths", () => {
-    expect(isAuthOnlyPage("/login/foo")).toBe(false);
-    expect(isAuthOnlyPage("/signup/step-2")).toBe(false);
+  it("matches sub-paths of auth-only pages", () => {
+    expect(isAuthOnlyPage("/login/foo")).toBe(true);
+    expect(isAuthOnlyPage("/signup/step-2")).toBe(true);
+  });
+
+  it("doesn't match lookalikes", () => {
+    expect(isAuthOnlyPage("/logindata")).toBe(false);
+    expect(isAuthOnlyPage("/signups")).toBe(false);
   });
 
   it("doesn't match app routes", () => {

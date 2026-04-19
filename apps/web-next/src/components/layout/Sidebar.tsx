@@ -62,6 +62,7 @@ export function Sidebar() {
   });
 
   const getActiveId = () => {
+    if (pathname === "/settings" || pathname.startsWith("/settings/")) return "settings";
     for (const item of NAV_ITEMS) {
       if (item.divider) continue;
       if (pathname === item.href || pathname.startsWith(item.href + "/")) return item.id;
@@ -134,7 +135,12 @@ export function Sidebar() {
           )}
           <Link
             href="/settings"
-            className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm text-text-secondary hover:bg-primary-light hover:text-primary"
+            className={cn(
+              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm",
+              activeId === "settings"
+                ? "bg-primary text-white shadow-sm"
+                : "text-text-secondary hover:bg-primary-light hover:text-primary"
+            )}
           >
             <span className="material-symbols-outlined text-[20px]">settings</span>
             <span className="font-medium">Settings</span>

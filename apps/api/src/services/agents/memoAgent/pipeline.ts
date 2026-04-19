@@ -10,6 +10,7 @@ import {
   COMPREHENSIVE_IC_SECTIONS,
 } from './prompts.js';
 import { getChatModel, isLLMAvailable } from '../../llm.js';
+import { MODEL_REASONING } from '../../../utils/aiModels.js';
 import { log } from '../../../utils/logger.js';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ export async function generateSection(
       ...(tableData !== undefined ? { tableData } : {}),
       ...(chartConfig !== undefined ? { chartConfig } : {}),
       aiGenerated: true,
-      aiModel: 'gpt-4o',
+      aiModel: MODEL_REASONING,
       ...(sortOrder !== undefined ? { sortOrder } : {}),
     };
   } catch (err: any) {

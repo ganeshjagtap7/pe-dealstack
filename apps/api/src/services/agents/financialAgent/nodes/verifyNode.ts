@@ -16,6 +16,7 @@
  */
 
 import { openai, isAIEnabled } from '../../../../openai.js';
+import { MODEL_FAST } from '../../../../utils/aiModels.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep } from '../state.js';
@@ -115,7 +116,7 @@ export async function verifyNode(
     const sourceTextSample = rawText.slice(0, 15000);
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o-mini', // cheap + fast for verification
+      model: MODEL_FAST, // cheap + fast for verification
       messages: [
         { role: 'system', content: VERIFY_SYSTEM_PROMPT },
         {

@@ -19,8 +19,6 @@ function escapeHtml(text: string): string {
 
 export function renderMarkdown(text: string): string {
   if (!text) return "";
-  const trimmed = text.trim();
-  if (trimmed.startsWith("<")) return text; // Already HTML — pass through.
 
   const escaped = escapeHtml(text);
 

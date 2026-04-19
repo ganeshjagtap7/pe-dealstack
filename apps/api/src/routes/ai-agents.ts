@@ -98,7 +98,8 @@ router.post('/ai/meeting-prep', async (req, res) => {
     res.json(brief);
   } catch (error: any) {
     log.error('Meeting prep error', error);
-    res.status(500).json({ error: classifyAIError(error.message || 'Failed to generate meeting prep') });
+    const msg = error instanceof Error ? error.message : String(error || 'Failed to generate meeting prep');
+    res.status(500).json({ error: classifyAIError(msg) });
   }
 });
 
@@ -169,7 +170,8 @@ router.post('/ai/draft-email', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Email draft error', error);
-    res.status(500).json({ error: classifyAIError(error.message || 'Failed to draft email') });
+    const msg = error instanceof Error ? error.message : String(error || 'Failed to draft email');
+    res.status(500).json({ error: classifyAIError(msg) });
   }
 });
 

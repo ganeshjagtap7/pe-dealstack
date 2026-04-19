@@ -7,6 +7,8 @@ import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { SystemMessage, HumanMessage, AIMessage } from '@langchain/core/messages';
 import { getChatModel, isLLMAvailable } from '../../llm.js';
 import { getDealChatTools } from './tools.js';
+import { MODEL_REASONING } from '../../../utils/aiModels.js';
+import { SHARED_GUARDRAILS } from '../guardrails.js';
 import { log } from '../../../utils/logger.js';
 import { classifyAIError } from '../../../utils/aiErrors.js';
 
@@ -73,7 +75,7 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
 
     // Build message history
     const messages: (SystemMessage | HumanMessage | AIMessage)[] = [
-      new SystemMessage(DEAL_AGENT_SYSTEM_PROMPT),
+      new SystemMessage(DEAL_AGENT_SYSTEM_PROMPT + '\n' + SHARED_GUARDRAILS),
       new SystemMessage(`Current Deal Context:\n${input.dealContext}\n\nDeal ID: ${input.dealId}\nOrganization ID: ${input.orgId}`),
     ];
 
@@ -140,7 +142,7 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
 
     return {
       response,
-      model: 'gpt-4o (ReAct agent)',
+      model: `${MODEL_REASONING} (ReAct agent)`,
       ...(updates.length > 0 && { updates }),
       ...(action && { action }),
     };

@@ -1,4 +1,5 @@
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -139,7 +140,7 @@ export async function classifyFinancials(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_CLASSIFICATION,
       messages: [
         { role: 'system', content: CLASSIFICATION_SYSTEM_PROMPT },
         {

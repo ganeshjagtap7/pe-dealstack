@@ -1,4 +1,5 @@
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_REASONING } from '../utils/aiModels.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import type { ExtractedDealData } from './aiExtractor.js';
@@ -198,7 +199,7 @@ Respond in JSON format:
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: MODEL_REASONING,
         messages: [
           { role: 'system', content: synthesisPrompt },
           { role: 'user', content: combinedText.slice(0, 30000) },

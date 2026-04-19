@@ -6,6 +6,12 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { log } from '../utils/logger.js';
+import {
+  AI_MODELS,
+  OPENROUTER_BASE_URL,
+  OPENROUTER_HEADERS,
+  isOpenRouterEnabled,
+} from '../utils/aiModels.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -32,11 +38,16 @@ const config: LLMConfig = {
 
 // ─── Model Registry ────────────────────────────────────────────────
 
+// When OpenRouter is enabled, model strings are OpenRouter IDs
+// (e.g. "anthropic/claude-sonnet-4.5") routed through the OpenAI-compatible
+// ChatOpenAI client below. Otherwise we fall back to bare OpenAI model names.
+const useOpenRouter = isOpenRouterEnabled();
+
 const MODELS = {
   openai: {
-    chat: process.env.LLM_CHAT_MODEL || 'gpt-4o',
-    fast: process.env.LLM_FAST_MODEL || 'gpt-4o-mini',
-    extraction: 'gpt-4-turbo',
+    chat: process.env.LLM_CHAT_MODEL || (useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4o'),
+    fast: process.env.LLM_FAST_MODEL || (useOpenRouter ? AI_MODELS.TIER3 : 'gpt-4o-mini'),
+    extraction: useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4-turbo',
   },
   gemini: {
     chat: 'gemini-1.5-pro',
@@ -48,11 +59,28 @@ const MODELS = {
 // ─── Factory Functions ─────────────────────────────────────────────
 
 function createOpenAIModel(model: string, temperature = 0.7, maxTokens?: number): ChatOpenAI {
+  if (useOpenRouter) {
+    // Route through OpenRouter using ChatOpenAI's OpenAI-compatible client.
+    // @langchain/openai v1 uses `apiKey` (not `openAIApiKey`); we also pass it
+    // inside `configuration` so the underlying OpenAI SDK definitely picks it up
+    // instead of falling back to the OPENAI_API_KEY env var.
+    return new ChatOpenAI({
+      model,
+      temperature,
+      maxTokens,
+      apiKey: process.env.OPENROUTER_API_KEY,
+      configuration: {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: OPENROUTER_BASE_URL,
+        defaultHeaders: OPENROUTER_HEADERS,
+      },
+    });
+  }
   return new ChatOpenAI({
-    modelName: model,
+    model,
     temperature,
     maxTokens,
-    openAIApiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
   });
 }
 
@@ -117,7 +145,7 @@ export function getModel(
 // ─── Availability Checks ──────────────────────────────────────────
 
 export function isOpenAIAvailable(): boolean {
-  return !!process.env.OPENAI_API_KEY;
+  return !!process.env.OPENAI_API_KEY || !!process.env.OPENROUTER_API_KEY;
 }
 
 export function isGeminiAvailable(): boolean {
@@ -142,4 +170,5 @@ log.info('LLM abstraction initialized', {
   fastModel: MODELS[config.fastProvider].fast,
   openaiAvailable: isOpenAIAvailable(),
   geminiAvailable: isGeminiAvailable(),
+  routedThroughOpenRouter: useOpenRouter,
 });

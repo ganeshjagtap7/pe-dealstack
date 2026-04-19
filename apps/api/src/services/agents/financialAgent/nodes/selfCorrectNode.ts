@@ -13,6 +13,7 @@
  */
 
 import { openai, isAIEnabled } from '../../../../openai.js';
+import { MODEL_REASONING } from '../../../../utils/aiModels.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { log } from '../../../../utils/logger.js';
 import type { ClassifiedStatement, ClassificationResult } from '../../../financialClassifier.js';
@@ -165,7 +166,7 @@ export async function selfCorrectNode(
       const prompt = buildCorrectionPrompt(failedChecks, rawText);
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: MODEL_REASONING,
         messages: [
           { role: 'user', content: prompt },
         ],

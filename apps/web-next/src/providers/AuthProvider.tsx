@@ -24,8 +24,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [supabase] = useState(() => createClient());
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+    // Use getUser() for the initial check — getSession() reads from local
+    // storage and isn't guaranteed to be valid (Supabase docs). The
+    // onAuthStateChange listener still provides the session object for
+    // subsequent updates (it validates server-side on each event).
+    supabase.auth.getUser().then(({ data: { user }, error }) => {
+      if (error || !user) {
+        setSession(null);
+      }
+      // getUser() doesn't return the session, so bootstrap it once via
+      // getSession() only after we've confirmed the user is valid.
+      if (user) {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          setSession(session);
+        });
+      }
       setLoading(false);
     });
 

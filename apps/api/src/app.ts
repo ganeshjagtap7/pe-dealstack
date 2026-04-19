@@ -31,6 +31,7 @@ import { orgMiddleware } from './middleware/orgScope.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { isAIEnabled } from './openai.js';
+import { MODEL_REASONING } from './utils/aiModels.js';
 import { log } from './utils/logger.js';
 
 dotenv.config();
@@ -258,7 +259,7 @@ app.use('/api', authMiddleware, orgMiddleware, aiRouter);
 app.get('/api/ai/status', (_req, res) => {
   res.json({
     enabled: isAIEnabled(),
-    model: 'gpt-4o',
+    model: MODEL_REASONING,
   });
 });
 

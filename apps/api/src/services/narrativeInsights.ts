@@ -8,6 +8,7 @@
 
 import crypto from 'crypto';
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_INSIGHTS } from '../utils/aiModels.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import type { IndustryBenchmark, PortfolioSummary } from './agentMemory.js';
@@ -297,7 +298,7 @@ Return JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_INSIGHTS,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
