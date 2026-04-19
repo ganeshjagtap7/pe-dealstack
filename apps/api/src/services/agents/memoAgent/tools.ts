@@ -18,6 +18,19 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+/** Map AI agent section types to valid DB types (CHECK constraint) */
+const SECTION_TYPE_MAP: Record<string, string> = {
+  'EXIT_ANALYSIS': 'EXIT_STRATEGY',
+  'VALUE_CREATION_PLAN': 'VALUE_CREATION',
+  'QUALITY_OF_EARNINGS': 'FINANCIAL_PERFORMANCE',
+  'MANAGEMENT_ASSESSMENT': 'CUSTOM',
+  'OPERATIONAL_DEEP_DIVE': 'CUSTOM',
+};
+
+function normalizeDbSectionType(type: string): string {
+  return SECTION_TYPE_MAP[type] || type;
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /** Create all memo agent tools with memoId/dealId/orgId baked in via closures */
@@ -383,7 +396,7 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
           .from('MemoSection')
           .insert({
             memoId,
-            type: sectionType,
+            type: normalizeDbSectionType(sectionType),
             title,
             content: content || '',
             aiGenerated: true,

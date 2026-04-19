@@ -55,6 +55,11 @@ const SECTION_TYPE_MAP: Record<string, string> = {
   'appendix': 'APPENDIX',
   'unit economics': 'FINANCIAL_PERFORMANCE',
   'brand analysis': 'COMPANY_OVERVIEW',
+  'quality of earnings': 'FINANCIAL_PERFORMANCE',
+  'management assessment': 'CUSTOM',
+  'operational deep dive': 'CUSTOM',
+  'value creation plan': 'VALUE_CREATION',
+  'exit analysis': 'EXIT_STRATEGY',
   'strategic rationale': 'EXECUTIVE_SUMMARY',
   'situation overview': 'EXECUTIVE_SUMMARY',
   'turnaround plan': 'VALUE_CREATION',
@@ -487,8 +492,17 @@ router.post('/:id/generate-all', async (req, res) => {
       if (existing) {
         await supabase.from('MemoSection').update(updateData).eq('id', existing.id);
       } else {
+        // Normalize type to match DB CHECK constraint
+        const DB_TYPE_MAP: Record<string, string> = {
+          'EXIT_ANALYSIS': 'EXIT_STRATEGY',
+          'VALUE_CREATION_PLAN': 'VALUE_CREATION',
+          'QUALITY_OF_EARNINGS': 'FINANCIAL_PERFORMANCE',
+          'MANAGEMENT_ASSESSMENT': 'CUSTOM',
+          'OPERATIONAL_DEEP_DIVE': 'CUSTOM',
+        };
+        const normalizedType = DB_TYPE_MAP[gen.type] || gen.type;
         await supabase.from('MemoSection').insert({
-          memoId: id, type: gen.type, title: gen.title,
+          memoId: id, type: normalizedType, title: gen.title,
           sortOrder: (gen as any).sortOrder || completed + 1,
           status: 'DRAFT', ...updateData,
         });
