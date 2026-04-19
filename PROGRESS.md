@@ -5,6 +5,61 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 59 — April 19, 2026
+
+#### Timestamp: April 19, 2026 — IST
+
+#### Goal: Deal Page Bug Fixes — Document Preview, Excel Rendering, Header Image
+
+---
+
+#### 1. Fix: "Project Apex" Ghost Popup on Document Click
+
+**Problem:** Clicking any document in Recent Documents on the deal page showed a hardcoded "Project Apex Logistics — Q3 2023 Financial Summary" popup first, then the real document preview stacked on top. Users couldn't properly open or download files.
+
+**Root Cause:** Legacy `initDocumentPreviews()` function in `deal-documents.js` used a broad CSS selector (`.flex.items-center.gap-3.p-2`) that matched document cards. It called `showDocumentPreview()` — a function containing **hardcoded demo content** ("Project Apex Logistics - Confidential", fake financial metrics). This legacy handler fired alongside the correct modern `.doc-preview-item` click handlers. The `downloadDocument()` function was also fake — just showed a notification with no actual download.
+
+**Fix:** Removed `initDocumentPreviews()`, `showDocumentPreview()`, and `downloadDocument()` entirely from `deal-documents.js`. Removed the `initDocumentPreviews()` call from `deal.js`. The modern handlers in `updateDocumentsList()` (which call `fetchAndPreviewDocument()` / `fetchAndShowAnalysis()` via `PEDocPreview`) now work without interference.
+
+**Files Changed:**
+- `apps/web/deal-documents.js` — removed ~80 lines of legacy preview code
+- `apps/web/deal.js` — removed `initDocumentPreviews()` call
+
+---
+
+#### 2. Fix: Excel/Spreadsheet Preview Showing Single Column
+
+**Problem:** Excel file preview in the document modal only showed row labels (Line Item, Revenue, Cost of Revenue, etc.) in a single column with no numeric values. The table was missing all data columns.
+
+**Root Cause:** `buildTable()` in `docPreview.js` assumed `sheetData[0]` (first row) was the header row and used its `.length` to determine column count. In financial models, row 0 is typically just a company name like `"Luktara Inc."` — a single cell. So `headers.length === 1`, and only 1 column was rendered for all rows.
+
+**Fix:** Rewrote `buildTable()` with smart detection:
+- Scans ALL rows to find max column count (not just row 0)
+- Auto-detects header row (first row with data in 40%+ of columns)
+- Renders title rows (company name, subtitle) as text above the table
+- Number formatting with commas, negatives in red
+- Financial-aware styling: section headers get gray bg, total/subtotal rows get bold + blue tint + top border
+- Right-aligned numeric columns
+- Increased row limit from 100 to 200
+
+**Files Changed:**
+- `apps/web/js/docPreview.js` — rewrote `buildTable()` function
+
+---
+
+#### 3. Fix: Broken Image in Deal Page Header
+
+**Problem:** A broken image icon appeared in the deal page header next to the team avatars, between the deal name and "Data Room" button.
+
+**Root Cause:** `deal-team.js` rendered an `<img>` tag whenever `user.avatar` was truthy, but if the avatar value was an empty string or invalid URL (not starting with `http`), the browser showed a broken image icon.
+
+**Fix:** Added URL validation (`user.avatar.startsWith('http')`) so only valid URLs render as images. Added `onerror="this.style.display='none'"` fallback to hide the image if it still fails to load. Invalid avatars now fall through to the initials display.
+
+**Files Changed:**
+- `apps/web/deal-team.js` — avatar URL validation + onerror fallback
+
+---
+
 ### Session 57-58 — April 18-19, 2026
 
 #### Timestamp: April 18-19, 2026 — 5:00 PM to 12:30 AM IST
@@ -171,12 +226,114 @@ Updated 5 files across the codebase to use shared utility.
 
 ---
 
+#### 9. Code Review Polish (Session 58 continued)
+
+Ran full code review (reuse + quality + efficiency) and fixed 13 issues:
+
+**Code quality fixes:**
+- Removed direct LangGraph state mutations in searchFirm, searchPerson, verify nodes (return partial state only)
+- Deleted dead `firmEnrichment.ts` (replaced by agent, no imports remaining)
+- Fixed 172.x.x.x private IP range check — proper numeric range (16-31) instead of buggy string prefix matching
+- Removed dead variable (`existingPerson = null ? null : null`), unused constant (`NODE_TIMEOUT_MS` in synthesize), meaningless audit field (`duration: Date.now()`)
+- Added serverless lock limitation comment on `runningEnrichments` Set
+- Removed duplicate `_startDeepResearchPolling()` call
+
+**Efficiency fix:**
+- Phase 2 deep research queries now run in parallel batches of 3 via `Promise.all` (was sequential — cuts wall-clock time by ~60%)
+
+**Functional fixes:**
+- LinkedIn search queries improved: added `"name" "firm" linkedin` pattern (returns cached LinkedIn profile with education + experience), `"slug" bio OR about` (catches Twitter/X bios)
+- Demo deal sample buttons (Luktara/Pinecrest) now show visual confirmation — green checkmark + "Demo data will be loaded" replaces the dropzone
+
+**Next session:** Build full Luktara demo deal with hardcoded financials, documents, chat history, red flags, analysis.
+
+---
+
+#### 10. Apify Integration (Session 58 continued)
+
+**Problem:** DuckDuckGo rate-limits after ~30 searches from same IP. LinkedIn data was limited to search snippets (80 chars). Testing was blocked for hours.
+
+**Solution:** Integrated Apify as primary search + LinkedIn scraping provider. DDG kept as free fallback.
+
+**Changes:**
+- `npm install apify-client` — added to `apps/api/package.json`
+- `webSearch.ts` rewritten: Apify Google Search actor (primary) → DDG Lite (fallback) → DDG HTML (last resort)
+- `scrapeLinkedInProfile()` added — Apify LinkedIn Profile Scraper returns full profile (name, headline, experience, education, skills)
+- `searchPerson.ts` — LinkedIn scrape + search queries now run in parallel via `Promise.all` (was sequential, caused 60s timeout)
+- Agent timeout increased from 60s to 120s (Apify actors need startup time)
+- `APIFY_API_KEY` added to `.env`
+
+**Cost:** ~$0.03-0.05 per enrichment. Free $5/month covers ~100 enrichments.
+
+---
+
+#### 11. Profile Report Modal (Session 58 continued)
+
+**Problem:** Preview card showed minimal data (3-4 fields). Agent collects much more (experience, education, portfolio, deals) but user couldn't see it.
+
+**Solution:** Added "View full report" button that opens a detailed modal with all collected data:
+- Firm section: description, strategy, sectors, check size, AUM, team size, HQ, founded year, investment criteria, key differentiators
+- Portfolio companies with verified badges + sector + exit status
+- Recent deals with dates
+- Person section: title, role, bio, education, years in PE, expertise, experience, notable deals
+- Sources list at bottom
+
+---
+
+#### 12. UX Polish + Bug Fixes (Session 58 continued)
+
+**Fixes from live testing:**
+- Team invite dropdown aligned — fixed 110px width, consistent height, custom chevron arrow
+- Fund size options changed: `<$1M`, `$1-10M`, `$10-50M`, `$50-100M` (was $100M-$1B+ range, wrong for micro PE)
+- Custom sector input — "+ Other" dashed button → text input → "Add" creates new chip (Enter key supported)
+- Skip setup: replaced `window.confirm()` with custom modal (navy icon, "Continue setup" / "Skip to dashboard" buttons)
+- Skip redirect loop fixed: `markWelcomeShown()` + `markOnboardingSkipped()` now awaited before redirect + sessionStorage backup flag
+- Old welcome modal suppressed for users who went through new onboarding flow
+- Firm task completion now persists (`firm` → `createDeal` mapping — was missing, caused 2/3 restore on page reload)
+
+---
+
+#### 13. Auth/Org Fixes (Session 58 continued)
+
+**Problem:** New test accounts couldn't load any pages — all org-scoped routes returned 500.
+
+**Root cause chain:**
+1. Multiple test signups with same firm name → Organization slug collision (unique constraint `Organization_slug_key`)
+2. `findOrCreateUser` threw on slug conflict → User created without `organizationId`
+3. `orgMiddleware` found User with `organizationId: null` → silently continued
+4. All routes called `getOrgId(req)` → threw "Organization ID not available" → 500
+
+**Fixes applied:**
+- `userService.ts`: Slug now includes timestamp hash (`pocket-fund-k8x3f`) for uniqueness. On 23505 conflict, falls back to finding existing org by name.
+- `orgScope.ts`: If User exists but `organizationId` is null, auto-creates Organization (first checks for existing org by name, then creates with unique slug if needed).
+- `orgScope.ts`: Auto-links orphaned users to their org.
+
+---
+
 #### Summary
 
-- **31 files changed**, 8,036 insertions
-- **13 new files** (agent nodes, web search, URL helpers, onboarding pages)
+- **17 commits** pushed to origin on main
 - **0 TypeScript errors**
-- **Commit:** `3a796c8` — `feat(onboarding): new 3-step onboarding flow + firm research agent`
+- **All commits:**
+  - `f5e8d94` — code review polish (state mutations, dead code, parallel queries)
+  - `e92046e` — LinkedIn-only enrichment + DDG UA rotation
+  - `bab9083` — DDG search fallback (Lite → HTML → retry)
+  - `aa65c72` — better error message when search unavailable
+  - `b7462b8` — Apify integration (Google Search + LinkedIn scraping)
+  - `aec7d2f` — parallel LinkedIn scrape + search, timeout to 120s
+  - `9948dcf` — full profile report modal
+  - `64762c6` — team invite row alignment
+  - `1a2114c` — firm task completion persists (redirect loop fix)
+  - `1ae82dc` — skip setup waits for API before redirect
+  - `5fa58c6` — custom skip modal (replaces browser confirm)
+  - `c987ade` — sessionStorage backup for redirect loop
+  - `994b094` — skip old welcome modal for new onboarding users
+  - `c613195` — fund size ranges + custom sector input
+  - `18b203e` — auto-create Organization for users without one
+  - `cacdf67` — handle slug conflict in org auto-create
+  - `0865168` — unique slug in findOrCreateUser + fallback on conflict
+
+**Next session:** Full Luktara demo deal (hardcoded financials, docs, chat, red flags, analysis)
 
 ---
 

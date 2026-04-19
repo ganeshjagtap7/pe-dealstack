@@ -241,32 +241,83 @@ window.PEDocPreview = (function() {
                 `;
             }
 
-            // Build table
+            // Build table — detect actual header row and max column count
             function buildTable(sheetData) {
-                const headers = sheetData[0] || [];
-                const rows = sheetData.slice(1);
+                // Find max columns across ALL rows (row 0 may have fewer cells than data rows)
+                const maxCols = sheetData.reduce((max, row) => Math.max(max, row.length), 0);
+                if (maxCols === 0) return '<p class="text-gray-500 text-sm p-4">No data in this sheet.</p>';
+
+                // Find header row: first row with data in at least half the columns
+                let headerIdx = -1;
+                for (let i = 0; i < Math.min(sheetData.length, 15); i++) {
+                    const nonEmpty = sheetData[i].filter(c => c !== undefined && c !== null && c !== '').length;
+                    if (nonEmpty >= Math.max(2, maxCols * 0.4)) {
+                        headerIdx = i;
+                        break;
+                    }
+                }
+
+                // Rows before header are title rows, rows after are data
+                const titleRows = headerIdx > 0 ? sheetData.slice(0, headerIdx) : [];
+                const headers = headerIdx >= 0 ? sheetData[headerIdx] : [];
+                const dataRows = headerIdx >= 0 ? sheetData.slice(headerIdx + 1) : sheetData;
+                const colRange = Array.from({ length: maxCols }, (_, i) => i);
+
+                function formatCell(val) {
+                    if (val === undefined || val === null || val === '') return '';
+                    if (typeof val === 'number') {
+                        // Format large numbers with commas, keep decimals reasonable
+                        return val.toLocaleString('en-US', { maximumFractionDigits: 2 });
+                    }
+                    return escapeHtml(val);
+                }
+
+                function isNumeric(val) {
+                    return typeof val === 'number' && isFinite(val);
+                }
 
                 return `
+                    ${titleRows.length > 0 ? `
+                        <div class="mb-3">
+                            ${titleRows.map(row => {
+                                const text = row.filter(c => c !== undefined && c !== null && c !== '').join(' — ');
+                                return text ? `<p class="text-sm font-semibold text-gray-700 px-1">${escapeHtml(text)}</p>` : '';
+                            }).join('')}
+                        </div>
+                    ` : ''}
                     <div class="bg-white rounded-lg shadow overflow-hidden">
                         <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
+                            <table class="w-full text-sm border-collapse">
+                                ${headerIdx >= 0 ? `
                                 <thead>
-                                    <tr class="bg-gray-50 border-b border-gray-200">
-                                        ${headers.map(h => `<th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">${escapeHtml(h) || ''}</th>`).join('')}
+                                    <tr class="bg-gray-50 border-b-2 border-gray-200">
+                                        ${colRange.map(i => `<th class="px-4 py-3 text-left font-semibold text-gray-700 whitespace-nowrap border-r border-gray-100 last:border-r-0">${formatCell(headers[i])}</th>`).join('')}
                                     </tr>
                                 </thead>
+                                ` : ''}
                                 <tbody class="divide-y divide-gray-100">
-                                    ${rows.slice(0, 100).map(row => `
-                                        <tr class="hover:bg-gray-50">
-                                            ${headers.map((_, i) => `<td class="px-4 py-2.5 text-gray-600 whitespace-nowrap">${escapeHtml(row[i]) ?? ''}</td>`).join('')}
-                                        </tr>
-                                    `).join('')}
+                                    ${dataRows.slice(0, 200).map(row => {
+                                        const firstCell = row[0];
+                                        const isSection = typeof firstCell === 'string' && firstCell.length > 0 && row.filter(c => c !== undefined && c !== null && c !== '').length <= 1;
+                                        const isTotalRow = typeof firstCell === 'string' && /^(total|net|gross|ebitda|subtotal)/i.test(firstCell.trim());
+                                        const rowClass = isSection ? 'bg-gray-50 font-semibold' : isTotalRow ? 'bg-blue-50/50 font-semibold border-t-2 border-gray-300' : 'hover:bg-gray-50';
+                                        return `
+                                            <tr class="${rowClass}">
+                                                ${colRange.map(i => {
+                                                    const val = row[i];
+                                                    const align = i > 0 && isNumeric(val) ? 'text-right' : 'text-left';
+                                                    const negativeClass = isNumeric(val) && val < 0 ? 'text-red-600' : 'text-gray-600';
+                                                    return `<td class="px-4 py-2.5 ${align} ${negativeClass} whitespace-nowrap border-r border-gray-50 last:border-r-0">${formatCell(val)}</td>`;
+                                                }).join('')}
+                                            </tr>
+                                        `;
+                                    }).join('')}
                                 </tbody>
                             </table>
                         </div>
-                        ${rows.length > 100 ? `
+                        ${dataRows.length > 200 ? `
                             <div class="px-4 py-3 bg-amber-50 text-amber-700 text-xs text-center border-t">
-                                Showing first 100 rows of ${rows.length} total. Download the file for full data.
+                                Showing first 200 rows of ${dataRows.length} total. Download the file for full data.
                             </div>
                         ` : ''}
                     </div>

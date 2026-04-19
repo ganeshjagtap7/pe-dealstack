@@ -30,7 +30,7 @@ function renderTeamAvatars(teamMembers) {
     avatarStack.innerHTML = visibleMembers.map((member, index) => {
         const user = member.user;
         const zIndex = maxVisible - index;
-        if (user?.avatar) {
+        if (user?.avatar && user.avatar.startsWith('http')) {
             return `
                 <img
                     src="${user.avatar}"
@@ -38,6 +38,7 @@ function renderTeamAvatars(teamMembers) {
                     title="${user.name} (${member.role})"
                     class="w-8 h-8 rounded-full border-2 border-white object-cover shadow-sm"
                     style="z-index: ${zIndex};"
+                    onerror="this.style.display='none'"
                 />
             `;
         } else {

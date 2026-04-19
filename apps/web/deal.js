@@ -298,7 +298,8 @@ function initializeFeatures() {
     initStagePipeline();
     initActivityFeed();
     initCitationButtons();
-    initDocumentPreviews();
+    // Legacy initDocumentPreviews() removed — was showing hardcoded "Project Apex" modal.
+    // Modern .doc-preview-item handlers in updateDocumentsList() handle previews correctly.
     initAIResponseActions();
     initContextSettings();
     initBreadcrumbNavigation();
