@@ -105,6 +105,45 @@
         .icon-btn {
             @apply p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors;
         }
+        /* Memo section content typography */
+        .memo-section-content h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0d131b;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.25rem;
+        }
+        .memo-section-content h3:first-child {
+            margin-top: 0;
+        }
+        .memo-section-content p {
+            color: #334155;
+            line-height: 1.7;
+            margin-bottom: 0.75rem;
+            font-size: 0.9375rem;
+        }
+        .memo-section-content ul, .memo-section-content ol {
+            margin: 0.5rem 0 0.75rem 1.25rem;
+            color: #334155;
+            font-size: 0.9375rem;
+        }
+        .memo-section-content li {
+            margin-bottom: 0.35rem;
+            line-height: 1.6;
+        }
+        .memo-section-content strong {
+            color: #0d131b;
+        }
+        .memo-section-content .highlight-positive {
+            color: #166534;
+            font-weight: 600;
+        }
+        .memo-section-content .highlight-negative {
+            color: #991b1b;
+            font-weight: 600;
+        }
         /* Resize handle */
         #ai-resize-handle {
             touch-action: none;

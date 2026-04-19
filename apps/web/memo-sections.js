@@ -241,7 +241,7 @@ function renderSection(section, index) {
                 ` : ''}
             </div>
 
-            ${section.content}
+            <div class="memo-section-content">${section.content}</div>
             ${tableHtml}
             ${chartHtml}
             ${chartConfigHtml}
