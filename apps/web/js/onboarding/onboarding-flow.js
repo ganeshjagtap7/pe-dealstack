@@ -62,7 +62,7 @@
       if (data.steps) {
         // Map old step IDs to new ones where possible
         const stepMapping = {
-          createDeal: null,
+          createDeal: 'firm',
           uploadDocument: 'cim',
           reviewExtraction: null,
           tryDealChat: null,
@@ -296,9 +296,9 @@
 
   async function saveTaskCompletion(taskId) {
     try {
-      // Save using existing onboarding API (complete-step)
-      // Map new IDs back to existing step IDs where applicable
+      // Map new task IDs to existing onboarding step IDs
       const reverseMapping = {
+        firm: 'createDeal',
         cim: 'uploadDocument',
         team: 'inviteTeamMember',
       };
