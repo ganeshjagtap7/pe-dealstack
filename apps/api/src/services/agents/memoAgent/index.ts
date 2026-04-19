@@ -43,6 +43,8 @@ export interface MemoChatResponse {
   chartConfig?: any;
   insertPosition?: 'append' | 'prepend' | 'replace';
   type?: 'table' | 'chart' | 'new_section';
+  sectionType?: string;
+  title?: string;
 }
 
 // ─── runMemoChatAgent ─────────────────────────────────────────────────────────
@@ -128,6 +130,8 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
     let chartConfig: any;
     let insertPosition: MemoChatResponse['insertPosition'] | undefined;
     let type: MemoChatResponse['type'] | undefined;
+    let sectionType: string | undefined;
+    let title: string | undefined;
 
     for (const tm of toolMessages) {
       try {
@@ -145,6 +149,8 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
           if (parsed.chartConfig !== undefined) chartConfig = parsed.chartConfig;
           if (parsed.insertPosition) insertPosition = parsed.insertPosition as MemoChatResponse['insertPosition'];
           if (parsed.type) type = parsed.type as MemoChatResponse['type'];
+          if (parsed.sectionType) sectionType = parsed.sectionType;
+          if (parsed.title) title = parsed.title;
         }
       } catch {
         // Not JSON tool output — skip
@@ -169,6 +175,8 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
       ...(chartConfig !== undefined && { chartConfig }),
       ...(insertPosition !== undefined && { insertPosition }),
       ...(type !== undefined && { type }),
+      ...(sectionType !== undefined && { sectionType }),
+      ...(title !== undefined && { title }),
     };
   } catch (error: any) {
     log.error('Memo chat agent error', {

@@ -468,13 +468,23 @@ async function applyConfirmedAction(sectionId, response) {
                 body: JSON.stringify({
                     type: sectionType,
                     title: title,
-                    content: response.preview || '',
+                    content: response.preview || '<p><em>Generating content...</em></p>',
                     aiGenerated: true,
                 }),
             });
             if (createResp.ok) {
+                const savedSection = await createResp.json();
                 await refreshSection(null);
                 showUndoToast('Section added');
+
+                // Auto-generate AI content for the new section
+                if (savedSection.id && typeof regenerateSectionAPI === 'function') {
+                    const generated = await regenerateSectionAPI(savedSection.id);
+                    if (generated) {
+                        await refreshSection(savedSection.id);
+                        showUndoToast(`${title} generated`);
+                    }
+                }
             }
         } catch (error) {
             console.error('[Memo] Failed to create new section:', error);
