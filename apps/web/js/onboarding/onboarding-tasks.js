@@ -51,7 +51,7 @@ function applyEnrichmentToForm(state, profile) {
 /**
  * Show a detailed profile report modal with all collected data.
  */
-function showProfileReport(firmProfile, personProfile) {
+function showProfileReport(firmProfile, personProfile, fullResult) {
   // Remove existing report modal if any
   const existing = document.getElementById('ob-report-modal');
   if (existing) existing.remove();
@@ -181,13 +181,47 @@ function showProfileReport(firmProfile, personProfile) {
     html += `</div>`;
   }
 
+  // Agent research steps (show what the agent did)
+  if (fullResult?.steps?.length > 0) {
+    html += `<div style="margin-top:16px;padding-top:12px;border-top:2px solid #E5E7EB;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+        <div style="width:32px;height:32px;border-radius:8px;background:#E6EEF5;display:flex;align-items:center;justify-content:center;">
+          <span class="material-symbols-outlined" style="font-size:18px;color:#003366;">search</span>
+        </div>
+        <h4 style="font-size:15px;font-weight:700;color:#111827;margin:0;">Research Activity</h4>
+      </div>
+      <div style="font-size:12px;color:#4B5563;space-y:4px;">`;
+    for (const s of fullResult.steps) {
+      const icon = s.node === 'scrape' ? 'language' : s.node === 'searchFirm' || s.node === 'searchPerson' ? 'search' : s.node === 'synthesize' ? 'auto_awesome' : s.node === 'verify' ? 'verified' : 'save';
+      html += `<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:6px;">
+        <span class="material-symbols-outlined" style="font-size:14px;color:#9CA3AF;margin-top:2px;">${icon}</span>
+        <div>
+          <span style="color:#111827;">${s.message}</span>
+          ${s.detail ? `<span style="color:#9CA3AF;margin-left:4px;">— ${s.detail}</span>` : ''}
+        </div>
+      </div>`;
+    }
+    html += `</div></div>`;
+  }
+
   // Sources
   if (firmProfile?.sources?.length > 0) {
-    html += `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #E5E7EB;">
+    html += `<div style="margin-top:12px;padding-top:10px;border-top:1px solid #E5E7EB;">
       <div style="font-size:11px;color:#9CA3AF;display:flex;align-items:center;gap:4px;">
         <span class="material-symbols-outlined" style="font-size:14px;">info</span>
         Sources: ${firmProfile.sources.join(', ')}
       </div>
+    </div>`;
+  }
+
+  // Confidence badge
+  if (firmProfile?.confidence) {
+    const confColors = { high: '#059669', medium: '#D97706', low: '#DC2626' };
+    const confBg = { high: '#D1FAE5', medium: '#FEF3C7', low: '#FEE2E2' };
+    html += `<div style="margin-top:8px;display:flex;align-items:center;gap:6px;">
+      <span style="font-size:11px;font-weight:600;color:${confColors[firmProfile.confidence]};background:${confBg[firmProfile.confidence]};padding:2px 8px;border-radius:4px;text-transform:uppercase;">
+        ${firmProfile.confidence} confidence
+      </span>
     </div>`;
   }
 
@@ -315,7 +349,7 @@ async function triggerEnrichment(state) {
         // "View full report" button opens detailed modal
         const viewBtn = document.getElementById('ob-view-report');
         if (viewBtn) {
-          viewBtn.addEventListener('click', () => showProfileReport(profile, person));
+          viewBtn.addEventListener('click', () => showProfileReport(profile, person, result));
         }
 
         // "Use this profile" button saves to memory and pre-fills form
@@ -363,7 +397,7 @@ window.OnboardingTasks = {
 
   _renderers: {
     firm() {
-      const aumOptions = ['<$100M', '$100-500M', '$500M-1B', '$1B+'];
+      const aumOptions = ['<$1M', '$1-10M', '$10-50M', '$50-100M'];
       const sectors = ['Healthcare', 'Industrials', 'Software', 'Consumer', 'Financial', 'Tech-enabled services', 'Energy'];
 
       return `
@@ -386,6 +420,13 @@ window.OnboardingTasks = {
         <label class="block text-[12px] font-medium text-text-secondary mb-1.5">Sectors you focus on</label>
         <div class="flex flex-wrap gap-2">
           ${sectors.map(v => `<button class="chip" data-sector="${v}">${v}</button>`).join('')}
+          <button class="chip" id="ob-custom-sector-btn" style="border-style:dashed;">+ Other</button>
+        </div>
+        <div id="ob-custom-sector-input" class="hidden mt-2">
+          <div class="flex gap-2">
+            <input id="ob-custom-sector-text" type="text" placeholder="e.g. Real Estate, Biotech..." class="flex-1 px-3 py-2 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none">
+            <button id="ob-custom-sector-add" class="text-[12px] font-semibold text-white px-3 py-2 rounded-lg cursor-pointer" style="background:#003366;">Add</button>
+          </div>
         </div>
       `;
     },
@@ -454,6 +495,41 @@ window.OnboardingTasks = {
           else state.data.sectors.push(s);
         });
       });
+
+      // Custom sector: "+ Other" button toggles input, "Add" creates a new chip
+      const customBtn = document.getElementById('ob-custom-sector-btn');
+      const customInput = document.getElementById('ob-custom-sector-input');
+      const customText = document.getElementById('ob-custom-sector-text');
+      const customAdd = document.getElementById('ob-custom-sector-add');
+
+      if (customBtn && customInput) {
+        customBtn.addEventListener('click', () => {
+          customInput.classList.toggle('hidden');
+          if (!customInput.classList.contains('hidden') && customText) customText.focus();
+        });
+      }
+      if (customAdd && customText) {
+        const addCustomSector = () => {
+          const value = customText.value.trim();
+          if (!value || state.data.sectors.includes(value)) return;
+          state.data.sectors.push(value);
+          // Create a new chip before the "+ Other" button
+          const chip = document.createElement('button');
+          chip.className = 'chip selected';
+          chip.dataset.sector = value;
+          chip.textContent = value;
+          chip.addEventListener('click', () => {
+            chip.classList.toggle('selected');
+            const idx = state.data.sectors.indexOf(value);
+            if (idx >= 0) state.data.sectors.splice(idx, 1);
+            else state.data.sectors.push(value);
+          });
+          customBtn.parentNode.insertBefore(chip, customBtn);
+          customText.value = '';
+        };
+        customAdd.addEventListener('click', addCustomSector);
+        customText.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSector(); } });
+      }
 
       const urlInput = document.getElementById('ob-firm-url');
       const linkedinInput = document.getElementById('ob-linkedin');
