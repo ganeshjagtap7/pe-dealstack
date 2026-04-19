@@ -139,12 +139,50 @@
     markWelcomeShown();
   }
 
-  async function skipAll() {
-    if (confirm('Skip setup and go to your workspace? You can finish onboarding later from the sidebar.')) {
-      // Wait for both API calls to complete before redirecting
+  function skipAll() {
+    // Show custom confirmation modal instead of browser confirm()
+    const existing = document.getElementById('ob-skip-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'ob-skip-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:60;background:rgba(17,24,39,0.45);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:16px;';
+    overlay.innerHTML = `
+      <div style="animation:modalIn 260ms cubic-bezier(0.16,1,0.3,1) both;background:#fff;border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,0.15);width:100%;max-width:400px;overflow:hidden;">
+        <div style="padding:24px;">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div style="width:36px;height:36px;border-radius:8px;background:#E6EEF5;display:flex;align-items:center;justify-content:center;">
+              <span class="material-symbols-outlined" style="font-size:20px;color:#003366;">info</span>
+            </div>
+            <h3 style="font-family:Manrope,Inter,sans-serif;font-size:16px;font-weight:700;color:#111827;margin:0;">Skip setup?</h3>
+          </div>
+          <p style="font-size:13.5px;color:#4B5563;line-height:1.5;margin:0;">
+            You can always finish setting up later from the sidebar checklist on your dashboard.
+          </p>
+        </div>
+        <div style="display:flex;gap:10px;justify-content:flex-end;padding:16px 24px;background:#F9FAFB;border-top:1px solid #E5E7EB;">
+          <button id="ob-skip-cancel" style="padding:8px 16px;font-size:13px;font-weight:500;color:#4B5563;background:#fff;border:1px solid #E5E7EB;border-radius:8px;cursor:pointer;">
+            Continue setup
+          </button>
+          <button id="ob-skip-confirm" style="padding:8px 16px;font-size:13px;font-weight:600;color:#fff;background:#003366;border:none;border-radius:8px;cursor:pointer;">
+            Skip to dashboard
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('ob-skip-cancel').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+
+    document.getElementById('ob-skip-confirm').addEventListener('click', async () => {
+      const btn = document.getElementById('ob-skip-confirm');
+      btn.textContent = 'Redirecting...';
+      btn.disabled = true;
       await Promise.all([markWelcomeShown(), markOnboardingSkipped()]);
       openWorkspace();
-    }
+    });
   }
 
   function openWorkspace() {
