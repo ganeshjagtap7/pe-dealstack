@@ -468,22 +468,32 @@ async function applyConfirmedAction(sectionId, response) {
                 body: JSON.stringify({
                     type: sectionType,
                     title: title,
-                    content: response.preview || '<p><em>Generating content...</em></p>',
+                    content: '<p><em>Generating content...</em></p>',
                     aiGenerated: true,
                 }),
             });
             if (createResp.ok) {
                 const savedSection = await createResp.json();
                 await refreshSection(null);
-                showUndoToast('Section added');
+                showUndoToast('Section added — generating content...');
 
-                // Auto-generate AI content for the new section
+                // Auto-generate AI content in background (don't block UI)
                 if (savedSection.id && typeof regenerateSectionAPI === 'function') {
-                    const generated = await regenerateSectionAPI(savedSection.id);
-                    if (generated) {
+                    regenerateSectionAPI(savedSection.id).then(async (generated) => {
+                        if (generated) {
+                            await refreshSection(savedSection.id);
+                            showUndoToast(`${title} content generated`);
+                        } else {
+                            // Generation failed — update section with fallback message
+                            await applySectionActionAPI(state.memo.id, savedSection.id, {
+                                content: `<p><em>AI content generation failed. Click the refresh icon (<span class="material-symbols-outlined text-[14px] align-middle">refresh</span>) to try again, or type your content directly.</em></p>`,
+                                insertPosition: 'replace',
+                            });
+                            await refreshSection(savedSection.id);
+                        }
+                    }).catch(async () => {
                         await refreshSection(savedSection.id);
-                        showUndoToast(`${title} generated`);
-                    }
+                    });
                 }
             }
         } catch (error) {

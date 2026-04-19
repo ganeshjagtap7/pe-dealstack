@@ -385,6 +385,47 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
     }
   );
 
+  // ── 11. remove_section ───────────────────────────────────────────────────
+
+  const removeSectionTool = tool(
+    async ({ sectionId }) => {
+      try {
+        const { data: section } = await supabase
+          .from('MemoSection')
+          .select('id, title')
+          .eq('id', sectionId)
+          .eq('memoId', memoId)
+          .single();
+
+        if (!section) return JSON.stringify({ success: false, error: 'Section not found' });
+
+        const { error } = await supabase
+          .from('MemoSection')
+          .delete()
+          .eq('id', sectionId);
+
+        if (error) throw error;
+
+        return JSON.stringify({
+          action: 'applied',
+          sectionId,
+          removed: true,
+          title: section.title,
+        });
+      } catch (error) {
+        log.error('removeSectionTool error', error);
+        return JSON.stringify({ success: false, error: 'Failed to remove section' });
+      }
+    },
+    {
+      name: 'remove_section',
+      description: 'Delete/remove a section from the memo. Use when the user asks to delete, remove, or get rid of a specific section. First call get_memo_sections to find the section ID.',
+      schema: z.object({
+        sectionId: z.string().describe('UUID of the memo section to remove'),
+      }),
+    }
+  );
+
   // ── Return all tools ──────────────────────────────────────────────────────
 
   return [
@@ -398,5 +439,6 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
     generateTableTool,
     generateChartTool,
     addSectionTool,
+    removeSectionTool,
   ];
 }
