@@ -49,16 +49,29 @@ export async function orgMiddleware(
     if (userRecord?.organizationId) {
       req.user.organizationId = userRecord.organizationId;
     } else if (userRecord && !userRecord.organizationId) {
-      // User exists but has no Organization — create one now
+      // User exists but has no Organization — find existing or create one
       try {
         const firmName = req.user.firmName || req.user.email?.split('@')[0] || 'My Firm';
         const slug = firmName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 100);
 
-        const { data: newOrg } = await supabase
+        // First try to find an existing org with same name (might exist from a previous failed attempt)
+        let newOrg: { id: string } | null = null;
+        const { data: existingOrg } = await supabase
           .from('Organization')
-          .insert({ name: firmName, slug: slug || `org-${Date.now()}` })
           .select('id')
+          .eq('name', firmName)
           .single();
+
+        if (existingOrg) {
+          newOrg = existingOrg;
+        } else {
+          const { data: createdOrg } = await supabase
+            .from('Organization')
+            .insert({ name: firmName, slug: `${slug}-${Date.now().toString(36)}` })
+            .select('id')
+            .single();
+          newOrg = createdOrg;
+        }
 
         if (newOrg) {
           await supabase
