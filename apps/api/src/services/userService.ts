@@ -49,25 +49,41 @@ export async function findOrCreateUser(authUser: {
       if (existingOrg) {
         organizationId = existingOrg.id;
       } else {
-        // Create new Organization
-        const slug = authUser.firmName
+        // Create new Organization with unique slug
+        const baseSlug = authUser.firmName
           .toLowerCase()
           .replace(/[^a-z0-9\s-]/g, '')
           .replace(/\s+/g, '-')
           .substring(0, 100);
+        const uniqueSlug = `${baseSlug || 'org'}-${Date.now().toString(36)}`;
 
         const { data: newOrg, error: orgError } = await supabase
           .from('Organization')
           .insert({
             name: authUser.firmName,
-            slug: slug || `org-${Date.now()}`,
+            slug: uniqueSlug,
           })
           .select()
           .single();
 
         if (orgError) {
           log.error('Failed to create organization', orgError);
-          throw orgError;
+          // If slug conflict, try to find existing org by name and use that
+          if (orgError.code === '23505') {
+            const { data: fallbackOrg } = await supabase
+              .from('Organization')
+              .select('id')
+              .eq('name', authUser.firmName)
+              .single();
+            if (fallbackOrg) {
+              organizationId = fallbackOrg.id;
+              log.info('Using existing organization after slug conflict', { orgId: fallbackOrg.id });
+            } else {
+              throw orgError;
+            }
+          } else {
+            throw orgError;
+          }
         }
         organizationId = newOrg.id;
         log.info('Organization created on signup', { orgId: newOrg.id, name: authUser.firmName });
