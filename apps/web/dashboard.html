@@ -470,8 +470,10 @@ Scan Signals
 
         PELayout.init('dashboard', { collapsible: true });
 
-        // Initialize onboarding (welcome modal + checklist + feedback button + beta badge)
-        if (window.initWelcomeModal) await initWelcomeModal();
+        // Initialize onboarding (checklist + feedback button + beta badge)
+        // Skip old welcome modal if user went through new onboarding flow
+        const seenNewOnboarding = sessionStorage.getItem('pe_onboarding_seen') === 'true';
+        if (window.initWelcomeModal && !seenNewOnboarding) await initWelcomeModal();
         if (window.initOnboardingChecklist) await initOnboardingChecklist();
         if (window.initOnboardingUI) initOnboardingUI();
     });
