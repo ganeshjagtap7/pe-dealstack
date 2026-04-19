@@ -455,7 +455,33 @@ function renderConfirmMessage(response) {
 // Apply / Undo Helpers
 // ============================================================
 async function applyConfirmedAction(sectionId, response) {
-    if (!state.memo?.id || !sectionId) return;
+    if (!state.memo?.id) return;
+
+    // Handle new section creation (add_section tool returns no sectionId)
+    if (response.type === 'new_section' || !sectionId) {
+        const sectionType = response.sectionType || 'CUSTOM';
+        const title = response.title || 'New Section';
+        try {
+            const createResp = await PEAuth.authFetch(`${API_BASE_URL}/memos/${state.memo.id}/sections`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    type: sectionType,
+                    title: title,
+                    content: response.preview || '',
+                    aiGenerated: true,
+                }),
+            });
+            if (createResp.ok) {
+                await refreshSection(null);
+                showUndoToast('Section added');
+            }
+        } catch (error) {
+            console.error('[Memo] Failed to create new section:', error);
+        }
+        return;
+    }
+
     const result = await applySectionActionAPI(state.memo.id, sectionId, {
         content: response.preview,
         tableData: response.tableData,
@@ -475,8 +501,12 @@ async function refreshSection(sectionId) {
     if (state.memo?.id) {
         await loadMemoFromAPI(state.memo.id);
         if (typeof renderSections === 'function') renderSections();
-        if (typeof renderChartsForAllSections === 'function') renderChartsForAllSections();
+        // Delay chart rendering slightly to let DOM settle after renderSections
+        setTimeout(() => {
+            if (typeof renderChartsForAllSections === 'function') renderChartsForAllSections();
+        }, 150);
         if (typeof renderSidebar === 'function') renderSidebar();
+        if (typeof updatePageCount === 'function') updatePageCount();
     }
 }
 

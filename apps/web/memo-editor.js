@@ -258,9 +258,15 @@ async function addNewSection() {
 
             if (response.ok) {
                 const savedSection = await response.json();
+                const oldId = newSection.id;
                 // Update local section with server ID
                 newSection.id = savedSection.id;
                 console.log('Section saved to API:', savedSection.id);
+
+                // Re-render to update DOM with real ID (needed for chart containers, etc.)
+                if (state.activeSection === oldId) state.activeSection = savedSection.id;
+                renderSidebar();
+                renderSections();
 
                 // If AI generation requested, call generate endpoint
                 if (generateAI) {

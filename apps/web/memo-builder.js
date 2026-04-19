@@ -268,6 +268,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     setupDragDrop();
 
     updateModeIndicators();
+    // Calculate dynamic page count after content is rendered
+    setTimeout(() => updatePageCount(), 300);
 });
 
 /**
@@ -764,6 +766,21 @@ async function postProactiveWelcome() {
         }];
         renderMessages();
     }
+}
+
+// ============================================================
+// Dynamic Page Count
+// ============================================================
+function updatePageCount() {
+    const indicator = document.getElementById('page-indicator');
+    if (!indicator) return;
+    // Estimate pages based on content height (letter-size page ~1056px at 96 DPI)
+    const content = document.getElementById('document-editor');
+    if (!content) return;
+    const pageHeight = 1056;
+    const totalHeight = content.scrollHeight;
+    const pageCount = Math.max(1, Math.ceil(totalHeight / pageHeight));
+    indicator.textContent = `Page 1 of ${pageCount}`;
 }
 
 console.log('PE OS Memo Builder script loaded');

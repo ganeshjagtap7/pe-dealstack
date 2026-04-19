@@ -154,6 +154,9 @@ function renderSections() {
 
     // Render Chart.js charts after DOM is updated
     setTimeout(() => renderChartsForAllSections(), 100);
+
+    // Update page count after content renders
+    setTimeout(() => { if (typeof updatePageCount === 'function') updatePageCount(); }, 200);
 }
 
 function renderSection(section, index) {
