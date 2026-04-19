@@ -48,6 +48,30 @@ export async function orgMiddleware(
 
     if (userRecord?.organizationId) {
       req.user.organizationId = userRecord.organizationId;
+    } else if (userRecord && !userRecord.organizationId) {
+      // User exists but has no Organization — create one now
+      try {
+        const firmName = req.user.firmName || req.user.email?.split('@')[0] || 'My Firm';
+        const slug = firmName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 100);
+
+        const { data: newOrg } = await supabase
+          .from('Organization')
+          .insert({ name: firmName, slug: slug || `org-${Date.now()}` })
+          .select('id')
+          .single();
+
+        if (newOrg) {
+          await supabase
+            .from('User')
+            .update({ organizationId: newOrg.id })
+            .eq('id', userRecord.id);
+
+          req.user.organizationId = newOrg.id;
+          log.info('Org middleware: auto-created org for user without one', { userId: userRecord.id, orgId: newOrg.id });
+        }
+      } catch (createErr) {
+        log.error('Org middleware: failed to auto-create org', createErr);
+      }
     }
 
     next();
