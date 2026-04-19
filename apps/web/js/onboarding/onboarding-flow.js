@@ -139,9 +139,10 @@
     markWelcomeShown();
   }
 
-  function skipAll() {
+  async function skipAll() {
     if (confirm('Skip setup and go to your workspace? You can finish onboarding later from the sidebar.')) {
-      markOnboardingSkipped();
+      // Wait for both API calls to complete before redirecting
+      await Promise.all([markWelcomeShown(), markOnboardingSkipped()]);
       openWorkspace();
     }
   }
