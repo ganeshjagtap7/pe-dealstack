@@ -109,7 +109,7 @@ export function ProfileSection({
               className="w-24 h-24 rounded-full bg-cover bg-center border-4 border-white shadow-card-hover bg-primary flex items-center justify-center text-white text-2xl font-bold"
               style={
                 profile?.avatar
-                  ? { backgroundImage: `url('${profile.avatar}')` }
+                  ? { backgroundImage: `url('${encodeURI(profile.avatar)}')` }
                   : undefined
               }
             >

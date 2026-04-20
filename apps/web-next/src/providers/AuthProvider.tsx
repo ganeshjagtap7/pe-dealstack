@@ -24,28 +24,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [supabase] = useState(() => createClient());
 
   useEffect(() => {
-    // Use getUser() for the initial check — getSession() reads from local
-    // storage and isn't guaranteed to be valid (Supabase docs). The
-    // onAuthStateChange listener still provides the session object for
-    // subsequent updates (it validates server-side on each event).
-    supabase.auth.getUser().then(({ data: { user }, error }) => {
-      if (error || !user) {
-        setSession(null);
-      }
-      // getUser() doesn't return the session, so bootstrap it once via
-      // getSession() only after we've confirmed the user is valid.
-      if (user) {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          setSession(session);
-        });
-      }
-      setLoading(false);
-    });
-
+    // Use onAuthStateChange as the single source of truth. It fires
+    // immediately with the current session (INITIAL_SESSION event) and
+    // on every subsequent auth state change. This avoids the race condition
+    // between getUser() and onAuthStateChange overwriting each other.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        // Validate the user server-side on initial load to ensure the
+        // session token from local storage is still valid.
+        if (event === "INITIAL_SESSION") {
+          const { error } = await supabase.auth.getUser();
+          if (error) {
+            setSession(null);
+            setLoading(false);
+            return;
+          }
+        }
+        setSession(session);
+      } else {
+        setSession(null);
+      }
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();

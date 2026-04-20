@@ -62,7 +62,7 @@ function RowDealPicker({
         {row.deals.map((deal) => (
           <div
             key={deal.id}
-            className="bg-[#003366]/10 border border-[#003366]/20 text-[#003366] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs"
+            className="bg-[#E6EDF5] border border-[#CCDBE8] text-[#003366] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs"
           >
             <span>{deal.name}</span>
             <button
@@ -71,7 +71,7 @@ function RowDealPicker({
                 e.stopPropagation();
                 onRemove(deal.id);
               }}
-              className="hover:text-[#003366]/70 text-[#003366]/50"
+              className="hover:text-[#4A6D8A] text-[#8099B3]"
             >
               <span className="material-symbols-outlined text-[14px]">close</span>
             </button>
@@ -104,7 +104,7 @@ function RowDealPicker({
                   onAdd(deal);
                   setQuery("");
                 }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-[#003366]/5 text-[#343A40] transition-colors"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-[#F0F4F8] text-[#343A40] transition-colors"
               >
                 {deal.name}
               </button>
@@ -357,7 +357,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
               <button
                 type="button"
                 onClick={addRow}
-                className="flex items-center gap-2 text-[#003366] hover:text-blue-700 font-medium text-sm transition-colors group px-2 py-1 rounded-md hover:bg-[#003366]/10"
+                className="flex items-center gap-2 text-[#003366] hover:text-blue-700 font-medium text-sm transition-colors group px-2 py-1 rounded-md hover:bg-[#E6EDF5]"
               >
                 <span className="material-symbols-outlined text-xl group-hover:scale-110 transition-transform">
                   add_circle
@@ -375,7 +375,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
             </div>
 
             {/* Access Control Info */}
-            <div className="mt-4 bg-[#003366]/5 border border-[#003366]/10 rounded-lg p-3 flex gap-3 items-start">
+            <div className="mt-4 bg-[#F0F4F8] border border-[#E0E8F0] rounded-lg p-3 flex gap-3 items-start">
               <span className="material-symbols-outlined text-[#003366] text-xl mt-0.5">info</span>
               <div className="text-sm text-[#868E96]">
                 <span className="text-[#343A40] font-medium">Access Control:</span> Analysts have{" "}

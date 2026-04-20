@@ -54,7 +54,7 @@ export default function LoginPage() {
                 <div className="w-3 h-3 rounded-full bg-amber-400" />
                 <div className="w-3 h-3 rounded-full bg-green-400" />
               </div>
-              <div className="aspect-[16/9] w-full bg-gradient-to-br from-[#003366]/80 to-[#002855] flex items-center justify-center">
+              <div className="aspect-[16/9] w-full bg-gradient-to-br from-[#335C85] to-[#002855] flex items-center justify-center">
                 <div className="text-center text-white/60">
                   <Logo className="size-16 mx-auto mb-4 text-white/40" />
                   <p className="text-sm">Deal Pipeline Dashboard</p>

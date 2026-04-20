@@ -63,13 +63,24 @@ const API_BASE_URL = "/api";
 
 export async function authFetchRaw(path: string, options: RequestInit = {}): Promise<Response> {
   const supabase = createClient();
+  // Validate user first (same pattern as the shared api client)
+  const { error } = await supabase.auth.getUser();
+  if (error) {
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   const headers: HeadersInit = {
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers || {}),
   };
-  return fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  const res = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  return res;
 }
 
 /* ------------------------------------------------------------------ */

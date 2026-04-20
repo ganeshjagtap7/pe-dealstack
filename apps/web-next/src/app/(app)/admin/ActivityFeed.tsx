@@ -186,7 +186,7 @@ export function ActivityFeed() {
                             {isAI ? "PE OS AI" : userName}
                           </span>{" "}
                           {entity ? (
-                            <span dangerouslySetInnerHTML={{ __html: renderText(text, entity) }} />
+                            <HighlightEntity text={text} entity={entity} />
                           ) : (
                             text
                           )}
@@ -219,22 +219,15 @@ export function ActivityFeed() {
   );
 }
 
-// Highlight the entity span inline. Kept simple — replace the literal entity
-// string with a styled <span>. The entity comes from the server so we escape
-// HTML-sensitive characters on the way in to keep this safe.
-function renderText(text: string, entity: string): string {
-  const escaped = entity
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-  const safeText = text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-  return safeText.replace(
-    escaped,
-    `<span class="text-primary font-medium">${escaped}</span>`,
+// Highlight the entity within the text using React elements (no raw HTML).
+function HighlightEntity({ text, entity }: { text: string; entity: string }) {
+  const idx = text.indexOf(entity);
+  if (idx === -1) return <>{text}</>;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <span className="text-primary font-medium">{entity}</span>
+      {text.slice(idx + entity.length)}
+    </>
   );
 }

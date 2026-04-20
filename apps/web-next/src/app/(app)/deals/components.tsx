@@ -45,7 +45,7 @@ export function FilterDropdown({
     : cn(
         "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3.5 text-sm font-medium transition-all group",
         active
-          ? "border-[#003366]/30 bg-blue-50 text-[#003366]"
+          ? "border-[#B3C2D1] bg-blue-50 text-[#003366]"
           : "border-border-subtle bg-surface-card text-text-secondary hover:border-primary/30 hover:shadow-sm"
       );
 
@@ -280,7 +280,7 @@ export function DealCard({
         onClick={() => router.push(`/deals/${deal.id}`)}
         onMouseEnter={() => router.prefetch(`/deals/${deal.id}`)}
         className={cn(
-          "bg-white rounded-lg border border-border-subtle p-5 hover:border-[#003366]/30 transition-all cursor-pointer flex flex-col h-full shadow-sm hover:shadow-md relative overflow-hidden",
+          "bg-white rounded-lg border border-border-subtle p-5 hover:border-[#B3C2D1] transition-all cursor-pointer flex flex-col h-full shadow-sm hover:shadow-md relative overflow-hidden",
           isPassed && "opacity-70 hover:opacity-100",
           selected && "ring-2 ring-[#003366] border-[#003366]"
         )}
@@ -412,7 +412,7 @@ export function DealCard({
 export function KanbanCard({ deal }: { deal: Deal }) {
   const hasRiskFlag = (deal.ebitda ?? 0) < 0 || deal.stage === "PASSED";
   return (
-    <div className="bg-white rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-[#003366]/30 transition-all">
+    <div className="bg-white rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-[#B3C2D1] transition-all">
       <Link href={`/deals/${deal.id}`} className="block">
         <div className="flex items-start gap-2 mb-2">
           <div className="size-8 rounded-md bg-blue-50 border border-blue-200 flex items-center justify-center text-[#003366] shrink-0">

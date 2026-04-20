@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { AdminTask, AdminTaskStatus } from "./types";
 
 // ─── Constants ───────────────────────────────────────────────────────
@@ -135,7 +136,8 @@ export function TaskTable({ tasks, externalFilter, onTasksChanged, onToast }: Pr
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const now = new Date();
+  // Stable reference — only recalculated when tasks change, not every render
+  const now = useMemo(() => new Date(), [tasks]);
 
   const filtered = useMemo(() => {
     let list = [...tasks];
@@ -160,7 +162,7 @@ export function TaskTable({ tasks, externalFilter, onTasksChanged, onToast }: Pr
       return sortAsc ? cmp : -cmp;
     });
     return list;
-  }, [tasks, filter, sortField, sortAsc, now]);
+  }, [tasks, filter, sortField, sortAsc]);
 
   const display = showAll ? filtered : filtered.slice(0, TASK_PAGE_SIZE);
 
@@ -191,8 +193,10 @@ export function TaskTable({ tasks, externalFilter, onTasksChanged, onToast }: Pr
     }
   };
 
-  const deleteTask = async (taskId: string, title: string) => {
-    if (!window.confirm(`Delete task "${title}"? This cannot be undone.`)) return;
+  const [confirmDelete, setConfirmDelete] = useState<{ id: string; title: string } | null>(null);
+
+  const deleteTask = async (taskId: string) => {
+    setConfirmDelete(null);
     try {
       await api.delete(`/tasks/${taskId}`);
       onTasksChanged();
@@ -458,7 +462,7 @@ export function TaskTable({ tasks, externalFilter, onTasksChanged, onToast }: Pr
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          deleteTask(task.id, task.title);
+                          setConfirmDelete({ id: task.id, title: task.title });
                         }}
                         className="p-1.5 text-text-muted hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete task"
@@ -495,6 +499,15 @@ export function TaskTable({ tasks, externalFilter, onTasksChanged, onToast }: Pr
           </button>
         </div>
       )}
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Task"
+        message={confirmDelete ? `Delete task "${confirmDelete.title}"? This cannot be undone.` : ""}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => confirmDelete && deleteTask(confirmDelete.id)}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </div>
   );
 }

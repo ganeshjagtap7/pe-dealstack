@@ -1,12 +1,12 @@
 // Minimal markdown → HTML converter for AI chat bubbles.
 // Ported from apps/web/memo-chat.js::mdToHtml. Handles bold/italic, ordered/
-// unordered lists, h3/h4 headings, paragraph breaks, and line breaks. HTML in
-// the input is escaped first so we can safely hand the result to
-// dangerouslySetInnerHTML.
+// unordered lists, h3/h4 headings, paragraph breaks, and line breaks.
+//
+// All input is HTML-escaped FIRST (including < > & " '), then markdown syntax
+// is converted to safe HTML tags. This prevents XSS even when fed to
+// dangerouslySetInnerHTML — no raw user/AI HTML can pass through.
 //
 // This is intentionally narrow — it's for short AI responses, not full docs.
-// If the input already looks like HTML (starts with "<"), it's passed through
-// unchanged to match vanilla's behavior for server-rendered HTML snippets.
 
 function escapeHtml(text: string): string {
   return text

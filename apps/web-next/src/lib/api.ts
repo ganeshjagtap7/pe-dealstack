@@ -8,6 +8,14 @@ const API_BASE_URL = "/api";
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient();
+  // Use getUser() — getSession() reads from local storage without server
+  // validation (Supabase docs warn against relying on it for auth checks).
+  // We still need the session for the access_token, but only fetch it after
+  // confirming the user is valid.
+  const { data: { user }, error } = await supabase.auth.getUser();
+  if (error || !user) {
+    return { "Content-Type": "application/json" };
+  }
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return {
@@ -26,6 +34,11 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   if (res.status === 401) {
     window.location.href = "/login";
     throw new Error("Unauthorized");
+  }
+
+  // DELETE endpoints return 204 No Content with empty body
+  if (res.status === 204) {
+    return undefined as T;
   }
 
   if (!res.ok) {

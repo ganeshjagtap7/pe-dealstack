@@ -8,6 +8,7 @@ import { searchDocumentChunks, buildRAGContext, isRAGEnabled } from '../../../ra
 import { supabase } from '../../../supabase.js';
 import { z } from 'zod';
 import { log } from '../../../utils/logger.js';
+import { TOPIC_GUARDRAILS, CONTEXT_ANCHORING } from '../guardrails.js';
 
 export interface MeetingPrepInput {
   dealId: string;
@@ -171,6 +172,8 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
 
   const brief = await structuredModel.invoke([
     new SystemMessage(`You are a PE deal team meeting prep assistant. Generate a comprehensive meeting brief that helps the deal team walk in prepared.
+${TOPIC_GUARDRAILS}
+${CONTEXT_ANCHORING}
 
 CRITICAL REQUIREMENTS:
 - Use SPECIFIC numbers and data from the financial statements (revenue figures, margins, EBITDA, growth rates). Do NOT use generic placeholder questions.

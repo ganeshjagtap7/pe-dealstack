@@ -1,8 +1,9 @@
 "use client";
 
-import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { FolderTree } from "@/components/vdr/FolderTree";
 import { FiltersBar } from "@/components/vdr/FiltersBar";
 import { FileTable } from "@/components/vdr/FileTable";
@@ -35,6 +36,7 @@ import {
   transformInsights,
   uploadDocument,
 } from "@/lib/vdr/api";
+import { CreateFolderModal, DataRoomHeader, DataRoomLoading } from "./components";
 
 interface PageProps {
   params: Promise<{ dealId: string }>;
@@ -59,8 +61,6 @@ export default function DataRoomDealPage({ params }: PageProps) {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const newFolderInputRef = useRef<HTMLInputElement>(null);
 
   const isSearching = searchQuery.trim().length > 0;
 
@@ -116,10 +116,6 @@ export default function DataRoomDealPage({ params }: PageProps) {
     })();
   }, [activeFolderId, insights]);
 
-  useEffect(() => {
-    if (showCreateFolder) newFolderInputRef.current?.focus();
-  }, [showCreateFolder]);
-
   // ─── Derived data ────────────────────────────────────────────────
   const filteredFiles = useMemo(() => {
     const base = isSearching
@@ -158,9 +154,7 @@ export default function DataRoomDealPage({ params }: PageProps) {
     setUploadError(null);
     if (!activeFolderId) {
       setUploadError("Select a folder first.");
-      return;
     }
-    fileInputRef.current?.click();
   };
 
   const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -215,16 +209,22 @@ export default function DataRoomDealPage({ params }: PageProps) {
     }
   };
 
+  const [pendingDelete, setPendingDelete] = useState<{ type: "folder" | "file"; id: string; name: string; extra?: string } | null>(null);
+
   const handleDeleteFolder = async (folderId: string) => {
     const folder = folders.find((f) => f.id === folderId);
-    const confirmed = window.confirm(
-      `Delete folder "${folder?.name}"? ${
-        (folder?.fileCount || 0) > 0
-          ? `This folder contains ${folder?.fileCount} file(s) which will also be deleted.`
-          : ""
-      }`,
-    );
-    if (!confirmed) return;
+    setPendingDelete({
+      type: "folder",
+      id: folderId,
+      name: folder?.name || "folder",
+      extra: (folder?.fileCount || 0) > 0
+        ? `This folder contains ${folder?.fileCount} file(s) which will also be deleted.`
+        : undefined,
+    });
+  };
+
+  const confirmDeleteFolder = async (folderId: string) => {
+    const folder = folders.find((f) => f.id === folderId);
 
     const cascade = (folder?.fileCount || 0) > 0;
     const ok = await deleteFolder(folderId, cascade);
@@ -245,7 +245,11 @@ export default function DataRoomDealPage({ params }: PageProps) {
 
   const handleDeleteFile = async (fileId: string) => {
     const file = allFiles.find((f) => f.id === fileId);
-    if (!window.confirm(`Delete "${file?.name}"? This cannot be undone.`)) return;
+    setPendingDelete({ type: "file", id: fileId, name: file?.name || "file" });
+  };
+
+  const confirmDeleteFile = async (fileId: string) => {
+    const file = allFiles.find((f) => f.id === fileId);
     const ok = await deleteDocument(fileId);
     if (!ok) return;
     setAllFiles((prev) => prev.filter((f) => f.id !== fileId));
@@ -314,98 +318,22 @@ export default function DataRoomDealPage({ params }: PageProps) {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-full w-full bg-slate-50">
-        <div className="text-center">
-          <div
-            className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
-            style={{ borderColor: "#003366" }}
-          />
-          <p className="text-slate-500">Loading Data Room...</p>
-        </div>
-      </div>
-    );
+    return <DataRoomLoading />;
   }
 
   return (
     <div className="flex h-full w-full bg-slate-50 overflow-hidden">
-      {/* Create Folder Modal */}
       {showCreateFolder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-            onClick={() => {
-              setShowCreateFolder(false);
-              setNewFolderName("");
-            }}
-          />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200">
-              <div className="flex items-center gap-3">
-                <div
-                  className="flex items-center justify-center w-10 h-10 rounded-lg"
-                  style={{ backgroundColor: "#E6EEF5" }}
-                >
-                  <span className="material-symbols-outlined text-primary">create_new_folder</span>
-                </div>
-                <h3 className="text-lg font-semibold text-slate-900">Create New Folder</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreateFolder(false);
-                  setNewFolderName("");
-                }}
-                className="p-1 rounded-lg hover:bg-slate-50 transition-colors"
-              >
-                <span className="material-symbols-outlined text-slate-400">close</span>
-              </button>
-            </div>
-            <div className="p-5">
-              <label className="block text-sm font-medium text-slate-600 mb-2">Folder Name</label>
-              <input
-                ref={newFolderInputRef}
-                type="text"
-                value={newFolderName}
-                onChange={(e) => setNewFolderName(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    handleCreateFolder();
-                  } else if (e.key === "Escape") {
-                    setShowCreateFolder(false);
-                    setNewFolderName("");
-                  }
-                }}
-                placeholder="e.g., Tax Documents, Contracts"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-slate-900 placeholder:text-slate-400"
-              />
-              <p className="mt-2 text-xs text-slate-400">
-                The folder will be created in the current deal&apos;s data room.
-              </p>
-            </div>
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200 bg-slate-50/50">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreateFolder(false);
-                  setNewFolderName("");
-                }}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleCreateFolder}
-                disabled={!newFolderName.trim() || creatingFolder}
-                className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800"
-              >
-                {creatingFolder ? "Creating..." : "Create Folder"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <CreateFolderModal
+          newFolderName={newFolderName}
+          onNameChange={setNewFolderName}
+          creatingFolder={creatingFolder}
+          onSubmit={handleCreateFolder}
+          onClose={() => {
+            setShowCreateFolder(false);
+            setNewFolderName("");
+          }}
+        />
       )}
 
       {/* Folder sidebar */}
@@ -448,80 +376,17 @@ export default function DataRoomDealPage({ params }: PageProps) {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col min-w-0 bg-slate-50 relative">
-        <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
-          <nav className="flex items-center gap-1.5 text-sm">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex items-center justify-center size-7 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors mr-1"
-              title="Go back"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </button>
-            <Link href="/deals" className="text-slate-400 hover:text-blue-600 transition-colors">
-              Deals
-            </Link>
-            <span className="material-symbols-outlined text-[14px] text-slate-300">
-              chevron_right
-            </span>
-            <Link
-              href={`/deals/${dealId}`}
-              className="text-slate-500 hover:text-blue-600 transition-colors truncate max-w-[150px]"
-            >
-              {dealName || "Deal"}
-            </Link>
-            <span className="material-symbols-outlined text-[14px] text-slate-300">
-              chevron_right
-            </span>
-            {activeFolder ? (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setActiveFolderId(null)}
-                  className="text-slate-500 hover:text-blue-600 cursor-pointer transition-colors"
-                >
-                  Data Room
-                </button>
-                <span className="material-symbols-outlined text-[14px] text-slate-300">
-                  chevron_right
-                </span>
-                <span className="font-medium text-slate-900 truncate max-w-[150px]">
-                  {activeFolder.name}
-                </span>
-              </>
-            ) : (
-              <span className="font-medium text-slate-900">Data Room</span>
-            )}
-          </nav>
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={handleUploadClick}
-              disabled={uploading || !activeFolderId}
-              className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white shadow transition-colors disabled:opacity-50"
-              style={{ backgroundColor: "#003366" }}
-            >
-              {uploading ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
-                  Uploading...
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[18px]">cloud_upload</span>
-                  Upload Files
-                </>
-              )}
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              multiple
-              onChange={handleFilesSelected}
-              className="hidden"
-            />
-          </div>
-        </header>
+        <DataRoomHeader
+          dealId={dealId}
+          dealName={dealName}
+          activeFolder={activeFolder}
+          activeFolderId={activeFolderId}
+          uploading={uploading}
+          onBack={() => router.back()}
+          onClearFolder={() => setActiveFolderId(null)}
+          onUploadClick={handleUploadClick}
+          onFilesSelected={handleFilesSelected}
+        />
 
         <FiltersBar
           searchQuery={searchQuery}
@@ -587,6 +452,25 @@ export default function DataRoomDealPage({ params }: PageProps) {
         isGenerating={generating}
         isCollapsed={insightsCollapsed}
         onToggleCollapse={() => setInsightsCollapsed((v) => !v)}
+      />
+
+      <ConfirmDialog
+        open={!!pendingDelete}
+        title={pendingDelete?.type === "folder" ? "Delete Folder" : "Delete File"}
+        message={
+          pendingDelete
+            ? `Delete "${pendingDelete.name}"? This cannot be undone.${pendingDelete.extra ? ` ${pendingDelete.extra}` : ""}`
+            : ""
+        }
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => {
+          if (!pendingDelete) return;
+          if (pendingDelete.type === "folder") confirmDeleteFolder(pendingDelete.id);
+          else confirmDeleteFile(pendingDelete.id);
+          setPendingDelete(null);
+        }}
+        onCancel={() => setPendingDelete(null)}
       />
     </div>
   );

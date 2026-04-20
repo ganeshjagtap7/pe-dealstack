@@ -31,9 +31,9 @@ const InviteModal = (function () {
     ).join('');
 
     const dealTags = row.deals.map(deal => `
-      <div class="invite-tag bg-[#003366]/10 border border-[#003366]/20 text-[#003366] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs">
+      <div class="invite-tag bg-[#E6EDF5] border border-[#C8D4E0] text-[#003366] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs">
         <span>${escapeHtml(deal.name)}</span>
-        <button onclick="InviteModal.removeDealFromRow(${row.id}, '${escapeHtml(deal.id)}')" class="hover:text-[#003366]/70 text-[#003366]/50">
+        <button onclick="InviteModal.removeDealFromRow(${row.id}, '${escapeHtml(deal.id)}')" class="hover:text-[#4A6D8A] text-[#8099B3]">
           <span class="material-symbols-outlined text-[14px]">close</span>
         </button>
       </div>
@@ -177,7 +177,7 @@ const InviteModal = (function () {
     } else {
       dropdown.innerHTML = available.map(deal => `
         <button
-          class="w-full text-left px-4 py-2 text-sm hover:bg-[#003366]/5 text-[#343A40] transition-colors"
+          class="w-full text-left px-4 py-2 text-sm hover:bg-[#F0F4F8] text-[#343A40] transition-colors"
           onclick="InviteModal.addDealToRow(${rowId}, '${escapeHtml(deal.id)}', '${escapeHtml(deal.name)}')"
         >
           ${escapeHtml(deal.name)}
@@ -206,7 +206,7 @@ const InviteModal = (function () {
     } else {
       dropdown.innerHTML = filtered.map(deal => `
         <button
-          class="w-full text-left px-4 py-2 text-sm hover:bg-[#003366]/5 text-[#343A40] transition-colors"
+          class="w-full text-left px-4 py-2 text-sm hover:bg-[#F0F4F8] text-[#343A40] transition-colors"
           onclick="InviteModal.addDealToRow(${rowId}, '${escapeHtml(deal.id)}', '${escapeHtml(deal.name)}')"
         >
           ${escapeHtml(deal.name)}

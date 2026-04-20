@@ -5,6 +5,7 @@ import { useUser } from "@/providers/UserProvider";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SecuritySection } from "./SecuritySection";
 import { PreferencesSection, type PrefsState } from "./PreferencesSection";
 import { ProfileSection, type UserProfile } from "./ProfileSection";
@@ -160,16 +161,25 @@ export default function SettingsPage() {
     }
   };
 
+  const [confirmAction, setConfirmAction] = useState<"discard" | "deactivate" | null>(null);
+
   const handleCancel = () => {
     if (!hasChanges) return;
-    if (!window.confirm("Discard unsaved changes?")) return;
-    if (profile) applyProfile(profile);
-    setHasChanges(false);
+    setConfirmAction("discard");
   };
 
   const handleDeactivate = () => {
-    if (!window.confirm("Are you sure you want to deactivate your account?")) return;
-    showToast("Account deactivation is not available in this version", "error");
+    setConfirmAction("deactivate");
+  };
+
+  const executeConfirm = () => {
+    if (confirmAction === "discard") {
+      if (profile) applyProfile(profile);
+      setHasChanges(false);
+    } else if (confirmAction === "deactivate") {
+      showToast("Account deactivation is not available in this version", "error");
+    }
+    setConfirmAction(null);
   };
 
   const updatePrefs = (patch: Partial<PrefsState>) => {
@@ -340,6 +350,20 @@ export default function SettingsPage() {
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={!!confirmAction}
+        title={confirmAction === "deactivate" ? "Deactivate Account" : "Discard Changes"}
+        message={
+          confirmAction === "deactivate"
+            ? "Are you sure you want to deactivate your account? This will disable your profile and data access."
+            : "Discard all unsaved changes? This cannot be undone."
+        }
+        confirmLabel={confirmAction === "deactivate" ? "Deactivate" : "Discard"}
+        variant={confirmAction === "deactivate" ? "danger" : "default"}
+        onConfirm={executeConfirm}
+        onCancel={() => setConfirmAction(null)}
+      />
     </div>
   );
 }

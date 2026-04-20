@@ -189,7 +189,7 @@ export function FileTable({
                             className="size-6 rounded-full bg-cover bg-slate-200 flex items-center justify-center text-[10px] font-semibold text-slate-600"
                             style={
                               file.author.avatar
-                                ? { backgroundImage: `url('${file.author.avatar}')` }
+                                ? { backgroundImage: `url('${encodeURI(file.author.avatar)}')` }
                                 : undefined
                             }
                             aria-label={file.author.name}
