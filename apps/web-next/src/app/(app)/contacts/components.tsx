@@ -76,11 +76,9 @@ const STAGE_STYLES: Record<string, { bg: string; text: string; label: string }> 
   CLOSED_LOST:    { bg: "bg-red-50", text: "text-red-700", label: "Closed Lost" },
 };
 
-export function getInitials(firstName?: string, lastName?: string): string {
-  const f = (firstName || "").trim();
-  const l = (lastName || "").trim();
-  return ((f[0] || "") + (l[0] || "")).toUpperCase() || "?";
-}
+// Imported from shared formatters and re-exported for contacts/page.tsx
+import { getInitials } from "@/lib/formatters";
+export { getInitials };
 
 export function getRelationshipLabel(score: number | null | undefined): string {
   if (!score && score !== 0) return "Cold";

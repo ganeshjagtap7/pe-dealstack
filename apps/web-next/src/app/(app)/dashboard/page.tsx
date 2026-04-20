@@ -43,12 +43,16 @@ export default function DashboardPage() {
     async function load() {
       try {
         const [dealsRes, tasksRes] = await Promise.allSettled([
-          api.get<{ deals: Deal[]; total: number }>("/deals?limit=100&sortBy=updatedAt&sortOrder=desc"),
+          api.get<Deal[] | { deals: Deal[] }>("/deals?limit=100&sortBy=updatedAt&sortOrder=desc"),
           api.get<{ tasks: Task[] } | Task[]>("/tasks?limit=5"),
         ]);
         if (dealsRes.status === "fulfilled") {
-          setAllDeals(dealsRes.value.deals || []);
-          setDeals((dealsRes.value.deals || []).slice(0, 5));
+          // API returns plain array; handle both formats for safety
+          const rawDeals = Array.isArray(dealsRes.value)
+            ? dealsRes.value
+            : (dealsRes.value as { deals: Deal[] }).deals || [];
+          setAllDeals(rawDeals);
+          setDeals(rawDeals.slice(0, 5));
         } else {
           console.warn("[dashboard] failed to load deals:", dealsRes.reason);
         }

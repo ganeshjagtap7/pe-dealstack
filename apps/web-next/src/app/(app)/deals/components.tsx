@@ -294,8 +294,8 @@ export function DealCard({
                 </span>
               </div>
               <div>
-                <h3 className="text-text-main font-bold text-base leading-tight group-hover/card:text-[#003366] transition-colors">
-                  {deal.name}
+                <h3 className="text-text-main font-bold text-base leading-tight group-hover/card:text-[#003366] transition-colors truncate max-w-[200px]" title={deal.name}>
+                  {deal.companyName || deal.name}
                 </h3>
                 <p className="text-text-muted text-xs font-medium">
                   {deal.industry || "N/A"}
@@ -314,50 +314,22 @@ export function DealCard({
             </span>
           </div>
 
-          {/* Metrics Grid */}
+          {/* Metrics */}
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                IRR (Proj)
-              </span>
-              <span className="text-text-main font-bold text-lg">
-                {deal.irrProjected != null
-                  ? deal.irrProjected.toFixed(1) + "%"
-                  : "N/A"}
-              </span>
-            </div>
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                MoM
-              </span>
-              <span
-                className={cn(
-                  "font-bold text-lg",
-                  (deal.mom ?? 0) >= 3 ? "text-green-600" : "text-text-main"
-                )}
-              >
-                {deal.mom != null ? deal.mom.toFixed(1) + "x" : "N/A"}
-              </span>
-            </div>
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                EBITDA
-              </span>
-              <span
-                className={cn(
-                  "font-bold text-lg",
-                  (deal.ebitda ?? 0) < 0 ? "text-red-600" : "text-text-main"
-                )}
-              >
-                {formatCurrency(deal.ebitda)}
-              </span>
-            </div>
             <div className="bg-gray-50 rounded-md p-3">
               <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
                 Revenue
               </span>
               <span className="text-text-main font-bold text-lg">
                 {formatCurrency(deal.revenue)}
+              </span>
+            </div>
+            <div className="bg-gray-50 rounded-md p-3">
+              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
+                Deal Size
+              </span>
+              <span className="text-text-main font-bold text-lg">
+                {formatCurrency(deal.dealSize)}
               </span>
             </div>
           </div>
@@ -421,8 +393,8 @@ export function KanbanCard({ deal }: { deal: Deal }) {
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold text-text-main truncate hover:text-[#003366] transition-colors">
-              {deal.name}
+            <h4 className="text-sm font-semibold text-text-main truncate hover:text-[#003366] transition-colors" title={deal.name}>
+              {deal.companyName || deal.name}
             </h4>
             <p className="text-[11px] text-text-muted truncate">
               {deal.industry || "N/A"}
@@ -431,21 +403,15 @@ export function KanbanCard({ deal }: { deal: Deal }) {
         </div>
         <div className="flex gap-3 mb-2">
           <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
-            <span className="text-[9px] text-text-muted font-medium uppercase block">IRR</span>
-            <span className="text-xs font-bold text-text-main">
-              {deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "N/A"}
-            </span>
-          </div>
-          <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
-            <span className="text-[9px] text-text-muted font-medium uppercase block">EBITDA</span>
-            <span className="text-xs font-bold text-text-main">
-              {formatCurrency(deal.ebitda)}
-            </span>
-          </div>
-          <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
             <span className="text-[9px] text-text-muted font-medium uppercase block">Revenue</span>
             <span className="text-xs font-bold text-text-main">
               {formatCurrency(deal.revenue)}
+            </span>
+          </div>
+          <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
+            <span className="text-[9px] text-text-muted font-medium uppercase block">Deal Size</span>
+            <span className="text-xs font-bold text-text-main">
+              {formatCurrency(deal.dealSize)}
             </span>
           </div>
         </div>

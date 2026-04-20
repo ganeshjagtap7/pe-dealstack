@@ -28,10 +28,7 @@ function getRoleLabel(role: string | undefined): string {
   return ROLE_LABELS[role || ""] || role || "Member";
 }
 
-function getInitials(name: string | undefined): string {
-  if (!name) return "U";
-  return name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-}
+import { getInitials } from "@/lib/formatters";
 
 // ─── Component ──────────────────────────────────────────────────────
 

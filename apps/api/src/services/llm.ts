@@ -144,7 +144,7 @@ export function getModel(
 
 // ─── Availability Checks ──────────────────────────────────────────
 
-export function isOpenAIAvailable(): boolean {
+export function isOpenAICompatibleAvailable(): boolean {
   return !!process.env.OPENAI_API_KEY || !!process.env.OPENROUTER_API_KEY;
 }
 
@@ -153,7 +153,7 @@ export function isGeminiAvailable(): boolean {
 }
 
 export function isLLMAvailable(): boolean {
-  return isOpenAIAvailable() || isGeminiAvailable();
+  return isOpenAICompatibleAvailable() || isGeminiAvailable();
 }
 
 /** Get the currently configured chat provider name */
@@ -168,7 +168,7 @@ log.info('LLM abstraction initialized', {
   chatModel: MODELS[config.chatProvider].chat,
   fastProvider: config.fastProvider,
   fastModel: MODELS[config.fastProvider].fast,
-  openaiAvailable: isOpenAIAvailable(),
+  openaiCompatibleAvailable: isOpenAICompatibleAvailable(),
   geminiAvailable: isGeminiAvailable(),
   routedThroughOpenRouter: useOpenRouter,
 });

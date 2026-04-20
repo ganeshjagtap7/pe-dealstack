@@ -1,17 +1,18 @@
 "use client";
 
 import React, { RefObject, useState } from "react";
+import DOMPurify from "dompurify";
 import { cn } from "@/lib/cn";
 import { renderMarkdown } from "@/lib/markdown";
 import type { MemoSection, ChatMessage } from "./components";
 
-// Sanitize AI-generated HTML for safe rendering. The content comes from our
-// own API (memo section generate), not from user input, but we strip script
-// tags and event handlers as defense-in-depth.
+// Allowlist-based HTML sanitization via DOMPurify. Permits only safe tags
+// and attributes — strips scripts, iframes, event handlers, javascript: URIs, etc.
 function sanitizeHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/\son\w+\s*=/gi, " data-removed=");
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong", "em", "b", "i", "br", "div", "span", "table", "thead", "tbody", "tr", "th", "td", "a", "blockquote", "code", "pre"],
+    ALLOWED_ATTR: ["class", "href", "target", "rel"],
+  });
 }
 
 /* ------------------------------------------------------------------ */

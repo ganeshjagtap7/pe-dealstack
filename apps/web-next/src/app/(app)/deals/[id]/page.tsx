@@ -15,14 +15,16 @@ import {
   type ChatMessage,
   type Activity,
   type Tab,
-  PIPELINE_STAGES,
   TERMINAL_STAGES,
-  TABS,
   OverviewTab,
   DocumentsTab,
   ChatTab,
   ActivityTab,
   StageChangeModal,
+  StagePipeline,
+  DealMetadataRow,
+  FinancialMetricsRow,
+  FinancialStatementsSection,
 } from "./components";
 
 // ---------------------------------------------------------------------------
@@ -44,13 +46,14 @@ export default function DealDetailPage() {
   const [stageModal, setStageModal] = useState<{ from: string; to: string } | null>(null);
   const [stageNote, setStageNote] = useState("");
   const [stageChanging, setStageChanging] = useState(false);
+  const [stageError, setStageError] = useState("");
 
   // Documents
   const [documents, setDocuments] = useState<DocItem[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Chat
+  // Chat (always visible in sidebar, load eagerly)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [chatSending, setChatSending] = useState(false);
@@ -68,7 +71,18 @@ export default function DealDetailPage() {
     setLoading(true);
     setError("");
     try {
-      const data = await api.get<DealDetail>(`/deals/${dealId}`);
+      const raw = await api.get<DealDetail & { teamMembers?: Array<{ role: string; user: { id: string; name: string; avatar?: string; email?: string } }> }>(`/deals/${dealId}`);
+      // Flatten teamMembers → team (API returns nested join, frontend expects flat)
+      const data: DealDetail = {
+        ...raw,
+        team: raw.team || raw.teamMembers?.map((tm) => ({
+          id: tm.user?.id || "",
+          name: tm.user?.name || "",
+          avatar: tm.user?.avatar,
+          email: tm.user?.email,
+          role: tm.role,
+        })) || [],
+      };
       setDeal(data);
       setDocuments(data.documents || []);
     } catch (err: unknown) {
@@ -106,12 +120,12 @@ export default function DealDetailPage() {
 
   useEffect(() => {
     loadDeal();
-  }, [loadDeal]);
+    loadChatHistory(); // Chat is always visible — load eagerly
+  }, [loadDeal, loadChatHistory]);
 
   useEffect(() => {
     if (activeTab === "Activity") loadActivities();
-    if (activeTab === "Chat") loadChatHistory();
-  }, [activeTab, loadActivities, loadChatHistory]);
+  }, [activeTab, loadActivities]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -127,8 +141,6 @@ export default function DealDetailPage() {
     setStageModal({ from: deal.stage, to: targetStage });
     setStageNote("");
   };
-
-  const [stageError, setStageError] = useState("");
 
   const confirmStageChange = async () => {
     if (!stageModal || !deal) return;
@@ -199,20 +211,27 @@ export default function DealDetailPage() {
     setChatSending(true);
 
     try {
-      const data = await api.post<ChatMessage | { message: ChatMessage }>(
+      const data = await api.post<{ response: string; model?: string }>(
         `/deals/${dealId}/chat`,
         { message: text }
       );
-      const assistantMsg: ChatMessage =
-        "message" in (data as Record<string, unknown>)
-          ? (data as { message: ChatMessage }).message
-          : (data as ChatMessage);
-      if (assistantMsg?.content) {
-        setMessages((prev) => [...prev, { ...assistantMsg, role: "assistant" }]);
+      const responseText =
+        data.response || (data as unknown as { content?: string }).content || "";
+      if (responseText) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `ai-${Date.now()}`,
+            role: "assistant",
+            content: responseText,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
-      const isServerError = msg.includes("API error 5") || msg.includes("API error 429");
+      const isServerError =
+        msg.includes("API error 5") || msg.includes("API error 429");
       setMessages((prev) => [
         ...prev,
         {
@@ -251,7 +270,9 @@ export default function DealDetailPage() {
         <div className="text-center max-w-md">
           <span className="material-symbols-outlined text-5xl text-red-400">error</span>
           <h2 className="mt-3 text-lg font-semibold text-text-main">Deal not found</h2>
-          <p className="mt-1 text-sm text-text-muted">{error || "Could not load this deal."}</p>
+          <p className="mt-1 text-sm text-text-muted">
+            {error || "Could not load this deal."}
+          </p>
           <Link
             href="/deals"
             className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg"
@@ -266,187 +287,141 @@ export default function DealDetailPage() {
   }
 
   const stageStyle = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
-  const currentStageIndex = PIPELINE_STAGES.findIndex((s) => s.key === deal.stage);
-  const isTerminal = TERMINAL_STAGES.includes(deal.stage);
 
   return (
-    <div className="p-4 md:p-6 mx-auto max-w-[1400px] w-full flex flex-col gap-6">
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm text-text-muted">
-        <Link href="/deals" className="hover:text-primary transition-colors">
-          Deals
-        </Link>
-        <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-        <span className="text-text-main font-medium">{deal.name}</span>
-      </div>
-
-      {/* Header */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="size-12 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center text-primary font-bold text-lg">
-            {deal.name?.[0] || "D"}
-          </div>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold text-text-main tracking-tight">{deal.name}</h1>
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-                  stageStyle.bg,
-                  stageStyle.text
-                )}
-              >
-                <span className={cn("size-1.5 rounded-full", stageStyle.border.replace("border-", "bg-"))} />
-                {STAGE_LABELS[deal.stage] || deal.stage}
-              </span>
-            </div>
-            {deal.industry && (
-              <p className="text-sm text-text-muted mt-0.5">{deal.industry}</p>
-            )}
-          </div>
+    <div className="p-4 md:p-6 mx-auto max-w-[1400px] w-full flex flex-col gap-5">
+      {/* Breadcrumb bar with actions */}
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 text-sm text-text-muted">
+          <Link href="/deals" className="hover:text-primary transition-colors">
+            Deals
+          </Link>
+          <span className="material-symbols-outlined text-[14px]">chevron_right</span>
+          <span className="text-text-main font-medium truncate max-w-[300px]">
+            {deal.name}
+          </span>
         </div>
-
         <div className="flex items-center gap-3">
-          {/* Team avatars */}
-          {deal.team && deal.team.length > 0 && (
-            <div className="flex -space-x-2 mr-2">
-              {deal.team.slice(0, 4).map((m) => (
-                <div
-                  key={m.id}
-                  className="size-8 rounded-full bg-blue-100 border-2 border-white flex items-center justify-center text-xs font-semibold text-primary"
-                  title={m.name}
-                >
-                  {m.name?.[0]?.toUpperCase() || "?"}
-                </div>
-              ))}
-              {deal.team.length > 4 && (
-                <div className="size-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-xs font-semibold text-text-muted">
-                  +{deal.team.length - 4}
-                </div>
-              )}
-            </div>
-          )}
-
+          <Link
+            href={`/data-room/${dealId}`}
+            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary border border-border-subtle rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">folder_open</span>
+            Data Room
+          </Link>
           <button
             onClick={() => router.push(`/deals/${dealId}/edit`)}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-text-secondary border border-border-subtle rounded-lg hover:bg-gray-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm transition-colors"
+            style={{ backgroundColor: "#003366" }}
           >
-            <span className="material-symbols-outlined text-[18px]">edit</span>
-            Edit
+            <span className="material-symbols-outlined text-[18px]">edit_document</span>
+            Edit Deal
           </button>
         </div>
       </div>
 
-      {/* Stage Pipeline */}
-      <div className="bg-surface-card border border-border-subtle rounded-xl p-4 shadow-card">
-        <div className="flex items-center gap-1">
-          {PIPELINE_STAGES.map((stage, index) => {
-            const isPast = currentStageIndex >= 0 && index < currentStageIndex;
-            const isCurrent = index === currentStageIndex && !isTerminal;
-            const isFuture = currentStageIndex < 0 || index > currentStageIndex || isTerminal;
-
-            return (
-              <div
-                key={stage.key}
-                className="flex-1 flex flex-col items-center relative group cursor-pointer"
-                onClick={() => handleStageClick(stage.key)}
-              >
-                <div className="flex items-center w-full">
-                  {index > 0 && (
-                    <div
-                      className={cn(
-                        "flex-1 h-0.5",
-                        isPast || isCurrent ? "bg-emerald-500" : "bg-gray-200"
-                      )}
-                    />
-                  )}
-                  {index === 0 && <div className="flex-1" />}
-                  <div
-                    className={cn(
-                      "size-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
-                      isPast && "bg-emerald-500 text-white",
-                      isCurrent &&
-                        "bg-primary text-white ring-2 ring-primary/30 shadow-lg",
-                      isFuture && !isCurrent && "bg-gray-100 text-gray-400"
-                    )}
-                  >
-                    {isPast ? (
-                      <span className="material-symbols-outlined text-sm">check</span>
-                    ) : (
-                      <span className="material-symbols-outlined text-sm">{stage.icon}</span>
-                    )}
-                  </div>
-                  {index < PIPELINE_STAGES.length - 1 ? (
-                    <div
-                      className={cn(
-                        "flex-1 h-0.5",
-                        isPast ? "bg-emerald-500" : "bg-gray-200"
-                      )}
-                    />
-                  ) : (
-                    <div className="flex-1" />
-                  )}
-                </div>
+      {/* Two-column layout */}
+      <div className="flex gap-6">
+        {/* LEFT COLUMN */}
+        <div className="flex-1 min-w-0 flex flex-col gap-5">
+          {/* Deal header */}
+          <div className="flex items-center gap-4">
+            <div className="size-14 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center">
+              <span className="material-symbols-outlined text-primary text-2xl">
+                business
+              </span>
+            </div>
+            <div>
+              <div className="flex items-center gap-3">
+                <h1 className="text-2xl font-bold text-text-main tracking-tight">
+                  {deal.name}
+                </h1>
                 <span
                   className={cn(
-                    "text-[10px] mt-1.5 text-center leading-tight whitespace-nowrap",
-                    isPast && "text-emerald-600 font-medium",
-                    isCurrent && "text-primary font-bold",
-                    isFuture && !isCurrent && "text-gray-400"
+                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                    stageStyle.bg,
+                    stageStyle.text
                   )}
                 >
-                  {stage.label}
+                  <span
+                    className={cn(
+                      "size-1.5 rounded-full",
+                      stageStyle.border.replace("border-", "bg-")
+                    )}
+                  />
+                  {STAGE_LABELS[deal.stage] || deal.stage}
                 </span>
               </div>
-            );
-          })}
+              {deal.industry && (
+                <p className="text-sm text-text-muted mt-0.5">{deal.industry}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Stage Pipeline */}
+          <StagePipeline deal={deal} onStageClick={handleStageClick} />
+
+          {/* Metadata row */}
+          <DealMetadataRow deal={deal} />
+
+          {/* Financial metrics row */}
+          <FinancialMetricsRow deal={deal} />
+
+          {/* Financial Statements section */}
+          <FinancialStatementsSection dealId={dealId} />
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1 border-b border-border-subtle">
+            {(["Overview", "Documents", "Activity"] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={cn(
+                  "px-4 py-2.5 text-sm font-medium transition-colors relative",
+                  activeTab === tab
+                    ? "text-primary"
+                    : "text-text-muted hover:text-text-secondary"
+                )}
+              >
+                {tab}
+                {activeTab === tab && (
+                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Tab content */}
+          <div>
+            {activeTab === "Overview" && <OverviewTab deal={deal} />}
+            {activeTab === "Documents" && (
+              <DocumentsTab
+                documents={documents}
+                uploading={uploading}
+                fileInputRef={fileInputRef}
+                onUpload={handleUpload}
+              />
+            )}
+            {activeTab === "Activity" && (
+              <ActivityTab activities={activities} loading={activitiesLoading} />
+            )}
+          </div>
+        </div>
+
+        {/* RIGHT COLUMN — AI Chat sidebar (sticky, desktop only) */}
+        <div className="hidden lg:block w-80 shrink-0">
+          <div className="sticky top-6">
+            <ChatTab
+              messages={messages}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              chatSending={chatSending}
+              onSend={sendMessage}
+              chatEndRef={chatEndRef}
+            />
+          </div>
         </div>
       </div>
-
-      {/* Tabs */}
-      <div className="flex items-center gap-1 border-b border-border-subtle">
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={cn(
-              "px-4 py-2.5 text-sm font-medium transition-colors relative",
-              activeTab === tab
-                ? "text-primary"
-                : "text-text-muted hover:text-text-secondary"
-            )}
-          >
-            {tab}
-            {activeTab === tab && (
-              <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-            )}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === "Overview" && <OverviewTab deal={deal} />}
-      {activeTab === "Documents" && (
-        <DocumentsTab
-          documents={documents}
-          uploading={uploading}
-          fileInputRef={fileInputRef}
-          onUpload={handleUpload}
-        />
-      )}
-      {activeTab === "Chat" && (
-        <ChatTab
-          messages={messages}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          chatSending={chatSending}
-          onSend={sendMessage}
-          chatEndRef={chatEndRef}
-        />
-      )}
-      {activeTab === "Activity" && (
-        <ActivityTab activities={activities} loading={activitiesLoading} />
-      )}
 
       {/* Stage Change Modal */}
       {stageModal && (
@@ -458,7 +433,10 @@ export default function DealDetailPage() {
           loading={stageChanging}
           error={stageError}
           onConfirm={confirmStageChange}
-          onClose={() => { setStageModal(null); setStageError(""); }}
+          onClose={() => {
+            setStageModal(null);
+            setStageError("");
+          }}
         />
       )}
     </div>

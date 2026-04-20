@@ -335,7 +335,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
         const completion = await openai.chat.completions.create({
           model: MODEL_REASONING,
           messages,
-          max_tokens: 2048,
+          max_tokens: 4096,
           temperature: 0.7,
         });
 

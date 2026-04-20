@@ -2,6 +2,7 @@
 
 import { cn } from "@/lib/cn";
 import { formatRelativeTime } from "@/lib/formatters";
+import { renderMarkdown } from "@/lib/markdown";
 import type { ChatMessage, Activity } from "./components";
 
 // ---------------------------------------------------------------------------
@@ -31,7 +32,15 @@ export function ChatTab({
   };
 
   return (
-    <div className="flex flex-col bg-surface-card border border-border-subtle rounded-xl shadow-card overflow-hidden" style={{ height: "500px" }}>
+    <div className="flex flex-col bg-surface-card border border-border-subtle rounded-xl shadow-card overflow-hidden h-[calc(100vh-10rem)]">
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-border-subtle flex items-center gap-2">
+        <div className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+        <span className="text-sm font-bold text-text-main tracking-wide">Deal Assistant AI</span>
+        <span className="px-2 py-0.5 rounded text-[10px] uppercase font-bold bg-blue-50 text-primary border border-primary/20">
+          Beta
+        </span>
+      </div>
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
         {messages.length === 0 && (
@@ -42,41 +51,43 @@ export function ChatTab({
           </div>
         )}
         {messages.map((msg) => (
-          <div
-            key={msg.id}
-            className={cn(
-              "flex gap-3 max-w-[85%]",
-              msg.role === "user" ? "ml-auto flex-row-reverse" : ""
+          <div key={msg.id} className={cn("flex gap-2.5", msg.role === "user" ? "justify-end" : "justify-start")}>
+            {msg.role === "assistant" && (
+              <div className="size-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0 mt-0.5">
+                <span className="material-symbols-outlined text-emerald-700 text-[14px]">smart_toy</span>
+              </div>
             )}
-          >
-            <div
-              className={cn(
-                "size-7 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold",
-                msg.role === "user"
-                  ? "bg-primary text-white"
-                  : "bg-purple-100 text-purple-700"
+            <div className={cn(
+              "max-w-[80%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
+              msg.role === "user"
+                ? "bg-primary text-white rounded-br-sm"
+                : "bg-white border border-border-subtle text-text-main rounded-bl-sm"
+            )}>
+              {msg.role === "assistant" && (
+                <p className="text-[10px] text-text-muted font-medium mb-1">PE OS AI</p>
               )}
-            >
-              {msg.role === "user" ? "U" : "AI"}
-            </div>
-            <div
-              className={cn(
-                "rounded-lg px-3.5 py-2.5 text-sm leading-relaxed",
-                msg.role === "user"
-                  ? "bg-primary text-white"
-                  : "bg-gray-50 border border-border-subtle text-text-main"
+              {msg.role === "user" ? (
+                <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+              ) : (
+                <div
+                  className="chat-markdown space-y-1 break-words [&_p]:mb-1.5 [&_ul]:pl-4 [&_ul]:list-disc [&_li]:mb-0.5 [&_strong]:font-semibold"
+                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                />
               )}
-            >
-              {msg.content}
             </div>
+            {msg.role === "user" && (
+              <div className="size-7 rounded-full bg-primary flex items-center justify-center shrink-0 mt-0.5 text-white text-xs font-bold">
+                U
+              </div>
+            )}
           </div>
         ))}
         {chatSending && (
-          <div className="flex gap-3">
-            <div className="size-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0 text-xs font-semibold text-purple-700">
-              AI
+          <div className="flex gap-2.5">
+            <div className="size-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+              <span className="material-symbols-outlined text-emerald-700 text-[14px]">smart_toy</span>
             </div>
-            <div className="bg-gray-50 border border-border-subtle rounded-lg px-3.5 py-2.5">
+            <div className="bg-white border border-border-subtle rounded-xl rounded-bl-sm px-3.5 py-2.5">
               <span className="material-symbols-outlined text-sm animate-spin text-text-muted">
                 progress_activity
               </span>

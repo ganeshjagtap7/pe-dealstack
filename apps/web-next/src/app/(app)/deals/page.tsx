@@ -66,8 +66,13 @@ export default function DealsPage() {
       if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
       params.set("limit", "50");
 
-      const data = await api.get<Deal[]>(`/deals?${params}`);
-      const list = Array.isArray(data) ? data : [];
+      const data = await api.get<(Deal & { company?: { name?: string } })[]>(`/deals?${params}`);
+      const raw = Array.isArray(data) ? data : [];
+      // Flatten company.name into companyName for display
+      const list = raw.map((d) => ({
+        ...d,
+        companyName: d.companyName || d.company?.name || undefined,
+      }));
       setDeals(list);
       setIndustries([...new Set(list.map((d) => d.industry).filter(Boolean) as string[])].sort());
     } catch (err) {

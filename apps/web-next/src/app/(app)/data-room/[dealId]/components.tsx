@@ -106,7 +106,8 @@ export function CreateFolderModal({
             type="button"
             onClick={onSubmit}
             disabled={!newFolderName.trim() || creatingFolder}
-            className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-slate-900 hover:bg-slate-800"
+            className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+            style={{ backgroundColor: "#003366" }}
           >
             {creatingFolder ? "Creating..." : "Create Folder"}
           </button>

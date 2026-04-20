@@ -2,11 +2,18 @@
 
 import { cn } from "@/lib/cn";
 import { formatCurrency, formatRelativeTime, formatFileSize, getDocIcon } from "@/lib/formatters";
-import { STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
-
+import { STAGE_LABELS } from "@/lib/constants";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+export interface AssignedUser {
+  id: string;
+  name: string;
+  avatar?: string;
+  email?: string;
+  title?: string;
+}
 
 export interface DealDetail {
   id: string;
@@ -25,6 +32,8 @@ export interface DealDetail {
   aiRisks?: { keyRisks?: string[]; investmentHighlights?: string[] };
   description?: string;
   assignee?: string;
+  assignedUser?: AssignedUser | null;
+  source?: string;
   createdAt: string;
   updatedAt: string;
   documents?: DocItem[];
@@ -79,59 +88,56 @@ export const PIPELINE_STAGES = [
 
 export const TERMINAL_STAGES = ["CLOSED", "PASSED"];
 
-export const TABS = ["Overview", "Documents", "Chat", "Activity"] as const;
+export const TABS = ["Overview", "Documents", "Activity"] as const;
 export type Tab = (typeof TABS)[number];
+
+// ---------------------------------------------------------------------------
+// Re-export layout components from deal-layout.tsx
+// ---------------------------------------------------------------------------
+
+export { StagePipeline, DealMetadataRow, FinancialMetricsRow, FinancialStatementsSection } from "./deal-layout";
 
 // ---------------------------------------------------------------------------
 // Overview Tab
 // ---------------------------------------------------------------------------
 
 export function OverviewTab({ deal }: { deal: DealDetail }) {
-  const metrics = [
-    { label: "Deal Size", value: formatCurrency(deal.dealSize), icon: "payments" },
-    { label: "Revenue", value: formatCurrency(deal.revenue), icon: "trending_up" },
-    { label: "EBITDA", value: formatCurrency(deal.ebitda), icon: "analytics" },
-    {
-      label: "Target Return",
-      value: deal.targetReturn != null ? `${deal.targetReturn}%` : "N/A",
-      icon: "target",
-    },
-    {
-      label: "EV Multiple",
-      value: deal.evMultiple != null ? `${deal.evMultiple}x` : "N/A",
-      icon: "calculate",
-    },
-  ];
-
   const risks = deal.aiRisks?.keyRisks || [];
   const highlights = deal.aiRisks?.investmentHighlights || [];
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* Left column: metrics + thesis */}
-      <div className="lg:col-span-2 flex flex-col gap-6">
-        {/* Metric cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-          {metrics.map((m) => (
-            <div
-              key={m.label}
-              className="bg-surface-card border border-border-subtle rounded-lg p-3 shadow-card"
-            >
-              <div className="flex items-center gap-1.5 mb-1">
-                <span className="material-symbols-outlined text-[16px] text-text-muted">
-                  {m.icon}
-                </span>
-                <span className="text-[10px] text-text-muted uppercase tracking-wider">
-                  {m.label}
-                </span>
-              </div>
-              <p className="text-lg font-bold text-text-main">{m.value}</p>
-            </div>
-          ))}
-        </div>
-
-        {/* AI Thesis */}
+    <div className="flex flex-col gap-6">
+      {/* Key Risks + Highlights (top, full width) */}
+      {(risks.length > 0 || highlights.length > 0) && (
         <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="material-symbols-outlined text-[20px] text-red-400">shield</span>
+            <h3 className="text-sm font-bold text-text-main uppercase tracking-wide">Key Risks</h3>
+          </div>
+          <div className="space-y-2.5">
+            {risks.map((risk, i) => (
+              <div key={i} className="flex items-start gap-3 p-3 bg-amber-50/50 border border-amber-200/50 rounded-lg">
+                <span className={cn(
+                  "material-symbols-outlined text-base mt-0.5 shrink-0",
+                  i === 0 ? "text-red-400" : "text-amber-500"
+                )}>
+                  {i === 0 ? "error" : "warning"}
+                </span>
+                <p className="text-sm text-text-secondary leading-relaxed">{risk}</p>
+              </div>
+            ))}
+            {highlights.map((h, i) => (
+              <div key={`h-${i}`} className="flex items-start gap-3 p-3 bg-emerald-50/50 border border-emerald-200/50 rounded-lg">
+                <span className="material-symbols-outlined text-emerald-500 text-base mt-0.5 shrink-0">check_circle</span>
+                <p className="text-sm text-text-secondary leading-relaxed">{h}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI Thesis */}
+      <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
           <div className="flex items-center gap-2 mb-3">
             <span className="material-symbols-outlined text-[20px] text-primary">auto_awesome</span>
             <h3 className="text-sm font-semibold text-text-main">AI Investment Thesis</h3>
@@ -154,88 +160,6 @@ export function OverviewTab({ deal }: { deal: DealDetail }) {
             </p>
           </div>
         )}
-      </div>
-
-      {/* Right column: risks + highlights */}
-      <div className="flex flex-col gap-6">
-        <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[20px] text-red-400">shield</span>
-            <h3 className="text-sm font-semibold text-text-main">Key Risks</h3>
-          </div>
-          {risks.length === 0 && highlights.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-6 text-text-muted">
-              <span className="material-symbols-outlined text-2xl mb-2">shield</span>
-              <p className="text-sm">No risks identified yet</p>
-              <p className="text-xs mt-1">Upload documents or use AI chat to analyze risks</p>
-            </div>
-          ) : (
-            <ul className="space-y-2">
-              {risks.map((risk, i) => (
-                <li
-                  key={i}
-                  className={cn(
-                    "bg-white border border-border-subtle p-3 rounded-lg",
-                    i === 0 ? "border-l-2 border-l-red-400" : "border-l-2 border-l-orange-300"
-                  )}
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span
-                      className={cn(
-                        "material-symbols-outlined text-base mt-0.5 shrink-0",
-                        i === 0 ? "text-red-400" : "text-orange-400"
-                      )}
-                    >
-                      {i === 0 ? "error" : "warning"}
-                    </span>
-                    <p className="text-xs text-text-secondary leading-snug">{risk}</p>
-                  </div>
-                </li>
-              ))}
-              {highlights.map((h, i) => (
-                <li
-                  key={`h-${i}`}
-                  className="bg-white border border-border-subtle border-l-2 border-l-emerald-500 p-3 rounded-lg"
-                >
-                  <div className="flex items-start gap-2.5">
-                    <span className="material-symbols-outlined text-emerald-500 text-base mt-0.5 shrink-0">
-                      check_circle
-                    </span>
-                    <p className="text-xs text-text-secondary leading-snug">{h}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {/* Deal info */}
-        <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-          <h3 className="text-sm font-semibold text-text-main mb-3">Deal Info</h3>
-          <dl className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <dt className="text-text-muted">Created</dt>
-              <dd className="text-text-main font-medium">{formatRelativeTime(deal.createdAt)}</dd>
-            </div>
-            <div className="flex justify-between">
-              <dt className="text-text-muted">Updated</dt>
-              <dd className="text-text-main font-medium">{formatRelativeTime(deal.updatedAt)}</dd>
-            </div>
-            {deal.assignee && (
-              <div className="flex justify-between">
-                <dt className="text-text-muted">Assignee</dt>
-                <dd className="text-text-main font-medium">{deal.assignee}</dd>
-              </div>
-            )}
-            {deal.priority && (
-              <div className="flex justify-between">
-                <dt className="text-text-muted">Priority</dt>
-                <dd className="text-text-main font-medium capitalize">{deal.priority}</dd>
-              </div>
-            )}
-          </dl>
-        </div>
-      </div>
     </div>
   );
 }

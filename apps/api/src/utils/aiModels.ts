@@ -29,8 +29,7 @@ export const AI_MODELS = {
 /** Memos, deal chat, financial extraction, analysis */
 export const MODEL_REASONING = AI_MODELS.TIER1;
 
-/** Vision (image understanding), classification, document insights */
-export const MODEL_VISION = AI_MODELS.TIER2;
+/** Classification, document insights, vision (image understanding) */
 export const MODEL_CLASSIFICATION = AI_MODELS.TIER2;
 export const MODEL_INSIGHTS = AI_MODELS.TIER2;
 
@@ -50,6 +49,6 @@ export function isOpenRouterEnabled(): boolean {
 
 /** Headers OpenRouter recommends for attribution / rate-limit pools */
 export const OPENROUTER_HEADERS = {
-  'HTTP-Referer': process.env.APP_URL || 'https://pe-dealstack.local',
+  'HTTP-Referer': process.env.APP_URL || 'https://pe-dealstack.vercel.app',
   'X-Title': 'PE OS',
 };

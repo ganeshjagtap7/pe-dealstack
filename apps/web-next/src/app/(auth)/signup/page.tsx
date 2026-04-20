@@ -223,7 +223,7 @@ export default function SignupPage() {
                 </button>
               </div>
               <p className="text-xs text-[#617289] mt-1">
-                Min 8 characters, one uppercase, one number
+                Min 10 characters, one uppercase, one number
               </p>
               {password.length > 0 && (
                 <div>
