@@ -269,7 +269,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Portfolio Allocation */}
-            <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden p-6 gap-5">
+            <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card p-6 gap-5">
               <div className="flex items-center justify-between">
                 <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
                 <span className="material-symbols-outlined text-text-muted">pie_chart</span>

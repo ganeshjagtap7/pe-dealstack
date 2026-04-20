@@ -160,9 +160,9 @@ export function ResourceAllocation({ members, tasks }: Props) {
                     {!cache?.loaded ? (
                       <span className="text-xs text-text-muted">…</span>
                     ) : dealNames.length > 0 ? (
-                      dealNames.map((n) => (
+                      dealNames.map((n, idx) => (
                         <span
-                          key={n}
+                          key={idx}
                           className="text-xs bg-gray-100 text-text-secondary px-2 py-0.5 rounded border border-border-subtle"
                         >
                           {n}
