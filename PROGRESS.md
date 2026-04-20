@@ -5,6 +5,108 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 60 — April 20, 2026
+
+#### Timestamp: April 20, 2026 — IST
+
+#### Goal: Deal Import QA Bug Fixes — 5 bugs reported by tester
+
+---
+
+#### 1. Fix: ARR/MRR Columns Misclassified as EBITDA
+
+**Problem:** When importing deals from Notion, columns named "ARR" (Annual Recurring Revenue) or "MRR" were being mapped by GPT-4o to the EBITDA field instead of Revenue. This caused misleading financial numbers in the preview and on imported deals — e.g., ARR of $5.5M showing as EBITDA $5.5.
+
+**Root Cause:** The GPT-4o column mapping prompt (`dealImportMapper.ts`) listed `ebitda` and `revenue` as separate fields but gave no guidance about SaaS metrics like ARR/MRR. GPT-4o picked `ebitda` as the closest match since both are financial metrics.
+
+**Fix (2-layer):**
+1. Updated GPT-4o prompt to explicitly state: "Only map columns labeled EBITDA to ebitda. Map ARR, MRR, Sales, Turnover to revenue."
+2. Added deterministic post-AI overrides — regex patterns force-correct known column names (`/\b(arr|mrr|sales|turnover)\b/i` → `revenue`) regardless of what GPT-4o returns. Also handles `Enterprise Value` → `dealSize` and `MOIC` → `mom`.
+
+**Files Changed:**
+- `apps/api/src/services/dealImportMapper.ts` — prompt update + deterministic override block
+
+---
+
+#### 2. Fix: Only ~80 of 430 Deals Imported (Serverless Timeout)
+
+**Problem:** User imported 436 deals from Notion CSV. Preview showed "430 valid" but only ~80 actually imported. The rest silently failed.
+
+**Root Cause:** The import endpoint processed deals **sequentially** — each deal required 3 separate Supabase queries (company lookup, duplicate check, insert). For 430 deals = ~1,290 DB roundtrips. On Vercel serverless (10-30s timeout), the function was killed after ~80 deals. The response never reached the frontend.
+
+**Fix:** Rewrote the entire import endpoint from sequential to **5-phase batched approach**:
+- Phase 1: Pre-fetch ALL existing deal names in one paginated query (handles >1000 deals)
+- Phase 2: Pre-fetch ALL existing companies in one query
+- Phase 3: Validate all rows + detect duplicates in-memory (zero DB calls)
+- Phase 4: Batch-create missing companies (groups of 50)
+- Phase 5: Batch-insert deals (groups of 50) with fallback to individual inserts on error
+
+Result: ~1,290 queries reduced to ~15 total. 430 deals should complete in 2-4 seconds.
+
+**Files Changed:**
+- `apps/api/src/routes/deal-import.ts` — full rewrite of POST `/api/deals/import`
+
+---
+
+#### 3. Fix: "Import Failed" Shown Despite Partial Success
+
+**Problem:** After the timeout killed the import (Bug #2), the frontend showed "Import failed" even though ~80 deals were successfully inserted in the DB.
+
+**Root Cause:** The `fetch()` promise rejected on timeout → catch block showed generic "Import failed" message with no awareness of partial success state.
+
+**Fix:**
+- Added 3-state result display: full success (green checkmark), partial success (amber warning: "X of Y deals imported"), total failure (red error)
+- Catch block now detects timeout-like errors and shows: "Request timed out. Some deals may have been imported — refresh the CRM page to check."
+- Added guard for server 500 errors (when response has no `imported` field)
+
+**Files Changed:**
+- `apps/web/js/deal-import.js` — result display logic + catch block improvement
+
+---
+
+#### 4. Fix: Financial Values Not Formatted in Preview Table
+
+**Problem:** Dollar amounts, percentages, and multiples in the Step 3 preview table appeared as raw numbers (e.g., "50000000" instead of "$50,000,000").
+
+**Root Cause:** The formatting code used `typeof val === 'number'` guard, but values coming from the transform pipeline could remain as strings (e.g., `"50000000"`) if no transform was applied. String values bypassed all formatting.
+
+**Fix:** Replaced `typeof` guard with `Number(val)` coercion — now formats any value that can be parsed as a number, regardless of whether it's stored as string or number type.
+
+**Files Changed:**
+- `apps/web/js/deal-import.js` — preview table formatting in `applyMappingAndPreview()`
+
+---
+
+#### 5. Fix: Duplicate Deals Allowed on Re-Import
+
+**Problem:** Re-importing the same Notion CSV created duplicate deals in the CRM instead of rejecting them.
+
+**Root Cause (3 causes):**
+1. **Primary:** Bug #2 (timeout) — first import only got ~80 deals. Second import: those 80 caught as duplicates, but the ~350 that failed silently now imported fresh → user sees "duplicates"
+2. **Case-sensitive matching:** Old code used `eq('name', deal.name)` — exact match. "Acme Corp" ≠ "acme corp"
+3. **No intra-file dedup:** If CSV had "Acme" twice, both would import
+
+**Fix:**
+- Pre-fetch ALL existing deal names (paginated for >1000), stored in Set with lowercase keys
+- Case-insensitive comparison via `.toLowerCase().trim()`
+- Intra-batch dedup: checks each incoming deal name against already-validated deals in same import
+- Company dedup: uses Map keyed by lowercase to prevent "Acme Corp" and "acme corp" creating two companies
+
+**Files Changed:**
+- `apps/api/src/routes/deal-import.ts` — duplicate detection logic
+
+---
+
+#### Summary of Files Changed
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/services/dealImportMapper.ts` | GPT-4o prompt update + deterministic ARR/MRR/EV/MOIC overrides |
+| `apps/api/src/routes/deal-import.ts` | Full rewrite: batched inserts, paginated pre-fetch, case-insensitive dedup |
+| `apps/web/js/deal-import.js` | 3-state results, timeout handling, `Number()` formatting fix, server error guard |
+
+---
+
 ### Session 59 — April 19, 2026
 
 #### Timestamp: April 19, 2026 — IST

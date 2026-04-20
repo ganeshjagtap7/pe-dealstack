@@ -376,13 +376,16 @@ function applyMappingAndPreview() {
     const rowClass = hasIssue ? 'bg-red-50' : (i % 2 === 0 ? 'bg-white' : 'bg-slate-50');
     return `<tr class="${rowClass} border-b border-slate-100">${displayFields.map(f => {
       let val = deal[f];
-      if (val === null || val === undefined) val = '—';
-      else if (typeof val === 'number' && ['dealSize', 'ebitda', 'revenue'].includes(f)) {
-        val = '$' + Number(val).toLocaleString();
-      } else if (typeof val === 'number' && f === 'irrProjected') {
-        val = (val * 100).toFixed(1) + '%';
-      } else if (typeof val === 'number' && f === 'mom') {
-        val = val.toFixed(1) + 'x';
+      if (val === null || val === undefined || val === '') val = '—';
+      else if (['dealSize', 'ebitda', 'revenue'].includes(f)) {
+        const num = Number(val);
+        val = isNaN(num) ? String(val) : '$' + num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+      } else if (f === 'irrProjected') {
+        const num = Number(val);
+        val = isNaN(num) ? String(val) : (num * 100).toFixed(1) + '%';
+      } else if (f === 'mom') {
+        const num = Number(val);
+        val = isNaN(num) ? String(val) : num.toFixed(1) + 'x';
       }
       return `<td class="px-3 py-2 text-sm text-slate-700 whitespace-nowrap">${escapeHtml(String(val))}</td>`;
     }).join('')}</tr>`;
@@ -424,20 +427,41 @@ async function submitDealImport() {
     // Show result
     goToImportStep(4);
 
-    if (data.imported > 0) {
+    // Handle server error responses (no imported/failed fields)
+    if (!res.ok && data.imported === undefined) {
+      document.getElementById('import-result-icon').textContent = 'error';
+      document.getElementById('import-result-icon').style.color = '#ef4444';
+      document.getElementById('import-result-title').textContent = 'Import failed';
+      document.getElementById('import-result-detail').textContent = data.error || 'Server error. Please try again.';
+      return;
+    }
+
+    if (data.imported > 0 && data.failed === 0) {
+      // Full success
       document.getElementById('import-result-icon').textContent = 'check_circle';
       document.getElementById('import-result-icon').style.color = '#059669';
       document.getElementById('import-result-title').textContent = `${data.imported} deals imported successfully!`;
 
       let detail = '';
-      if (data.companiesCreated > 0) detail += `${data.companiesCreated} new companies created. `;
-      if (data.failed > 0) detail += `${data.failed} rows failed.`;
+      if (data.companiesCreated > 0) detail += `${data.companiesCreated} new companies created.`;
       document.getElementById('import-result-detail').textContent = detail || 'All deals imported successfully.';
+    } else if (data.imported > 0 && data.failed > 0) {
+      // Partial success
+      document.getElementById('import-result-icon').textContent = 'warning';
+      document.getElementById('import-result-icon').style.color = '#d97706';
+      document.getElementById('import-result-title').textContent = `${data.imported} of ${data.imported + data.failed} deals imported`;
+
+      let detail = `${data.failed} rows failed.`;
+      if (data.companiesCreated > 0) detail = `${data.companiesCreated} new companies created. ` + detail;
+      document.getElementById('import-result-detail').textContent = detail;
     } else {
+      // Total failure
       document.getElementById('import-result-icon').textContent = 'error';
       document.getElementById('import-result-icon').style.color = '#ef4444';
       document.getElementById('import-result-title').textContent = 'Import failed';
-      document.getElementById('import-result-detail').textContent = 'No deals could be imported.';
+      document.getElementById('import-result-detail').textContent = data.errors?.length
+        ? `${data.failed} rows failed. See details below.`
+        : 'No deals could be imported.';
     }
 
     // Show errors if any
@@ -462,7 +486,10 @@ async function submitDealImport() {
     document.getElementById('import-result-icon').textContent = 'error';
     document.getElementById('import-result-icon').style.color = '#ef4444';
     document.getElementById('import-result-title').textContent = 'Import failed';
-    document.getElementById('import-result-detail').textContent = 'An unexpected error occurred. Please try again.';
+    const isTimeout = err?.name === 'TypeError' || err?.message?.includes('fetch');
+    document.getElementById('import-result-detail').textContent = isTimeout
+      ? 'Request timed out. Some deals may have been imported — refresh the CRM page to check.'
+      : 'An unexpected error occurred. Please try again.';
   } finally {
     btn.disabled = false;
     btn.innerHTML = origHTML;
