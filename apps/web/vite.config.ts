@@ -114,6 +114,7 @@ export default defineConfig({
         'help-center': resolve(__dirname, 'help-center.html'),
         templates: resolve(__dirname, 'templates.html'),
         'contacts': resolve(__dirname, 'contacts.html'),
+        'onboarding': resolve(__dirname, 'onboarding.html'),
       },
     },
   },
