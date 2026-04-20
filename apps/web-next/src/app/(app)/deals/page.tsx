@@ -169,7 +169,7 @@ export default function DealsPage() {
   })();
 
   return (
-    <div className="p-6 mx-auto max-w-[1600px] flex flex-col gap-5">
+    <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex flex-col gap-5">
       {/* Header */}
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Pipeline</h1>

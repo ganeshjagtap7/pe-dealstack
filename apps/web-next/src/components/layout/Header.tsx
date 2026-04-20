@@ -41,7 +41,7 @@ export function Header() {
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "";
 
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-40 sticky top-0">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-4 md:px-6 bg-surface-card z-40 sticky top-0 min-w-0">
       <div className="flex items-center gap-4 flex-1">
         <div className="relative hidden w-full max-w-lg md:block group">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -63,9 +63,9 @@ export function Header() {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 md:gap-4 min-w-0">
         {showDealActions && (
-          <>
+          <div className="hidden sm:flex items-center gap-2 md:gap-4">
             <Link
               href="/deals/import"
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium border border-border-subtle text-text-secondary bg-white hover:border-primary hover:text-primary"
@@ -81,7 +81,7 @@ export function Header() {
               <span className="material-symbols-outlined text-[16px]">add</span>
               New Deal
             </Link>
-          </>
+          </div>
         )}
 
         {/* Notifications — real-data dropdown */}

@@ -223,7 +223,7 @@ export default function DealIntakePage() {
   /* ================================================================ */
 
   return (
-    <div className="p-6 mx-auto max-w-4xl flex flex-col gap-5">
+    <div className="p-4 md:p-6 mx-auto max-w-4xl w-full flex flex-col gap-5">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Intake</h1>

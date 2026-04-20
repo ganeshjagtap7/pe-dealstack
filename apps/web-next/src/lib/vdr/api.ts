@@ -263,11 +263,21 @@ export function transformDocument(apiDoc: APIDocument): VDRFile {
       analysisDescription = ai.description || ai.summary || "Document analyzed successfully.";
       analysisColor = "primary";
     }
-  } else if (apiDoc.aiAnalyzedAt) {
+  } else if (apiDoc.aiAnalyzedAt || apiDoc.status === "analyzed") {
     analysisType = "complete";
     analysisLabel = "Analysis Complete";
     analysisDescription = "Document has been analyzed.";
     analysisColor = "primary";
+  } else if (apiDoc.status === "completed") {
+    analysisType = "complete";
+    analysisLabel = "Processed";
+    analysisDescription = "Document uploaded and text extracted.";
+    analysisColor = "primary";
+  } else if (apiDoc.status === "processing") {
+    analysisType = "standard";
+    analysisLabel = "Processing...";
+    analysisDescription = "Document is being analyzed.";
+    analysisColor = "slate";
   }
 
   return {

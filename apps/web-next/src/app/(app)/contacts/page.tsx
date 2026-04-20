@@ -264,7 +264,7 @@ export default function ContactsPage() {
   }
 
   return (
-    <div className="p-6 mx-auto max-w-[1600px] flex flex-col gap-6">
+    <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
@@ -415,8 +415,8 @@ export default function ContactsPage() {
               {viewMode === "grid" ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{grouped[company].map(renderContactCard)}</div>
               ) : (
-                <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-                  <table className="w-full"><thead><tr className="border-b border-border-subtle bg-slate-50/50">
+                <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden overflow-x-auto">
+                  <table className="w-full min-w-[600px]"><thead><tr className="border-b border-border-subtle bg-slate-50/50">
                     <th className="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Name</th>
                     <th className="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Company</th>
                     <th className="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Type</th>
@@ -432,8 +432,8 @@ export default function ContactsPage() {
       ) : viewMode === "grid" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{contacts.map(renderContactCard)}</div>
       ) : (
-        <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-          <table className="w-full"><thead><tr className="border-b border-border-subtle bg-slate-50/50">
+        <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden overflow-x-auto">
+          <table className="w-full min-w-[600px]"><thead><tr className="border-b border-border-subtle bg-slate-50/50">
             <th className="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Name</th>
             <th className="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Company</th>
             <th className="px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider">Type</th>

@@ -337,7 +337,7 @@ export default function DataRoomDealPage({ params }: PageProps) {
       )}
 
       {/* Folder sidebar */}
-      <aside className="w-[280px] min-w-[280px] flex flex-col border-r border-slate-200 bg-white">
+      <aside className="hidden md:flex w-[280px] min-w-[280px] flex-col border-r border-slate-200 bg-white">
         <div className="p-5 border-b border-slate-200/50">
           <Link
             href="/data-room"

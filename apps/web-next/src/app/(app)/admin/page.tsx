@@ -93,7 +93,7 @@ export default function AdminPage() {
 
   if (user && !canView) {
     return (
-      <div className="p-6 mx-auto max-w-[1600px] flex items-center justify-center py-20">
+      <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex items-center justify-center py-20">
         <div className="text-center">
           <span className="material-symbols-outlined text-5xl text-red-400">lock</span>
           <h2 className="mt-3 text-lg font-bold text-text-main">Access Denied</h2>
@@ -107,7 +107,7 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="p-6 mx-auto max-w-[1600px] flex items-center justify-center py-20">
+      <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex items-center justify-center py-20">
         <div className="text-center text-text-muted">
           <span className="material-symbols-outlined text-4xl animate-spin">progress_activity</span>
           <p className="mt-2 text-sm">Loading Command Center...</p>
@@ -147,7 +147,7 @@ export default function AdminPage() {
   };
 
   return (
-    <div className="p-6 mx-auto max-w-[1600px] flex flex-col gap-6">
+    <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex flex-col gap-6">
       {/* Toast */}
       {toast && (
         <div

@@ -1,9 +1,7 @@
 "use client";
 
-import { RefObject } from "react";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
-import { renderMarkdown } from "@/lib/markdown";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -100,7 +98,7 @@ export function MemoListSidebar({
   filteredMemos,
 }: MemoListSidebarProps) {
   return (
-    <div className="w-80 shrink-0 border-r border-border-subtle bg-surface-card flex flex-col overflow-hidden">
+    <div className="hidden lg:flex w-64 shrink-0 border-r border-border-subtle bg-surface-card flex-col overflow-hidden">
       {/* Sidebar header */}
       <div className="p-4 border-b border-border-subtle">
         <div className="flex items-center justify-between mb-3">
@@ -200,120 +198,10 @@ export function MemoListSidebar({
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  MemoChat                                                           */
-/* ------------------------------------------------------------------ */
-
-interface MemoChatProps {
-  messages: ChatMessage[];
-  chatInput: string;
-  setChatInput: (v: string) => void;
-  sendingChat: boolean;
-  onSend: () => void;
-  chatOpen: boolean;
-  onToggleChat: () => void;
-  chatEndRef: RefObject<HTMLDivElement | null>;
-}
-
-export function MemoChat({
-  messages,
-  chatInput,
-  setChatInput,
-  sendingChat,
-  onSend,
-  chatOpen,
-  onToggleChat,
-  chatEndRef,
-}: MemoChatProps) {
-  if (!chatOpen) return null;
-
-  return (
-    <div className="w-96 shrink-0 border-l border-border-subtle bg-surface-card flex flex-col overflow-hidden">
-      {/* Chat header */}
-      <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[18px] text-primary">smart_toy</span>
-          <h3 className="text-sm font-bold text-text-main">AI Analyst</h3>
-        </div>
-        <button onClick={onToggleChat} className="text-text-muted hover:text-text-main transition-colors">
-          <span className="material-symbols-outlined text-[18px]">close</span>
-        </button>
-      </div>
-
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
-        {messages.map((msg) => (
-          <div key={msg.id} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
-            <div
-              className={cn(
-                "max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-                msg.role === "user"
-                  ? "bg-primary text-white rounded-br-sm"
-                  : "bg-background-body text-text-main border border-border-subtle rounded-bl-sm"
-              )}
-            >
-              {msg.role === "user" ? (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-              ) : (
-                <div
-                  className="chat-markdown space-y-1"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                />
-              )}
-              <p
-                className={cn(
-                  "text-[10px] mt-1.5",
-                  msg.role === "user" ? "text-white/60" : "text-text-muted"
-                )}
-              >
-                {msg.timestamp}
-              </p>
-            </div>
-          </div>
-        ))}
-        {sendingChat && (
-          <div className="flex justify-start">
-            <div className="bg-background-body border border-border-subtle rounded-xl rounded-bl-sm px-4 py-3">
-              <div className="flex items-center gap-1.5">
-                <span className="size-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="size-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="size-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
-      </div>
-
-      {/* Input */}
-      <div className="p-3 border-t border-border-subtle">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSend();
-              }
-            }}
-            rows={1}
-            className="flex-1 rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary resize-none"
-            placeholder="Ask about this memo..."
-          />
-          <button
-            onClick={onSend}
-            disabled={!chatInput.trim() || sendingChat}
-            className="h-9 w-9 rounded-lg flex items-center justify-center text-white disabled:opacity-40 transition-opacity shrink-0"
-            style={{ backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[18px]">send</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
+// MemoEditor and MemoChat are in editor.tsx to keep this file under 500 lines
+export { MemoEditor } from "./editor";
+export type { MemoEditorProps } from "./editor";
+export { MemoChat } from "./editor";
 
 /* ------------------------------------------------------------------ */
 /*  CreateMemoModal                                                    */
@@ -412,6 +300,107 @@ export function CreateMemoModal({
           >
             {creatingMemo && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
             Create Memo
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  AddSectionModal                                                    */
+/* ------------------------------------------------------------------ */
+
+interface AddSectionModalProps {
+  open: boolean;
+  onClose: () => void;
+  sectionType: string;
+  setSectionType: (v: string) => void;
+  sectionTitle: string;
+  setSectionTitle: (v: string) => void;
+  generateAI: boolean;
+  setGenerateAI: (v: boolean) => void;
+  loading: boolean;
+  onAdd: () => void;
+}
+
+export function AddSectionModal({
+  open,
+  onClose,
+  sectionType,
+  setSectionType,
+  sectionTitle,
+  setSectionTitle,
+  generateAI,
+  setGenerateAI,
+  loading,
+  onAdd,
+}: AddSectionModalProps) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative bg-surface-card rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold text-text-main">Add Section</h2>
+          <button onClick={onClose} className="text-text-muted hover:text-text-main">
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+        <div className="flex flex-col gap-4">
+          <div>
+            <label className="block text-sm font-medium text-text-main mb-1">Section Type</label>
+            <select
+              value={sectionType}
+              onChange={(e) => {
+                setSectionType(e.target.value);
+                if (e.target.value !== "CUSTOM") {
+                  setSectionTitle(SECTION_TYPES.find((t) => t.value === e.target.value)?.label || "");
+                }
+              }}
+              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-1 focus:ring-primary focus:border-primary"
+            >
+              {SECTION_TYPES.map((t) => (
+                <option key={t.value} value={t.value}>{t.label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-main mb-1">Title</label>
+            <input
+              type="text"
+              value={sectionTitle}
+              onChange={(e) => setSectionTitle(e.target.value)}
+              placeholder={SECTION_TYPES.find((t) => t.value === sectionType)?.label || "Section title"}
+              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={generateAI}
+              onChange={(e) => setGenerateAI(e.target.checked)}
+              className="rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <span className="text-sm text-text-secondary">Generate content with AI</span>
+          </label>
+        </div>
+        <div className="flex items-center justify-end gap-3 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary border border-border-subtle hover:bg-background-body transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onAdd}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#003366" }}
+          >
+            {loading && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
+            Add Section
           </button>
         </div>
       </div>

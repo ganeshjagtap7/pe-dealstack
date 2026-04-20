@@ -131,9 +131,9 @@ export default function DashboardPage() {
   });
 
   return (
-    <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+    <div className="p-4 md:p-6">
       <WelcomeModal />
-      <div className="mx-auto max-w-[1600px] flex flex-col gap-6">
+      <div className="mx-auto max-w-[1600px] w-full flex flex-col gap-6">
         {/* Welcome */}
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold text-text-main tracking-tight font-display">

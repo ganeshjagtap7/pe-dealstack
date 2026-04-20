@@ -270,7 +270,7 @@ export default function DealDetailPage() {
   const isTerminal = TERMINAL_STAGES.includes(deal.stage);
 
   return (
-    <div className="p-6 mx-auto max-w-[1400px] flex flex-col gap-6">
+    <div className="p-4 md:p-6 mx-auto max-w-[1400px] w-full flex flex-col gap-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-text-muted">
         <Link href="/deals" className="hover:text-primary transition-colors">

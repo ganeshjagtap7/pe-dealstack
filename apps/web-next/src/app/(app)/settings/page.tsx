@@ -199,7 +199,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[1400px] p-6">
+    <div className="mx-auto max-w-[1400px] w-full p-4 md:p-6">
       {/* Toast */}
       {toast && (
         <div

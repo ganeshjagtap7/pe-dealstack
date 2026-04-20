@@ -113,6 +113,7 @@ export interface APIDocument {
   fileUrl?: string;
   fileSize?: number;
   mimeType?: string;
+  status?: string;
   aiAnalysis?: {
     type?: string;
     label?: string;

@@ -7,6 +7,8 @@ import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtrac
 import { mergeIntoExistingDeal } from '../services/dealMerger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES } from '../services/fileValidator.js';
+import { extractTextFromWord } from '../services/documentParser.js';
+import { extractTextFromExcel, isExcelFile } from '../services/excelFinancialExtractor.js';
 import { embedDocument } from '../rag.js';
 import { AICache } from '../services/aiCache.js';
 import { log } from '../utils/logger.js';
@@ -170,40 +172,78 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     let numPages: number | null = null;
     let aiExtractedData: ExtractedDealData | null = null;
 
-    if (file && mimeType === 'application/pdf') {
+    if (file) {
       extractionStatus = 'processing';
-      log.info('Starting PDF extraction', { documentName });
 
-      const extraction = await extractTextFromPDF(file.buffer);
-      if (extraction) {
-        // Remove null characters that PostgreSQL can't store
-        extractedText = extraction.text.replace(/\u0000/g, '');
-        numPages = extraction.numPages;
+      // ── Extract text based on file type ──
+      if (mimeType === 'application/pdf') {
+        log.info('Starting PDF extraction', { documentName });
+        const extraction = await extractTextFromPDF(file.buffer);
+        if (extraction) {
+          extractedText = extraction.text.replace(/\u0000/g, '');
+          numPages = extraction.numPages;
+          log.info('PDF extraction completed', { numPages, textLength: extractedText.length });
+        } else {
+          extractionStatus = 'failed';
+          log.warn('PDF extraction failed', { documentName });
+        }
+      } else if (isExcelFile(mimeType, documentName)) {
+        log.info('Starting Excel extraction', { documentName });
+        const excelText = extractTextFromExcel(file.buffer);
+        if (excelText) {
+          extractedText = excelText.replace(/\u0000/g, '');
+          log.info('Excel extraction completed', { textLength: extractedText.length });
+        } else {
+          log.info('Excel extraction returned no text', { documentName });
+        }
+      } else if (
+        mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+        mimeType === 'application/msword'
+      ) {
+        log.info('Starting Word extraction', { documentName });
+        const wordText = await extractTextFromWord(file.buffer);
+        if (wordText) {
+          extractedText = wordText.replace(/\u0000/g, '');
+          log.info('Word extraction completed', { textLength: extractedText.length });
+        } else {
+          log.info('Word extraction returned no text', { documentName });
+        }
+      }
+
+      // ── Run AI analysis on extracted text ──
+      if (extractedText && extractedText.length >= 50) {
         extractionStatus = 'completed';
-        log.info('PDF extraction completed', { numPages, textLength: extractedText.length });
-
-        // Run AI extraction on the extracted text
         try {
           log.info('Starting AI data extraction', { documentName });
           const aiData = await extractDealDataFromText(extractedText);
           if (aiData) {
             aiExtractedData = aiData;
             extractionStatus = 'analyzed';
-            log.info('AI extraction completed', { documentName, companyName: aiData.companyName, industry: aiData.industry });
+            // Build aiAnalysis summary so the VDR UI shows "Analysis Complete"
+            const summaryParts: string[] = [];
+            if (aiData.companyName?.value) summaryParts.push(aiData.companyName.value);
+            if (aiData.industry?.value) summaryParts.push(aiData.industry.value);
+            if (aiData.revenue?.value != null) summaryParts.push(`Revenue: $${aiData.revenue.value}M`);
+            if (aiData.ebitda?.value != null) summaryParts.push(`EBITDA: $${aiData.ebitda.value}M`);
+            aiAnalysis = {
+              type: 'complete',
+              label: 'Analysis Complete',
+              summary: summaryParts.length > 0
+                ? `Extracted: ${summaryParts.join(' · ')}`
+                : 'Document analyzed successfully.',
+              description: aiData.description?.value || 'Document analyzed successfully.',
+            };
+            log.info('AI extraction completed', { documentName, companyName: aiData.companyName?.value, industry: aiData.industry?.value });
           } else {
             log.info('AI extraction returned no data', { documentName });
           }
         } catch (aiError) {
-          // Log AI error but don't fail the upload - text extraction still worked
           log.error('AI extraction failed', aiError, { documentName });
         }
-      } else {
-        extractionStatus = 'failed';
-        log.warn('PDF extraction failed', { documentName });
+      } else if (extractionStatus !== 'failed') {
+        // File uploaded successfully but no meaningful text to analyze
+        extractionStatus = 'completed';
       }
-    } else if (file) {
-      // Non-PDF files don't need text extraction
-      extractionStatus = 'completed';
     }
 
     // Create document record

@@ -5,6 +5,8 @@ import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+
 import {
   MemoSection,
   Memo,
@@ -12,54 +14,48 @@ import {
   DealOption,
   TemplateOption,
   STATUS_STYLES,
+  SECTION_TYPES,
   MemoListSidebar,
+  MemoEditor,
   MemoChat,
   CreateMemoModal,
+  AddSectionModal,
 } from "./components";
-
-/* ------------------------------------------------------------------ */
-/*  Page                                                               */
-/* ------------------------------------------------------------------ */
+import { exportMemoPDF } from "./export";
 
 export default function MemoBuilderPage() {
-  /* ---- Memo list ---- */
+  /* ---- State ---- */
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loadingList, setLoadingList] = useState(true);
   const [listSearch, setListSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
-
-  /* ---- Selected memo ---- */
   const [selectedMemo, setSelectedMemo] = useState<Memo | null>(null);
   const [sections, setSections] = useState<MemoSection[]>([]);
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [loadingMemo, setLoadingMemo] = useState(false);
-
-  /* ---- Section editing ---- */
   const [editingContent, setEditingContent] = useState<Record<string, string>>({});
   const [generatingSection, setGeneratingSection] = useState<string | null>(null);
   const [savingSection, setSavingSection] = useState<string | null>(null);
-
-  /* ---- Chat ---- */
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
-
-  /* ---- Create memo modal ---- */
   const [showCreate, setShowCreate] = useState(false);
   const [deals, setDeals] = useState<DealOption[]>([]);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);
   const [createForm, setCreateForm] = useState({ dealId: "", templateId: "", title: "Investment Committee Memo" });
   const [creatingMemo, setCreatingMemo] = useState(false);
-
-  /* ---- Error ---- */
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [addSectionType, setAddSectionType] = useState("CUSTOM");
+  const [addSectionTitle, setAddSectionTitle] = useState("");
+  const [addSectionAI, setAddSectionAI] = useState(true);
+  const [addingSectionLoading, setAddingSectionLoading] = useState(false);
+  const [pendingDeleteSection, setPendingDeleteSection] = useState<{ id: string; title: string } | null>(null);
+  const [generatingAll, setGeneratingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  /* ================================================================ */
-  /*  Data loading                                                     */
-  /* ================================================================ */
-
+  /* ---- Data loading ---- */
   const loadMemos = useCallback(async () => {
     setLoadingList(true);
     try {
@@ -75,9 +71,7 @@ export default function MemoBuilderPage() {
     }
   }, [statusFilter]);
 
-  useEffect(() => {
-    loadMemos();
-  }, [loadMemos]);
+  useEffect(() => { loadMemos(); }, [loadMemos]);
 
   const loadMemo = useCallback(async (id: string) => {
     setLoadingMemo(true);
@@ -124,15 +118,9 @@ export default function MemoBuilderPage() {
     }
   }, []);
 
-  /* ---- Scroll chat ---- */
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  /* ================================================================ */
-  /*  Filtered list                                                    */
-  /* ================================================================ */
-
+  /* ---- Filtered list ---- */
   const filteredMemos = memos.filter((m) => {
     if (listSearch) {
       const q = listSearch.toLowerCase();
@@ -141,10 +129,7 @@ export default function MemoBuilderPage() {
     return true;
   });
 
-  /* ================================================================ */
-  /*  Create memo                                                      */
-  /* ================================================================ */
-
+  /* ---- Create memo ---- */
   const openCreateModal = async () => {
     setShowCreate(true);
     try {
@@ -177,10 +162,7 @@ export default function MemoBuilderPage() {
     }
   };
 
-  /* ================================================================ */
-  /*  Section actions                                                  */
-  /* ================================================================ */
-
+  /* ---- Section actions ---- */
   const handleGenerate = async (sectionId: string) => {
     if (!selectedMemo) return;
     setGeneratingSection(sectionId);
@@ -214,10 +196,88 @@ export default function MemoBuilderPage() {
     }
   };
 
-  /* ================================================================ */
-  /*  Chat                                                             */
-  /* ================================================================ */
+  /* ---- Add / Delete / Generate-All ---- */
+  const handleAddSection = async () => {
+    if (!selectedMemo) return;
+    const title = addSectionTitle.trim() || SECTION_TYPES.find((t) => t.value === addSectionType)?.label || "New Section";
+    setAddingSectionLoading(true);
+    try {
+      const body = {
+        type: addSectionType,
+        title,
+        sortOrder: sections.length + 1,
+        content: "",
+      };
+      const created = await api.post<MemoSection>(`/memos/${selectedMemo.id}/sections`, body);
+      setSections((prev) => [...prev, created]);
+      setEditingContent((prev) => ({ ...prev, [created.id]: "" }));
+      setActiveSection(created.id);
+      setShowAddSection(false);
+      setAddSectionTitle("");
+      setAddSectionType("CUSTOM");
 
+      // Auto-generate if checkbox was checked
+      if (addSectionAI) {
+        handleGenerate(created.id);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to add section");
+    } finally {
+      setAddingSectionLoading(false);
+    }
+  };
+
+  const handleDeleteSection = async (sectionId: string) => {
+    if (!selectedMemo) return;
+    setPendingDeleteSection(null);
+    try {
+      await api.delete(`/memos/${selectedMemo.id}/sections/${sectionId}`);
+      setSections((prev) => prev.filter((s) => s.id !== sectionId));
+      setEditingContent((prev) => {
+        const next = { ...prev };
+        delete next[sectionId];
+        return next;
+      });
+      if (activeSection === sectionId) {
+        setActiveSection(sections.find((s) => s.id !== sectionId)?.id || null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete section");
+    }
+  };
+
+  const handleGenerateAll = async () => {
+    if (!selectedMemo) return;
+    setGeneratingAll(true);
+    try {
+      const result = await api.post<{ sections: MemoSection[] }>(`/memos/${selectedMemo.id}/generate-all`, {});
+      if (result.sections) {
+        const sorted = result.sections.sort((a, b) => a.sortOrder - b.sortOrder);
+        setSections(sorted);
+        const contentMap: Record<string, string> = {};
+        sorted.forEach((s) => { contentMap[s.id] = s.content || ""; });
+        setEditingContent(contentMap);
+        setActiveSection(sorted[0]?.id || null);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to generate all sections");
+    } finally {
+      setGeneratingAll(false);
+    }
+  };
+
+  /* ---- PDF Export ---- */
+
+  const handleExportPDF = async () => {
+    if (!selectedMemo || sections.length === 0) return;
+    try {
+      await exportMemoPDF(selectedMemo, sections, editingContent);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    }
+  };
+
+  /* ---- Chat ---- */
   const sendMessage = async () => {
     if (!chatInput.trim() || !selectedMemo) return;
     const content = chatInput.trim();
@@ -251,12 +311,10 @@ export default function MemoBuilderPage() {
     }
   };
 
-  /* ================================================================ */
-  /*  Render                                                           */
-  /* ================================================================ */
+  /* ---- Render ---- */
 
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex h-full overflow-hidden min-w-0">
       {/* ---- Left sidebar: memo list ---- */}
       <MemoListSidebar
         memos={memos}
@@ -272,7 +330,7 @@ export default function MemoBuilderPage() {
       />
 
       {/* ---- Right: editor + chat ---- */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-w-0">
         {!selectedMemo ? (
           /* Empty state */
           <div className="flex-1 flex items-center justify-center bg-background-body">
@@ -302,7 +360,7 @@ export default function MemoBuilderPage() {
         ) : (
           <>
             {/* Editor area */}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
               {/* Editor header */}
               <div className="border-b border-border-subtle bg-surface-card px-6 py-3 flex items-center justify-between">
                 <div>
@@ -310,6 +368,31 @@ export default function MemoBuilderPage() {
                   <p className="text-xs text-text-muted">{selectedMemo.title} &middot; {formatRelativeTime(selectedMemo.updatedAt)}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  {sections.length > 0 && (
+                    <>
+                      <button
+                        onClick={handleExportPDF}
+                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium border border-border-subtle text-text-secondary hover:text-primary hover:border-primary transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+                        Export PDF
+                      </button>
+                      <button
+                        onClick={handleGenerateAll}
+                        disabled={generatingAll}
+                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
+                        style={{ backgroundColor: "#003366" }}
+                        title="Generate all sections with AI"
+                      >
+                        {generatingAll ? (
+                          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                        ) : (
+                          <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                        )}
+                        {generatingAll ? "Generating..." : "Generate All"}
+                      </button>
+                    </>
+                  )}
                   <span
                     className={cn(
                       "px-2 py-1 rounded text-[11px] font-medium",
@@ -333,114 +416,19 @@ export default function MemoBuilderPage() {
               </div>
 
               {/* Section outline + content */}
-              <div className="flex-1 flex overflow-hidden">
-                {/* Section nav */}
-                <div className="w-56 shrink-0 border-r border-border-subtle bg-background-body p-3 overflow-y-auto custom-scrollbar">
-                  <p className="text-[10px] uppercase tracking-wider text-text-muted font-bold mb-2 px-2">Sections</p>
-                  {sections.map((section) => (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      className={cn(
-                        "flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-left mb-0.5",
-                        activeSection === section.id
-                          ? "bg-surface-card shadow-sm border border-border-subtle text-primary"
-                          : "text-text-secondary hover:bg-surface-card/50"
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "material-symbols-outlined text-[14px]",
-                          activeSection === section.id ? "text-primary" : "text-text-muted"
-                        )}
-                      >
-                        drag_indicator
-                      </span>
-                      <span className="truncate">{section.title}</span>
-                      {activeSection === section.id && <div className="ml-auto size-1.5 rounded-full bg-primary shrink-0" />}
-                    </button>
-                  ))}
-
-                  {sections.length === 0 && (
-                    <p className="text-[11px] text-text-muted text-center py-6">No sections yet</p>
-                  )}
-                </div>
-
-                {/* Content editor */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar bg-background-body p-6">
-                  {sections.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-16 text-center">
-                      <span className="material-symbols-outlined text-4xl text-text-muted mb-2">article</span>
-                      <p className="text-sm font-medium text-text-main mb-1">No sections</p>
-                      <p className="text-xs text-text-muted">This memo has no sections yet. They will be created from the template.</p>
-                    </div>
-                  ) : (
-                    sections.map((section) => (
-                      <div
-                        key={section.id}
-                        id={`section-${section.id}`}
-                        className={cn(
-                          "mb-6 bg-surface-card rounded-xl border shadow-card p-5 transition-all",
-                          activeSection === section.id ? "border-primary/30 shadow-card-hover" : "border-border-subtle"
-                        )}
-                        onClick={() => setActiveSection(section.id)}
-                      >
-                        {/* Section header */}
-                        <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-text-main">{section.title}</h3>
-                            {section.aiGenerated && (
-                              <span className="flex items-center gap-1 bg-purple-50 text-purple-700 text-[10px] font-medium px-1.5 py-0.5 rounded">
-                                <span className="material-symbols-outlined text-[12px]">auto_awesome</span>
-                                AI
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleGenerate(section.id); }}
-                              disabled={generatingSection === section.id}
-                              className="h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-medium text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
-                              title="AI Generate"
-                            >
-                              {generatingSection === section.id ? (
-                                <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-                              ) : (
-                                <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                              )}
-                              Generate
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleSaveSection(section.id); }}
-                              disabled={savingSection === section.id}
-                              className="h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-medium text-text-secondary hover:bg-background-body transition-colors disabled:opacity-50"
-                              title="Save section"
-                            >
-                              {savingSection === section.id ? (
-                                <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-                              ) : (
-                                <span className="material-symbols-outlined text-[14px]">save</span>
-                              )}
-                              Save
-                            </button>
-                          </div>
-                        </div>
-
-                        {/* Content editor */}
-                        <textarea
-                          value={editingContent[section.id] || ""}
-                          onChange={(e) =>
-                            setEditingContent((prev) => ({ ...prev, [section.id]: e.target.value }))
-                          }
-                          rows={8}
-                          className="w-full rounded-lg border border-border-subtle bg-background-body px-4 py-3 text-sm text-text-main leading-relaxed placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary resize-y"
-                          placeholder="Write section content here or click Generate to use AI..."
-                        />
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
+              <MemoEditor
+                sections={sections}
+                activeSection={activeSection}
+                setActiveSection={setActiveSection}
+                editingContent={editingContent}
+                setEditingContent={setEditingContent}
+                generatingSection={generatingSection}
+                savingSection={savingSection}
+                onGenerate={handleGenerate}
+                onSave={handleSaveSection}
+                onDelete={setPendingDeleteSection}
+                onAddSection={() => setShowAddSection(true)}
+              />
             </div>
 
             {/* ---- Chat panel ---- */}
@@ -481,6 +469,31 @@ export default function MemoBuilderPage() {
         setCreateForm={setCreateForm}
         creatingMemo={creatingMemo}
         onCreate={handleCreate}
+      />
+
+      {/* ---- Add Section Modal ---- */}
+      <AddSectionModal
+        open={showAddSection}
+        onClose={() => setShowAddSection(false)}
+        sectionType={addSectionType}
+        setSectionType={setAddSectionType}
+        sectionTitle={addSectionTitle}
+        setSectionTitle={setAddSectionTitle}
+        generateAI={addSectionAI}
+        setGenerateAI={setAddSectionAI}
+        loading={addingSectionLoading}
+        onAdd={handleAddSection}
+      />
+
+      {/* ---- Delete Section Confirm ---- */}
+      <ConfirmDialog
+        open={!!pendingDeleteSection}
+        title="Delete Section"
+        message={pendingDeleteSection ? `Delete "${pendingDeleteSection.title}"? This cannot be undone.` : ""}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={() => pendingDeleteSection && handleDeleteSection(pendingDeleteSection.id)}
+        onCancel={() => setPendingDeleteSection(null)}
       />
     </div>
   );
