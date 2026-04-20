@@ -67,18 +67,19 @@ export function Header() {
         {showDealActions && (
           <>
             <Link
-              href="/deal-intake"
-              className="flex items-center gap-2 px-4 py-2 rounded-lg shadow-sm transition-colors text-sm font-medium border-2 border-primary text-primary bg-white hover:bg-primary hover:text-white"
+              href="/deals/import"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium border border-border-subtle text-text-secondary bg-white hover:border-primary hover:text-primary"
             >
-              <span className="material-symbols-outlined text-[18px]">upload_file</span>
-              Import Deals
+              <span className="material-symbols-outlined text-[16px]">upload_file</span>
+              Import
             </Link>
             <Link
               href="/deal-intake"
-              className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 text-white rounded-lg hover:opacity-90 transition-colors text-sm font-medium"
+              style={{ backgroundColor: "#003366" }}
             >
-              <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-              Ingest Deal Data
+              <span className="material-symbols-outlined text-[16px]">add</span>
+              New Deal
             </Link>
           </>
         )}

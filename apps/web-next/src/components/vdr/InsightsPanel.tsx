@@ -112,7 +112,7 @@ export function InsightsPanel({
             />
             <p className="text-sm font-medium text-slate-700 mb-1">Analyzing folder...</p>
             <p className="text-xs text-slate-400">
-              GPT-4o is scanning documents and generating insights
+              AI is scanning documents and generating insights
             </p>
           </div>
         </div>
