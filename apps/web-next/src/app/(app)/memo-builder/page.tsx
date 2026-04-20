@@ -314,7 +314,7 @@ export default function MemoBuilderPage() {
   /* ---- Render ---- */
 
   return (
-    <div className="flex h-full overflow-hidden min-w-0">
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden min-w-0">
       {/* ---- Left sidebar: memo list ---- */}
       <MemoListSidebar
         memos={memos}

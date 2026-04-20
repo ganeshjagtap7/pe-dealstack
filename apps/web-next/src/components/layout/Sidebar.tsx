@@ -10,13 +10,14 @@ import { cn } from "@/lib/cn";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { InviteTeamModal } from "./InviteTeamModal";
 
-function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
+function NavLink({ item, isActive, collapsed }: { item: NavItem; isActive: boolean; collapsed: boolean }) {
   return (
     <Link
       href={item.href}
       title={item.label}
       className={cn(
-        "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors",
+        "flex items-center gap-3 rounded-lg transition-colors",
+        collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
         isActive
           ? "bg-primary text-white shadow-sm"
           : "text-text-secondary hover:bg-primary-light hover:text-primary",
@@ -25,13 +26,13 @@ function NavLink({ item, isActive }: { item: NavItem; isActive: boolean }) {
     >
       <span
         className={cn(
-          "material-symbols-outlined text-[20px]",
+          "material-symbols-outlined text-[20px] shrink-0",
           item.isAI && !isActive && "text-secondary"
         )}
       >
         {item.icon}
       </span>
-      <span className="nav-label text-sm font-medium">{item.label}</span>
+      {!collapsed && <span className="text-sm font-medium truncate">{item.label}</span>}
     </Link>
   );
 }
@@ -115,7 +116,7 @@ export function Sidebar() {
                 className={cn("my-2 mx-2 border-t border-border-subtle", collapsed && "hidden")}
               />
             ) : (
-              <NavLink key={item.id} item={item} isActive={item.id === activeId} />
+              <NavLink key={item.id} item={item} isActive={item.id === activeId} collapsed={collapsed} />
             )
           )}
         </nav>
