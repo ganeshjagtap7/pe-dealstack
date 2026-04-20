@@ -90,6 +90,10 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
+// Trust proxy — required when running behind Vercel/Render/nginx so that
+// express-rate-limit reads the real client IP from X-Forwarded-For.
+app.set('trust proxy', 1);
+
 // CORS - whitelist allowed origins (configurable via ALLOWED_ORIGINS env var)
 const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 const allowedOrigins = [
