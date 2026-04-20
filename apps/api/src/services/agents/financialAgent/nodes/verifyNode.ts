@@ -2,7 +2,7 @@
  * Verify Node — LangGraph node for two-pass extraction verification.
  *
  * After the initial extraction, this node sends the extracted values BACK
- * to GPT-4o-mini along with a sample of the original source text and asks:
+ * to GPT-4.1-mini (MODEL_FAST) along with a sample of the original source text and asks:
  *   "Do these numbers match what's in the source document?"
  *
  * This catches:
@@ -11,7 +11,7 @@
  *   - Wrong row mapping (COGS value put in Revenue field)
  *   - Missing values that exist in source but weren't extracted
  *
- * Uses GPT-4o-mini for cost efficiency — this is a verification check,
+ * Uses GPT-4.1-mini (MODEL_FAST) for cost efficiency — this is a verification check,
  * not a full extraction. Typically costs ~$0.003 per run.
  */
 
@@ -63,7 +63,7 @@ If everything looks correct, return: { "verified": true, "corrections": [], "uni
 
 /**
  * Build a concise summary of extracted values for verification.
- * Keeps it short to use GPT-4o-mini efficiently.
+ * Keeps it short to use GPT-4.1-mini efficiently.
  */
 function buildExtractionSummary(statements: ClassifiedStatement[]): string {
   const parts: string[] = [];

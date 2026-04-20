@@ -5,7 +5,7 @@
  * structured tables from complex financial PDFs (dense multi-column CIM layouts,
  * page-spanning tables, scanned-but-OCR'd documents).
  *
- * Output: table data as CSV-like text ready for classifyFinancials() (GPT-4o Layer 2).
+ * Output: table data as CSV-like text ready for classifyFinancials() (AI classifier Layer 2).
  * Same interface as extractTextFromExcel() — the pipeline is uniform regardless of source.
  *
  * Activated when AZURE_DOC_INTEL_ENDPOINT + AZURE_DOC_INTEL_KEY are set in env.
@@ -20,7 +20,7 @@ const require = createRequire(import.meta.url);
 // ─── Types ────────────────────────────────────────────────────
 
 export interface AzureExtractionResult {
-  /** Formatted table text ready for GPT-4o classification */
+  /** Formatted table text ready for AI classification */
   text: string;
   /** Number of tables extracted */
   tableCount: number;
@@ -133,7 +133,7 @@ export async function extractTablesFromPdf(buffer: Buffer): Promise<AzureExtract
           grid[r][c] = content;
         }
 
-        // Fill column-spanned cells with the same content (helps GPT-4o align headers)
+        // Fill column-spanned cells with the same content (helps AI classifier align headers)
         const rowSpan = cell.rowSpan ?? 1;
         const colSpan = cell.columnSpan ?? 1;
         for (let dr = 0; dr < rowSpan; dr++) {

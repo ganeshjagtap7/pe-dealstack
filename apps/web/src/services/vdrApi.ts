@@ -554,7 +554,7 @@ export function transformInsights(apiInsight: APIFolderInsight | null, folderId:
 }
 
 /**
- * Generate AI insights for a folder (calls GPT-4o)
+ * Generate AI insights for a folder
  */
 export async function generateInsights(folderId: string): Promise<APIFolderInsight | null> {
   try {

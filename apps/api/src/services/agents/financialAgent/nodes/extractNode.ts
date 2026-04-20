@@ -2,10 +2,10 @@
  * Extract Node — LangGraph node for the financial extraction agent.
  *
  * Routes the file to the best extraction layer:
- *   Excel → xlsx parser → CSV text → GPT-4o classifier
+ *   Excel → xlsx parser → CSV text → AI classifier (MODEL_CLASSIFICATION)
  *   PDF Layer 1 → Azure Document Intelligence (if configured)
- *   PDF Layer 2 → pdf-parse text → GPT-4o classifier (text-rich)
- *   PDF Layer 3 → GPT-4o Vision (scanned/image PDFs)
+ *   PDF Layer 2 → pdf-parse text → AI classifier (MODEL_CLASSIFICATION)
+ *   PDF Layer 3 → GPT-4.1 Vision (scanned/image PDFs)
  *
  * Wraps existing service functions — no extraction logic is duplicated.
  */
@@ -67,7 +67,7 @@ export async function extractNode(
         };
       }
 
-      steps.push(step('extract', `Extracted ${excelText.length} chars from Excel, classifying with GPT-4o`));
+      steps.push(step('extract', `Extracted ${excelText.length} chars from Excel, classifying with AI`));
       const classification = await classifyFinancials(excelText);
 
       if (!classification || classification.statements.length === 0) {
@@ -108,7 +108,7 @@ export async function extractNode(
         const azureResult = await extractTablesFromPdf(fileBuffer);
         if (azureResult && azureResult.text.trim().length > 50) {
           steps.push(step('extract', `Azure extracted ${azureResult.tableCount} tables from ${azureResult.pageCount} pages`));
-          steps.push(step('extract', 'Classifying Azure output with GPT-4o'));
+          steps.push(step('extract', 'Classifying Azure output with AI'));
 
           const classification = await classifyFinancials(azureResult.text);
           if (classification && classification.statements.length > 0) {
@@ -136,7 +136,7 @@ export async function extractNode(
       }
     }
 
-    // Layer 2: pdf-parse text → GPT-4o
+    // Layer 2: pdf-parse text → AI classifier
     steps.push(step('extract', 'Extracting text with pdf-parse (Layer 2)'));
     let pdfText: string | null = null;
     try {
@@ -147,7 +147,7 @@ export async function extractNode(
     }
 
     if (pdfText && pdfText.trim().length >= MIN_TEXT_LENGTH) {
-      steps.push(step('extract', `Extracted ${pdfText.length} chars — classifying with GPT-4o`));
+      steps.push(step('extract', `Extracted ${pdfText.length} chars — classifying with AI`));
       const classification = await classifyFinancials(pdfText);
 
       if (classification && classification.statements.length > 0) {
@@ -172,8 +172,8 @@ export async function extractNode(
       steps.push(step('extract', `Text too sparse (${pdfText?.trim().length ?? 0} chars) — trying Vision`));
     }
 
-    // Layer 3: GPT-4o Vision (scanned / image-only PDFs)
-    steps.push(step('extract', 'Switching to GPT-4o Vision (Layer 3)'));
+    // Layer 3: GPT-4.1 Vision (scanned / image-only PDFs)
+    steps.push(step('extract', 'Switching to AI Vision (Layer 3)'));
     const visionClassification = await classifyFinancialsVision(fileBuffer, fileName || 'document.pdf');
 
     if (!visionClassification || visionClassification.statements.length === 0) {

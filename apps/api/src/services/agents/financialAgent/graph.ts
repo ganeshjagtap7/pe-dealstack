@@ -9,7 +9,7 @@
  *                                     (loops back to validate, max 3 retries)
  *
  * The verify node (two-pass verification) compares extracted values against
- * the source text using GPT-4o-mini and auto-corrects unit scale errors,
+ * the source text using GPT-4.1-mini and auto-corrects unit scale errors,
  * transposed digits, and wrong row mappings before validation runs.
  *
  * Each node reads/writes to the shared FinancialAgentState.

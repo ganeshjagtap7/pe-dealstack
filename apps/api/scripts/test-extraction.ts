@@ -49,7 +49,7 @@ async function main() {
   console.log('--- end snippet ---\n');
 
   // ─── Step 2: classifyFinancials ────────────────────────────
-  console.log('Step 2 — Running GPT-4o financial classifier (deep pass)...');
+  console.log('Step 2 — Running AI financial classifier (deep pass)...');
   const classification = await classifyFinancials(text);
 
   if (!classification) {

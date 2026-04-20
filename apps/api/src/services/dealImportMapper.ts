@@ -167,7 +167,7 @@ export async function analyzeImportData(
   const headers = Object.keys(rows[0]);
   const sampleRows = rows.slice(0, 3);
 
-  // Call GPT-4o for mapping
+  // Call AI for mapping
   const model = getChatModel(0.1, 2000);
   const userPrompt = `Column headers: ${JSON.stringify(headers)}
 

@@ -67,7 +67,7 @@ export async function runFastPass(text: string): Promise<FastPassResult | null> 
 // ─── Deep Pass ────────────────────────────────────────────────
 
 /**
- * Deep pass: full 3-statement extraction via GPT-4o classifier.
+ * Deep pass: full 3-statement extraction via AI classifier.
  * Upserts one FinancialStatement row per (dealId, statementType, period).
  * Designed so the extraction layer can be swapped for Azure later —
  * only this function and classifyFinancials() need to change.

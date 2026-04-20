@@ -369,7 +369,7 @@ async function handleExtract(documentId) {
     } else if (result.hasConflicts) {
       showNotification('Conflicts Detected', `${stored} period${stored !== 1 ? 's' : ''} extracted — overlapping data found from multiple documents. Review the merge view.`, 'warning');
     } else {
-      showNotification('Financials Extracted', `${stored} period${stored !== 1 ? 's' : ''} stored (${result.extractionMethod ?? 'gpt4o'})`, 'success');
+      showNotification('Financials Extracted', `${stored} period${stored !== 1 ? 's' : ''} stored (AI extraction)`, 'success');
     }
 
     await loadFinancials(dealId);

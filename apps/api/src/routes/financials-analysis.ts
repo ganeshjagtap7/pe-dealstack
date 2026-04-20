@@ -54,7 +54,7 @@ router.get('/deals/:dealId/financials/analysis', async (req, res) => {
   }
 });
 
-// ─── AI Narrative Insights (GPT-4o + Agent Memory) ────────────
+// ─── AI Narrative Insights (AI + Agent Memory) ───────────────
 
 router.get('/deals/:dealId/financials/insights', async (req, res) => {
   try {

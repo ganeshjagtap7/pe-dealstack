@@ -45,9 +45,9 @@ const useOpenRouter = isOpenRouterEnabled();
 
 const MODELS = {
   openai: {
-    chat: process.env.LLM_CHAT_MODEL || (useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4o'),
-    fast: process.env.LLM_FAST_MODEL || (useOpenRouter ? AI_MODELS.TIER3 : 'gpt-4o-mini'),
-    extraction: useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4-turbo',
+    chat: process.env.LLM_CHAT_MODEL || (useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4.1'),
+    fast: process.env.LLM_FAST_MODEL || (useOpenRouter ? AI_MODELS.TIER3 : 'gpt-4.1-mini'),
+    extraction: useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4.1',
   },
   gemini: {
     chat: 'gemini-1.5-pro',
@@ -111,14 +111,14 @@ function createModel(
 
 // ─── Pre-built Model Instances ─────────────────────────────────────
 
-/** Primary chat model (GPT-4o or Gemini Pro) — for deal analysis, chat, memos */
+/** Primary chat model (Claude Sonnet 4.5 via OpenRouter, or GPT-4.1 direct) — for deal analysis, chat, memos */
 export function getChatModel(temperature = 0.7, maxTokens = 1500): BaseChatModel {
   const provider = config.chatProvider;
   const model = MODELS[provider].chat;
   return createModel(provider, model, temperature, maxTokens);
 }
 
-/** Fast/cheap model (GPT-4o-mini or Gemini Flash) — for sentiment, classification */
+/** Fast/cheap model (GPT-4.1-mini via OpenRouter, or GPT-4.1-mini direct) — for sentiment, classification */
 export function getFastModel(temperature = 0.7, maxTokens = 500): BaseChatModel {
   const provider = config.fastProvider;
   const model = MODELS[provider].fast;

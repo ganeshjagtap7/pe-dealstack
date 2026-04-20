@@ -76,7 +76,7 @@ router.post('/folders/:id/insights', async (req: Request, res: Response, next: N
   }
 });
 
-// POST /api/folders/:id/generate-insights - AI-generate folder insights using GPT-4o
+// POST /api/folders/:id/generate-insights - AI-generate folder insights
 router.post('/folders/:id/generate-insights', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id: folderId } = req.params;
@@ -135,7 +135,7 @@ router.post('/folders/:id/generate-insights', async (req: Request, res: Response
       };
     });
 
-    // 5. Call GPT-4o to generate insights
+    // 5. Call AI to generate insights
     const insights = await generateFolderInsights(
       folder.name,
       {
