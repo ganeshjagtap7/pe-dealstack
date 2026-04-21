@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import { STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
@@ -35,7 +35,9 @@ export default function DealDetailPage() {
   const params = useParams<{ id: string }>();
   const dealId = params.id;
   const router = useRouter();
+  const pathname = usePathname();
   const { user } = useUser();
+  const [linkCopied, setLinkCopied] = useState(false);
 
   const [deal, setDeal] = useState<DealDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -302,6 +304,21 @@ export default function DealDetailPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={async () => {
+              try {
+                await navigator.clipboard.writeText(window.location.origin + pathname);
+                setLinkCopied(true);
+                setTimeout(() => setLinkCopied(false), 2000);
+              } catch {
+                // Fallback for non-secure contexts
+              }
+            }}
+            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary border border-border-subtle rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">{linkCopied ? "check" : "share"}</span>
+            {linkCopied ? "Copied!" : "Share"}
+          </button>
           <Link
             href={`/data-room/${dealId}`}
             className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary border border-border-subtle rounded-lg hover:bg-blue-50 transition-colors"

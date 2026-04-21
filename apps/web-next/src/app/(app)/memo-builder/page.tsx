@@ -368,31 +368,6 @@ export default function MemoBuilderPage() {
                   <p className="text-xs text-text-muted">{selectedMemo.title} &middot; {formatRelativeTime(selectedMemo.updatedAt)}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {sections.length > 0 && (
-                    <>
-                      <button
-                        onClick={handleExportPDF}
-                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium border border-border-subtle text-text-secondary hover:text-primary hover:border-primary transition-colors"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
-                        Export PDF
-                      </button>
-                      <button
-                        onClick={handleGenerateAll}
-                        disabled={generatingAll}
-                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium text-white transition-colors disabled:opacity-50"
-                        style={{ backgroundColor: "#003366" }}
-                        title="Generate all sections with AI"
-                      >
-                        {generatingAll ? (
-                          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-                        ) : (
-                          <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                        )}
-                        {generatingAll ? "Generating..." : "Generate All"}
-                      </button>
-                    </>
-                  )}
                   <span
                     className={cn(
                       "px-2 py-1 rounded text-[11px] font-medium",
@@ -412,6 +387,31 @@ export default function MemoBuilderPage() {
                   >
                     <span className="material-symbols-outlined text-[18px]">smart_toy</span>
                   </button>
+                  {sections.length > 0 && (
+                    <>
+                      <button
+                        onClick={handleGenerateAll}
+                        disabled={generatingAll}
+                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium border border-border-subtle text-text-secondary hover:text-primary hover:border-primary transition-colors disabled:opacity-50"
+                        title="Generate all sections with AI"
+                      >
+                        {generatingAll ? (
+                          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+                        ) : (
+                          <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                        )}
+                        {generatingAll ? "Generating..." : "Generate All"}
+                      </button>
+                      <button
+                        onClick={handleExportPDF}
+                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-bold text-white transition-colors"
+                        style={{ backgroundColor: "#003366" }}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+                        Export PDF
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 

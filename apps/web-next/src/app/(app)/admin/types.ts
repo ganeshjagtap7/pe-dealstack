@@ -57,5 +57,6 @@ export interface AdminAuditLog {
   entityName?: string;
   resourceName?: string;
   userEmail?: string;
+  userName?: string;
   createdAt: string;
 }

@@ -6,6 +6,21 @@ import { useRouter } from "next/navigation";
 import { Logo } from "@/components/layout/Logo";
 import Link from "next/link";
 
+const AI_AGENTS = [
+  { name: "Financial Extractor", desc: "Auto-parses CIMs & balance sheets in seconds", icon: "table_view", color: "#4F7CFF" },
+  { name: "Deal Chat AI", desc: "Ask anything — instant answers from your data", icon: "smart_toy", color: "#A855F7" },
+  { name: "Memo Builder", desc: "Drafts IC memos in minutes, not weeks", icon: "description", color: "#10B981" },
+  { name: "Quality of Earnings", desc: "Detects red flags, validates EBITDA quality", icon: "verified", color: "#F59E0B" },
+  { name: "Portfolio Monitor", desc: "24/7 signal scanning across holdings", icon: "monitoring", color: "#F43F5E" },
+  { name: "Meeting Prep", desc: "Briefs auto-generated before every call", icon: "calendar_month", color: "#14B8A6" },
+];
+
+const STATS = [
+  { value: "10x", label: "FASTER DILIGENCE" },
+  { value: "15hrs", label: "SAVED PER DEAL" },
+  { value: "SOC 2", label: "ENTERPRISE READY" },
+];
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +50,7 @@ export default function LoginPage() {
   return (
     <div className="flex h-screen w-full overflow-hidden">
       {/* Left Panel — Branding */}
-      <div className="hidden lg:flex w-1/2 relative items-center justify-center overflow-hidden" style={{ backgroundColor: "#003366" }}>
+      <div className="hidden lg:flex w-1/2 relative flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: "#003366" }}>
         {/* Dot pattern */}
         <div
           className="absolute inset-0 z-0 opacity-20"
@@ -44,34 +59,70 @@ export default function LoginPage() {
         {/* Gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-tr from-[#003366] via-transparent to-white/10 z-0" />
 
-        <div className="relative z-10 flex flex-col items-center w-full px-12">
-          {/* Dashboard preview card */}
-          <div className="w-full max-w-2xl relative">
-            <div className="absolute -inset-2 bg-gradient-to-r from-blue-400/30 to-purple-300/20 rounded-xl blur-xl opacity-40" />
-            <div className="relative rounded-xl overflow-hidden shadow-2xl border border-white/20 bg-gray-900">
-              <div className="h-8 bg-gray-800/80 backdrop-blur border-b border-white/10 flex items-center px-4 space-x-2">
-                <div className="w-3 h-3 rounded-full bg-red-400" />
-                <div className="w-3 h-3 rounded-full bg-amber-400" />
-                <div className="w-3 h-3 rounded-full bg-green-400" />
-              </div>
-              <div className="aspect-[16/9] w-full bg-gradient-to-br from-[#335C85] to-[#002855] flex items-center justify-center">
-                <div className="text-center text-white/60">
-                  <Logo className="size-16 mx-auto mb-4 text-white/40" />
-                  <p className="text-sm">Deal Pipeline Dashboard</p>
-                </div>
-              </div>
-            </div>
+        <div className="relative z-10 flex flex-col w-full max-w-xl px-12">
+          {/* Live badge */}
+          <div className="flex items-center gap-2 mb-7">
+            <span className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-400/30 text-xs font-bold text-emerald-300 tracking-wide">
+              <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              7 AI AGENTS &middot; LIVE
+            </span>
           </div>
 
-          {/* Tagline */}
-          <div className="mt-12 text-center space-y-3">
-            <h2 className="text-3xl font-semibold text-white tracking-tight">
-              The Operating System for Modern Capital
-            </h2>
-            <p className="text-blue-100/80 text-base max-w-md mx-auto leading-relaxed">
-              Unified intelligence for private equity. Streamline your deal flow and portfolio
-              monitoring in one secure environment.
-            </p>
+          {/* Headline */}
+          <h2 className="text-[40px] font-bold text-white tracking-tight leading-[1.1] mb-4">
+            Your AI deal team,<br />working 24/7.
+          </h2>
+          <p className="text-blue-200/70 text-[15px] leading-relaxed mb-9 max-w-md">
+            Purpose-built AI agents for private equity. From sourcing to close &mdash; automate the work that bankers, analysts, and associates do every day.
+          </p>
+
+          {/* Agent Cards */}
+          <div className="grid grid-cols-2 gap-3 mb-8">
+            {AI_AGENTS.map((agent) => (
+              <div
+                key={agent.name}
+                className="rounded-xl p-4 border border-white/[0.08] bg-[#062446]/60 hover:bg-[#072e57]/60 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="size-9 rounded-lg flex items-center justify-center shrink-0 border"
+                    style={{
+                      backgroundColor: `${agent.color}1F`,
+                      borderColor: `${agent.color}33`,
+                    }}
+                  >
+                    <span
+                      className="material-symbols-outlined text-[18px]"
+                      style={{
+                        color: agent.color,
+                        fontVariationSettings: "'FILL' 0, 'wght' 400",
+                      }}
+                    >
+                      {agent.icon}
+                    </span>
+                  </div>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-sm font-bold text-white mb-1 leading-tight">{agent.name}</p>
+                    <p className="text-[11px] text-blue-200/60 leading-snug">{agent.desc}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Stats */}
+          <div className="pt-6 border-t border-white/10">
+            <div className="flex items-center gap-12">
+              {STATS.map((stat, i) => (
+                <div key={stat.label} className="flex items-center gap-12">
+                  <div>
+                    <p className="text-3xl font-bold text-white leading-tight">{stat.value}</p>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-blue-200/50 mt-1.5">{stat.label}</p>
+                  </div>
+                  {i < STATS.length - 1 && <div className="w-px h-10 bg-white/15" />}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -83,8 +134,8 @@ export default function LoginPage() {
         <div className="w-full max-w-[440px] z-10">
           {/* Logo */}
           <div className="flex items-center gap-2 mb-10">
-            <Logo className="size-8 text-primary" />
-            <span className="text-xl font-bold tracking-tight text-primary">PE OS</span>
+            <Logo className="size-7 text-primary" />
+            <span className="text-xl font-bold tracking-tight text-primary">PEOS</span>
           </div>
 
           {/* Header */}
@@ -164,7 +215,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-lg text-white font-semibold text-sm transition-all disabled:opacity-60 hover:opacity-90"
+              className="w-full h-12 rounded-lg text-white font-semibold text-sm transition-all disabled:opacity-60 hover:opacity-90 flex items-center justify-center gap-2"
               style={{ backgroundColor: "#003366" }}
             >
               {loading ? (
@@ -173,25 +224,40 @@ export default function LoginPage() {
                   Signing in...
                 </span>
               ) : (
-                "Sign In"
+                <>
+                  Sign In
+                  <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
+                </>
               )}
             </button>
 
             {/* Divider */}
             <div className="flex items-center gap-4 my-1">
               <div className="flex-1 h-px bg-gray-200" />
-              <span className="text-xs text-gray-400 uppercase">or</span>
+              <span className="text-xs text-gray-400 uppercase tracking-wide">or continue with</span>
               <div className="flex-1 h-px bg-gray-200" />
             </div>
 
+            {/* SSO */}
+            <button
+              type="button"
+              className="w-full h-12 rounded-lg border border-gray-200 bg-white text-[#121417] font-semibold text-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2.5"
+            >
+              <span className="material-symbols-outlined text-[20px] text-gray-500">lock</span>
+              Single Sign-On (SSO)
+            </button>
+
             <p className="text-center text-sm text-slate-500">
               Don&apos;t have an account?{" "}
-              <Link href="/signup" className="text-primary font-medium hover:underline">
-                Create one now
+              <Link href="/signup" className="text-primary font-semibold hover:underline">
+                Sign up
               </Link>
             </p>
           </form>
         </div>
+
+        {/* Footer */}
+        <p className="absolute bottom-6 text-xs text-gray-400">&copy; 2026 PE OS.</p>
       </div>
     </div>
   );

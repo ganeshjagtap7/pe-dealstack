@@ -99,7 +99,7 @@ export function Header() {
               className="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm flex items-center justify-center bg-primary text-white text-xs font-bold"
               style={user?.avatar ? { backgroundImage: `url('${encodeURI(user.avatar)}')` } : {}}
             >
-              {!user?.avatar && initials}
+              {initials}
             </div>
             <span className="hidden md:inline">{user?.name || "Loading..."}</span>
             <span

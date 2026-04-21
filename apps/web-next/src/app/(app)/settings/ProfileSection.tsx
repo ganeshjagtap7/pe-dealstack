@@ -110,7 +110,7 @@ export function ProfileSection({
                   : undefined
               }
             >
-              {!profile?.avatar && getInitials(profile?.name)}
+              {getInitials(profile?.name)}
             </div>
             <button
               type="button"

@@ -383,7 +383,7 @@ function groupLogsByDay(logs) {
 }
 
 function renderActivityItem(log) {
-    const userName = log.userEmail?.split('@')[0] || 'System';
+    const userName = log.userName || log.userEmail?.split('@')[0] || 'System';
     const initials = getInitials(userName);
     const { text, icon } = formatAuditAction(log);
     const timeAgo = getTimeAgo(log.createdAt);

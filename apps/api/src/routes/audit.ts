@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getAuditLogs, getAuditSummary, AUDIT_ACTIONS, RESOURCE_TYPES, SEVERITY } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { supabase } from '../supabase.js';
 
 const router = Router();
 
@@ -50,12 +51,29 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to retrieve audit logs' });
     }
 
+    // Enrich logs with user display names from User table
+    let enrichedLogs = data || [];
+    const userIds = [...new Set(enrichedLogs.map((l: any) => l.userId).filter(Boolean))];
+    if (userIds.length > 0) {
+      const { data: users } = await supabase
+        .from('User')
+        .select('id, name')
+        .in('id', userIds);
+      if (users) {
+        const nameMap = new Map(users.map((u: any) => [u.id, u.name]));
+        enrichedLogs = enrichedLogs.map((l: any) => ({
+          ...l,
+          userName: nameMap.get(l.userId) || null,
+        }));
+      }
+    }
+
     res.json({
       success: true,
       count,
       limit,
       offset,
-      logs: data,
+      logs: enrichedLogs,
     });
   } catch (error) {
     log.error('Audit route error', error);
@@ -84,11 +102,28 @@ router.get('/entity/:entityId', async (req, res) => {
       return res.status(500).json({ error: 'Failed to retrieve audit trail' });
     }
 
+    // Enrich logs with user display names from User table
+    let enrichedLogs = data || [];
+    const entityUserIds = [...new Set(enrichedLogs.map((l: any) => l.userId).filter(Boolean))];
+    if (entityUserIds.length > 0) {
+      const { data: users } = await supabase
+        .from('User')
+        .select('id, name')
+        .in('id', entityUserIds);
+      if (users) {
+        const nameMap = new Map(users.map((u: any) => [u.id, u.name]));
+        enrichedLogs = enrichedLogs.map((l: any) => ({
+          ...l,
+          userName: nameMap.get(l.userId) || null,
+        }));
+      }
+    }
+
     res.json({
       success: true,
       entityId,
       count,
-      logs: data,
+      logs: enrichedLogs,
     });
   } catch (error) {
     log.error('Audit entity route error', error);

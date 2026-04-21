@@ -147,7 +147,7 @@ export function ActivityFeed() {
                   {label}
                 </p>
                 {dayLogs.map((log) => {
-                  const userName = log.userEmail?.split("@")[0] || "System";
+                  const userName = log.userName || log.userEmail?.split("@")[0] || "System";
                   const isAI = log.action?.startsWith("AI_");
                   const meta = ACTION_META[log.action];
                   const entity = log.entityName || log.resourceName || "";
