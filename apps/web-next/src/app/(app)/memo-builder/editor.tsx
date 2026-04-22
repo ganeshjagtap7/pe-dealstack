@@ -293,7 +293,7 @@ export function MemoChat({
               ) : (
                 <div
                   className="chat-markdown space-y-1"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
                 />
               )}
               <p className={cn("text-[10px] mt-1.5", msg.role === "user" ? "text-white/60" : "text-text-muted")}>

@@ -85,7 +85,7 @@ export default defineConfig({
   plugins: [injectEnvConfig(), react(), copyStaticFiles()],
   root: '.',
   server: {
-    port: 3000,
+    port: 3003,
     open: true,
   },
   build: {

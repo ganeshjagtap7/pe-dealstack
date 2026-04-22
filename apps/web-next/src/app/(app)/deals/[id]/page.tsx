@@ -122,8 +122,12 @@ export default function DealDetailPage() {
 
   useEffect(() => {
     loadDeal();
-    loadChatHistory(); // Chat is always visible — load eagerly
-  }, [loadDeal, loadChatHistory]);
+  }, [loadDeal]);
+
+  // Chat is always visible in the sidebar — load eagerly, independently of deal metadata.
+  useEffect(() => {
+    loadChatHistory();
+  }, [loadChatHistory]);
 
   useEffect(() => {
     if (activeTab === "Activity") loadActivities();

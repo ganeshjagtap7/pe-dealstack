@@ -1,5 +1,6 @@
 "use client";
 
+import DOMPurify from "dompurify";
 import { cn } from "@/lib/cn";
 import { formatRelativeTime } from "@/lib/formatters";
 import { renderMarkdown } from "@/lib/markdown";
@@ -71,7 +72,7 @@ export function ChatTab({
               ) : (
                 <div
                   className="chat-markdown space-y-1 break-words [&_p]:mb-1.5 [&_ul]:pl-4 [&_ul]:list-disc [&_li]:mb-0.5 [&_strong]:font-semibold"
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
                 />
               )}
             </div>

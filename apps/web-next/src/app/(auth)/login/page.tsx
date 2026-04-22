@@ -18,7 +18,7 @@ const AI_AGENTS = [
 const STATS = [
   { value: "10x", label: "FASTER DILIGENCE" },
   { value: "15hrs", label: "SAVED PER DEAL" },
-  { value: "SOC 2", label: "ENTERPRISE READY" },
+  { value: "AES-256", label: "BANK-LEVEL ENCRYPTION" },
 ];
 
 export default function LoginPage() {
@@ -238,13 +238,16 @@ export default function LoginPage() {
               <div className="flex-1 h-px bg-gray-200" />
             </div>
 
-            {/* SSO */}
+            {/* SSO — not yet wired up */}
             <button
               type="button"
-              className="w-full h-12 rounded-lg border border-gray-200 bg-white text-[#121417] font-semibold text-sm hover:bg-gray-50 transition-colors flex items-center justify-center gap-2.5"
+              disabled
+              title="Coming soon"
+              className="w-full h-12 rounded-lg border border-gray-200 bg-white text-[#121417] font-semibold text-sm flex items-center justify-center gap-2.5 opacity-60 cursor-not-allowed"
             >
               <span className="material-symbols-outlined text-[20px] text-gray-500">lock</span>
               Single Sign-On (SSO)
+              <span className="ml-1 text-[10px] font-bold uppercase tracking-wide text-gray-400">Coming soon</span>
             </button>
 
             <p className="text-center text-sm text-slate-500">
