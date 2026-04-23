@@ -107,13 +107,22 @@ app.use(cors({
   credentials: true,
 }));
 
-// Rate limiting - protect API from abuse
+// Rate limiting - per-user via auth token, fallback to IP
+const rateLimitKeyGenerator = (req: express.Request) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return 'user:' + authHeader.slice(-16);
+  }
+  return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+};
+
 const generalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // 200 requests per 15 min for general API
+  windowMs: 15 * 60 * 1000,
+  max: 600,
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitKeyGenerator,
 });
 
 app.use('/api/', generalLimiter);

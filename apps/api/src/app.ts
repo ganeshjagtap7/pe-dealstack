@@ -115,12 +115,25 @@ app.use(cors({
 }));
 
 // Rate limiting - protect API from abuse
+// Use Authorization header as key so each user gets their own bucket,
+// falling back to IP for unauthenticated requests.
+// This prevents Vercel CDN IP sharing from causing false 429s.
+const rateLimitKeyGenerator = (req: express.Request) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return 'user:' + authHeader.slice(-16);
+  }
+  // Fallback to forwarded IP header (Vercel/proxy) or socket address
+  return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+};
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // 200 requests per 15 min for general API
+  max: 600, // 600 requests per 15 min per user (was 200 — too low for SPA navigation)
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitKeyGenerator,
 });
 
 const aiLimiter = rateLimit({
@@ -129,6 +142,7 @@ const aiLimiter = rateLimit({
   message: { error: 'Too many AI requests, please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitKeyGenerator,
 });
 
 const writeLimiter = rateLimit({
@@ -137,6 +151,7 @@ const writeLimiter = rateLimit({
   message: { error: 'Too many write operations, please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitKeyGenerator,
 });
 
 app.use('/api/', generalLimiter);
