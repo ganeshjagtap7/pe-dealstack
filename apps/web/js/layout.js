@@ -442,6 +442,34 @@ function initPELayout(activePage, options = {}) {
     // Then refresh from API in background (updates cache for next navigation)
     loadUserData();
 
+    // ── Page Transitions ─────────────────────────────────
+    // Fade-in content on load, fade-out on navigation.
+    // Sidebar stays static — only <main> transitions.
+    const mainEl = document.querySelector('main');
+    if (mainEl) {
+        // Fade in on page load
+        mainEl.style.opacity = '0';
+        mainEl.style.transition = 'opacity 0.18s ease-out';
+        requestAnimationFrame(() => { mainEl.style.opacity = '1'; });
+
+        // Intercept sidebar nav clicks — fade out, then navigate
+        const sidebarLinks = document.querySelectorAll('#pe-sidebar .nav-item[href]');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                const href = link.getAttribute('href');
+                // Skip if same page, external link, or modifier key held
+                if (!href || href === '#' || e.metaKey || e.ctrlKey || e.shiftKey) return;
+                const currentPath = window.location.pathname;
+                if (currentPath === href || currentPath.endsWith(href)) return;
+
+                e.preventDefault();
+                mainEl.style.transition = 'opacity 0.12s ease-in';
+                mainEl.style.opacity = '0';
+                setTimeout(() => { window.location.href = href; }, 120);
+            });
+        });
+    }
+
     // Dispatch custom event to signal layout is ready
     window.dispatchEvent(new CustomEvent('pe-layout-ready', { detail: { activePage } }));
 }
