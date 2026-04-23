@@ -106,10 +106,21 @@ export default function OnboardingPage() {
     else router.push("/dashboard");
   };
 
+  // Same pe_onboarding_seen sessionStorage backup WelcomeModal uses — keeps
+  // /dashboard from bouncing the user back here while the backend catches up.
+  const markSeen = () => {
+    try {
+      sessionStorage.setItem("pe_onboarding_seen", "1");
+    } catch {
+      // storage disabled — fine
+    }
+  };
+
   const confirmSkip = async () => {
     // /onboarding/dismiss sets checklistDismissed=true (NOT /onboarding/skip;
     // that endpoint doesn't exist). Matches legacy markOnboardingSkipped in
     // apps/web/js/onboarding/onboarding-flow.js:405.
+    markSeen();
     try {
       await Promise.all([
         api.post("/onboarding/welcome-shown", {}).catch(() => undefined),
@@ -130,6 +141,7 @@ export default function OnboardingPage() {
       });
     }
     setView("checklist");
+    markSeen();
     try {
       await api.post("/onboarding/welcome-shown", {});
     } catch {

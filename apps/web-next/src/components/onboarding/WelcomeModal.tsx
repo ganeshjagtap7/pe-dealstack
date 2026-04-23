@@ -41,6 +41,16 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      // sessionStorage backup — matches c987ade "prevent redirect loop with
+      // sessionStorage backup". If the API flakes, the flag keeps us from
+      // shuttling the user to /onboarding on every render.
+      try {
+        if (sessionStorage.getItem("pe_onboarding_seen") === "1") return;
+      } catch {
+        // sessionStorage disabled (private mode, strict blockers) — fall
+        // through to the API check below.
+      }
+
       try {
         const status = await api.get<OnboardingStatus>("/onboarding/status");
         if (cancelled) return;
@@ -58,7 +68,16 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
 
         // Fallback: if welcomeShown is already true but no new-flow progress
         // (e.g. pre-existing user who saw the old modal), keep the old modal
-        // hidden — they've already seen something introductory.
+        // hidden — they've already seen something introductory. Cache the
+        // "seen" bit in sessionStorage so subsequent loads skip the API call
+        // entirely (works around transient /onboarding/status 5xx).
+        if (status.welcomeShown || status.checklistDismissed || hasAnyProgress) {
+          try {
+            sessionStorage.setItem("pe_onboarding_seen", "1");
+          } catch {
+            // ignore write failures
+          }
+        }
       } catch {
         // silently skip
       }
@@ -70,6 +89,13 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
 
   const markShown = () => {
     api.post("/onboarding/welcome-shown", {}).catch(() => {});
+    // Mirror the backend flag into sessionStorage so a subsequent load won't
+    // hit a race with the DB update and redirect to /onboarding.
+    try {
+      sessionStorage.setItem("pe_onboarding_seen", "1");
+    } catch {
+      // ignore
+    }
   };
 
   const close = () => {

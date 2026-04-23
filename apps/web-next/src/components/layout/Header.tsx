@@ -75,13 +75,9 @@ export function Header() {
       <div className="flex items-center gap-2 md:gap-4 min-w-0">
         {showDealActions && (
           <div className="hidden sm:flex items-center gap-2 md:gap-4">
-            <Link
-              href="/deals/import"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors text-sm font-medium border border-border-subtle text-text-secondary bg-white hover:border-primary hover:text-primary"
-            >
-              <span className="material-symbols-outlined text-[16px]">upload_file</span>
-              Import
-            </Link>
+            {/* Bulk CSV import modal hasn't been ported from legacy crm.html yet —
+                keep the Import button hidden so we don't 404 users. Port tracked
+                in docs/planning/WEB-NEXT-PORT-PLAN.md. */}
             <Link
               href="/deal-intake"
               className="flex items-center gap-2 px-3 py-1.5 text-white rounded-lg hover:opacity-90 transition-colors text-sm font-medium"

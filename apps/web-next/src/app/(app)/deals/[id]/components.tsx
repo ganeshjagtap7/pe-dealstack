@@ -78,16 +78,22 @@ export interface Activity {
 // Stage pipeline config (matches the constants used in the old app)
 // ---------------------------------------------------------------------------
 
+// Matches the Deal.stage zod enum in apps/api/src/routes/deals.ts:54-56:
+// INITIAL_REVIEW / DUE_DILIGENCE / IOI_SUBMITTED / LOI_SUBMITTED /
+// NEGOTIATION / CLOSING / PASSED / CLOSED_WON / CLOSED_LOST.
+// The visible pipeline is the 6 in-flight stages; terminal states
+// (PASSED / CLOSED_WON / CLOSED_LOST) render as final and disable stage
+// changes in StageChangeModal.
 export const PIPELINE_STAGES = [
-  { key: "SOURCING", label: "Sourcing", icon: "search" },
-  { key: "SCREENING", label: "Screening", icon: "filter_alt" },
-  { key: "DILIGENCE", label: "Due Diligence", icon: "fact_check" },
-  { key: "IC_REVIEW", label: "IC Review", icon: "groups" },
+  { key: "INITIAL_REVIEW", label: "Initial Review", icon: "search" },
+  { key: "DUE_DILIGENCE", label: "Due Diligence", icon: "fact_check" },
+  { key: "IOI_SUBMITTED", label: "IOI Submitted", icon: "description" },
+  { key: "LOI_SUBMITTED", label: "LOI Submitted", icon: "task_alt" },
+  { key: "NEGOTIATION", label: "Negotiation", icon: "handshake" },
   { key: "CLOSING", label: "Closing", icon: "gavel" },
-  { key: "CLOSED", label: "Closed", icon: "check_circle" },
 ];
 
-export const TERMINAL_STAGES = ["CLOSED", "PASSED"];
+export const TERMINAL_STAGES = ["PASSED", "CLOSED_WON", "CLOSED_LOST"];
 
 export const TABS = ["Overview", "Documents", "Activity"] as const;
 export type Tab = (typeof TABS)[number];
