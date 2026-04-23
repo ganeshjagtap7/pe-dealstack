@@ -192,7 +192,7 @@ function SectionContent({
     return (
       <div className="relative group">
         <div
-          className="prose prose-sm max-w-none text-text-main leading-relaxed [&_h3]:text-sm [&_h3]:font-bold [&_h3]:mt-4 [&_h3]:mb-2 [&_h4]:text-sm [&_h4]:font-semibold [&_h4]:mt-3 [&_h4]:mb-1 [&_p]:mb-2 [&_ul]:pl-5 [&_ul]:list-disc [&_li]:mb-1 [&_strong]:font-semibold"
+          className="memo-section-content max-w-none text-text-main"
           dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
           onClick={() => setEditing(true)}
         />
