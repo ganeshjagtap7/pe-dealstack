@@ -182,9 +182,9 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
       : null;
 
   const allMetrics = [
-    { label: "Deal Size", value: deal.dealSize, formatted: formatCurrency(deal.dealSize), icon: "payments" },
-    { label: "Revenue", value: deal.revenue, formatted: formatCurrency(deal.revenue), icon: "trending_up" },
-    { label: "EBITDA", value: deal.ebitda, formatted: formatCurrency(deal.ebitda), icon: "analytics" },
+    { label: "Deal Size", value: deal.dealSize, formatted: formatCurrency(deal.dealSize, deal.currency), icon: "payments" },
+    { label: "Revenue", value: deal.revenue, formatted: formatCurrency(deal.revenue, deal.currency), icon: "trending_up" },
+    { label: "EBITDA", value: deal.ebitda, formatted: formatCurrency(deal.ebitda, deal.currency), icon: "analytics" },
     { label: "EBITDA Margin", value: ebitdaMargin, formatted: ebitdaMargin || "N/A", icon: "percent" },
   ];
 

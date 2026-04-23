@@ -321,7 +321,7 @@ export function DealCard({
                 Revenue
               </span>
               <span className="text-text-main font-bold text-lg">
-                {formatCurrency(deal.revenue)}
+                {formatCurrency(deal.revenue, deal.currency)}
               </span>
             </div>
             <div className="bg-gray-50 rounded-md p-3">
@@ -329,7 +329,7 @@ export function DealCard({
                 Deal Size
               </span>
               <span className="text-text-main font-bold text-lg">
-                {formatCurrency(deal.dealSize)}
+                {formatCurrency(deal.dealSize, deal.currency)}
               </span>
             </div>
           </div>
@@ -405,13 +405,13 @@ export function KanbanCard({ deal }: { deal: Deal }) {
           <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
             <span className="text-[9px] text-text-muted font-medium uppercase block">Revenue</span>
             <span className="text-xs font-bold text-text-main">
-              {formatCurrency(deal.revenue)}
+              {formatCurrency(deal.revenue, deal.currency)}
             </span>
           </div>
           <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
             <span className="text-[9px] text-text-muted font-medium uppercase block">Deal Size</span>
             <span className="text-xs font-bold text-text-main">
-              {formatCurrency(deal.dealSize)}
+              {formatCurrency(deal.dealSize, deal.currency)}
             </span>
           </div>
         </div>

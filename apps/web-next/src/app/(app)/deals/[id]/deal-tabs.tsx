@@ -40,8 +40,8 @@ function buildSuggestionPrompts(deal: DealDetail | null): SuggestionPrompt[] {
 
   // 2. Financial deep-dive
   if (revenue != null && ebitda != null) {
-    const fmtRev = formatCurrency(revenue);
-    const fmtEbitda = formatCurrency(ebitda);
+    const fmtRev = formatCurrency(revenue, deal.currency);
+    const fmtEbitda = formatCurrency(ebitda, deal.currency);
     const margin = revenue > 0 ? ((ebitda / revenue) * 100).toFixed(1) : null;
     prompts.push({
       icon: "analytics",

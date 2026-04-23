@@ -214,7 +214,7 @@ export default function DashboardPage() {
                               {STAGE_LABELS[deal.stage] || deal.stage}
                             </span>
                           </td>
-                          <td className="px-5 py-4 text-text-main font-medium font-mono">{deal.dealSize != null ? formatCurrency(deal.dealSize) : "\u2014"}</td>
+                          <td className="px-5 py-4 text-text-main font-medium font-mono">{deal.dealSize != null ? formatCurrency(deal.dealSize, deal.currency) : "\u2014"}</td>
                           <td className="px-5 py-4 text-text-main text-sm">{deal.nextAction || "\u2014"}</td>
                           <td className="px-5 py-4">
                             <div className="flex -space-x-2">

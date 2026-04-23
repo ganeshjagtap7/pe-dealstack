@@ -17,6 +17,7 @@ export interface Deal {
   stage: string;
   industry?: string;
   dealSize?: number;
+  currency?: string;
   priority?: string;
   status?: string;
   aiThesis?: string;

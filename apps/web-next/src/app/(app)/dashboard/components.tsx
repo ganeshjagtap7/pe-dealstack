@@ -14,6 +14,7 @@ export interface Deal {
   name: string;
   stage: string;
   dealSize?: number;
+  currency?: string;
   updatedAt: string;
   nextAction?: string;
   industry?: string;
@@ -294,7 +295,7 @@ export function StageDetailModal({ stageModal, deals, onClose }: StageDetailModa
                 <p className="text-xs text-text-muted">{deal.industry || "No industry"} · {formatRelativeTime(deal.updatedAt)}</p>
               </div>
               {deal.dealSize != null && (
-                <span className="text-sm font-medium text-text-main font-mono">{formatCurrency(deal.dealSize)}</span>
+                <span className="text-sm font-medium text-text-main font-mono">{formatCurrency(deal.dealSize, deal.currency)}</span>
               )}
             </Link>
           ))}

@@ -22,6 +22,7 @@ export interface DealDetail {
   stage: string;
   industry?: string;
   dealSize?: number;
+  currency?: string;
   revenue?: number;
   ebitda?: number;
   targetReturn?: number;
