@@ -164,13 +164,13 @@ Tier 3  [ ] 8a Memo PDF export + share
         [ ] 8b Memo saved list
         [ ] 8c Memo section tools
         [ ] 8d Memo rate-limit
-        [ ] 9  Help & Support modal
-        [ ] 10 Dashboard undefined-Deals fix       folds into #4 — "undefined Deals" is in the stats widget
+        [x] 9  Help & Support modal                07a3dfe
+        [=] 10 Dashboard undefined-Deals fix       folds into #4 — "undefined Deals" is in the stats widget
 Tier 4  [ ] 11 Onboarding 3-step flow
         [ ] 12 Firm enrichment modal
 Tier 5  [ ] 13 Verify VDR parity
         [x] 14 Verify Enter-URL tab removed        done as part of #7
-        [ ] 15 Verify Help modal in sidebar
+        [x] 15 Verify Help modal in sidebar        done via Tier 3 #9
 ```
 
 ## Verification notes
