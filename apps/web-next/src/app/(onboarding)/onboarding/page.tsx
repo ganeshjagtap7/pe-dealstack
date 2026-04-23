@@ -50,11 +50,6 @@ export default function OnboardingPage() {
             if (taskId) done.add(taskId);
           }
         }
-        if (Array.isArray(data.onboardingCompleted)) {
-          for (const id of data.onboardingCompleted) {
-            if (id === "firm" || id === "cim" || id === "team") done.add(id);
-          }
-        }
         setCompleted(done);
         // If user already finished onboarding, skip straight to dashboard.
         if (done.size >= TASKS.length) router.push("/dashboard");
@@ -106,28 +101,19 @@ export default function OnboardingPage() {
   const doneCount = completed.size;
   const allDone = doneCount >= TASKS.length;
 
-  // Auto-advance: once all 3 are done, persist + wait a beat + redirect.
-  useEffect(() => {
-    if (!allDone) return;
-    (async () => {
-      try {
-        await api.post("/onboarding/complete", {});
-      } catch {
-        // ignore
-      }
-    })();
-  }, [allDone]);
-
   const openWorkspace = () => {
     if (createdDealId) router.push(`/deals/${createdDealId}`);
     else router.push("/dashboard");
   };
 
   const confirmSkip = async () => {
+    // /onboarding/dismiss sets checklistDismissed=true (NOT /onboarding/skip;
+    // that endpoint doesn't exist). Matches legacy markOnboardingSkipped in
+    // apps/web/js/onboarding/onboarding-flow.js:405.
     try {
       await Promise.all([
         api.post("/onboarding/welcome-shown", {}).catch(() => undefined),
-        api.post("/onboarding/skip", {}).catch(() => undefined),
+        api.post("/onboarding/dismiss", {}).catch(() => undefined),
       ]);
     } finally {
       router.push("/dashboard");

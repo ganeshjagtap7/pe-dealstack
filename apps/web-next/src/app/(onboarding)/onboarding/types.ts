@@ -41,13 +41,18 @@ export interface TeamInvite {
   role: string;
 }
 
-export const TEAM_ROLES = ["Partner", "Principal", "Associate", "Analyst", "Operations"];
+// Visual role labels only — these do NOT submit to the API during
+// onboarding (matches legacy behavior). Matches the <select> options
+// in apps/web/js/onboarding/onboarding-tasks.js team hydrator.
+export const TEAM_ROLES = ["Analyst", "VP", "Partner", "Admin"];
 
-// API response shapes
+// API response shape — matches DEFAULT_STATUS in
+// apps/api/src/routes/onboarding.ts exactly. Fields I previously
+// invented (`onboardingCompleted`, `onboardingSkipped`) are not
+// returned by GET /onboarding/status.
 export interface OnboardingStatus {
   welcomeShown?: boolean;
   checklistDismissed?: boolean;
-  onboardingCompleted?: string[];
   steps?: Record<string, boolean>;
 }
 
