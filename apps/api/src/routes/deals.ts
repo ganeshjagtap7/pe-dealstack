@@ -8,7 +8,6 @@ import { log } from '../utils/logger.js';
 import { NotFoundError } from '../middleware/errorHandler.js';
 import type { SortableByDate } from '../types/index.js';
 import { createNotification, notifyDealTeam, resolveUserId } from './notifications.js';
-import { generateFollowUpQuestions } from '../services/followUpQuestions.js';
 
 // Sub-routers
 import dealsTeamRouter from './deals-team.js';
@@ -359,6 +358,7 @@ router.post('/:id/follow-up-questions', async (req, res) => {
     if (!deal) return res.status(404).json({ error: 'Deal not found' });
 
     const extraction = req.body.extraction || req.body;
+    const { generateFollowUpQuestions } = await import('../services/followUpQuestions.js');
     const questions = await generateFollowUpQuestions(extraction);
     res.json({ questions });
   } catch (error) {

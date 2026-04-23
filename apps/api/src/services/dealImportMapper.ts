@@ -1,7 +1,5 @@
 import { parse } from 'csv-parse/sync';
 import XLSX from 'xlsx';
-import { getChatModel } from './llm.js';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 
 // ============================================
@@ -167,7 +165,9 @@ export async function analyzeImportData(
   const headers = Object.keys(rows[0]);
   const sampleRows = rows.slice(0, 3);
 
-  // Call GPT-4o for mapping
+  // Call GPT-4o for mapping (dynamic import to avoid pulling LangChain into lite bundle)
+  const { getChatModel } = await import('./llm.js');
+  const { HumanMessage, SystemMessage } = await import('@langchain/core/messages');
   const model = getChatModel(0.1, 2000);
   const userPrompt = `Column headers: ${JSON.stringify(headers)}
 

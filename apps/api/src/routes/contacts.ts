@@ -3,9 +3,6 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
-import { runContactEnrichment } from '../services/agents/contactEnrichment/index.js';
-import { isLLMAvailable } from '../services/llm.js';
-
 // Sub-routers
 import contactsInsightsRouter from './contacts-insights.js';
 import contactsConnectionsRouter from './contacts-connections.js';
@@ -259,7 +256,9 @@ router.post('/', async (req: any, res) => {
     log.info('Contact created', { contactId: contact.id, name: `${data.firstName} ${data.lastName}` });
 
     // Auto-enrich in background (fire-and-forget) — don't block the response
+    const { isLLMAvailable } = await import('../services/llm.js');
     if (isLLMAvailable()) {
+      const { runContactEnrichment } = await import('../services/agents/contactEnrichment/index.js');
       runContactEnrichment({
         contactId: contact.id,
         organizationId: orgId,
