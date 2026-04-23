@@ -141,18 +141,25 @@
 
             if (!hasActiveFilters && allDeals.length === 0) {
                 return `
-        <div class="col-span-full flex flex-col items-center justify-center py-20">
-            <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <span class="material-symbols-outlined text-primary text-3xl">rocket_launch</span>
+        <div class="col-span-full flex flex-col items-center justify-center py-24">
+            <div class="w-20 h-20 rounded-2xl bg-primary-light flex items-center justify-center mb-6 shadow-sm border border-primary/10">
+                <span class="material-symbols-outlined text-primary" style="font-size:36px">rocket_launch</span>
             </div>
-            <p class="text-text-main font-semibold text-lg mb-2">Welcome to Your Deal Pipeline</p>
-            <p class="text-text-muted text-sm mb-6 max-w-md text-center">Start building your deal flow. Create your first deal to track it through sourcing, due diligence, and close.</p>
-            <button onclick="document.getElementById('new-deal-btn')?.click() || (window.location.href='deal-intake.html')"
-                    class="px-5 py-2.5 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm"
-                    style="background-color: #003366;">
-                <span class="material-symbols-outlined text-[18px] align-middle mr-1">add_circle</span>
-                Create Your First Deal
-            </button>
+            <p class="text-text-main font-bold text-xl mb-2 tracking-tight">Welcome to Your Deal Pipeline</p>
+            <p class="text-text-muted text-sm mb-8 max-w-md text-center leading-relaxed">Start building your deal flow. Create your first deal or import from a spreadsheet to track through sourcing, due diligence, and close.</p>
+            <div class="flex items-center gap-3">
+                <button onclick="document.getElementById('new-deal-btn')?.click() || (window.location.href='deal-intake.html')"
+                        class="px-5 py-2.5 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm"
+                        style="background-color: #003366;">
+                    <span class="material-symbols-outlined text-[18px] align-middle mr-1">add_circle</span>
+                    Create Your First Deal
+                </button>
+                <button onclick="document.getElementById('import-deals-btn')?.click()"
+                        class="px-5 py-2.5 rounded-lg text-sm font-semibold border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary transition-all">
+                    <span class="material-symbols-outlined text-[18px] align-middle mr-1">upload_file</span>
+                    Import Deals
+                </button>
+            </div>
         </div>
     `;
             }
