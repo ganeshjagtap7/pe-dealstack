@@ -9,7 +9,7 @@ Plan for porting the 57 main-ahead commits of `apps/web` → `apps/web-next` wit
 
 ## Guiding principles
 
-1. **Only edit `apps/web-next/**` on `frontend/dev` from now on.** Do not touch `apps/web/` or `apps/api/` — the eventual merge will overwrite them, and touching them creates conflicts for no benefit.
+1. **Only edit `apps/web-next/**` on `frontend/dev` from now on.** Do not touch `apps/web/` or `apps/api/` — the eventual merge overwrite them, and touching them creates conflicts for no benefit.
 2. **Port from the worktree, not from memory.** `../pe-dealstack-main/apps/web/` is the source of truth — open it side-by-side with the `.tsx` you're writing.
 3. **Commit per feature, not per wave.** Small semantic commits (`feat(web-next): port login redesign`) leave a reviewable trail and let the final merge squash cleanly.
 4. **Test `:3003` vs `:3000` side-by-side** before marking a feature done.
@@ -168,7 +168,7 @@ Tier 3  [x] 8a Memo PDF export + share             052eb57
         [=] 10 Dashboard undefined-Deals fix       folds into #4 — "undefined Deals" is in the stats widget
 Tier 4  [ ] 11 Onboarding 3-step flow
         [ ] 12 Firm enrichment modal
-Tier 5  [ ] 13 Verify VDR parity
+Tier 5  [x] 13 VDR 3-state badge + Re-analyze      eb73579
         [x] 14 Verify Enter-URL tab removed        done as part of #7
         [x] 15 Verify Help modal in sidebar        done via Tier 3 #9
 ```
