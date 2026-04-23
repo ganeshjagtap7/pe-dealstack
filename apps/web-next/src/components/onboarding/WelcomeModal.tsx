@@ -27,6 +27,8 @@ const STEPS = [
 
 interface OnboardingStatus {
   welcomeShown?: boolean;
+  onboardingCompleted?: string[];
+  onboardingSkipped?: boolean;
 }
 
 export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
@@ -39,7 +41,22 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
     (async () => {
       try {
         const status = await api.get<OnboardingStatus>("/onboarding/status");
-        if (!cancelled && !status.welcomeShown) setOpen(true);
+        if (cancelled) return;
+
+        // New flow — if user hasn't seen the welcome and hasn't explicitly
+        // skipped or completed any step, send them to /onboarding rather
+        // than showing the legacy modal. Matches 994b094 ("skip old welcome
+        // modal for users who went through new flow") — the new flow now
+        // replaces the modal entirely.
+        const hasAnyProgress = Array.isArray(status.onboardingCompleted) && status.onboardingCompleted.length > 0;
+        if (!status.welcomeShown && !status.onboardingSkipped && !hasAnyProgress) {
+          router.push("/onboarding");
+          return;
+        }
+
+        // Fallback: if welcomeShown is already true but no new-flow progress
+        // (e.g. pre-existing user who saw the old modal), keep the old modal
+        // hidden — they've already seen something introductory.
       } catch {
         // silently skip
       }
@@ -47,7 +64,7 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [router]);
 
   const markShown = () => {
     api.post("/onboarding/welcome-shown", {}).catch(() => {});
