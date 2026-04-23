@@ -25,6 +25,8 @@ import {
   MarketSentimentCard,
   StageDetailModal,
 } from "./components";
+import { CustomizeDashboardModal } from "./widgets/customize-modal";
+import { useVisibleWidgets } from "./widgets/useVisibleWidgets";
 
 export default function DashboardPage() {
   const { user } = useUser();
@@ -38,6 +40,8 @@ export default function DashboardPage() {
   const [sentiment, setSentiment] = useState<MarketSentiment | null>(null);
   const [sentimentLoading, setSentimentLoading] = useState(true);
   const [sentimentError, setSentimentError] = useState(false);
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const { visible, toggle, orderedVisible } = useVisibleWidgets();
 
   useEffect(() => {
     async function load() {
@@ -344,12 +348,40 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
+        {/* Optional widgets (user-customizable via Customize button below) */}
+        {orderedVisible.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {orderedVisible.map((w) => (
+              <w.Component key={w.id} />
+            ))}
+          </div>
+        )}
+
+        {/* Customize button — always visible, rendered below widgets */}
+        <div className="flex justify-center">
+          <button
+            type="button"
+            onClick={() => setCustomizeOpen(true)}
+            className="flex items-center gap-2 rounded-lg border border-dashed border-border-subtle px-4 py-3 text-sm font-medium text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50"
+          >
+            <span className="material-symbols-outlined text-[18px]">tune</span>
+            Customize Dashboard
+          </button>
+        </div>
       </div>
 
       {/* Stage Detail Modal */}
       {stageModal && (
         <StageDetailModal stageModal={stageModal} deals={allDeals} onClose={() => setStageModal(null)} />
       )}
+
+      <CustomizeDashboardModal
+        open={customizeOpen}
+        visible={visible}
+        onToggle={toggle}
+        onClose={() => setCustomizeOpen(false)}
+      />
     </div>
   );
 }
