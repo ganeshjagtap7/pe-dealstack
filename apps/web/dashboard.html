@@ -35,7 +35,11 @@
 
 <!-- Pipeline Stats (loaded dynamically from real deal data) -->
 <div id="stats-cards" data-widget="stats-cards" class="widget-container grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-    <div class="col-span-full text-center py-4 text-text-muted text-sm">Loading pipeline...</div>
+    <!-- Skeleton stat cards — replaced when real data loads -->
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:6.5rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:5.5rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:4rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
 </div>
 <script>
 (async function loadPipelineStats() {
@@ -125,11 +129,9 @@
 </tr>
 </thead>
 <tbody id="priorities-table" class="divide-y divide-border-subtle bg-white">
-<tr><td colspan="5" class="px-5 py-10 text-center">
-<span class="material-symbols-outlined text-text-muted text-[32px] mb-2 block opacity-60">priority_high</span>
-<p class="text-sm font-medium text-text-main">No active priorities</p>
-<p class="text-xs text-text-muted mt-1">Deals needing immediate attention will appear here</p>
-</td></tr>
+<tr class="skeleton-row"><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:70%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-badge"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:50%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:80%"></div></td><td class="px-5 py-3.5"><div class="flex gap-1"><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div></div></td></tr>
+<tr class="skeleton-row"><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:55%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-badge"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:40%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:65%"></div></td><td class="px-5 py-3.5"><div class="flex gap-1"><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div></div></td></tr>
+<tr class="skeleton-row"><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:60%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-badge"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:45%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:75%"></div></td><td class="px-5 py-3.5"><div class="flex gap-1"><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div></div></td></tr>
 </tbody>
 </table>
 </div>
@@ -188,8 +190,11 @@
 <span class="material-symbols-outlined text-text-muted">pie_chart</span>
 </div>
 <div id="portfolio-allocation-content" class="flex items-center gap-6">
-    <div class="flex items-center justify-center py-4 w-full">
-        <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
+    <div class="skeleton skeleton-circle" style="width:7rem;height:7rem;flex-shrink:0"></div>
+    <div class="flex flex-col gap-3 flex-1">
+        <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="skeleton" style="width:10px;height:10px;border-radius:2px"></div><div class="skeleton skeleton-text-sm" style="width:4rem"></div></div><div class="skeleton skeleton-text-sm" style="width:1.5rem"></div></div>
+        <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="skeleton" style="width:10px;height:10px;border-radius:2px"></div><div class="skeleton skeleton-text-sm" style="width:5rem"></div></div><div class="skeleton skeleton-text-sm" style="width:1.5rem"></div></div>
+        <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="skeleton" style="width:10px;height:10px;border-radius:2px"></div><div class="skeleton skeleton-text-sm" style="width:3.5rem"></div></div><div class="skeleton skeleton-text-sm" style="width:1.5rem"></div></div>
     </div>
 </div>
 </div>
@@ -393,6 +398,7 @@ Scan Signals
 <script src="js/notifications.js"></script>
 <script src="js/layoutComponents.js"></script>
 <script src="js/layout.js"></script>
+<script src="js/commandPalette.js"></script>
 <script src="js/inviteModal-template.js"></script>
 <script src="js/inviteModal.js"></script>
 <!-- Onboarding modules -->

@@ -84,7 +84,7 @@
                     </button>
                     <a class="text-text-muted hover:text-primary transition-colors" href="/crm.html">Deals</a>
                     <span class="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
-                    <span id="breadcrumb-deal" class="text-text-main font-medium truncate max-w-[300px]">Loading...</span>
+                    <span id="breadcrumb-deal" class="text-text-main font-medium truncate max-w-[300px]"><span class="skeleton inline-block" style="width:6rem;height:0.875rem;vertical-align:middle"></span></span>
                 </nav>
             </div>
             <div class="flex items-center gap-4">
@@ -179,7 +179,7 @@
                                 </div>
                             </div>
                             <div>
-                                <h2 id="deal-title" class="text-2xl font-bold text-text-main leading-tight">Loading...
+                                <h2 id="deal-title" class="text-2xl font-bold text-text-main leading-tight"><span class="skeleton inline-block" style="width:12rem;height:1.75rem;vertical-align:middle"></span>
                                 </h2>
                                 <div class="flex flex-wrap gap-2 mt-2">
                                     <!-- Financial extraction status badge -->
@@ -274,6 +274,10 @@
 
                 <!-- Dynamic Financial Metrics (only shows metrics that have data) -->
                 <div id="deal-metrics-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:4rem"></div><div class="skeleton skeleton-text-lg" style="width:5rem;margin-top:0.5rem"></div></div>
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:3.5rem"></div><div class="skeleton skeleton-text-lg" style="width:4rem;margin-top:0.5rem"></div></div>
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-text-lg" style="width:3.5rem;margin-top:0.5rem"></div></div>
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:4.5rem"></div><div class="skeleton skeleton-text-lg" style="width:4.5rem;margin-top:0.5rem"></div></div>
                 </div>
 
                 <!-- Financials Section -->
@@ -500,6 +504,7 @@
 
     <script src="js/layoutComponents.js"></script>
     <script src="js/layout.js"></script>
+    <script src="js/commandPalette.js"></script>
     <script src="js/docPreview-modal.js"></script>
     <script src="js/docPreview.js"></script>
     <script src="js/notificationCenter.js"></script>
