@@ -26,7 +26,7 @@ export function WelcomeView({
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
             Purpose-built for PE
           </div>
-          <h1 className="text-[44px] leading-[1.05] font-bold tracking-tight text-text-main">
+          <h1 className="font-display text-[44px] leading-[1.05] font-bold tracking-tight text-text-main">
             Let&apos;s analyze your first deal.
             <span className="block text-text-muted">Three short steps.</span>
           </h1>
@@ -63,7 +63,7 @@ export function WelcomeView({
               { value: "SOC 2", label: "Enterprise ready" },
             ].map((s) => (
               <div key={s.label}>
-                <div className="text-[22px] font-bold text-primary">{s.value}</div>
+                <div className="font-display text-[22px] font-bold text-primary">{s.value}</div>
                 <div className="text-[10.5px] text-text-muted uppercase tracking-wider mt-1">{s.label}</div>
               </div>
             ))}

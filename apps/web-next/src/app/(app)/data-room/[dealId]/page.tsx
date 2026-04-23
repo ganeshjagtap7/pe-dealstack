@@ -22,6 +22,8 @@ import {
   createFolder,
   deleteDocument,
   deleteFolder,
+  extractFinancials,
+  fetchAllDeals,
   fetchDeal,
   fetchDocuments,
   fetchFolderInsights,
@@ -29,6 +31,7 @@ import {
   generateInsights,
   getDocumentDownloadUrl,
   initializeDealFolders,
+  linkDocumentToDeal,
   renameDocument,
   renameFolder,
   requestDocument,
@@ -37,7 +40,14 @@ import {
   transformInsights,
   uploadDocument,
 } from "@/lib/vdr/api";
-import { CreateFolderModal, DataRoomHeader, DataRoomLoading } from "./components";
+import {
+  CreateFolderModal,
+  DataRoomHeader,
+  DataRoomLoading,
+  LinkToDealModal,
+  UploadConfirmModal,
+  VDRToast,
+} from "./components";
 
 interface PageProps {
   params: Promise<{ dealId: string }>;
@@ -62,6 +72,22 @@ export default function DataRoomDealPage({ params }: PageProps) {
   const [creatingFolder, setCreatingFolder] = useState(false);
   const [insightsCollapsed, setInsightsCollapsed] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [teamMembers, setTeamMembers] = useState<Array<{ id: string; role: string; user?: { name?: string; avatar?: string } }>>([]);
+  // Upload confirmation modal state (two-stage upload like legacy)
+  const [pendingUploadFiles, setPendingUploadFiles] = useState<File[] | null>(null);
+  const [autoUpdateDeal, setAutoUpdateDeal] = useState(false);
+  // Link-to-deal modal state
+  const [linkModalFile, setLinkModalFile] = useState<VDRFile | null>(null);
+  const [linkDeals, setLinkDeals] = useState<Array<{ id: string; name: string; industry?: string }>>([]);
+  const [linkSearchQuery, setLinkSearchQuery] = useState("");
+  const [linking, setLinking] = useState(false);
+  // Toast notifications
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
+
+  const showToast = useCallback((message: string, type: "success" | "error" | "info" = "success") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 5000);
+  }, []);
 
   const isSearching = searchQuery.trim().length > 0;
 
@@ -78,6 +104,9 @@ export default function DataRoomDealPage({ params }: PageProps) {
         if (cancelled) return;
 
         if (dealData?.name) setDealName(dealData.name);
+        if ((dealData as Record<string, unknown>)?.teamMembers) {
+          setTeamMembers((dealData as Record<string, unknown>).teamMembers as typeof teamMembers);
+        }
 
         let folderList: APIFolder[] = apiFolders;
         if (folderList.length === 0) {
@@ -158,18 +187,58 @@ export default function DataRoomDealPage({ params }: PageProps) {
     }
   };
 
-  const handleFilesSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Stage 1: Files selected -> show confirmation modal
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     e.target.value = ""; // allow re-selecting the same file
     if (!files.length || !activeFolderId) return;
 
+    const maxFileSize = 50 * 1024 * 1024;
+    const allowedTypes = [
+      "application/pdf",
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ];
+
+    const validFiles: File[] = [];
+    for (const file of files) {
+      if (file.size > maxFileSize) {
+        showToast(`File "${file.name}" exceeds maximum size of 50MB`, "error");
+        continue;
+      }
+      if (!allowedTypes.includes(file.type)) {
+        showToast(`File "${file.name}" has an unsupported file type`, "error");
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length > 0) {
+      // Smart default: auto-check toggle for CIM/financials/teaser documents
+      const hasHighValueDoc = validFiles.some((f) => {
+        const name = f.name.toLowerCase();
+        return name.includes("cim") || name.includes("teaser") || name.includes("financial") || name.includes("model");
+      });
+      setAutoUpdateDeal(hasHighValueDoc);
+      setPendingUploadFiles(validFiles);
+    }
+  };
+
+  // Stage 2: User confirms upload
+  const handleConfirmUpload = useCallback(async () => {
+    if (!pendingUploadFiles || !activeFolderId) return;
+
     setUploading(true);
+    setPendingUploadFiles(null);
     setUploadError(null);
     const failures: string[] = [];
     const uploaded: APIDocument[] = [];
-    for (const file of files) {
+
+    for (const file of pendingUploadFiles) {
       try {
-        const doc = await uploadDocument(dealId, activeFolderId, file);
+        const doc = await uploadDocument(dealId, activeFolderId, file, { autoUpdateDeal });
         if (doc) uploaded.push(doc);
       } catch (err) {
         failures.push(`${file.name}: ${err instanceof Error ? err.message : "upload failed"}`);
@@ -184,13 +253,14 @@ export default function DataRoomDealPage({ params }: PageProps) {
           f.id === activeFolderId ? { ...f, fileCount: f.fileCount + uploaded.length } : f,
         ),
       );
+      showToast(`${uploaded.length} file(s) uploaded successfully`, "success");
     }
     if (failures.length > 0) {
       setUploadError(failures.join("; "));
       setTimeout(() => setUploadError(null), 6000);
     }
     setUploading(false);
-  };
+  }, [pendingUploadFiles, dealId, activeFolderId, autoUpdateDeal, showToast]);
 
   const handleCreateFolder = async () => {
     const name = newFolderName.trim();
@@ -269,21 +339,65 @@ export default function DataRoomDealPage({ params }: PageProps) {
     setAllFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, name: newName } : f)));
   };
 
-  const handleFileClick = async (file: VDRFile) => {
-    const url = await getDocumentDownloadUrl(file.id);
-    if (url) window.open(url, "_blank", "noopener,noreferrer");
-  };
+  const handleFileClick = useCallback(async (file: VDRFile) => {
+    try {
+      const url = await getDocumentDownloadUrl(file.id);
+      if (url) {
+        window.open(url, "_blank", "noopener,noreferrer");
+      } else {
+        showToast(`Unable to load document: ${file.name}`, "error");
+      }
+    } catch {
+      showToast(`Error loading file: ${file.name}`, "error");
+    }
+  }, [showToast]);
 
   // Re-analyze a document — extract text + RAG embed, then refresh the row.
   const handleReanalyze = useCallback(async (file: VDRFile) => {
+    showToast(`Analyzing "${file.name}"...`, "info");
     try {
       await analyzeDocument(file.id);
       const docs = await fetchDocuments(dealId);
       setAllFiles(docs.map(transformDocument));
+      showToast(`"${file.name}" analyzed successfully`, "success");
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Analysis failed");
+      showToast(err instanceof Error ? err.message : "Analysis failed", "error");
     }
+  }, [dealId, showToast]);
+
+  // Extract financials from a VDR document
+  const handleExtractFinancials = useCallback(async (file: VDRFile) => {
+    showToast(`Extracting financials from "${file.name}"... This may take 30-90 seconds.`, "info");
+    try {
+      const result = await extractFinancials(dealId, file.id);
+      const count = result?.result?.periodsStored ?? result?.stored ?? 0;
+      showToast(`Financials extracted -- ${count} period${count !== 1 ? "s" : ""} stored`, "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Financial extraction failed", "error");
+    }
+  }, [dealId, showToast]);
+
+  // Link document to another deal
+  const handleLinkToDeal = useCallback(async (file: VDRFile) => {
+    setLinkModalFile(file);
+    setLinkSearchQuery("");
+    const deals = await fetchAllDeals();
+    setLinkDeals(deals.filter((d) => d.id !== dealId));
   }, [dealId]);
+
+  const confirmLinkToDeal = useCallback(async (targetDealId: string) => {
+    if (!linkModalFile) return;
+    setLinking(true);
+    try {
+      await linkDocumentToDeal(linkModalFile.id, targetDealId);
+      const targetDeal = linkDeals.find((d) => d.id === targetDealId);
+      showToast(`"${linkModalFile.name}" linked to ${targetDeal?.name || "deal"}`, "success");
+      setLinkModalFile(null);
+    } catch (err) {
+      showToast(`Failed to link document: ${err instanceof Error ? err.message : "Unknown error"}`, "error");
+    }
+    setLinking(false);
+  }, [linkModalFile, linkDeals, showToast]);
 
   const handleGenerateInsights = useCallback(async () => {
     if (!activeFolderId || generating) return;
@@ -315,6 +429,67 @@ export default function DataRoomDealPage({ params }: PageProps) {
       setGenerating(false);
     }
   }, [activeFolderId, generating]);
+
+  // Generate Full Report — downloads a markdown file (matching legacy behavior)
+  const handleGenerateReport = useCallback(() => {
+    if (!activeFolder) return;
+    const folderInsights = activeFolderInsights;
+
+    const report = `# VDR Analysis Report - ${activeFolder.name}
+Generated: ${new Date().toLocaleString()}
+
+## Summary
+${folderInsights?.summary || "No summary available."}
+
+**Completion Status:** ${folderInsights?.completionPercent || 0}%
+**Total Files:** ${activeFolder.fileCount}
+
+## Red Flags (${folderInsights?.redFlags?.length || 0})
+${(folderInsights?.redFlags || [])
+  .map(
+    (flag) => `
+### ${flag.title} [${flag.severity.toUpperCase()}]
+${flag.description}
+`,
+  )
+  .join("\n")}
+
+## Missing Documents (${folderInsights?.missingDocuments?.length || 0})
+${(folderInsights?.missingDocuments || []).map((doc) => `- ${doc.name}`).join("\n")}
+
+## Files in Folder
+${filteredFiles
+  .map(
+    (file) => `
+- **${file.name}** (${file.size})
+  - Analysis: ${file.analysis.label}
+  - ${file.analysis.description}
+  - Author: ${file.author.name}
+  - Date: ${file.date}
+`,
+  )
+  .join("\n")}
+
+---
+Generated by PE OS VDR System
+`;
+
+    const blob = new Blob([report], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `VDR_Report_${activeFolder.name.replace(/\s+/g, "_")}_${Date.now()}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [activeFolder, activeFolderInsights, filteredFiles]);
+
+  // Handle "View File" from insights panel red flags
+  const handleViewFile = useCallback((fileId: string) => {
+    const file = allFiles.find((f) => f.id === fileId);
+    if (file) handleFileClick(file);
+  }, [allFiles, handleFileClick]);
 
   const handleRequestDocument = async (docId: string) => {
     const doc = activeFolderInsights?.missingDocuments.find((d) => d.id === docId);
@@ -394,6 +569,7 @@ export default function DataRoomDealPage({ params }: PageProps) {
           activeFolder={activeFolder}
           activeFolderId={activeFolderId}
           uploading={uploading}
+          teamMembers={teamMembers}
           onBack={() => router.back()}
           onClearFolder={() => setActiveFolderId(null)}
           onUploadClick={handleUploadClick}
@@ -442,6 +618,8 @@ export default function DataRoomDealPage({ params }: PageProps) {
             onFileClick={handleFileClick}
             onDeleteFile={handleDeleteFile}
             onRenameFile={handleRenameFile}
+            onLinkToDeal={handleLinkToDeal}
+            onExtractFinancials={handleExtractFinancials}
             onReanalyze={handleReanalyze}
           />
         ) : (
@@ -459,13 +637,37 @@ export default function DataRoomDealPage({ params }: PageProps) {
       <InsightsPanel
         insights={activeFolderInsights}
         folderName={activeFolder?.name || ""}
-        onGenerateReport={handleGenerateInsights}
+        onGenerateReport={handleGenerateReport}
+        onViewFile={handleViewFile}
         onRequestDocument={handleRequestDocument}
         onGenerateInsights={handleGenerateInsights}
         isGenerating={generating}
         isCollapsed={insightsCollapsed}
         onToggleCollapse={() => setInsightsCollapsed((v) => !v)}
       />
+
+      {pendingUploadFiles && (
+        <UploadConfirmModal
+          files={pendingUploadFiles}
+          autoUpdateDeal={autoUpdateDeal}
+          uploading={uploading}
+          onAutoUpdateChange={setAutoUpdateDeal}
+          onConfirm={handleConfirmUpload}
+          onCancel={() => setPendingUploadFiles(null)}
+        />
+      )}
+
+      {linkModalFile && (
+        <LinkToDealModal
+          file={linkModalFile}
+          deals={linkDeals}
+          searchQuery={linkSearchQuery}
+          onSearchChange={setLinkSearchQuery}
+          linking={linking}
+          onSelect={confirmLinkToDeal}
+          onClose={() => setLinkModalFile(null)}
+        />
+      )}
 
       <ConfirmDialog
         open={!!pendingDelete}
@@ -485,6 +687,10 @@ export default function DataRoomDealPage({ params }: PageProps) {
         }}
         onCancel={() => setPendingDelete(null)}
       />
+
+      {toast && (
+        <VDRToast message={toast.message} type={toast.type} onDismiss={() => setToast(null)} />
+      )}
     </div>
   );
 }

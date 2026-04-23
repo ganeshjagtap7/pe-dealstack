@@ -8,12 +8,15 @@ import {
   type DealOption,
   type IngestResponse,
   type TabKey,
+  type FollowUpQuestion,
+  MAX_FILE_SIZE,
   TABS,
-  TEXT_SOURCE_TYPES,
   authFetchRaw,
   DealSelector,
   ResultDisplay,
 } from "./components";
+import { FollowUpQuestions, WarningBanner } from "./intake-widgets";
+import { FileUploadPanel, TextInputPanel, UrlInputPanel } from "./tab-panels";
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -37,7 +40,11 @@ export default function DealIntakePage() {
 
   /* ---- Text ---- */
   const [textInput, setTextInput] = useState("");
-  const [textSourceType, setTextSourceType] = useState("cim");
+  const [textSourceType, setTextSourceType] = useState("other");
+
+  /* ---- URL ---- */
+  const [urlInput, setUrlInput] = useState("");
+  const [urlCompanyName, setUrlCompanyName] = useState("");
 
   /* ---- Processing ---- */
   const [processing, setProcessing] = useState(false);
@@ -46,140 +53,218 @@ export default function DealIntakePage() {
   /* ---- Result ---- */
   const [result, setResult] = useState<IngestResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [warning, setWarning] = useState<{ title: string; message: string } | null>(null);
+
+  /* ---- Follow-up questions ---- */
+  const [followUpQuestions, setFollowUpQuestions] = useState<FollowUpQuestion[]>([]);
+  const [followUpAnswers, setFollowUpAnswers] = useState<Record<string, string>>({});
+  const [followUpLoading, setFollowUpLoading] = useState(false);
 
   /* ================================================================ */
   /*  Deal search                                                      */
   /* ================================================================ */
 
   const searchDeals = useCallback(async (query: string) => {
-    if (query.length < 2) {
-      setDealOptions([]);
-      return;
-    }
+    if (query.length < 2) { setDealOptions([]); return; }
     setLoadingDeals(true);
     try {
       const res = await api.get<{ deals: DealOption[] }>(`/deals?search=${encodeURIComponent(query)}&limit=10`);
       setDealOptions(res.deals || []);
-    } catch {
-      setDealOptions([]);
-    } finally {
-      setLoadingDeals(false);
-    }
+    } catch { setDealOptions([]); }
+    finally { setLoadingDeals(false); }
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (dealSearch) searchDeals(dealSearch);
-    }, 300);
+    const timer = setTimeout(() => { if (dealSearch) searchDeals(dealSearch); }, 300);
     return () => clearTimeout(timer);
   }, [dealSearch, searchDeals]);
 
-  /* Close deal dropdown on outside click */
   useEffect(() => {
     if (!showDealDropdown) return;
     const close = (e: MouseEvent) => {
-      if (!(e.target as HTMLElement).closest("[data-deal-dropdown]")) {
-        setShowDealDropdown(false);
-      }
+      if (!(e.target as HTMLElement).closest("[data-deal-dropdown]")) setShowDealDropdown(false);
     };
     document.addEventListener("click", close);
     return () => document.removeEventListener("click", close);
   }, [showDealDropdown]);
 
   /* ================================================================ */
-  /*  File drag & drop                                                 */
+  /*  File handling                                                     */
   /* ================================================================ */
 
+  const validateAndSetFile = (file: File) => {
+    setWarning(null);
+    if (file.size > MAX_FILE_SIZE) {
+      setWarning({
+        title: "File too large",
+        message: `This file is ${formatFileSize(file.size)}, but the maximum upload size is 50MB. Please compress the file or use a smaller version.`,
+      });
+      setSelectedFile(null);
+      return;
+    }
+    setSelectedFile(file);
+  };
+
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
+    e.preventDefault(); setDragOver(false);
     const file = e.dataTransfer.files?.[0];
-    if (file) setSelectedFile(file);
+    if (file) validateAndSetFile(file);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) setSelectedFile(file);
+    if (file) validateAndSetFile(file);
+  };
+
+  const clearFile = () => {
+    setSelectedFile(null); setWarning(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  /* ================================================================ */
+  /*  URL validation                                                    */
+  /* ================================================================ */
+
+  const isValidUrl = (() => { try { new URL(urlInput); return true; } catch { return false; } })();
+
+  /* ================================================================ */
+  /*  Follow-up questions                                              */
+  /* ================================================================ */
+
+  const fetchFollowUpQuestions = useCallback(async (dealId: string, extraction: IngestResponse["extraction"]) => {
+    if (!extraction) return;
+    setFollowUpLoading(true);
+    try {
+      const res = await api.post<{ questions: FollowUpQuestion[] }>(`/deals/${dealId}/follow-up-questions`, {
+        extraction: {
+          companyName: extraction.companyName?.value || null,
+          industry: extraction.industry?.value || null,
+          revenue: extraction.revenue?.value || null,
+          ebitda: extraction.ebitda?.value || null,
+          currency: extraction.currency || "USD",
+          summary: extraction.summary || null,
+          keyRisks: extraction.keyRisks || [],
+          investmentHighlights: extraction.investmentHighlights || [],
+          overallConfidence: extraction.overallConfidence || 0,
+        },
+      });
+      setFollowUpQuestions(res.questions || []);
+    } catch { /* Non-blocking */ }
+    finally { setFollowUpLoading(false); }
+  }, []);
+
+  const handleFollowUpAnswer = (questionId: string, answer: string) => {
+    setFollowUpAnswers((prev) => {
+      const next = { ...prev };
+      if (answer.trim()) next[questionId] = answer; else delete next[questionId];
+      return next;
+    });
   };
 
   /* ================================================================ */
   /*  Submission handlers                                              */
   /* ================================================================ */
 
+  const actionLabel = mode === "existing" ? "Update Deal" : "Create Deal";
+
+  const clearState = () => {
+    setError(null); setResult(null); setFollowUpQuestions([]); setFollowUpAnswers({});
+  };
+
   const resetForm = () => {
-    setSelectedFile(null);
-    setTextInput("");
-    setResult(null);
-    setError(null);
+    setSelectedFile(null); setTextInput(""); setUrlInput(""); setUrlCompanyName("");
+    setWarning(null); clearState();
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const beginProcessing = (msg: string) => {
+    setProcessing(true); setProgressMessage(msg); clearState();
+  };
+
+  const endProcessing = () => {
+    setProcessing(false); setProgressMessage("");
+  };
+
+  const fireFollowUp = (data: IngestResponse) => {
+    if (data.deal?.id && data.extraction) {
+      setTimeout(() => fetchFollowUpQuestions(data.deal!.id, data.extraction), 800);
+    }
   };
 
   const handleUploadFile = async () => {
     if (!selectedFile) return;
-    if (mode === "existing" && !selectedDeal) {
-      setError("Please select a deal first.");
-      return;
-    }
-
-    setProcessing(true);
-    setProgressMessage("Uploading and analyzing document...");
-    setError(null);
-    setResult(null);
-
+    if (mode === "existing" && !selectedDeal) { setError("Please select a deal first."); return; }
+    beginProcessing("Extracting deal data...");
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
-      if (mode === "existing" && selectedDeal) {
-        formData.append("dealId", selectedDeal.id);
-      }
-
+      if (mode === "existing" && selectedDeal) formData.append("dealId", selectedDeal.id);
       const isExcel = /\.(xlsx|xls|csv)$/i.test(selectedFile.name);
       const useBulk = isExcel && mode !== "existing";
-      const endpoint = useBulk ? "/ingest/bulk" : "/ingest";
-
-      const response = await authFetchRaw(endpoint, { method: "POST", body: formData });
-      const data: IngestResponse = await response.json();
-
-      if (!response.ok) {
-        throw new Error((data as unknown as { error?: string }).error || "Upload failed");
+      const response = await authFetchRaw(useBulk ? "/ingest/bulk" : "/ingest", { method: "POST", body: formData });
+      if (response.status === 413) {
+        setWarning({ title: "File too large", message: "Maximum upload size is 50MB. Please compress the file or try a smaller version." });
+        return;
       }
-
+      const data: IngestResponse = await response.json();
+      if (!response.ok) throw new Error((data as unknown as { message?: string; error?: string }).message || (data as unknown as { error?: string }).error || "Upload failed");
       setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
-    } finally {
-      setProcessing(false);
-      setProgressMessage("");
-    }
+      fireFollowUp(data);
+    } catch (err) { setError(err instanceof Error ? err.message : "Upload failed"); }
+    finally { endProcessing(); }
+  };
+
+  const handleUploadDirect = async () => {
+    if (!selectedFile || !selectedDeal) return;
+    beginProcessing("Uploading to Data Room...");
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      const response = await authFetchRaw(`/deals/${selectedDeal.id}/documents`, { method: "POST", body: formData });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Upload failed");
+      setResult({ deal: { id: selectedDeal.id, name: selectedDeal.name }, isUpdate: true });
+    } catch (err) { setError(err instanceof Error ? err.message : "Upload failed"); }
+    finally { endProcessing(); }
   };
 
   const handleExtractText = async () => {
-    if (textInput.trim().length < 50) {
-      setError("Please enter at least 50 characters of text.");
-      return;
-    }
-    if (mode === "existing" && !selectedDeal) {
-      setError("Please select a deal first.");
-      return;
-    }
-
-    setProcessing(true);
-    setProgressMessage("Analyzing text content...");
-    setError(null);
-    setResult(null);
-
+    if (textInput.trim().length < 50) { setError("Please enter at least 50 characters of text."); return; }
+    if (mode === "existing" && !selectedDeal) { setError("Please select a deal first."); return; }
+    beginProcessing("Extracting deal data...");
     try {
       const body: Record<string, string> = { text: textInput, sourceType: textSourceType };
       if (mode === "existing" && selectedDeal) body.dealId = selectedDeal.id;
-
       const data = await api.post<IngestResponse>("/ingest/text", body);
       setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Text extraction failed");
-    } finally {
-      setProcessing(false);
-      setProgressMessage("");
-    }
+      fireFollowUp(data);
+    } catch (err) { setError(err instanceof Error ? err.message : "Text extraction failed"); }
+    finally { endProcessing(); }
+  };
+
+  const handleExtractUrl = async () => {
+    if (!isValidUrl) return;
+    if (mode === "existing" && !selectedDeal) { setError("Please select a deal first."); return; }
+    beginProcessing("Extracting deal data...");
+    try {
+      const body: Record<string, string> = { url: urlInput };
+      if (urlCompanyName.trim()) body.companyName = urlCompanyName.trim();
+      if (mode === "existing" && selectedDeal) body.dealId = selectedDeal.id;
+      const data = await api.post<IngestResponse>("/ingest/url", body);
+      setResult(data);
+      fireFollowUp(data);
+    } catch (err) { setError(err instanceof Error ? err.message : "URL scraping failed"); }
+    finally { endProcessing(); }
+  };
+
+  const handleSaveFollowUpAndGoToDeal = async () => {
+    if (!result?.deal?.id || Object.keys(followUpAnswers).length === 0) return;
+    try {
+      await api.patch(`/deals/${result.deal.id}`, {
+        customFields: { aiFollowUp: { generatedAt: new Date().toISOString(), questions: followUpQuestions, answers: followUpAnswers } },
+      });
+    } catch { /* Non-blocking */ }
+    window.location.href = `/deals/${result.deal.id}`;
   };
 
   /* ================================================================ */
@@ -187,189 +272,100 @@ export default function DealIntakePage() {
   /* ================================================================ */
 
   return (
-    <div className="p-4 md:p-6 mx-auto max-w-4xl w-full flex flex-col gap-5">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Intake</h1>
-        <p className="text-text-secondary text-sm mt-0.5">
-          Upload files or paste text to create or update deals with AI-powered extraction.
-        </p>
-      </div>
+    <div className="flex-1 overflow-y-auto p-6">
+      <div className="mx-auto max-w-3xl flex flex-col gap-6">
+        {/* Header */}
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Intake</h1>
+          <p className="text-text-secondary text-sm">Upload a document, paste text, or enter a company URL to create a new deal.</p>
+        </div>
 
-      {/* Deal mode selector */}
-      <DealSelector
-        mode={mode}
-        setMode={setMode}
-        selectedDeal={selectedDeal}
-        setSelectedDeal={setSelectedDeal}
-        dealSearch={dealSearch}
-        setDealSearch={setDealSearch}
-        dealOptions={dealOptions}
-        loadingDeals={loadingDeals}
-        showDealDropdown={showDealDropdown}
-        setShowDealDropdown={setShowDealDropdown}
-      />
+        {/* Deal mode selector */}
+        <DealSelector mode={mode} setMode={setMode} selectedDeal={selectedDeal} setSelectedDeal={setSelectedDeal} dealSearch={dealSearch} setDealSearch={setDealSearch} dealOptions={dealOptions} loadingDeals={loadingDeals} showDealDropdown={showDealDropdown} setShowDealDropdown={setShowDealDropdown} />
 
-      {/* Tab switcher */}
-      <div className="flex items-center gap-1 p-1 bg-background-body rounded-lg border border-border-subtle">
-        {TABS.map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => { setActiveTab(tab.key); setError(null); setResult(null); }}
-            className={cn(
-              "flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-medium transition-all",
-              activeTab === tab.key
-                ? "bg-surface-card text-primary shadow-sm"
-                : "text-text-secondary hover:text-text-main"
+        {/* Tab switcher */}
+        <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          {TABS.map((tab) => (
+            <button key={tab.key} onClick={() => { setActiveTab(tab.key); clearState(); }}
+              className={cn("flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all", activeTab === tab.key ? "bg-white text-primary shadow-sm" : "text-text-secondary hover:text-text-main")}>
+              <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        {!processing && !result && (
+          <>
+            {activeTab === "file" && (
+              <FileUploadPanel selectedFile={selectedFile} dragOver={dragOver} setDragOver={setDragOver} fileInputRef={fileInputRef} onDrop={handleDrop} onFileSelect={handleFileSelect} onClear={clearFile} onUpload={handleUploadFile} onUploadDirect={handleUploadDirect} processing={processing} actionLabel={actionLabel} showDirectUpload={mode === "existing"} directUploadDisabled={!selectedFile || !selectedDeal || processing} />
             )}
-          >
-            <span className="material-symbols-outlined text-[18px]">{tab.icon}</span>
-            {tab.label}
-          </button>
-        ))}
-      </div>
+            {activeTab === "text" && (
+              <TextInputPanel textInput={textInput} setTextInput={setTextInput} textSourceType={textSourceType} setTextSourceType={setTextSourceType} onExtract={handleExtractText} processing={processing} actionLabel={actionLabel} />
+            )}
+            {activeTab === "url" && (
+              <UrlInputPanel urlInput={urlInput} setUrlInput={setUrlInput} urlCompanyName={urlCompanyName} setUrlCompanyName={setUrlCompanyName} onExtract={handleExtractUrl} processing={processing} isValidUrl={isValidUrl} actionLabel={actionLabel} />
+            )}
+          </>
+        )}
 
-      {/* Tab content */}
-      <div className="bg-surface-card rounded-xl border border-border-subtle shadow-card p-6">
-        {/* ---- File upload ---- */}
-        {activeTab === "file" && (
-          <div>
-            <div
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={cn(
-                "border-2 border-dashed rounded-xl p-10 flex flex-col items-center justify-center text-center cursor-pointer transition-all",
-                dragOver
-                  ? "border-primary bg-blue-50/50"
-                  : "border-border-subtle hover:border-primary/30 hover:bg-background-body"
-              )}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept=".pdf,.docx,.doc,.xlsx,.xls,.csv,.txt"
-                onChange={handleFileSelect}
-              />
-              <div className="bg-background-body p-3 rounded-full mb-3">
-                <span className="material-symbols-outlined text-[28px] text-text-muted">cloud_upload</span>
-              </div>
-              <p className="text-sm font-medium text-text-main mb-1">
-                {dragOver ? "Drop file here" : "Click to upload or drag and drop"}
-              </p>
-              <p className="text-xs text-text-muted">PDF, Word, Excel, CSV, or Text files up to 25MB</p>
+        {/* Loading state */}
+        {processing && (
+          <div className="rounded-lg border border-primary/20 bg-primary-light/30 p-8 shadow-card text-center">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-primary/10 mb-4">
+              <span className="material-symbols-outlined text-primary text-2xl animate-spin">progress_activity</span>
             </div>
+            <p className="text-sm font-medium text-text-main">{progressMessage || "Extracting deal data..."}</p>
+            <p className="text-xs text-text-secondary mt-1">AI is analyzing the content and extracting company information</p>
+          </div>
+        )}
 
-            {/* File info */}
-            {selectedFile && (
-              <div className="mt-4 flex items-center justify-between bg-background-body rounded-lg px-4 py-3 border border-border-subtle">
-                <div className="flex items-center gap-3">
-                  <span className="material-symbols-outlined text-[20px] text-primary">description</span>
-                  <div>
-                    <p className="text-sm font-medium text-text-main">{selectedFile.name}</p>
-                    <p className="text-xs text-text-muted">{formatFileSize(selectedFile.size)}</p>
+        {/* Warning */}
+        {warning && <WarningBanner title={warning.title} message={warning.message} onDismiss={() => setWarning(null)} />}
+
+        {/* Error */}
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-red-50 p-5 shadow-card">
+            <div className="flex items-start gap-3">
+              <span className="material-symbols-outlined text-red-500 mt-0.5">error</span>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-red-800">
+                  {activeTab === "url" ? "URL scraping failed" : activeTab === "text" ? "Text extraction failed" : "Upload failed"}
+                </p>
+                <p className="text-xs text-red-600 mt-1">{error}</p>
+              </div>
+              <button onClick={() => setError(null)} className="p-1 rounded hover:bg-red-100 text-red-400 hover:text-red-600 transition-colors">
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Result */}
+        {result && (
+          <div>
+            <ResultDisplay result={result} onReset={resetForm} />
+            {result.deal && (followUpLoading || followUpQuestions.length > 0) && (
+              <div className="bg-surface-card rounded-xl border border-border-subtle shadow-card p-6 mt-4">
+                <FollowUpQuestions questions={followUpQuestions} answers={followUpAnswers} onAnswer={handleFollowUpAnswer} loading={followUpLoading} />
+                {Object.keys(followUpAnswers).length > 0 && (
+                  <div className="mt-5">
+                    <button onClick={handleSaveFollowUpAndGoToDeal} className="w-full py-2.5 px-4 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-all flex items-center justify-center gap-2" style={{ backgroundColor: "#003366" }}>
+                      <span className="material-symbols-outlined text-[18px]">save</span>
+                      Save & View Deal
+                    </button>
+                    <p className="text-center mt-2">
+                      <button onClick={() => { if (result.deal) window.location.href = `/deals/${result.deal.id}`; }} className="text-[11px] text-gray-400 hover:text-gray-600 cursor-pointer transition-colors">
+                        Skip -- I&apos;ll add context later
+                      </button>
+                    </p>
                   </div>
-                </div>
-                <button
-                  onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = ""; }}
-                  className="text-text-muted hover:text-red-500 transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[18px]">close</span>
-                </button>
+                )}
               </div>
             )}
-
-            <button
-              onClick={handleUploadFile}
-              disabled={!selectedFile || processing}
-              className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: "#003366" }}
-            >
-              {processing ? (
-                <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-              ) : (
-                <span className="material-symbols-outlined text-[16px]">upload</span>
-              )}
-              {processing ? "Processing..." : "Upload & Analyze"}
-            </button>
           </div>
         )}
-
-        {/* ---- Text input ---- */}
-        {activeTab === "text" && (
-          <div>
-            <div className="mb-3">
-              <label className="block text-sm font-medium text-text-main mb-1">Source Type</label>
-              <select
-                value={textSourceType}
-                onChange={(e) => setTextSourceType(e.target.value)}
-                className="w-full max-w-xs rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-1 focus:ring-primary focus:border-primary"
-              >
-                {TEXT_SOURCE_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <textarea
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              rows={10}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-4 py-3 text-sm text-text-main leading-relaxed placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary resize-y"
-              placeholder="Paste CIM text, deal teaser, or other deal-related content here..."
-            />
-            <div className="flex items-center justify-between mt-2">
-              <p className="text-xs text-text-muted">
-                {textInput.length} characters {textInput.length < 50 && textInput.length > 0 ? "(minimum 50)" : ""}
-              </p>
-            </div>
-
-            <button
-              onClick={handleExtractText}
-              disabled={textInput.trim().length < 50 || processing}
-              className="mt-4 w-full flex items-center justify-center gap-2 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: "#003366" }}
-            >
-              {processing ? (
-                <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-              ) : (
-                <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-              )}
-              {processing ? "Analyzing..." : "Extract & Create Deal"}
-            </button>
-          </div>
-        )}
-
       </div>
-
-      {/* Processing indicator */}
-      {processing && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl px-5 py-4 flex items-center gap-4">
-          <div className="size-10 border-4 border-primary border-t-transparent rounded-full animate-spin shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-text-main">{progressMessage || "Processing..."}</p>
-            <p className="text-xs text-text-muted mt-0.5">This may take a few moments depending on the document size.</p>
-          </div>
-        </div>
-      )}
-
-      {/* Error */}
-      {error && (
-        <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-5 py-4">
-          <span className="material-symbols-outlined text-red-500 text-[20px]">error</span>
-          <div className="flex-1">
-            <p className="text-sm font-medium text-red-700">{error}</p>
-          </div>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600">
-            <span className="material-symbols-outlined text-[18px]">close</span>
-          </button>
-        </div>
-      )}
-
-      {/* Result */}
-      {result && <ResultDisplay result={result} onReset={resetForm} />}
     </div>
   );
 }

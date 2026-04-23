@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { WelcomeView } from "./welcome-view";
 import { ChecklistView } from "./checklist-view";
+import { Confetti } from "./confetti";
 import { FirmTaskModal } from "./firm-task";
 import { CimTaskModal } from "./cim-task";
 import { TeamTaskModal } from "./team-task";
@@ -32,8 +33,14 @@ export default function OnboardingPage() {
   const [firmData, setFirmData] = useState<FirmData>({ url: "", linkedin: "", aum: "", sectors: [] });
   const [sampleDealId, setSampleDealId] = useState<string | null>(null); // "luktara" | "pinecrest" | null
   const [cimFile, setCimFile] = useState<File | null>(null);
-  const [teamInvites, setTeamInvites] = useState<TeamInvite[]>([{ email: "", role: "Analyst" }]);
+  // Legacy starts with 2 team invite rows (onboarding-tasks.js team hydrator calls addRow() twice).
+  const [teamInvites, setTeamInvites] = useState<TeamInvite[]>([
+    { email: "", role: "Analyst" },
+    { email: "", role: "Analyst" },
+  ]);
   const [createdDealId, setCreatedDealId] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const confettiFiredRef = useRef(false);
 
   // ─── Load existing progress from the API ────────────────────────
   useEffect(() => {
@@ -90,12 +97,23 @@ export default function OnboardingPage() {
       setCompleted((prev) => {
         const next = new Set(prev);
         next.add(taskId);
+        // Fire confetti when all tasks are done (legacy: fireConfetti in onboarding-flow.js)
+        if (next.size >= TASKS.length && !confettiFiredRef.current) {
+          confettiFiredRef.current = true;
+          setShowConfetti(true);
+        }
         return next;
       });
       setActiveTask(null);
       void markServerStep(taskId);
+
+      // Also mark full onboarding complete when all done (legacy: markOnboardingComplete)
+      const willBeComplete = completed.size + 1 >= TASKS.length || (completed.has(taskId) && completed.size >= TASKS.length);
+      if (willBeComplete) {
+        api.post("/onboarding/complete-step", { step: "createDeal" }).catch(() => {});
+      }
     },
-    [markServerStep, sampleDealId],
+    [markServerStep, sampleDealId, completed],
   );
 
   const doneCount = completed.size;
@@ -151,6 +169,7 @@ export default function OnboardingPage() {
 
   return (
     <>
+      <Confetti active={showConfetti} />
       <TopNav doneCount={doneCount} onSkip={() => setShowSkip(true)} />
 
       {view === "welcome" ? (
@@ -161,6 +180,7 @@ export default function OnboardingPage() {
           onOpenTask={setActiveTask}
           allDone={allDone}
           onOpenWorkspace={openWorkspace}
+          onDealId={(id) => setCreatedDealId((prev) => prev ?? id)}
         />
       )}
 

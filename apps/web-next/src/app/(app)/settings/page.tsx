@@ -10,6 +10,8 @@ import { SecuritySection } from "./SecuritySection";
 import { PreferencesSection, type PrefsState } from "./PreferencesSection";
 import { ProfileSection, type UserProfile } from "./ProfileSection";
 import { NotificationsSection, DEFAULT_NOTIFICATION_PREFS } from "./NotificationsSection";
+import { TeamSection } from "./TeamSection";
+import { FirmProfileSection } from "./FirmProfileSection";
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -18,6 +20,8 @@ const NAV_SECTIONS = [
   { id: "security", label: "Security", icon: "shield" },
   { id: "preferences", label: "Preferences", icon: "tune" },
   { id: "notifications", label: "Notifications", icon: "notifications" },
+  { id: "team", label: "Team", icon: "group" },
+  { id: "firm-profile", label: "Firm Profile", icon: "domain" },
 ] as const;
 
 const DEFAULT_PREFS: PrefsState = {
@@ -324,6 +328,10 @@ export default function SettingsPage() {
             setNotificationPrefs={setNotificationPrefs}
             markChanged={markChanged}
           />
+
+          <TeamSection />
+
+          <FirmProfileSection />
 
           {/* Deactivate Account */}
           <div className="flex items-center justify-between p-5 bg-red-50 border border-red-200 rounded-xl">

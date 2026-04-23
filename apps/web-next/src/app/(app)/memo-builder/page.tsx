@@ -86,6 +86,11 @@ export default function MemoBuilderPage() {
       setSelectedMemo(memo);
 
       const sortedSections = (memo.sections || [])
+        .map((s) => ({
+          ...s,
+          hasTable: !!s.tableData,
+          hasChart: !!s.chartConfig,
+        }))
         .sort((a, b) => a.sortOrder - b.sortOrder);
       setSections(sortedSections);
 

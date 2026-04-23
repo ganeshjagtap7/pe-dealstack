@@ -7,6 +7,20 @@ import { cn } from "@/lib/cn";
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
+export interface TableRow {
+  metric: string;
+  values: string[];
+  isBold?: boolean;
+  isSubMetric?: boolean;
+  highlight?: string;
+}
+
+export interface TableData {
+  headers: string[];
+  rows: (TableRow | string[])[];
+  footnote?: string;
+}
+
 export interface MemoSection {
   id: string;
   type: string;
@@ -14,6 +28,13 @@ export interface MemoSection {
   sortOrder: number;
   aiGenerated: boolean;
   content: string;
+  tableData?: TableData | null;
+  chartConfig?: Record<string, unknown> | null;
+  hasTable?: boolean;
+  hasChart?: boolean;
+  hasPlaceholder?: boolean;
+  placeholderText?: string;
+  citations?: unknown[];
 }
 
 export interface Memo {
@@ -62,10 +83,13 @@ export const SECTION_TYPES = [
   { value: "COMPANY_OVERVIEW", label: "Company Overview" },
   { value: "FINANCIAL_PERFORMANCE", label: "Financial Performance" },
   { value: "MARKET_DYNAMICS", label: "Market Dynamics" },
+  { value: "COMPETITIVE_LANDSCAPE", label: "Competitive Landscape" },
   { value: "RISK_ASSESSMENT", label: "Risk Assessment" },
   { value: "DEAL_STRUCTURE", label: "Deal Structure" },
   { value: "VALUE_CREATION", label: "Value Creation" },
+  { value: "EXIT_STRATEGY", label: "Exit Strategy" },
   { value: "RECOMMENDATION", label: "Recommendation" },
+  { value: "APPENDIX", label: "Appendix" },
   { value: "CUSTOM", label: "Custom" },
 ];
 
@@ -198,10 +222,11 @@ export function MemoListSidebar({
   );
 }
 
-// MemoEditor, MemoChat, and MemoChatCollapsed live in editor.tsx.
+// MemoEditor lives in editor.tsx; MemoChat/MemoChatCollapsed in chat.tsx.
 // MemoOutlineSidebar (document outline + template/compliance cards) in outline-sidebar.tsx.
-export { MemoEditor, MemoChat, MemoChatCollapsed } from "./editor";
+export { MemoEditor } from "./editor";
 export type { MemoEditorProps } from "./editor";
+export { MemoChat, MemoChatCollapsed } from "./chat";
 export { MemoOutlineSidebar } from "./outline-sidebar";
 
 /* ------------------------------------------------------------------ */

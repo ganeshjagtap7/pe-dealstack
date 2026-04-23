@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { formatCurrency } from "@/lib/formatters";
 import { createClient } from "@/lib/supabase/client";
 
 /* ------------------------------------------------------------------ */
@@ -26,6 +27,19 @@ export interface ExtractionResult {
   overallConfidence?: number;
   needsReview?: boolean;
   reviewReasons?: string[];
+  currency?: string;
+  summary?: string;
+  keyRisks?: string[];
+  investmentHighlights?: string[];
+}
+
+export interface FollowUpQuestion {
+  id: string;
+  question: string;
+  reason: string;
+  type: "choice" | "text";
+  options?: string[];
+  placeholder?: string;
 }
 
 export interface IngestResponse {
@@ -39,19 +53,22 @@ export interface IngestResponse {
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
+export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+
 export const TABS = [
   { key: "file", label: "Upload File", icon: "upload_file" },
-  { key: "text", label: "Paste Text", icon: "content_paste" },
+  { key: "text", label: "Paste Text", icon: "edit_note" },
+  { key: "url", label: "Enter URL", icon: "language" },
 ] as const;
 
 export type TabKey = (typeof TABS)[number]["key"];
 
 export const TEXT_SOURCE_TYPES = [
-  { value: "cim", label: "CIM / Teaser" },
-  { value: "research", label: "Research Report" },
-  { value: "financials", label: "Financial Summary" },
-  { value: "notes", label: "Meeting Notes" },
-  { value: "other", label: "Other" },
+  { value: "other", label: "Source: Other" },
+  { value: "email", label: "Email" },
+  { value: "note", label: "Note" },
+  { value: "slack", label: "Slack" },
+  { value: "whatsapp", label: "WhatsApp" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -209,22 +226,6 @@ export function DealSelector({
 /*  ResultDisplay                                                       */
 /* ------------------------------------------------------------------ */
 
-function ConfidenceBar({ confidence }: { confidence?: number }) {
-  if (confidence === undefined || confidence === null) return null;
-  const color =
-    confidence >= 80 ? "bg-emerald-500" : confidence >= 60 ? "bg-yellow-400" : "bg-red-400";
-  const textColor =
-    confidence >= 80 ? "text-emerald-600" : confidence >= 60 ? "text-yellow-600" : "text-red-500";
-  return (
-    <div className="flex items-center gap-2">
-      <div className="flex-1 h-1.5 bg-background-body rounded-full overflow-hidden">
-        <div className={cn("h-full rounded-full transition-all", color)} style={{ width: `${confidence}%` }} />
-      </div>
-      <span className={cn("text-xs font-medium", textColor)}>{confidence}%</span>
-    </div>
-  );
-}
-
 function ResultField({
   label,
   value,
@@ -279,43 +280,77 @@ interface ResultDisplayProps {
   onReset: () => void;
 }
 
-function formatCurrencyValue(val: number | null | undefined): string {
-  if (val === null || val === undefined) return "N/A";
-  if (Math.abs(val) >= 1000) return `$${(val / 1000).toFixed(1)}B`;
-  if (Math.abs(val) >= 1) return `$${val.toFixed(1)}M`;
-  return `$${(val * 1000).toFixed(0)}K`;
-}
-
 export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
+  const detectedCurrency = result.extraction?.currency || "USD";
+
   return (
     <div className="bg-surface-card rounded-xl border border-border-subtle shadow-card p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="bg-emerald-50 p-2 rounded-full">
-          <span className="material-symbols-outlined text-emerald-600 text-[24px]">
-            {result.isUpdate ? "update" : result.summary ? "checklist" : "check_circle"}
-          </span>
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="bg-emerald-50 p-2 rounded-full">
+            <span className="material-symbols-outlined text-emerald-600 text-[24px]">
+              {result.isUpdate ? "update" : result.summary ? "checklist" : "check_circle"}
+            </span>
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-text-main">
+              {result.summary
+                ? "Bulk Import Complete"
+                : result.isUpdate
+                  ? "Deal Updated"
+                  : "Deal Created"}
+            </h3>
+            {result.deal && (
+              <p className="text-xs text-text-muted">{result.deal.name}</p>
+            )}
+          </div>
         </div>
-        <div>
-          <h3 className="text-base font-bold text-text-main">
-            {result.summary
-              ? "Bulk Import Complete"
-              : result.isUpdate
-                ? "Deal Updated"
-                : "Deal Created"}
-          </h3>
-          {result.deal && (
-            <p className="text-xs text-text-muted">{result.deal.name}</p>
-          )}
-        </div>
+        {result.extraction?.needsReview && (
+          <div className="px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-medium flex items-center gap-1">
+            <span className="material-symbols-outlined text-[14px]">warning</span>
+            Needs Review
+          </div>
+        )}
       </div>
 
       {/* Extraction fields */}
       {result.extraction && (
-        <div className="grid grid-cols-2 gap-4 mb-5">
-          <ResultField label="Company" value={result.extraction.companyName?.value as string || "N/A"} confidence={result.extraction.companyName?.confidence} source={result.extraction.companyName?.source} />
-          <ResultField label="Industry" value={result.extraction.industry?.value as string || "N/A"} confidence={result.extraction.industry?.confidence} source={result.extraction.industry?.source} />
-          <ResultField label="Revenue" value={result.extraction.revenue?.value != null ? formatCurrencyValue(result.extraction.revenue.value as number) : "N/A"} confidence={result.extraction.revenue?.confidence} source={result.extraction.revenue?.source} />
-          <ResultField label="EBITDA" value={result.extraction.ebitda?.value != null ? formatCurrencyValue(result.extraction.ebitda.value as number) : "N/A"} confidence={result.extraction.ebitda?.confidence} source={result.extraction.ebitda?.source} />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+          <div className="col-span-full">
+            <ResultField
+              label="Company Name"
+              value={result.extraction.companyName?.value as string || "N/A"}
+              confidence={result.extraction.companyName?.confidence}
+              source={result.extraction.companyName?.source}
+            />
+          </div>
+          <ResultField
+            label="Industry"
+            value={result.extraction.industry?.value as string || (result.extraction.industry?.confidence === 0 ? "Not Found" : "N/A")}
+            confidence={result.extraction.industry?.confidence}
+            source={result.extraction.industry?.source}
+          />
+          <ResultField
+            label="Overall Confidence"
+            value={`${result.extraction.overallConfidence || 0}%`}
+            confidence={result.extraction.overallConfidence}
+          />
+          <ResultField
+            label="Revenue"
+            value={result.extraction.revenue?.value != null
+              ? formatCurrency(result.extraction.revenue.value as number, detectedCurrency)
+              : (result.extraction.revenue?.confidence === 0 ? "Not Found" : "N/A")}
+            confidence={result.extraction.revenue?.confidence}
+            source={result.extraction.revenue?.source}
+          />
+          <ResultField
+            label="EBITDA"
+            value={result.extraction.ebitda?.value != null
+              ? formatCurrency(result.extraction.ebitda.value as number, detectedCurrency)
+              : (result.extraction.ebitda?.confidence === 0 ? "Not Found" : "N/A")}
+            confidence={result.extraction.ebitda?.confidence}
+            source={result.extraction.ebitda?.source}
+          />
         </div>
       )}
 
@@ -337,54 +372,48 @@ export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
         </div>
       )}
 
-      {/* Overall confidence */}
-      {result.extraction?.overallConfidence !== undefined && (
-        <div className="mb-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-xs font-medium text-text-secondary">Overall Confidence</span>
-            <span className="text-xs font-bold text-text-main">{result.extraction.overallConfidence}%</span>
-          </div>
-          <ConfidenceBar confidence={result.extraction.overallConfidence} />
-        </div>
-      )}
-
-      {/* Review needed */}
-      {result.extraction?.needsReview && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3 mb-4">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="material-symbols-outlined text-amber-600 text-[16px]">warning</span>
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wide">Needs Review</span>
-          </div>
-          {result.extraction.reviewReasons && result.extraction.reviewReasons.length > 0 && (
-            <ul className="text-xs text-amber-700 list-disc pl-5 mt-1 space-y-0.5">
-              {result.extraction.reviewReasons.map((r, i) => (
-                <li key={i}>{r}</li>
-              ))}
-            </ul>
-          )}
+      {/* Review reasons */}
+      {result.extraction?.needsReview && result.extraction.reviewReasons && result.extraction.reviewReasons.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 mb-4">
+          <p className="text-xs font-medium text-yellow-800 mb-1">Review needed:</p>
+          <ul className="text-xs text-yellow-700 list-disc list-inside space-y-0.5">
+            {result.extraction.reviewReasons.map((r, i) => (
+              <li key={i}>{r}</li>
+            ))}
+          </ul>
         </div>
       )}
 
       {/* Actions */}
-      <div className="flex items-center gap-3 pt-4 border-t border-border-subtle">
-        {result.deal && (
+      <div className="flex gap-3 mt-5">
+        {result.deal ? (
           <a
             href={`/deals/${result.deal.id}`}
-            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
             style={{ backgroundColor: "#003366" }}
           >
-            <span className="material-symbols-outlined text-[16px]">open_in_new</span>
+            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
             View Deal
           </a>
-        )}
+        ) : result.summary ? (
+          <a
+            href="/crm"
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 px-4 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#003366" }}
+          >
+            <span className="material-symbols-outlined text-[18px]">list</span>
+            View All Deals
+          </a>
+        ) : null}
         <button
           onClick={onReset}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium text-text-secondary border border-border-subtle hover:bg-background-body transition-colors"
+          className="py-2.5 px-4 rounded-lg text-sm font-medium text-text-secondary border border-border-subtle hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
         >
-          <span className="material-symbols-outlined text-[16px]">add</span>
+          <span className="material-symbols-outlined text-[18px]">add</span>
           Add Another
         </button>
       </div>
     </div>
   );
 }
+

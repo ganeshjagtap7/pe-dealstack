@@ -34,6 +34,7 @@ export interface Deal {
   icon?: string;
   lastDocument?: string;
   lastDocumentUpdated?: string;
+  tags?: string[];
 }
 
 export interface DealFilters {

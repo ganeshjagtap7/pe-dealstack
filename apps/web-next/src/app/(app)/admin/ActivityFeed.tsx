@@ -14,9 +14,12 @@ const ACTION_META: Record<string, { text: (entity: string) => string; icon: stri
   DEAL_DELETED: { text: (e) => `deleted deal ${e}`, icon: "delete" },
   DEAL_STAGE_CHANGED: { text: (e) => `moved ${e} to a new stage`, icon: "arrow_forward" },
   DEAL_ASSIGNED: { text: (e) => `assigned ${e}`, icon: "person_add" },
+  DEAL_VIEWED: { text: (e) => `viewed ${e}`, icon: "visibility" },
+  DEAL_EXPORTED: { text: (e) => `exported ${e}`, icon: "file_download" },
   DOCUMENT_UPLOADED: { text: (e) => `uploaded ${e}`, icon: "upload_file" },
   DOCUMENT_DELETED: { text: (e) => `deleted document ${e}`, icon: "delete" },
   DOCUMENT_DOWNLOADED: { text: (e) => `downloaded ${e}`, icon: "download" },
+  DOCUMENT_VIEWED: { text: (e) => `viewed document ${e}`, icon: "visibility" },
   MEMO_CREATED: { text: (e) => `created memo ${e}`, icon: "description" },
   MEMO_UPDATED: { text: (e) => `updated memo ${e}`, icon: "edit_note" },
   MEMO_EXPORTED: { text: (e) => `exported memo ${e}`, icon: "file_download" },
@@ -27,7 +30,9 @@ const ACTION_META: Record<string, { text: (entity: string) => string; icon: stri
   INVITATION_ACCEPTED: { text: (e) => `${e} accepted invitation`, icon: "how_to_reg" },
   AI_INGEST: { text: (e) => `ingested document ${e}`, icon: "auto_awesome" },
   AI_GENERATE: { text: (e) => `generated analysis for ${e}`, icon: "auto_awesome" },
+  AI_CHAT: { text: (e) => `chatted with ${e || "PE OS AI"}`, icon: "auto_awesome" },
   LOGIN: { text: () => "logged in", icon: "login" },
+  LOGOUT: { text: () => "logged out", icon: "logout" },
   SETTINGS_CHANGED: { text: () => "updated settings", icon: "settings" },
 };
 

@@ -31,7 +31,7 @@ export function QuickNotesWidget() {
   };
 
   return (
-    <WidgetShell title="Quick Notes" icon="edit_note">
+    <WidgetShell title="Quick Notes" icon="sticky_note_2">
       <div className="p-4">
         <textarea
           value={note}

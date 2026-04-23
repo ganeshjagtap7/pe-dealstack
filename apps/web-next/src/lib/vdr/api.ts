@@ -77,6 +77,7 @@ export async function uploadDocument(
   dealId: string,
   folderId: string,
   file: File,
+  options?: { autoUpdateDeal?: boolean },
 ): Promise<APIDocument | null> {
   const supabase = createClient();
   const { data: sessionData } = await supabase.auth.getSession();
@@ -86,6 +87,9 @@ export async function uploadDocument(
   formData.append("file", file);
   formData.append("folderId", folderId);
   formData.append("type", "OTHER");
+  if (options?.autoUpdateDeal) {
+    formData.append("autoUpdateDeal", "true");
+  }
 
   const res = await fetch(`/api/deals/${dealId}/documents`, {
     method: "POST",
@@ -163,6 +167,43 @@ export async function requestDocument(
     folderId: options?.folderId,
     folderName: options?.folderName,
   });
+}
+
+/**
+ * Extract financials from a VDR document — calls GPT-4o to parse financial data.
+ */
+export async function extractFinancials(
+  dealId: string,
+  documentId: string,
+): Promise<{ result?: { periodsStored?: number }; stored?: number }> {
+  return api.post(`/deals/${dealId}/financials/extract`, { documentId });
+}
+
+/**
+ * Link (copy) a document to another deal.
+ */
+export async function linkDocumentToDeal(
+  documentId: string,
+  targetDealId: string,
+): Promise<APIDocument | null> {
+  return api.post(`/documents/${documentId}/link`, { targetDealId });
+}
+
+/**
+ * Fetch all deals (for the deal picker in link-to-deal modal).
+ */
+export async function fetchAllDeals(): Promise<
+  Array<{ id: string; name: string; industry?: string }>
+> {
+  try {
+    const data = await api.get<
+      Array<{ id: string; name: string; industry?: string }> | { deals: Array<{ id: string; name: string; industry?: string }> }
+    >("/deals?limit=100");
+    return Array.isArray(data) ? data : data.deals || [];
+  } catch (err) {
+    console.warn("[vdr] fetchAllDeals failed:", err);
+    return [];
+  }
 }
 
 export async function initializeDealFolders(

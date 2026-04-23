@@ -10,6 +10,8 @@ export default function LandingPage() {
 
       {/* Hero */}
       <div className="relative w-full overflow-hidden bg-[#f8fafc]">
+        {/* Grid pattern background matching legacy */}
+        <div className="absolute inset-0 pointer-events-none" style={{ backgroundImage: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23003366' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E\")" }} />
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 bg-blue-400/10 rounded-full blur-3xl pointer-events-none" />
         <div className="relative px-4 md:px-10 lg:px-40 py-16 lg:py-24">
@@ -18,7 +20,7 @@ export default function LandingPage() {
               <div className="flex-1 flex flex-col gap-6 text-center lg:text-left z-10">
                 <div className="inline-flex items-center gap-2 self-center lg:self-start rounded-full border border-primary/20 bg-primary/5 px-3 py-1">
                   <span className="flex size-2 rounded-full bg-primary animate-pulse" />
-                  <span className="text-xs font-semibold text-primary uppercase tracking-wide">New: AI-Powered Analysis</span>
+                  <span className="text-xs font-semibold text-primary uppercase tracking-wide">New: GPT-4o Integration</span>
                 </div>
                 <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold leading-[1.1] tracking-tight text-[#111418]">
                   The Intelligence Layer for <span className="text-primary">Private Equity</span>
@@ -42,45 +44,26 @@ export default function LandingPage() {
                   <span>No credit card required</span>
                 </div>
               </div>
-              {/* Hero Image */}
-              <div className="flex-1 w-full max-w-[600px] lg:max-w-none">
-                <div className="relative group">
-                  <div className="absolute -inset-1 bg-gradient-to-r from-primary to-blue-400 rounded-xl blur opacity-25 group-hover:opacity-40 transition duration-1000" />
+              {/* Hero Image / Dashboard Preview */}
+              <div className="flex-1 w-full max-w-[600px] lg:max-w-none" style={{ perspective: "1000px" }}>
+                <div className="relative group transform transition-transform duration-700 hover:scale-[1.01] hover:rotate-1">
+                  {/* Glow effect behind */}
+                  <div className="absolute -inset-1 bg-gradient-to-r from-primary to-blue-400 rounded-xl blur opacity-25 group-hover:opacity-40 transition duration-1000 group-hover:duration-200" />
+                  {/* Main Image Container */}
                   <div className="relative rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200">
-                    <div className="h-8 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-2">
+                    <div className="absolute top-0 w-full h-8 bg-slate-100 border-b border-slate-200 flex items-center px-4 gap-2">
                       <div className="size-2.5 rounded-full bg-red-400" />
                       <div className="size-2.5 rounded-full bg-yellow-400" />
                       <div className="size-2.5 rounded-full bg-green-400" />
                     </div>
-                    <div className="aspect-[4/3] bg-gradient-to-br from-[#f8fafc] to-[#e2e8f0] flex items-center justify-center p-8">
-                      <div className="w-full max-w-md space-y-4">
-                        <div className="flex gap-3">
-                          {[1, 2, 3, 4].map((i) => (
-                            <div key={i} className="flex-1 h-20 rounded-lg bg-white border border-slate-200 shadow-sm p-3">
-                              <div className="h-2 w-12 bg-slate-200 rounded" />
-                              <div className="h-5 w-8 bg-primary/20 rounded mt-2" />
-                            </div>
-                          ))}
+                    <div className="pt-8 aspect-[4/3]" style={{ background: "linear-gradient(135deg, #003366 0%, #004488 40%, #0055AA 70%, #1a6bb5 100%)" }}>
+                      <div className="w-full h-full bg-white/10 p-6 flex flex-col gap-4">
+                        <div className="flex gap-4">
+                          <div className="w-1/3 h-32 rounded bg-white/90 shadow-sm backdrop-blur" />
+                          <div className="w-1/3 h-32 rounded bg-white/90 shadow-sm backdrop-blur" />
+                          <div className="w-1/3 h-32 rounded bg-white/90 shadow-sm backdrop-blur" />
                         </div>
-                        <div className="h-32 rounded-lg bg-white border border-slate-200 shadow-sm p-4">
-                          <div className="h-2 w-24 bg-slate-200 rounded mb-3" />
-                          <div className="flex gap-2 h-16">
-                            {[60, 80, 45, 90, 70, 55].map((h, i) => (
-                              <div key={i} className="flex-1 flex items-end">
-                                <div className="w-full rounded-t bg-primary/30" style={{ height: `${h}%` }} />
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        <div className="h-24 rounded-lg bg-white border border-slate-200 shadow-sm p-3">
-                          {[1, 2, 3].map((i) => (
-                            <div key={i} className="flex items-center gap-2 py-1.5">
-                              <div className="size-5 rounded-full bg-primary/10" />
-                              <div className="h-2 flex-1 bg-slate-100 rounded" />
-                              <div className="h-4 w-12 bg-blue-50 rounded" />
-                            </div>
-                          ))}
-                        </div>
+                        <div className="flex-1 rounded bg-white/90 shadow-sm backdrop-blur" />
                       </div>
                     </div>
                   </div>

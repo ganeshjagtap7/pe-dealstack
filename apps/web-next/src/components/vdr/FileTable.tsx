@@ -9,6 +9,8 @@ interface Props {
   onFileClick?: (file: VDRFile) => void;
   onDeleteFile?: (fileId: string) => void;
   onRenameFile?: (fileId: string, newName: string) => void;
+  onLinkToDeal?: (file: VDRFile) => void;
+  onExtractFinancials?: (file: VDRFile) => void;
   onReanalyze?: (file: VDRFile) => void;
 }
 
@@ -46,6 +48,8 @@ export function FileTable({
   onFileClick,
   onDeleteFile,
   onRenameFile,
+  onLinkToDeal,
+  onExtractFinancials,
   onReanalyze,
 }: Props) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
@@ -267,6 +271,34 @@ export function FileTable({
                                 <span className="material-symbols-outlined text-[18px]">download</span>
                                 Download
                               </button>
+                              {onLinkToDeal && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onLinkToDeal(file);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">link</span>
+                                  Link to Deal
+                                </button>
+                              )}
+                              {onExtractFinancials && (file.type === "excel" || file.type === "pdf") && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onExtractFinancials(file);
+                                    setOpenMenuId(null);
+                                  }}
+                                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors"
+                                >
+                                  <span className="material-symbols-outlined text-[18px]">analytics</span>
+                                  Extract Financials
+                                </button>
+                              )}
                               <div className="border-t border-slate-200 my-1" />
                               <button
                                 type="button"

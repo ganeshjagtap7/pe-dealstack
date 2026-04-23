@@ -52,7 +52,7 @@ export function UpcomingDeadlinesWidget() {
   }, []);
 
   return (
-    <WidgetShell title="Upcoming Deadlines" icon="event">
+    <WidgetShell title="Upcoming Deadlines" icon="event_upcoming">
       {error ? (
         <WidgetError message="Could not load deadlines" />
       ) : !upcoming ? (

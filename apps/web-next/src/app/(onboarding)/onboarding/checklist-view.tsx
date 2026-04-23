@@ -1,6 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/cn";
+import { CompletionFindings } from "./completion-findings";
 import { TaskId, TASKS } from "./types";
 
 // Checklist view — the 3-task list with progress bar. Ported from
@@ -11,11 +12,13 @@ export function ChecklistView({
   onOpenTask,
   allDone,
   onOpenWorkspace,
+  onDealId,
 }: {
   completed: Set<TaskId>;
   onOpenTask: (id: TaskId) => void;
   allDone: boolean;
   onOpenWorkspace: () => void;
+  onDealId?: (id: string) => void;
 }) {
   const doneCount = TASKS.filter((t) => completed.has(t.id)).length;
   const pct = Math.round((doneCount / TASKS.length) * 100);
@@ -38,7 +41,7 @@ export function ChecklistView({
         <div className="text-[11px] uppercase tracking-widest text-text-muted font-medium mb-2">
           Getting started · {doneCount} of {TASKS.length} complete
         </div>
-        <h2 className="text-[32px] leading-[1.15] font-bold tracking-tight text-text-main">{heading}</h2>
+        <h2 className="font-display text-[32px] leading-[1.15] font-bold tracking-tight text-text-main">{heading}</h2>
         <p className="mt-2 text-[14px] text-text-secondary max-w-2xl">{sub}</p>
         <div className="mt-5 max-w-md bg-border-subtle h-[3px] rounded-sm overflow-hidden">
           <div
@@ -134,20 +137,23 @@ export function ChecklistView({
         </button>
       </div>
 
-      {/* Completion CTA */}
+      {/* Completion CTA — dynamically populated with real findings */}
       {allDone && (
-        <div className="mt-6 bg-white border-2 border-secondary/30 rounded-xl p-6">
+        <div className="mt-6 bg-white border-2 border-secondary/30 rounded-xl p-6 animate-[fadeIn_320ms_ease_both]">
           <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-secondary font-semibold mb-3">
             <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
               check_circle
             </span>
             You&apos;re in
           </div>
-          <h3 className="text-[24px] font-bold text-text-main">Your workspace is ready.</h3>
-          <p className="text-[13.5px] text-text-secondary mt-1.5 mb-5">
-            Your AI analyst is processing your deal. Findings will appear on your dashboard.
-          </p>
-          <div className="mt-5 pt-5 border-t border-border-subtle flex items-center justify-end">
+
+          <CompletionFindings onDealId={onDealId} />
+
+          <div className="mt-5 pt-5 border-t border-border-subtle flex items-center justify-between gap-4 flex-wrap">
+            <div className="text-[12.5px] text-text-muted flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">info</span>
+              Every finding traces to a page + cell in the source document.
+            </div>
             <button
               type="button"
               onClick={onOpenWorkspace}

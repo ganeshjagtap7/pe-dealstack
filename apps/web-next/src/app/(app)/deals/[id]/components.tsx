@@ -25,6 +25,8 @@ export interface DealDetail {
   currency?: string;
   revenue?: number;
   ebitda?: number;
+  irrProjected?: number;
+  mom?: number;
   targetReturn?: number;
   evMultiple?: number;
   priority?: string;
@@ -35,10 +37,12 @@ export interface DealDetail {
   assignee?: string;
   assignedUser?: AssignedUser | null;
   source?: string;
+  icon?: string;
   createdAt: string;
   updatedAt: string;
   documents?: DocItem[];
   team?: TeamMember[];
+  activities?: Activity[];
 }
 
 export interface DocItem {
@@ -46,6 +50,8 @@ export interface DocItem {
   name: string;
   type?: string;
   fileSize?: number;
+  fileUrl?: string;
+  aiAnalysis?: string;
   createdAt: string;
   url?: string;
 }
@@ -67,9 +73,12 @@ export interface ChatMessage {
 
 export interface Activity {
   id: string;
+  type?: string;
   action: string;
+  title?: string;
   description?: string;
   userName?: string;
+  user?: { name?: string };
   createdAt: string;
   metadata?: Record<string, unknown>;
 }
@@ -104,72 +113,10 @@ export type Tab = (typeof TABS)[number];
 
 export { StagePipeline, DealMetadataRow, FinancialMetricsRow, FinancialStatementsSection } from "./deal-layout";
 
-// ---------------------------------------------------------------------------
-// Overview Tab
-// ---------------------------------------------------------------------------
-
-export function OverviewTab({ deal }: { deal: DealDetail }) {
-  const risks = deal.aiRisks?.keyRisks || [];
-  const highlights = deal.aiRisks?.investmentHighlights || [];
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Key Risks + Highlights (top, full width) */}
-      {(risks.length > 0 || highlights.length > 0) && (
-        <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="material-symbols-outlined text-[20px] text-red-400">shield</span>
-            <h3 className="text-sm font-bold text-text-main uppercase tracking-wide">Key Risks</h3>
-          </div>
-          <div className="space-y-2.5">
-            {risks.map((risk, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 bg-amber-50/50 border border-amber-200/50 rounded-lg">
-                <span className={cn(
-                  "material-symbols-outlined text-base mt-0.5 shrink-0",
-                  i === 0 ? "text-red-400" : "text-amber-500"
-                )}>
-                  {i === 0 ? "error" : "warning"}
-                </span>
-                <p className="text-sm text-text-secondary leading-relaxed">{risk}</p>
-              </div>
-            ))}
-            {highlights.map((h, i) => (
-              <div key={`h-${i}`} className="flex items-start gap-3 p-3 bg-emerald-50/50 border border-emerald-200/50 rounded-lg">
-                <span className="material-symbols-outlined text-emerald-500 text-base mt-0.5 shrink-0">check_circle</span>
-                <p className="text-sm text-text-secondary leading-relaxed">{h}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* AI Thesis */}
-      <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="material-symbols-outlined text-[20px] text-primary">auto_awesome</span>
-            <h3 className="text-sm font-semibold text-text-main">AI Investment Thesis</h3>
-          </div>
-          {deal.aiThesis ? (
-            <p className="text-sm text-text-secondary leading-relaxed">{deal.aiThesis}</p>
-          ) : (
-            <p className="text-sm text-text-muted italic">
-              No AI thesis generated yet. Upload documents and use the chat to analyze this deal.
-            </p>
-          )}
-        </div>
-
-        {/* Description */}
-        {deal.description && (
-          <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
-            <h3 className="text-sm font-semibold text-text-main mb-3">Description</h3>
-            <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-              {deal.description}
-            </p>
-          </div>
-        )}
-    </div>
-  );
-}
+// Re-export OverviewTab from deal-overview.tsx
+export { OverviewTab } from "./deal-overview";
+// Re-export panel components from deal-panels.tsx
+export { DealActionsMenu, TeamAvatarStack, ClearChatModal } from "./deal-panels";
 
 // ---------------------------------------------------------------------------
 // Documents Tab
@@ -261,6 +208,9 @@ export function DocumentsTab({
 
 export { ChatTab } from "./deal-tabs";
 export { ActivityTab } from "./deal-tabs";
+
+// Re-export new components (defined above)
+// DealActionsMenu, TeamAvatarStack, ClearChatModal are exported inline
 
 // ---------------------------------------------------------------------------
 // Stage Change Modal

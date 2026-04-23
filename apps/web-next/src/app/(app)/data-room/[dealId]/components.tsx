@@ -2,7 +2,7 @@
 
 import { useRef, useEffect } from "react";
 import Link from "next/link";
-import type { Folder } from "@/lib/vdr/types";
+import type { Folder, VDRFile } from "@/lib/vdr/types";
 
 /* ────────────────────────────────────────────────────────────────────── */
 /*  Loading spinner shown while the data room is initialising            */
@@ -121,16 +121,28 @@ export function CreateFolderModal({
 /*  Breadcrumb header with upload button                                 */
 /* ────────────────────────────────────────────────────────────────────── */
 
+interface TeamMember {
+  id: string;
+  role: string;
+  user?: { name?: string; avatar?: string };
+}
+
 interface DataRoomHeaderProps {
   dealId: string;
   dealName: string;
   activeFolder: Folder | undefined;
   activeFolderId: string | null;
   uploading: boolean;
+  teamMembers?: TeamMember[];
   onBack: () => void;
   onClearFolder: () => void;
   onUploadClick: () => void;
   onFilesSelected: (e: React.ChangeEvent<HTMLInputElement>) => void;
+}
+
+function getInitials(name: string): string {
+  if (!name) return "?";
+  return name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
 }
 
 export function DataRoomHeader({
@@ -139,6 +151,7 @@ export function DataRoomHeader({
   activeFolder,
   activeFolderId,
   uploading,
+  teamMembers = [],
   onBack,
   onClearFolder,
   onUploadClick,
@@ -199,6 +212,45 @@ export function DataRoomHeader({
         )}
       </nav>
       <div className="flex items-center gap-3">
+        {/* Team Members Avatar Group */}
+        <div className="flex -space-x-2" title="Team members with access">
+          {teamMembers.length > 0 ? (
+            <>
+              {teamMembers.slice(0, 3).map((member, idx) => {
+                const user = member.user;
+                return user?.avatar ? (
+                  <img
+                    key={member.id}
+                    src={user.avatar}
+                    alt={user.name || ""}
+                    title={`${user.name || "Unknown"} (${member.role})`}
+                    className="size-8 rounded-full border-2 border-white bg-slate-200 object-cover"
+                    style={{ zIndex: 3 - idx }}
+                  />
+                ) : (
+                  <div
+                    key={member.id}
+                    className="flex size-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold"
+                    style={{ backgroundColor: "#E6EEF5", color: "#003366", zIndex: 3 - idx }}
+                    title={`${user?.name || "Unknown"} (${member.role})`}
+                  >
+                    {getInitials(user?.name || "")}
+                  </div>
+                );
+              })}
+              {teamMembers.length > 3 && (
+                <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-xs font-bold text-slate-600">
+                  +{teamMembers.length - 3}
+                </div>
+              )}
+            </>
+          ) : (
+            <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors">
+              <span className="material-symbols-outlined text-[16px]">group_add</span>
+            </div>
+          )}
+        </div>
+        <div className="h-4 w-px bg-slate-200 mx-2" />
         <button
           type="button"
           onClick={handleUpload}
@@ -222,10 +274,201 @@ export function DataRoomHeader({
           ref={fileInputRef}
           type="file"
           multiple
+          accept=".pdf,.xlsx,.xls,.doc,.docx"
           onChange={onFilesSelected}
           className="hidden"
         />
       </div>
     </header>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  Upload Confirmation Modal (two-stage upload matching legacy)         */
+/* ────────────────────────────────────────────────────────────────────── */
+
+interface UploadConfirmModalProps {
+  files: File[];
+  autoUpdateDeal: boolean;
+  uploading: boolean;
+  onAutoUpdateChange: (value: boolean) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+
+export function UploadConfirmModal({
+  files,
+  autoUpdateDeal,
+  uploading,
+  onAutoUpdateChange,
+  onConfirm,
+  onCancel,
+}: UploadConfirmModalProps) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+          <h3 className="text-lg font-semibold text-slate-900">
+            Upload {files.length} file{files.length > 1 ? "s" : ""}
+          </h3>
+          <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600">
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+        <div className="p-5">
+          <ul className="mb-4 space-y-1.5 max-h-40 overflow-y-auto">
+            {files.map((f, i) => (
+              <li key={i} className="text-sm text-slate-600 flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] text-slate-400">description</span>
+                <span className="truncate">{f.name}</span>
+                <span className="text-xs text-slate-400 shrink-0">
+                  ({(f.size / 1024 / 1024).toFixed(1)} MB)
+                </span>
+              </li>
+            ))}
+          </ul>
+          {files.some((f) => f.type === "application/pdf") && (
+            <label className="flex items-start gap-3 p-3 rounded-lg border border-slate-200 hover:bg-slate-50 cursor-pointer transition-colors">
+              <input
+                type="checkbox"
+                checked={autoUpdateDeal}
+                onChange={(e) => onAutoUpdateChange(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div>
+                <div className="text-sm font-medium text-slate-900">
+                  Auto-update deal with extracted data
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5">
+                  Merge financial data (revenue, EBITDA, industry) from PDF into the deal card
+                </div>
+              </div>
+            </label>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200">
+          <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            disabled={uploading}
+            className="px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50"
+            style={{ backgroundColor: "#003366" }}
+          >
+            {uploading ? "Uploading..." : "Upload"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  Link to Deal Modal                                                   */
+/* ────────────────────────────────────────────────────────────────────── */
+
+interface LinkToDealModalProps {
+  file: VDRFile;
+  deals: Array<{ id: string; name: string; industry?: string }>;
+  searchQuery: string;
+  onSearchChange: (q: string) => void;
+  linking: boolean;
+  onSelect: (dealId: string) => void;
+  onClose: () => void;
+}
+
+export function LinkToDealModal({
+  file,
+  deals,
+  searchQuery,
+  onSearchChange,
+  linking,
+  onSelect,
+  onClose,
+}: LinkToDealModalProps) {
+  const filtered = deals.filter(
+    (d) => !searchQuery || d.name.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
+        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">Link to Deal</h3>
+            <p className="text-xs text-slate-500 mt-0.5 truncate">&quot;{file.name}&quot;</p>
+          </div>
+          <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <span className="material-symbols-outlined text-xl">close</span>
+          </button>
+        </div>
+        <div className="p-5">
+          <input
+            type="text"
+            placeholder="Search deals..."
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+            autoFocus
+          />
+          <ul className="max-h-60 overflow-y-auto space-y-1">
+            {filtered.map((deal) => (
+              <li key={deal.id}>
+                <button
+                  type="button"
+                  onClick={() => onSelect(deal.id)}
+                  disabled={linking}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined text-[20px] text-slate-400">
+                    business_center
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-900 truncate">{deal.name}</div>
+                    {deal.industry && <div className="text-xs text-slate-500">{deal.industry}</div>}
+                  </div>
+                </button>
+              </li>
+            ))}
+            {filtered.length === 0 && (
+              <li className="text-sm text-slate-400 text-center py-4">No deals found</li>
+            )}
+          </ul>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────────────────────────────────────────────────── */
+/*  Toast notification (inline, no provider needed)                      */
+/* ────────────────────────────────────────────────────────────────────── */
+
+interface ToastProps {
+  message: string;
+  type: "success" | "error" | "info";
+  onDismiss: () => void;
+}
+
+const TOAST_STYLES: Record<string, { bg: string; border: string; icon: string; iconColor: string }> = {
+  success: { bg: "bg-green-50", border: "border-green-200", icon: "check_circle", iconColor: "text-green-600" },
+  error: { bg: "bg-red-50", border: "border-red-200", icon: "error", iconColor: "text-red-600" },
+  info: { bg: "bg-blue-50", border: "border-blue-200", icon: "info", iconColor: "text-blue-700" },
+};
+
+export function VDRToast({ message, type, onDismiss }: ToastProps) {
+  const s = TOAST_STYLES[type] || TOAST_STYLES.info;
+  return (
+    <div className={`fixed bottom-6 right-6 z-[9998] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border max-w-sm ${s.bg} ${s.border}`}>
+      <span className={`material-symbols-outlined text-xl shrink-0 ${s.iconColor}`}>{s.icon}</span>
+      <p className="text-sm text-slate-800 flex-1">{message}</p>
+      <button type="button" onClick={onDismiss} className="text-slate-400 hover:text-slate-600 shrink-0">
+        <span className="material-symbols-outlined text-lg">close</span>
+      </button>
+    </div>
   );
 }

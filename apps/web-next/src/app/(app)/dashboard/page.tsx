@@ -19,12 +19,14 @@ import {
   LOI_STAGES,
   CLOSED_STAGES,
   SECTOR_COLORS,
-  AVATAR_COLORS,
   getGreeting,
   StatCards,
   MarketSentimentCard,
   StageDetailModal,
+  fmtNextAction,
+  PortfolioAllocation,
 } from "./components";
+import { TasksModal, SignalResults } from "./dashboard-modals";
 import { CustomizeDashboardModal } from "./widgets/customize-modal";
 import { DraggableWidget } from "./widgets/draggable-widget";
 import { useVisibleWidgets } from "./widgets/useVisibleWidgets";
@@ -38,7 +40,9 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
+  const [signalResult, setSignalResult] = useState<{ signals?: Array<{ title: string; description: string; severity: string; signalType: string; dealName: string; suggestedAction: string }>; processedCount?: number } | null>(null);
   const [stageModal, setStageModal] = useState<{ label: string; stages: string[] } | null>(null);
+  const [tasksModalOpen, setTasksModalOpen] = useState(false);
   const [sentiment, setSentiment] = useState<MarketSentiment | null>(null);
   const [sentimentLoading, setSentimentLoading] = useState(true);
   const [sentimentError, setSentimentError] = useState(false);
@@ -52,7 +56,7 @@ export default function DashboardPage() {
       try {
         const [dealsRes, tasksRes] = await Promise.allSettled([
           api.get<Deal[] | { deals: Deal[] }>("/deals?limit=100&sortBy=updatedAt&sortOrder=desc"),
-          api.get<{ tasks: Task[] } | Task[]>("/tasks?limit=5"),
+          api.get<{ tasks: Task[] } | Task[]>("/tasks?limit=20"),
         ]);
         if (dealsRes.status === "fulfilled") {
           // API returns plain array; handle both formats for safety
@@ -60,7 +64,13 @@ export default function DashboardPage() {
             ? dealsRes.value
             : (dealsRes.value as { deals: Deal[] }).deals || [];
           setAllDeals(rawDeals);
-          setDeals(rawDeals.slice(0, 5));
+          // Active Priorities: filter active, sort by priority (HIGH first) — matches legacy loadActivePriorities
+          const PRIORITY_ORDER: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+          const activeForPriorities = rawDeals
+            .filter((d) => d.status !== "ARCHIVED" && d.status !== "PASSED")
+            .sort((a, b) => (PRIORITY_ORDER[a.priority || ""] ?? 99) - (PRIORITY_ORDER[b.priority || ""] ?? 99))
+            .slice(0, 5);
+          setDeals(activeForPriorities);
         } else {
           console.warn("[dashboard] failed to load deals:", dealsRes.reason);
         }
@@ -114,8 +124,8 @@ export default function DashboardPage() {
     }
   };
 
-  const today = new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-  const activeDeals = allDeals.filter((d) => (d as { status?: string }).status !== "PASSED");
+  const today = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+  const activeDeals = allDeals.filter((d) => d.status !== "ARCHIVED");
   const activeTotal = Math.max(activeDeals.length, 1);
   const sourcingCount = activeDeals.filter((d) => SOURCING_STAGES.includes(d.stage)).length;
   const ddCount = activeDeals.filter((d) => DD_STAGES.includes(d.stage)).length;
@@ -210,29 +220,41 @@ export default function DashboardPage() {
                     {loading ? (
                       <tr><td colSpan={5} className="px-5 py-8 text-center text-text-muted">Loading...</td></tr>
                     ) : deals.length === 0 ? (
-                      <tr><td colSpan={5} className="px-5 py-8 text-center text-text-muted">No deals yet. <Link href="/deal-intake" className="text-primary font-medium hover:underline">Add your first deal</Link></td></tr>
-                    ) : deals.map((deal, i) => {
+                      <tr><td colSpan={5} className="px-5 py-10 text-center">
+                        <span className="material-symbols-outlined text-text-muted text-[32px] mb-2 block opacity-60">priority_high</span>
+                        <p className="text-sm font-medium text-text-main">No active priorities</p>
+                        <p className="text-xs text-text-muted mt-1">Deals needing immediate attention will appear here</p>
+                      </td></tr>
+                    ) : deals.map((deal) => {
                       const style = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
+                      // Collect team members from assignedUser + teamMembers — matches legacy teamAvatars()
+                      const members: Array<{ name?: string; email?: string }> = [];
+                      if (deal.assignedUser) members.push(deal.assignedUser);
+                      if (deal.teamMembers) {
+                        deal.teamMembers.forEach((tm) => { if (tm.user) members.push(tm.user); });
+                      }
                       return (
-                        <tr key={deal.id} onClick={() => router.push(`/deals/${deal.id}`)} className="hover:bg-primary-light/30 transition-colors cursor-pointer group">
+                        <tr key={deal.id} onClick={() => router.push(`/deals/${deal.id}`)} className="hover:bg-gray-50 transition-colors cursor-pointer group">
                           <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              <div className={cn("size-8 rounded border flex items-center justify-center font-bold shadow-sm text-sm", AVATAR_COLORS[i % AVATAR_COLORS.length])}>
-                                {deal.name?.[0] || "D"}
-                              </div>
-                              <span className="font-semibold text-text-main group-hover:text-primary transition-colors">{deal.name}</span>
-                            </div>
+                            <div className="font-semibold text-text-main">{deal.name}</div>
+                            <div className="text-xs text-text-muted">{deal.industry || ""}</div>
                           </td>
                           <td className="px-5 py-4">
-                            <span className={cn("inline-flex items-center rounded-md border px-2.5 py-1 text-xs font-medium", style.bg, style.text, style.border)}>
+                            <span className={cn("inline-flex items-center rounded-md border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap", style.bg, style.text, style.border)}>
                               {STAGE_LABELS[deal.stage] || deal.stage}
                             </span>
                           </td>
-                          <td className="px-5 py-4 text-text-main font-medium font-mono">{deal.dealSize != null ? formatCurrency(deal.dealSize, deal.currency) : "\u2014"}</td>
-                          <td className="px-5 py-4 text-text-main text-sm">{deal.nextAction || "\u2014"}</td>
+                          <td className="px-5 py-4 font-mono font-semibold text-text-main">{deal.dealSize != null ? formatCurrency(deal.dealSize, deal.currency) : "\u2014"}</td>
+                          <td className="px-5 py-4 text-text-secondary">{deal.nextAction || fmtNextAction(deal.stage)}</td>
                           <td className="px-5 py-4">
-                            <div className="flex -space-x-2">
-                              <div className="inline-flex h-7 w-7 rounded-full ring-2 ring-white bg-gray-500 items-center justify-center text-[10px] text-white font-medium">{firstName?.[0] || "U"}</div>
+                            <div className="flex items-center">
+                              {members.length === 0 ? (
+                                <span className="text-xs text-text-muted">Unassigned</span>
+                              ) : members.slice(0, 3).map((m, mi) => (
+                                <div key={mi} className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white border-2 border-white" style={{ backgroundColor: "#003366", marginLeft: mi === 0 ? 0 : "-6px" }} title={m.name || m.email || ""}>
+                                  {(m.name || m.email || "?").charAt(0).toUpperCase()}
+                                </div>
+                              ))}
                             </div>
                           </td>
                         </tr>
@@ -262,69 +284,49 @@ export default function DashboardPage() {
               )}
               <div>
                 {loading ? (
-                  <div className="p-6 text-center text-text-muted text-sm">Loading...</div>
+                  <div className="flex items-center justify-center py-8 text-text-muted">
+                    <span className="material-symbols-outlined animate-spin mr-2 text-lg">sync</span>
+                    <span className="text-sm">Loading tasks...</span>
+                  </div>
                 ) : tasks.length === 0 ? (
-                  <div className="p-6 text-center text-text-muted text-sm">No tasks assigned</div>
+                  <div className="flex flex-col items-center justify-center py-8 text-text-muted">
+                    <span className="material-symbols-outlined text-3xl mb-2 text-secondary">task_alt</span>
+                    <span className="text-sm font-medium">All caught up!</span>
+                    <span className="text-xs mt-0.5">No tasks assigned to you</span>
+                  </div>
                 ) : tasks.slice(0, 5).map((task, i) => {
                   const done = task.status === "COMPLETED";
+                  const isOverdue = !done && task.dueDate && formatRelativeTime(task.dueDate).toLowerCase().includes("ago");
+                  const isDueToday = !done && task.dueDate && (() => { const d = new Date(task.dueDate!); const n = new Date(); return d.toDateString() === n.toDateString(); })();
+                  const dueColor = done ? "text-text-secondary" : isOverdue ? "text-red-500" : isDueToday ? "text-orange-500" : "text-text-muted";
+                  const dealName = task.deal?.name || task.dealName;
                   return (
-                    <label key={task.id} className={cn("flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer group", i < tasks.length - 1 && "border-b border-border-subtle/50")}>
-                      <input type="checkbox" checked={done} onChange={() => toggleTask(task.id, task.status)} className="mt-1 size-4 rounded border-gray-300 text-primary focus:ring-primary" />
-                      <div className={cn("flex flex-col gap-0.5", done && "opacity-50")}>
-                        <span className={cn("text-sm font-semibold text-text-main group-hover:text-primary transition-colors", done && "line-through font-medium")}>{task.title}</span>
-                        <span className="text-xs text-text-muted font-medium">
-                          {done ? "Completed" : task.dueDate ? `Due ${formatRelativeTime(task.dueDate)}` : "No due date"}
-                          {task.category ? ` · ${task.category}` : ""}
-                        </span>
+                    <label key={task.id} className={cn("flex items-start gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer group", i < Math.min(tasks.length, 5) - 1 && "border-b border-border-subtle/50")}>
+                      <input type="checkbox" checked={done} onChange={() => toggleTask(task.id, task.status)} className="mt-1 size-4 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0" />
+                      <div className={cn("flex flex-col gap-0.5 flex-1", done && "opacity-50")}>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("text-sm text-text-main group-hover:text-primary transition-colors", done ? "font-medium line-through" : "font-semibold")}>{task.title}</span>
+                          {!done && task.priority === "HIGH" && <span className="text-[10px] bg-red-50 text-red-500 px-1.5 py-0.5 rounded font-bold">HIGH</span>}
+                          {!done && task.priority === "LOW" && <span className="text-[10px] bg-gray-100 text-text-muted px-1.5 py-0.5 rounded font-bold">LOW</span>}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className={cn("text-xs font-medium", dueColor)}>
+                            {done ? "Completed" : task.dueDate ? formatRelativeTime(task.dueDate) : "No due date"}
+                          </span>
+                          {dealName && <span className="text-xs text-text-muted">· {dealName}</span>}
+                        </div>
                       </div>
                     </label>
                   );
                 })}
               </div>
               <div className="p-3 bg-gray-50 text-center border-t border-border-subtle">
-                <button onClick={() => router.push("/deals")} className="text-xs font-bold text-primary hover:text-primary-hover transition-colors uppercase tracking-wide">View All Tasks</button>
+                <button onClick={() => setTasksModalOpen(true)} className="text-xs font-bold text-primary hover:text-primary-hover transition-colors uppercase tracking-wide">View All Tasks</button>
               </div>
             </div>
 
             {/* Portfolio Allocation */}
-            <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card p-6 gap-5">
-              <div className="flex items-center justify-between">
-                <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
-                <span className="material-symbols-outlined text-text-muted">pie_chart</span>
-              </div>
-              {loading ? (
-                <div className="flex items-center justify-center py-4 text-text-muted text-xs">
-                  <span className="material-symbols-outlined text-xl animate-spin">sync</span>
-                </div>
-              ) : allocation.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-4 text-text-muted">
-                  <span className="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span>
-                  <p className="text-xs">No deals yet</p>
-                </div>
-              ) : (
-                <div className="flex items-center gap-6">
-                  <div
-                    className="size-28 rounded-full shrink-0 shadow-inner"
-                    style={{
-                      background: `conic-gradient(${gradientParts.join(", ")})`,
-                      mask: "radial-gradient(circle at center, transparent 40%, black 41%)",
-                      WebkitMask: "radial-gradient(circle at center, transparent 40%, black 41%)",
-                    }}
-                  />
-                  <div className="flex flex-col gap-3 flex-1">
-                    {allocation.map((item) => (
-                      <div key={item.label} className="flex items-center justify-between text-xs">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <div className="size-2.5 rounded-sm shadow-sm shrink-0" style={{ background: item.color }} />
-                          <span className="text-text-secondary font-medium truncate">{item.label}</span>
-                        </div>
-                        <span className="text-text-main font-bold ml-2">{item.pct}%</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
+            <PortfolioAllocation loading={loading} allocation={allocation} gradientParts={gradientParts} />
 
             {/* AI Deal Signals */}
             <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
@@ -336,8 +338,10 @@ export default function DashboardPage() {
                 <button
                   onClick={async () => {
                     setScanning(true);
+                    setSignalResult(null);
                     try {
-                      await api.get("/ai/scan-signals");
+                      const result = await api.get<{ signals?: Array<{ title: string; description: string; severity: string; signalType: string; dealName: string; suggestedAction: string }>; processedCount?: number }>("/ai/scan-signals");
+                      setSignalResult(result);
                     } catch (err) {
                       console.warn("[dashboard] scan-signals failed:", err);
                       setTaskError("Couldn't scan signals — please try again.");
@@ -354,11 +358,20 @@ export default function DashboardPage() {
                   {scanning ? "Scanning..." : "Scan Signals"}
                 </button>
               </div>
-              <div className="p-5 text-center">
-                <span className="material-symbols-outlined text-text-muted text-2xl mb-2">monitoring</span>
-                <p className="text-sm font-medium text-text-main mb-1">Portfolio Signal Monitor</p>
-                <p className="text-xs text-text-muted">Click &quot;Scan Signals&quot; to analyze your portfolio for risks and opportunities.</p>
-              </div>
+              {scanning ? (
+                <div className="flex flex-col items-center justify-center py-8">
+                  <span className="material-symbols-outlined text-primary text-2xl animate-spin mb-2">radar</span>
+                  <p className="text-sm text-text-muted">Scanning portfolio for signals...</p>
+                </div>
+              ) : signalResult ? (
+                <SignalResults result={signalResult} />
+              ) : (
+                <div className="p-5 text-center">
+                  <span className="material-symbols-outlined text-text-muted text-2xl mb-2">monitoring</span>
+                  <p className="text-sm font-medium text-text-main mb-1">Portfolio Signal Monitor</p>
+                  <p className="text-xs text-text-muted">Click &quot;Scan Signals&quot; to analyze your portfolio for risks, opportunities, and actionable deal signals using AI.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -416,8 +429,8 @@ export default function DashboardPage() {
             onClick={() => setCustomizeOpen(true)}
             className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle px-4 py-4 text-sm font-medium text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50"
           >
-            <span className="material-symbols-outlined text-[18px]">add</span>
-            Add Widget
+            <span className="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
+            <span className="text-sm font-semibold">Add Widget</span>
           </button>
           <button
             type="button"
@@ -458,6 +471,10 @@ export default function DashboardPage() {
         onToggle={toggle}
         onClose={() => setCustomizeOpen(false)}
       />
+
+      {tasksModalOpen && (
+        <TasksModal tasks={tasks} onClose={() => setTasksModalOpen(false)} />
+      )}
     </div>
   );
 }

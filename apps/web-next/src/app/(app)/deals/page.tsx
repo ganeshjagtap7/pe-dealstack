@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, type DragEvent } from "react";
 import { api } from "@/lib/api";
+import { formatCurrency } from "@/lib/formatters";
 import {
   STAGES,
   KANBAN_STAGES,
@@ -11,6 +12,9 @@ import {
   DEAL_SIZE_OPTIONS,
   PRIORITY_OPTIONS,
   PRIORITY_LABELS,
+  DEFAULT_CARD_METRICS,
+  ALL_METRIC_KEYS,
+  type MetricKey,
 } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
@@ -22,6 +26,8 @@ import {
   StageChangeModal,
   DealCard,
   KanbanCard,
+  MetricsDropdown,
+  UploadCard,
 } from "./components";
 
 export default function DealsPage() {
@@ -43,12 +49,24 @@ export default function DealsPage() {
     sortBy: "updatedAt",
     sortOrder: "desc",
   });
+  const [activeMetrics, setActiveMetrics] = useState<MetricKey[]>([...DEFAULT_CARD_METRICS]);
+  const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load view preference from localStorage
+  // Load view preference and metrics from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.dealsView);
     if (saved === "kanban" || saved === "list") setView(saved);
+    try {
+      const cached = localStorage.getItem(STORAGE_KEYS.dealCardMetrics);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const valid = parsed.filter((k: string) => ALL_METRIC_KEYS.includes(k as MetricKey));
+          if (valid.length > 0) setActiveMetrics(valid as MetricKey[]);
+        }
+      }
+    } catch { /* ignore */ }
   }, []);
 
   const loadDeals = useCallback(async () => {
@@ -161,6 +179,107 @@ export default function DealsPage() {
     loadDeals();
   };
 
+  const handleBulkPass = async () => {
+    if (!confirm(`Mark ${selected.size} deal${selected.size > 1 ? "s" : ""} as Passed?`)) return;
+    await handleBulkStage("PASSED");
+  };
+
+  // CSV Export
+  const exportSelectedToCSV = () => {
+    const dealsToExport = deals.filter((d) => selected.has(d.id));
+    if (dealsToExport.length === 0) return;
+
+    const escapeCSV = (val: string | null | undefined) => {
+      if (val == null) return "";
+      const str = String(val);
+      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const headers = [
+      "Name", "Industry", "Stage", "Status",
+      "Revenue (displayed)", "EBITDA (displayed)", "Deal Size (displayed)",
+      "IRR Projected (%)", "MoM Multiple", "AI Thesis",
+      "Created At", "Updated At",
+    ];
+
+    const rows = dealsToExport.map((deal) => [
+      escapeCSV(deal.name),
+      escapeCSV(deal.industry),
+      escapeCSV(STAGE_LABELS[deal.stage] || deal.stage),
+      escapeCSV(deal.status),
+      deal.revenue != null ? formatCurrency(deal.revenue) : "",
+      deal.ebitda != null ? formatCurrency(deal.ebitda) : "",
+      deal.dealSize != null ? formatCurrency(deal.dealSize) : "",
+      deal.irrProjected?.toString() ?? "",
+      deal.mom?.toString() ?? "",
+      escapeCSV(deal.aiThesis),
+      deal.createdAt ? new Date(deal.createdAt).toISOString() : "",
+      deal.updatedAt ? new Date(deal.updatedAt).toISOString() : "",
+    ]);
+
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `deals-export-${new Date().toISOString().split("T")[0]}.csv`;
+    link.style.visibility = "hidden";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Save metrics preference to localStorage (and server if available)
+  const handleMetricsApply = (metrics: MetricKey[]) => {
+    setActiveMetrics(metrics);
+    localStorage.setItem(STORAGE_KEYS.dealCardMetrics, JSON.stringify(metrics));
+    // Fire-and-forget save to server
+    api.patch("/users/me", { dealCardMetrics: metrics }).catch(() => {});
+  };
+
+  // Remove sample deal
+  const handleRemoveSample = async (id: string) => {
+    try {
+      await api.delete(`/deals/${id}`);
+      setDeals((prev) => prev.filter((d) => d.id !== id));
+    } catch {
+      // ignore
+    }
+  };
+
+  // Kanban drag-and-drop
+  const handleKanbanDrop = async (e: DragEvent<HTMLDivElement>, newStage: string) => {
+    e.preventDefault();
+    setDragOverStage(null);
+    const dealId = e.dataTransfer.getData("text/plain");
+    if (!dealId) return;
+    const deal = deals.find((d) => d.id === dealId);
+    if (!deal || deal.stage === newStage) return;
+    const oldStage = deal.stage;
+    // Optimistic update
+    setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
+    try {
+      await api.patch(`/deals/${dealId}`, { stage: newStage });
+    } catch {
+      // Revert on error
+      setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: oldStage } : d)));
+    }
+  };
+
+  // Keyboard shortcuts (CMD+K handled by layout Header; deals page handles Escape)
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      // Escape to clear selection
+      if (e.key === "Escape" && selected.size > 0) {
+        clearSelection();
+      }
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [selected.size]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const sortLabel = SORT_OPTIONS.find(
     (o) => o.sortBy === filters.sortBy && o.sortOrder === filters.sortOrder
   )?.label || "Recent Activity";
@@ -176,16 +295,25 @@ export default function DealsPage() {
   return (
     <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex flex-col gap-5">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Pipeline</h1>
-        <p className="text-text-secondary text-sm mt-0.5 flex items-center gap-2">
-          {!loading && (
-            <>
-              <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(5,150,105,0.4)]" />
-              {deals.filter((d) => d.status !== "PASSED").length} Active Opportunities
-            </>
-          )}
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Pipeline</h1>
+          <p className="text-text-secondary text-sm mt-0.5 flex items-center gap-2">
+            {!loading && (
+              <>
+                <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(5,150,105,0.4)]" />
+                {deals.filter((d) => d.status !== "PASSED").length} Active Opportunities
+              </>
+            )}
+          </p>
+        </div>
+        <Link
+          href="/deal-import"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 text-text-secondary hover:border-[#003366] hover:text-[#003366] bg-white text-sm font-medium transition-colors"
+        >
+          <span className="material-symbols-outlined text-[18px]">upload_file</span>
+          Import Deals
+        </Link>
       </div>
 
       {/* Filter Bar */}
@@ -320,12 +448,7 @@ export default function DealsPage() {
         >
           <span className="material-symbols-outlined text-[20px]">view_kanban</span>
         </button>
-        <button
-          title="Customize Metrics"
-          className="p-2 rounded-md text-text-muted hover:text-text-secondary hover:bg-gray-100 transition-all"
-        >
-          <span className="material-symbols-outlined text-[20px]">tune</span>
-        </button>
+        <MetricsDropdown activeMetrics={activeMetrics} onApply={handleMetricsApply} />
 
         <div className="flex-1" />
 
@@ -360,28 +483,45 @@ export default function DealsPage() {
 
       {/* Bulk Actions Bar */}
       {selected.size > 0 && (
-        <div className="flex items-center gap-3 bg-[#003366] text-white rounded-lg px-4 py-2.5 shadow-lg">
-          <span className="text-sm font-medium">
-            {selected.size} deal{selected.size > 1 ? "s" : ""} selected
-          </span>
-          <div className="flex-1" />
-          <button onClick={clearSelection} className="text-xs font-medium hover:underline">
-            Clear
-          </button>
-          <button
-            onClick={() => setStageModal(true)}
-            className="flex items-center gap-1 px-3 py-1 rounded bg-white/20 text-xs font-medium hover:bg-white/30 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-            Change Stage
-          </button>
-          <button
-            onClick={() => setDeleteTarget({ id: "__bulk__", name: `${selected.size} deals` })}
-            className="flex items-center gap-1 px-3 py-1 rounded bg-red-500/80 text-xs font-medium hover:bg-red-500 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">delete</span>
-            Delete
-          </button>
+        <div className="flex items-center justify-between bg-[#003366] text-white rounded-xl p-4 shadow-lg">
+          <div className="flex items-center gap-3">
+            <button onClick={clearSelection} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+            <span className="font-bold text-sm">
+              {selected.size} deal{selected.size > 1 ? "s" : ""} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setStageModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
+              Change Stage
+            </button>
+            <button
+              onClick={exportSelectedToCSV}
+              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">download</span>
+              Export CSV
+            </button>
+            <button
+              onClick={handleBulkPass}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/80 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">block</span>
+              Mark as Passed
+            </button>
+            <button
+              onClick={() => setDeleteTarget({ id: "__bulk__", name: `${selected.size} deals` })}
+              className="flex items-center gap-2 px-4 py-2 bg-red-600/90 hover:bg-red-600 rounded-lg text-sm font-medium transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">delete</span>
+              Delete
+            </button>
+          </div>
         </div>
       )}
 
@@ -444,8 +584,11 @@ export default function DealsPage() {
               selected={selected.has(deal.id)}
               onToggleSelect={toggleSelect}
               onDelete={(id, name) => setDeleteTarget({ id, name })}
+              activeMetrics={activeMetrics}
+              onRemoveSample={handleRemoveSample}
             />
           ))}
+          <UploadCard />
         </div>
       ) : (
         /* Kanban View */
@@ -454,7 +597,7 @@ export default function DealsPage() {
             const s = STAGE_STYLES[stage] || STAGE_STYLES.INITIAL_REVIEW;
             const stageDeals = deals.filter((d) => d.stage === stage);
             return (
-              <div key={stage} className="min-w-[280px] w-[280px] shrink-0">
+              <div key={stage} className="min-w-[300px] w-[300px] shrink-0" data-stage={stage}>
                 <div className="bg-white rounded-xl border border-border-subtle overflow-hidden h-full flex flex-col">
                   <div className={cn("px-4 py-3 border-b border-border-subtle", s.bg)}>
                     <div className="flex items-center justify-between">
@@ -466,14 +609,26 @@ export default function DealsPage() {
                       </span>
                     </div>
                   </div>
-                  <div className="flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-320px)]">
+                  <div
+                    className={cn(
+                      "flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-320px)] border-2 border-dashed border-transparent rounded-lg transition-all",
+                      dragOverStage === stage && "bg-[rgba(0,51,102,0.05)] border-[rgba(0,51,102,0.3)]",
+                    )}
+                    style={{ minHeight: 100 }}
+                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverStage(stage); }}
+                    onDragLeave={(e) => {
+                      const col = (e.currentTarget as HTMLElement);
+                      if (!col.contains(e.relatedTarget as Node)) setDragOverStage(null);
+                    }}
+                    onDrop={(e) => handleKanbanDrop(e, stage)}
+                  >
                     {stageDeals.map((deal) => (
-                      <KanbanCard key={deal.id} deal={deal} />
+                      <KanbanCard key={deal.id} deal={deal} activeMetrics={activeMetrics} />
                     ))}
                     {stageDeals.length === 0 && (
                       <div className="text-center py-8 text-text-muted text-sm">
                         <span className="material-symbols-outlined text-2xl mb-2 block opacity-40">inbox</span>
-                        No deals
+                        Drop deals here
                       </div>
                     )}
                   </div>

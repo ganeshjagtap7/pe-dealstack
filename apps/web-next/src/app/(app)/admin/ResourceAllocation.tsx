@@ -1,18 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
-import type { AdminTask, AdminTeamMember } from "./types";
+import type { AdminDeal, AdminTask, AdminTeamMember } from "./types";
 
 interface Props {
   members: AdminTeamMember[];
+  deals: AdminDeal[];
   tasks: AdminTask[];
-}
-
-interface MemberDealCache {
-  names: string[];
-  loaded: boolean;
 }
 
 // Capacity heuristic from vanilla: dealCount / 5 * 100, capped at 100.
@@ -31,49 +26,25 @@ function initials(name?: string, email?: string): string {
     .join("");
 }
 
-export function ResourceAllocation({ members, tasks }: Props) {
+export function ResourceAllocation({ members, deals, tasks }: Props) {
   const [expanded, setExpanded] = useState(false);
-  const [dealNamesByMember, setDealNamesByMember] = useState<Record<string, MemberDealCache>>({});
 
-  // Reset cache when the member list changes (e.g., after assignment)
-  useEffect(() => {
-    setDealNamesByMember({});
-  }, [members.map((m) => m.id).join(",")]);
-
-  useEffect(() => {
-    const limit = expanded ? members.length : 8;
-    const visible = members.slice(0, limit);
-    let cancelled = false;
-
-    (async () => {
-      for (const member of visible) {
-        if (cancelled) return;
-        if (dealNamesByMember[member.id]?.loaded) continue;
-        try {
-          // API returns DealTeamMember rows with nested { Deal: { name } }; also handle
-          // flattened shapes from older deploys.
-          type DealLike = { name?: string; dealName?: string; Deal?: { name?: string } };
-          const deals = await api.get<DealLike[]>(`/users/${member.id}/deals`);
-          if (cancelled) return;
-          const names = (Array.isArray(deals) ? deals : [])
-            .slice(0, 3)
-            .map((d) => d.Deal?.name || d.name || d.dealName || "Unknown");
-          setDealNamesByMember((prev) => ({ ...prev, [member.id]: { names, loaded: true } }));
-        } catch {
-          // A single member's deals failure shouldn't blow up the whole panel
-          setDealNamesByMember((prev) => ({
-            ...prev,
-            [member.id]: { names: [], loaded: true },
-          }));
-        }
+  // Build memberId -> dealNames[] map from the already-loaded deals array.
+  // Matches vanilla admin-dashboard.js renderResourceAllocation: single pass
+  // over allDeals instead of N sequential HTTP calls.
+  const dealsByMember = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const deal of deals) {
+      const name = deal.name || "Unknown";
+      for (const tm of deal.teamMembers || []) {
+        const uid = (tm as { user?: { id: string }; userId: string }).user?.id || tm.userId;
+        if (!uid) continue;
+        if (!map.has(uid)) map.set(uid, []);
+        map.get(uid)!.push(name);
       }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [members, expanded]);
+    }
+    return map;
+  }, [deals]);
 
   if (members.length === 0) {
     return (
@@ -126,12 +97,12 @@ export function ResourceAllocation({ members, tasks }: Props) {
       </div>
       <div className="p-5 space-y-1">
         {visible.map((member) => {
-          const cache = dealNamesByMember[member.id];
-          const dealNames = cache?.names || [];
+          const memberDeals = dealsByMember.get(member.id) || [];
+          const dealNames = memberDeals.slice(0, 3);
           const taskCount = tasks.filter(
             (t) => t.assignedTo === member.id && t.status !== "COMPLETED",
           ).length;
-          const capacity = capacityFor(dealNames.length);
+          const capacity = capacityFor(memberDeals.length);
           const barColor =
             capacity >= 80 ? "#ef4444" : capacity >= 50 ? "#f59e0b" : "#003366";
 
@@ -158,9 +129,7 @@ export function ResourceAllocation({ members, tasks }: Props) {
                 <div>
                   <p className="text-xs text-text-muted mb-1.5">Active Deals</p>
                   <div className="flex gap-1 flex-wrap">
-                    {!cache?.loaded ? (
-                      <span className="text-xs text-text-muted">…</span>
-                    ) : dealNames.length > 0 ? (
+                    {dealNames.length > 0 ? (
                       dealNames.map((n, idx) => (
                         <span
                           key={idx}

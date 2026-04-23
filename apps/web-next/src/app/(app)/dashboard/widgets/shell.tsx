@@ -28,7 +28,7 @@ export function WidgetShell({
       <div className="p-4 border-b border-border-subtle flex items-center justify-between">
         <div className="flex items-center gap-2">
           {icon && (
-            <span className="material-symbols-outlined text-text-secondary text-[20px]">{icon}</span>
+            <span className="material-symbols-outlined text-primary text-[20px]">{icon}</span>
           )}
           <h3 className="font-bold text-text-main text-sm">{title}</h3>
         </div>

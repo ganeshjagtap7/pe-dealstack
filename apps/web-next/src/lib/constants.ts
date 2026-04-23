@@ -92,3 +92,26 @@ export const PRIORITY_LABELS: Record<string, string> = {
   MEDIUM: "Medium",
   LOW: "Low",
 };
+
+// ---------------------------------------------------------------------------
+// Deal Card Metrics -- maps metric keys to display info.
+// Port of METRIC_CONFIG from apps/web/crm.js
+// ---------------------------------------------------------------------------
+export type MetricKey = "irrProjected" | "mom" | "ebitda" | "revenue" | "dealSize";
+
+export interface MetricConfig {
+  label: string;
+  kanbanLabel: string;
+}
+
+export const METRIC_CONFIG: Record<MetricKey, MetricConfig> = {
+  irrProjected: { label: "IRR (Proj)", kanbanLabel: "IRR" },
+  mom: { label: "MoM", kanbanLabel: "MoM" },
+  ebitda: { label: "EBITDA", kanbanLabel: "EBITDA" },
+  revenue: { label: "Revenue", kanbanLabel: "Revenue" },
+  dealSize: { label: "Deal Size", kanbanLabel: "Size" },
+};
+
+export const DEFAULT_CARD_METRICS: MetricKey[] = ["irrProjected", "mom", "ebitda", "revenue"];
+
+export const ALL_METRIC_KEYS: MetricKey[] = ["irrProjected", "mom", "ebitda", "revenue", "dealSize"];

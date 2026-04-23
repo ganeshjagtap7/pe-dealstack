@@ -25,7 +25,10 @@ import {
   DealMetadataRow,
   FinancialMetricsRow,
   FinancialStatementsSection,
+  DealActionsMenu,
+  TeamAvatarStack,
 } from "./components";
+import { TerminalStageModal } from "./deal-panels";
 
 // ---------------------------------------------------------------------------
 // Page component
@@ -50,6 +53,9 @@ export default function DealDetailPage() {
   const [stageChanging, setStageChanging] = useState(false);
   const [stageError, setStageError] = useState("");
 
+  // Terminal stage modal (Close Deal: Won/Lost/Passed)
+  const [showTerminalModal, setShowTerminalModal] = useState(false);
+
   // Documents
   const [documents, setDocuments] = useState<DocItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -61,7 +67,7 @@ export default function DealDetailPage() {
   const [chatSending, setChatSending] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Activity
+  // Activity (loaded eagerly for inline feed in Overview)
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
 
@@ -74,7 +80,7 @@ export default function DealDetailPage() {
     setError("");
     try {
       const raw = await api.get<DealDetail & { teamMembers?: Array<{ role: string; user: { id: string; name: string; avatar?: string; email?: string } }> }>(`/deals/${dealId}`);
-      // Flatten teamMembers → team (API returns nested join, frontend expects flat)
+      // Flatten teamMembers -> team (API returns nested join, frontend expects flat)
       const data: DealDetail = {
         ...raw,
         team: raw.team || raw.teamMembers?.map((tm) => ({
@@ -98,10 +104,14 @@ export default function DealDetailPage() {
   const loadActivities = useCallback(async () => {
     setActivitiesLoading(true);
     try {
-      const data = await api.get<{ activities: Activity[] } | Activity[]>(
-        `/deals/${dealId}/activities`
+      const data = await api.get<{ activities: Activity[]; data?: Activity[] } | Activity[]>(
+        `/deals/${dealId}/activities?limit=10`
       );
-      setActivities(Array.isArray(data) ? data : data.activities || []);
+      if (Array.isArray(data)) {
+        setActivities(data);
+      } else {
+        setActivities(data.data || data.activities || []);
+      }
     } catch {
       // non-critical
     } finally {
@@ -124,14 +134,15 @@ export default function DealDetailPage() {
     loadDeal();
   }, [loadDeal]);
 
-  // Chat is always visible in the sidebar — load eagerly, independently of deal metadata.
+  // Chat is always visible in the sidebar -- load eagerly, independently of deal metadata.
   useEffect(() => {
     loadChatHistory();
   }, [loadChatHistory]);
 
+  // Activities loaded eagerly (shown in Overview tab inline feed)
   useEffect(() => {
-    if (activeTab === "Activity") loadActivities();
-  }, [activeTab, loadActivities]);
+    loadActivities();
+  }, [loadActivities]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -172,6 +183,13 @@ export default function DealDetailPage() {
     setStageNote("");
   };
 
+  // "Change Stage" button handler: opens terminal stage modal (like legacy)
+  const handleChangeStageBtn = () => {
+    if (!deal) return;
+    if (TERMINAL_STAGES.includes(deal.stage)) return;
+    setShowTerminalModal(true);
+  };
+
   const confirmStageChange = async () => {
     if (!stageModal || !deal) return;
     setStageChanging(true);
@@ -182,10 +200,43 @@ export default function DealDetailPage() {
       });
       setDeal(updated);
       setStageModal(null);
+      loadActivities();
     } catch (err) {
       setStageError(err instanceof Error ? err.message : "Failed to update deal stage");
     } finally {
       setStageChanging(false);
+    }
+  };
+
+  const handleTerminalSelect = async (stage: string) => {
+    setShowTerminalModal(false);
+    try {
+      const updated = await api.patch<DealDetail>(`/deals/${dealId}`, {
+        stage,
+      });
+      setDeal(updated);
+      loadActivities();
+    } catch {
+      // non-critical
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Delete deal
+  // -----------------------------------------------------------------------
+
+  const handleDeleteDeal = async () => {
+    if (!deal) return;
+    const confirmed = window.confirm(
+      `Are you sure you want to delete "${deal.name}"?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      await api.delete(`/deals/${dealId}`);
+      router.push("/deals");
+    } catch {
+      // non-critical
     }
   };
 
@@ -227,7 +278,7 @@ export default function DealDetailPage() {
   // -----------------------------------------------------------------------
 
   // Send a specific text (used by suggestion chips) without relying on
-  // chatInput state — setState is async so a chip click can't setChatInput
+  // chatInput state -- setState is async so a chip click can't setChatInput
   // then immediately read it.
   const sendPrompt = useCallback(async (text: string) => {
     const trimmed = text.trim();
@@ -286,6 +337,16 @@ export default function DealDetailPage() {
     await sendPrompt(text);
   };
 
+  // Clear chat history (ported from deal-chat.js clearChatConfirm)
+  const clearChatHistory = useCallback(async () => {
+    try {
+      await api.delete(`/deals/${dealId}/chat/history`);
+      setMessages([]);
+    } catch {
+      // non-critical
+    }
+  }, [dealId]);
+
   // -----------------------------------------------------------------------
   // Render helpers
   // -----------------------------------------------------------------------
@@ -341,6 +402,18 @@ export default function DealDetailPage() {
           </span>
         </div>
         <div className="flex items-center gap-3">
+          {/* Team Avatar Stack */}
+          <div className="hidden md:flex items-center cursor-pointer hover:opacity-80 transition-opacity">
+            <TeamAvatarStack team={deal.team || []} />
+          </div>
+
+          <Link
+            href={`/data-room/${dealId}`}
+            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary border border-border-subtle rounded-lg hover:bg-blue-50 transition-colors"
+          >
+            <span className="material-symbols-outlined text-[18px]">folder_open</span>
+            Data Room
+          </Link>
           <button
             onClick={async () => {
               try {
@@ -351,18 +424,11 @@ export default function DealDetailPage() {
                 // Fallback for non-secure contexts
               }
             }}
-            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary border border-border-subtle rounded-lg hover:bg-blue-50 transition-colors"
+            className="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-blue-50 rounded-lg transition-colors"
+            title="Copy share link"
           >
-            <span className="material-symbols-outlined text-[18px]">{linkCopied ? "check" : "share"}</span>
-            {linkCopied ? "Copied!" : "Share"}
+            <span className="material-symbols-outlined text-[20px]">{linkCopied ? "check" : "link"}</span>
           </button>
-          <Link
-            href={`/data-room/${dealId}`}
-            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary border border-border-subtle rounded-lg hover:bg-blue-50 transition-colors"
-          >
-            <span className="material-symbols-outlined text-[18px]">folder_open</span>
-            Data Room
-          </Link>
           <button
             onClick={() => router.push(`/deals/${dealId}/edit`)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm transition-colors"
@@ -379,41 +445,54 @@ export default function DealDetailPage() {
         {/* LEFT COLUMN */}
         <div className="flex-1 min-w-0 flex flex-col gap-5">
           {/* Deal header */}
-          <div className="flex items-center gap-4">
-            <div className="size-14 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center">
-              <span className="material-symbols-outlined text-primary text-2xl">
-                business
-              </span>
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-2xl font-bold text-text-main tracking-tight">
+          <div className="flex justify-between items-start">
+            <div className="flex items-center gap-4">
+              <div className="size-16 rounded-xl bg-white p-1 border border-border-subtle shadow-card">
+                <div className="w-full h-full bg-blue-50 rounded-lg flex items-center justify-center border border-border-subtle">
+                  <span className="material-symbols-outlined text-primary text-3xl">
+                    {deal.icon || "business"}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-text-main leading-tight">
                   {deal.name}
                 </h1>
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
-                    stageStyle.bg,
-                    stageStyle.text
-                  )}
-                >
-                  <span
-                    className={cn(
-                      "size-1.5 rounded-full",
-                      stageStyle.border.replace("border-", "bg-")
-                    )}
-                  />
-                  {STAGE_LABELS[deal.stage] || deal.stage}
-                </span>
+                {deal.industry && (
+                  <div className="flex flex-wrap gap-2 mt-2">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                        stageStyle.bg,
+                        stageStyle.text
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "size-1.5 rounded-full",
+                          stageStyle.border.replace("border-", "bg-")
+                        )}
+                      />
+                      {STAGE_LABELS[deal.stage] || deal.stage}
+                    </span>
+                  </div>
+                )}
               </div>
-              {deal.industry && (
-                <p className="text-sm text-text-muted mt-0.5">{deal.industry}</p>
-              )}
             </div>
+            {/* Deal Actions Menu */}
+            <DealActionsMenu
+              dealId={dealId}
+              dealName={deal.name}
+              onDelete={handleDeleteDeal}
+            />
           </div>
 
           {/* Stage Pipeline */}
-          <StagePipeline deal={deal} onStageClick={handleStageClick} />
+          <StagePipeline
+            deal={deal}
+            onStageClick={handleStageClick}
+            onChangeStage={handleChangeStageBtn}
+          />
 
           {/* Metadata row */}
           <DealMetadataRow deal={deal} />
@@ -447,7 +526,14 @@ export default function DealDetailPage() {
 
           {/* Tab content */}
           <div>
-            {activeTab === "Overview" && <OverviewTab deal={deal} />}
+            {activeTab === "Overview" && (
+              <OverviewTab
+                deal={deal}
+                activities={activities}
+                activitiesLoading={activitiesLoading}
+                onRefreshActivities={loadActivities}
+              />
+            )}
             {activeTab === "Documents" && (
               <DocumentsTab
                 documents={documents}
@@ -462,7 +548,7 @@ export default function DealDetailPage() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN — AI Chat sidebar (sticky, desktop only) */}
+        {/* RIGHT COLUMN -- AI Chat sidebar (sticky, desktop only) */}
         <div className="hidden lg:block w-80 shrink-0">
           <div className="sticky top-6">
             <ChatTab
@@ -473,6 +559,7 @@ export default function DealDetailPage() {
               chatSending={chatSending}
               onSend={sendMessage}
               onSendPrompt={sendPrompt}
+              onClearChat={clearChatHistory}
               chatEndRef={chatEndRef}
             />
           </div>
@@ -493,6 +580,15 @@ export default function DealDetailPage() {
             setStageModal(null);
             setStageError("");
           }}
+        />
+      )}
+
+      {/* Terminal Stage Modal (Close Deal) */}
+      {showTerminalModal && (
+        <TerminalStageModal
+          dealName={deal.name}
+          onSelect={handleTerminalSelect}
+          onClose={() => setShowTerminalModal(false)}
         />
       )}
     </div>

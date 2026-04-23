@@ -13,9 +13,10 @@ export interface AdminTeamMember {
 export interface AdminDeal {
   id: string;
   name: string;
+  dealName?: string;
   stage: string;
   dealSize?: number;
-  teamMembers?: { userId: string }[];
+  teamMembers?: { userId: string; user?: { id: string } }[];
 }
 
 export interface AdminTaskAssignee {

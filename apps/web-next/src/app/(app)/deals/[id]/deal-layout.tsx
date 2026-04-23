@@ -3,6 +3,7 @@
 import { cn } from "@/lib/cn";
 import { formatCurrency, formatRelativeTime } from "@/lib/formatters";
 import Link from "next/link";
+import { STAGE_LABELS } from "@/lib/constants";
 import { type DealDetail, PIPELINE_STAGES, TERMINAL_STAGES } from "./components";
 
 // ---------------------------------------------------------------------------
@@ -12,9 +13,11 @@ import { type DealDetail, PIPELINE_STAGES, TERMINAL_STAGES } from "./components"
 export function StagePipeline({
   deal,
   onStageClick,
+  onChangeStage,
 }: {
   deal: DealDetail;
   onStageClick: (stage: string) => void;
+  onChangeStage?: () => void;
 }) {
   const currentStageIndex = PIPELINE_STAGES.findIndex((s) => s.key === deal.stage);
   const isTerminal = TERMINAL_STAGES.includes(deal.stage);
@@ -29,12 +32,16 @@ export function StagePipeline({
         <button
           onClick={() => {
             if (isTerminal) return;
-            const nextIdx = currentStageIndex + 1;
-            if (nextIdx < PIPELINE_STAGES.length) {
-              onStageClick(PIPELINE_STAGES[nextIdx].key);
+            if (onChangeStage) {
+              onChangeStage();
+            } else {
+              const nextIdx = currentStageIndex + 1;
+              if (nextIdx < PIPELINE_STAGES.length) {
+                onStageClick(PIPELINE_STAGES[nextIdx].key);
+              }
             }
           }}
-          className="text-xs text-primary font-medium flex items-center gap-1 transition-colors"
+          className="text-xs text-primary hover:text-blue-800 font-medium flex items-center gap-1 transition-colors"
         >
           <span className="material-symbols-outlined text-sm">edit</span>
           Change Stage
@@ -101,6 +108,29 @@ export function StagePipeline({
             </div>
           );
         })}
+        {/* Terminal stage pill (Closed Won / Closed Lost / Passed) */}
+        {isTerminal && (
+          <div className="flex items-center ml-2">
+            <div className="h-0.5 w-4 bg-gray-300" />
+            <div
+              className={cn(
+                "px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-white shadow-lg",
+                deal.stage === "CLOSED_WON" && "bg-green-500",
+                deal.stage === "CLOSED_LOST" && "bg-red-500",
+                deal.stage === "PASSED" && "bg-gray-500"
+              )}
+            >
+              <span className="material-symbols-outlined text-sm">
+                {deal.stage === "CLOSED_WON"
+                  ? "celebration"
+                  : deal.stage === "CLOSED_LOST"
+                    ? "cancel"
+                    : "block"}
+              </span>
+              {STAGE_LABELS[deal.stage] || deal.stage}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -176,42 +206,96 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
 // ---------------------------------------------------------------------------
 
 export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
-  const ebitdaMargin =
-    deal.ebitda != null && deal.revenue != null && deal.revenue !== 0
-      ? ((deal.ebitda / deal.revenue) * 100).toFixed(1) + "%"
-      : null;
+  // Dynamic financial metrics — only show cards with data, prioritized by
+  // relevance. Ported from apps/web/deal.js renderDynamicMetrics.
+  const hasMarginData = deal.ebitda != null && deal.revenue != null && deal.revenue !== 0;
 
-  const allMetrics = [
-    { label: "Deal Size", value: deal.dealSize, formatted: formatCurrency(deal.dealSize, deal.currency), icon: "payments" },
-    { label: "Revenue", value: deal.revenue, formatted: formatCurrency(deal.revenue, deal.currency), icon: "trending_up" },
-    { label: "EBITDA", value: deal.ebitda, formatted: formatCurrency(deal.ebitda, deal.currency), icon: "analytics" },
-    { label: "EBITDA Margin", value: ebitdaMargin, formatted: ebitdaMargin || "N/A", icon: "percent" },
+  type MetricDef = { key: string; label: string; value: unknown; formatted: string; badge?: string; extra?: string };
+  const allMetrics: MetricDef[] = [
+    {
+      key: "revenue",
+      label: "Revenue (LTM)",
+      value: deal.revenue,
+      formatted: formatCurrency(deal.revenue, deal.currency),
+    },
+    {
+      key: "ebitdaMargin",
+      label: "EBITDA Margin",
+      value: hasMarginData ? deal.ebitda : null,
+      formatted: hasMarginData ? ((deal.ebitda! / deal.revenue!) * 100).toFixed(0) + "%" : "N/A",
+    },
+    {
+      key: "ebitda",
+      label: "EBITDA",
+      value: deal.ebitda,
+      formatted: formatCurrency(deal.ebitda, deal.currency),
+    },
+    {
+      key: "dealSize",
+      label: "Deal Size",
+      value: deal.dealSize,
+      formatted: formatCurrency(deal.dealSize, deal.currency),
+      extra: deal.dealSize && deal.ebitda ? `~${(deal.dealSize / deal.ebitda).toFixed(1)}x EBITDA Multiple` : undefined,
+    },
+    {
+      key: "irr",
+      label: "Projected IRR",
+      value: deal.irrProjected,
+      formatted: deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "N/A",
+      badge: "Target",
+      extra: deal.mom != null ? `MoM: ${deal.mom.toFixed(1)}x` : undefined,
+    },
+    {
+      key: "mom",
+      label: "Money Multiple",
+      value: deal.mom,
+      formatted: deal.mom != null ? deal.mom.toFixed(1) + "x" : "N/A",
+    },
   ];
 
-  // Show all metrics but highlight ones with actual values
+  // Filter to only metrics with data
+  let available = allMetrics.filter((m) => m.value != null);
+
+  // If EBITDA + revenue both exist, prefer ebitdaMargin over raw ebitda
+  const hasMargin = available.some((m) => m.key === "ebitdaMargin");
+  if (hasMargin) available = available.filter((m) => m.key !== "ebitda");
+
+  // If IRR exists, skip standalone MoM (shown as sub-text under IRR)
+  const hasIRR = available.some((m) => m.key === "irr");
+  if (hasIRR) available = available.filter((m) => m.key !== "mom");
+
+  const metrics = available.slice(0, 4);
+
+  if (metrics.length === 0) {
+    return (
+      <div className="bg-surface-card border border-border-subtle rounded-xl p-6 shadow-card text-center">
+        <span className="material-symbols-outlined text-text-muted text-3xl mb-2 block">analytics</span>
+        <p className="text-text-muted text-sm">
+          No financial metrics yet. Upload a CIM or edit the deal to add data.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex flex-wrap gap-3">
-      {allMetrics.map((m) => {
-        const hasValue = m.value != null;
-        return (
-          <div
-            key={m.label}
-            className={cn(
-              "rounded-lg p-3 min-w-[120px] flex-1",
-              hasValue
-                ? "bg-surface-card border border-border-subtle shadow-card"
-                : "bg-gray-50 border border-gray-100"
+    <div className={cn("grid gap-4", metrics.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
+      {metrics.map((m) => (
+        <div
+          key={m.key}
+          className="bg-surface-card border border-border-subtle rounded-xl p-4 shadow-card relative overflow-hidden group"
+        >
+          <p className="text-[11px] text-text-muted font-bold uppercase tracking-wide">{m.label}</p>
+          <div className="flex items-center gap-2 mt-3">
+            <span className="text-2xl font-bold text-text-main leading-none">{m.formatted}</span>
+            {m.badge && (
+              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+                {m.badge}
+              </span>
             )}
-          >
-            <span className="text-[10px] text-text-muted font-medium uppercase tracking-wider block mb-1">
-              {m.label}
-            </span>
-            <p className={cn("text-lg font-bold", hasValue ? "text-text-main" : "text-text-muted")}>
-              {m.formatted}
-            </p>
           </div>
-        );
-      })}
+          {m.extra && <p className="text-xs text-text-muted font-medium mt-2">{m.extra}</p>}
+        </div>
+      ))}
     </div>
   );
 }

@@ -47,7 +47,7 @@ export const WIDGETS: WidgetMeta[] = [
     id: "quick-notes",
     title: "Quick Notes",
     description: "Personal scratchpad. Saves to this browser only.",
-    icon: "edit_note",
+    icon: "sticky_note_2",
     Component: QuickNotesWidget,
   },
   {
@@ -61,7 +61,7 @@ export const WIDGETS: WidgetMeta[] = [
     id: "upcoming-deadlines",
     title: "Upcoming Deadlines",
     description: "Tasks due in the next 14 days, color-coded by urgency.",
-    icon: "event",
+    icon: "event_upcoming",
     Component: UpcomingDeadlinesWidget,
   },
   {
@@ -82,7 +82,7 @@ export const WIDGETS: WidgetMeta[] = [
     id: "recent-activity",
     title: "Recent Activity",
     description: "Latest audit events across your org.",
-    icon: "rss_feed",
+    icon: "history",
     Component: RecentActivityWidget,
   },
   {
@@ -110,7 +110,7 @@ export const WIDGETS: WidgetMeta[] = [
     id: "market-multiples",
     title: "Market Multiples",
     description: "Static EV/EBITDA + EV/Revenue reference table.",
-    icon: "insights",
+    icon: "insert_chart",
     Component: MarketMultiplesWidget,
   },
 ];

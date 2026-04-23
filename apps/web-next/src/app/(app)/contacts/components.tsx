@@ -45,12 +45,12 @@ export interface LinkedDeal {
 export const CONTACT_TYPES = ["BANKER", "ADVISOR", "EXECUTIVE", "LP", "LEGAL", "OTHER"] as const;
 
 export const TYPE_CONFIG: Record<string, { label: string; bg: string; text: string; avatarBg: string; avatarText: string }> = {
-  BANKER:    { label: "Banker",    bg: "bg-blue-50",    text: "text-blue-700",    avatarBg: "#DBEAFE", avatarText: "#1D4ED8" },
-  ADVISOR:   { label: "Advisor",   bg: "bg-purple-50",  text: "text-purple-700",  avatarBg: "#EDE9FE", avatarText: "#6D28D9" },
-  EXECUTIVE: { label: "Executive", bg: "bg-slate-50",   text: "text-slate-700",   avatarBg: "#F1F5F9", avatarText: "#334155" },
-  LP:        { label: "LP",        bg: "bg-green-50",   text: "text-green-700",   avatarBg: "#D1FAE5", avatarText: "#047857" },
-  LEGAL:     { label: "Legal",     bg: "bg-amber-50",   text: "text-amber-700",   avatarBg: "#FEF3C7", avatarText: "#B45309" },
-  OTHER:     { label: "Other",     bg: "bg-gray-50",    text: "text-gray-600",    avatarBg: "#F3F4F6", avatarText: "#374151" },
+  BANKER:    { label: "Banker",    bg: "bg-blue-100",    text: "text-blue-700",    avatarBg: "#DBEAFE", avatarText: "#1D4ED8" },
+  ADVISOR:   { label: "Advisor",   bg: "bg-purple-100",  text: "text-purple-700",  avatarBg: "#EDE9FE", avatarText: "#6D28D9" },
+  EXECUTIVE: { label: "Executive", bg: "bg-emerald-100", text: "text-emerald-700", avatarBg: "#D1FAE5", avatarText: "#047857" },
+  LP:        { label: "LP",        bg: "bg-amber-100",   text: "text-amber-700",   avatarBg: "#FEF3C7", avatarText: "#B45309" },
+  LEGAL:     { label: "Legal",     bg: "bg-slate-100",   text: "text-slate-700",   avatarBg: "#F1F5F9", avatarText: "#334155" },
+  OTHER:     { label: "Other",     bg: "bg-gray-100",    text: "text-gray-700",    avatarBg: "#F3F4F6", avatarText: "#374151" },
 };
 
 export const SCORE_CONFIG: Record<string, { bg: string; text: string; dot: string }> = {
@@ -62,18 +62,6 @@ export const SCORE_CONFIG: Record<string, { bg: string; text: string; dot: strin
 
 const INTERACTION_ICONS: Record<string, string> = {
   NOTE: "edit_note", MEETING: "groups", CALL: "call", EMAIL: "mail", OTHER: "more_horiz",
-};
-
-const STAGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  INITIAL_REVIEW: { bg: "bg-blue-50", text: "text-blue-700", label: "Initial Review" },
-  DUE_DILIGENCE:  { bg: "bg-indigo-50", text: "text-indigo-700", label: "Due Diligence" },
-  IOI_SUBMITTED:  { bg: "bg-amber-50", text: "text-amber-700", label: "IOI Submitted" },
-  LOI_SUBMITTED:  { bg: "bg-purple-50", text: "text-purple-700", label: "LOI Submitted" },
-  NEGOTIATION:    { bg: "bg-orange-50", text: "text-orange-700", label: "Negotiation" },
-  CLOSING:        { bg: "bg-teal-50", text: "text-teal-700", label: "Closing" },
-  PASSED:         { bg: "bg-gray-100", text: "text-gray-600", label: "Passed" },
-  CLOSED_WON:     { bg: "bg-green-50", text: "text-green-700", label: "Closed Won" },
-  CLOSED_LOST:    { bg: "bg-red-50", text: "text-red-700", label: "Closed Lost" },
 };
 
 // Imported from shared formatters and re-exported for contacts/page.tsx
@@ -90,25 +78,35 @@ export function getRelationshipLabel(score: number | null | undefined): string {
 
 // ─── Contact Modal ─────────────────────────────────────────
 
+export interface ContactFormData {
+  firstName: string; lastName: string; email: string; phone: string;
+  title: string; company: string; type: string; linkedinUrl: string;
+  tags: string[]; notes: string;
+}
+
 export function ContactModal({
   contact, saving, onSave, onClose,
 }: {
   contact: Contact | null;
   saving: boolean;
-  onSave: (data: { firstName: string; lastName: string; email: string; phone: string; company: string; type: string; notes: string }) => void;
+  onSave: (data: ContactFormData) => void;
   onClose: () => void;
 }) {
   const [form, setForm] = useState({
     firstName: contact?.firstName || "", lastName: contact?.lastName || "",
     email: contact?.email || "", phone: contact?.phone || "",
-    company: contact?.company || "", type: contact?.type || "OTHER",
-    notes: contact?.notes || "",
+    title: contact?.title || "", company: contact?.company || "",
+    type: contact?.type || "", linkedinUrl: contact?.linkedinUrl || "",
+    tagsRaw: (contact?.tags || []).join(", "), notes: contact?.notes || "",
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!form.firstName.trim()) return;
-    onSave(form);
+    const tags = form.tagsRaw ? form.tagsRaw.split(",").map((t) => t.trim()).filter(Boolean) : [];
+    let linkedinUrl = form.linkedinUrl.trim();
+    if (linkedinUrl && !linkedinUrl.startsWith("http")) linkedinUrl = "https://" + linkedinUrl;
+    onSave({ firstName: form.firstName, lastName: form.lastName, email: form.email, phone: form.phone, title: form.title, company: form.company, type: form.type, linkedinUrl, tags, notes: form.notes });
   }
 
   const inputCls = "w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors";
@@ -129,8 +127,8 @@ export function ContactModal({
               <input type="text" required value={form.firstName} onChange={(e) => setForm((f) => ({ ...f, firstName: e.target.value }))} className={inputCls} placeholder="John" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-text-main mb-1.5">Last Name</label>
-              <input type="text" value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} className={inputCls} placeholder="Doe" />
+              <label className="block text-sm font-medium text-text-main mb-1.5">Last Name <span className="text-red-500">*</span></label>
+              <input type="text" required value={form.lastName} onChange={(e) => setForm((f) => ({ ...f, lastName: e.target.value }))} className={inputCls} placeholder="Doe" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -145,24 +143,40 @@ export function ContactModal({
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium text-text-main mb-1.5">Title</label>
+              <input type="text" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} className={inputCls} placeholder="Managing Director" />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-text-main mb-1.5">Company</label>
               <input type="text" value={form.company} onChange={(e) => setForm((f) => ({ ...f, company: e.target.value }))} className={inputCls} placeholder="Goldman Sachs" />
             </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-text-main mb-1.5">Type <span className="text-red-500">*</span></label>
-              <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className={inputCls}>
+              <select value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))} className={inputCls} required>
+                <option value="">Select type...</option>
                 {CONTACT_TYPES.map((t) => <option key={t} value={t}>{TYPE_CONFIG[t].label}</option>)}
               </select>
             </div>
+            <div>
+              <label className="block text-sm font-medium text-text-main mb-1.5">LinkedIn URL</label>
+              <input type="text" value={form.linkedinUrl} onChange={(e) => setForm((f) => ({ ...f, linkedinUrl: e.target.value }))} className={inputCls} placeholder="https://linkedin.com/in/..." />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-text-main mb-1.5">Tags <span className="text-text-muted font-normal">(comma-separated)</span></label>
+            <input type="text" value={form.tagsRaw} onChange={(e) => setForm((f) => ({ ...f, tagsRaw: e.target.value }))} className={inputCls} placeholder="healthcare, m&a, midwest" />
           </div>
           <div>
             <label className="block text-sm font-medium text-text-main mb-1.5">Notes</label>
-            <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} className={cn(inputCls, "resize-none")} placeholder="Any additional notes..." />
+            <textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} className={cn(inputCls, "resize-none")} placeholder="Any additional notes about this contact..." />
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-border-subtle text-text-secondary text-sm font-medium hover:bg-gray-50 transition-colors">Cancel</button>
-            <button type="submit" disabled={saving || !form.firstName.trim()} className="px-5 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50" style={{ backgroundColor: "#003366" }}>
-              {saving ? "Saving..." : contact ? "Update Contact" : "Save Contact"}
+            <button type="submit" disabled={saving || !form.firstName.trim()} className="px-5 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-colors disabled:opacity-50 flex items-center gap-2" style={{ backgroundColor: "#003366" }}>
+              <span>{saving ? "Saving..." : contact ? "Update Contact" : "Save Contact"}</span>
+              {saving && <span className="material-symbols-outlined text-[18px] animate-spin">progress_activity</span>}
             </button>
           </div>
         </form>
@@ -337,154 +351,5 @@ function Spinner() {
     <div className="flex items-center justify-center py-6">
       <span className="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
     </div>
-  );
-}
-
-// ─── Detail Panel ──────────────────────────────────────────
-
-export function DetailPanel({ contactId, onClose }: { contactId: string; onClose: () => void }) {
-  const [contact, setContact] = useState<Contact | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"info" | "interactions" | "deals">("info");
-  const [interactions, setInteractions] = useState<Interaction[]>([]);
-  const [deals, setDeals] = useState<LinkedDeal[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = await api.get<Contact>(`/contacts/${contactId}`);
-        setContact(data);
-        setInteractions(data.interactions || []);
-        setDeals(data.linkedDeals || []);
-      } catch { /* silent */ }
-      setLoading(false);
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [contactId]);
-
-  if (loading) {
-    return (
-      <>
-        <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-        <div className="fixed top-0 right-0 h-full w-[450px] max-w-full bg-surface-card shadow-2xl z-50 flex flex-col border-l border-border-subtle animate-[slideIn_0.3s_ease-out]">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
-            <h2 className="text-lg font-bold text-text-main">Contact Details</h2>
-            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-text-muted"><span className="material-symbols-outlined text-[20px]">close</span></button>
-          </div>
-          <div className="flex-1 flex items-center justify-center"><Spinner /></div>
-        </div>
-      </>
-    );
-  }
-
-  if (!contact) return null;
-  const tc = TYPE_CONFIG[contact.type] || TYPE_CONFIG.OTHER;
-  const sortedInteractions = [...interactions].sort((a, b) => new Date(b.date || b.createdAt).getTime() - new Date(a.date || a.createdAt).getTime());
-  const tabs = [{ key: "info" as const, label: "Info" }, { key: "interactions" as const, label: `Interactions (${interactions.length})` }, { key: "deals" as const, label: `Deals (${deals.length})` }];
-
-  return (
-    <>
-      <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <div className="fixed top-0 right-0 h-full w-[450px] max-w-full bg-surface-card shadow-2xl z-50 flex flex-col border-l border-border-subtle">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle shrink-0">
-          <h2 className="text-lg font-bold text-text-main">Contact Details</h2>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-text-muted hover:text-text-main transition-colors"><span className="material-symbols-outlined text-[20px]">close</span></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-6">
-          {/* Header */}
-          <div className="flex items-start gap-4 mb-6">
-            <div className="size-14 rounded-full flex items-center justify-center shrink-0 text-lg font-bold shadow-sm" style={{ backgroundColor: tc.avatarBg, color: tc.avatarText }}>
-              {getInitials(contact.firstName, contact.lastName)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-xl font-bold text-text-main leading-tight">{contact.firstName} {contact.lastName}</h3>
-              {contact.title && <p className="text-text-secondary text-sm mt-0.5">{contact.title}</p>}
-              {contact.company && <p className="text-text-muted text-sm flex items-center gap-1 mt-0.5"><span className="material-symbols-outlined text-[14px]">business</span>{contact.company}</p>}
-              <span className={cn("inline-block mt-2 px-2.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider", tc.bg, tc.text)}>{tc.label}</span>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex gap-1 mb-6 border-b border-border-subtle">
-            {tabs.map((t) => (
-              <button key={t.key} onClick={() => setActiveTab(t.key)} className={cn("px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors", activeTab === t.key ? "border-primary text-primary" : "border-transparent text-text-muted hover:text-text-main")}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab Content */}
-          {activeTab === "info" && (
-            <>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Contact Information</h4>
-              <div className="flex flex-col gap-2 mb-6">
-                {contact.email && <a href={`mailto:${contact.email}`} className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary p-2 rounded-lg hover:bg-blue-50/50 transition-colors"><span className="material-symbols-outlined text-[18px] text-text-muted">mail</span>{contact.email}</a>}
-                {contact.phone && <a href={`tel:${contact.phone}`} className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary p-2 rounded-lg hover:bg-blue-50/50 transition-colors"><span className="material-symbols-outlined text-[18px] text-text-muted">call</span>{contact.phone}</a>}
-                {!contact.email && !contact.phone && <p className="text-text-muted text-sm italic p-2">No contact information added</p>}
-              </div>
-              {(contact.tags?.length || 0) > 0 && (
-                <div className="mb-6">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Tags</h4>
-                  <div className="flex flex-wrap gap-1.5">{contact.tags!.map((t, i) => <span key={i} className="px-2.5 py-1 rounded-full bg-gray-50 text-text-secondary text-xs font-medium border border-border-subtle">{t}</span>)}</div>
-                </div>
-              )}
-              {contact.notes && (
-                <div className="mb-6">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Notes</h4>
-                  <div className="p-3 bg-gray-50 rounded-lg border border-border-subtle text-sm text-text-secondary leading-relaxed whitespace-pre-wrap">{contact.notes}</div>
-                </div>
-              )}
-            </>
-          )}
-
-          {activeTab === "interactions" && (
-            sortedInteractions.length === 0 ? (
-              <p className="text-text-muted text-sm text-center py-8">No interactions recorded</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {sortedInteractions.map((inter) => {
-                  const icon = INTERACTION_ICONS[inter.type] || INTERACTION_ICONS.OTHER;
-                  return (
-                    <div key={inter.id} className="flex items-start gap-3 p-3 rounded-lg border border-border-subtle hover:border-primary/30 transition-colors">
-                      <div className="size-8 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined text-[16px] text-[#003366]">{icon}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-text-main">{inter.title || inter.type}</p>
-                        {inter.notes && <p className="text-xs text-text-muted mt-1 line-clamp-2">{inter.notes}</p>}
-                        <p className="text-[10px] text-text-muted mt-1">{formatRelativeTime(inter.date || inter.createdAt)}</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          )}
-
-          {activeTab === "deals" && (
-            deals.length === 0 ? (
-              <p className="text-text-muted text-sm text-center py-8">No linked deals</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {deals.map((d) => {
-                  const deal = d.deal || {} as LinkedDeal["deal"];
-                  const ss = STAGE_STYLES[deal.stage] || { bg: "bg-gray-100", text: "text-gray-600", label: deal.stage };
-                  return (
-                    <div key={d.dealId} className="flex items-center justify-between p-3 rounded-lg border border-border-subtle hover:border-primary/30 transition-all group">
-                      <div className="flex items-center gap-2.5 flex-1 min-w-0">
-                        <span className="material-symbols-outlined text-text-muted text-[18px] group-hover:text-primary">work</span>
-                        <span className="text-sm font-medium text-text-main group-hover:text-primary truncate">{deal.name}</span>
-                        {deal.stage && <span className={cn("px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shrink-0", ss.bg, ss.text)}>{ss.label}</span>}
-                      </div>
-                      {d.role && <span className="text-[10px] text-text-muted ml-2">{d.role}</span>}
-                    </div>
-                  );
-                })}
-              </div>
-            )
-          )}
-        </div>
-      </div>
-    </>
   );
 }

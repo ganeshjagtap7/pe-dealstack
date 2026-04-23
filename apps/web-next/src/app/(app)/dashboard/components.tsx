@@ -18,6 +18,10 @@ export interface Deal {
   updatedAt: string;
   nextAction?: string;
   industry?: string;
+  priority?: string;
+  status?: string;
+  assignedUser?: { id?: string; name?: string; email?: string };
+  teamMembers?: Array<{ userId?: string; user?: { id?: string; name?: string; email?: string } }>;
 }
 
 export interface Task {
@@ -27,6 +31,9 @@ export interface Task {
   priority?: string;
   dueDate?: string;
   category?: string;
+  dealId?: string;
+  dealName?: string;
+  deal?: { id?: string; name?: string };
 }
 
 export interface MarketSentiment {
@@ -301,9 +308,95 @@ export function StageDetailModal({ stageModal, deals, onClose }: StageDetailModa
           ))}
         </div>
         <div className="p-4 border-t border-border-subtle bg-gray-50 text-center">
-          <Link href="/deals" onClick={onClose} className="text-sm font-medium text-primary hover:underline">View all deals →</Link>
+          <Link href="/deals" onClick={onClose} className="text-sm font-medium text-primary hover:underline">View all deals &rarr;</Link>
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// fmtNextAction — stage-based fallback for Next Action column
+// Matches legacy dashboard.js fmtNextAction()
+// ---------------------------------------------------------------------------
+
+export function fmtNextAction(stage: string): string {
+  switch (stage) {
+    case "SOURCING":
+      return "Initial review";
+    case "INITIAL_REVIEW":
+      return "Schedule mgmt call";
+    case "DUE_DILIGENCE":
+      return "Complete QoE analysis";
+    case "LOI_OFFER":
+    case "IOI_SUBMITTED":
+    case "LOI_SUBMITTED":
+      return "Negotiate terms";
+    case "CLOSED_WON":
+    case "CLOSING":
+      return "Onboard portfolio co";
+    default:
+      return "Review deal";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PortfolioAllocation — donut chart + legend
+// Matches legacy dashboard.html portfolio-widget
+// ---------------------------------------------------------------------------
+
+interface AllocationItem {
+  label: string;
+  count: number;
+  pct: number;
+  color: string;
+}
+
+interface PortfolioAllocationProps {
+  loading: boolean;
+  allocation: AllocationItem[];
+  gradientParts: string[];
+}
+
+export function PortfolioAllocation({ loading, allocation, gradientParts }: PortfolioAllocationProps) {
+  return (
+    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card p-6 gap-5">
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
+        <span className="material-symbols-outlined text-text-muted">pie_chart</span>
+      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-4 text-text-muted text-xs">
+          <span className="material-symbols-outlined text-xl animate-spin">sync</span>
+        </div>
+      ) : allocation.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-4 text-text-muted">
+          <span className="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span>
+          <p className="text-xs">No deals yet</p>
+        </div>
+      ) : (
+        <div className="flex items-center gap-6">
+          <div
+            className="size-28 rounded-full shrink-0 shadow-inner"
+            style={{
+              background: `conic-gradient(${gradientParts.join(", ")})`,
+              mask: "radial-gradient(circle at center, transparent 40%, black 41%)",
+              WebkitMask: "radial-gradient(circle at center, transparent 40%, black 41%)",
+            }}
+          />
+          <div className="flex flex-col gap-3 flex-1">
+            {allocation.map((item) => (
+              <div key={item.label} className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="size-2.5 rounded-sm shadow-sm shrink-0" style={{ background: item.color }} />
+                  <span className="text-text-secondary font-medium truncate">{item.label}</span>
+                </div>
+                <span className="text-text-main font-bold ml-2">{item.pct}%</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

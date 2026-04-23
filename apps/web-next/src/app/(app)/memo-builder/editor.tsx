@@ -1,18 +1,102 @@
 "use client";
 
-import React, { RefObject, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/cn";
-import { renderMarkdown } from "@/lib/markdown";
-import type { Memo, MemoSection, ChatMessage } from "./components";
+import type { Memo, MemoSection, TableData, TableRow } from "./components";
 
 // Allowlist-based HTML sanitization via DOMPurify. Permits only safe tags
 // and attributes — strips scripts, iframes, event handlers, javascript: URIs, etc.
 function sanitizeHtml(html: string): string {
   return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS: ["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong", "em", "b", "i", "br", "div", "span", "table", "thead", "tbody", "tr", "th", "td", "a", "blockquote", "code", "pre"],
-    ALLOWED_ATTR: ["class", "href", "target", "rel"],
+    ALLOWED_TAGS: ["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "strong", "em", "b", "i", "br", "div", "span", "table", "thead", "tbody", "tr", "th", "td", "a", "blockquote", "code", "pre", "button"],
+    ALLOWED_ATTR: ["class", "href", "target", "rel", "data-source", "data-page", "title"],
   });
+}
+
+/* ---- Table rendering helper ---- */
+function renderTableData(tableData: TableData) {
+  if (!tableData.headers || !tableData.rows) return null;
+
+  return (
+    <div className="overflow-hidden border border-border-subtle rounded-lg bg-white shadow-sm mb-6">
+      <table className="w-full text-sm text-left">
+        <thead className="bg-[#f0f4f8] text-text-muted font-medium border-b border-border-subtle">
+          <tr>
+            {tableData.headers.map((h, i) => (
+              <th
+                key={i}
+                className={cn(
+                  "px-4 py-3 font-semibold text-[11px] uppercase tracking-[0.05em]",
+                  i === 0 ? "w-1/3 text-left text-primary" : "text-right text-primary"
+                )}
+                style={{ borderRight: i < tableData.headers.length - 1 ? "1px solid #e2e8f0" : undefined }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-[#f1f5f9]">
+          {tableData.rows.map((row, rowIdx) => {
+            let metric = "";
+            let values: string[] = [];
+            let isBold = false;
+            let isSubMetric = false;
+
+            if (Array.isArray(row)) {
+              metric = (row as string[])[0] || "";
+              values = (row as string[]).slice(1);
+              const ml = metric.toLowerCase();
+              isBold = ml.includes("ebitda") || ml.includes("total") || ml.includes("net income");
+              isSubMetric = ml.includes("margin") || ml.includes("growth") || ml.includes("%");
+            } else {
+              const r = row as TableRow;
+              metric = r.metric || "";
+              values = Array.isArray(r.values) ? r.values : [];
+              isBold = !!r.isBold;
+              isSubMetric = !!r.isSubMetric;
+            }
+
+            return (
+              <tr
+                key={rowIdx}
+                className={cn(
+                  "hover:bg-[#f8fafc]",
+                  isBold && "bg-[#f8fafc]"
+                )}
+              >
+                <td
+                  className={cn(
+                    "px-4 py-2.5",
+                    isBold ? "font-bold text-text-main" : isSubMetric ? "pl-8 text-text-muted italic" : "font-medium text-text-main"
+                  )}
+                >
+                  {metric}
+                </td>
+                {values.map((v, ci) => (
+                  <td
+                    key={ci}
+                    className={cn(
+                      "px-4 py-2.5 text-right font-mono",
+                      isBold ? "font-semibold text-text-main" : isSubMetric ? "text-text-muted" : "text-text-secondary"
+                    )}
+                  >
+                    {v ?? ""}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {tableData.footnote && (
+        <div className="bg-[#f8fafc] border-t border-border-subtle px-4 py-2">
+          <p className="text-[10px] text-text-muted">{tableData.footnote}</p>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function formatDocDate(iso?: string): string {
@@ -261,167 +345,23 @@ function DocSection({
           />
         </div>
       )}
+
+      {/* Table data rendering */}
+      {section.tableData && renderTableData(section.tableData)}
+
+      {/* Placeholder for missing content */}
+      {section.hasPlaceholder && section.placeholderText && (
+        <div className="p-4 bg-[#f8fafc] rounded-lg border border-dashed border-border-subtle text-center">
+          <button className="inline-flex flex-col items-center gap-2 text-text-muted hover:text-primary transition-colors group/add">
+            <div className="size-8 rounded-full bg-border-subtle flex items-center justify-center group-hover/add:bg-primary/10 transition-colors">
+              <span className="material-symbols-outlined group-hover/add:text-primary">add</span>
+            </div>
+            <span className="text-sm font-medium">{section.placeholderText}</span>
+          </button>
+        </div>
+      )}
     </section>
   );
 }
 
-/* ------------------------------------------------------------------ */
-/*  MemoChat                                                           */
-/* ------------------------------------------------------------------ */
-
-const PROMPT_CHIPS = [
-  "Summarize the key risks",
-  "Draft the executive summary",
-  "What financial data is missing?",
-  "Compare to industry benchmarks",
-  "Strengthen the investment thesis",
-];
-
-interface MemoChatProps {
-  messages: ChatMessage[];
-  chatInput: string;
-  setChatInput: (v: string) => void;
-  sendingChat: boolean;
-  onSend: () => void;
-  chatOpen: boolean;
-  onToggleChat: () => void;
-  chatEndRef: RefObject<HTMLDivElement | null>;
-}
-
-export function MemoChat({
-  messages,
-  chatInput,
-  setChatInput,
-  sendingChat,
-  onSend,
-  chatOpen,
-  onToggleChat,
-  chatEndRef,
-}: MemoChatProps) {
-  if (!chatOpen) return null;
-
-  return (
-    <aside className="w-[360px] shrink-0 border-l border-border-subtle bg-surface-card flex flex-col overflow-hidden shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)]">
-      <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="size-6 rounded bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
-            <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-          </div>
-          <h3 className="text-sm font-bold text-text-main">AI Analyst</h3>
-        </div>
-        <button
-          onClick={onToggleChat}
-          className="text-text-muted hover:text-text-main transition-colors"
-          title="Collapse panel"
-        >
-          <span className="material-symbols-outlined text-[18px]">chevron_right</span>
-        </button>
-      </div>
-
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 bg-background-body">
-        {messages.map((msg) => (
-          <div key={msg.id} className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
-            <div
-              className={cn(
-                "max-w-[85%] rounded-xl px-3.5 py-2.5 text-sm leading-relaxed",
-                msg.role === "user"
-                  ? "bg-primary text-white rounded-br-sm"
-                  : "bg-surface-card text-text-main border border-border-subtle rounded-bl-sm"
-              )}
-            >
-              {msg.role === "user" ? (
-                <p className="whitespace-pre-wrap">{msg.content}</p>
-              ) : (
-                <div
-                  className="chat-markdown space-y-1"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
-                />
-              )}
-              <p className={cn("text-[10px] mt-1.5", msg.role === "user" ? "text-white/60" : "text-text-muted")}>
-                {msg.timestamp}
-              </p>
-            </div>
-          </div>
-        ))}
-        {sendingChat && (
-          <div className="flex justify-start">
-            <div className="bg-surface-card border border-border-subtle rounded-xl rounded-bl-sm px-4 py-3">
-              <div className="flex items-center gap-1.5">
-                <span className="size-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                <span className="size-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                <span className="size-2 bg-primary/40 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
-              </div>
-            </div>
-          </div>
-        )}
-        <div ref={chatEndRef} />
-      </div>
-
-      {messages.length < 3 && (
-        <div className="px-3 pt-2 flex flex-wrap gap-1.5">
-          {PROMPT_CHIPS.map((chip) => (
-            <button
-              key={chip}
-              onClick={() => setChatInput(chip)}
-              className="px-2.5 py-1 rounded-full text-[11px] font-medium border border-border-subtle text-text-secondary hover:text-primary hover:border-primary bg-background-body transition-colors"
-            >
-              {chip}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="p-3 border-t border-border-subtle">
-        <div className="flex items-end gap-2">
-          <textarea
-            value={chatInput}
-            onChange={(e) => setChatInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && !e.shiftKey) {
-                e.preventDefault();
-                onSend();
-              }
-            }}
-            rows={1}
-            className="flex-1 rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary resize-none"
-            placeholder="Ask about this memo..."
-          />
-          <button
-            onClick={onSend}
-            disabled={!chatInput.trim() || sendingChat}
-            className="h-9 w-9 rounded-lg flex items-center justify-center text-white disabled:opacity-40 transition-opacity shrink-0"
-            style={{ backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[18px]">send</span>
-          </button>
-        </div>
-      </div>
-    </aside>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/*  Collapsed chat rail — vertical tab when chat is closed             */
-/* ------------------------------------------------------------------ */
-
-export function MemoChatCollapsed({ onOpen }: { onOpen: () => void }) {
-  return (
-    <aside className="w-12 bg-surface-card border-l border-border-subtle flex flex-col shrink-0">
-      <button
-        onClick={onOpen}
-        className="flex flex-col items-center justify-center gap-2 py-4 hover:bg-background-body transition-colors"
-        title="Open AI Analyst"
-      >
-        <div className="size-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
-          <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-        </div>
-        <span
-          className="text-[10px] font-medium text-text-muted"
-          style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
-        >
-          AI Analyst
-        </span>
-      </button>
-    </aside>
-  );
-}
+// MemoChat and MemoChatCollapsed moved to chat.tsx

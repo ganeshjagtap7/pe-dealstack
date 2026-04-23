@@ -30,6 +30,14 @@ export function CimTaskModal({
 
   const canComplete = file !== null || sampleId !== null;
 
+  // Legacy: when a sample deal is selected, the dropzone transforms to show
+  // a green check + sample name (onboarding-tasks.js cim hydrator).
+  const SAMPLE_NAMES: Record<string, string> = {
+    luktara: "Luktara Industries -- Specialty Chemicals CIM",
+    pinecrest: "Pinecrest Dermatology -- Healthcare Roll-up",
+  };
+  const sampleSelected = sampleId !== null && !file;
+
   const handleSelect = (e: ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     if (f) {
@@ -61,7 +69,7 @@ export function CimTaskModal({
       </p>
 
       <div
-        onClick={() => inputRef.current?.click()}
+        onClick={() => !sampleSelected && inputRef.current?.click()}
         onDragOver={(e) => {
           e.preventDefault();
           setDragOver(true);
@@ -69,25 +77,50 @@ export function CimTaskModal({
         onDragLeave={() => setDragOver(false)}
         onDrop={handleDrop}
         className={cn(
-          "border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-colors",
-          dragOver ? "border-primary bg-primary-light/30" : "border-border-subtle hover:border-primary",
+          "border-2 rounded-xl p-6 cursor-pointer transition-colors",
+          sampleSelected
+            ? "border-secondary/30 bg-secondary-light/10"
+            : "border-dashed",
+          !sampleSelected && (dragOver ? "border-primary bg-primary-light/30" : "border-border-subtle hover:border-primary"),
+          sampleSelected ? "text-left" : "text-center",
         )}
       >
-        <div
-          className="w-12 h-12 rounded-xl mx-auto flex items-center justify-center mb-3"
-          style={{ backgroundColor: "#003366" }}
-        >
-          <span className="material-symbols-outlined text-white text-[24px]">upload</span>
-        </div>
-        {file ? (
-          <>
-            <div className="text-[14px] font-semibold text-text-main">{file.name}</div>
-            <div className="text-[12px] text-text-muted mt-1">{formatFileSize(file.size)}</div>
-          </>
+        {sampleSelected ? (
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center flex-shrink-0">
+              <span
+                className="material-symbols-outlined text-secondary text-[20px]"
+                style={{ fontVariationSettings: "'FILL' 1" }}
+              >
+                check_circle
+              </span>
+            </div>
+            <div>
+              <div className="text-[13.5px] font-semibold text-text-main">
+                {SAMPLE_NAMES[sampleId!] ?? "Sample deal selected"}
+              </div>
+              <div className="text-[12px] text-text-muted">Demo data will be loaded into your workspace</div>
+            </div>
+          </div>
         ) : (
           <>
-            <div className="text-[14px] font-semibold text-text-main">Drop your CIM here</div>
-            <div className="text-[12px] text-text-muted mt-1">PDF · XLSX · DOCX · up to 50MB</div>
+            <div
+              className="w-12 h-12 rounded-xl mx-auto flex items-center justify-center mb-3"
+              style={{ backgroundColor: "#003366" }}
+            >
+              <span className="material-symbols-outlined text-white text-[24px]">upload</span>
+            </div>
+            {file ? (
+              <>
+                <div className="text-[14px] font-semibold text-text-main">{file.name}</div>
+                <div className="text-[12px] text-text-muted mt-1">{formatFileSize(file.size)}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-[14px] font-semibold text-text-main">Drop your CIM here</div>
+                <div className="text-[12px] text-text-muted mt-1">PDF · XLSX · DOCX · up to 50MB</div>
+              </>
+            )}
           </>
         )}
         <input

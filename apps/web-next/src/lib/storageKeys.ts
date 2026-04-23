@@ -9,4 +9,5 @@ export const STORAGE_KEYS = {
   userCache: "pe-user-cache",
   sidebarCollapsed: "pe-sidebar-collapsed",
   dealsView: "pe-deals-view",
+  dealCardMetrics: "pe-deal-card-metrics",
 } as const;

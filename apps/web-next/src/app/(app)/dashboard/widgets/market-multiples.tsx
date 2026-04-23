@@ -19,7 +19,7 @@ const SECTORS: Array<{ sector: string; evEbitda: string; evRevenue: string }> = 
 
 export function MarketMultiplesWidget() {
   return (
-    <WidgetShell title="Market Multiples" icon="insights">
+    <WidgetShell title="Market Multiples" icon="insert_chart">
       <div className="p-4">
         <p className="text-[11px] text-text-muted mb-3">As of {AS_OF} · Illustrative only</p>
         <div className="overflow-x-auto">

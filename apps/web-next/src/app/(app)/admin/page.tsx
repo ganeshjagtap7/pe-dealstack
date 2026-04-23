@@ -132,7 +132,12 @@ export default function AdminPage() {
     return d >= now && d <= weekFromNow;
   });
   const membersWithDeals = new Set<string>();
-  deals.forEach((d) => d.teamMembers?.forEach((tm) => membersWithDeals.add(tm.userId)));
+  deals.forEach((d) =>
+    d.teamMembers?.forEach((tm) => {
+      const uid = tm.user?.id || tm.userId;
+      if (uid) membersWithDeals.add(uid);
+    }),
+  );
   const assignedCount = membersWithDeals.size;
   const utilization =
     totalMembers > 0 ? Math.min(100, Math.round((assignedCount / totalMembers) * 100)) : 0;
@@ -265,7 +270,7 @@ export default function AdminPage() {
       {/* Main grid */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-2 space-y-6">
-          <ResourceAllocation members={teamMembers} tasks={tasks} />
+          <ResourceAllocation members={teamMembers} deals={deals} tasks={tasks} />
           <TaskTable
             tasks={tasks}
             externalFilter={externalTaskFilter}

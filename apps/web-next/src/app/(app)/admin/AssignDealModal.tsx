@@ -16,6 +16,7 @@ export function AssignDealModal({
   const [dealId, setDealId] = useState("");
   const [userId, setUserId] = useState("");
   const [role, setRole] = useState<"lead" | "analyst">("analyst");
+  const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export function AssignDealModal({
       setDealId("");
       setUserId("");
       setRole("analyst");
+      setNotes("");
     }
   }, [open]);
 
@@ -109,6 +111,16 @@ export function AssignDealModal({
             </label>
           ))}
         </div>
+      </div>
+      <div>
+        <label className={LABEL_CLS}>Notes (Optional)</label>
+        <textarea
+          rows={3}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Add any context or instructions..."
+          className={`${INPUT_CLS} resize-none`}
+        />
       </div>
     </Modal>
   );

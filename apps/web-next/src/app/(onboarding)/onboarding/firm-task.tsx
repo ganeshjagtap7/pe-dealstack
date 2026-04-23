@@ -1,6 +1,6 @@
 "use client";
 
-import { KeyboardEvent, useState } from "react";
+import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import { api } from "@/lib/api";
 import { TaskModalShell } from "./task-modal-shell";
@@ -251,6 +251,50 @@ function EnrichmentPanel({
   onViewReport: () => void;
   onUseProfile: () => void;
 }) {
+  // Phase 2 deep-research polling — ported from onboarding-tasks.js
+  // triggerEnrichment Phase 2 status section. Polls /onboarding/research-status
+  // every 5s for up to 90s.
+  const [phase2, setPhase2] = useState<"polling" | "complete" | "timeout">("polling");
+  const [phase2Count, setPhase2Count] = useState(0);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollCountRef = useRef(0);
+
+  const stopPhase2 = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  // Start polling when entering "done" state (enrichment succeeded)
+  useEffect(() => {
+    if (state !== "done") return;
+    if (pollRef.current) return;
+    pollCountRef.current = 0;
+    pollRef.current = setInterval(async () => {
+      pollCountRef.current++;
+      // Safety timeout after 90s (18 polls at 5s)
+      if (pollCountRef.current > 18) {
+        stopPhase2();
+        setPhase2("timeout");
+        return;
+      }
+      try {
+        const data = await api.get<{ phase?: number; status?: string; newInsightsCount?: number }>(
+          "/onboarding/research-status",
+        );
+        if (data.phase === 2 && data.status === "complete") {
+          stopPhase2();
+          setPhase2("complete");
+          if (data.newInsightsCount) setPhase2Count(data.newInsightsCount);
+        }
+      } catch {
+        // Silent polling
+      }
+    }, 5000);
+    return () => stopPhase2();
+  }, [state, stopPhase2]);
+
   if (state === "loading") {
     return (
       <div className="mb-4 p-3 rounded-lg bg-primary-light/40 flex items-center gap-2 text-[12px] text-primary font-medium">
@@ -322,6 +366,38 @@ function EnrichmentPanel({
           <div>
             <span className="text-text-muted">You:</span> {person.title}
             {person.bio && <> — {person.bio.slice(0, 80)}</>}
+          </div>
+        )}
+      </div>
+      {/* Phase 2 deep research status */}
+      <div className="mt-2 pt-2 border-t border-secondary/20">
+        {phase2 === "polling" && (
+          <div className="flex items-center gap-2 text-[11px] text-primary font-medium">
+            <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            Researching deeper — following leads, checking press, social...
+          </div>
+        )}
+        {phase2 === "complete" && (
+          <div className="flex items-center gap-2 text-[11px] text-secondary font-semibold">
+            <span
+              className="material-symbols-outlined text-[14px]"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              auto_awesome
+            </span>
+            Deep research complete
+            {phase2Count > 0 && <> — {phase2Count} additional insight{phase2Count > 1 ? "s" : ""} found and saved</>}
+          </div>
+        )}
+        {phase2 === "timeout" && (
+          <div className="flex items-center gap-2 text-[11px] text-secondary font-medium">
+            <span
+              className="material-symbols-outlined text-[14px]"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              check_circle
+            </span>
+            Deep research saved — more insights will appear in your dashboard.
           </div>
         )}
       </div>

@@ -1,12 +1,21 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, type DragEvent } from "react";
 import { formatCurrency, formatRelativeTime, getDocIcon } from "@/lib/formatters";
-import { STAGES, STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
+import {
+  STAGES,
+  STAGE_STYLES,
+  STAGE_LABELS,
+  METRIC_CONFIG,
+  DEFAULT_CARD_METRICS,
+  ALL_METRIC_KEYS,
+  type MetricKey,
+} from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { Deal } from "@/types";
+import { api } from "@/lib/api";
 
 // ---------------------------------------------------------------------------
 // Filter Dropdown (reusable popover)
@@ -178,11 +187,15 @@ export function DealCard({
   selected,
   onToggleSelect,
   onDelete,
+  activeMetrics,
+  onRemoveSample,
 }: {
   deal: Deal;
   selected: boolean;
   onToggleSelect: (id: string) => void;
   onDelete: (id: string, name: string) => void;
+  activeMetrics: MetricKey[];
+  onRemoveSample?: (id: string) => void;
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -276,6 +289,18 @@ export function DealCard({
         )}
       </div>
 
+      {/* Remove Sample button (for sample deals) */}
+      {deal.tags?.includes("sample") && onRemoveSample && (
+        <button
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); onRemoveSample(deal.id); }}
+          className="absolute top-2 right-2 z-10 px-2 py-1 rounded-md bg-white border border-slate-200 text-slate-400 hover:text-red-500 hover:border-red-200 text-[10px] font-medium transition-colors shadow-sm"
+          title="Remove sample deal"
+        >
+          <span className="material-symbols-outlined text-[14px] align-middle">close</span>{" "}
+          Remove Sample
+        </button>
+      )}
+
       <article
         onClick={() => router.push(`/deals/${deal.id}`)}
         onMouseEnter={() => router.prefetch(`/deals/${deal.id}`)}
@@ -302,62 +327,51 @@ export function DealCard({
                 </p>
               </div>
             </div>
-            <span
-              className={cn(
-                "px-2 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wider mr-8",
-                style.bg,
-                style.border,
-                style.text
+            <div className="flex items-center gap-1 mr-8 shrink-0">
+              <span
+                className={cn(
+                  "px-2 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap leading-none",
+                  style.bg,
+                  style.border,
+                  style.text
+                )}
+              >
+                {STAGE_LABELS[deal.stage] || deal.stage}
+              </span>
+              {deal.tags?.includes("sample") && (
+                <span className="px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-wider">
+                  Sample
+                </span>
               )}
-            >
-              {STAGE_LABELS[deal.stage] || deal.stage}
-            </span>
+            </div>
           </div>
 
-          {/* Metrics — matches apps/web/crm-cards.js METRIC_CONFIG default set */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                IRR (Proj)
-              </span>
-              <span className="text-text-main font-bold text-lg">
-                {deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "N/A"}
-              </span>
-            </div>
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                MoM
-              </span>
-              <span
-                className={cn(
-                  "font-bold text-lg",
-                  deal.mom != null && deal.mom >= 3 ? "text-green-600" : "text-text-main",
-                )}
-              >
-                {deal.mom != null ? deal.mom.toFixed(1) + "x" : "N/A"}
-              </span>
-            </div>
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                EBITDA
-              </span>
-              <span
-                className={cn(
-                  "font-bold text-lg",
-                  deal.ebitda != null && deal.ebitda < 0 ? "text-red-600" : "text-text-main",
-                )}
-              >
-                {formatCurrency(deal.ebitda, deal.currency)}
-              </span>
-            </div>
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                Revenue
-              </span>
-              <span className="text-text-main font-bold text-lg">
-                {formatCurrency(deal.revenue, deal.currency)}
-              </span>
-            </div>
+          {/* Dynamic Metrics Grid */}
+          <div className={cn("grid gap-3 mb-4", activeMetrics.length >= 5 ? "grid-cols-3" : "grid-cols-2")}>
+            {activeMetrics.map((key) => {
+              const cfg = METRIC_CONFIG[key];
+              if (!cfg) return null;
+              const value = deal[key as keyof Deal] as number | undefined | null;
+              return (
+                <div key={key} className="bg-gray-50 rounded-md p-3">
+                  <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
+                    {cfg.label}
+                  </span>
+                  <span className={cn(
+                    "font-bold text-lg",
+                    key === "mom" && value != null && value >= 3 ? "text-green-600" : "",
+                    key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
+                    !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
+                  )}>
+                    {key === "irrProjected"
+                      ? (value != null ? Number(value).toFixed(1) + "%" : "N/A")
+                      : key === "mom"
+                        ? (value != null ? Number(value).toFixed(1) + "x" : "N/A")
+                        : formatCurrency(value as number | null | undefined, deal.currency)}
+                  </span>
+                </div>
+              );
+            })}
           </div>
 
           {/* AI Thesis */}
@@ -416,12 +430,35 @@ export function DealCard({
 }
 
 // ---------------------------------------------------------------------------
-// Kanban Card (Compact)
+// Kanban Card (Compact) with drag-and-drop support
 // ---------------------------------------------------------------------------
-export function KanbanCard({ deal }: { deal: Deal }) {
+export function KanbanCard({
+  deal,
+  activeMetrics,
+  onDragStart,
+}: {
+  deal: Deal;
+  activeMetrics: MetricKey[];
+  onDragStart?: (e: DragEvent<HTMLDivElement>, dealId: string) => void;
+}) {
   const hasRiskFlag = (deal.ebitda ?? 0) < 0 || deal.stage === "PASSED";
+  const kanbanMetrics = activeMetrics.slice(0, 3);
+
   return (
-    <div className="bg-white rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-[#B3C2D1] transition-all">
+    <div
+      className="kanban-card bg-white rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-[#B3C2D1] transition-all cursor-grab active:cursor-grabbing"
+      draggable
+      data-deal-id={deal.id}
+      onDragStart={(e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", deal.id);
+        (e.target as HTMLDivElement).style.opacity = "0.5";
+        onDragStart?.(e, deal.id);
+      }}
+      onDragEnd={(e) => {
+        (e.target as HTMLDivElement).style.opacity = "1";
+      }}
+    >
       <Link href={`/deals/${deal.id}`} className="block">
         <div className="flex items-start gap-2 mb-2">
           <div className="size-8 rounded-md bg-blue-50 border border-blue-200 flex items-center justify-center text-[#003366] shrink-0">
@@ -438,37 +475,30 @@ export function KanbanCard({ deal }: { deal: Deal }) {
             </p>
           </div>
         </div>
-        {/* Compact metrics — first 3 of default set (IRR, MoM, EBITDA), matches
-            kanban rendering in apps/web/crm-cards.js */}
+        {/* Dynamic compact metrics (first 3) */}
         <div className="flex gap-2 mb-2">
-          <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
-            <span className="text-[9px] text-text-muted font-medium uppercase block">IRR</span>
-            <span className="text-xs font-bold text-text-main">
-              {deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "N/A"}
-            </span>
-          </div>
-          <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
-            <span className="text-[9px] text-text-muted font-medium uppercase block">MoM</span>
-            <span
-              className={cn(
-                "text-xs font-bold",
-                deal.mom != null && deal.mom >= 3 ? "text-green-600" : "text-text-main",
-              )}
-            >
-              {deal.mom != null ? deal.mom.toFixed(1) + "x" : "N/A"}
-            </span>
-          </div>
-          <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
-            <span className="text-[9px] text-text-muted font-medium uppercase block">EBITDA</span>
-            <span
-              className={cn(
-                "text-xs font-bold",
-                deal.ebitda != null && deal.ebitda < 0 ? "text-red-600" : "text-text-main",
-              )}
-            >
-              {formatCurrency(deal.ebitda, deal.currency)}
-            </span>
-          </div>
+          {kanbanMetrics.map((key) => {
+            const cfg = METRIC_CONFIG[key];
+            if (!cfg) return null;
+            const value = deal[key as keyof Deal] as number | undefined | null;
+            return (
+              <div key={key} className="flex-1 bg-gray-50 rounded px-2 py-1.5">
+                <span className="text-[9px] text-text-muted font-medium uppercase block">{cfg.kanbanLabel}</span>
+                <span className={cn(
+                  "text-xs font-bold",
+                  key === "mom" && value != null && value >= 3 ? "text-green-600" : "",
+                  key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
+                  !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
+                )}>
+                  {key === "irrProjected"
+                    ? (value != null ? Number(value).toFixed(1) + "%" : "N/A")
+                    : key === "mom"
+                      ? (value != null ? Number(value).toFixed(1) + "x" : "N/A")
+                      : formatCurrency(value as number | null | undefined, deal.currency)}
+                </span>
+              </div>
+            );
+          })}
         </div>
         {deal.aiThesis && (
           <div className="flex items-start gap-1.5 pt-2 border-t border-border-subtle">
@@ -487,5 +517,122 @@ export function KanbanCard({ deal }: { deal: Deal }) {
         )}
       </Link>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Customize Metrics Dropdown
+// ---------------------------------------------------------------------------
+export function MetricsDropdown({
+  activeMetrics,
+  onApply,
+}: {
+  activeMetrics: MetricKey[];
+  onApply: (metrics: MetricKey[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [checked, setChecked] = useState<Set<MetricKey>>(new Set(activeMetrics));
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Sync local checked state when activeMetrics prop changes
+  useEffect(() => {
+    setChecked(new Set(activeMetrics));
+  }, [activeMetrics]);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const toggle = (key: MetricKey) => {
+    setChecked((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => { setOpen((o) => !o); if (!open) setChecked(new Set(activeMetrics)); }}
+        className="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-blue-50 transition-all"
+        title="Customize Metrics"
+      >
+        <span className="material-symbols-outlined text-text-muted text-[18px]">tune</span>
+        <span className="text-text-secondary text-sm font-medium hidden lg:block">Metrics</span>
+      </button>
+      {open && (
+        <div className="absolute top-full right-0 mt-2 bg-white border border-border-subtle rounded-lg shadow-lg z-50 min-w-[220px] py-2">
+          <div className="px-4 py-2 border-b border-border-subtle">
+            <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Visible Metrics</p>
+          </div>
+          <div className="py-1">
+            {ALL_METRIC_KEYS.map((key) => (
+              <label
+                key={key}
+                className="flex items-center gap-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+              >
+                <input
+                  type="checkbox"
+                  className="size-4 rounded border-gray-300 text-[#003366] focus:ring-[#003366]"
+                  checked={checked.has(key)}
+                  onChange={() => toggle(key)}
+                />
+                <span className="text-sm text-text-main font-medium">{METRIC_CONFIG[key].label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="border-t border-border-subtle px-4 py-2 flex items-center justify-between">
+            <button
+              onClick={() => setChecked(new Set(DEFAULT_CARD_METRICS))}
+              className="text-xs text-text-muted hover:text-[#003366] transition-colors"
+            >
+              Reset
+            </button>
+            <button
+              onClick={() => {
+                const arr = ALL_METRIC_KEYS.filter((k) => checked.has(k));
+                if (arr.length === 0) return; // Must have at least one
+                onApply(arr);
+                setOpen(false);
+              }}
+              className="text-xs font-medium text-white px-3 py-1 rounded-md hover:opacity-90 transition-colors"
+              style={{ backgroundColor: "#003366" }}
+            >
+              Apply
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Upload Card (shown at end of deals grid)
+// ---------------------------------------------------------------------------
+export function UploadCard({ onClick }: { onClick?: () => void }) {
+  return (
+    <article
+      onClick={onClick}
+      className="bg-white/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-[#003366] hover:bg-blue-50/30 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4"
+    >
+      <div className="size-14 rounded-full bg-white border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-[#003366]/30 transition-all shadow-sm">
+        <span className="material-symbols-outlined text-text-muted group-hover:text-[#003366] text-2xl">add</span>
+      </div>
+      <div>
+        <h3 className="text-text-main font-bold text-base group-hover:text-[#003366] transition-colors">
+          Upload Documents
+        </h3>
+        <p className="text-text-muted text-sm mt-1 max-w-[180px]">
+          Drop CIMs, Teasers, or Excel models
+        </p>
+      </div>
+    </article>
   );
 }

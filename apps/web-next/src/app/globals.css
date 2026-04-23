@@ -72,6 +72,17 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes checkmark {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
 .welcome-fade-in {
   animation: welcomeFadeInUp 0.3s ease-out;
 }
@@ -113,3 +124,37 @@ body {
   color: #991b1b;
   font-weight: 600;
 }
+
+/* Document canvas — embedded table typography (AI-generated content) */
+.memo-section-content table {
+  font-size: 12.5px;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+.memo-section-content th {
+  background-color: #f0f4f8;
+  color: #003366;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+.memo-section-content td {
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+.memo-section-content tr:nth-child(even) td {
+  background-color: #fafafa;
+}
+
+/* Chat markdown inside AI Analyst panel */
+.chat-markdown p { margin-bottom: 0.25rem; }
+.chat-markdown ul, .chat-markdown ol {
+  margin: 0.25rem 0 0.5rem 1.25rem;
+}
+.chat-markdown li { margin-bottom: 0.15rem; }
