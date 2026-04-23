@@ -2,6 +2,7 @@
 export default {
   content: [
     "./*.html",
+    "./*.js",
     "./js/**/*.js",
     "./src/**/*.{js,ts,jsx,tsx}",
   ],
@@ -27,6 +28,7 @@ export default {
         'text-main': '#111827',
         'text-secondary': '#4B5563',
         'text-muted': '#9CA3AF',
+        'navy-custom': '#0f1c2e',
       },
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
