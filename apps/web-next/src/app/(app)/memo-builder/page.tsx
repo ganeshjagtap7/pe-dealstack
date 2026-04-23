@@ -334,6 +334,24 @@ export default function MemoBuilderPage() {
   };
 
   /* ---- Chat ---- */
+  //
+  // Agent responses can now carry an "action" field (e788eb3 + b609ebd on
+  // main): 'applied' means the agent added, removed, or regenerated a
+  // section server-side. When we see it, reload the memo so the new state
+  // is visible in the editor — matches the refreshSection/full-reload
+  // behavior in apps/web/memo-chat.js without porting all the confirm/undo
+  // UI that web-next doesn't have yet.
+  type MemoChatResponse = {
+    role?: string;
+    content: string;
+    timestamp?: string;
+    action?: string;
+    sectionId?: string;
+    type?: string;
+    sectionType?: string;
+    title?: string;
+  };
+
   const sendMessage = async () => {
     if (!chatInput.trim() || !selectedMemo) return;
     const content = chatInput.trim();
@@ -349,7 +367,7 @@ export default function MemoBuilderPage() {
     setSendingChat(true);
 
     try {
-      const res = await api.post<{ role: string; content: string; timestamp?: string }>(`/memos/${selectedMemo.id}/chat`, { content });
+      const res = await api.post<MemoChatResponse>(`/memos/${selectedMemo.id}/chat`, { content });
       const aiMsg: ChatMessage = {
         id: "a-" + Date.now(),
         role: "assistant",
@@ -357,6 +375,15 @@ export default function MemoBuilderPage() {
         timestamp: res.timestamp ? formatRelativeTime(res.timestamp) : "Now",
       };
       setMessages((prev) => [...prev, aiMsg]);
+
+      if (res.action === "applied" && selectedMemo) {
+        await loadMemo(selectedMemo.id);
+        if (res.type === "new_section" && res.title) {
+          setSuccessToast(`Section "${res.title}" added.`);
+        } else if (res.type === "remove_section") {
+          setSuccessToast("Section removed.");
+        }
+      }
     } catch {
       setMessages((prev) => [
         ...prev,
