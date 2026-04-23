@@ -2,7 +2,7 @@ let appPromise: Promise<any> | null = null;
 
 function getApp() {
   if (!appPromise) {
-    appPromise = import('../apps/api/dist/app-lite.js').then(m => m.default);
+    appPromise = import('../apps/api/dist/app-ai.js').then(m => m.default);
   }
   return appPromise;
 }
@@ -15,7 +15,7 @@ export default async function handler(req: any, res: any) {
     res.statusCode = 500;
     res.setHeader('Content-Type', 'application/json');
     res.end(JSON.stringify({
-      error: 'Function initialization failed',
+      error: 'AI function initialization failed',
       message: error.message,
     }));
   }
