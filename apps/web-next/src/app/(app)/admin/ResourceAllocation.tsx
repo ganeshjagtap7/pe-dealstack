@@ -50,13 +50,14 @@ export function ResourceAllocation({ members, tasks }: Props) {
         if (cancelled) return;
         if (dealNamesByMember[member.id]?.loaded) continue;
         try {
-          const deals = await api.get<Array<{ name?: string; dealName?: string }>>(
-            `/users/${member.id}/deals`,
-          );
+          // API returns DealTeamMember rows with nested { Deal: { name } }; also handle
+          // flattened shapes from older deploys.
+          type DealLike = { name?: string; dealName?: string; Deal?: { name?: string } };
+          const deals = await api.get<DealLike[]>(`/users/${member.id}/deals`);
           if (cancelled) return;
           const names = (Array.isArray(deals) ? deals : [])
             .slice(0, 3)
-            .map((d) => d.name || d.dealName || "Unknown");
+            .map((d) => d.Deal?.name || d.name || d.dealName || "Unknown");
           setDealNamesByMember((prev) => ({ ...prev, [member.id]: { names, loaded: true } }));
         } catch {
           // A single member's deals failure shouldn't blow up the whole panel
