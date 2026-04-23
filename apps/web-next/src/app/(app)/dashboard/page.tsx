@@ -358,15 +358,31 @@ export default function DashboardPage() {
           </div>
         )}
 
-        {/* Customize button — always visible, rendered below widgets */}
-        <div className="flex justify-center">
+        {/* Two separate actions, matching legacy dashboard.html#add-widget-btn
+            + #widget-settings-btn. "Add Widget" toggles widget visibility via
+            the picker modal (functional). "Customize Dashboard" is the legacy
+            drag-and-drop layout editor, which hasn't been ported yet — kept
+            visible + disabled so users see where reordering will live. */}
+        <div className="flex flex-col md:flex-row gap-3">
           <button
             type="button"
             onClick={() => setCustomizeOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-dashed border-border-subtle px-4 py-3 text-sm font-medium text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50"
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle px-4 py-4 text-sm font-medium text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span>
+            Add Widget
+          </button>
+          <button
+            type="button"
+            disabled
+            title="Drag-and-drop reordering — coming soon"
+            className="hidden md:flex flex-1 items-center justify-center gap-2 rounded-lg border border-border-subtle px-4 py-4 text-sm font-medium text-text-muted bg-surface-card/50 opacity-60 cursor-not-allowed"
           >
             <span className="material-symbols-outlined text-[18px]">tune</span>
             Customize Dashboard
+            <span className="ml-1 text-[10px] font-bold uppercase tracking-wide text-text-muted/70">
+              Soon
+            </span>
           </button>
         </div>
       </div>
