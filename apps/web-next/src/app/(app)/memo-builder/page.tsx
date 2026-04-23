@@ -21,7 +21,7 @@ import {
   CreateMemoModal,
   AddSectionModal,
 } from "./components";
-import { exportMemoPDF } from "./export";
+import { exportMemoPDF, exportMemoMarkdown, exportMemoClipboard, shareMemoLink } from "./export";
 
 export default function MemoBuilderPage() {
   /* ---- State ---- */
@@ -54,6 +54,9 @@ export default function MemoBuilderPage() {
   const [pendingDeleteSection, setPendingDeleteSection] = useState<{ id: string; title: string } | null>(null);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successToast, setSuccessToast] = useState<string | null>(null);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const exportMenuRef = useRef<HTMLDivElement>(null);
 
   /* ---- Data loading ---- */
   const loadMemos = useCallback(async () => {
@@ -266,14 +269,67 @@ export default function MemoBuilderPage() {
     }
   };
 
-  /* ---- PDF Export ---- */
+  /* ---- Export + Share ---- */
+
+  // Auto-dismiss success toasts after 3s
+  useEffect(() => {
+    if (!successToast) return;
+    const t = setTimeout(() => setSuccessToast(null), 3000);
+    return () => clearTimeout(t);
+  }, [successToast]);
+
+  // Close export menu on outside click
+  useEffect(() => {
+    if (!exportMenuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (exportMenuRef.current && !exportMenuRef.current.contains(e.target as Node)) {
+        setExportMenuOpen(false);
+      }
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [exportMenuOpen]);
 
   const handleExportPDF = async () => {
     if (!selectedMemo || sections.length === 0) return;
+    setExportMenuOpen(false);
     try {
       await exportMemoPDF(selectedMemo, sections, editingContent);
+      setSuccessToast("Memo exported as PDF.");
     } catch (err) {
-      console.error("PDF export failed:", err);
+      setError(err instanceof Error ? err.message : "PDF export failed");
+    }
+  };
+
+  const handleExportMarkdown = () => {
+    if (!selectedMemo || sections.length === 0) return;
+    setExportMenuOpen(false);
+    try {
+      exportMemoMarkdown(selectedMemo, sections, editingContent);
+      setSuccessToast("Memo exported as Markdown.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Markdown export failed");
+    }
+  };
+
+  const handleExportClipboard = async () => {
+    if (!selectedMemo || sections.length === 0) return;
+    setExportMenuOpen(false);
+    try {
+      await exportMemoClipboard(sections, editingContent);
+      setSuccessToast("Memo content copied to clipboard.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Copy failed");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!selectedMemo) return;
+    try {
+      await shareMemoLink();
+      setSuccessToast(`Share link for "${selectedMemo.projectName || selectedMemo.title}" copied.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Share failed");
     }
   };
 
@@ -403,13 +459,59 @@ export default function MemoBuilderPage() {
                         {generatingAll ? "Generating..." : "Generate All"}
                       </button>
                       <button
-                        onClick={handleExportPDF}
-                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-bold text-white transition-colors"
-                        style={{ backgroundColor: "#003366" }}
+                        onClick={handleShare}
+                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium border border-border-subtle text-text-secondary hover:text-primary hover:border-primary transition-colors"
+                        title="Copy share link"
                       >
-                        <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
-                        Export PDF
+                        <span className="material-symbols-outlined text-[14px]">share</span>
+                        Share
                       </button>
+                      <div className="relative" ref={exportMenuRef}>
+                        <div className="flex items-center rounded-lg overflow-visible" style={{ backgroundColor: "#003366" }}>
+                          <button
+                            onClick={handleExportPDF}
+                            className="h-8 px-3 flex items-center gap-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity rounded-l-lg"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
+                            Export PDF
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setExportMenuOpen((v) => !v);
+                            }}
+                            className="h-8 px-1.5 flex items-center text-white hover:opacity-90 transition-opacity rounded-r-lg border-l border-white/20"
+                            aria-label="Export options"
+                          >
+                            <span className="material-symbols-outlined text-[18px]">arrow_drop_down</span>
+                          </button>
+                        </div>
+                        {exportMenuOpen && (
+                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+                            <button
+                              onClick={handleExportPDF}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
+                            >
+                              <span className="material-symbols-outlined text-[18px] text-red-500">picture_as_pdf</span>
+                              Export as PDF
+                            </button>
+                            <button
+                              onClick={handleExportMarkdown}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
+                            >
+                              <span className="material-symbols-outlined text-[18px] text-text-muted">code</span>
+                              Export as Markdown
+                            </button>
+                            <button
+                              onClick={handleExportClipboard}
+                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
+                            >
+                              <span className="material-symbols-outlined text-[18px] text-blue-500">content_copy</span>
+                              Copy to Clipboard
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -445,6 +547,19 @@ export default function MemoBuilderPage() {
           </>
         )}
       </div>
+
+      {/* ---- Success toast ---- */}
+      {successToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm bg-emerald-50 border border-emerald-200 rounded-lg shadow-lg px-4 py-3 flex items-start gap-3">
+          <span className="material-symbols-outlined text-emerald-600 text-[20px] mt-0.5">check_circle</span>
+          <div className="flex-1">
+            <p className="text-sm text-emerald-800">{successToast}</p>
+          </div>
+          <button onClick={() => setSuccessToast(null)} className="text-emerald-400 hover:text-emerald-600">
+            <span className="material-symbols-outlined text-[16px]">close</span>
+          </button>
+        </div>
+      )}
 
       {/* ---- Error toast ---- */}
       {error && (
