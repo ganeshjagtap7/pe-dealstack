@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, Suspense } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/layout/Logo";
 import Link from "next/link";
@@ -12,6 +12,14 @@ const RESEND_COOLDOWN = 60;
 type PageState = "loading" | "code-entry" | "success" | "error";
 
 export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><span className="material-symbols-rounded animate-spin text-3xl text-primary">progress_activity</span></div>}>
+      <VerifyEmailContent />
+    </Suspense>
+  );
+}
+
+function VerifyEmailContent() {
   const searchParams = useSearchParams();
 
   const [pageState, setPageState] = useState<PageState>("loading");
