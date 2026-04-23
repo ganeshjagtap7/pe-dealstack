@@ -38,10 +38,22 @@ function getCachedUser() {
 
 function cacheUserData(userData) {
     try {
+        userData._cachedAt = Date.now();
         sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
     } catch (e) {
         // Storage full or unavailable — not critical
     }
+}
+
+function isCacheFresh() {
+    try {
+        const cached = sessionStorage.getItem(USER_CACHE_KEY);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            return parsed._cachedAt && (Date.now() - parsed._cachedAt) < 120000;
+        }
+    } catch (e) {}
+    return false;
 }
 
 // User data — immediately use cache if available, otherwise show Loading...
@@ -57,6 +69,15 @@ let USER = cachedUser || {
 
 // Load user data from API (and refresh cache)
 async function loadUserData() {
+    // If cache is fresh (< 2 min old), skip the API call
+    if (isCacheFresh() && cachedUser && cachedUser.name && cachedUser.name !== 'Loading...') {
+        USER = cachedUser;
+        updateUserDisplay();
+        updateSidebarForRole();
+        window.dispatchEvent(new CustomEvent('pe-user-loaded', { detail: { user: USER } }));
+        return;
+    }
+
     try {
         if (typeof PEAuth !== 'undefined' && PEAuth.authFetch) {
             const response = await PEAuth.authFetch(`${API_BASE_URL}/users/me`);
