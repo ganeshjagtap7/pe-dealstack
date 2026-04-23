@@ -153,9 +153,10 @@ The existing audit.ts / vite.config.ts edits on `frontend/dev` are already done 
 
 ```
 Tier 1  [x] 1  Login redesign                     0458328
-        [ ] 2  VDR button color
-        [ ] 3  Dashboard CSS fixes
+        [x] 2  VDR button color                   d5abe19
+        [=] 3  Dashboard CSS fixes                 folds into #4 — fixes the 12-widget layout
 Tier 2  [ ] 4  Dashboard 12-widget + drag-drop     (large — 21 files, 1803 LoC, new API endpoints)
+                                                   includes Tier 1 #3 CSS fixes (d931fbe, 09c59c7, dcf164a, 8e259aa)
         [=] 5  Deal page dropdown + Excel + avatar N/A — verified, see notes below
         [x] 6  Chat suggestion chips               7ae4d61
         [x] 7  Intake tab + scroll-hash            23d81a5
@@ -164,7 +165,7 @@ Tier 3  [ ] 8a Memo PDF export + share
         [ ] 8c Memo section tools
         [ ] 8d Memo rate-limit
         [ ] 9  Help & Support modal
-        [ ] 10 Dashboard undefined-Deals fix
+        [ ] 10 Dashboard undefined-Deals fix       folds into #4 — "undefined Deals" is in the stats widget
 Tier 4  [ ] 11 Onboarding 3-step flow
         [ ] 12 Firm enrichment modal
 Tier 5  [ ] 13 Verify VDR parity
@@ -173,6 +174,15 @@ Tier 5  [ ] 13 Verify VDR parity
 ```
 
 ## Verification notes
+
+### Tier 1 #3 + Tier 3 #10 — fold into Tier 2 #4
+
+The 4 CSS layout commits (`d931fbe`, `09c59c7`, `dcf164a`, `8e259aa`) all
+refine the 12-widget grid shipped in `c9dcc6d`. The "undefined Deals" fix
+(`1000f52`) also lives inside one of the new widgets. Web-next doesn't
+have that grid yet, so these fixes have nothing to apply to in isolation.
+When Tier 2 #4 lands, port the fixes' behavior into the fresh TSX
+components directly — no need to re-create the buggy intermediate state.
 
 ### Tier 2 #5 — N/A (no port needed)
 
