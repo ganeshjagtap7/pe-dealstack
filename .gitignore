@@ -3,6 +3,7 @@ node_modules/
 .pnp
 .pnp.js
 .npm-cache/
+.npm-cache
 
 # Build outputs
 dist/

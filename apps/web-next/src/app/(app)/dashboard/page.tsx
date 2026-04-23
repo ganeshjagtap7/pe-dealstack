@@ -26,7 +26,9 @@ import {
   StageDetailModal,
 } from "./components";
 import { CustomizeDashboardModal } from "./widgets/customize-modal";
+import { DraggableWidget } from "./widgets/draggable-widget";
 import { useVisibleWidgets } from "./widgets/useVisibleWidgets";
+import type { WidgetId } from "./widgets/registry";
 
 export default function DashboardPage() {
   const { user } = useUser();
@@ -41,7 +43,9 @@ export default function DashboardPage() {
   const [sentimentLoading, setSentimentLoading] = useState(true);
   const [sentimentError, setSentimentError] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
-  const { visible, toggle, orderedVisible } = useVisibleWidgets();
+  const [layoutEditing, setLayoutEditing] = useState(false);
+  const [dragging, setDragging] = useState<WidgetId | null>(null);
+  const { visible, toggle, orderedVisible, reorder } = useVisibleWidgets();
 
   useEffect(() => {
     async function load() {
@@ -84,6 +88,16 @@ export default function DashboardPage() {
       }
     })();
   }, []);
+
+  // Esc exits layout edit mode — mirrors onKeyDown in layout-editor.js
+  useEffect(() => {
+    if (!layoutEditing) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setLayoutEditing(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [layoutEditing]);
 
   const [taskError, setTaskError] = useState<string | null>(null);
 
@@ -349,20 +363,53 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Edit-mode banner — matches #layout-edit-banner in
+            apps/web/js/widgets/layout-editor.js */}
+        {layoutEditing && (
+          <div
+            className="flex items-center gap-2.5 px-5 py-2.5 rounded-lg text-white text-sm font-semibold shadow-md"
+            style={{ background: "linear-gradient(90deg, #003366 0%, #004488 100%)" }}
+          >
+            <span className="material-symbols-outlined text-[18px]">drag_indicator</span>
+            <span>
+              Drag widgets by the handle to reorder. Click <strong>Done</strong> when finished.
+            </span>
+          </div>
+        )}
+
         {/* Optional widgets (user-customizable via Customize button below) */}
         {orderedVisible.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {orderedVisible.map((w) => (
-              <w.Component key={w.id} />
+              <DraggableWidget
+                key={w.id}
+                id={w.id}
+                editing={layoutEditing}
+                dragState={{ dragging }}
+                onDragStart={setDragging}
+                onDragEnter={(targetId) => {
+                  if (!dragging || dragging === targetId) return;
+                  const ids = orderedVisible.map((x) => x.id);
+                  const from = ids.indexOf(dragging);
+                  const to = ids.indexOf(targetId);
+                  if (from === -1 || to === -1) return;
+                  const next = [...ids];
+                  next.splice(from, 1);
+                  next.splice(to, 0, dragging);
+                  reorder(next);
+                }}
+                onDragEnd={() => setDragging(null)}
+              >
+                <w.Component />
+              </DraggableWidget>
             ))}
           </div>
         )}
 
         {/* Two separate actions, matching legacy dashboard.html#add-widget-btn
             + #widget-settings-btn. "Add Widget" toggles widget visibility via
-            the picker modal (functional). "Customize Dashboard" is the legacy
-            drag-and-drop layout editor, which hasn't been ported yet — kept
-            visible + disabled so users see where reordering will live. */}
+            the picker modal. "Customize Dashboard" toggles the drag-and-drop
+            layout editor — ports apps/web/js/widgets/layout-editor.js. */}
         <div className="flex flex-col md:flex-row gap-3">
           <button
             type="button"
@@ -374,15 +421,28 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
-            disabled
-            title="Drag-and-drop reordering — coming soon"
-            className="hidden md:flex flex-1 items-center justify-center gap-2 rounded-lg border border-border-subtle px-4 py-4 text-sm font-medium text-text-muted bg-surface-card/50 opacity-60 cursor-not-allowed"
+            onClick={() => setLayoutEditing((v) => !v)}
+            disabled={!layoutEditing && orderedVisible.length < 2}
+            title={
+              orderedVisible.length < 2
+                ? "Add at least two widgets to reorder"
+                : layoutEditing
+                  ? "Exit edit mode"
+                  : "Reorder widgets"
+            }
+            className={cn(
+              "hidden md:flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-4 text-sm font-medium transition-all",
+              layoutEditing
+                ? "text-white border-transparent"
+                : "text-text-muted border-border-subtle bg-surface-card/50 hover:border-primary hover:text-primary hover:bg-primary-light/50",
+              !layoutEditing && orderedVisible.length < 2 && "opacity-60 cursor-not-allowed",
+            )}
+            style={layoutEditing ? { backgroundColor: "#003366" } : undefined}
           >
-            <span className="material-symbols-outlined text-[18px]">tune</span>
-            Customize Dashboard
-            <span className="ml-1 text-[10px] font-bold uppercase tracking-wide text-text-muted/70">
-              Soon
+            <span className="material-symbols-outlined text-[18px]">
+              {layoutEditing ? "check" : "tune"}
             </span>
+            {layoutEditing ? "Done" : "Customize Dashboard"}
           </button>
         </div>
       </div>

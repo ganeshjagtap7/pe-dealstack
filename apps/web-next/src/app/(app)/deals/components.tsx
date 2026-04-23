@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { formatCurrency, formatRelativeTime } from "@/lib/formatters";
+import { formatCurrency, formatRelativeTime, getDocIcon } from "@/lib/formatters";
 import { STAGES, STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
@@ -314,22 +314,48 @@ export function DealCard({
             </span>
           </div>
 
-          {/* Metrics */}
+          {/* Metrics — matches apps/web/crm-cards.js METRIC_CONFIG default set */}
           <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-gray-50 rounded-md p-3">
+              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
+                IRR (Proj)
+              </span>
+              <span className="text-text-main font-bold text-lg">
+                {deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "N/A"}
+              </span>
+            </div>
+            <div className="bg-gray-50 rounded-md p-3">
+              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
+                MoM
+              </span>
+              <span
+                className={cn(
+                  "font-bold text-lg",
+                  deal.mom != null && deal.mom >= 3 ? "text-green-600" : "text-text-main",
+                )}
+              >
+                {deal.mom != null ? deal.mom.toFixed(1) + "x" : "N/A"}
+              </span>
+            </div>
+            <div className="bg-gray-50 rounded-md p-3">
+              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
+                EBITDA
+              </span>
+              <span
+                className={cn(
+                  "font-bold text-lg",
+                  deal.ebitda != null && deal.ebitda < 0 ? "text-red-600" : "text-text-main",
+                )}
+              >
+                {formatCurrency(deal.ebitda, deal.currency)}
+              </span>
+            </div>
             <div className="bg-gray-50 rounded-md p-3">
               <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
                 Revenue
               </span>
               <span className="text-text-main font-bold text-lg">
                 {formatCurrency(deal.revenue, deal.currency)}
-              </span>
-            </div>
-            <div className="bg-gray-50 rounded-md p-3">
-              <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
-                Deal Size
-              </span>
-              <span className="text-text-main font-bold text-lg">
-                {formatCurrency(deal.dealSize, deal.currency)}
               </span>
             </div>
           </div>
@@ -361,17 +387,28 @@ export function DealCard({
 
           {/* Footer */}
           <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
-            <span className="text-[11px] text-text-muted font-medium">
-              {formatRelativeTime(deal.updatedAt)}
-            </span>
-            <Link
-              href={`/data-room?dealId=${deal.id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-1 text-[11px] text-text-muted hover:text-[#003366] transition-colors"
-            >
-              <span className="material-symbols-outlined text-[14px]">folder_open</span>
-              <span className="hidden sm:inline">VDR</span>
-            </Link>
+            <div className="flex items-center gap-1.5 text-text-muted min-w-0">
+              <span className="material-symbols-outlined text-[14px] shrink-0">
+                {getDocIcon(deal.lastDocument)}
+              </span>
+              <span className="text-[11px] font-medium truncate max-w-[100px]">
+                {deal.lastDocument || "No docs"}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Link
+                href={`/data-room?dealId=${deal.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1 text-[11px] text-text-muted hover:text-[#003366] transition-colors"
+                title="Open Data Room"
+              >
+                <span className="material-symbols-outlined text-[14px]">folder_open</span>
+                <span className="hidden sm:inline">VDR</span>
+              </Link>
+              <span className="text-[11px] text-text-muted font-medium">
+                {formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}
+              </span>
+            </div>
           </div>
       </article>
     </div>
@@ -401,17 +438,35 @@ export function KanbanCard({ deal }: { deal: Deal }) {
             </p>
           </div>
         </div>
-        <div className="flex gap-3 mb-2">
+        {/* Compact metrics — first 3 of default set (IRR, MoM, EBITDA), matches
+            kanban rendering in apps/web/crm-cards.js */}
+        <div className="flex gap-2 mb-2">
           <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
-            <span className="text-[9px] text-text-muted font-medium uppercase block">Revenue</span>
+            <span className="text-[9px] text-text-muted font-medium uppercase block">IRR</span>
             <span className="text-xs font-bold text-text-main">
-              {formatCurrency(deal.revenue, deal.currency)}
+              {deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "N/A"}
             </span>
           </div>
           <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
-            <span className="text-[9px] text-text-muted font-medium uppercase block">Deal Size</span>
-            <span className="text-xs font-bold text-text-main">
-              {formatCurrency(deal.dealSize, deal.currency)}
+            <span className="text-[9px] text-text-muted font-medium uppercase block">MoM</span>
+            <span
+              className={cn(
+                "text-xs font-bold",
+                deal.mom != null && deal.mom >= 3 ? "text-green-600" : "text-text-main",
+              )}
+            >
+              {deal.mom != null ? deal.mom.toFixed(1) + "x" : "N/A"}
+            </span>
+          </div>
+          <div className="flex-1 bg-gray-50 rounded px-2 py-1.5">
+            <span className="text-[9px] text-text-muted font-medium uppercase block">EBITDA</span>
+            <span
+              className={cn(
+                "text-xs font-bold",
+                deal.ebitda != null && deal.ebitda < 0 ? "text-red-600" : "text-text-main",
+              )}
+            >
+              {formatCurrency(deal.ebitda, deal.currency)}
             </span>
           </div>
         </div>

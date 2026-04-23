@@ -198,10 +198,11 @@ export function MemoListSidebar({
   );
 }
 
-// MemoEditor and MemoChat are in editor.tsx to keep this file under 500 lines
-export { MemoEditor } from "./editor";
+// MemoEditor, MemoChat, and MemoChatCollapsed live in editor.tsx.
+// MemoOutlineSidebar (document outline + template/compliance cards) in outline-sidebar.tsx.
+export { MemoEditor, MemoChat, MemoChatCollapsed } from "./editor";
 export type { MemoEditorProps } from "./editor";
-export { MemoChat } from "./editor";
+export { MemoOutlineSidebar } from "./outline-sidebar";
 
 /* ------------------------------------------------------------------ */
 /*  CreateMemoModal                                                    */

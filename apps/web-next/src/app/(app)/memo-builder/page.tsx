@@ -1,9 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
-import { cn } from "@/lib/cn";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 
@@ -13,15 +13,17 @@ import {
   ChatMessage,
   DealOption,
   TemplateOption,
-  STATUS_STYLES,
   SECTION_TYPES,
   MemoListSidebar,
+  MemoOutlineSidebar,
   MemoEditor,
   MemoChat,
+  MemoChatCollapsed,
   CreateMemoModal,
   AddSectionModal,
 } from "./components";
 import { exportMemoPDF, exportMemoMarkdown, exportMemoClipboard, shareMemoLink } from "./export";
+import { DocumentHeaderBar } from "./header-bar";
 
 export default function MemoBuilderPage() {
   /* ---- State ---- */
@@ -412,8 +414,34 @@ export default function MemoBuilderPage() {
         filteredMemos={filteredMemos}
       />
 
-      {/* ---- Right: editor + chat ---- */}
-      <div className="flex-1 flex overflow-hidden min-w-0">
+      {/* ---- Main column: breadcrumb + header + workspace ---- */}
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        {/* Breadcrumb bar */}
+        <div className="flex items-center h-10 px-6 border-b border-border-subtle bg-background-body/60 text-sm shrink-0">
+          <nav className="flex items-center gap-1.5">
+            <button
+              onClick={() => setSelectedMemo(null)}
+              className="flex items-center justify-center size-7 rounded-md hover:bg-primary-light text-text-muted hover:text-primary transition-colors mr-1"
+              title="Back to memo list"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </button>
+            <Link href="/dashboard" className="text-text-muted hover:text-primary transition-colors">
+              Dashboard
+            </Link>
+            <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
+            <span className="text-text-muted">AI Reports</span>
+            {selectedMemo && (
+              <>
+                <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
+                <span className="text-text-main font-medium">
+                  {selectedMemo.projectName || selectedMemo.title}
+                </span>
+              </>
+            )}
+          </nav>
+        </div>
+
         {!selectedMemo ? (
           /* Empty state */
           <div className="flex-1 flex items-center justify-center bg-background-body">
@@ -442,110 +470,30 @@ export default function MemoBuilderPage() {
           </div>
         ) : (
           <>
-            {/* Editor area */}
-            <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-              {/* Editor header */}
-              <div className="border-b border-border-subtle bg-surface-card px-6 py-3 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base font-bold text-text-main">{selectedMemo.projectName || selectedMemo.title}</h2>
-                  <p className="text-xs text-text-muted">{selectedMemo.title} &middot; {formatRelativeTime(selectedMemo.updatedAt)}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "px-2 py-1 rounded text-[11px] font-medium",
-                      (STATUS_STYLES[selectedMemo.status] || STATUS_STYLES.DRAFT).bg,
-                      (STATUS_STYLES[selectedMemo.status] || STATUS_STYLES.DRAFT).text
-                    )}
-                  >
-                    {selectedMemo.status}
-                  </span>
-                  <button
-                    onClick={() => setChatOpen(!chatOpen)}
-                    className={cn(
-                      "h-8 w-8 rounded-lg flex items-center justify-center transition-colors border",
-                      chatOpen ? "bg-primary text-white border-primary" : "bg-surface-card text-text-muted border-border-subtle hover:text-primary"
-                    )}
-                    title={chatOpen ? "Close AI chat" : "Open AI chat"}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">smart_toy</span>
-                  </button>
-                  {sections.length > 0 && (
-                    <>
-                      <button
-                        onClick={handleGenerateAll}
-                        disabled={generatingAll}
-                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium border border-border-subtle text-text-secondary hover:text-primary hover:border-primary transition-colors disabled:opacity-50"
-                        title="Generate all sections with AI"
-                      >
-                        {generatingAll ? (
-                          <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
-                        ) : (
-                          <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
-                        )}
-                        {generatingAll ? "Generating..." : "Generate All"}
-                      </button>
-                      <button
-                        onClick={handleShare}
-                        className="h-8 px-3 rounded-lg flex items-center gap-1.5 text-xs font-medium border border-border-subtle text-text-secondary hover:text-primary hover:border-primary transition-colors"
-                        title="Copy share link"
-                      >
-                        <span className="material-symbols-outlined text-[14px]">share</span>
-                        Share
-                      </button>
-                      <div className="relative" ref={exportMenuRef}>
-                        <div className="flex items-center rounded-lg overflow-visible" style={{ backgroundColor: "#003366" }}>
-                          <button
-                            onClick={handleExportPDF}
-                            className="h-8 px-3 flex items-center gap-1.5 text-xs font-bold text-white hover:opacity-90 transition-opacity rounded-l-lg"
-                          >
-                            <span className="material-symbols-outlined text-[14px]">picture_as_pdf</span>
-                            Export PDF
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setExportMenuOpen((v) => !v);
-                            }}
-                            className="h-8 px-1.5 flex items-center text-white hover:opacity-90 transition-opacity rounded-r-lg border-l border-white/20"
-                            aria-label="Export options"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">arrow_drop_down</span>
-                          </button>
-                        </div>
-                        {exportMenuOpen && (
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
-                            <button
-                              onClick={handleExportPDF}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
-                            >
-                              <span className="material-symbols-outlined text-[18px] text-red-500">picture_as_pdf</span>
-                              Export as PDF
-                            </button>
-                            <button
-                              onClick={handleExportMarkdown}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
-                            >
-                              <span className="material-symbols-outlined text-[18px] text-text-muted">code</span>
-                              Export as Markdown
-                            </button>
-                            <button
-                              onClick={handleExportClipboard}
-                              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
-                            >
-                              <span className="material-symbols-outlined text-[18px] text-blue-500">content_copy</span>
-                              Copy to Clipboard
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
+            <DocumentHeaderBar
+              memo={selectedMemo}
+              sections={sections}
+              generatingAll={generatingAll}
+              exportMenuOpen={exportMenuOpen}
+              setExportMenuOpen={setExportMenuOpen}
+              exportMenuRef={exportMenuRef}
+              onGenerateAll={handleGenerateAll}
+              onShare={handleShare}
+              onExportPDF={handleExportPDF}
+              onExportMarkdown={handleExportMarkdown}
+              onExportClipboard={handleExportClipboard}
+            />
 
-              {/* Section outline + content */}
+            {/* Workspace: outline + document canvas + chat */}
+            <div className="flex flex-1 overflow-hidden">
+              <MemoOutlineSidebar
+                sections={sections}
+                activeSection={activeSection}
+                setActiveSection={setActiveSection}
+                onAddSection={() => setShowAddSection(true)}
+              />
               <MemoEditor
+                memo={selectedMemo}
                 sections={sections}
                 activeSection={activeSection}
                 setActiveSection={setActiveSection}
@@ -556,21 +504,22 @@ export default function MemoBuilderPage() {
                 onGenerate={handleGenerate}
                 onSave={handleSaveSection}
                 onDelete={setPendingDeleteSection}
-                onAddSection={() => setShowAddSection(true)}
               />
+              {chatOpen ? (
+                <MemoChat
+                  messages={messages}
+                  chatInput={chatInput}
+                  setChatInput={setChatInput}
+                  sendingChat={sendingChat}
+                  onSend={sendMessage}
+                  chatOpen={chatOpen}
+                  onToggleChat={() => setChatOpen(false)}
+                  chatEndRef={chatEndRef}
+                />
+              ) : (
+                <MemoChatCollapsed onOpen={() => setChatOpen(true)} />
+              )}
             </div>
-
-            {/* ---- Chat panel ---- */}
-            <MemoChat
-              messages={messages}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              sendingChat={sendingChat}
-              onSend={sendMessage}
-              chatOpen={chatOpen}
-              onToggleChat={() => setChatOpen(false)}
-              chatEndRef={chatEndRef}
-            />
           </>
         )}
       </div>
