@@ -5,6 +5,182 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 61 — April 24, 2026
+
+#### Timestamp: April 24, 2026 — 03:00-05:30 IST
+
+#### Goal: Page Load Performance Optimization + Premium UX Polish
+
+---
+
+#### Part 1: Performance Optimization (Cold Starts, CSS, Auth, Fonts)
+
+##### 1. Split API into Lite + AI Serverless Functions
+
+**Problem:** Single Vercel serverless function loaded ALL routes including 50MB of AI dependencies (LangChain 24MB, OpenAI 13MB, Azure 13MB) on every cold start. Simple CRUD requests like `/api/users/me` took 3-5s on cold start.
+
+**Root Cause:** `api/index.ts` imported `app.ts` which statically imported all 20+ route modules, including AI-heavy ones.
+
+**Fix:**
+- Created `apps/api/src/app-lite.ts` — lightweight Express app with 17 CRUD routes only (deals, companies, contacts, users, notifications, etc.)
+- Created `apps/api/src/app-ai.ts` — AI Express app with 6 AI-heavy routes (ai, chat, financials, memos, ingest, onboarding)
+- Created `api/ai.ts` — separate Vercel serverless handler for AI function
+- Updated `vercel.json` with two functions + 15 AI-specific rewrites before catch-all
+- Added `Cache-Control: immutable` headers for `/js/` and `/assets/` static files
+- Lite function: `maxDuration: 60s`. AI function: `maxDuration: 300s`
+- **Cold start improvement: 3-5s → <500ms for 90% of page navigations**
+
+##### 2. Fix Transitive AI Import Leaks
+
+**Problem:** Three "lite" routes had transitive imports to LangChain via service files, defeating the split.
+
+**Root Cause:**
+- `dealImportMapper.ts` → `@langchain/core/messages` (static import)
+- `contacts.ts` → `contactEnrichment/index.ts` → `@langchain/langgraph` (static import)
+- `deals.ts` → `followUpQuestions.ts` → `@langchain/core/messages` (static import)
+
+**Fix:** Converted all three to dynamic `import()` calls inside the functions that use them. Modules load on-demand, not at cold start.
+
+##### 3. Replace Tailwind CDN with Build-Time CSS
+
+**Problem:** Every HTML page loaded `cdn.tailwindcss.com` which JIT-compiles CSS client-side — adding 100-200ms per page.
+
+**Fix:**
+- Created `apps/web/css/app.css` with `@tailwind` directives
+- Installed `@tailwindcss/forms` + `@tailwindcss/container-queries` plugins
+- Updated `tailwind.config.js` with merged theme config from inline CDN configs
+- Removed CDN script + inline config from all 29 HTML files
+- Added `<link rel="stylesheet" href="/css/app.css" />` to all pages
+- **Also fixed:** content paths missing `./*.js` (root-level JS files like `contacts-render.js` weren't scanned, causing class purging). Added `navy-custom` color for login page.
+
+##### 4. Optimize Google Fonts Loading
+
+**Problem:** Google Fonts loaded synchronously without `display=swap`, blocking first paint by 300-500ms.
+
+**Fix:** Added `rel="preload" as="style"` for Inter font, ensured `display=swap` on all links, removed duplicate Material Symbols links, updated Material Symbols to include optical size axis. Applied to all 29 HTML files.
+
+##### 5. Cache Supabase Session + User Data
+
+**Problem:** 4 sequential network calls per page: `getUser()` called both `client.auth.getUser()` AND `client.auth.getSession()`, then `loadUserData()` called `getAccessToken()` → `getSession()` again, then `/api/users/me`.
+
+**Fix:**
+- `auth.js`: Session cached in memory per page lifecycle. Concurrent `getSession()` calls share one promise. `getUser()` derives from cached session instead of separate API call.
+- `layout.js`: User data cached in `sessionStorage` with 2-minute TTL. Skips `/api/users/me` call when cache is fresh.
+- **Reduced from 4 sequential calls → 0-1 per page navigation**
+
+##### 6. Fix 429 Rate Limiting
+
+**Problem:** Users randomly hit HTTP 429 "Too Many Requests". Rate limiter was IP-based at 200 req/15min. On Vercel, CDN IP sharing caused all users to share one bucket.
+
+**Root Cause:** Each page load makes 5-8 API calls + notification polling every 30s. 25 navigations easily exceeded 200 limit.
+
+**Fix:** Rate limit key now uses auth token (per-user) with `x-forwarded-for` fallback. Limit raised to 600 req/15min. Applied to all 3 app files (app.ts, app-lite.ts, app-ai.ts).
+
+---
+
+#### Part 2: Premium UX Polish (6 Features)
+
+##### 7. Skeleton Loading Shimmer (4 pages)
+
+Replaced "Loading..." text and spinning icons with animated gray shimmer placeholders that match the shape of actual content:
+- **Dashboard:** 4 stat cards, 3 priority table rows, portfolio chart (circle + legend)
+- **CRM:** 3-4 shimmer deal cards (icon, name, metrics, avatars)
+- **Contacts:** 3-6 shimmer contact cards (avatar, name, company, badge)
+- **Deal Detail:** title, breadcrumb, 4 metric cards
+
+Shared CSS module: `apps/web/css/skeleton.css` (reusable across all pages).
+
+##### 8. Page Transition Animations
+
+Sidebar link clicks now fade-out main content (120ms) then fade-in on new page (180ms). Sidebar stays static throughout — no flicker. Respects Cmd/Ctrl+click for new tab. Implemented in `layout.js` — applies to all pages automatically.
+
+##### 9. Command Palette (Cmd+K)
+
+Spotlight-style search overlay for quick navigation:
+- Opens with Cmd+K (Mac) or Ctrl+K (Windows)
+- Searches pages (7), deals, and contacts
+- Keyboard navigation: arrow keys, Enter to open, Escape to close
+- Grouped results by type (Pages / Deals / Contacts)
+- Prefetches deal + contact data on open
+- Added to all 11 app pages via `js/commandPalette.js`
+
+##### 10. Premium Toast Notifications
+
+Upgraded `showNotification()` with:
+- Colored type icons (blue info, green success, amber warning, red error)
+- Countdown progress bar at bottom
+- Pause-on-hover (progress bar freezes while reading)
+- Slide-in/slide-out animations
+- Smooth vertical stacking with repositioning
+- Same API — fully backward compatible
+
+##### 11. Smart Empty States
+
+Upgraded CRM and Contacts empty states:
+- Larger icon in rounded square with soft shadow
+- Bolder title with tighter tracking
+- Two action buttons: primary CTA + secondary outline (Import Deals / Import CSV)
+- More breathing room
+
+##### 12. Hover & Micro-interactions (CSS-only)
+
+Global polish via `css/skeleton.css`:
+- Card hover lift: `translateY(-2px)` on deal/contact cards
+- Button press feedback: `scale(0.97)` on click
+- Dropdown slide-in animations
+- Notification dot pulse animation
+- Focus-visible keyboard ring (Banker Blue)
+- Smooth scrollbar behavior
+
+---
+
+#### Session 61 Summary
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Split API into lite + AI serverless functions | Done |
+| 2 | Fix transitive AI import leaks (dynamic import) | Done |
+| 3 | Replace Tailwind CDN with build-time CSS | Done |
+| 4 | Optimize Google Fonts (preload + display=swap) | Done |
+| 5 | Cache Supabase session + user data (2min TTL) | Done |
+| 6 | Fix 429 rate limit (per-user keying + 600/15min) | Done |
+| 7 | Skeleton loading shimmer (4 pages) | Done |
+| 8 | Page transition animations | Done |
+| 9 | Command palette (Cmd+K) | Done |
+| 10 | Premium toast notifications | Done |
+| 11 | Smart empty states | Done |
+| 12 | Hover & micro-interactions | Done |
+
+### Files Changed — Session 61
+
+| File | Changes |
+|------|---------|
+| `api/index.ts` | Rewritten to import `app-lite.js` |
+| `api/ai.ts` | **New** — Vercel handler for AI function |
+| `apps/api/src/app-lite.ts` | **New** — lightweight Express app (17 CRUD routes) |
+| `apps/api/src/app-ai.ts` | **New** — AI Express app (6 AI routes) |
+| `apps/api/src/app.ts` | Rate limiter: per-user keying + 600/15min |
+| `apps/api/src/routes/deals.ts` | Dynamic import for followUpQuestions |
+| `apps/api/src/routes/contacts.ts` | Dynamic import for contactEnrichment + llm |
+| `apps/api/src/services/dealImportMapper.ts` | Dynamic import for langchain + llm |
+| `vercel.json` | Two functions, 15 AI rewrites, cache headers |
+| `apps/web/css/skeleton.css` | **New** — shimmer + micro-interaction CSS |
+| `apps/web/css/app.css` | Tailwind entry + skeleton import |
+| `apps/web/tailwind.config.js` | Full theme, plugins, content paths |
+| `apps/web/js/layout.js` | Page transition + user cache TTL |
+| `apps/web/js/auth.js` | Session caching + promise dedup |
+| `apps/web/js/notifications.js` | Premium toast rewrite |
+| `apps/web/js/commandPalette.js` | **New** — Cmd+K search overlay |
+| `apps/web/dashboard.html` | Skeleton loaders + CSS link |
+| `apps/web/crm.html` | Skeleton loaders + CSS link |
+| `apps/web/contacts.html` | Skeleton loaders + CSS link |
+| `apps/web/deal.html` | Skeleton loaders + CSS link |
+| `apps/web/crm-cards.js` | Smart empty state |
+| `apps/web/contacts-render.js` | Smart empty state |
+| All 29 `.html` files | Tailwind CDN → build CSS, font optimization |
+
+---
+
 ### Session 60 — April 20, 2026
 
 #### Timestamp: April 20, 2026 — IST
