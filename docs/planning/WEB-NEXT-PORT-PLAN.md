@@ -152,13 +152,13 @@ The existing audit.ts / vite.config.ts edits on `frontend/dev` are already done 
 ## Progress tracker (update as you go)
 
 ```
-Tier 1  [ ] 1  Login redesign
+Tier 1  [x] 1  Login redesign                     0458328
         [ ] 2  VDR button color
         [ ] 3  Dashboard CSS fixes
-Tier 2  [ ] 4  Dashboard 12-widget + drag-drop
-        [ ] 5  Deal page dropdown + Excel + avatar
-        [ ] 6  Chat suggestion chips
-        [ ] 7  Intake tab + scroll-hash
+Tier 2  [ ] 4  Dashboard 12-widget + drag-drop     (large — 21 files, 1803 LoC, new API endpoints)
+        [=] 5  Deal page dropdown + Excel + avatar N/A — verified, see notes below
+        [x] 6  Chat suggestion chips               7ae4d61
+        [x] 7  Intake tab + scroll-hash            23d81a5
 Tier 3  [ ] 8a Memo PDF export + share
         [ ] 8b Memo saved list
         [ ] 8c Memo section tools
@@ -168,6 +168,17 @@ Tier 3  [ ] 8a Memo PDF export + share
 Tier 4  [ ] 11 Onboarding 3-step flow
         [ ] 12 Firm enrichment modal
 Tier 5  [ ] 13 Verify VDR parity
-        [ ] 14 Verify Enter-URL tab removed
+        [x] 14 Verify Enter-URL tab removed        done as part of #7
         [ ] 15 Verify Help modal in sidebar
 ```
+
+## Verification notes
+
+### Tier 2 #5 — N/A (no port needed)
+
+Each sub-item of this legacy fix is already moot in web-next:
+
+- **User dropdown on deal header** (`65cbdac`) — legacy had a per-page custom header on deal.html that didn't include the dropdown markup. Web-next uses a shared `src/components/layout/Header.tsx` on all `(app)` routes, which already has Profile / Settings / Log out. No change needed.
+- **Legacy Project Apex preview** (`200d36b`) — the hardcoded fake modal was never ported; web-next was scaffolded fresh.
+- **Broken team avatar fallback** (`200d36b`) — web-next's `deal-layout.tsx:127,144` renders initials-only circles. No remote `<img>`, no broken-image bug to fix.
+- **Excel table rendering** (`200d36b`) — web-next has no document preview feature. Rolls into the VDR work (Tier 5 #13) when preview UI lands.
