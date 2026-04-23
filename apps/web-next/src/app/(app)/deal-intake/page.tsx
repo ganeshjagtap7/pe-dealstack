@@ -39,10 +39,6 @@ export default function DealIntakePage() {
   const [textInput, setTextInput] = useState("");
   const [textSourceType, setTextSourceType] = useState("cim");
 
-  /* ---- URL ---- */
-  const [urlInput, setUrlInput] = useState("");
-  const [urlCompanyName, setUrlCompanyName] = useState("");
-
   /* ---- Processing ---- */
   const [processing, setProcessing] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
@@ -113,8 +109,6 @@ export default function DealIntakePage() {
   const resetForm = () => {
     setSelectedFile(null);
     setTextInput("");
-    setUrlInput("");
-    setUrlCompanyName("");
     setResult(null);
     setError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -188,36 +182,6 @@ export default function DealIntakePage() {
     }
   };
 
-  const handleExtractUrl = async () => {
-    if (!urlInput.trim()) {
-      setError("Please enter a URL.");
-      return;
-    }
-    if (mode === "existing" && !selectedDeal) {
-      setError("Please select a deal first.");
-      return;
-    }
-
-    setProcessing(true);
-    setProgressMessage("Scraping and analyzing URL...");
-    setError(null);
-    setResult(null);
-
-    try {
-      const body: Record<string, string> = { url: urlInput };
-      if (urlCompanyName) body.companyName = urlCompanyName;
-      if (mode === "existing" && selectedDeal) body.dealId = selectedDeal.id;
-
-      const data = await api.post<IngestResponse>("/ingest/url", body);
-      setResult(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "URL scraping failed");
-    } finally {
-      setProcessing(false);
-      setProgressMessage("");
-    }
-  };
-
   /* ================================================================ */
   /*  Render                                                           */
   /* ================================================================ */
@@ -228,7 +192,7 @@ export default function DealIntakePage() {
       <div>
         <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Intake</h1>
         <p className="text-text-secondary text-sm mt-0.5">
-          Upload files, paste text, or enter a URL to create or update deals with AI-powered extraction.
+          Upload files or paste text to create or update deals with AI-powered extraction.
         </p>
       </div>
 
@@ -378,51 +342,6 @@ export default function DealIntakePage() {
           </div>
         )}
 
-        {/* ---- URL input ---- */}
-        {activeTab === "url" && (
-          <div>
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-text-main mb-1">URL</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-                  <span className="material-symbols-outlined text-text-muted text-[16px]">link</span>
-                </div>
-                <input
-                  type="url"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  className="w-full rounded-lg border border-border-subtle bg-background-body py-2 pl-9 pr-3 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary"
-                  placeholder="https://example.com/company-profile"
-                />
-              </div>
-            </div>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-text-main mb-1">Company Name (optional)</label>
-              <input
-                type="text"
-                value={urlCompanyName}
-                onChange={(e) => setUrlCompanyName(e.target.value)}
-                className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary"
-                placeholder="Helps improve extraction accuracy"
-              />
-            </div>
-
-            <button
-              onClick={handleExtractUrl}
-              disabled={!urlInput.trim() || processing}
-              className="w-full flex items-center justify-center gap-2 py-2.5 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
-              style={{ backgroundColor: "#003366" }}
-            >
-              {processing ? (
-                <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-              ) : (
-                <span className="material-symbols-outlined text-[16px]">travel_explore</span>
-              )}
-              {processing ? "Scraping..." : "Scrape & Create Deal"}
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Processing indicator */}

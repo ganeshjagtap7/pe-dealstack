@@ -42,7 +42,6 @@ export interface IngestResponse {
 export const TABS = [
   { key: "file", label: "Upload File", icon: "upload_file" },
   { key: "text", label: "Paste Text", icon: "content_paste" },
-  { key: "url", label: "Enter URL", icon: "link" },
 ] as const;
 
 export type TabKey = (typeof TABS)[number]["key"];

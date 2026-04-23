@@ -137,6 +137,30 @@ export default function DealDetailPage() {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
+  // Hash-scroll: the onboarding checklist links to /deals/:id#financials-section
+  // etc. Sections render async after the deal loads, so the browser's native
+  // hash scroll fires before targets exist. Poll up to 8s for the element then
+  // smooth-scroll. Ported from apps/web/deal.js scrollToHashWhenReady (ee35074).
+  useEffect(() => {
+    if (!deal) return;
+    const hash = window.location.hash?.slice(1);
+    if (!hash) return;
+
+    let attempts = 0;
+    const maxAttempts = 40; // ~8 seconds @ 200ms
+    const interval = setInterval(() => {
+      const el = document.getElementById(hash);
+      if (el) {
+        clearInterval(interval);
+        el.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else if (++attempts >= maxAttempts) {
+        clearInterval(interval);
+      }
+    }, 200);
+
+    return () => clearInterval(interval);
+  }, [deal]);
+
   // -----------------------------------------------------------------------
   // Stage change
   // -----------------------------------------------------------------------
