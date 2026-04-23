@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd ../.. && npm install && cd apps/web-next && npm run build",
-  "installCommand": "echo 'install handled in buildCommand'",
+  "installCommand": "cd ../.. && npm install",
+  "buildCommand": "npm run build",
   "framework": "nextjs"
 }
