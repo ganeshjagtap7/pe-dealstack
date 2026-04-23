@@ -160,10 +160,10 @@ Tier 2  [ ] 4  Dashboard 12-widget + drag-drop     (large — 21 files, 1803 LoC
         [=] 5  Deal page dropdown + Excel + avatar N/A — verified, see notes below
         [x] 6  Chat suggestion chips               7ae4d61
         [x] 7  Intake tab + scroll-hash            23d81a5
-Tier 3  [ ] 8a Memo PDF export + share
-        [ ] 8b Memo saved list
-        [ ] 8c Memo section tools
-        [ ] 8d Memo rate-limit
+Tier 3  [x] 8a Memo PDF export + share             052eb57
+        [=] 8b Memo saved list                     N/A — sidebar already persistent in web-next
+        [x] 8c Memo chat applied-action refresh    3b4276f  (partial — skipped Confirm/Undo UI)
+        [x] 8d Memo section typography             45c3da8
         [x] 9  Help & Support modal                07a3dfe
         [=] 10 Dashboard undefined-Deals fix       folds into #4 — "undefined Deals" is in the stats widget
 Tier 4  [ ] 11 Onboarding 3-step flow
