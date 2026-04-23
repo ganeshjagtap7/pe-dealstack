@@ -7,11 +7,20 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NotificationsDropdown } from "./NotificationsDropdown";
 
+// Ported from apps/web/js/onboarding/onboarding-config.js (f23a61c).
+// Hardcoded here for now — web-next doesn't yet have a runtime config layer.
+const SUPPORT_CONFIG = {
+  bookingUrl: "https://calendar.app.google/vRexQ5AmhivWx2PH6",
+  formUrl: "https://docs.google.com/forms/d/e/1FAIpQLSet_GfebuKpdspK7aQ8yAFUF_l5yXeFczBRoKauGEg2GlpS5g/viewform",
+  urgentEmails: ["tech@pocketfund.org", "hello@pocketfund.org"],
+} as const;
+
 export function Header() {
   const { signOut } = useAuth();
   const { user } = useUser();
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
@@ -134,6 +143,17 @@ export function Header() {
                   <span className="material-symbols-outlined text-[18px]">settings</span>
                   Settings
                 </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDropdownOpen(false);
+                    setHelpOpen(true);
+                  }}
+                  className="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[18px]">help</span>
+                  Help &amp; Support
+                </button>
               </div>
               <div className="border-t border-border-subtle py-1">
                 <button
@@ -148,6 +168,129 @@ export function Header() {
           )}
         </div>
       </div>
+      <HelpSupportModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </header>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// HelpSupportModal
+// Two-option modal opened from the user dropdown (Book a Call / Written
+// Feedback), with urgent-contact mailto footer. Ported from
+// apps/web/js/layoutComponents.js generateHelpSupportModal (f23a61c).
+// ---------------------------------------------------------------------------
+
+function HelpSupportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const openExternal = (url: string) => {
+    window.open(url, "_blank", "noopener,noreferrer");
+    onClose();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="rounded-xl shadow-2xl w-full max-w-md mx-4 overflow-hidden bg-surface-card border border-border-subtle">
+        {/* Header */}
+        <div className="px-6 py-4 flex items-center justify-between border-b border-border-subtle bg-background-body">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#003366" }}>
+              <span className="material-symbols-outlined text-white text-[20px]">help</span>
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-text-main">Help &amp; Support</h3>
+              <p className="text-xs text-text-muted">Choose how you&apos;d like to reach our team.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-md text-text-muted hover:bg-background-body transition-colors"
+            title="Close"
+          >
+            <span className="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        {/* Options */}
+        <div className="p-6 space-y-3">
+          <HelpOptionCard
+            icon="event"
+            title="Book a Support Call"
+            desc="30-min video call with our team. Pick a time that works for you."
+            onClick={() => openExternal(SUPPORT_CONFIG.bookingUrl)}
+          />
+          <HelpOptionCard
+            icon="edit_note"
+            title="Send Written Feedback"
+            desc="Quick form for bug reports, feature requests, or general feedback."
+            onClick={() => openExternal(SUPPORT_CONFIG.formUrl)}
+          />
+        </div>
+
+        {/* Footer — urgent emails */}
+        <div className="px-6 py-3 text-center border-t border-border-subtle bg-background-body">
+          <p className="text-xs text-text-muted">
+            Need urgent help? Email{" "}
+            {SUPPORT_CONFIG.urgentEmails.map((email, i) => (
+              <span key={email}>
+                <a
+                  href={`mailto:${email}`}
+                  className="font-semibold"
+                  style={{ color: "#003366" }}
+                >
+                  {email}
+                </a>
+                {i < SUPPORT_CONFIG.urgentEmails.length - 1 ? " or " : ""}
+              </span>
+            ))}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HelpOptionCard({
+  icon,
+  title,
+  desc,
+  onClick,
+}: {
+  icon: string;
+  title: string;
+  desc: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left p-4 rounded-lg flex items-start gap-4 transition-all hover:shadow-md bg-surface-card border-[1.5px] border-border-subtle hover:border-primary hover:bg-[#F8FAFC]"
+    >
+      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: "#E6EEF5", color: "#003366" }}>
+        <span className="material-symbols-outlined text-[22px]">{icon}</span>
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-bold text-text-main">{title}</p>
+        <p className="text-xs mt-0.5 text-text-muted">{desc}</p>
+      </div>
+      <span className="material-symbols-outlined text-[20px] shrink-0 text-text-muted">chevron_right</span>
+    </button>
   );
 }
