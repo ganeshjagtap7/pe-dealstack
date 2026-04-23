@@ -116,14 +116,6 @@ const generalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-const writeLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: 30, // 30 writes per minute
-  message: { error: 'Too many write operations, please slow down.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 app.use('/api/', generalLimiter);
 
 app.use(express.json({ limit: '50mb' }));
@@ -154,21 +146,6 @@ app.get('/health/ready', async (_req, res) => {
       .from('Deal')
       .select('count', { count: 'exact', head: true });
     checks.services.database = { ok: !dbError, latencyMs: Date.now() - dbStart };
-
-    checks.services.openai = {
-      ok: !!process.env.OPENAI_API_KEY,
-      configured: !!process.env.OPENAI_API_KEY,
-    };
-
-    checks.services.gemini = {
-      ok: !!process.env.GEMINI_API_KEY,
-      configured: !!process.env.GEMINI_API_KEY,
-    };
-
-    checks.services.sentry = {
-      ok: !!process.env.SENTRY_DSN,
-      configured: !!process.env.SENTRY_DSN,
-    };
 
     const allHealthy = Object.values(checks.services).every(s => s.ok);
     checks.status = allHealthy ? 'healthy' : 'degraded';
