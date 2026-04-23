@@ -6,7 +6,7 @@
 apps/
   api/          Express + TypeScript API (Supabase PostgreSQL)
   web/          Legacy vanilla JS frontend + React VDR (Vite) — :3003
-  web-next/     Next.js 16 + React 19 + Tailwind v4 app (primary) — :3000
+  web-next/     Next.js 16 + React 19 + Tailwind v4 app (primary) — :3002
 docs/           Architecture docs, planning, diagrams
 packages/       ui/ (shared React components/styles), etc.
 ```
@@ -46,9 +46,11 @@ packages/       ui/ (shared React components/styles), etc.
 ```bash
 # Development
 cd apps/api && npm run dev        # API on :3001
-cd apps/web-next && npm run dev   # Next.js app on :3000 (primary)
+cd apps/web-next && npm run dev   # Next.js app on :3002 (primary)
 cd apps/web && npm run dev        # Legacy vanilla app on :3003
-                                  # (moved from :3000 so web-next takes the primary port)
+                                  # Port note: :3000 is reserved for the main-branch
+                                  # worktree's apps/web (Vite default) so side-by-side
+                                  # port isn't stepped on while the migration is in flight.
 
 # Type check
 cd apps/api && npx tsc --noEmit
@@ -62,5 +64,5 @@ npm run build                 # Turborepo builds all apps
 - `overflow-x-auto` clips dropdown menus — use `flex-wrap` instead.
 - Tailwind opacity on dark colors (`bg-primary/[0.05]`) is invisible on white — use hex.
 - Partial unique index `WHERE isActive = true` enforces one active financial statement per period.
-- Dev ports: web-next owns :3000, web owns :3003, api owns :3001. If web-next can't bind :3000 it'll pick :3001 and collide with api — kill stale processes first.
+- Dev ports: web-next owns :3002, web owns :3003, api owns :3001. Port :3000 is left free for the main-branch worktree's legacy apps/web (Vite defaults to 3000). If web-next can't bind :3002 it'll pick another free port and may collide with api — kill stale processes first.
 - `apps/web-next/` runs Next.js 16 + React 19 + Tailwind v4 (bleeding-edge). APIs and conventions may differ from older Next docs — read `node_modules/next/dist/docs/` before guessing.

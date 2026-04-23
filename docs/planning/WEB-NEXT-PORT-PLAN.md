@@ -12,7 +12,7 @@ Plan for porting the 57 main-ahead commits of `apps/web` → `apps/web-next` wit
 1. **Only edit `apps/web-next/**` on `frontend/dev` from now on.** Do not touch `apps/web/` or `apps/api/` — the eventual merge overwrite them, and touching them creates conflicts for no benefit.
 2. **Port from the worktree, not from memory.** `../pe-dealstack-main/apps/web/` is the source of truth — open it side-by-side with the `.tsx` you're writing.
 3. **Commit per feature, not per wave.** Small semantic commits (`feat(web-next): port login redesign`) leave a reviewable trail and let the final merge squash cleanly.
-4. **Test `:3003` vs `:3000` side-by-side** before marking a feature done.
+4. **Test `:3003` vs `:3002` side-by-side** before marking a feature done.
 
 ## Known merge-conflict hotspots (already unavoidable)
 
@@ -38,7 +38,7 @@ Port these first. No backend coupling; you can diff HTML-to-TSX mechanically and
 | 2 | VDR button color fix (Banker Blue) | `61b5d02` | `apps/web/vdr.html` + JS | `src/app/(app)/data-room/**` |
 | 3 | Dashboard CSS layout fixes | `d931fbe`, `09c59c7`, `dcf164a`, `8e259aa` | `apps/web/dashboard.html` | `src/app/(app)/dashboard/**` |
 
-**#1 is the visible one** — your :3000 login doesn't match main's :3003 right now. Fix this first so the port matches the deployed app. The current web-next login has decorative cards too but copy/stats differ — align field-by-field with main's `login.html:70-170` region.
+**#1 is the visible one** — your :3002 login doesn't match main's :3003 right now. Fix this first so the port matches the deployed app. The current web-next login has decorative cards too but copy/stats differ — align field-by-field with main's `login.html:70-170` region.
 
 ### Tier 2 — Visual + existing-API (~2–3 days)
 
@@ -114,7 +114,7 @@ Pick a row from a tier. Then:
 
 5. **Test side-by-side**
    - `:3003/<page>.html` (worktree, current main)
-   - `:3000/<route>` (primary, your port)
+   - `:3002/<route>` (primary, your port)
    - Log in as the same user — same backend, same data.
 
 6. **Commit**
@@ -144,7 +144,7 @@ The existing audit.ts / vite.config.ts edits on `frontend/dev` are already done 
 4. `npm install` to reconcile lockfile.
 5. `cd apps/web-next && npx tsc --noEmit` — full type check.
 6. `cd apps/api && npx tsc --noEmit` — full type check.
-7. Smoke test every ported route at :3000 against the same API.
+7. Smoke test every ported route at :3002 against the same API.
 8. Open PR `frontend/dev` → `main` — it'll be additive-only on `apps/web-next/**`.
 
 ---
