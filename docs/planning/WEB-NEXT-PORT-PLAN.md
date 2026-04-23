@@ -155,8 +155,7 @@ The existing audit.ts / vite.config.ts edits on `frontend/dev` are already done 
 Tier 1  [x] 1  Login redesign                     0458328
         [x] 2  VDR button color                   d5abe19
         [=] 3  Dashboard CSS fixes                 folds into #4 — fixes the 12-widget layout
-Tier 2  [ ] 4  Dashboard 12-widget + drag-drop     (large — 21 files, 1803 LoC, new API endpoints)
-                                                   includes Tier 1 #3 CSS fixes (d931fbe, 09c59c7, dcf164a, 8e259aa)
+Tier 2  [x] 4  Dashboard 12-widget expansion       76b33d5  (drag-drop skipped — registry order used)
         [=] 5  Deal page dropdown + Excel + avatar N/A — verified, see notes below
         [x] 6  Chat suggestion chips               7ae4d61
         [x] 7  Intake tab + scroll-hash            23d81a5
