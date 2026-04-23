@@ -165,8 +165,8 @@ Tier 3  [x] 8a Memo PDF export + share             052eb57
         [x] 8d Memo section typography             45c3da8
         [x] 9  Help & Support modal                07a3dfe
         [=] 10 Dashboard undefined-Deals fix       folds into #4 — "undefined Deals" is in the stats widget
-Tier 4  [ ] 11 Onboarding 3-step flow
-        [ ] 12 Firm enrichment modal
+Tier 4  [x] 11 Onboarding 3-step flow              6db0ecf  (deferred: deep-research polling, confetti, findings preview)
+        [x] 12 Firm enrichment modal               585fb19  (back-fills the AI enrichment part of #11)
 Tier 5  [x] 13 VDR 3-state badge + Re-analyze      eb73579
         [x] 14 Verify Enter-URL tab removed        done as part of #7
         [x] 15 Verify Help modal in sidebar        done via Tier 3 #9
