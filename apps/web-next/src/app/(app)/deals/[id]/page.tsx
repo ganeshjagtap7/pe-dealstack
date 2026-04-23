@@ -202,24 +202,26 @@ export default function DealDetailPage() {
   // Chat
   // -----------------------------------------------------------------------
 
-  const sendMessage = async () => {
-    const text = chatInput.trim();
-    if (!text || chatSending) return;
+  // Send a specific text (used by suggestion chips) without relying on
+  // chatInput state — setState is async so a chip click can't setChatInput
+  // then immediately read it.
+  const sendPrompt = useCallback(async (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed || chatSending) return;
 
     const userMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
       role: "user",
-      content: text,
+      content: trimmed,
       createdAt: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);
-    setChatInput("");
     setChatSending(true);
 
     try {
       const data = await api.post<{ response: string; model?: string }>(
         `/deals/${dealId}/chat`,
-        { message: text }
+        { message: trimmed }
       );
       const responseText =
         data.response || (data as unknown as { content?: string }).content || "";
@@ -251,6 +253,13 @@ export default function DealDetailPage() {
     } finally {
       setChatSending(false);
     }
+  }, [dealId, chatSending]);
+
+  const sendMessage = async () => {
+    const text = chatInput.trim();
+    if (!text || chatSending) return;
+    setChatInput("");
+    await sendPrompt(text);
   };
 
   // -----------------------------------------------------------------------
@@ -433,11 +442,13 @@ export default function DealDetailPage() {
         <div className="hidden lg:block w-80 shrink-0">
           <div className="sticky top-6">
             <ChatTab
+              deal={deal}
               messages={messages}
               chatInput={chatInput}
               setChatInput={setChatInput}
               chatSending={chatSending}
               onSend={sendMessage}
+              onSendPrompt={sendPrompt}
               chatEndRef={chatEndRef}
             />
           </div>
