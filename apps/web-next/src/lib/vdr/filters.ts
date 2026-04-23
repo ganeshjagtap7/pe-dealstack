@@ -107,11 +107,17 @@ export const CUSTOM_FILTER_PRESETS: Array<{
       file.analysis.type === "key-insight" || file.analysis.type === "complete",
   },
   {
+    id: "ready-for-ai",
+    label: "Ready for AI",
+    icon: "check_circle",
+    filterFn: (file) => file.analysis.type === "ready",
+  },
+  {
     id: "pending-analysis",
     label: "Pending Analysis",
     icon: "hourglass_top",
-    filterFn: (file) =>
-      file.analysis.type === "standard" &&
-      file.analysis.label.toLowerCase().includes("pending"),
+    // Loosened per 68ff3f8: any standard-type file is pending, label
+    // substring check was too narrow.
+    filterFn: (file) => file.analysis.type === "standard",
   },
 ];

@@ -119,6 +119,15 @@ export async function renameDocument(documentId: string, newName: string): Promi
   }
 }
 
+/**
+ * Re-analyze a document — downloads the file, extracts text, writes it back
+ * on Document.extractedText, and triggers RAG embedding. Returns 422 on
+ * unsupported types (e.g. images without OCR). Ported from 68ff3f8.
+ */
+export async function analyzeDocument(documentId: string): Promise<void> {
+  await api.post(`/documents/${documentId}/analyze`, {});
+}
+
 export async function getDocumentDownloadUrl(documentId: string): Promise<string | null> {
   try {
     const data = await api.get<{ url: string }>(`/documents/${documentId}/download`);
@@ -239,10 +248,11 @@ export function transformDocument(apiDoc: APIDocument): VDRFile {
     }
   }
 
-  // Analysis
+  // Analysis — three-state: Pending → Ready for AI → Analyzed
+  // (ported from apps/web/src/services/vdrApi.ts transformDocument, 68ff3f8)
   let analysisType: VDRFile["analysis"]["type"] = "standard";
   let analysisLabel = "Pending Analysis";
-  let analysisDescription = "Document awaiting AI analysis.";
+  let analysisDescription = "Document awaiting text extraction.";
   let analysisColor: VDRFile["analysis"]["color"] = "slate";
 
   const ai = apiDoc.aiAnalysis;
@@ -273,6 +283,11 @@ export function transformDocument(apiDoc: APIDocument): VDRFile {
     analysisLabel = "Processed";
     analysisDescription = "Document uploaded and text extracted.";
     analysisColor = "primary";
+  } else if (apiDoc.extractedText) {
+    analysisType = "ready";
+    analysisLabel = "Ready for AI";
+    analysisDescription = "Text extracted. Ready for AI analysis.";
+    analysisColor = "green";
   } else if (apiDoc.status === "processing") {
     analysisType = "standard";
     analysisLabel = "Processing...";

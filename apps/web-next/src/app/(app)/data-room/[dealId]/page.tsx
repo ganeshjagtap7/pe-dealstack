@@ -18,6 +18,7 @@ import type {
   VDRFile,
 } from "@/lib/vdr/types";
 import {
+  analyzeDocument,
   createFolder,
   deleteDocument,
   deleteFolder,
@@ -273,6 +274,17 @@ export default function DataRoomDealPage({ params }: PageProps) {
     if (url) window.open(url, "_blank", "noopener,noreferrer");
   };
 
+  // Re-analyze a document — extract text + RAG embed, then refresh the row.
+  const handleReanalyze = useCallback(async (file: VDRFile) => {
+    try {
+      await analyzeDocument(file.id);
+      const docs = await fetchDocuments(dealId);
+      setAllFiles(docs.map(transformDocument));
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Analysis failed");
+    }
+  }, [dealId]);
+
   const handleGenerateInsights = useCallback(async () => {
     if (!activeFolderId || generating) return;
     setGenerating(true);
@@ -430,6 +442,7 @@ export default function DataRoomDealPage({ params }: PageProps) {
             onFileClick={handleFileClick}
             onDeleteFile={handleDeleteFile}
             onRenameFile={handleRenameFile}
+            onReanalyze={handleReanalyze}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">

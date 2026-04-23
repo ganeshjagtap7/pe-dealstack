@@ -16,13 +16,13 @@ export interface Folder {
 
 export type FileType = "excel" | "pdf" | "doc" | "other";
 
-export type AnalysisType = "key-insight" | "warning" | "standard" | "complete";
+export type AnalysisType = "key-insight" | "warning" | "standard" | "complete" | "ready";
 
 export interface FileAnalysis {
   type: AnalysisType;
   label: string;
   description: string;
-  color: "primary" | "orange" | "slate";
+  color: "primary" | "orange" | "slate" | "green";
 }
 
 export interface VDRFile {
@@ -114,6 +114,7 @@ export interface APIDocument {
   fileSize?: number;
   mimeType?: string;
   status?: string;
+  extractedText?: string;
   aiAnalysis?: {
     type?: string;
     label?: string;

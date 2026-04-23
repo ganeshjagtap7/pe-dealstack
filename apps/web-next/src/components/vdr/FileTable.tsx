@@ -9,6 +9,7 @@ interface Props {
   onFileClick?: (file: VDRFile) => void;
   onDeleteFile?: (fileId: string) => void;
   onRenameFile?: (fileId: string, newName: string) => void;
+  onReanalyze?: (file: VDRFile) => void;
 }
 
 const FILE_ICON: Record<string, string> = {
@@ -32,7 +33,11 @@ function getAnalysisStyle(type: string) {
   if (type === "warning") {
     return { className: "text-orange-600", icon: "warning" };
   }
-  return { className: "text-slate-400", icon: "check_circle" };
+  if (type === "ready") {
+    return { className: "text-green-600", icon: "check_circle" };
+  }
+  // "standard" = Pending Analysis — grey hourglass
+  return { className: "text-slate-400", icon: "hourglass_top" };
 }
 
 export function FileTable({
@@ -41,6 +46,7 @@ export function FileTable({
   onFileClick,
   onDeleteFile,
   onRenameFile,
+  onReanalyze,
 }: Props) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [renamingFileId, setRenamingFileId] = useState<string | null>(null);
@@ -181,6 +187,19 @@ export function FileTable({
                           <p className="text-xs leading-relaxed text-slate-600 line-clamp-2">
                             {file.analysis.description}
                           </p>
+                          {file.analysis.type === "standard" && onReanalyze && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onReanalyze(file);
+                              }}
+                              className="mt-1 inline-flex items-center gap-1 text-xs font-medium rounded px-2 py-1 transition-colors hover:bg-slate-100 self-start"
+                              style={{ color: "#003366" }}
+                            >
+                              <span className="material-symbols-outlined text-[14px]">refresh</span>
+                              Re-analyze
+                            </button>
+                          )}
                         </div>
                       </td>
                       <td className="whitespace-nowrap px-3 py-4 text-sm text-slate-500">
