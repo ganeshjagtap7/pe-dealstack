@@ -1,7 +1,17 @@
 {
   "version": 2,
-  "framework": "nextjs",
-  "buildCommand": "cd apps/web-next && npm run build",
-  "installCommand": "npm install",
-  "outputDirectory": "apps/web-next/.next"
+  "buildCommand": "npm run build:api && npm run build:web",
+  "outputDirectory": "apps/web/dist",
+  "functions": {
+    "api/index.ts": {
+      "includeFiles": "apps/api/dist/**",
+      "maxDuration": 60
+    }
+  },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api" },
+    { "source": "/health", "destination": "/api" },
+    { "source": "/health/ready", "destination": "/api" }
+  ],
+  "cleanUrls": true
 }
