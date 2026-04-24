@@ -275,12 +275,43 @@ function initChatInterface() {
                     if (data.updates && data.updates.length > 0) {
                         console.log('[Chat] Deal updates detected:', data.updates);
                         showNotification('Deal Updated', 'Changes have been applied', 'success');
-                        // Refresh deal data to show updated values
                         try {
                             await loadDealData();
                             console.log('[Chat] Deal data refreshed successfully');
                         } catch (refreshError) {
                             console.error('[Chat] Failed to refresh deal data:', refreshError);
+                        }
+                    }
+
+                    // Handle side effects (notes, extraction, scroll)
+                    if (data.sideEffects && data.sideEffects.length > 0) {
+                        for (const effect of data.sideEffects) {
+                            if (effect.type === 'note_added') {
+                                showNotification('Note Added', 'Activity feed updated', 'success');
+                                try { await loadDealData(); } catch (e) { /* ignore */ }
+                            }
+                            if (effect.type === 'extraction_triggered') {
+                                showNotification('Extraction', effect.message || 'Financial extraction queued', 'info');
+                            }
+                            if (effect.type === 'scroll_to') {
+                                const sectionMap = {
+                                    financials: 'financials-section',
+                                    analysis: 'analysis-section',
+                                    activity: 'activity-feed',
+                                    documents: 'documents-list',
+                                    risks: 'key-risks-list',
+                                };
+                                const elId = sectionMap[effect.section];
+                                const el = elId && document.getElementById(elId);
+                                if (el) {
+                                    const leftPanel = document.getElementById('deal-left-panel');
+                                    if (leftPanel) {
+                                        leftPanel.scrollTo({ top: el.offsetTop - 80, behavior: 'smooth' });
+                                    } else {
+                                        el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                    }
+                                }
+                            }
                         }
                     }
                     return;

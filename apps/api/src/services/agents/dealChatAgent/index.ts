@@ -17,7 +17,8 @@ Your role is to help investment professionals analyze deals by:
 - Searching uploaded documents (CIMs, teasers, financial reports)
 - Comparing the current deal against the firm's portfolio
 - Providing risk assessment and investment thesis development
-- Updating deal fields when asked (lead partner, analyst, source, etc.)
+- Updating deal fields when asked (name, revenue, EBITDA, dealSize, IRR, MoM, priority, etc.)
+- Changing deal pipeline stage (advance, move back, close)
 - Suggesting navigation actions (create memo, open data room, etc.)
 
 ═══════════════════════════════════════════════════════
@@ -53,8 +54,16 @@ TOOL USAGE:
 - get_deal_financials — ONLY if a metric/year is missing from the context tables, or to refresh data
 - compare_deals — for benchmarks, portfolio comparisons; pass targetDealName if comparing to a specific deal
 - get_deal_activity — for timeline of deal changes
-- update_deal_field — when asked to change lead partner, analyst, source, priority, industry, description
-- suggest_action — when asked to create a memo, open data room, upload document, view financials, change stage
+- update_deal_field — when asked to change deal properties: name, currency, revenue, ebitda, dealSize, irrProjected, mom, grossMargin, targetCloseDate, priority, industry, description, source, leadPartner, analyst. For numeric fields pass value in millions. For targetCloseDate use YYYY-MM-DD.
+- change_deal_stage — when asked to advance, move back, or close a deal. Stages: INITIAL_REVIEW → DUE_DILIGENCE → IOI_SUBMITTED → LOI_NEGOTIATION → CLOSING → CLOSED_WON. Terminal: CLOSED_LOST, PASSED.
+- add_note — when asked to log a note, call, email, or meeting on the deal
+- trigger_financial_extraction — when asked to extract or analyze financials from documents
+- generate_meeting_prep — when asked to prepare for a meeting, create a brief, or get talking points
+- draft_email — when asked to write or draft an email related to the deal
+- get_analysis_summary — when asked about QoE score, red flags, financial ratios, or analysis results
+- list_documents — when asked what documents are uploaded, document status, or file details
+- scroll_to_section — when asked to show, view, or navigate to a section (financials, analysis, activity, documents, risks)
+- suggest_action — when asked to create a memo, open data room, or upload document
 - All tools already know the current deal ID and organization — pass only query-specific parameters
 
 RESPONSE FORMAT:
@@ -76,6 +85,7 @@ export interface DealChatResult {
   model: string;
   updates?: any[];
   action?: any;
+  sideEffects?: Array<{ type: string; [key: string]: any }>;
 }
 
 /**
@@ -90,7 +100,7 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
   }
 
   try {
-    const model = getChatModel(0.7, 1500);
+    const model = getChatModel(0.7, 2500);
     const tools = getDealChatTools(input.dealId, input.orgId);
 
     const agent = createReactAgent({
@@ -133,9 +143,10 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
       ? lastAI.content
       : 'I apologize, I was unable to generate a response.';
 
-    // Check for tool call results (updates + actions)
+    // Check for tool call results (updates, actions, side effects)
     let updates: any[] = [];
     let action: any = null;
+    let sideEffects: Array<{ type: string; [key: string]: any }> = [];
 
     const toolMessages = result.messages.filter(
       (m: any) => m._getType?.() === 'tool' || m.constructor?.name === 'ToolMessage'
@@ -152,6 +163,10 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
         }
         if (parsed.type && parsed.url) {
           action = parsed;
+        }
+        // Side effects: note_added, extraction_triggered, scroll_to
+        if (parsed.type && ['note_added', 'extraction_triggered', 'scroll_to'].includes(parsed.type)) {
+          sideEffects.push(parsed);
         }
       } catch {
         // Not JSON tool output — skip
@@ -170,6 +185,7 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
       model: 'gpt-4o (ReAct agent)',
       ...(updates.length > 0 && { updates }),
       ...(action && { action }),
+      ...(sideEffects.length > 0 && { sideEffects }),
     };
   } catch (error: any) {
     log.error('Deal chat agent error', { message: error.message, stack: error.stack?.slice(0, 500) });

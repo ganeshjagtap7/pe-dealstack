@@ -7,6 +7,9 @@ import { z } from 'zod';
 import { supabase } from '../../../supabase.js';
 import { searchDocumentChunks, buildRAGContext, isRAGEnabled } from '../../../rag.js';
 import { log } from '../../../utils/logger.js';
+import { generateMeetingPrep } from '../meetingPrep/index.js';
+import { generateEmailDraft } from '../emailDrafter/index.js';
+import { analyzeFinancials } from '../../analysis/index.js';
 
 /** Create all deal chat tools with dealId/orgId baked in via closures */
 export function getDealChatTools(dealId: string, orgId: string) {
@@ -307,7 +310,8 @@ export function getDealChatTools(dealId: string, orgId: string) {
         }
 
         const updateData: Record<string, any> = {};
-        updateData[field] = value;
+        const numericFields = ['revenue', 'ebitda', 'dealSize', 'irrProjected', 'mom', 'grossMargin'];
+        updateData[field] = numericFields.includes(field) ? parseFloat(value) : value;
         updateData.updatedAt = new Date().toISOString();
 
         await supabase.from('Deal').update(updateData).eq('id', dealId);
@@ -327,11 +331,62 @@ export function getDealChatTools(dealId: string, orgId: string) {
     },
     {
       name: 'update_deal_field',
-      description: 'Update a field on the current deal. Use when the user asks to change lead partner, analyst, source, priority, industry, or description.',
+      description: 'Update a field on the current deal. Use when the user asks to change deal properties like name, metrics, team assignments, etc.',
       schema: z.object({
-        field: z.enum(['leadPartner', 'analyst', 'source', 'priority', 'industry', 'description']),
-        value: z.string().describe('New value. For leadPartner/analyst, use user ID.'),
+        field: z.enum([
+          'leadPartner', 'analyst', 'source', 'priority', 'industry', 'description',
+          'name', 'currency', 'revenue', 'ebitda', 'dealSize', 'irrProjected', 'mom',
+          'targetCloseDate', 'grossMargin',
+        ]),
+        value: z.string().describe('New value. For leadPartner/analyst use user ID. For numeric fields (revenue, ebitda, dealSize, irrProjected, mom, grossMargin) pass the number in millions. For targetCloseDate use ISO date (YYYY-MM-DD).'),
         userName: z.string().optional().describe('Name of user being assigned (for confirmation message)'),
+      }),
+    }
+  );
+
+  const changeDealStageTool = tool(
+    async ({ stage, reason }) => {
+      try {
+        const { data: deal } = await supabase
+          .from('Deal')
+          .select('stage')
+          .eq('id', dealId)
+          .single();
+
+        if (!deal) return JSON.stringify({ success: false, error: 'Deal not found' });
+
+        const previousStage = deal.stage;
+        if (previousStage === stage) {
+          return JSON.stringify({ success: false, error: `Deal is already at stage: ${stage}` });
+        }
+
+        await supabase
+          .from('Deal')
+          .update({ stage, updatedAt: new Date().toISOString() })
+          .eq('id', dealId);
+
+        await supabase.from('Activity').insert({
+          dealId,
+          type: 'STAGE_CHANGED',
+          title: 'Deal Stage Changed',
+          description: `${previousStage} → ${stage}${reason ? '. Reason: ' + reason : ''}`,
+        });
+
+        return JSON.stringify({ success: true, field: 'stage', value: stage, previousStage });
+      } catch (error) {
+        log.error('changeDealStage tool error', error);
+        return JSON.stringify({ success: false, error: 'Failed to change deal stage' });
+      }
+    },
+    {
+      name: 'change_deal_stage',
+      description: 'Change the deal pipeline stage. Use when the user asks to advance, move back, or close a deal. Stages flow: INITIAL_REVIEW → DUE_DILIGENCE → IOI_SUBMITTED → LOI_NEGOTIATION → CLOSING → CLOSED_WON. Terminal stages: CLOSED_WON, CLOSED_LOST, PASSED.',
+      schema: z.object({
+        stage: z.enum([
+          'INITIAL_REVIEW', 'DUE_DILIGENCE', 'IOI_SUBMITTED',
+          'LOI_NEGOTIATION', 'CLOSING', 'CLOSED_WON', 'CLOSED_LOST', 'PASSED',
+        ]),
+        reason: z.string().optional().describe('Optional reason for the stage change'),
       }),
     }
   );
@@ -364,12 +419,265 @@ export function getDealChatTools(dealId: string, orgId: string) {
     }
   );
 
+  // ─── Phase 3: Action Tools ─────────────────────────────────────────
+
+  const addNoteTool = tool(
+    async ({ content, type }) => {
+      try {
+        await supabase.from('Activity').insert({
+          dealId,
+          type: type || 'NOTE_ADDED',
+          title: type === 'CALL_LOGGED' ? 'Call Logged' : type === 'EMAIL_SENT' ? 'Email Logged' : type === 'MEETING_SCHEDULED' ? 'Meeting Scheduled' : 'Note Added',
+          description: content,
+        });
+        return JSON.stringify({ success: true, type: 'note_added' });
+      } catch (error) {
+        log.error('addNote tool error', error);
+        return JSON.stringify({ success: false, error: 'Failed to add note' });
+      }
+    },
+    {
+      name: 'add_note',
+      description: 'Add a note, call log, email log, or meeting note to the deal activity feed.',
+      schema: z.object({
+        content: z.string().describe('The note content'),
+        type: z.enum(['NOTE_ADDED', 'CALL_LOGGED', 'EMAIL_SENT', 'MEETING_SCHEDULED']).default('NOTE_ADDED').describe('Type of activity'),
+      }),
+    }
+  );
+
+  const triggerFinancialExtractionTool = tool(
+    async () => {
+      try {
+        const { data: docs } = await supabase
+          .from('Document')
+          .select('id, name, type, fileUrl')
+          .eq('dealId', dealId)
+          .order('createdAt', { ascending: false })
+          .limit(5);
+
+        if (!docs || docs.length === 0) {
+          return 'No documents found for this deal. Please upload a CIM or financial document first.';
+        }
+
+        // Find the best document for extraction
+        const financialDoc = docs.find(d => d.type === 'FINANCIALS' || d.type === 'CIM') || docs[0];
+
+        return JSON.stringify({
+          success: true,
+          type: 'extraction_triggered',
+          documentName: financialDoc.name,
+          message: `Financial extraction queued for "${financialDoc.name}". Use the Extract Financials button on the page to run it, or navigate to the financials section.`,
+        });
+      } catch (error) {
+        log.error('triggerFinancialExtraction tool error', error);
+        return JSON.stringify({ success: false, error: 'Failed to trigger extraction' });
+      }
+    },
+    {
+      name: 'trigger_financial_extraction',
+      description: 'Check which documents are available for financial extraction and guide the user to trigger it.',
+      schema: z.object({}),
+    }
+  );
+
+  const generateMeetingPrepTool = tool(
+    async ({ attendees, topics }) => {
+      try {
+        const brief = await generateMeetingPrep({
+          dealId,
+          organizationId: orgId,
+          meetingTopic: [attendees, topics].filter(Boolean).join('. '),
+        });
+
+        const parts = [
+          `## ${brief.headline}\n`,
+          `**Deal Summary:** ${brief.dealSummary}\n`,
+        ];
+        if (brief.contactProfile) parts.push(`**Contact:** ${brief.contactProfile}\n`);
+        if (brief.keyTalkingPoints.length) parts.push(`**Talking Points:**\n${brief.keyTalkingPoints.map(p => `- ${p}`).join('\n')}\n`);
+        if (brief.questionsToAsk.length) parts.push(`**Questions to Ask:**\n${brief.questionsToAsk.map(q => `- ${q}`).join('\n')}\n`);
+        if (brief.risksToAddress.length) parts.push(`**Risks to Address:**\n${brief.risksToAddress.map(r => `- ${r}`).join('\n')}\n`);
+        if (brief.suggestedAgenda.length) parts.push(`**Suggested Agenda:**\n${brief.suggestedAgenda.map((a, i) => `${i + 1}. ${a}`).join('\n')}`);
+
+        return parts.join('\n');
+      } catch (error) {
+        log.error('generateMeetingPrep tool error', error);
+        return 'Failed to generate meeting prep. Please try again.';
+      }
+    },
+    {
+      name: 'generate_meeting_prep',
+      description: 'Generate a meeting preparation brief for this deal. Includes talking points, questions, risks, and suggested agenda.',
+      schema: z.object({
+        attendees: z.string().optional().describe('Who the meeting is with (e.g., "CEO of target company")'),
+        topics: z.string().optional().describe('Key topics to cover'),
+      }),
+    }
+  );
+
+  const draftEmailTool = tool(
+    async ({ recipient, purpose, tone }) => {
+      try {
+        const result = await generateEmailDraft({
+          organizationId: orgId,
+          dealId,
+          purpose,
+          context: recipient,
+          tone: tone || 'formal',
+        });
+
+        if (result.status === 'failed') {
+          return `Email draft failed: ${result.error || 'Unknown error'}`;
+        }
+
+        const parts = [
+          `**Subject:** ${result.subject}\n`,
+          result.draft,
+        ];
+        if (result.suggestions.length) {
+          parts.push(`\n**Suggestions:** ${result.suggestions.join('; ')}`);
+        }
+        if (!result.isCompliant && result.complianceIssues.length) {
+          parts.push(`\n**Compliance Notes:** ${result.complianceIssues.join('; ')}`);
+        }
+
+        return parts.join('\n');
+      } catch (error) {
+        log.error('draftEmail tool error', error);
+        return 'Failed to draft email. Please try again.';
+      }
+    },
+    {
+      name: 'draft_email',
+      description: 'Draft a professional email related to this deal. Returns subject line, body, and compliance check.',
+      schema: z.object({
+        recipient: z.string().describe('Who the email is for (e.g., "management team", "broker", "legal counsel")'),
+        purpose: z.string().describe('Purpose of the email (e.g., "request additional financials", "schedule site visit", "follow up on LOI")'),
+        tone: z.enum(['formal', 'casual', 'direct']).default('formal').describe('Email tone'),
+      }),
+    }
+  );
+
+  // ─── Phase 4: Reading Tools ───────────────────────────────────────
+
+  const getAnalysisSummaryTool = tool(
+    async () => {
+      try {
+        const { data: statements } = await supabase
+          .from('FinancialStatement')
+          .select('*')
+          .eq('dealId', dealId)
+          .eq('isActive', true);
+
+        if (!statements || statements.length === 0) {
+          return 'No financial statements available for analysis. Extract financials first.';
+        }
+
+        const analysis = await analyzeFinancials(dealId, statements);
+        const parts: string[] = [];
+
+        // QoE Score
+        if (analysis.qoe) {
+          parts.push(`**Quality of Earnings Score: ${analysis.qoe.score}/100**`);
+          parts.push(analysis.qoe.summary);
+          if (analysis.qoe.flags?.length) {
+            parts.push(`\nQoE Flags:\n${analysis.qoe.flags.map((f: any) => `- [${f.severity}] ${f.label}: ${f.description}`).join('\n')}`);
+          }
+        }
+
+        // Red Flags
+        if (analysis.redFlags?.length) {
+          parts.push(`\n**Red Flags (${analysis.redFlags.length}):**`);
+          for (const rf of analysis.redFlags.slice(0, 8)) {
+            parts.push(`- [${rf.severity}] ${rf.title}: ${rf.detail}`);
+          }
+        }
+
+        // Key Ratios (grouped by category)
+        if (analysis.ratios?.length) {
+          parts.push(`\n**Key Ratios:**`);
+          for (const group of analysis.ratios.slice(0, 5)) {
+            parts.push(`\n*${group.category}:*`);
+            for (const r of group.ratios.slice(0, 4)) {
+              const latest = r.periods?.[0];
+              const val = latest?.value != null ? latest.value.toFixed(2) : '—';
+              parts.push(`- ${r.name}: ${val}${r.unit || ''} (${r.trend})`);
+            }
+          }
+        }
+
+        return parts.join('\n') || 'Analysis ran but produced no results.';
+      } catch (error) {
+        log.error('getAnalysisSummary tool error', error);
+        return 'Error running analysis.';
+      }
+    },
+    {
+      name: 'get_analysis_summary',
+      description: 'Run and fetch the PE analysis summary: Quality of Earnings score, red flags, key financial ratios. Use when the user asks about QoE, red flags, analysis results, or financial health.',
+      schema: z.object({}),
+    }
+  );
+
+  const listDocumentsTool = tool(
+    async () => {
+      try {
+        const { data: docs } = await supabase
+          .from('Document')
+          .select('id, name, type, fileSize, createdAt, aiAnalyzedAt, confidence')
+          .eq('dealId', dealId)
+          .order('createdAt', { ascending: false });
+
+        if (!docs || docs.length === 0) return 'No documents uploaded for this deal.';
+
+        const parts = [`**Documents (${docs.length}):**\n`];
+        for (const doc of docs) {
+          const size = doc.fileSize ? `${(doc.fileSize / 1024).toFixed(0)} KB` : 'unknown size';
+          const date = new Date(doc.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          const aiStatus = doc.aiAnalyzedAt ? `AI analyzed (${doc.confidence ? Math.round(doc.confidence * 100) + '%' : 'done'})` : 'Not analyzed';
+          parts.push(`- **${doc.name}** — ${size}, uploaded ${date}, ${aiStatus}`);
+        }
+        return parts.join('\n');
+      } catch (error) {
+        log.error('listDocuments tool error', error);
+        return 'Error fetching documents.';
+      }
+    },
+    {
+      name: 'list_documents',
+      description: 'List all documents uploaded to this deal with file details and AI analysis status.',
+      schema: z.object({}),
+    }
+  );
+
+  const scrollToSectionTool = tool(
+    async ({ section }) => {
+      return JSON.stringify({ type: 'scroll_to', section });
+    },
+    {
+      name: 'scroll_to_section',
+      description: 'Scroll the deal page to a specific section. Use when the user asks to see or navigate to financials, analysis, documents, activity, or risks.',
+      schema: z.object({
+        section: z.enum(['financials', 'analysis', 'activity', 'documents', 'risks']).describe('Section to scroll to'),
+      }),
+    }
+  );
+
   return [
     searchDocumentsTool,
     getDealFinancialsTool,
     compareDealsTool,
     getDealActivityTool,
     updateDealFieldTool,
+    changeDealStageTool,
+    addNoteTool,
+    triggerFinancialExtractionTool,
+    generateMeetingPrepTool,
+    draftEmailTool,
+    getAnalysisSummaryTool,
+    listDocumentsTool,
+    scrollToSectionTool,
     suggestActionTool,
   ];
 }

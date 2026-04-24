@@ -12,24 +12,6 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
 <style>
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #D1D5DB;
-            border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #9CA3AF;
-        }
-
         body {
             font-feature-settings: "cv11", "ss01";
             -webkit-font-smoothing: antialiased;
@@ -165,8 +147,9 @@
         <!-- Main Content - Two Column Layout -->
         <main class="flex-1 flex overflow-hidden">
             <!-- Left Panel - Deal Details -->
-            <section
-                class="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar">
+            <section id="deal-left-panel"
+                class="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar"
+                style="min-width: 400px;">
                 <!-- Deal Header -->
                 <div class="flex flex-col gap-6 mb-8">
                     <div class="flex justify-between items-start">
@@ -245,31 +228,22 @@
                             <!-- Pipeline stages will be rendered by JS -->
                         </div>
                     </div>
-                    <div
-                        class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
+                    <div class="grid grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Lead Partner
-                            </p>
-                            <div id="lead-partner-container" class="flex items-center gap-2">
-                                <div class="size-5 rounded-full bg-primary border border-primary/20"></div>
-                                <span id="lead-partner-name" class="text-sm text-text-main font-bold">—</span>
-                            </div>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Lead Partner</p>
+                            <span id="lead-partner-name" class="text-[13px] text-text-main font-semibold">—</span>
                         </div>
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Analyst</p>
-                            <div id="analyst-container" class="flex items-center gap-2">
-                                <div class="size-5 rounded-full bg-secondary border border-secondary/20"></div>
-                                <span id="analyst-name" class="text-sm text-text-main font-bold">—</span>
-                            </div>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Analyst</p>
+                            <span id="analyst-name" class="text-[13px] text-text-main font-semibold">—</span>
                         </div>
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Deal Source</p>
-                            <span id="deal-source" class="text-sm text-text-main font-bold">—</span>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Deal Source</p>
+                            <span id="deal-source" class="text-[13px] text-text-main font-semibold">—</span>
                         </div>
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Last Updated
-                            </p>
-                            <span id="deal-updated" class="text-sm text-text-main font-bold">—</span>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Last Updated</p>
+                            <span id="deal-updated" class="text-[13px] text-text-muted font-medium">—</span>
                         </div>
                     </div>
                 </div>
@@ -393,9 +367,16 @@
                 </div>
             </section>
 
+            <!-- Resize Handle -->
+            <div id="chat-resize-handle" class="hidden lg:flex w-1.5 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors flex-shrink-0 relative items-center justify-center z-10" title="Drag to resize">
+                <div class="absolute inset-y-0 -left-2 -right-2"></div>
+                <div class="w-0.5 h-8 bg-gray-300 group-hover:bg-primary/50 rounded-full transition-colors opacity-0 hover:opacity-100"></div>
+            </div>
+
             <!-- Right Panel - AI Chat -->
-            <section
-                class="flex-1 flex flex-col bg-background-body relative border-l border-border-subtle/60 shadow-inner">
+            <section id="deal-right-panel"
+                class="flex-1 flex flex-col bg-background-body relative border-l border-border-subtle/60 shadow-inner"
+                style="min-width: 300px;">
                 <!-- Chat Header -->
                 <div
                     class="h-14 border-b border-border-subtle flex items-center justify-between px-6 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
@@ -540,6 +521,7 @@
     <script src="deal-chat-responses.js"></script>
     <script src="deal-chat-attachments.js"></script>
     <script src="deal-chat.js"></script>
+    <script src="deal-chat-resize.js"></script>
     <script src="deal-stages.js"></script>
     <script src="deal-team.js"></script>
     <script src="deal-documents.js"></script>
