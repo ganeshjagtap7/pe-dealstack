@@ -77,7 +77,7 @@ export function MemoChat({
                 <span className="text-[11px] font-semibold text-text-muted ml-1">
                   AI Analyst &bull; {msg.timestamp}
                 </span>
-                <div className="bg-surface-card border border-border-subtle rounded-2xl rounded-tl-none p-3 shadow-sm text-sm text-text-secondary leading-relaxed">
+                <div className="bg-surface-card border border-border-subtle rounded-xl rounded-tl-none p-3 shadow-sm text-sm text-text-secondary leading-relaxed">
                   <div
                     className="chat-markdown space-y-1"
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
@@ -97,7 +97,7 @@ export function MemoChat({
                 <span className="text-[11px] font-semibold text-text-muted mr-1">
                   You &bull; {msg.timestamp}
                 </span>
-                <div className="bg-primary text-white rounded-2xl rounded-tr-none p-3 shadow-sm text-sm leading-relaxed">
+                <div className="bg-primary text-white rounded-xl rounded-tr-none p-3 shadow-sm text-sm leading-relaxed">
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                 </div>
               </div>
@@ -113,7 +113,7 @@ export function MemoChat({
               <span className="text-[11px] font-semibold text-text-muted ml-1">
                 AI Analyst &bull; typing...
               </span>
-              <div className="bg-surface-card border border-border-subtle rounded-2xl rounded-tl-none p-3 shadow-sm">
+              <div className="bg-surface-card border border-border-subtle rounded-xl rounded-tl-none p-3 shadow-sm">
                 <div className="flex gap-1">
                   <span className="size-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
                   <span className="size-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />

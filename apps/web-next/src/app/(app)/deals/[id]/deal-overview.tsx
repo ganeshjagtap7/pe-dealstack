@@ -27,11 +27,11 @@ export function OverviewTab({
   const highlights = deal.aiRisks?.investmentHighlights || [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       <KeyRisksSection risks={risks} highlights={highlights} />
 
       {/* AI Thesis */}
-      <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
+      <div className="bg-surface-card border border-border-subtle rounded-lg p-5 shadow-card">
         <div className="flex items-center gap-2 mb-3">
           <span className="material-symbols-outlined text-[20px] text-primary">auto_awesome</span>
           <h3 className="text-sm font-semibold text-text-main">AI Investment Thesis</h3>
@@ -46,7 +46,7 @@ export function OverviewTab({
       </div>
 
       {deal.description && (
-        <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
+        <div className="bg-surface-card border border-border-subtle rounded-lg p-5 shadow-card">
           <h3 className="text-sm font-semibold text-text-main mb-3">Description</h3>
           <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
             {deal.description}
@@ -76,7 +76,7 @@ export function OverviewTab({
 function KeyRisksSection({ risks, highlights }: { risks: string[]; highlights: string[] }) {
   if (risks.length === 0 && highlights.length === 0) {
     return (
-      <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
+      <div className="bg-surface-card border border-border-subtle rounded-lg p-5 shadow-card">
         <div className="flex items-center gap-2 mb-4">
           <span className="material-symbols-outlined text-lg text-amber-500">warning</span>
           <h3 className="text-sm font-bold text-text-main uppercase tracking-wider">Key Risks</h3>
@@ -91,7 +91,7 @@ function KeyRisksSection({ risks, highlights }: { risks: string[]; highlights: s
   }
 
   return (
-    <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
+    <div className="bg-surface-card border border-border-subtle rounded-lg p-5 shadow-card">
       <div className="flex items-center gap-2 mb-4">
         <span className="material-symbols-outlined text-lg text-amber-500">warning</span>
         <h3 className="text-sm font-bold text-text-main uppercase tracking-wider">Key Risks</h3>
@@ -152,7 +152,7 @@ function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: 
   }, [dealId, note, onNoteAdded]);
 
   return (
-    <div className="bg-surface-card border border-border-subtle rounded-xl p-4 shadow-card">
+    <div className="bg-surface-card border border-border-subtle rounded-lg p-4 shadow-card">
       <h3 className="text-sm font-bold text-text-main uppercase tracking-wider mb-3 flex items-center gap-2">
         <span className="material-symbols-outlined text-amber-500 text-lg">sticky_note_2</span>
         Add Note
@@ -197,7 +197,7 @@ const ACTIVITY_ICONS: Record<string, { icon: string; color: string; bg: string }
 
 function InlineActivityFeed({ activities, loading, onRefresh }: { activities: Activity[]; loading: boolean; onRefresh: () => void }) {
   return (
-    <div className="bg-surface-card border border-border-subtle rounded-xl p-5 shadow-card">
+    <div className="bg-surface-card border border-border-subtle rounded-lg p-5 shadow-card">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-sm font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-lg">history</span>
@@ -217,7 +217,7 @@ function InlineActivityFeed({ activities, loading, onRefresh }: { activities: Ac
         )}
         {!loading && activities.length === 0 && (
           <div className="flex flex-col items-center justify-center py-8 text-text-muted">
-            <span className="material-symbols-outlined text-3xl mb-2">inbox</span>
+            <span className="material-symbols-outlined text-2xl mb-2">inbox</span>
             <p className="text-sm">No activities yet</p>
           </div>
         )}
@@ -256,7 +256,7 @@ function InlineActivityFeed({ activities, loading, onRefresh }: { activities: Ac
 
 function RecentDocuments({ documents }: { documents: DocItem[] }) {
   return (
-    <div className="pt-6 border-t border-border-subtle">
+    <div className="pt-5 border-t border-border-subtle">
       <h3 className="text-sm font-bold text-text-main mb-3">Recent Documents</h3>
       <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
         {documents.slice(0, 5).map((doc) => (

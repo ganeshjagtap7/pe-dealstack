@@ -98,7 +98,7 @@ export function DeleteModal({
       onClick={onCancel}
     >
       <div
-        className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-6"
+        className="bg-white rounded-xl shadow-2xl max-w-sm w-full p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -358,7 +358,7 @@ export function DealCard({
                     {cfg.label}
                   </span>
                   <span className={cn(
-                    "font-bold text-lg",
+                    "font-bold text-base",
                     key === "mom" && value != null && value >= 3 ? "text-green-600" : "",
                     key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
                     !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
@@ -620,10 +620,10 @@ export function UploadCard({ onClick }: { onClick?: () => void }) {
   return (
     <article
       onClick={onClick}
-      className="bg-white/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-[#003366] hover:bg-primary-light/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4"
+      className="bg-white/50 rounded-lg border border-dashed border-border-subtle p-5 hover:border-[#003366] hover:bg-primary-light/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[280px] text-center gap-3"
     >
-      <div className="size-14 rounded-full bg-white border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-[#003366]/30 transition-all shadow-sm">
-        <span className="material-symbols-outlined text-text-muted group-hover:text-[#003366] text-2xl">add</span>
+      <div className="size-12 rounded-full bg-white border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-[#003366]/30 transition-all shadow-sm">
+        <span className="material-symbols-outlined text-text-muted group-hover:text-[#003366] text-xl">add</span>
       </div>
       <div>
         <h3 className="text-text-main font-bold text-base group-hover:text-[#003366] transition-colors">

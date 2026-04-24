@@ -23,7 +23,7 @@ export function StagePipeline({
   const isTerminal = TERMINAL_STAGES.includes(deal.stage);
 
   return (
-    <div className="bg-surface-card border border-border-subtle rounded-xl p-4 shadow-card">
+    <div className="bg-surface-card border border-border-subtle rounded-lg p-4 shadow-card">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-sm">timeline</span>
@@ -146,7 +146,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
   const analyst = deal.team?.find((m) => m.role === "MEMBER") ?? deal.team?.find((m) => m.role !== "LEAD") ?? deal.team?.[0];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-background-body border border-border-subtle">
       <div>
         <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
           Lead Partner
@@ -268,8 +268,8 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
 
   if (metrics.length === 0) {
     return (
-      <div className="bg-surface-card border border-border-subtle rounded-xl p-6 shadow-card text-center">
-        <span className="material-symbols-outlined text-text-muted text-3xl mb-2 block">analytics</span>
+      <div className="bg-surface-card border border-border-subtle rounded-lg p-5 shadow-card text-center">
+        <span className="material-symbols-outlined text-text-muted text-2xl mb-2 block">analytics</span>
         <p className="text-text-muted text-sm">
           No financial metrics yet. Upload a CIM or edit the deal to add data.
         </p>
@@ -282,7 +282,7 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
       {metrics.map((m) => (
         <div
           key={m.key}
-          className="bg-surface-card border border-border-subtle rounded-xl p-4 shadow-card relative overflow-hidden group"
+          className="bg-surface-card border border-border-subtle rounded-lg p-4 shadow-card relative overflow-hidden group"
         >
           <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">{m.label}</p>
           <div className="flex items-center gap-2 mt-3">

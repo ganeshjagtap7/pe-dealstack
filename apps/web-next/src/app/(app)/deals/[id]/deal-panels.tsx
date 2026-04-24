@@ -189,19 +189,19 @@ export function AISettingsModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-        <div className="p-6 border-b border-border-subtle">
+        <div className="p-5 border-b border-border-subtle">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-text-main text-lg">AI Context Settings</h3>
+            <h3 className="font-bold text-text-main text-base">AI Context Settings</h3>
             <button onClick={onClose} className="text-text-muted hover:text-text-main transition-colors">
               <span className="material-symbols-outlined">close</span>
             </button>
           </div>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-5 space-y-4">
           <div>
             <label className="block text-sm font-semibold text-text-main mb-2">AI Model</label>
-            <div className="flex items-center gap-2 px-4 py-2.5 bg-gray-50 border border-border-subtle rounded-lg">
-              <span className="material-symbols-outlined text-primary text-lg">smart_toy</span>
+            <div className="flex items-center gap-2 px-3 py-2 bg-gray-50 border border-border-subtle rounded-lg">
+              <span className="material-symbols-outlined text-primary text-base">smart_toy</span>
               <span className="text-sm font-medium text-text-main">GPT-4o (ReAct Agent)</span>
               <span className="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-green-50 text-green-600 border border-green-200">Active</span>
             </div>
@@ -221,7 +221,7 @@ export function AISettingsModal({ onClose }: { onClose: () => void }) {
               <span className="text-sm text-text-main">Include citations from documents</span>
             </label>
           </div>
-          <button onClick={() => { localStorage.setItem("pe-ai-settings", JSON.stringify({ responseStyle, includeCitations })); onClose(); }} className="w-full text-white font-semibold py-2.5 rounded-lg transition-colors" style={{ backgroundColor: "#003366" }}>
+          <button onClick={() => { localStorage.setItem("pe-ai-settings", JSON.stringify({ responseStyle, includeCitations })); onClose(); }} className="w-full text-white font-semibold py-2 rounded-lg transition-colors" style={{ backgroundColor: "#003366" }}>
             Save Settings
           </button>
         </div>
@@ -267,8 +267,8 @@ export function TerminalStageModal({
               { stage: "PASSED", icon: "do_not_disturb_on", color: "gray", label: "Passed", desc: "Decided not to pursue" },
             ] as const).map(({ stage, icon, color, label, desc }) => (
               <button key={stage} onClick={() => onSelect(stage)} className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg border border-border-subtle bg-white hover:border-${color}-300 transition-all group`}>
-                <div className={`size-9 rounded-lg bg-${color}-50 text-${color}-500 flex items-center justify-center group-hover:bg-${color}-500 group-hover:text-white transition-colors`}>
-                  <span className="material-symbols-outlined text-xl">{icon}</span>
+                <div className={`size-8 rounded-lg bg-${color}-50 text-${color}-500 flex items-center justify-center group-hover:bg-${color}-500 group-hover:text-white transition-colors`}>
+                  <span className="material-symbols-outlined text-lg">{icon}</span>
                 </div>
                 <div className="text-left flex-1">
                   <div className="font-medium text-text-main text-sm">{label}</div>

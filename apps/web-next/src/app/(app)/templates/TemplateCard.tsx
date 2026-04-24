@@ -37,7 +37,7 @@ export function TemplateCard({
   return (
     <div
       className={cn(
-        "template-card group bg-surface-card rounded-xl overflow-hidden transition-all cursor-pointer relative",
+        "template-card group bg-surface-card rounded-lg overflow-hidden transition-all cursor-pointer relative",
         isSelected
           ? "border-2 border-primary shadow-card-hover"
           : "border border-border-subtle shadow-card hover:shadow-card-hover hover:border-primary/30"
@@ -60,13 +60,13 @@ export function TemplateCard({
 
         {/* Dropdown */}
         {menuOpen && (
-          <div className="absolute right-0 top-10 bg-white rounded-xl shadow-xl border border-gray-200 py-1 w-44 overflow-hidden z-20">
+          <div className="absolute right-0 top-10 bg-white rounded-lg shadow-xl border border-gray-200 py-1 w-44 overflow-hidden z-20">
             <button
               onClick={(e) => {
                 e.stopPropagation();
                 onDuplicate();
               }}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">content_copy</span>
               Duplicate
@@ -76,7 +76,7 @@ export function TemplateCard({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+              className="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">delete</span>
               Delete
@@ -105,7 +105,7 @@ export function TemplateCard({
       {/* Content */}
       <div className="p-4">
         <div className="flex items-start justify-between mb-2">
-          <h3 className="font-semibold text-text-main text-base">{template.name}</h3>
+          <h3 className="font-semibold text-text-main text-sm">{template.name}</h3>
           {template.isGoldStandard && (
             <span className="bg-primary/10 text-primary text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide ml-2 shrink-0">
               Gold Std
@@ -141,7 +141,7 @@ export function CreateFromScratchCard({ onClick }: { onClick: () => void }) {
   return (
     <div
       onClick={onClick}
-      className="group border-2 border-dashed border-border-subtle rounded-xl flex flex-col items-center justify-center text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/30 transition-all cursor-pointer min-h-[280px]"
+      className="group border-2 border-dashed border-border-subtle rounded-lg flex flex-col items-center justify-center text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/30 transition-all cursor-pointer min-h-[280px]"
     >
       <div className="bg-background-body p-3 rounded-full mb-3 group-hover:bg-primary-light group-hover:text-primary transition-colors">
         <span className="material-symbols-outlined text-[24px]">add</span>

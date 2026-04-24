@@ -188,13 +188,13 @@ interface MarketSentimentCardProps {
 export function MarketSentimentCard({ sentiment, sentimentLoading, sentimentError }: MarketSentimentCardProps) {
   return (
     <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
-      <div className="p-6 border-b border-border-subtle flex items-start justify-between gap-4 bg-gradient-to-r from-white to-gray-50/50">
-        <div className="flex flex-col gap-3 min-w-0">
+      <div className="p-5 border-b border-border-subtle flex items-start justify-between gap-4 bg-gradient-to-r from-white to-gray-50/50">
+        <div className="flex flex-col gap-2 min-w-0">
           <div className="flex items-center gap-2">
             <div className="p-1.5 bg-secondary-light rounded text-secondary border border-secondary/20">
               <span className="material-symbols-outlined text-[20px] block">psychology</span>
             </div>
-            <h2 className="text-lg font-bold text-primary">AI Market Sentiment</h2>
+            <h2 className="text-base font-bold text-primary">AI Market Sentiment</h2>
           </div>
           {sentimentLoading ? (
             <p className="text-text-muted text-sm flex items-center gap-2">
@@ -232,7 +232,7 @@ export function MarketSentimentCard({ sentiment, sentimentLoading, sentimentErro
           <div className="hidden sm:flex flex-col items-end border-l border-border-subtle pl-6 py-1">
             <div
               className={cn(
-                "text-4xl font-bold tracking-tight",
+                "text-3xl font-bold tracking-tight",
                 sentiment.sentiment === "BULLISH" ? "text-secondary"
                   : sentiment.sentiment === "BEARISH" ? "text-red-600"
                     : "text-primary",

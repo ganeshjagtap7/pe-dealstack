@@ -105,8 +105,8 @@ export default function DataRoomOverviewPage() {
               setNewName("");
             }}
           />
-          <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-slate-200">
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <div
                   className="flex items-center justify-center w-10 h-10 rounded-lg"
@@ -127,7 +127,7 @@ export default function DataRoomOverviewPage() {
                 <span className="material-symbols-outlined text-slate-400">close</span>
               </button>
             </div>
-            <div className="p-5">
+            <div className="p-4">
               <label className="block text-sm font-medium text-slate-600 mb-2">
                 Data Room Name
               </label>
@@ -146,13 +146,13 @@ export default function DataRoomOverviewPage() {
                   }
                 }}
                 placeholder="e.g., Project Apollo, Acme Corp Acquisition"
-                className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-slate-900 placeholder:text-slate-400"
+                className="w-full px-3 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-slate-900 placeholder:text-slate-400"
               />
               <p className="mt-2 text-xs text-slate-400">
                 A new data room will be created with default folders for due diligence.
               </p>
             </div>
-            <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200 bg-slate-50/50">
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50/50">
               <button
                 type="button"
                 onClick={() => {
@@ -184,9 +184,9 @@ export default function DataRoomOverviewPage() {
         </div>
       )}
 
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
+      <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-slate-900">All Data Rooms</h1>
+          <h1 className="text-lg font-bold text-slate-900">All Data Rooms</h1>
           <p className="text-sm text-slate-500">{deals.length} active deals</p>
         </div>
         <button
@@ -239,9 +239,9 @@ export default function DataRoomOverviewPage() {
                 <Link
                   key={deal.id}
                   href={`/data-room/${deal.id}`}
-                  className="bg-white rounded-xl border border-slate-200 p-5 hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer group block"
+                  className="bg-white rounded-lg border border-slate-200 p-4 hover:shadow-lg hover:border-slate-300 transition-all cursor-pointer group block"
                 >
-                  <div className="flex items-start gap-3 mb-4">
+                  <div className="flex items-start gap-3 mb-3">
                     <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-slate-100 group-hover:bg-primary/10 transition-colors shrink-0">
                       <span className="material-symbols-outlined text-slate-600 group-hover:text-primary">
                         folder_open
@@ -270,7 +270,7 @@ export default function DataRoomOverviewPage() {
       </div>
 
       {errorMsg && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border max-w-sm bg-red-50 border-red-200">
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border max-w-sm bg-red-50 border-red-200">
           <span className="material-symbols-outlined text-xl text-red-600">error</span>
           <p className="text-sm text-slate-800 flex-1">{errorMsg}</p>
           <button

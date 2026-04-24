@@ -53,16 +53,16 @@ export function CreateFolderModal({
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
         onClick={onClose}
       />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="flex items-center justify-between p-5 border-b border-slate-200">
+      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <div className="flex items-center gap-3">
             <div
-              className="flex items-center justify-center w-10 h-10 rounded-lg"
+              className="flex items-center justify-center w-9 h-9 rounded-lg"
               style={{ backgroundColor: "#E6EEF5" }}
             >
-              <span className="material-symbols-outlined text-primary">create_new_folder</span>
+              <span className="material-symbols-outlined text-primary text-[20px]">create_new_folder</span>
             </div>
-            <h3 className="text-lg font-semibold text-slate-900">Create New Folder</h3>
+            <h3 className="text-base font-semibold text-slate-900">Create New Folder</h3>
           </div>
           <button
             type="button"
@@ -72,7 +72,7 @@ export function CreateFolderModal({
             <span className="material-symbols-outlined text-slate-400">close</span>
           </button>
         </div>
-        <div className="p-5">
+        <div className="p-4">
           <label className="block text-sm font-medium text-slate-600 mb-2">Folder Name</label>
           <input
             ref={inputRef}
@@ -88,13 +88,13 @@ export function CreateFolderModal({
               }
             }}
             placeholder="e.g., Tax Documents, Contracts"
-            className="w-full px-4 py-3 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-slate-900 placeholder:text-slate-400"
+            className="w-full px-3 py-2.5 rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-sm text-slate-900 placeholder:text-slate-400"
           />
           <p className="mt-2 text-xs text-slate-400">
             The folder will be created in the current deal&apos;s data room.
           </p>
         </div>
-        <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200 bg-slate-50/50">
+        <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50/50">
           <button
             type="button"
             onClick={onClose}
@@ -106,7 +106,7 @@ export function CreateFolderModal({
             type="button"
             onClick={onSubmit}
             disabled={!newFolderName.trim() || creatingFolder}
-            className="px-5 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
+            className="px-4 py-2 text-sm font-medium text-white rounded-lg shadow transition-colors disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90"
             style={{ backgroundColor: "#003366" }}
           >
             {creatingFolder ? "Creating..." : "Create Folder"}
@@ -166,7 +166,7 @@ export function DataRoomHeader({
   };
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
+    <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
       <nav className="flex items-center gap-1.5 text-sm">
         <button
           type="button"
@@ -307,16 +307,16 @@ export function UploadConfirmModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-900">
+      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+          <h3 className="text-base font-semibold text-slate-900">
             Upload {files.length} file{files.length > 1 ? "s" : ""}
           </h3>
           <button type="button" onClick={onCancel} className="text-slate-400 hover:text-slate-600">
-            <span className="material-symbols-outlined text-xl">close</span>
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
-        <div className="p-5">
+        <div className="p-4">
           <ul className="mb-4 space-y-1.5 max-h-40 overflow-y-auto">
             {files.map((f, i) => (
               <li key={i} className="text-sm text-slate-600 flex items-center gap-2">
@@ -347,7 +347,7 @@ export function UploadConfirmModal({
             </label>
           )}
         </div>
-        <div className="flex items-center justify-end gap-3 p-5 border-t border-slate-200">
+        <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200">
           <button type="button" onClick={onCancel} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-900">
             Cancel
           </button>
@@ -355,7 +355,7 @@ export function UploadConfirmModal({
             type="button"
             onClick={onConfirm}
             disabled={uploading}
-            className="px-5 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50"
+            className="px-4 py-2 text-sm font-medium text-white rounded-lg transition-colors disabled:opacity-50"
             style={{ backgroundColor: "#003366" }}
           >
             {uploading ? "Uploading..." : "Upload"}
@@ -396,17 +396,17 @@ export function LinkToDealModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md mx-4">
-        <div className="p-5 border-b border-slate-200 flex items-center justify-between">
+      <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Link to Deal</h3>
+            <h3 className="text-base font-semibold text-slate-900">Link to Deal</h3>
             <p className="text-xs text-slate-500 mt-0.5 truncate">&quot;{file.name}&quot;</p>
           </div>
           <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
-            <span className="material-symbols-outlined text-xl">close</span>
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
         </div>
-        <div className="p-5">
+        <div className="p-4">
           <input
             type="text"
             placeholder="Search deals..."
@@ -463,7 +463,7 @@ const TOAST_STYLES: Record<string, { bg: string; border: string; icon: string; i
 export function VDRToast({ message, type, onDismiss }: ToastProps) {
   const s = TOAST_STYLES[type] || TOAST_STYLES.info;
   return (
-    <div className={`fixed bottom-6 right-6 z-[9998] flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border max-w-sm ${s.bg} ${s.border}`}>
+    <div className={`fixed bottom-6 right-6 z-[9998] flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg border max-w-sm ${s.bg} ${s.border}`}>
       <span className={`material-symbols-outlined text-xl shrink-0 ${s.iconColor}`}>{s.icon}</span>
       <p className="text-sm text-slate-800 flex-1">{message}</p>
       <button type="button" onClick={onDismiss} className="text-slate-400 hover:text-slate-600 shrink-0">

@@ -162,19 +162,19 @@ export function DocumentsTab({
       </div>
 
       {documents.length === 0 ? (
-        <div className="text-center py-16 border border-dashed border-border-subtle rounded-lg">
-          <span className="material-symbols-outlined text-4xl text-text-muted">folder_open</span>
+        <div className="text-center py-12 border border-dashed border-border-subtle rounded-lg">
+          <span className="material-symbols-outlined text-3xl text-text-muted">folder_open</span>
           <p className="mt-2 text-sm text-text-muted">No documents yet</p>
           <p className="text-xs text-text-muted mt-1">Upload files to get started</p>
         </div>
       ) : (
-        <div className="bg-surface-card border border-border-subtle rounded-xl shadow-card divide-y divide-border-subtle">
+        <div className="bg-surface-card border border-border-subtle rounded-lg shadow-card divide-y divide-border-subtle">
           {documents.map((doc) => (
             <div
               key={doc.id}
               className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
             >
-              <span className="material-symbols-outlined text-[22px] text-text-muted">
+              <span className="material-symbols-outlined text-[20px] text-text-muted">
                 {getDocIcon(doc.name)}
               </span>
               <div className="flex-1 min-w-0">
@@ -249,7 +249,7 @@ export function StageChangeModal({
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
         <div className="p-5 border-b border-border-subtle">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-text-main text-lg flex items-center gap-2">
+            <h3 className="font-bold text-text-main text-base flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">swap_horiz</span>
               Change Deal Stage
             </h3>
@@ -259,16 +259,16 @@ export function StageChangeModal({
           </div>
         </div>
         <div className="p-5">
-          <div className="flex items-center justify-center gap-4 mb-5">
+          <div className="flex items-center justify-center gap-4 mb-4">
             <div className="text-center">
-              <div className="size-12 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-2">
+              <div className="size-10 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-2">
                 <span className="material-symbols-outlined text-gray-500">circle</span>
               </div>
               <span className="text-sm font-medium text-text-secondary">{fromLabel}</span>
             </div>
             <span
               className={cn(
-                "material-symbols-outlined text-2xl",
+                "material-symbols-outlined text-xl",
                 isMovingBack ? "text-amber-500" : "text-primary"
               )}
             >
@@ -277,7 +277,7 @@ export function StageChangeModal({
             <div className="text-center">
               <div
                 className={cn(
-                  "size-12 rounded-full flex items-center justify-center mx-auto mb-2",
+                  "size-10 rounded-full flex items-center justify-center mx-auto mb-2",
                   isMovingBack ? "bg-amber-100" : "bg-blue-50"
                 )}
               >

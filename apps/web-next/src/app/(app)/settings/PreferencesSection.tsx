@@ -5,10 +5,7 @@ import { cn } from "@/lib/cn";
 
 export interface PrefsState {
   investmentFocus: string[];
-  sourcingSensitivity: number;
   preferredCurrency: string;
-  autoExtract: boolean;
-  autoUpdateDeal: boolean;
   density: string;
   theme: string;
 }
@@ -48,19 +45,19 @@ export function PreferencesSection({ prefs, onChange }: Props) {
 
   return (
     <>
-      {/* AI / Sourcing Preferences */}
+      {/* Preferences */}
       <section
         id="section-preferences"
         className="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden scroll-mt-6"
       >
         <div className="px-6 py-5 border-b border-border-subtle flex items-center gap-3">
-          <div className="p-2 bg-secondary-light rounded-lg text-secondary border border-secondary/20">
-            <span className="material-symbols-outlined text-[20px] block">auto_awesome</span>
+          <div className="p-2 bg-primary-light rounded-lg text-primary border border-primary/20">
+            <span className="material-symbols-outlined text-[20px] block">tune</span>
           </div>
           <div>
-            <h2 className="text-base font-bold text-text-main">AI &amp; Sourcing Preferences</h2>
+            <h2 className="text-base font-bold text-text-main">Preferences</h2>
             <p className="text-xs text-text-muted">
-              Tune how the platform&apos;s AI evaluates deals and extracts data.
+              Configure your investment focus and display settings.
             </p>
           </div>
         </div>
@@ -96,67 +93,24 @@ export function PreferencesSection({ prefs, onChange }: Props) {
                 Add Sector
               </button>
             </div>
-            <p className="text-xs text-text-muted mt-2">
-              The AI prioritizes deals in these sectors when scoring and recommending.
-            </p>
           </div>
 
-          {/* Sourcing Sensitivity */}
+          {/* Currency */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider">
-                Sourcing Sensitivity
-              </label>
-              <span className="text-sm font-bold text-primary">{prefs.sourcingSensitivity}%</span>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={100}
-              step={1}
-              value={prefs.sourcingSensitivity}
-              onChange={(e) => onChange({ sourcingSensitivity: Number(e.target.value) })}
-              className="w-full accent-primary"
-            />
-            <div className="flex justify-between text-[10px] text-text-muted uppercase tracking-wider mt-1">
-              <span>Strict</span>
-              <span>Balanced</span>
-              <span>Permissive</span>
-            </div>
-          </div>
-
-          {/* Currency + Auto-extract + Auto-update */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
-                Preferred Currency
-              </label>
-              <select
-                value={prefs.preferredCurrency}
-                onChange={(e) => onChange({ preferredCurrency: e.target.value })}
-                className="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm outline-none cursor-pointer"
-              >
-                {CURRENCIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="flex flex-col gap-3">
-              <ToggleRow
-                label="Auto-extract financials from uploads"
-                description="Run AI extraction automatically when a CIM or statement is uploaded."
-                checked={prefs.autoExtract}
-                onChange={(v) => onChange({ autoExtract: v })}
-              />
-              <ToggleRow
-                label="Auto-update deal card from extractions"
-                description="Merge confident extractions (revenue, EBITDA, industry) into the deal."
-                checked={prefs.autoUpdateDeal}
-                onChange={(v) => onChange({ autoUpdateDeal: v })}
-              />
-            </div>
+            <label className="block text-xs font-bold text-text-secondary uppercase tracking-wider mb-2">
+              Preferred Currency
+            </label>
+            <select
+              value={prefs.preferredCurrency}
+              onChange={(e) => onChange({ preferredCurrency: e.target.value })}
+              className="w-full rounded-lg border border-border-subtle bg-white text-text-main text-sm font-medium focus:border-primary focus:ring-1 focus:ring-primary h-11 px-4 shadow-sm outline-none cursor-pointer max-w-xs"
+            >
+              {CURRENCIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
       </section>
@@ -295,40 +249,3 @@ export function PreferencesSection({ prefs, onChange }: Props) {
   );
 }
 
-function ToggleRow({
-  label,
-  description,
-  checked,
-  onChange,
-}: {
-  label: string;
-  description: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="flex items-start justify-between gap-4 p-3 rounded-lg border border-border-subtle bg-white">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-text-main">{label}</p>
-        <p className="text-xs text-text-muted">{description}</p>
-      </div>
-      <button
-        type="button"
-        onClick={() => onChange(!checked)}
-        role="switch"
-        aria-checked={checked}
-        className={cn(
-          "relative w-11 h-6 rounded-full transition-colors shrink-0 mt-0.5",
-          checked ? "bg-primary" : "bg-gray-300",
-        )}
-      >
-        <span
-          className={cn(
-            "absolute top-0.5 left-0.5 size-5 rounded-full bg-white shadow transition-transform",
-            checked ? "translate-x-5" : "translate-x-0",
-          )}
-        />
-      </button>
-    </div>
-  );
-}

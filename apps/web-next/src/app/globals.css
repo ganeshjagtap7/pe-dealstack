@@ -193,6 +193,16 @@ body {
   background-color: #fafafa;
 }
 
+/* AI chat bubble gradient — matches legacy deal.html .ai-bubble-gradient */
+.ai-bubble-gradient {
+  background: linear-gradient(135deg, #E6EEF5 0%, #F8F9FA 100%);
+}
+
+/* Chat message fade-in — matches legacy animate-fadeIn */
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
 /* Chat markdown inside AI Analyst panel */
 .chat-markdown p { margin-bottom: 0.25rem; }
 .chat-markdown ul, .chat-markdown ol {

@@ -428,19 +428,19 @@ export default function ContactsPage() {
             </>
           ) : (
             <>
-              <div className="size-20 rounded-full bg-blue-50/60 flex items-center justify-center mb-5">
-                <span className="material-symbols-outlined text-[#003366] text-4xl">groups</span>
+              <div className="size-16 rounded-full bg-blue-50/60 flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-[#003366] text-3xl">groups</span>
               </div>
-              <h3 className="text-lg font-bold text-text-main mb-2">Start building your network</h3>
-              <p className="text-text-muted text-sm mb-6 text-center max-w-xs">Add contacts to track relationships with bankers, advisors, executives, and LPs.</p>
-              <button onClick={openAddModal} className="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-medium" style={{ backgroundColor: "#003366" }}>
+              <h3 className="text-base font-bold text-text-main mb-2">Start building your network</h3>
+              <p className="text-text-muted text-sm mb-5 text-center max-w-xs">Add contacts to track relationships with bankers, advisors, executives, and LPs.</p>
+              <button onClick={openAddModal} className="flex items-center gap-2 px-5 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-medium" style={{ backgroundColor: "#003366" }}>
                 <span className="material-symbols-outlined text-[18px]">person_add</span>Add Your First Contact
               </button>
             </>
           )}
         </div>
       ) : groupByCompany ? (
-        <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-5">
           {sortedGroupKeys.map((company) => (
             <div key={company}>
               <div className="flex items-center gap-3 mb-3">

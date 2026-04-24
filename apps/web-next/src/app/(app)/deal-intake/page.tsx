@@ -346,7 +346,7 @@ export default function DealIntakePage() {
           <div>
             <ResultDisplay result={result} onReset={resetForm} />
             {result.deal && (followUpLoading || followUpQuestions.length > 0) && (
-              <div className="bg-surface-card rounded-xl border border-border-subtle shadow-card p-6 mt-4">
+              <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card p-5 mt-4">
                 <FollowUpQuestions questions={followUpQuestions} answers={followUpAnswers} onAnswer={handleFollowUpAnswer} loading={followUpLoading} />
                 {Object.keys(followUpAnswers).length > 0 && (
                   <div className="mt-5">

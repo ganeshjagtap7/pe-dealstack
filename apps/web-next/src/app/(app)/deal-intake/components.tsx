@@ -129,7 +129,7 @@ export function DealSelector({
   setShowDealDropdown,
 }: DealSelectorProps) {
   return (
-    <div className="bg-surface-card rounded-xl border border-border-subtle shadow-card p-5">
+    <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card p-5">
       <label className="block text-sm font-medium text-text-main mb-3">Target</label>
       <div className="flex gap-3 mb-4">
         <button

@@ -368,7 +368,7 @@ export default function DealDetailPage() {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center max-w-md">
-          <span className="material-symbols-outlined text-5xl text-red-400">error</span>
+          <span className="material-symbols-outlined text-4xl text-red-400">error</span>
           <h2 className="mt-3 text-lg font-semibold text-text-main">Deal not found</h2>
           <p className="mt-1 text-sm text-text-muted">
             {error || "Could not load this deal."}
@@ -441,7 +441,7 @@ export default function DealDetailPage() {
       </div>
 
       {/* Two-column layout */}
-      <div className="flex gap-6">
+      <div className="flex gap-5">
         {/* LEFT COLUMN */}
         <div className="flex-1 min-w-0 flex flex-col gap-5">
           {/* Deal header */}
@@ -549,7 +549,7 @@ export default function DealDetailPage() {
         </div>
 
         {/* RIGHT COLUMN -- AI Chat sidebar (sticky, desktop only) */}
-        <div className="hidden lg:block w-80 shrink-0">
+        <div className="hidden lg:block w-96 xl:w-[440px] shrink-0">
           <div className="sticky top-6">
             <ChatTab
               deal={deal}

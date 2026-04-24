@@ -26,10 +26,7 @@ const NAV_SECTIONS = [
 
 const DEFAULT_PREFS: PrefsState = {
   investmentFocus: [],
-  sourcingSensitivity: 50,
   preferredCurrency: "USD",
-  autoExtract: true,
-  autoUpdateDeal: false,
   density: "default",
   theme: "light",
 };
@@ -52,11 +49,7 @@ function parsePrefs(raw: UserProfile["preferences"]): {
   }
   const prefs: PrefsState = {
     investmentFocus: Array.isArray(obj.investmentFocus) ? (obj.investmentFocus as string[]) : [],
-    sourcingSensitivity:
-      typeof obj.sourcingSensitivity === "number" ? obj.sourcingSensitivity : 50,
     preferredCurrency: typeof obj.preferredCurrency === "string" ? obj.preferredCurrency : "USD",
-    autoExtract: typeof obj.autoExtract === "boolean" ? obj.autoExtract : true,
-    autoUpdateDeal: typeof obj.autoUpdateDeal === "boolean" ? obj.autoUpdateDeal : false,
     density: typeof obj.density === "string" ? obj.density : "default",
     theme: typeof obj.theme === "string" ? obj.theme : "light",
   };
@@ -243,7 +236,7 @@ export default function SettingsPage() {
             type="button"
             onClick={handleCancel}
             disabled={!hasChanges}
-            className="px-4 py-2.5 bg-white border border-border-subtle text-text-main text-sm font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-card disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-4 py-2 bg-white border border-border-subtle text-text-main text-sm font-semibold rounded-lg hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-card disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Cancel
           </button>
@@ -251,7 +244,7 @@ export default function SettingsPage() {
             type="button"
             onClick={handleSave}
             disabled={saving || !hasChanges}
-            className="px-5 py-2.5 bg-primary hover:bg-primary-hover text-white text-sm font-semibold rounded-lg shadow-card transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="px-5 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-semibold rounded-lg shadow-card transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             {saving && (
               <span className="material-symbols-outlined text-[18px] animate-spin">sync</span>
@@ -281,14 +274,14 @@ export default function SettingsPage() {
                     setActiveSection(section.id);
                   }}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-all",
+                    "flex items-center gap-3 px-3 py-2 rounded-lg border transition-all",
                     isActive
                       ? "bg-primary-light text-primary border-primary"
                       : "border-transparent text-text-secondary hover:bg-primary-light hover:text-primary",
                   )}
                 >
                   <span
-                    className="material-symbols-outlined text-[20px]"
+                    className="material-symbols-outlined text-[18px]"
                     style={isActive ? { fontVariationSettings: "'FILL' 1" } : undefined}
                   >
                     {section.icon}
@@ -334,7 +327,7 @@ export default function SettingsPage() {
           <FirmProfileSection />
 
           {/* Deactivate Account */}
-          <div className="flex items-center justify-between p-5 bg-red-50 border border-red-200 rounded-xl">
+          <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
             <div>
               <h4 className="text-sm font-bold text-red-700">Deactivate Professional Account</h4>
               <p className="text-xs text-red-600/80">
