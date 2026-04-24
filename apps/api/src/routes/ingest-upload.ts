@@ -27,6 +27,7 @@ function transformDeepResultToExtractedDealData(result: DeepExtractionResult): E
     revenue: { value: d.revenue, confidence: d.revenue != null ? highConf : 0 },
     ebitda: { value: d.ebitda, confidence: d.ebitda != null ? highConf : 0 },
     ebitdaMargin: { value: d.ebitdaMargin, confidence: d.ebitdaMargin != null ? highConf : 0 },
+    dealSize: { value: (d as any).dealSize || null, confidence: (d as any).dealSize != null ? highConf : 0 },
     revenueGrowth: { value: d.revenueGrowth, confidence: d.revenueGrowth != null ? highConf : 0 },
     employees: { value: d.employees, confidence: d.employees != null ? highConf : 0 },
     foundedYear: { value: null, confidence: 0 },
@@ -203,8 +204,23 @@ router.post('/', upload.single('file'), async (req, res) => {
       const userSource = req.body?.source || null;
       const userThesis = req.body?.userThesis || null;
       const userPriority = req.body?.priority || 'MEDIUM';
-      const userTimeline = req.body?.targetTimeline || null;
+      const rawTimeline = req.body?.targetTimeline || null;
       const userConcerns = req.body?.concerns || null;
+
+      // Convert timeline string ("30 days", "6 months") to ISO date
+      let userTimeline: string | null = null;
+      if (rawTimeline) {
+        const now = new Date();
+        const match = rawTimeline.match(/^(\d+)\s*(day|month|year)s?$/i);
+        if (match) {
+          const amount = parseInt(match[1], 10);
+          const unit = match[2].toLowerCase();
+          if (unit === 'day') now.setDate(now.getDate() + amount);
+          else if (unit === 'month') now.setMonth(now.getMonth() + amount);
+          else if (unit === 'year') now.setFullYear(now.getFullYear() + amount);
+          userTimeline = now.toISOString().split('T')[0];
+        }
+      }
 
       const { data: newDeal, error: dealError } = await supabase
         .from('Deal')
@@ -220,7 +236,7 @@ router.post('/', upload.single('file'), async (req, res) => {
           revenue: aiData.revenue.value,
           ebitda: aiData.ebitda.value,
           currency: aiData.currency || 'USD',
-          dealSize: aiData.revenue.value,
+          dealSize: aiData.dealSize?.value || null,
           aiThesis: userThesis || aiData.summary,
           icon: dealIcon,
           ...(userSource ? { source: userSource } : {}),
@@ -325,6 +341,7 @@ router.post('/', upload.single('file'), async (req, res) => {
           revenue: aiData.revenue,
           ebitda: aiData.ebitda,
           ebitdaMargin: aiData.ebitdaMargin,
+          dealSize: aiData.dealSize,
           revenueGrowth: aiData.revenueGrowth,
           employees: aiData.employees,
           foundedYear: aiData.foundedYear,

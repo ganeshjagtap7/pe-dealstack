@@ -62,6 +62,11 @@ const ExtractionOutputSchema = z.object({
     value: z.string().nullable(),
     confidence: z.number().min(0).max(100),
   }).describe('City, State or City, Country'),
+  dealSize: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+    source: z.string().optional(),
+  }).describe('Enterprise value, asking price, or deal size in millions (in the original document currency). Look for terms like "enterprise value", "EV", "asking price", "valuation", "deal value". Return null if not mentioned.'),
   keyRisks: z.array(z.string()).describe('3-5 key investment risks'),
   investmentHighlights: z.array(z.string()).describe('3-5 positive investment points'),
   summary: z.string().describe('3-4 sentence executive summary'),
@@ -83,6 +88,7 @@ export interface ExtractedDealData {
   revenue: ExtractedField<number | null>;
   ebitda: ExtractedField<number | null>;
   ebitdaMargin: ExtractedField<number | null>;
+  dealSize: ExtractedField<number | null>;
   revenueGrowth: ExtractedField<number | null>;
   employees: ExtractedField<number | null>;
   foundedYear: ExtractedField<number | null>;
@@ -180,6 +186,7 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
       revenue: normalizeNumericField(extracted.revenue),
       ebitda: normalizeNumericField(extracted.ebitda),
       ebitdaMargin: normalizeNumericField(extracted.ebitdaMargin),
+      dealSize: normalizeNumericField(extracted.dealSize),
       revenueGrowth: normalizeNumericField(extracted.revenueGrowth),
       employees: normalizeNumericField(extracted.employees),
       foundedYear: normalizeNumericField(extracted.foundedYear),

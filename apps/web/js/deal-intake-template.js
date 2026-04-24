@@ -64,7 +64,7 @@ function initDealIntakeModal(apiBaseURL) {
                 <!-- Header -->
                 <div class="flex flex-col gap-1 mb-4">
                     <h3 class="text-xl font-bold text-text-main tracking-tight">Ingest Deal Data</h3>
-                    <p id="intake-header-desc" class="text-text-secondary text-sm">Upload a document, paste text, or enter a company URL to create a new deal.</p>
+                    <p id="intake-header-desc" class="text-text-secondary text-sm">Upload a document or paste text to create a new deal.</p>
                 </div>
 
                 <!-- Mode Toggle: New vs Update -->
@@ -110,10 +110,6 @@ function initDealIntakeModal(apiBaseURL) {
                     <button id="intake-tab-text" class="intake-tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all text-text-secondary hover:text-text-main" onclick="switchIntakeTab('text')">
                         <span class="material-symbols-outlined text-[18px]">edit_note</span>
                         Paste Text
-                    </button>
-                    <button id="intake-tab-url" class="intake-tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all text-text-secondary hover:text-text-main" onclick="switchIntakeTab('url')">
-                        <span class="material-symbols-outlined text-[18px]">language</span>
-                        Enter URL
                     </button>
                 </div>
 
@@ -220,23 +216,6 @@ function initDealIntakeModal(apiBaseURL) {
                         <button id="intake-text-btn" onclick="intakeExtractFromText()" disabled class="mt-4 w-full py-2.5 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
                             <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
                             Extract & Create Deal
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Enter URL Tab -->
-                <div id="intake-panel-url" class="intake-tab-panel hidden">
-                    <div class="rounded-lg border border-border-subtle bg-white p-6">
-                        <label class="block text-sm font-medium text-text-main mb-2">Company website URL</label>
-                        <div class="relative">
-                            <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">link</span>
-                            <input id="intake-url-input" type="url" class="w-full rounded-lg border border-border-subtle bg-white pl-10 pr-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" placeholder="https://www.example.com" />
-                        </div>
-                        <label class="block text-sm font-medium text-text-main mt-4 mb-2">Company name <span class="text-text-muted font-normal">(optional override)</span></label>
-                        <input id="intake-url-company-name" type="text" class="w-full rounded-lg border border-border-subtle bg-white px-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" placeholder="e.g. Acme Healthcare" />
-                        <button id="intake-url-btn" onclick="intakeExtractFromURL()" disabled class="mt-4 w-full py-2.5 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-                            <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-                            Scrape & Create Deal
                         </button>
                     </div>
                 </div>
