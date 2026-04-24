@@ -20,6 +20,7 @@
 
   --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
   --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-float: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
   --shadow-glow: 0 0 15px rgba(0, 51, 102, 0.1);
 }
 
@@ -67,6 +68,31 @@ body {
   }
 }
 
+/* User dropdown / notification panel slide-in (matches legacy dropdownSlideIn) */
+@keyframes dropdownSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.dropdown-animate {
+  animation: dropdownSlideIn 0.15s ease-out;
+}
+
+/* User-dropdown item hover states (legacy parity) */
+.user-dropdown-item:hover {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary) !important;
+}
+.user-dropdown-item-logout:hover {
+  background-color: #FEF2F2 !important;
+  color: #DC2626 !important;
+}
+
 @keyframes welcomeFadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -81,6 +107,21 @@ body {
   0% { transform: scale(0); opacity: 0; }
   50% { transform: scale(1.2); }
   100% { transform: scale(1); opacity: 1; }
+}
+
+/* Onboarding pulse dot — ported from onboarding.html .pulse-dot */
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(5, 150, 105, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+}
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #059669;
+  box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.7);
+  animation: pulseDot 2s infinite;
 }
 
 .welcome-fade-in {

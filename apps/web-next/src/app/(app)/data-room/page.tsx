@@ -184,7 +184,7 @@ export default function DataRoomOverviewPage() {
         </div>
       )}
 
-      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 md:px-6 shrink-0">
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
         <div>
           <h1 className="text-xl font-bold text-slate-900">All Data Rooms</h1>
           <p className="text-sm text-slate-500">{deals.length} active deals</p>

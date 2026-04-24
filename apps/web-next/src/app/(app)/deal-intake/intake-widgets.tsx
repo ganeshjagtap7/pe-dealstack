@@ -65,7 +65,7 @@ export function FollowUpQuestions({ questions, answers, onAnswer, loading }: Fol
             ) : (
               <input
                 type="text"
-                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:ring-1 focus:ring-primary/30 focus:border-primary transition-colors"
+                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-lg focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
                 placeholder={q.placeholder || "Share your thoughts..."}
                 value={answers[q.id] || ""}
                 onChange={(e) => onAnswer(q.id, e.target.value)}

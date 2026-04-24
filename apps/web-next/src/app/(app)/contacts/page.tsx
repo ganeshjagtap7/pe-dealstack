@@ -306,7 +306,7 @@ export default function ContactsPage() {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-text-main tracking-tight font-display">Contacts</h1>
-            {!loading && <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-[#003366] text-xs font-bold">{totalContacts}</span>}
+            {!loading && <span className="px-2.5 py-0.5 rounded-full bg-primary-light text-primary text-xs font-bold">{totalContacts}</span>}
           </div>
           <p className="text-text-secondary text-sm flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(5,150,105,0.4)]" />
@@ -332,9 +332,9 @@ export default function ContactsPage() {
             </button>
             {typeOpen && (
               <div className="absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
-                <button onClick={() => { setFilters((f) => ({ ...f, type: "" })); setTypeOpen(false); }} className={cn("w-full text-left px-4 py-2 text-sm hover:bg-blue-50", !filters.type && "font-medium")}>All Types</button>
+                <button onClick={() => { setFilters((f) => ({ ...f, type: "" })); setTypeOpen(false); }} className={cn("w-full text-left px-4 py-2 text-sm hover:bg-primary-light", !filters.type && "font-medium")}>All Types</button>
                 {CONTACT_TYPES.map((t) => (
-                  <button key={t} onClick={() => { setFilters((f) => ({ ...f, type: t })); setTypeOpen(false); }} className={cn("w-full text-left px-4 py-2 text-sm hover:bg-blue-50", filters.type === t && "font-medium text-primary")}>{TYPE_CONFIG[t].label}</button>
+                  <button key={t} onClick={() => { setFilters((f) => ({ ...f, type: t })); setTypeOpen(false); }} className={cn("w-full text-left px-4 py-2 text-sm hover:bg-primary-light", filters.type === t && "font-medium text-primary")}>{TYPE_CONFIG[t].label}</button>
                 ))}
               </div>
             )}
@@ -353,7 +353,7 @@ export default function ContactsPage() {
                 <div className="px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">Sort by</div>
                 {SORT_OPTIONS.map((opt) => (
                   <button key={`${opt.sortBy}-${opt.sortOrder}`} onClick={() => { setFilters((f) => ({ ...f, sortBy: opt.sortBy, sortOrder: opt.sortOrder })); setSortOpen(false); }}
-                    className={cn("w-full text-left px-4 py-2 text-sm hover:bg-blue-50 flex items-center justify-between", filters.sortBy === opt.sortBy && filters.sortOrder === opt.sortOrder && "font-medium text-primary")}>
+                    className={cn("w-full text-left px-4 py-2 text-sm hover:bg-primary-light flex items-center justify-between", filters.sortBy === opt.sortBy && filters.sortOrder === opt.sortOrder && "font-medium text-primary")}>
                     {opt.label}
                     {filters.sortBy === opt.sortBy && filters.sortOrder === opt.sortOrder && <span className="material-symbols-outlined text-primary text-[16px]">check</span>}
                   </button>
@@ -382,13 +382,13 @@ export default function ContactsPage() {
             </button>
             {moreOpen && (
               <div className="absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[200px] py-1">
-                <button onClick={() => { setGroupByCompany(!groupByCompany); setMoreOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-blue-50 hover:text-text-main transition-colors">
+                <button onClick={() => { setGroupByCompany(!groupByCompany); setMoreOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-primary-light hover:text-text-main transition-colors">
                   <span className="material-symbols-outlined text-[18px]">corporate_fare</span>{groupByCompany ? "Ungroup Contacts" : "Group by Company"}
                 </button>
-                <button onClick={() => { handleExportCSV(); setMoreOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-blue-50 hover:text-text-main transition-colors">
+                <button onClick={() => { handleExportCSV(); setMoreOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-primary-light hover:text-text-main transition-colors">
                   <span className="material-symbols-outlined text-[18px]">download</span>Export to CSV
                 </button>
-                <button onClick={() => { setImportModalOpen(true); setMoreOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-blue-50 hover:text-text-main transition-colors">
+                <button onClick={() => { setImportModalOpen(true); setMoreOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-primary-light hover:text-text-main transition-colors">
                   <span className="material-symbols-outlined text-[18px]">upload_file</span>Import from CSV
                 </button>
               </div>

@@ -44,7 +44,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap"
         />
       </head>
-      <body className="h-full font-sans">{children}</body>
+      <body className="h-full font-sans overflow-hidden">{children}</body>
     </html>
   );
 }

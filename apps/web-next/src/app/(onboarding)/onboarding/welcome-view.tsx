@@ -46,7 +46,7 @@ export function WelcomeView({
             <button
               type="button"
               onClick={onSample}
-              className="inline-flex items-center rounded-lg border border-border-subtle px-4 py-2.5 text-text-secondary font-medium text-sm hover:border-border-focus hover:text-text-main transition-colors"
+              className="inline-flex items-center rounded-lg border border-border-subtle bg-white px-4 py-2.5 text-text-secondary font-medium text-sm hover:border-border-focus hover:text-text-main transition-colors"
             >
               Use a sample deal
             </button>
@@ -103,7 +103,7 @@ export function WelcomeView({
 
 function ChecklistCircle({ text }: { text: string }) {
   return (
-    <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-100 border border-border-subtle text-[11px] font-semibold text-text-secondary">
+    <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-100 border border-border-subtle text-[11px] font-semibold text-gray-500">
       {text}
     </span>
   );

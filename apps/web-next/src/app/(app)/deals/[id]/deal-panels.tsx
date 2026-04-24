@@ -39,14 +39,14 @@ export function DealActionsMenu({
             </div>
             <button
               onClick={() => setOpen(false)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-blue-50 hover:text-primary transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">event_note</span>
               Meeting Prep
             </button>
             <button
               onClick={() => setOpen(false)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-blue-50 hover:text-primary transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">edit_note</span>
               Draft Email
@@ -57,7 +57,7 @@ export function DealActionsMenu({
                 setOpen(false);
                 window.location.href = `/data-room/${dealId}`;
               }}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-blue-50 hover:text-primary transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">folder_open</span>
               Open Data Room
@@ -209,7 +209,7 @@ export function AISettingsModal({ onClose }: { onClose: () => void }) {
           </div>
           <div>
             <label className="block text-sm font-semibold text-text-main mb-2">Response Style</label>
-            <select value={responseStyle} onChange={(e) => setResponseStyle(e.target.value)} className="w-full px-4 py-2 border border-border-subtle rounded-lg text-sm focus:border-primary focus:ring-1 focus:ring-primary">
+            <select value={responseStyle} onChange={(e) => setResponseStyle(e.target.value)} className="w-full px-4 py-2 border border-border-subtle rounded-lg text-sm focus:border-primary focus:ring-2 focus:ring-primary/20">
               <option value="detailed">Detailed Analysis</option>
               <option value="concise">Concise Summaries</option>
               <option value="executive">Executive Briefing</option>

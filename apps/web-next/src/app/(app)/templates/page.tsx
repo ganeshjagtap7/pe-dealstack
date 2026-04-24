@@ -251,7 +251,7 @@ export default function TemplatesPage() {
                 className="flex items-center gap-1.5 text-xs font-medium text-text-muted hover:text-primary transition-colors"
               >
                 <span className="material-symbols-outlined text-[18px]">sort</span>
-                Sort: {sortByUsage ? "Usage" : "Newest"}
+                Sort by Usage
               </button>
             </div>
           </div>
@@ -293,7 +293,7 @@ export default function TemplatesPage() {
         )}
 
         {/* Grid Content */}
-        <div className="flex-1 overflow-y-auto p-8 pt-4 bg-background-body custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-8 pt-6 bg-background-body custom-scrollbar">
           {loading ? (
             <div className="col-span-3 flex flex-col items-center justify-center py-12">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4" />

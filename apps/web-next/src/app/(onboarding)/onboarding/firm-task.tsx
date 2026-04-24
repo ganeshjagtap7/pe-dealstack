@@ -123,7 +123,7 @@ export function FirmTaskModal({
             if (value.url.trim().length > 3) triggerEnrichment();
           }}
           placeholder="yourfirm.com"
-          className="w-full pl-10 pr-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+          className="w-full pl-10 pr-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
         />
       </div>
 
@@ -140,7 +140,7 @@ export function FirmTaskModal({
             if (value.linkedin.includes("linkedin.com")) triggerEnrichment();
           }}
           placeholder="https://linkedin.com/in/yourprofile"
-          className="w-full pl-10 pr-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+          className="w-full pl-10 pr-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
         />
       </div>
 
@@ -218,7 +218,7 @@ export function FirmTaskModal({
             onChange={(e) => setCustomSector(e.target.value)}
             onKeyDown={handleCustomKey}
             placeholder="e.g. Real Estate, Biotech..."
-            className="flex-1 px-3 py-2 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+            className="flex-1 px-3 py-2 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           />
           <button
             type="button"

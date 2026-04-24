@@ -131,7 +131,7 @@ export function ChecklistView({
         <button
           type="button"
           onClick={onOpenWorkspace}
-          className="inline-flex items-center rounded-lg border border-border-subtle bg-white px-3 py-1.5 text-[13px] font-medium text-text-secondary hover:border-border-focus hover:text-text-main transition-colors flex-shrink-0"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle bg-white px-[13px] py-[7px] text-[13px] font-medium text-text-secondary hover:border-border-focus hover:text-text-main transition-colors flex-shrink-0"
         >
           Go to Home
         </button>
@@ -194,17 +194,12 @@ function TaskCircle({ index, state }: { index: number; state: "pending" | "activ
     );
   }
   return (
-    <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-100 border border-border-subtle text-[13px] font-semibold text-text-secondary">
+    <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-100 border border-border-subtle text-[13px] font-semibold text-gray-500">
       {index}
     </span>
   );
 }
 
 function PulseDot() {
-  return (
-    <span className="relative inline-flex">
-      <span className="w-2 h-2 rounded-full bg-secondary animate-ping absolute inline-flex opacity-75" />
-      <span className="w-2 h-2 rounded-full bg-secondary relative inline-flex" />
-    </span>
-  );
+  return <span className="pulse-dot inline-block flex-shrink-0" />
 }

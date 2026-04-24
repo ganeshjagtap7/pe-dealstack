@@ -17,7 +17,7 @@ function NavLink({ item, isActive, collapsed }: { item: NavItem; isActive: boole
       title={item.label}
       className={cn(
         "flex items-center gap-3 rounded-lg transition-colors",
-        collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5",
+        collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
         isActive
           ? "bg-primary text-white shadow-sm"
           : "text-text-secondary hover:bg-primary-light hover:text-primary",
@@ -153,12 +153,15 @@ export function Sidebar() {
           <Link
             href="/settings"
             className={cn(
-              "flex items-center gap-3 p-2.5 rounded-lg transition-all border border-border-subtle bg-background-body/50 hover:border-primary hover:bg-primary-light",
-              collapsed && "justify-center border-none bg-transparent p-2.5"
+              "flex items-center gap-3 p-2.5 rounded-lg transition-all hover:shadow-sm border border-border-subtle bg-background-body/50 hover:border-primary hover:bg-primary-light",
+              collapsed && "justify-center border-none bg-transparent p-2.5 hover:bg-[rgba(0,51,102,0.05)] hover:border-none hover:shadow-none"
             )}
           >
             <div
-              className="bg-center bg-no-repeat bg-cover rounded-full size-8 shrink-0 border border-gray-200 shadow-sm flex items-center justify-center bg-primary text-white text-xs font-bold"
+              className={cn(
+                "bg-center bg-no-repeat bg-cover rounded-full shrink-0 border border-gray-200 shadow-sm flex items-center justify-center bg-primary text-white text-xs font-bold",
+                collapsed ? "size-9" : "size-8"
+              )}
               style={user?.avatar ? { backgroundImage: `url('${encodeURI(user.avatar)}')` } : {}}
             >
               {initials}

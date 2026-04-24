@@ -276,7 +276,7 @@ export default function DealIntakePage() {
       <div className="mx-auto max-w-3xl flex flex-col gap-6">
         {/* Header */}
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Intake</h1>
+          <h1 className="text-2xl font-bold text-text-main tracking-tight font-display">Deal Intake</h1>
           <p className="text-text-secondary text-sm">Upload a document, paste text, or enter a company URL to create a new deal.</p>
         </div>
 

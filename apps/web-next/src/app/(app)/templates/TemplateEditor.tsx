@@ -190,7 +190,7 @@ export function TemplateEditor({
               onClick={handleToggleActive}
               className={cn(
                 "relative inline-flex h-5 w-9 items-center rounded-full cursor-pointer transition-colors",
-                isActive ? "bg-emerald-600" : "bg-border-subtle"
+                isActive ? "bg-secondary" : "bg-border-subtle"
               )}
             >
               <span
@@ -273,7 +273,7 @@ export function TemplateEditor({
           </button>
           <button
             onClick={onUseTemplate}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+            className="px-4 py-2 bg-secondary hover:bg-secondary/90 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
           >
             <span className="material-symbols-outlined text-[16px]">play_arrow</span>
             Use Template

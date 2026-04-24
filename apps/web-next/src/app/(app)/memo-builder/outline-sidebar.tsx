@@ -19,10 +19,10 @@ export function MemoOutlineSidebar({
   templateName,
 }: MemoOutlineSidebarProps) {
   return (
-    <aside className="hidden md:flex w-64 bg-[#F8F9FA] border-r border-border-subtle flex-col shrink-0">
+    <aside className="hidden md:flex w-64 bg-slate-50 border-r border-slate-200 flex-col shrink-0">
       {/* Sections outline */}
-      <div className="p-4 border-b border-border-subtle flex-1 overflow-y-auto custom-scrollbar">
-        <h3 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">
+      <div className="p-4 border-b border-slate-100 flex-1 overflow-y-auto custom-scrollbar">
+        <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">
           Sections
         </h3>
         <nav className="flex flex-col gap-1">
@@ -69,7 +69,7 @@ export function MemoOutlineSidebar({
         )}
         <button
           onClick={onAddSection}
-          className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-text-secondary hover:text-primary hover:bg-white border border-dashed border-border-subtle hover:border-primary rounded-lg transition-colors"
+          className="mt-3 w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-500 hover:text-primary hover:bg-white border border-dashed border-slate-300 hover:border-primary rounded-lg transition-colors"
         >
           <span className="material-symbols-outlined text-[16px]">add</span>
           Add Section
@@ -80,15 +80,15 @@ export function MemoOutlineSidebar({
       <div className="p-4 shrink-0 space-y-3">
         <a
           href="/templates"
-          className="block bg-surface-card rounded-lg p-3 border border-border-subtle hover:border-primary/50 hover:shadow-sm transition-all group"
+          className="block bg-white rounded-lg p-3 border border-slate-200 hover:border-primary/50 hover:shadow-sm transition-all group"
         >
-          <div className="flex items-center gap-2 text-text-secondary group-hover:text-primary font-semibold text-xs mb-1">
+          <div className="flex items-center gap-2 text-slate-700 group-hover:text-primary font-semibold text-xs mb-1">
             <span className="material-symbols-outlined text-[16px]">description</span>
             <span>Memo Templates</span>
           </div>
-          <p className="text-[11px] text-text-muted mb-2">
+          <p className="text-[11px] text-slate-500 mb-2">
             Using:{" "}
-            <span className="font-medium text-text-secondary">
+            <span className="font-medium text-slate-700">
               {templateName || "Standard IC Memo"}
             </span>
           </p>

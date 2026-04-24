@@ -38,7 +38,7 @@ export function QuickNotesWidget() {
           onChange={(e) => setNote(e.target.value)}
           onBlur={save}
           placeholder="Jot down quick notes, reminders, follow-ups..."
-          className="w-full h-32 resize-none rounded-lg border border-border-subtle p-3 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+          className="w-full h-32 resize-none rounded-lg border border-border-subtle p-3 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors"
         />
         <p className="text-[11px] text-text-muted mt-1.5">{status}</p>
       </div>

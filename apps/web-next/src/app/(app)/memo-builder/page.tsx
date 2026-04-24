@@ -422,24 +422,24 @@ export default function MemoBuilderPage() {
       {/* ---- Main column: breadcrumb + header + workspace ---- */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         {/* Breadcrumb bar */}
-        <div className="flex items-center h-10 px-6 border-b border-border-subtle bg-background-body/60 text-sm shrink-0">
+        <div className="flex items-center h-10 px-6 border-b border-slate-100 bg-slate-50/80 text-sm shrink-0">
           <nav className="flex items-center gap-1.5">
             <button
               onClick={() => setSelectedMemo(null)}
-              className="flex items-center justify-center size-7 rounded-md hover:bg-primary-light text-text-muted hover:text-primary transition-colors mr-1"
+              className="flex items-center justify-center size-7 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors mr-1"
               title="Back to memo list"
             >
               <span className="material-symbols-outlined text-[18px]">arrow_back</span>
             </button>
-            <Link href="/dashboard" className="text-text-muted hover:text-primary transition-colors">
+            <Link href="/dashboard" className="text-slate-400 hover:text-primary transition-colors">
               Dashboard
             </Link>
-            <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
-            <span className="text-text-muted">AI Reports</span>
+            <span className="material-symbols-outlined text-[14px] text-slate-300">chevron_right</span>
+            <span className="text-slate-400">AI Reports</span>
             {selectedMemo && (
               <>
-                <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
-                <span className="text-text-main font-medium">
+                <span className="material-symbols-outlined text-[14px] text-slate-300">chevron_right</span>
+                <span className="text-slate-900 font-medium">
                   {selectedMemo.projectName || selectedMemo.title}
                 </span>
               </>

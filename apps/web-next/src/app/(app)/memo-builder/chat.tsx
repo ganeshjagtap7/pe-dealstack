@@ -47,18 +47,18 @@ export function MemoChat({
   if (!chatOpen) return null;
 
   return (
-    <aside className="w-[360px] shrink-0 border-l border-border-subtle bg-surface-card flex flex-col overflow-hidden shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)]">
+    <aside className="w-[400px] shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)]">
       {/* Header */}
-      <div className="px-3 py-3 border-b border-border-subtle flex items-center justify-between bg-surface-card">
+      <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
           <div className="size-6 rounded bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
             <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
           </div>
-          <span className="font-bold text-text-main text-sm">AI Analyst</span>
+          <span className="font-bold text-slate-800 text-sm">AI Analyst</span>
         </div>
         <button
           onClick={onToggleChat}
-          className="p-1 rounded hover:bg-background-body text-text-muted hover:text-text-secondary transition-colors"
+          className="p-1 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
           title="Collapse panel"
         >
           <span className="material-symbols-outlined text-[20px]">chevron_right</span>
@@ -66,7 +66,7 @@ export function MemoChat({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4 bg-background-body">
+      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4 bg-slate-50">
         {messages.map((msg) =>
           msg.role === "assistant" ? (
             <div key={msg.id} className="flex gap-3">
@@ -127,7 +127,7 @@ export function MemoChat({
       </div>
 
       {/* Input area */}
-      <div className="p-4 bg-surface-card border-t border-border-subtle">
+      <div className="p-4 bg-white border-t border-slate-200">
         {/* Prompt chips */}
         {messages.length < 3 && (
           <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar">
@@ -159,13 +159,13 @@ export function MemoChat({
               }
             }}
             rows={3}
-            className="w-full resize-none rounded-xl border border-border-subtle bg-background-body pl-4 pr-12 py-3 text-sm focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-text-muted"
+            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 pl-4 pr-12 py-3 text-sm focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary outline-none transition-all placeholder:text-slate-400"
             placeholder="Ask AI to analyze, rewrite, or visualize data..."
           />
           <div className="absolute right-2 bottom-2 flex items-center gap-1">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 text-text-muted hover:text-primary rounded-lg transition-colors"
+              className="p-1.5 text-slate-400 hover:text-primary rounded-lg transition-colors"
               title="Upload context"
             >
               <span className="material-symbols-outlined text-[20px]">attach_file</span>
@@ -182,7 +182,7 @@ export function MemoChat({
           </div>
         </div>
         <div className="mt-2 flex justify-between items-center px-1">
-          <span className="text-[10px] text-text-muted">
+          <span className="text-[10px] text-slate-400">
             AI can make mistakes. Review generated financial data.
           </span>
         </div>
@@ -208,17 +208,17 @@ export function MemoChat({
 
 export function MemoChatCollapsed({ onOpen }: { onOpen: () => void }) {
   return (
-    <aside className="w-12 bg-surface-card border-l border-border-subtle flex flex-col shrink-0">
+    <aside className="w-12 bg-white border-l border-slate-200 flex flex-col shrink-0">
       <button
         onClick={onOpen}
-        className="flex flex-col items-center justify-center gap-2 py-4 hover:bg-background-body transition-colors"
+        className="flex flex-col items-center justify-center gap-2 py-4 hover:bg-slate-50 transition-colors"
         title="Open AI Analyst"
       >
         <div className="size-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
           <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
         </div>
         <span
-          className="text-[10px] font-medium text-text-muted"
+          className="text-[10px] font-medium text-slate-500"
           style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
         >
           AI Analyst

@@ -187,7 +187,7 @@ interface MarketSentimentCardProps {
 
 export function MarketSentimentCard({ sentiment, sentimentLoading, sentimentError }: MarketSentimentCardProps) {
   return (
-    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card">
+    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
       <div className="p-6 border-b border-border-subtle flex items-start justify-between gap-4 bg-gradient-to-r from-white to-gray-50/50">
         <div className="flex flex-col gap-3 min-w-0">
           <div className="flex items-center gap-2">
@@ -360,7 +360,7 @@ interface PortfolioAllocationProps {
 
 export function PortfolioAllocation({ loading, allocation, gradientParts }: PortfolioAllocationProps) {
   return (
-    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card p-6 gap-5">
+    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden p-6 gap-5 group">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
         <span className="material-symbols-outlined text-text-muted">pie_chart</span>

@@ -252,7 +252,7 @@ export default function AdminPage() {
           icon="pending_actions"
           value={overdueTasks.length}
           subtitle={`${dueThisWeek.length} due this week`}
-          valueColor={overdueTasks.length > 0 ? "#ef4444" : "#003366"}
+          valueColor="#003366"
           onClick={() => {
             setExternalTaskFilter("OVERDUE");
             scrollTo("task-table-body");

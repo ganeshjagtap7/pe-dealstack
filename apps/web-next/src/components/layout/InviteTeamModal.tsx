@@ -275,7 +275,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
                           value={row.email}
                           onChange={(e) => updateRow(row.id, { email: e.target.value })}
                           placeholder="colleague@firm.com"
-                          className="block w-full rounded-lg border border-[#EBEBEB] bg-white text-[#343A40] placeholder-[#868E96]/60 focus:border-[#003366] focus:ring-1 focus:ring-[#003366] h-12 px-4 text-sm transition-all outline-none"
+                          className="block w-full rounded-lg border border-[#EBEBEB] bg-white text-[#343A40] placeholder-[#868E96]/60 focus:border-[#003366] focus:ring-2 focus:ring-[#003366]/20 h-12 px-4 text-sm transition-all outline-none"
                         />
                         {emailValid && (
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600 material-symbols-outlined text-lg">
@@ -295,7 +295,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
                       <select
                         value={row.role}
                         onChange={(e) => updateRow(row.id, { role: e.target.value as Role })}
-                        className="block w-full rounded-lg border border-[#EBEBEB] bg-white text-[#343A40] focus:border-[#003366] focus:ring-1 focus:ring-[#003366] h-12 px-4 text-sm transition-all cursor-pointer outline-none appearance-none pr-10"
+                        className="block w-full rounded-lg border border-[#EBEBEB] bg-white text-[#343A40] focus:border-[#003366] focus:ring-2 focus:ring-[#003366]/20 h-12 px-4 text-sm transition-all cursor-pointer outline-none appearance-none pr-10"
                         style={{
                           backgroundImage:
                             "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239CA3AF'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E\")",

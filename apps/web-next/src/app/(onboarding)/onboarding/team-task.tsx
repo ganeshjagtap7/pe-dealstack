@@ -49,12 +49,12 @@ export function TeamTaskModal({
               value={row.email}
               onChange={(e) => updateRow(i, { email: e.target.value })}
               placeholder="teammate@firm.com"
-              className="flex-1 px-3 py-2.5 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+              className="flex-1 px-3 py-2.5 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
             />
             <select
               value={row.role}
               onChange={(e) => updateRow(i, { role: e.target.value })}
-              className="w-32 px-3 py-2.5 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-1 focus:ring-primary outline-none bg-white"
+              className="w-32 px-3 py-2.5 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none bg-white"
             >
               {TEAM_ROLES.map((r) => (
                 <option key={r} value={r}>

@@ -293,7 +293,7 @@ export default function DealsPage() {
   })();
 
   return (
-    <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex flex-col gap-5">
+    <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex flex-col gap-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
@@ -324,7 +324,7 @@ export default function DealsPage() {
             <>
               <button
                 onClick={() => { setFilters((f) => ({ ...f, stage: "" })); close(); }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 font-medium"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
               >
                 All Stages
               </button>
@@ -332,7 +332,7 @@ export default function DealsPage() {
                 <button
                   key={s}
                   onClick={() => { setFilters((f) => ({ ...f, stage: s })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50"
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
                 >
                   {STAGE_LABELS[s]}
                 </button>
@@ -347,7 +347,7 @@ export default function DealsPage() {
             <>
               <button
                 onClick={() => { setFilters((f) => ({ ...f, industry: "" })); close(); }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 font-medium"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
               >
                 All Industries
               </button>
@@ -355,7 +355,7 @@ export default function DealsPage() {
                 <button
                   key={ind}
                   onClick={() => { setFilters((f) => ({ ...f, industry: ind })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50"
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
                 >
                   {ind}
                 </button>
@@ -374,7 +374,7 @@ export default function DealsPage() {
                   setFilters((f) => ({ ...f, minDealSize: opt.min, maxDealSize: opt.max }));
                   close();
                 }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
               >
                 {opt.label}
               </button>
@@ -391,7 +391,7 @@ export default function DealsPage() {
             <>
               <button
                 onClick={() => { setFilters((f) => ({ ...f, priority: "" })); close(); }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50 font-medium"
+                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
               >
                 All Priorities
               </button>
@@ -399,7 +399,7 @@ export default function DealsPage() {
                 <button
                   key={p}
                   onClick={() => { setFilters((f) => ({ ...f, priority: p })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-blue-50"
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
                 >
                   {PRIORITY_LABELS[p]}
                 </button>
@@ -408,51 +408,55 @@ export default function DealsPage() {
           )}
         </FilterDropdown>
 
+        <div className="h-6 w-px bg-border-subtle mx-1 hidden sm:block" />
+
         {/* Clear Filters */}
         {hasActiveFilters && (
           <button
             onClick={clearFilters}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 transition-colors"
+            className="flex items-center gap-1 h-9 px-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium transition-colors"
           >
-            <span className="material-symbols-outlined text-[16px]">close</span>
-            Clear Filters
+            <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+            Clear
           </button>
         )}
 
-      </div>
-
-      {/* View + Sort Row */}
-      <div className="flex flex-wrap items-center gap-1">
-        {/* View Toggle (icon-only) */}
-        <button
-          onClick={() => toggleView("list")}
-          title="List View"
-          className={cn(
-            "p-2 rounded-md transition-all",
-            view === "list"
-              ? "text-primary bg-primary/10"
-              : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
-          )}
-        >
-          <span className="material-symbols-outlined text-[20px]">view_list</span>
-        </button>
-        <button
-          onClick={() => toggleView("kanban")}
-          title="Kanban View"
-          className={cn(
-            "p-2 rounded-md transition-all",
-            view === "kanban"
-              ? "text-primary bg-primary/10"
-              : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
-          )}
-        >
-          <span className="material-symbols-outlined text-[20px]">view_kanban</span>
-        </button>
-        <MetricsDropdown activeMetrics={activeMetrics} onApply={handleMetricsApply} />
-
         <div className="flex-1" />
 
-        {/* Sort (hidden in kanban) */}
+        {/* View Toggle */}
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => toggleView("list")}
+            title="List View"
+            className={cn(
+              "p-2 rounded-md transition-all",
+              view === "list"
+                ? "text-primary bg-primary/10"
+                : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+            )}
+          >
+            <span className="material-symbols-outlined text-[20px]">view_list</span>
+          </button>
+          <button
+            onClick={() => toggleView("kanban")}
+            title="Kanban View"
+            className={cn(
+              "p-2 rounded-md transition-all",
+              view === "kanban"
+                ? "text-primary bg-primary/10"
+                : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+            )}
+          >
+            <span className="material-symbols-outlined text-[20px]">view_kanban</span>
+          </button>
+        </div>
+
+        {/* Customize Metrics */}
+        <MetricsDropdown activeMetrics={activeMetrics} onApply={handleMetricsApply} />
+
+        <div className="h-6 w-px bg-border-subtle hidden sm:block" />
+
+        {/* Sort */}
         {view === "list" && (
           <FilterDropdown
             label={`Sort by: ${sortLabel}`}
@@ -469,7 +473,7 @@ export default function DealsPage() {
                     close();
                   }}
                   className={cn(
-                    "w-full text-left px-4 py-2 text-sm hover:bg-blue-50",
+                    "w-full text-left px-4 py-2 text-sm hover:bg-primary-light",
                     filters.sortBy === opt.sortBy && filters.sortOrder === opt.sortOrder && "font-medium text-[#003366]"
                   )}
                 >
@@ -576,7 +580,7 @@ export default function DealsPage() {
           </div>
         )
       ) : view === "list" ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-6">
           {deals.map((deal) => (
             <DealCard
               key={deal.id}

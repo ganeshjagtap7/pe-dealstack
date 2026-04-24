@@ -6,6 +6,7 @@ import { useUser } from "@/providers/UserProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NotificationsDropdown } from "./NotificationsDropdown";
+import { GlobalSearchModal } from "./GlobalSearchModal";
 
 // Ported from apps/web/js/onboarding/onboarding-config.js (f23a61c).
 // Hardcoded here for now — web-next doesn't yet have a runtime config layer.
@@ -21,8 +22,8 @@ export function Header() {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const searchRef = useRef<HTMLInputElement>(null);
 
   const showDealActions = pathname === "/deals";
 
@@ -40,7 +41,7 @@ export function Header() {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
-        searchRef.current?.focus();
+        setSearchOpen((prev) => !prev);
       }
     }
     document.addEventListener("keydown", handleKeyDown);
@@ -52,24 +53,24 @@ export function Header() {
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-4 md:px-6 bg-surface-card z-40 sticky top-0 min-w-0">
       <div className="flex items-center gap-4 flex-1">
-        <div className="relative hidden w-full max-w-lg md:block group">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <span className="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[20px]">
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="relative hidden w-full max-w-lg md:flex items-center rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-muted cursor-pointer hover:border-primary/40 transition-all shadow-sm text-left"
+        >
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+            <span className="material-symbols-outlined text-text-muted text-[20px]">
               search
             </span>
           </div>
-          <input
-            ref={searchRef}
-            className="block w-full rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm"
-            placeholder="Search deals by name, industry, or thesis..."
-            type="text"
-          />
-          <div className="absolute inset-y-0 right-0 flex items-center pr-2">
-            <button className="p-1 hover:bg-gray-200 rounded transition-colors text-primary">
-              <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
-            </button>
+          <span>Ask AI anything about your portfolio...</span>
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1">
+            <kbd className="px-1.5 py-0.5 text-[10px] font-bold text-gray-400 bg-gray-100 rounded border border-gray-200">
+              &#8984;K
+            </kbd>
+            <span className="material-symbols-outlined text-[18px] text-primary">auto_awesome</span>
           </div>
-        </div>
+        </button>
       </div>
 
       <div className="flex items-center gap-2 md:gap-4 min-w-0">
@@ -80,10 +81,10 @@ export function Header() {
                 in docs/planning/WEB-NEXT-PORT-PLAN.md. */}
             <Link
               href="/deal-intake"
-              className="flex items-center gap-2 px-3 py-1.5 text-white rounded-lg hover:opacity-90 transition-colors text-sm font-medium"
+              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg shadow-sm hover:bg-[#002855] transition-colors text-sm font-medium"
               style={{ backgroundColor: "#003366" }}
             >
-              <span className="material-symbols-outlined text-[16px]">add</span>
+              <span className="material-symbols-outlined text-[18px]">add</span>
               New Deal
             </Link>
           </div>
@@ -117,7 +118,7 @@ export function Header() {
           </button>
 
           {dropdownOpen && (
-            <div className="absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50 bg-surface-card border border-border-subtle animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50 bg-surface-card border border-border-subtle dropdown-animate">
               <div className="px-4 py-3 border-b border-border-subtle">
                 <p className="text-sm font-medium text-text-main">{user?.name}</p>
                 <p className="text-xs text-text-muted truncate">{user?.role}</p>
@@ -125,7 +126,7 @@ export function Header() {
               <div className="py-1">
                 <Link
                   href="/settings"
-                  className="flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
+                  className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm text-text-secondary transition-colors"
                   onClick={() => setDropdownOpen(false)}
                 >
                   <span className="material-symbols-outlined text-[18px]">person</span>
@@ -133,7 +134,7 @@ export function Header() {
                 </Link>
                 <Link
                   href="/settings"
-                  className="flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
+                  className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm text-text-secondary transition-colors"
                   onClick={() => setDropdownOpen(false)}
                 >
                   <span className="material-symbols-outlined text-[18px]">settings</span>
@@ -145,7 +146,7 @@ export function Header() {
                     setDropdownOpen(false);
                     setHelpOpen(true);
                   }}
-                  className="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
+                  className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-text-secondary transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px]">help</span>
                   Help &amp; Support
@@ -154,7 +155,7 @@ export function Header() {
               <div className="border-t border-border-subtle py-1">
                 <button
                   onClick={signOut}
-                  className="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-red-600 hover:bg-red-50 transition-colors"
+                  className="user-dropdown-item-logout flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-red-600 transition-colors"
                 >
                   <span className="material-symbols-outlined text-[18px]">logout</span>
                   Log out
@@ -164,6 +165,7 @@ export function Header() {
           )}
         </div>
       </div>
+      <GlobalSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       <HelpSupportModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </header>
   );

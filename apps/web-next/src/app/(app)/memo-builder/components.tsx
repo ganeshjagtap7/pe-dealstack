@@ -146,7 +146,7 @@ export function MemoListSidebar({
             type="text"
             value={listSearch}
             onChange={(e) => setListSearch(e.target.value)}
-            className="block w-full rounded-md border border-border-subtle bg-background-body py-1.5 pl-8 pr-3 text-xs text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary"
+            className="block w-full rounded-md border border-border-subtle bg-background-body py-1.5 pl-8 pr-3 text-xs text-text-main placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary"
             placeholder="Search memos..."
           />
         </div>
@@ -275,7 +275,7 @@ export function CreateMemoModal({
               type="text"
               value={createForm.title}
               onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary"
+              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary"
               placeholder="Investment Committee Memo"
             />
           </div>
@@ -286,7 +286,7 @@ export function CreateMemoModal({
             <select
               value={createForm.dealId}
               onChange={(e) => setCreateForm((f) => ({ ...f, dealId: e.target.value }))}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-1 focus:ring-primary focus:border-primary"
+              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               <option value="">No deal selected</option>
               {deals.map((d) => (
@@ -301,7 +301,7 @@ export function CreateMemoModal({
             <select
               value={createForm.templateId}
               onChange={(e) => setCreateForm((f) => ({ ...f, templateId: e.target.value }))}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-1 focus:ring-primary focus:border-primary"
+              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               <option value="">Blank memo</option>
               {templates.map((t) => (
@@ -385,7 +385,7 @@ export function AddSectionModal({
                   setSectionTitle(SECTION_TYPES.find((t) => t.value === e.target.value)?.label || "");
                 }
               }}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-1 focus:ring-primary focus:border-primary"
+              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary"
             >
               {SECTION_TYPES.map((t) => (
                 <option key={t.value} value={t.value}>{t.label}</option>
@@ -399,7 +399,7 @@ export function AddSectionModal({
               value={sectionTitle}
               onChange={(e) => setSectionTitle(e.target.value)}
               placeholder={SECTION_TYPES.find((t) => t.value === sectionType)?.label || "Section title"}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary"
+              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary"
             />
           </div>
           <label className="flex items-center gap-2 cursor-pointer">

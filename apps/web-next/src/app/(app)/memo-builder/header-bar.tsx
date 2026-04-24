@@ -36,7 +36,7 @@ export function DocumentHeaderBar({
   const disabled = sections.length === 0;
 
   return (
-    <header className="flex items-center justify-between whitespace-nowrap border-b border-border-subtle bg-surface-card px-6 py-3 shrink-0 shadow-sm">
+    <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 bg-white px-6 py-3 shrink-0 z-20 shadow-sm">
       <div className="flex items-center gap-3">
         <div
           className="flex size-8 items-center justify-center rounded text-white"
@@ -45,16 +45,16 @@ export function DocumentHeaderBar({
           <span className="material-symbols-outlined">description</span>
         </div>
         <div>
-          <h2 className="text-text-main text-base font-bold leading-tight tracking-[-0.015em]">
+          <h2 className="text-[#0d131b] text-base font-bold leading-tight tracking-[-0.015em]">
             {memo.projectName || memo.title}
           </h2>
-          <div className="flex items-center gap-2 text-xs text-text-muted">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
             <span>{memo.title}</span>
-            <span className="size-1 rounded-full bg-text-muted/40" />
+            <span className="size-1 rounded-full bg-slate-300" />
             <span className={cn("font-medium px-1.5 rounded", statusStyle.bg, statusStyle.text)}>
               {memo.status.charAt(0) + memo.status.slice(1).toLowerCase()}
             </span>
-            <span className="size-1 rounded-full bg-text-muted/40" />
+            <span className="size-1 rounded-full bg-slate-300" />
             <span>Last edited {formatRelativeTime(memo.updatedAt)}</span>
           </div>
         </div>
@@ -64,7 +64,7 @@ export function DocumentHeaderBar({
           <button
             onClick={onGenerateAll}
             disabled={generatingAll}
-            className="flex items-center justify-center rounded-lg h-9 px-3 bg-surface-card border border-border-subtle text-text-secondary text-sm font-semibold hover:bg-background-body transition-colors gap-2 disabled:opacity-50"
+            className="flex items-center justify-center rounded-lg h-9 px-3 bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors gap-2 disabled:opacity-50"
             title="Generate all sections with AI"
           >
             {generatingAll ? (
@@ -77,7 +77,7 @@ export function DocumentHeaderBar({
         )}
         <button
           onClick={onShare}
-          className="flex items-center justify-center rounded-lg h-9 px-3 bg-surface-card border border-border-subtle text-text-secondary text-sm font-semibold hover:bg-background-body transition-colors gap-2"
+          className="flex items-center justify-center rounded-lg h-9 px-3 bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors gap-2"
         >
           <span className="material-symbols-outlined text-[20px]">share</span>
           <span>Share</span>
@@ -107,24 +107,24 @@ export function DocumentHeaderBar({
             </button>
           </div>
           {exportMenuOpen && (
-            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+            <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
               <button
                 onClick={onExportPDF}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
               >
                 <span className="material-symbols-outlined text-[18px] text-red-500">picture_as_pdf</span>
                 Export as PDF
               </button>
               <button
                 onClick={onExportMarkdown}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
               >
-                <span className="material-symbols-outlined text-[18px] text-text-muted">code</span>
+                <span className="material-symbols-outlined text-[18px] text-slate-500">code</span>
                 Export as Markdown
               </button>
               <button
                 onClick={onExportClipboard}
-                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-text-main hover:bg-background-body transition-colors text-left"
+                className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors text-left"
               >
                 <span className="material-symbols-outlined text-[18px] text-blue-500">content_copy</span>
                 Copy to Clipboard

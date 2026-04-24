@@ -192,31 +192,31 @@ export default function DashboardPage() {
           onStageClick={setStageModal}
         />
 
-        {/* Main Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column */}
-          <div className="lg:col-span-2 flex flex-col gap-6">
-            {/* AI Market Sentiment */}
-            <MarketSentimentCard sentiment={sentiment} sentimentLoading={sentimentLoading} sentimentError={sentimentError} />
+        {/* Main widget grid — matches legacy dashboard.html:
+             Active Priorities spans col-span-full (full-width hero row),
+             other widgets are 1 column each in a 3-col grid. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min items-start">
 
-            {/* Active Priorities */}
-            <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
-              <div className="p-5 border-b border-border-subtle flex items-center justify-between">
-                <h3 className="font-bold text-text-main text-base">Active Priorities</h3>
-                <Link href="/deals" className="text-xs font-semibold text-text-secondary hover:text-primary hover:bg-primary-light px-3 py-1.5 rounded-md transition-all">View All</Link>
+          {/* Active Priorities Table — full-width hero row */}
+          <div className="col-span-full flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
+            <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
+              <h3 className="font-bold text-text-main text-base">Active Priorities</h3>
+              <div className="flex gap-2">
+                <Link href="/deals" className="text-xs font-semibold text-text-secondary hover:text-primary hover:bg-primary-light px-3 py-1.5 rounded-md border border-transparent hover:border-primary/20 transition-all">View All</Link>
               </div>
+            </div>
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
+                <table className="w-full text-left text-sm text-text-secondary">
                   <thead className="bg-gray-50 text-xs uppercase font-semibold text-text-secondary border-b border-border-subtle">
                     <tr>
-                      <th className="px-5 py-3">Deal Name</th>
-                      <th className="px-5 py-3">Stage</th>
-                      <th className="px-5 py-3">Value</th>
-                      <th className="px-5 py-3">Next Action</th>
-                      <th className="px-5 py-3">Team</th>
+                      <th className="px-5 py-3 tracking-wide">Deal Name</th>
+                      <th className="px-5 py-3 tracking-wide">Stage</th>
+                      <th className="px-5 py-3 tracking-wide">Value</th>
+                      <th className="px-5 py-3 tracking-wide">Next Action</th>
+                      <th className="px-5 py-3 tracking-wide">Team</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border-subtle">
+                  <tbody className="divide-y divide-border-subtle bg-white">
                     {loading ? (
                       <tr><td colSpan={5} className="px-5 py-8 text-center text-text-muted">Loading...</td></tr>
                     ) : deals.length === 0 ? (
@@ -264,19 +264,18 @@ export default function DashboardPage() {
                 </table>
               </div>
             </div>
-          </div>
 
-          {/* Right Column */}
-          <div className="flex flex-col gap-6">
-            {/* Tasks */}
-            <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
-              <div className="p-5 border-b border-border-subtle flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-text-secondary text-[20px]">check_circle</span>
-                  <h3 className="font-bold text-text-main text-base">My Tasks</h3>
-                </div>
+          {/* My Tasks Widget */}
+          <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
+            <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-text-secondary">check_circle</span>
+                <h3 className="font-bold text-text-main text-base">My Tasks</h3>
+              </div>
+              <div className="flex items-center gap-2">
                 <span className="bg-primary-light text-primary text-xs font-bold px-2.5 py-1 rounded-full border border-primary/10">{pendingTasks.length} Pending</span>
               </div>
+            </div>
               {taskError && (
                 <div className="px-5 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100">
                   {taskError}
@@ -325,12 +324,12 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Portfolio Allocation */}
-            <PortfolioAllocation loading={loading} allocation={allocation} gradientParts={gradientParts} />
+          {/* Portfolio Allocation */}
+          <PortfolioAllocation loading={loading} allocation={allocation} gradientParts={gradientParts} />
 
-            {/* AI Deal Signals */}
-            <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
-              <div className="p-5 border-b border-border-subtle flex items-center justify-between">
+          {/* AI Deal Signals */}
+          <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
+            <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-primary text-[20px]">radar</span>
                   <h3 className="font-bold text-text-main text-base">AI Deal Signals</h3>
@@ -366,15 +365,18 @@ export default function DashboardPage() {
               ) : signalResult ? (
                 <SignalResults result={signalResult} />
               ) : (
-                <div className="p-5 text-center">
-                  <span className="material-symbols-outlined text-text-muted text-2xl mb-2">monitoring</span>
-                  <p className="text-sm font-medium text-text-main mb-1">Portfolio Signal Monitor</p>
-                  <p className="text-xs text-text-muted">Click &quot;Scan Signals&quot; to analyze your portfolio for risks, opportunities, and actionable deal signals using AI.</p>
-                </div>
-              )}
-            </div>
+              <div className="p-5 text-center">
+                <span className="material-symbols-outlined text-text-muted text-2xl mb-2">monitoring</span>
+                <p className="text-sm font-medium text-text-main mb-1">Portfolio Signal Monitor</p>
+                <p className="text-xs text-text-muted">Click &quot;Scan Signals&quot; to analyze your portfolio for risks, opportunities, and actionable deal signals using AI.</p>
+              </div>
+            )}
           </div>
-        </div>
+
+          {/* AI Market Sentiment */}
+          <MarketSentimentCard sentiment={sentiment} sentimentLoading={sentimentLoading} sentimentError={sentimentError} />
+
+        </div>{/* /dashboard-widget-grid */}
 
         {/* Edit-mode banner — matches #layout-edit-banner in
             apps/web/js/widgets/layout-editor.js */}
@@ -423,11 +425,11 @@ export default function DashboardPage() {
             + #widget-settings-btn. "Add Widget" toggles widget visibility via
             the picker modal. "Customize Dashboard" toggles the drag-and-drop
             layout editor — ports apps/web/js/widgets/layout-editor.js. */}
-        <div className="flex flex-col md:flex-row gap-3">
+        <div className="flex flex-col sm:flex-row gap-3 mt-2">
           <button
             type="button"
             onClick={() => setCustomizeOpen(true)}
-            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle px-4 py-4 text-sm font-medium text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50"
+            className="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50"
           >
             <span className="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
             <span className="text-sm font-semibold">Add Widget</span>
@@ -444,7 +446,7 @@ export default function DashboardPage() {
                   : "Reorder widgets"
             }
             className={cn(
-              "hidden md:flex flex-1 items-center justify-center gap-2 rounded-lg border px-4 py-4 text-sm font-medium transition-all",
+              "hidden md:flex flex-1 items-center justify-center gap-2 rounded-lg border p-4 text-sm font-medium transition-all",
               layoutEditing
                 ? "text-white border-transparent"
                 : "text-text-muted border-border-subtle bg-surface-card/50 hover:border-primary hover:text-primary hover:bg-primary-light/50",

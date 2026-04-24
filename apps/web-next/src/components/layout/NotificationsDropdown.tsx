@@ -155,8 +155,8 @@ export function NotificationsDropdown() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-96 max-h-[calc(100vh-5rem)] bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex flex-col overflow-hidden">
-          <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+        <div className="absolute right-0 top-full mt-2 w-96 max-h-[calc(100vh-5rem)] bg-white rounded-xl shadow-2xl border border-gray-200 z-50 flex flex-col overflow-hidden dropdown-animate">
+          <div className="p-4 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary">notifications</span>
               <h3 className="font-bold text-gray-900">Notifications</h3>

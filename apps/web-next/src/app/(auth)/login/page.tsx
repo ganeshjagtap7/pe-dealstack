@@ -372,7 +372,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleMfaVerify}
                 disabled={!mfaReady || mfaVerifying}
-                className="w-full h-12 rounded-lg text-white font-medium text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 flex items-center justify-center gap-2"
+                className="w-full h-12 rounded-lg text-white font-medium text-sm shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#15304a] flex items-center justify-center gap-2"
                 style={{ backgroundColor: "#003366" }}
               >
                 {mfaVerifying ? (

@@ -238,7 +238,7 @@ function VerifyEmailContent() {
             </div>
 
             <h1 className="text-2xl font-bold text-text-main mb-2">Email Verified!</h1>
-            <p className="text-text-muted text-sm mb-6">
+            <p className="text-gray-500 text-sm mb-6">
               Your email has been successfully verified. You can now sign in to your account.
             </p>
 
@@ -267,7 +267,7 @@ function VerifyEmailContent() {
             </div>
 
             <h1 className="text-2xl font-bold text-text-main mb-2">Verification Failed</h1>
-            <p className="text-text-muted text-sm mb-4">{errorMessage}</p>
+            <p className="text-gray-500 text-sm mb-4">{errorMessage}</p>
 
             {/* Resend Email Form */}
             <div className="mb-4">
@@ -280,7 +280,7 @@ function VerifyEmailContent() {
                   value={resendEmail}
                   onChange={(e) => setResendEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="flex-1 rounded-lg border border-border-subtle px-4 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+                  className="flex-1 rounded-lg border border-gray-200 px-4 py-2 text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
                 />
                 <button
                   onClick={handleErrorResend}

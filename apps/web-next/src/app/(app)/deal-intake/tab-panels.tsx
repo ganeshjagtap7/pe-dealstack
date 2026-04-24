@@ -184,7 +184,7 @@ export function UrlInputPanel({
           type="url"
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
-          className="w-full rounded-lg border border-border-subtle bg-white pl-10 pr-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+          className="w-full rounded-lg border border-border-subtle bg-white pl-10 pr-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors"
           placeholder="https://www.example.com"
         />
       </div>
@@ -196,7 +196,7 @@ export function UrlInputPanel({
         type="text"
         value={urlCompanyName}
         onChange={(e) => setUrlCompanyName(e.target.value)}
-        className="w-full rounded-lg border border-border-subtle bg-white px-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors"
+        className="w-full rounded-lg border border-border-subtle bg-white px-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors"
         placeholder="e.g. Acme Healthcare"
       />
 

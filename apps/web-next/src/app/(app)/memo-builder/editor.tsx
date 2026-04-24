@@ -163,7 +163,7 @@ export function MemoEditor({
     >
       <div className="w-full max-w-[850px] bg-white flex flex-col rounded-sm shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.10)] min-h-[calc(100vh-120px)]">
         {/* Document header */}
-        <div className="px-14 pt-14 pb-6 border-b border-border-subtle">
+        <div className="px-14 pt-14 pb-6 border-b border-slate-200">
           <h1 className="text-[26px] font-bold text-[#1a1a2e] tracking-tight mb-3 leading-tight">
             {memo.title || "Investment Committee Memo"}
           </h1>
@@ -215,8 +215,8 @@ export function MemoEditor({
         </div>
 
         {/* Document footer */}
-        <div className="px-14 py-6 border-t border-border-subtle mt-auto bg-[#f9fafb]">
-          <div className="flex justify-between text-xs text-text-muted">
+        <div className="px-14 py-6 border-t border-slate-200 mt-auto bg-slate-50/50">
+          <div className="flex justify-between text-xs text-slate-400">
             <span>CONFIDENTIAL - FOR INTERNAL USE ONLY</span>
             <span>Page 1 of {Math.max(1, sections.length)}</span>
           </div>
@@ -340,7 +340,7 @@ function DocSection({
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
             rows={6}
-            className="w-full rounded-lg border border-border-subtle bg-[#fafbfc] px-4 py-3 text-[13.5px] text-text-main leading-[1.75] placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary resize-y"
+            className="w-full rounded-lg border border-border-subtle bg-[#fafbfc] px-4 py-3 text-[13.5px] text-text-main leading-[1.75] placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
             placeholder="Write section content here or click Generate to use AI..."
           />
         </div>

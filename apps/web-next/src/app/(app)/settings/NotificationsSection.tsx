@@ -51,13 +51,13 @@ export function NotificationsSection({
           </p>
         </div>
       </div>
-      <div className="divide-y divide-border-subtle">
+      <div className="p-6 space-y-1">
         {NOTIFICATION_TYPES.map((notif) => {
           const enabled = !!notificationPrefs[notif.key];
           return (
             <div
               key={notif.key}
-              className="flex items-center justify-between px-5 py-4 hover:bg-background-body/50 transition-colors"
+              className="flex items-center justify-between px-5 py-4 hover:bg-background-body/50 transition-colors rounded-lg"
             >
               <div className="flex items-center gap-3 min-w-0">
                 <div className="size-9 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">

@@ -93,7 +93,7 @@ export function TemplatePreviewModal({ template, onClose, onUseTemplate }: Templ
             </button>
             <button
               onClick={onUseTemplate}
-              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
+              className="px-4 py-2 bg-secondary hover:bg-secondary/90 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1.5"
             >
               <span className="material-symbols-outlined text-[16px]">play_arrow</span>
               Use This Template

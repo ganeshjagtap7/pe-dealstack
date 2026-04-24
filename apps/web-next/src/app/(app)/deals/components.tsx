@@ -54,7 +54,7 @@ export function FilterDropdown({
     : cn(
         "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3.5 text-sm font-medium transition-all group",
         active
-          ? "border-[#B3C2D1] bg-blue-50 text-[#003366]"
+          ? "border-[#B3C2D1] bg-primary-light text-[#003366]"
           : "border-border-subtle bg-surface-card text-text-secondary hover:border-primary/30 hover:shadow-sm"
       );
 
@@ -165,7 +165,7 @@ export function StageChangeModal({
               <button
                 key={stage}
                 onClick={() => onSelect(stage)}
-                className="w-full text-left px-4 py-3 hover:bg-blue-50 flex items-center gap-3 transition-colors"
+                className="w-full text-left px-4 py-3 hover:bg-primary-light flex items-center gap-3 transition-colors"
               >
                 <span className={cn("px-2 py-0.5 rounded text-xs font-bold", s.bg, s.text)}>
                   {STAGE_LABELS[stage]}
@@ -260,14 +260,14 @@ export function DealCard({
           <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
             <Link
               href={`/deals/${deal.id}`}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-blue-50 hover:text-[#003366] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-[#003366] transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">open_in_new</span>
               Open Deal
             </Link>
             <Link
               href={`/data-room?dealId=${deal.id}`}
-              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-blue-50 hover:text-[#003366] transition-colors"
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-[#003366] transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">folder_open</span>
               Open Data Room
@@ -560,7 +560,7 @@ export function MetricsDropdown({
     <div className="relative" ref={ref}>
       <button
         onClick={() => { setOpen((o) => !o); if (!open) setChecked(new Set(activeMetrics)); }}
-        className="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-blue-50 transition-all"
+        className="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-primary-light transition-all"
         title="Customize Metrics"
       >
         <span className="material-symbols-outlined text-text-muted text-[18px]">tune</span>
@@ -575,7 +575,7 @@ export function MetricsDropdown({
             {ALL_METRIC_KEYS.map((key) => (
               <label
                 key={key}
-                className="flex items-center gap-3 px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+                className="flex items-center gap-3 px-4 py-2 hover:bg-primary-light cursor-pointer transition-colors"
               >
                 <input
                   type="checkbox"
@@ -620,7 +620,7 @@ export function UploadCard({ onClick }: { onClick?: () => void }) {
   return (
     <article
       onClick={onClick}
-      className="bg-white/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-[#003366] hover:bg-blue-50/30 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4"
+      className="bg-white/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-[#003366] hover:bg-primary-light/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4"
     >
       <div className="size-14 rounded-full bg-white border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-[#003366]/30 transition-all shadow-sm">
         <span className="material-symbols-outlined text-text-muted group-hover:text-[#003366] text-2xl">add</span>

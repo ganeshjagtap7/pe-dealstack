@@ -68,7 +68,7 @@ export function LinkDealModal({ contactId, linkedDeals, onClose, onLinked }: { c
         <div className="p-4 border-b border-border-subtle shrink-0">
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><span className="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[18px]">search</span></div>
-            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search deals..." className="block w-full rounded-lg border border-border-subtle bg-gray-50 py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all" autoFocus />
+            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search deals..." className="block w-full rounded-lg border border-border-subtle bg-background-body py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all" autoFocus />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 min-h-[200px]">
@@ -78,7 +78,7 @@ export function LinkDealModal({ contactId, linkedDeals, onClose, onLinked }: { c
             const ss = STAGE_STYLES[deal.stage] || { bg: "bg-gray-100", text: "text-gray-600", label: deal.stage || "Unknown" };
             return (
               <button key={deal.id} onClick={() => { setSelectedDealId(deal.id); setSelectedDealName(deal.name || "Unnamed Deal"); }}
-                className={cn("w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-blue-50/50 transition-colors", selectedDealId === deal.id && "bg-blue-50/50 ring-1 ring-primary/30")}>
+                className={cn("w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-primary-light/50 transition-colors", selectedDealId === deal.id && "bg-primary-light/50 ring-1 ring-primary/30")}>
                 <span className="material-symbols-outlined text-text-muted text-[20px]">work</span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-main truncate">{deal.name || "Unnamed Deal"}</p>
@@ -91,7 +91,7 @@ export function LinkDealModal({ contactId, linkedDeals, onClose, onLinked }: { c
         </div>
         {selectedDealId && (
           <div className="shrink-0 border-t border-border-subtle p-4">
-            <div className="flex items-center gap-3 mb-3 p-3 bg-blue-50/50 rounded-lg border border-primary/10">
+            <div className="flex items-center gap-3 mb-3 p-3 bg-primary-light/50 rounded-lg border border-primary/10">
               <span className="material-symbols-outlined text-primary text-[20px]">work</span>
               <span className="text-sm font-medium text-text-main truncate">{selectedDealName}</span>
             </div>
@@ -160,7 +160,7 @@ export function ConnectionModal({ contactId, onClose, onCreated }: { contactId: 
         <div className="p-4 border-b border-border-subtle shrink-0">
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><span className="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[18px]">search</span></div>
-            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search contacts..." className="block w-full rounded-lg border border-border-subtle bg-gray-50 py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all" autoFocus />
+            <input type="text" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search contacts..." className="block w-full rounded-lg border border-border-subtle bg-background-body py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all" autoFocus />
           </div>
         </div>
         <div className="flex-1 overflow-y-auto p-2 min-h-[150px] max-h-[250px]">
@@ -171,7 +171,7 @@ export function ConnectionModal({ contactId, onClose, onCreated }: { contactId: 
             const name = `${c.firstName || ""} ${c.lastName || ""}`.trim();
             return (
               <button key={c.id} onClick={() => { setSelectedId(c.id); setSelectedName(name); }}
-                className={cn("w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-blue-50/50 transition-colors", selectedId === c.id && "bg-blue-50/50 ring-1 ring-primary/30")}>
+                className={cn("w-full flex items-center gap-3 p-3 rounded-lg text-left hover:bg-primary-light/50 transition-colors", selectedId === c.id && "bg-primary-light/50 ring-1 ring-primary/30")}>
                 <div className="size-8 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold" style={{ backgroundColor: ctc.avatarBg, color: ctc.avatarText }}>{getInitials(c.firstName, c.lastName)}</div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-text-main truncate">{name}</p>
@@ -183,7 +183,7 @@ export function ConnectionModal({ contactId, onClose, onCreated }: { contactId: 
         </div>
         {selectedId && (
           <div className="shrink-0 border-t border-border-subtle p-4">
-            <div className="flex items-center gap-3 mb-3 p-3 bg-blue-50/50 rounded-lg border border-primary/10">
+            <div className="flex items-center gap-3 mb-3 p-3 bg-primary-light/50 rounded-lg border border-primary/10">
               <span className="material-symbols-outlined text-primary text-[20px]">person</span>
               <span className="text-sm font-medium text-text-main truncate">{selectedName}</span>
             </div>

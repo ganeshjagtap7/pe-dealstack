@@ -191,7 +191,7 @@ export default function OtpCodeEntry({
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="Enter your email to verify"
-            className="w-full rounded-lg border border-border-subtle px-4 py-2.5 text-sm text-center focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
+            className="w-full rounded-lg border border-gray-200 px-4 py-2.5 text-sm text-center focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none"
           />
         </div>
       )}
@@ -217,7 +217,7 @@ export default function OtpCodeEntry({
               onChange={(e) => handleDigitChange(i, e.target.value)}
               onKeyDown={(e) => handleDigitKeyDown(i, e)}
               onPaste={handlePaste}
-              className="w-12 h-14 text-center text-xl font-bold border border-border-subtle rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+              className="w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all"
             />
             {i === 2 && (
               <span className="ml-2 flex items-center text-gray-300 text-xl">-</span>

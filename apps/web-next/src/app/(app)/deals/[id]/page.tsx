@@ -409,7 +409,7 @@ export default function DealDetailPage() {
 
           <Link
             href={`/data-room/${dealId}`}
-            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary border border-border-subtle rounded-lg hover:bg-blue-50 transition-colors"
+            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle"
           >
             <span className="material-symbols-outlined text-[18px]">folder_open</span>
             Data Room
@@ -424,7 +424,7 @@ export default function DealDetailPage() {
                 // Fallback for non-secure contexts
               }
             }}
-            className="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-blue-50 rounded-lg transition-colors"
+            className="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors"
             title="Copy share link"
           >
             <span className="material-symbols-outlined text-[20px]">{linkCopied ? "check" : "link"}</span>
@@ -448,7 +448,7 @@ export default function DealDetailPage() {
           <div className="flex justify-between items-start">
             <div className="flex items-center gap-4">
               <div className="size-16 rounded-xl bg-white p-1 border border-border-subtle shadow-card">
-                <div className="w-full h-full bg-blue-50 rounded-lg flex items-center justify-center border border-border-subtle">
+                <div className="w-full h-full bg-primary-light rounded-lg flex items-center justify-center border border-border-subtle">
                   <span className="material-symbols-outlined text-primary text-3xl">
                     {deal.icon || "business"}
                   </span>

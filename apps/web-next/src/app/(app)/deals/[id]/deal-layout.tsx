@@ -148,13 +148,13 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
           Lead Partner
         </p>
         <div className="flex items-center gap-2">
           {leadPartner ? (
             <>
-              <div className="size-5 rounded-full bg-primary flex items-center justify-center text-[10px] font-bold text-white">
+              <div className="size-5 rounded-full bg-primary border border-primary/20 flex items-center justify-center text-[10px] font-bold text-white">
                 {leadPartner.name?.[0]?.toUpperCase() || "?"}
               </div>
               <span className="text-sm text-text-main font-bold">{leadPartner.name}</span>
@@ -165,13 +165,13 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
         </div>
       </div>
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
           Analyst
         </p>
         <div className="flex items-center gap-2">
           {analyst ? (
             <>
-              <div className="size-5 rounded-full bg-emerald-600 flex items-center justify-center text-[10px] font-bold text-white">
+              <div className="size-5 rounded-full bg-secondary border border-secondary/20 flex items-center justify-center text-[10px] font-bold text-white">
                 {analyst.name?.[0]?.toUpperCase() || "?"}
               </div>
               <span className="text-sm text-text-main font-bold">{analyst.name}</span>
@@ -182,7 +182,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
         </div>
       </div>
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
           Deal Source
         </p>
         <span className="text-sm text-text-main font-bold">
@@ -190,7 +190,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
         </span>
       </div>
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
           Last Updated
         </p>
         <span className="text-sm text-text-main font-bold">
@@ -284,7 +284,7 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
           key={m.key}
           className="bg-surface-card border border-border-subtle rounded-xl p-4 shadow-card relative overflow-hidden group"
         >
-          <p className="text-[11px] text-text-muted font-bold uppercase tracking-wide">{m.label}</p>
+          <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">{m.label}</p>
           <div className="flex items-center gap-2 mt-3">
             <span className="text-2xl font-bold text-text-main leading-none">{m.formatted}</span>
             {m.badge && (
@@ -307,32 +307,32 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
 export function FinancialStatementsSection({ dealId }: { dealId: string }) {
   return (
     <div
-      className="rounded-xl overflow-hidden border-2 shadow-sm"
-      style={{ borderColor: "#003366" }}
+      className="overflow-hidden"
+      style={{ borderRadius: "12px", border: "2px solid #003366", boxShadow: "0 2px 8px rgba(0,51,102,0.15)", flexShrink: 0 }}
     >
       <div
-        className="flex items-center gap-2.5 px-5 py-3.5"
-        style={{ backgroundColor: "#003366" }}
+        className="flex items-center gap-2.5"
+        style={{ backgroundColor: "#003366", padding: "14px 20px", borderRadius: "10px 10px 0 0" }}
       >
         <span className="material-symbols-outlined text-white text-[20px]">table_chart</span>
-        <span className="text-white text-[13px] font-bold uppercase tracking-wider">
+        <span className="text-white text-[13px] font-bold uppercase tracking-wider" style={{ letterSpacing: "0.05em" }}>
           Financial Statements
         </span>
       </div>
-      <div className="bg-white p-5">
-        <div className="text-center py-8">
-          <span className="material-symbols-outlined text-4xl text-text-muted block mb-2">
+      <div className="bg-white" style={{ padding: "20px", borderRadius: "0 0 10px 10px" }}>
+        <div className="text-center" style={{ padding: "40px 16px" }}>
+          <span className="material-symbols-outlined text-text-muted block mb-2" style={{ fontSize: "40px" }}>
             table_chart
           </span>
-          <p className="text-sm font-semibold text-text-main mb-1">No Financial Data Yet</p>
-          <p className="text-xs text-text-muted mb-5">
+          <p className="text-sm font-semibold text-text-main" style={{ marginBottom: "4px" }}>No Financial Data Yet</p>
+          <p className="text-xs text-text-muted" style={{ marginBottom: "20px" }}>
             Upload a CIM, P&amp;L, or financial PDF to extract the 3-statement model
             automatically.
           </p>
           <Link
             href={`/data-room/${dealId}`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-white text-xs font-semibold rounded-lg transition-colors"
-            style={{ backgroundColor: "#003366" }}
+            className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg transition-colors"
+            style={{ padding: "10px 20px", backgroundColor: "#003366" }}
           >
             <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
             Extract Financials

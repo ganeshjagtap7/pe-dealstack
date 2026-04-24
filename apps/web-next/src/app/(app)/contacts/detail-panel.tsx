@@ -155,7 +155,7 @@ export function DetailPanel({
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-6">
           {/* Avatar + Name */}
           <div className="flex items-start gap-4 mb-6">
             <div className="size-14 rounded-full flex items-center justify-center shrink-0 text-lg font-bold shadow-sm" style={{ backgroundColor: tc.avatarBg, color: tc.avatarText }}>
@@ -173,9 +173,9 @@ export function DetailPanel({
           <div className="mb-6">
             <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Contact Information</h4>
             <div className="flex flex-col gap-2">
-              {contact.email && <a href={`mailto:${contact.email}`} className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-blue-50/50"><span className="material-symbols-outlined text-[18px] text-text-muted">mail</span>{contact.email}</a>}
-              {contact.phone && <a href={`tel:${contact.phone}`} className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-blue-50/50"><span className="material-symbols-outlined text-[18px] text-text-muted">call</span>{contact.phone}</a>}
-              {contact.linkedinUrl && <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-blue-50/50"><span className="material-symbols-outlined text-[18px] text-text-muted">open_in_new</span>LinkedIn Profile</a>}
+              {contact.email && <a href={`mailto:${contact.email}`} className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary-light/50"><span className="material-symbols-outlined text-[18px] text-text-muted">mail</span>{contact.email}</a>}
+              {contact.phone && <a href={`tel:${contact.phone}`} className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary-light/50"><span className="material-symbols-outlined text-[18px] text-text-muted">call</span>{contact.phone}</a>}
+              {contact.linkedinUrl && <a href={contact.linkedinUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2.5 text-sm text-text-secondary hover:text-primary transition-colors p-2 rounded-lg hover:bg-primary-light/50"><span className="material-symbols-outlined text-[18px] text-text-muted">open_in_new</span>LinkedIn Profile</a>}
               {!contact.email && !contact.phone && !contact.linkedinUrl && <p className="text-text-muted text-sm italic p-2">No contact information added</p>}
             </div>
           </div>
@@ -192,7 +192,7 @@ export function DetailPanel({
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted">Connections</h4>
-              <button onClick={() => setConnectionModalOpen(true)} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-primary hover:bg-blue-50 transition-colors">
+              <button onClick={() => setConnectionModalOpen(true)} className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-primary hover:bg-primary-light transition-colors">
                 <span className="material-symbols-outlined text-[14px]">add</span> Add
               </button>
             </div>
@@ -202,7 +202,7 @@ export function DetailPanel({
                 const rtc = RELATIONSHIP_TYPE_CONFIG[conn.type] || { label: conn.type, icon: "link", bg: "bg-gray-100", text: "text-gray-700" };
                 const ctc = TYPE_CONFIG[c.type] || TYPE_CONFIG.OTHER;
                 return (
-                  <div key={conn.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border-subtle hover:border-primary/30 hover:bg-blue-50/30 transition-all group">
+                  <div key={conn.id} className="flex items-center gap-3 p-2.5 rounded-lg border border-border-subtle hover:border-primary/30 hover:bg-primary-light/30 transition-all group">
                     <div className="size-8 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold" style={{ backgroundColor: ctc.avatarBg, color: ctc.avatarText }}>{getInitials(c.firstName, c.lastName)}</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-text-main truncate group-hover:text-primary">{c.firstName} {c.lastName}</p>
@@ -236,7 +236,7 @@ export function DetailPanel({
                   const dealId = deal.id || d.dealId;
                   const ss = STAGE_STYLES[deal.stage] || { bg: "bg-gray-100", text: "text-gray-600", label: deal.stage };
                   return (
-                    <div key={dealId} className="flex items-center justify-between p-3 rounded-lg border border-border-subtle hover:border-primary/30 hover:bg-blue-50/30 transition-all group">
+                    <div key={dealId} className="flex items-center justify-between p-3 rounded-lg border border-border-subtle hover:border-primary/30 hover:bg-primary-light/30 transition-all group">
                       <div className="flex items-center gap-2.5 flex-1 min-w-0">
                         <span className="material-symbols-outlined text-text-muted text-[18px] group-hover:text-primary">work</span>
                         <span className="text-sm font-medium text-text-main group-hover:text-primary truncate">{deal.name}</span>
@@ -293,13 +293,13 @@ export function DetailPanel({
         {/* Actions Bar */}
         <div className="shrink-0 border-t border-border-subtle px-6 py-3">
           <div className="flex items-center gap-2">
-            <button onClick={() => setShowInteractionForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-blue-50/50 transition-all">
+            <button onClick={() => setShowInteractionForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
               <span className="material-symbols-outlined text-[16px]">edit_note</span>Add Note
             </button>
-            <button onClick={() => setLinkDealOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-blue-50/50 transition-all">
+            <button onClick={() => setLinkDealOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
               <span className="material-symbols-outlined text-[16px]">link</span>Link Deal
             </button>
-            <button onClick={() => setEditModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-blue-50/50 transition-all">
+            <button onClick={() => setEditModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
               <span className="material-symbols-outlined text-[16px]">edit</span>Edit
             </button>
             <button onClick={() => setDeleteConfirmOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-all">

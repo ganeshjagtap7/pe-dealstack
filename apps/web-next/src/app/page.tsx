@@ -57,7 +57,7 @@ export default function LandingPage() {
                       <div className="size-2.5 rounded-full bg-green-400" />
                     </div>
                     <div className="pt-8 aspect-[4/3]" style={{ background: "linear-gradient(135deg, #003366 0%, #004488 40%, #0055AA 70%, #1a6bb5 100%)" }}>
-                      <div className="w-full h-full bg-white/10 p-6 flex flex-col gap-4">
+                      <div className="w-full h-full bg-white/10 backdrop-contrast-125 p-6 flex flex-col gap-4">
                         <div className="flex gap-4">
                           <div className="w-1/3 h-32 rounded bg-white/90 shadow-sm backdrop-blur" />
                           <div className="w-1/3 h-32 rounded bg-white/90 shadow-sm backdrop-blur" />

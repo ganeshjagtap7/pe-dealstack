@@ -175,7 +175,7 @@ export function DealSelector({
                 setShowDealDropdown(true);
               }}
               onFocus={() => setShowDealDropdown(true)}
-              className="w-full rounded-lg border border-border-subtle bg-background-body py-2 pl-9 pr-3 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary"
+              className="w-full rounded-lg border border-border-subtle bg-background-body py-2 pl-9 pr-3 text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary"
               placeholder="Search deals by name..."
             />
             {selectedDeal && (
@@ -255,15 +255,17 @@ function ResultField({
       : "";
 
   return (
-    <div className="bg-background-body rounded-lg p-3">
-      <p className="text-[10px] text-text-muted uppercase tracking-wider mb-1">{label}</p>
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs font-medium text-text-secondary">{label}</span>
+        {confidence !== undefined && (
+          <span className={cn("text-xs font-medium", confColor)}>{confidence}%</span>
+        )}
+      </div>
       <p className="text-sm font-semibold text-text-main">{value}</p>
       {confidence !== undefined && (
-        <div className="flex items-center gap-2 mt-1.5">
-          <div className="flex-1 h-1.5 bg-surface-card rounded-full overflow-hidden">
-            <div className={cn("h-full rounded-full", barColor)} style={{ width: `${confidence}%` }} />
-          </div>
-          <span className={cn("text-[10px] font-medium", confColor)}>{confidence}%</span>
+        <div className="w-full bg-gray-100 h-1.5 mt-1.5 rounded-full overflow-hidden">
+          <div className={cn("h-1.5 rounded-full transition-all", barColor)} style={{ width: `${confidence}%` }} />
         </div>
       )}
       {source && (
@@ -284,26 +286,19 @@ export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
   const detectedCurrency = result.extraction?.currency || "USD";
 
   return (
-    <div className="bg-surface-card rounded-xl border border-border-subtle shadow-card p-6">
+    <div className="rounded-lg border border-secondary/30 bg-surface-card p-6 shadow-card">
       <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
-          <div className="bg-emerald-50 p-2 rounded-full">
-            <span className="material-symbols-outlined text-emerald-600 text-[24px]">
-              {result.isUpdate ? "update" : result.summary ? "checklist" : "check_circle"}
-            </span>
-          </div>
-          <div>
-            <h3 className="text-base font-bold text-text-main">
+        <div className="flex items-center gap-2">
+          <span className="material-symbols-outlined text-secondary">
+            {result.isUpdate ? "update" : result.summary ? "checklist" : "check_circle"}
+          </span>
+          <h2 className="text-lg font-bold text-text-main">
               {result.summary
                 ? "Bulk Import Complete"
                 : result.isUpdate
                   ? "Deal Updated"
                   : "Deal Created"}
-            </h3>
-            {result.deal && (
-              <p className="text-xs text-text-muted">{result.deal.name}</p>
-            )}
-          </div>
+          </h2>
         </div>
         {result.extraction?.needsReview && (
           <div className="px-2.5 py-1 rounded-full bg-yellow-100 text-yellow-800 text-xs font-medium flex items-center gap-1">
@@ -374,7 +369,7 @@ export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
 
       {/* Review reasons */}
       {result.extraction?.needsReview && result.extraction.reviewReasons && result.extraction.reviewReasons.length > 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3 mb-4">
+        <div className="mt-4 p-3 rounded-lg bg-yellow-50 border border-yellow-200">
           <p className="text-xs font-medium text-yellow-800 mb-1">Review needed:</p>
           <ul className="text-xs text-yellow-700 list-disc list-inside space-y-0.5">
             {result.extraction.reviewReasons.map((r, i) => (
