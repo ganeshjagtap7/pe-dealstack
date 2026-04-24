@@ -33,18 +33,19 @@ function generateSidebar(activePage, options = {}) {
 
         if (isActive) {
             return `
-                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${activeStyle}" data-active="true" ${roleAttr}>
+                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${activeStyle}" data-active="true" data-nav-id="${item.id}" ${roleAttr}>
                     <span class="material-symbols-outlined text-[20px]">${item.icon}</span>
                     <span class="nav-label text-sm font-medium">${item.label}</span>
                 </a>
             `;
         } else {
             return `
-                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${inactiveStyle}" ${roleAttr}
+                <a class="${baseClasses}" href="${item.href}" title="${item.label}" style="${inactiveStyle};position:relative;" data-nav-id="${item.id}" ${roleAttr}
                    onmouseover="this.style.backgroundColor='${item.isAI ? PE_COLORS.secondaryLight : PE_COLORS.primaryLight}';this.style.color='${item.isAI ? PE_COLORS.secondary : PE_COLORS.primary}';"
                    onmouseout="this.style.backgroundColor='';this.style.color='${PE_COLORS.textSecondary}';">
                     <span class="material-symbols-outlined text-[20px]" style="${aiIconStyle}">${item.icon}</span>
                     <span class="nav-label text-sm font-medium">${item.label}</span>
+                    <span class="nav-activity-dot hidden" style="position:absolute;top:8px;right:8px;width:6px;height:6px;border-radius:50%;background:#059669;box-shadow:0 0 6px rgba(5,150,105,0.5);"></span>
                 </a>
             `;
         }

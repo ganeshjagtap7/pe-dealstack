@@ -442,6 +442,21 @@ function initPELayout(activePage, options = {}) {
     // Then refresh from API in background (updates cache for next navigation)
     loadUserData();
 
+    // ── Sidebar activity dots ─────────────────────────────
+    // Show green dot on "Deals" nav when there are unread notifications
+    function updateSidebarActivityDots() {
+        const unread = window.PENotifications?.getUnreadCount?.() || 0;
+        const dealsDot = document.querySelector('[data-nav-id="deals"] .nav-activity-dot');
+        if (dealsDot) {
+            if (unread > 0 && activePage !== 'deals') dealsDot.classList.remove('hidden');
+            else dealsDot.classList.add('hidden');
+        }
+    }
+    // Check every 30s (after notification poll refreshes)
+    setInterval(updateSidebarActivityDots, 31000);
+    // Also check after a short delay on load
+    setTimeout(updateSidebarActivityDots, 3000);
+
     // ── Page Transitions ─────────────────────────────────
     // Fade-in content on load, fade-out on navigation.
     // Sidebar stays static — only <main> transitions.

@@ -267,6 +267,23 @@ function populateDealPage(deal) {
 
     // Render team avatars in header
     renderTeamAvatars(deal.teamMembers || []);
+
+    // Show recently active team members
+    const viewersEl = document.getElementById('deal-viewers');
+    if (viewersEl && teamMembers.length > 0) {
+        const colors = ['#003366', '#059669', '#D97706', '#7C3AED', '#DC2626'];
+        const avatars = teamMembers.slice(0, 3).map((m, i) => {
+            const name = m.user?.name || 'User';
+            const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            return `<div class="size-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold border-2 border-white shadow-sm" style="background:${colors[i % colors.length]};margin-left:${i > 0 ? '-4px' : '0'}" title="${name}">${initials}</div>`;
+        }).join('');
+        const names = teamMembers.slice(0, 2).map(m => (m.user?.name || 'User').split(' ')[0]).join(', ');
+        const extra = teamMembers.length > 2 ? ` +${teamMembers.length - 2}` : '';
+        viewersEl.innerHTML = `
+            <div class="flex items-center">${avatars}</div>
+            <span class="text-[11px] text-text-muted font-medium">${names}${extra} on this deal</span>
+        `;
+    }
 }
 
 // ============================================================
