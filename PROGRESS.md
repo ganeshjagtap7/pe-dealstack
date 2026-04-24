@@ -5,6 +5,78 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 63 — April 24, 2026
+
+#### Timestamp: April 24, 2026 — 20:00-21:30 IST
+
+#### Goal: Deal Chat Agent Superpowers + Ingest Bug Fixes + UI Polish
+
+---
+
+#### Bug Fixes
+
+1. **Ingest context fields 500 error** — `targetCloseDate` received `"60 days"` string but DB expects ISO date. Fixed by converting timeline strings ("30 days", "6 months") to actual dates in `ingest-upload.ts`.
+
+2. **Deal size = revenue copy bug** — `dealSize` was being set to `revenue` value during ingest, causing identical Revenue and Deal Size on CRM cards. Fixed:
+   - Added `dealSize` field to AI extraction schema (`aiExtractor.ts`) — GPT-4o now looks for enterprise value / asking price in documents
+   - Removed the `revenue → dealSize` copy in `ingest-upload.ts` and `dealMerger.ts`
+   - Cleaned up 44 existing deals in DB that had the bug
+   - Removed bad EBITDA×8x estimation fallback after user feedback
+
+#### New Features
+
+3. **Resizable chat panel** — New draggable border between deal details and chat panel. Drag to resize, double-click to reset. Persists to localStorage. New file: `deal-chat-resize.js`.
+
+4. **Deal Chat Agent — 14 tools (was 6):**
+   - **Expanded `update_deal_field`** — now handles 15 fields (was 6): name, currency, revenue, ebitda, dealSize, irrProjected, mom, grossMargin, targetCloseDate + original 6
+   - **New `change_deal_stage`** — change pipeline stage directly from chat (INITIAL_REVIEW → CLOSING → CLOSED_WON etc.)
+   - **New `add_note`** — add notes/calls/meetings to activity feed
+   - **New `trigger_financial_extraction`** — check documents available for extraction
+   - **New `generate_meeting_prep`** — generate full meeting brief via chat
+   - **New `draft_email`** — draft professional emails via chat
+   - **New `get_analysis_summary`** — QoE scores, red flags, financial ratios
+   - **New `list_documents`** — list all uploaded docs with AI status
+   - **New `scroll_to_section`** — scroll deal page to any section from chat
+   - **New `sideEffects` protocol** — frontend handles note_added, extraction_triggered, scroll_to events
+
+5. **Max tokens increased** — Chat agent output limit raised from 1500 → 2500 tokens for richer responses (meeting briefs, email drafts).
+
+#### UI Polish
+
+6. **N/A → em dash (—)** — Replaced all "N/A" with "—" across 6 frontend files (formatters.js, crm-cards.js, crm.js, crm-dynamic.js, templates.js, dashboard-search.js).
+
+7. **Hidden scrollbars globally** — Added CSS to hide all scrollbars while keeping scroll functionality (`skeleton.css`).
+
+8. **Deal page metadata grid** — Cleaned up Lead Partner / Analyst / Source / Updated row — removed avatar circles, consistent 13px semibold font, proper background.
+
+9. **Deal metrics cards polish** — Tighter typography (10px labels, text-xl values, tabular-nums).
+
+---
+
+### Files Changed — Session 63
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/routes/ingest-upload.ts` | Timeline-to-date conversion, dealSize fix, dealSize extraction from AI |
+| `apps/api/src/services/aiExtractor.ts` | Added `dealSize` to Zod schema, interface, result builder |
+| `apps/api/src/services/dealMerger.ts` | Removed revenue→dealSize copy |
+| `apps/api/src/services/agents/dealChatAgent/tools.ts` | 8 new tools, expanded update_deal_field (6→15 fields), +316 lines |
+| `apps/api/src/services/agents/dealChatAgent/index.ts` | Updated system prompt, sideEffects parsing, max tokens 1500→2500 |
+| `apps/web/deal-chat-resize.js` | **New** — resizable chat panel (drag, localStorage, touch) |
+| `apps/web/deal-chat.js` | sideEffects handler (note_added, extraction_triggered, scroll_to) |
+| `apps/web/deal.html` | Resize handle, metadata grid redesign, removed inline scrollbar CSS |
+| `apps/web/deal.js` | Simplified lead/analyst rendering, metrics card polish |
+| `apps/web/js/formatters.js` | N/A → — (em dash) globally |
+| `apps/web/crm-cards.js` | N/A → — |
+| `apps/web/crm.js` | N/A → — |
+| `apps/web/crm-dynamic.js` | N/A → — |
+| `apps/web/templates.js` | N/A → — |
+| `apps/web/dashboard-search.js` | N/A → — |
+| `apps/web/css/skeleton.css` | Global scrollbar hiding |
+| `apps/web/js/deal-intake-template.js` | (context fields UI — no code change, template only) |
+
+---
+
 ### Session 62 — April 24, 2026
 
 #### Timestamp: April 24, 2026 — 05:30-07:00 IST
