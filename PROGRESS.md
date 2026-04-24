@@ -5,6 +5,124 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 62 — April 24, 2026
+
+#### Timestamp: April 24, 2026 — 05:30-07:00 IST
+
+#### Goal: Premium UX Features — Notification Center, Data Visualization, AI Assistant, Real-Time Indicators
+
+---
+
+#### 1. Notification Center — Full Slide-Out Panel (#D)
+
+**What changed:** Replaced the basic notification dropdown (small fixed box) with a full-height slide-out panel from the right edge.
+
+**Features:**
+- 420px wide panel with backdrop blur overlay
+- Time-grouped notifications: Today / Yesterday / This Week / This Month / Older (sticky headers)
+- 4 filter tabs: All / Unread / AI / Team
+- "Mark all read" button in header with unread count pill
+- Color-coded type icons (Deal=navy, Document=blue, AI=amber, Task=green, Comment=cyan)
+- Click notification → navigates to deal page
+- Escape key / backdrop click to close
+- Slide-in/out animations
+
+**Files:** `apps/web/js/notificationCenter.js` (complete rewrite — 400 lines)
+
+---
+
+#### 2. Data Visualization — Dashboard (#F)
+
+**Portfolio Metrics Bar:**
+- 4 metric cards below stat cards: Total Pipeline, Avg Deal Size, Conversion Rate, Total Revenue
+- All computed from real deal data (not hardcoded)
+- Colored icons: navy (pipeline), blue (avg size), green (conversion), amber (revenue)
+
+**Pipeline Funnel Chart:**
+- Horizontal bar chart showing Sourcing → Due Diligence → LOI/Offer → Closed
+- Labels outside bars for visibility, counts and percentages
+- Color-coded per stage, proportional bar widths
+
+**Stat Card Pipeline % Badge:**
+- Each stat card now shows a colored percentage badge (e.g. "67%") indicating pipeline share
+
+**Deal Card Completeness Bar:**
+- Each deal card on CRM page shows a data completeness indicator
+- Green (≥80%), amber (≥50%), gray (<50%)
+- Checks: revenue, EBITDA, dealSize, aiThesis, documents, industry
+
+**Files:** `apps/web/dashboard.html`, `apps/web/crm-cards.js`, `apps/web/crm.js`
+
+---
+
+#### 3. Contextual AI Assistant (#C)
+
+**What built:** Floating "Ask AI" button (sparkle icon, Banker Blue) on bottom-right of all 11 app pages. Opens a chat drawer that's context-aware.
+
+**Features:**
+- Page-aware context: shows "Deal: Luktara Industries" on deal page, "Portfolio" on dashboard, "Contacts" on contacts page
+- Welcome message customized per context
+- Sends to deal chat API when on deal page, portfolio AI on other pages
+- Typing indicator with animated dots
+- Markdown bold support in responses
+- Shift+Space keyboard shortcut
+- Positioned above Feedback button (no overlap)
+- Hidden on login/signup/onboarding pages
+
+**Files:** `apps/web/js/aiAssistant.js` (new — 310 lines), all 11 HTML pages updated
+
+---
+
+#### 4. Real-Time Indicators (#B)
+
+**Team Avatars on Deal Page:**
+- Overlapping avatar circles below deal title showing team members
+- Shows initials + "Ganesh, John on this deal" text
+
+**Live Timestamps on CRM Cards:**
+- Deal card timestamps (e.g. "2m ago") auto-update every 30 seconds
+- Uses `data-timestamp` attributes + interval ticker
+
+**Sidebar Activity Dot:**
+- Small green dot with glow appears on "Deals" nav item when unread notifications exist
+- Updates every 31 seconds (synced with notification polling)
+- Hidden when on the Deals page or no unread notifications
+
+**Files:** `apps/web/deal.js`, `apps/web/deal.html`, `apps/web/js/layout.js`, `apps/web/js/layoutComponents.js`
+
+---
+
+#### Session 62 Summary
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Notification Center — slide-out panel | Done |
+| 2 | Portfolio Metrics Bar | Done |
+| 3 | Pipeline Funnel Chart | Done |
+| 4 | Stat Card % Badges | Done |
+| 5 | Deal Completeness Bar | Done |
+| 6 | Contextual AI Assistant | Done |
+| 7 | Team Avatars on Deal Page | Done |
+| 8 | Live Timestamps on CRM | Done |
+| 9 | Sidebar Activity Dot | Done |
+
+### Files Changed — Session 62
+
+| File | Changes |
+|------|---------|
+| `apps/web/js/notificationCenter.js` | Complete rewrite — slide-out panel |
+| `apps/web/js/aiAssistant.js` | **New** — contextual AI assistant |
+| `apps/web/dashboard.html` | Portfolio metrics + pipeline funnel + stat % badges |
+| `apps/web/crm-cards.js` | Deal completeness bar + live timestamp data attrs |
+| `apps/web/crm.js` | Live timestamp ticker (30s interval) |
+| `apps/web/deal.html` | Team viewers container |
+| `apps/web/deal.js` | Team avatar rendering |
+| `apps/web/js/layout.js` | Sidebar activity dot logic |
+| `apps/web/js/layoutComponents.js` | Nav item data-nav-id + activity dot HTML |
+| All 11 app HTML files | aiAssistant.js script tag |
+
+---
+
 ### Session 61 — April 24, 2026
 
 #### Timestamp: April 24, 2026 — 03:00-05:30 IST
