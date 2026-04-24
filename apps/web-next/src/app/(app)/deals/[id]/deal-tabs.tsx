@@ -101,13 +101,13 @@ const DEFAULT_PROMPTS: SuggestionPrompt[] = [
 function SuggestionChips({ deal, onPick }: { deal: DealDetail | null; onPick: (prompt: string) => void }) {
   const prompts = buildSuggestionPrompts(deal);
   return (
-    <div className="flex flex-wrap gap-2 px-4 pt-3 pb-2 border-t border-border-subtle bg-surface-card">
+    <div className="flex flex-wrap gap-1.5 px-3 pt-2 pb-1.5 border-t border-border-subtle bg-surface-card">
       {prompts.map((p) => (
         <button
           key={p.label}
           type="button"
           onClick={() => onPick(p.prompt)}
-          className="flex items-start gap-2 px-3 py-2 text-left text-xs font-medium rounded-lg transition-colors cursor-pointer"
+          className="flex items-start gap-1.5 px-2 py-1.5 text-left text-[10px] font-medium rounded-md transition-colors cursor-pointer"
           style={{
             border: "1px solid #00336622",
             color: "#003366",
@@ -122,7 +122,7 @@ function SuggestionChips({ deal, onPick }: { deal: DealDetail | null; onPick: (p
             e.currentTarget.style.borderColor = "#00336622";
           }}
         >
-          <span className="material-symbols-outlined text-sm mt-px shrink-0">{p.icon}</span>
+          <span className="material-symbols-outlined text-xs mt-px shrink-0">{p.icon}</span>
           <span className="leading-relaxed">{p.label}</span>
         </button>
       ))}
@@ -296,9 +296,9 @@ export function ChatTab({
 
   return (
     <>
-      <div className="flex flex-col bg-background-body border border-border-subtle rounded-xl shadow-card overflow-hidden h-[calc(100vh-10rem)]">
+      <div className="flex flex-col bg-background-body border border-border-subtle rounded-xl shadow-card overflow-hidden h-[calc(100vh-8rem)]">
         {/* Header — matches legacy chat header */}
-        <div className="h-14 border-b border-border-subtle flex items-center justify-between px-6 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
+        <div className="h-12 border-b border-border-subtle flex items-center justify-between px-4 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
           <div className="flex items-center gap-2">
             <div className="size-2 rounded-full bg-secondary animate-pulse" />
             <span className="text-sm font-bold text-text-main tracking-wide">Deal Assistant AI</span>
@@ -326,7 +326,7 @@ export function ChatTab({
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 flex flex-col custom-scrollbar">
           {/* Welcome message when no history (matches legacy ai-intro-message) */}
           {messages.length === 0 && (
             <div className="ai-intro-message flex gap-4 max-w-[90%]">
@@ -403,7 +403,7 @@ export function ChatTab({
         <SuggestionChips deal={deal} onPick={onSendPrompt} />
 
         {/* Input area with attachment support */}
-        <div className="p-4 bg-surface-card border-t-0 relative z-30">
+        <div className="p-3 bg-surface-card border-t-0 relative z-30">
           {/* Attached file chips */}
           {attachedFiles.length > 0 && (
             <div className="flex gap-2 mb-3 overflow-x-auto custom-scrollbar">

@@ -242,7 +242,13 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
       const data = await api.get<FinancialStatement[]>(`/deals/${dealId}/financials`);
       setStatements(Array.isArray(data) ? data : []);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load financials");
+      const msg = err instanceof Error ? err.message : "Failed to load financials";
+      // Treat 404 as empty data (no financials yet) rather than an error
+      if (msg.includes("404") || msg.includes("Not Found")) {
+        setStatements([]);
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }

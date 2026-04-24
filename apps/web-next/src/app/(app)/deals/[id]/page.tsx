@@ -390,7 +390,7 @@ export default function DealDetailPage() {
   const stageStyle = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
 
   return (
-    <div className="p-4 md:p-6 mx-auto max-w-[1400px] w-full flex flex-col gap-6">
+    <div className="p-3 md:p-4 mx-auto max-w-[1400px] w-full flex flex-col gap-3">
       {/* Breadcrumb bar with actions */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-text-muted">
@@ -442,28 +442,28 @@ export default function DealDetailPage() {
       </div>
 
       {/* Two-column layout */}
-      <div className="flex gap-6">
+      <div className="flex gap-4">
         {/* LEFT COLUMN */}
-        <div className="flex-1 min-w-0 flex flex-col gap-6">
+        <div className="flex-1 min-w-0 flex flex-col gap-3">
           {/* Deal header */}
           <div className="flex justify-between items-start">
-            <div className="flex items-start gap-4">
-              <div className="size-16 rounded-xl bg-white p-1 border border-border-subtle shadow-card">
+            <div className="flex items-start gap-3">
+              <div className="size-12 rounded-xl bg-white p-0.5 border border-border-subtle shadow-card">
                 <div className="w-full h-full bg-primary-light rounded-lg flex items-center justify-center border border-border-subtle">
-                  <span className="material-symbols-outlined text-primary text-3xl">
+                  <span className="material-symbols-outlined text-primary text-2xl">
                     {deal.icon || "business"}
                   </span>
                 </div>
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-text-main leading-tight">
-                  {deal.name}
-                </h1>
-                {deal.industry && (
-                  <div className="flex flex-wrap gap-2 mt-2">
+                <div className="flex items-center gap-2.5">
+                  <h1 className="text-xl font-bold text-text-main leading-tight">
+                    {deal.name}
+                  </h1>
+                  {deal.industry && (
                     <span
                       className={cn(
-                        "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium",
+                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
                         stageStyle.bg,
                         stageStyle.text
                       )}
@@ -476,8 +476,8 @@ export default function DealDetailPage() {
                       />
                       {STAGE_LABELS[deal.stage] || deal.stage}
                     </span>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             </div>
             {/* Deal Actions Menu */}
@@ -508,7 +508,7 @@ export default function DealDetailPage() {
           <DealAnalysisSection dealId={dealId} />
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 border-b border-border-subtle mt-2">
+          <div className="flex items-center gap-1 border-b border-border-subtle mt-1">
             {(["Overview", "Documents", "Activity"] as const).map((tab) => (
               <button
                 key={tab}
@@ -553,8 +553,8 @@ export default function DealDetailPage() {
         </div>
 
         {/* RIGHT COLUMN -- AI Chat sidebar (sticky, desktop only) */}
-        <div className="hidden lg:block w-96 xl:w-[440px] shrink-0">
-          <div className="sticky top-6">
+        <div className="hidden lg:block w-80 xl:w-96 shrink-0">
+          <div className="sticky top-4">
             <ChatTab
               deal={deal}
               messages={messages}

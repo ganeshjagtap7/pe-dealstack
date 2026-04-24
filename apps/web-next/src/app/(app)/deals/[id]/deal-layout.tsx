@@ -23,10 +23,10 @@ export function StagePipeline({
   const isTerminal = TERMINAL_STAGES.includes(deal.stage);
 
   return (
-    <div className="rounded-xl p-4" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-sm">timeline</span>
+    <div className="rounded-xl p-3" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[10px] font-bold text-text-main uppercase tracking-wider flex items-center gap-1.5">
+          <span className="material-symbols-outlined text-primary text-xs">timeline</span>
           Deal Pipeline
         </h3>
         <button
@@ -72,16 +72,16 @@ export function StagePipeline({
                 {index === 0 && <div className="flex-1" />}
                 <div
                   className={cn(
-                    "size-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
+                    "size-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
                     isPast && "bg-secondary text-white",
-                    isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-lg",
+                    isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-md",
                     isFuture && !isCurrent && "bg-gray-100 text-gray-400"
                   )}
                 >
                   {isPast ? (
-                    <span className="material-symbols-outlined text-sm">check</span>
+                    <span className="material-symbols-outlined text-xs">check</span>
                   ) : (
-                    <span className="material-symbols-outlined text-sm">{stage.icon}</span>
+                    <span className="material-symbols-outlined text-xs">{stage.icon}</span>
                   )}
                 </div>
                 {index < PIPELINE_STAGES.length - 1 ? (
@@ -97,7 +97,7 @@ export function StagePipeline({
               </div>
               <span
                 className={cn(
-                  "text-[10px] mt-1.5 text-center leading-tight whitespace-nowrap",
+                  "text-[9px] mt-1 text-center leading-tight whitespace-nowrap",
                   isPast && "text-secondary font-medium",
                   isCurrent && "text-primary font-bold",
                   isFuture && !isCurrent && "text-gray-400"
@@ -114,13 +114,13 @@ export function StagePipeline({
             <div className="h-0.5 w-4 bg-gray-300" />
             <div
               className={cn(
-                "px-3 py-1.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-white shadow-lg",
+                "px-2.5 py-1 rounded-full flex items-center gap-1 text-[10px] font-bold text-white shadow-md",
                 deal.stage === "CLOSED_WON" && "bg-green-500",
                 deal.stage === "CLOSED_LOST" && "bg-red-500",
                 deal.stage === "PASSED" && "bg-gray-500"
               )}
             >
-              <span className="material-symbols-outlined text-sm">
+              <span className="material-symbols-outlined text-xs">
                 {deal.stage === "CLOSED_WON"
                   ? "celebration"
                   : deal.stage === "CLOSED_LOST"
@@ -146,9 +146,9 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
   const analyst = deal.team?.find((m) => m.role === "MEMBER") ?? deal.team?.find((m) => m.role !== "LEAD") ?? deal.team?.[0];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl bg-background-body border border-border-subtle">
       <div>
-        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
           Lead Partner
         </p>
         <div className="flex items-center gap-2">
@@ -165,7 +165,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
         </div>
       </div>
       <div>
-        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
           Analyst
         </p>
         <div className="flex items-center gap-2">
@@ -182,7 +182,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
         </div>
       </div>
       <div>
-        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
           Deal Source
         </p>
         <span className="text-sm text-text-main font-bold">
@@ -190,7 +190,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
         </span>
       </div>
       <div>
-        <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
+        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
           Last Updated
         </p>
         <span className="text-sm text-text-main font-bold">
@@ -268,8 +268,8 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
 
   if (metrics.length === 0) {
     return (
-      <div className="col-span-full rounded-xl p-6 text-center" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
-        <span className="material-symbols-outlined text-text-muted text-3xl mb-2 block">analytics</span>
+      <div className="col-span-full rounded-xl p-4 text-center" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
+        <span className="material-symbols-outlined text-text-muted text-2xl mb-1 block">analytics</span>
         <p className="text-text-muted text-sm">
           No financial metrics yet. Upload a CIM or edit the deal to add data.
         </p>
@@ -278,23 +278,23 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
   }
 
   return (
-    <div className={cn("grid gap-4 items-stretch", metrics.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
+    <div className={cn("grid gap-3 items-stretch", metrics.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
       {metrics.map((m) => (
         <div
           key={m.key}
-          className="rounded-xl p-4 relative overflow-hidden group"
+          className="rounded-xl p-3 relative overflow-hidden group"
           style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}
         >
-          <p className="text-[11px] text-text-muted font-bold uppercase tracking-wide">{m.label}</p>
-          <div className="flex items-center gap-2 mt-3">
-            <span className="text-2xl font-bold text-text-main leading-none">{m.formatted}</span>
+          <p className="text-[10px] text-text-muted font-bold uppercase tracking-wide">{m.label}</p>
+          <div className="flex items-center gap-1.5 mt-1.5">
+            <span className="text-lg font-bold text-text-main leading-none">{m.formatted}</span>
             {m.badge && (
               <span className="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded">
                 {m.badge}
               </span>
             )}
           </div>
-          {m.extra && <p className="text-xs text-text-muted font-medium mt-2">{m.extra}</p>}
+          {m.extra && <p className="text-[10px] text-text-muted font-medium mt-1">{m.extra}</p>}
         </div>
       ))}
     </div>

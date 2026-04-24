@@ -27,7 +27,7 @@ export function OverviewTab({
   const highlights = deal.aiRisks?.investmentHighlights || [];
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-3">
       <KeyRisksSection risks={risks} highlights={highlights} />
 
       {/* AI Thesis */}
