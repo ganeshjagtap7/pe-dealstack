@@ -6,29 +6,44 @@ import { api } from "@/lib/api";
 import type { Deal } from "@/types";
 
 // ---------------------------------------------------------------------------
-// Quick actions — hardcoded entries matching legacy globalSearch.js
+// Contact type (matches the API shape used by legacy command palette)
 // ---------------------------------------------------------------------------
-interface QuickAction {
+interface ContactResult {
   id: string;
-  label: string;
-  icon: string;
-  route: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  company?: string;
+  title?: string;
 }
 
-const QUICK_ACTIONS: QuickAction[] = [
-  { id: "new-deal", label: "Create Deal", icon: "add_circle", route: "/deal-intake" },
-  { id: "goto-pipeline", label: "Go to Pipeline", icon: "dashboard", route: "/deals" },
-  { id: "goto-vdr", label: "Open Data Room", icon: "folder_open", route: "/data-room" },
-  { id: "goto-memo", label: "AI Reports", icon: "edit_note", route: "/memo-builder" },
-  { id: "goto-settings", label: "Settings", icon: "settings", route: "/settings" },
+// ---------------------------------------------------------------------------
+// Static pages — matching legacy commandPalette.js PAGES array
+// ---------------------------------------------------------------------------
+interface PageEntry {
+  label: string;
+  route: string;
+  icon: string;
+  keywords: string;
+}
+
+const PAGES: PageEntry[] = [
+  { label: "Dashboard", route: "/dashboard", icon: "dashboard", keywords: "home overview" },
+  { label: "Deals", route: "/deals", icon: "work", keywords: "pipeline crm deals" },
+  { label: "Data Room", route: "/data-room", icon: "folder_open", keywords: "vdr documents files" },
+  { label: "Contacts", route: "/contacts", icon: "groups", keywords: "crm people network" },
+  { label: "AI Reports", route: "/memo-builder", icon: "auto_awesome", keywords: "memo ic report" },
+  { label: "Admin", route: "/admin", icon: "admin_panel_settings", keywords: "admin tasks team" },
+  { label: "Settings", route: "/settings", icon: "settings", keywords: "profile preferences account" },
 ];
 
 // ---------------------------------------------------------------------------
-// Result union type
+// Result union type — Pages, Deals, Contacts (matching legacy groups)
 // ---------------------------------------------------------------------------
 type SearchResult =
+  | { type: "page"; entry: PageEntry }
   | { type: "deal"; deal: Deal }
-  | { type: "action"; action: QuickAction };
+  | { type: "contact"; contact: ContactResult };
 
 // ---------------------------------------------------------------------------
 // Stage label formatter (mirrors legacy)
@@ -76,6 +91,18 @@ function HighlightedText({ text, query }: { text: string; query: string }) {
 }
 
 // ---------------------------------------------------------------------------
+// Search helper — matches legacy prefix-matching (every word in query must
+// appear somewhere in the haystack string)
+// ---------------------------------------------------------------------------
+function matchesQuery(haystack: string, query: string): boolean {
+  const lower = haystack.toLowerCase();
+  return query
+    .toLowerCase()
+    .split(" ")
+    .every((word) => lower.includes(word));
+}
+
+// ---------------------------------------------------------------------------
 // GlobalSearchModal
 // ---------------------------------------------------------------------------
 export function GlobalSearchModal({
@@ -95,17 +122,78 @@ export function GlobalSearchModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
 
+  // Prefetch caches — filled once on first open
+  const dealsCacheRef = useRef<Deal[] | null>(null);
+  const contactsCacheRef = useRef<ContactResult[] | null>(null);
+  const prefetchedRef = useRef(false);
+
   // -----------------------------------------------------------------------
-  // Build the default result set (quick actions only, no query)
+  // Prefetch deals + contacts on open (matching legacy behaviour)
   // -----------------------------------------------------------------------
-  const buildQuickActionResults = useCallback(
-    (filter?: string): SearchResult[] => {
-      const actions = filter
-        ? QUICK_ACTIONS.filter((a) =>
-            a.label.toLowerCase().includes(filter.toLowerCase()),
-          )
-        : QUICK_ACTIONS;
-      return actions.map((a) => ({ type: "action" as const, action: a }));
+  const prefetchData = useCallback(async () => {
+    if (prefetchedRef.current) return;
+    prefetchedRef.current = true;
+
+    try {
+      if (!dealsCacheRef.current) {
+        const data = await api.get<Deal[] | { deals: Deal[] }>("/deals");
+        dealsCacheRef.current = Array.isArray(data)
+          ? data
+          : (data as { deals: Deal[] }).deals ?? [];
+      }
+    } catch {
+      /* silent — legacy behaviour */
+    }
+
+    try {
+      if (!contactsCacheRef.current) {
+        const data = await api.get<ContactResult[] | { contacts: ContactResult[] }>("/contacts");
+        contactsCacheRef.current = Array.isArray(data)
+          ? data
+          : (data as { contacts: ContactResult[] }).contacts ?? [];
+      }
+    } catch {
+      /* silent — legacy behaviour */
+    }
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Build default result set (pages only, no query)
+  // -----------------------------------------------------------------------
+  const buildDefaultResults = useCallback((): SearchResult[] => {
+    return PAGES.map((p) => ({ type: "page" as const, entry: p }));
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Search across all three groups (Pages, Deals, Contacts) — client-side
+  // filtering against the prefetched cache, matching legacy behaviour.
+  // Up to 12 results total.
+  // -----------------------------------------------------------------------
+  const searchAll = useCallback(
+    (q: string): SearchResult[] => {
+      const pageResults: SearchResult[] = PAGES.filter((p) =>
+        matchesQuery(`${p.label} ${p.keywords}`, q),
+      ).map((p) => ({ type: "page" as const, entry: p }));
+
+      const dealResults: SearchResult[] = (dealsCacheRef.current || [])
+        .filter((d) =>
+          matchesQuery(
+            `${d.name} ${d.industry || ""} ${d.companyName || ""}`,
+            q,
+          ),
+        )
+        .map((d) => ({ type: "deal" as const, deal: d }));
+
+      const contactResults: SearchResult[] = (contactsCacheRef.current || [])
+        .filter((c) =>
+          matchesQuery(
+            `${c.firstName || ""} ${c.lastName || ""} ${c.company || ""} ${c.email || ""}`,
+            q,
+          ),
+        )
+        .map((c) => ({ type: "contact" as const, contact: c }));
+
+      return [...pageResults, ...dealResults, ...contactResults].slice(0, 12);
     },
     [],
   );
@@ -117,25 +205,26 @@ export function GlobalSearchModal({
     if (open) {
       setQuery("");
       setSelectedIndex(0);
-      setResults(buildQuickActionResults());
+      setResults(buildDefaultResults());
       setLoading(false);
       setError(false);
       // Focus the input after the modal renders
       requestAnimationFrame(() => inputRef.current?.focus());
+      prefetchData();
     }
-  }, [open, buildQuickActionResults]);
+  }, [open, buildDefaultResults, prefetchData]);
 
   // -----------------------------------------------------------------------
-  // Debounced search
+  // Debounced search — filters cached data client-side (matching legacy)
   // -----------------------------------------------------------------------
   useEffect(() => {
     if (!open) return;
 
     const trimmed = query.trim();
 
-    // No query — show all quick actions
+    // No query — show pages
     if (!trimmed) {
-      setResults(buildQuickActionResults());
+      setResults(buildDefaultResults());
       setSelectedIndex(0);
       setLoading(false);
       setError(false);
@@ -145,24 +234,9 @@ export function GlobalSearchModal({
     setLoading(true);
     setError(false);
 
-    const timer = setTimeout(async () => {
+    const timer = setTimeout(() => {
       try {
-        // Fetch deals matching query
-        const data = await api.get<Deal[] | { deals: Deal[] }>(
-          `/deals?search=${encodeURIComponent(trimmed)}&limit=5`,
-        );
-        const deals: Deal[] = Array.isArray(data)
-          ? data
-          : (data as { deals: Deal[] }).deals ?? [];
-
-        // Filter quick actions by query
-        const matchingActions = buildQuickActionResults(trimmed);
-
-        const combined: SearchResult[] = [
-          ...deals.map((d) => ({ type: "deal" as const, deal: d })),
-          ...matchingActions,
-        ];
-
+        const combined = searchAll(trimmed);
         setResults(combined);
         setSelectedIndex(0);
         setLoading(false);
@@ -171,10 +245,10 @@ export function GlobalSearchModal({
         setLoading(false);
         setResults([]);
       }
-    }, 300);
+    }, 150);
 
     return () => clearTimeout(timer);
-  }, [query, open, buildQuickActionResults]);
+  }, [query, open, buildDefaultResults, searchAll]);
 
   // -----------------------------------------------------------------------
   // Navigate to a result
@@ -184,8 +258,10 @@ export function GlobalSearchModal({
       onClose();
       if (result.type === "deal") {
         router.push(`/deals/${result.deal.id}`);
+      } else if (result.type === "contact") {
+        router.push(`/contacts#detail-${result.contact.id}`);
       } else {
-        router.push(result.action.route);
+        router.push(result.entry.route);
       }
     },
     [onClose, router],
@@ -201,11 +277,11 @@ export function GlobalSearchModal({
       switch (e.key) {
         case "ArrowDown":
           e.preventDefault();
-          setSelectedIndex((prev) => (prev + 1) % (total || 1));
+          setSelectedIndex((prev) => Math.min(prev + 1, total - 1));
           break;
         case "ArrowUp":
           e.preventDefault();
-          setSelectedIndex((prev) => (prev <= 0 ? (total || 1) - 1 : prev - 1));
+          setSelectedIndex((prev) => Math.max(prev - 1, 0));
           break;
         case "Enter":
           e.preventDefault();
@@ -240,49 +316,56 @@ export function GlobalSearchModal({
   if (!open) return null;
 
   // -----------------------------------------------------------------------
-  // Derived data for rendering
+  // Group results by type — Pages, Deals, Contacts (matching legacy order)
   // -----------------------------------------------------------------------
+  const pageResults = results.filter((r) => r.type === "page") as Extract<
+    SearchResult,
+    { type: "page" }
+  >[];
   const dealResults = results.filter((r) => r.type === "deal") as Extract<
     SearchResult,
     { type: "deal" }
   >[];
-  const actionResults = results.filter((r) => r.type === "action") as Extract<
+  const contactResults = results.filter((r) => r.type === "contact") as Extract<
     SearchResult,
-    { type: "action" }
+    { type: "contact" }
   >[];
 
-  // Global index counter for mapping selected index across groups
+  // Global index counter for mapping selectedIndex across groups
   let globalIdx = 0;
 
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-start justify-center pt-[15vh]"
-      style={{ backgroundColor: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)" }}
+      className="fixed inset-0 z-[200] flex items-start justify-center pt-[18vh]"
+      style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-[560px] mx-4 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
         {/* Search Input */}
-        <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-200">
-          <span className="material-symbols-outlined text-gray-400">search</span>
+        <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-gray-200">
+          <span className="material-symbols-outlined text-gray-400" style={{ fontSize: 22 }}>
+            search
+          </span>
           <input
             ref={inputRef}
             type="text"
-            className="flex-1 text-lg outline-none placeholder-gray-400 bg-transparent"
-            placeholder="Search deals, documents, or type a command..."
+            className="flex-1 text-[15px] outline-none placeholder-gray-400 bg-transparent font-sans"
+            placeholder="Search deals, contacts, pages..."
             autoComplete="off"
+            spellCheck={false}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={handleKeyDown}
           />
-          <kbd className="px-2 py-0.5 text-xs font-bold text-gray-400 bg-gray-100 rounded border border-gray-200">
+          <kbd className="px-1.5 py-0.5 text-[10px] font-semibold text-gray-400 bg-gray-100 rounded border border-gray-200 font-sans">
             ESC
           </kbd>
         </div>
 
         {/* Results */}
-        <div ref={resultsRef} className="max-h-[400px] overflow-y-auto">
+        <div ref={resultsRef} className="max-h-[340px] overflow-y-auto p-1.5">
           {/* Loading */}
           {loading && (
             <div className="flex items-center justify-center py-8">
@@ -304,125 +387,200 @@ export function GlobalSearchModal({
           {/* No results (with query) */}
           {!loading && !error && query.trim() && results.length === 0 && (
             <div className="flex flex-col items-center justify-center py-8 text-gray-400">
-              <span className="material-symbols-outlined text-3xl mb-2">search_off</span>
-              <p className="text-sm font-medium">No results found for &ldquo;{query}&rdquo;</p>
-              <p className="text-xs mt-1">Try a different search term</p>
+              <span className="material-symbols-outlined mb-1" style={{ fontSize: 28, opacity: 0.4 }}>
+                search_off
+              </span>
+              <p className="text-[13px]">No results found</p>
             </div>
           )}
 
           {/* Results list */}
           {!loading && !error && results.length > 0 && (
-            <div className="p-2">
+            <>
+              {/* Pages section */}
+              {pageResults.length > 0 && (
+                <>
+                  <div className="px-2.5 pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-[0.06em]">
+                    Pages
+                  </div>
+                  {pageResults.map((r) => {
+                    const idx = globalIdx++;
+                    const isSelected = idx === selectedIndex;
+                    return (
+                      <div
+                        key={r.entry.route}
+                        data-result-item
+                        className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                          isSelected
+                            ? "text-white"
+                            : "hover:bg-[#E6EEF5]"
+                        }`}
+                        style={isSelected ? { backgroundColor: "#003366" } : undefined}
+                        onClick={() => selectResult(r)}
+                        onMouseEnter={() => setSelectedIndex(idx)}
+                      >
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                          style={
+                            isSelected
+                              ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
+                              : { backgroundColor: "#E6EEF5", color: "#003366" }
+                          }
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                            {r.entry.icon}
+                          </span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            <HighlightedText text={r.entry.label} query={query} />
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+
               {/* Deals section */}
               {dealResults.length > 0 && (
                 <>
-                  <div className="px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider">
+                  <div className="px-2.5 pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-[0.06em]">
                     Deals
                   </div>
                   {dealResults.map((r) => {
                     const idx = globalIdx++;
                     const isSelected = idx === selectedIndex;
+                    const sub = [r.deal.stage ? formatStage(r.deal.stage) : null, r.deal.industry]
+                      .filter(Boolean)
+                      .join(" \u00B7 ");
                     return (
                       <div
                         key={r.deal.id}
                         data-result-item
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                          isSelected ? "bg-[#E6EEF5]" : "hover:bg-gray-100"
+                        className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                          isSelected
+                            ? "text-white"
+                            : "hover:bg-[#E6EEF5]"
                         }`}
+                        style={isSelected ? { backgroundColor: "#003366" } : undefined}
                         onClick={() => selectResult(r)}
                         onMouseEnter={() => setSelectedIndex(idx)}
                       >
                         <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center"
-                          style={{ backgroundColor: "#E6EEF5" }}
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                          style={
+                            isSelected
+                              ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
+                              : { backgroundColor: "#DBEAFE", color: "#1D4ED8" }
+                          }
                         >
-                          <span
-                            className="material-symbols-outlined text-lg"
-                            style={{ color: "#003366" }}
-                          >
-                            {r.deal.icon || "business_center"}
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                            work
                           </span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">
+                          <p className="text-sm font-medium truncate">
                             <HighlightedText text={r.deal.name} query={query} />
                           </p>
-                          <p className="text-xs text-gray-500 truncate">
-                            {r.deal.industry || "No industry"} &bull;{" "}
-                            {formatStage(r.deal.stage)}
-                          </p>
+                          {sub && (
+                            <p
+                              className="text-[11px] truncate"
+                              style={isSelected ? { color: "rgba(255,255,255,0.7)" } : { color: "#9CA3AF" }}
+                            >
+                              {sub}
+                            </p>
+                          )}
                         </div>
-                        {r.deal.dealSize != null && (
-                          <span className="text-xs font-bold text-gray-500">
-                            ${r.deal.dealSize}M
-                          </span>
-                        )}
                       </div>
                     );
                   })}
                 </>
               )}
 
-              {/* Quick Actions section */}
-              {actionResults.length > 0 && (
+              {/* Contacts section */}
+              {contactResults.length > 0 && (
                 <>
-                  <div
-                    className={`px-3 py-2 text-xs font-bold text-gray-400 uppercase tracking-wider ${
-                      dealResults.length > 0 ? "mt-2" : ""
-                    }`}
-                  >
-                    Quick Actions
+                  <div className="px-2.5 pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-[0.06em]">
+                    Contacts
                   </div>
-                  {actionResults.map((r) => {
+                  {contactResults.map((r) => {
                     const idx = globalIdx++;
                     const isSelected = idx === selectedIndex;
+                    const fullName = `${r.contact.firstName || ""} ${r.contact.lastName || ""}`.trim();
+                    const sub = [r.contact.title, r.contact.company]
+                      .filter(Boolean)
+                      .join(" \u00B7 ");
                     return (
                       <div
-                        key={r.action.id}
+                        key={r.contact.id}
                         data-result-item
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
-                          isSelected ? "bg-[#E6EEF5]" : "hover:bg-gray-100"
+                        className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg cursor-pointer transition-colors ${
+                          isSelected
+                            ? "text-white"
+                            : "hover:bg-[#E6EEF5]"
                         }`}
+                        style={isSelected ? { backgroundColor: "#003366" } : undefined}
                         onClick={() => selectResult(r)}
                         onMouseEnter={() => setSelectedIndex(idx)}
                       >
-                        <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
-                          <span className="material-symbols-outlined text-amber-600 text-lg">
-                            {r.action.icon}
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center text-lg flex-shrink-0"
+                          style={
+                            isSelected
+                              ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
+                              : { backgroundColor: "#D1FAE5", color: "#059669" }
+                          }
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
+                            person
                           </span>
                         </div>
-                        <span className="text-sm font-medium text-gray-800">
-                          <HighlightedText text={r.action.label} query={query} />
-                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            <HighlightedText text={fullName} query={query} />
+                          </p>
+                          {sub && (
+                            <p
+                              className="text-[11px] truncate"
+                              style={isSelected ? { color: "rgba(255,255,255,0.7)" } : { color: "#9CA3AF" }}
+                            >
+                              {sub}
+                            </p>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </>
               )}
-            </div>
+            </>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between px-4 py-2 bg-gray-50 border-t border-gray-200 text-xs text-gray-400">
-          <div className="flex items-center gap-4">
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-200">
-                &uarr;
-              </kbd>
-              <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-200">
-                &darr;
-              </kbd>
-              Navigate
-            </span>
-            <span className="flex items-center gap-1">
-              <kbd className="px-1.5 py-0.5 bg-white rounded border border-gray-200">
-                &crarr;
-              </kbd>
-              Select
-            </span>
-          </div>
-          <span>PE OS Command Palette</span>
+        {/* Footer — keyboard hints matching legacy cp-footer */}
+        <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-200 text-[11px] text-gray-400">
+          <span>
+            <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
+              &uarr;
+            </kbd>
+            <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
+              &darr;
+            </kbd>
+            {" "}navigate
+          </span>
+          <span>
+            <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
+              Enter
+            </kbd>
+            {" "}open
+          </span>
+          <span>
+            <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
+              ESC
+            </kbd>
+            {" "}close
+          </span>
         </div>
       </div>
     </div>

@@ -5,7 +5,7 @@ import { useAuth } from "@/providers/AuthProvider";
 import { useUser } from "@/providers/UserProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { NotificationsDropdown } from "./NotificationsDropdown";
+import { NotificationCenter } from "./NotificationPanel";
 import { GlobalSearchModal } from "./GlobalSearchModal";
 
 // Ported from apps/web/js/onboarding/onboarding-config.js (f23a61c).
@@ -90,8 +90,8 @@ export function Header() {
           </div>
         )}
 
-        {/* Notifications — real-data dropdown */}
-        <NotificationsDropdown />
+        {/* Notifications — slide-out panel */}
+        <NotificationCenter />
 
         <div className="h-6 w-px bg-border-subtle" />
 
