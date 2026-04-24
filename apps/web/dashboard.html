@@ -66,9 +66,12 @@
                         <span class="text-xs font-bold uppercase tracking-wider ${isHighlight ? 'text-primary' : 'text-text-secondary'}">${s.label}</span>
                         <span class="material-symbols-outlined ${isHighlight ? 'text-primary' : 'text-text-muted group-hover:text-primary'} transition-colors text-[20px]">${s.icon}</span>
                     </div>
-                    <div class="flex items-end gap-2 mt-3">
-                        <span class="text-3xl font-bold ${count > 0 ? 'text-text-main' : 'text-text-muted'} tracking-tight">${count}</span>
-                        <span class="text-xs font-medium text-text-secondary mb-1.5">${count === 1 ? 'deal' : 'deals'}</span>
+                    <div class="flex items-end justify-between mt-3">
+                        <div class="flex items-end gap-2">
+                            <span class="text-3xl font-bold ${count > 0 ? 'text-text-main' : 'text-text-muted'} tracking-tight">${count}</span>
+                            <span class="text-xs font-medium text-text-secondary mb-1.5">${count === 1 ? 'deal' : 'deals'}</span>
+                        </div>
+                        ${count > 0 ? `<span class="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style="color: ${isHighlight ? '#003366' : '#059669'}; background: ${isHighlight ? '#E6EEF5' : '#ECFDF5'};">${pct}%</span>` : ''}
                     </div>
                     <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
                         <div class="bg-${s.color} h-1.5 rounded-full transition-all" style="width: ${pct}%"></div>
@@ -98,6 +101,155 @@
     } catch (e) {
         // Keep the zero-count cards already rendered above
         console.warn('Pipeline stats fetch failed:', e);
+    }
+})();
+</script>
+
+<!-- Portfolio Metrics Bar — computed from deal data -->
+<div id="portfolio-metrics" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-text-lg" style="width:4rem;margin-top:0.5rem"></div></div>
+    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-text-lg" style="width:4rem;margin-top:0.5rem"></div></div>
+    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-text-lg" style="width:4rem;margin-top:0.5rem"></div></div>
+    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-text-lg" style="width:4rem;margin-top:0.5rem"></div></div>
+</div>
+<script>
+(async function loadPortfolioMetrics() {
+    const container = document.getElementById('portfolio-metrics');
+    if (!container) return;
+
+    const waitForAuth = () => new Promise(resolve => {
+        const check = setInterval(() => {
+            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
+        }, 100);
+        setTimeout(() => { clearInterval(check); resolve(); }, 5000);
+    });
+    await waitForAuth();
+
+    try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
+        if (!resp.ok) return;
+        const deals = await resp.json();
+        const list = Array.isArray(deals) ? deals : (deals?.deals || []);
+        const active = list.filter(d => d.status !== 'ARCHIVED');
+
+        if (active.length === 0) {
+            container.innerHTML = '';
+            return;
+        }
+
+        // Compute metrics
+        const totalAUM = active.reduce((sum, d) => sum + (d.dealSize || 0), 0);
+        const avgSize = active.length > 0 ? totalAUM / active.length : 0;
+        const closedCount = active.filter(d => ['CLOSED_WON', 'CLOSING'].includes(d.stage)).length;
+        const conversionPct = active.length > 0 ? Math.round((closedCount / active.length) * 100) : 0;
+        const totalRevenue = active.reduce((sum, d) => sum + (d.revenue || 0), 0);
+
+        function fmtM(val) {
+            if (!val) return '$0';
+            if (val >= 1000) return '$' + (val / 1000).toFixed(1) + 'B';
+            if (val >= 1) return '$' + val.toFixed(1) + 'M';
+            return '$' + (val * 1000).toFixed(0) + 'K';
+        }
+
+        const metrics = [
+            { label: 'Total Pipeline', value: fmtM(totalAUM), icon: 'account_balance', color: '#003366' },
+            { label: 'Avg Deal Size', value: fmtM(avgSize), icon: 'equalizer', color: '#2563EB' },
+            { label: 'Conversion Rate', value: conversionPct + '%', icon: 'trending_up', color: '#059669' },
+            { label: 'Total Revenue', value: fmtM(totalRevenue), icon: 'payments', color: '#D97706' },
+        ];
+
+        container.innerHTML = metrics.map(m => `
+            <div class="flex items-center gap-3 bg-surface-card rounded-lg border border-border-subtle p-4 shadow-card">
+                <div class="size-10 rounded-lg flex items-center justify-center shrink-0" style="background: ${m.color}10; color: ${m.color};">
+                    <span class="material-symbols-outlined text-[20px]">${m.icon}</span>
+                </div>
+                <div>
+                    <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted">${m.label}</p>
+                    <p class="text-xl font-bold text-text-main tracking-tight">${m.value}</p>
+                </div>
+            </div>
+        `).join('');
+    } catch (e) {
+        container.innerHTML = '';
+        console.warn('Portfolio metrics failed:', e);
+    }
+})();
+</script>
+
+<!-- Deal Funnel — visual pipeline conversion -->
+<div id="deal-funnel" class="bg-surface-card rounded-lg border border-border-subtle shadow-card p-5">
+    <div class="flex items-center justify-between mb-4">
+        <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined text-primary text-[20px]">filter_alt</span>
+            <h3 class="font-bold text-text-main text-base">Pipeline Funnel</h3>
+        </div>
+        <span class="text-xs text-text-muted font-medium">Conversion rates</span>
+    </div>
+    <div id="funnel-bars" class="flex flex-col gap-2">
+        <div class="skeleton" style="height:2rem;width:100%;border-radius:6px"></div>
+        <div class="skeleton" style="height:2rem;width:75%;border-radius:6px"></div>
+        <div class="skeleton" style="height:2rem;width:50%;border-radius:6px"></div>
+        <div class="skeleton" style="height:2rem;width:25%;border-radius:6px"></div>
+    </div>
+</div>
+<script>
+(async function loadDealFunnel() {
+    const container = document.getElementById('funnel-bars');
+    if (!container) return;
+
+    const waitForAuth = () => new Promise(resolve => {
+        const check = setInterval(() => {
+            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
+        }, 100);
+        setTimeout(() => { clearInterval(check); resolve(); }, 5000);
+    });
+    await waitForAuth();
+
+    try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
+        if (!resp.ok) return;
+        const deals = await resp.json();
+        const list = Array.isArray(deals) ? deals : (deals?.deals || []);
+        const active = list.filter(d => d.status !== 'ARCHIVED');
+
+        if (active.length === 0) {
+            document.getElementById('deal-funnel').style.display = 'none';
+            return;
+        }
+
+        const stages = [
+            { label: 'Sourcing', keys: ['INITIAL_REVIEW'], color: '#3B82F6' },
+            { label: 'Due Diligence', keys: ['DUE_DILIGENCE'], color: '#003366' },
+            { label: 'LOI / Offer', keys: ['LOI_SUBMITTED', 'IOI_SUBMITTED'], color: '#F59E0B' },
+            { label: 'Closed', keys: ['CLOSED_WON', 'CLOSING', 'NEGOTIATION'], color: '#059669' },
+        ];
+
+        const total = active.length;
+        let cumulative = total;
+        const funnelData = stages.map(s => {
+            const count = active.filter(d => s.keys.includes(d.stage)).length;
+            const pct = Math.round((count / total) * 100);
+            const widthPct = Math.max(Math.round((cumulative / total) * 100), 8);
+            const result = { ...s, count, pct, widthPct };
+            cumulative -= count;
+            return result;
+        });
+
+        container.innerHTML = funnelData.map(s => `
+            <div class="flex items-center gap-3">
+                <span class="text-xs font-bold w-24 shrink-0 text-right" style="color: ${s.color};">${s.label}</span>
+                <div class="relative rounded-md overflow-hidden h-8 flex-1 transition-all" style="background: ${s.color}10; border: 1px solid ${s.color}20;">
+                    <div class="absolute inset-y-0 left-0 rounded-md" style="width: ${Math.max(s.pct, 2)}%; background: ${s.color}; opacity: 0.85;"></div>
+                    <div class="relative flex items-center justify-end px-3 h-full">
+                        <span class="text-xs font-bold" style="color: ${s.color};">${s.count}</span>
+                    </div>
+                </div>
+                <span class="text-xs text-text-muted font-semibold w-8 text-right">${s.pct}%</span>
+            </div>
+        `).join('');
+    } catch (e) {
+        document.getElementById('deal-funnel').style.display = 'none';
+        console.warn('Deal funnel failed:', e);
     }
 })();
 </script>
@@ -399,6 +551,7 @@ Scan Signals
 <script src="js/layoutComponents.js"></script>
 <script src="js/layout.js"></script>
 <script src="js/commandPalette.js"></script>
+<script src="js/aiAssistant.js"></script>
 <script src="js/inviteModal-template.js"></script>
 <script src="js/inviteModal.js"></script>
 <!-- Onboarding modules -->
