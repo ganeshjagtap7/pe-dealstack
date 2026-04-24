@@ -25,6 +25,7 @@ import {
   DealMetadataRow,
   FinancialMetricsRow,
   FinancialStatementsSection,
+  DealAnalysisSection,
   DealActionsMenu,
   TeamAvatarStack,
 } from "./components";
@@ -502,6 +503,9 @@ export default function DealDetailPage() {
 
           {/* Financial Statements section */}
           <FinancialStatementsSection dealId={dealId} />
+
+          {/* AI Financial Analysis section */}
+          <DealAnalysisSection dealId={dealId} />
 
           {/* Tabs */}
           <div className="flex items-center gap-1 border-b border-border-subtle mt-2">

@@ -309,7 +309,7 @@ export default function DealsPage() {
         </div>
         <Link
           href="/deal-intake"
-          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 text-text-secondary hover:border-[#003366] hover:text-[#003366] bg-white text-sm font-medium transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 text-text-secondary hover:border-[#003366] hover:text-[#003366] bg-surface-card text-sm font-medium transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">upload_file</span>
           Import Deals
@@ -318,6 +318,19 @@ export default function DealsPage() {
 
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3">
+        {/* Search Input */}
+        <div className="relative group w-full sm:w-auto sm:min-w-[280px]">
+          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+            <span className="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[20px]">search</span>
+          </div>
+          <input
+            type="text"
+            placeholder="Search deals by name, industry, or thesis..."
+            onChange={(e) => handleSearch(e.target.value)}
+            className="block w-full rounded-lg border border-border-subtle bg-surface-card py-2 pl-10 pr-3 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm"
+          />
+        </div>
+
         {/* Stage Filter */}
         <FilterDropdown label={filters.stage ? `Stage: ${STAGE_LABELS[filters.stage]}` : "Stage: All"} active={!!filters.stage}>
           {(close) => (
@@ -487,7 +500,7 @@ export default function DealsPage() {
 
       {/* Bulk Actions Bar */}
       {selected.size > 0 && (
-        <div className="flex items-center justify-between bg-[#003366] text-white rounded-lg p-4 shadow-lg">
+        <div className="flex items-center justify-between bg-[#003366] text-white rounded-xl p-4 shadow-lg">
           <div className="flex items-center gap-3">
             <button onClick={clearSelection} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
               <span className="material-symbols-outlined text-[20px]">close</span>
@@ -558,14 +571,14 @@ export default function DealsPage() {
         ) : (
           <div className="flex flex-col items-center justify-center py-20">
             <div
-              className="w-14 h-14 rounded-xl flex items-center justify-center mb-4"
+              className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4"
               style={{ backgroundColor: "#E6EEF5" }}
             >
-              <span className="material-symbols-outlined text-[28px]" style={{ color: "#003366" }}>
+              <span className="material-symbols-outlined text-[36px]" style={{ color: "#003366" }}>
                 rocket_launch
               </span>
             </div>
-            <p className="text-text-main font-semibold text-base mb-2">Welcome to Your Deal Pipeline</p>
+            <p className="text-text-main font-semibold text-xl mb-2">Welcome to Your Deal Pipeline</p>
             <p className="text-text-muted text-sm text-center max-w-md mb-5">
               Start building your deal flow. Create your first deal to track it through sourcing, due diligence, and close.
             </p>
@@ -602,7 +615,7 @@ export default function DealsPage() {
             const stageDeals = deals.filter((d) => d.stage === stage);
             return (
               <div key={stage} className="min-w-[300px] w-[300px] shrink-0" data-stage={stage}>
-                <div className="bg-white rounded-lg border border-border-subtle overflow-hidden h-full flex flex-col">
+                <div className="bg-surface-card rounded-lg border border-border-subtle overflow-hidden h-full flex flex-col">
                   <div className={cn("px-4 py-3 border-b border-border-subtle", s.bg)}>
                     <div className="flex items-center justify-between">
                       <span className={cn("px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider", s.bg, s.border, s.text)}>

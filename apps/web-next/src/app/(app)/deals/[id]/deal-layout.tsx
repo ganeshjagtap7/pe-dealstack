@@ -302,44 +302,13 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
 }
 
 // ---------------------------------------------------------------------------
-// Financial Statements Section (collapsible, with "Extract Financials" CTA)
+// Financial Statements Section
+// Delegates to FinancialStatementsPanel which handles loading, empty state,
+// and data rendering internally.
 // ---------------------------------------------------------------------------
 
+import { FinancialStatementsPanel } from "./deal-financials";
+
 export function FinancialStatementsSection({ dealId }: { dealId: string }) {
-  return (
-    <div
-      className="overflow-hidden"
-      style={{ borderRadius: "12px", border: "2px solid #003366", boxShadow: "0 2px 8px rgba(0,51,102,0.15)", flexShrink: 0 }}
-    >
-      <div
-        className="flex items-center gap-2.5"
-        style={{ backgroundColor: "#003366", padding: "14px 20px", borderRadius: "10px 10px 0 0" }}
-      >
-        <span className="material-symbols-outlined text-white text-[20px]">table_chart</span>
-        <span className="text-white text-[13px] font-bold uppercase tracking-wider" style={{ letterSpacing: "0.05em" }}>
-          Financial Statements
-        </span>
-      </div>
-      <div className="bg-white" style={{ padding: "20px", borderRadius: "0 0 10px 10px" }}>
-        <div className="text-center" style={{ padding: "40px 16px" }}>
-          <span className="material-symbols-outlined text-text-muted block mb-2" style={{ fontSize: "40px" }}>
-            table_chart
-          </span>
-          <p className="text-sm font-semibold text-text-main" style={{ marginBottom: "4px" }}>No Financial Data Yet</p>
-          <p className="text-xs text-text-muted" style={{ marginBottom: "20px" }}>
-            Upload a CIM, P&amp;L, or financial PDF to extract the 3-statement model
-            automatically.
-          </p>
-          <Link
-            href={`/data-room/${dealId}`}
-            className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg transition-colors"
-            style={{ padding: "10px 20px", backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-            Extract Financials
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
+  return <FinancialStatementsPanel dealId={dealId} />;
 }

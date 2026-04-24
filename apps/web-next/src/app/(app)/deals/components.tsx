@@ -72,7 +72,7 @@ export function FilterDropdown({
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+        <div className="absolute right-0 top-full mt-1 w-48 bg-surface-card rounded-lg shadow-lg border border-border-subtle py-1 z-50">
           {children(() => setOpen(false))}
         </div>
       )}
@@ -257,7 +257,7 @@ export function DealCard({
           <span className="material-symbols-outlined text-[18px] text-text-muted">more_vert</span>
         </button>
         {menuOpen && (
-          <div className="absolute right-0 top-full mt-1 w-44 bg-white rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+          <div className="absolute right-0 top-full mt-1 w-44 bg-surface-card rounded-lg shadow-lg border border-border-subtle py-1 z-50">
             <Link
               href={`/deals/${deal.id}`}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-[#003366] transition-colors"
@@ -305,7 +305,7 @@ export function DealCard({
         onClick={() => router.push(`/deals/${deal.id}`)}
         onMouseEnter={() => router.prefetch(`/deals/${deal.id}`)}
         className={cn(
-          "bg-white rounded-lg border border-border-subtle p-5 hover:border-[#B3C2D1] transition-all cursor-pointer flex flex-col h-full shadow-sm hover:shadow-md relative overflow-hidden",
+          "bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-sm hover:shadow-md relative overflow-hidden",
           isPassed && "opacity-70 hover:opacity-100",
           selected && "ring-2 ring-[#003366] border-[#003366]"
         )}
@@ -313,7 +313,7 @@ export function DealCard({
           {/* Header */}
           <div className="flex justify-between items-start mb-4">
             <div className="flex gap-3 items-center pl-6">
-              <div className="size-10 rounded-lg bg-blue-50 border border-blue-200 flex items-center justify-center text-[#003366]">
+              <div className="size-10 rounded-lg bg-primary-light border border-primary/10 flex items-center justify-center text-[#003366]">
                 <span className="material-symbols-outlined text-[20px]">
                   {deal.icon || "business_center"}
                 </span>
@@ -353,13 +353,13 @@ export function DealCard({
               if (!cfg) return null;
               const value = deal[key as keyof Deal] as number | undefined | null;
               return (
-                <div key={key} className="bg-gray-50 rounded-md p-3">
+                <div key={key} className="bg-background-body rounded-md p-3">
                   <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
                     {cfg.label}
                   </span>
                   <span className={cn(
                     "font-bold text-base",
-                    key === "mom" && value != null && value >= 3 ? "text-green-600" : "",
+                    key === "mom" && value != null && value >= 3 ? "text-secondary" : "",
                     key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
                     !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
                   )}>
@@ -375,7 +375,7 @@ export function DealCard({
           </div>
 
           {/* AI Thesis */}
-          <div className="bg-gray-50 rounded-md p-3 mt-auto border border-border-subtle">
+          <div className="bg-background-body rounded-md p-3 mt-auto border border-border-subtle">
             <div className="flex items-center gap-2 mb-1.5">
               <span
                 className={cn(
@@ -477,7 +477,7 @@ export function KanbanCard({
 
   return (
     <div
-      className="kanban-card bg-white rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-[#B3C2D1] transition-all cursor-grab active:cursor-grabbing"
+      className="kanban-card bg-surface-card rounded-lg border border-border-subtle p-3 shadow-sm hover:shadow-md hover:border-primary/30 transition-all cursor-grab active:cursor-grabbing"
       draggable
       data-deal-id={deal.id}
       onDragStart={(e) => {
@@ -492,7 +492,7 @@ export function KanbanCard({
     >
       <Link href={`/deals/${deal.id}`} className="block">
         <div className="flex items-start gap-2 mb-2">
-          <div className="size-8 rounded-md bg-blue-50 border border-blue-200 flex items-center justify-center text-[#003366] shrink-0">
+          <div className="size-8 rounded-md bg-primary-light border border-primary/10 flex items-center justify-center text-[#003366] shrink-0">
             <span className="material-symbols-outlined text-[16px]">
               {deal.icon || "business_center"}
             </span>
@@ -513,11 +513,11 @@ export function KanbanCard({
             if (!cfg) return null;
             const value = deal[key as keyof Deal] as number | undefined | null;
             return (
-              <div key={key} className="flex-1 bg-gray-50 rounded px-2 py-1.5">
+              <div key={key} className="flex-1 bg-background-body rounded px-2 py-1.5">
                 <span className="text-[9px] text-text-muted font-medium uppercase block">{cfg.kanbanLabel}</span>
                 <span className={cn(
                   "text-xs font-bold",
-                  key === "mom" && value != null && value >= 3 ? "text-green-600" : "",
+                  key === "mom" && value != null && value >= 3 ? "text-secondary" : "",
                   key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
                   !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
                 )}>
@@ -598,7 +598,7 @@ export function MetricsDropdown({
         <span className="text-text-secondary text-sm font-medium hidden lg:block">Metrics</span>
       </button>
       {open && (
-        <div className="absolute top-full right-0 mt-2 bg-white border border-border-subtle rounded-lg shadow-lg z-50 min-w-[220px] py-2">
+        <div className="absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[220px] py-2">
           <div className="px-4 py-2 border-b border-border-subtle">
             <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Visible Metrics</p>
           </div>
@@ -651,9 +651,9 @@ export function UploadCard({ onClick }: { onClick?: () => void }) {
   return (
     <article
       onClick={onClick}
-      className="bg-white/50 rounded-lg border border-dashed border-border-subtle p-5 hover:border-[#003366] hover:bg-primary-light/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[280px] text-center gap-3"
+      className="bg-surface-card/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-primary/30 hover:bg-primary-light/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4"
     >
-      <div className="size-12 rounded-full bg-white border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-[#003366]/30 transition-all shadow-sm">
+      <div className="size-14 rounded-full bg-surface-card border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-primary/30 transition-all shadow-sm">
         <span className="material-symbols-outlined text-text-muted group-hover:text-[#003366] text-xl">add</span>
       </div>
       <div>

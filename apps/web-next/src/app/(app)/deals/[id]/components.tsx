@@ -112,6 +112,7 @@ export type Tab = (typeof TABS)[number];
 // ---------------------------------------------------------------------------
 
 export { StagePipeline, DealMetadataRow, FinancialMetricsRow, FinancialStatementsSection } from "./deal-layout";
+export { DealAnalysisSection } from "./deal-analysis";
 
 // Re-export OverviewTab from deal-overview.tsx
 export { OverviewTab } from "./deal-overview";
