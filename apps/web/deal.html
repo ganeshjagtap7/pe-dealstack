@@ -181,7 +181,9 @@
                             <div>
                                 <h2 id="deal-title" class="text-2xl font-bold text-text-main leading-tight"><span class="skeleton inline-block" style="width:12rem;height:1.75rem;vertical-align:middle"></span>
                                 </h2>
-                                <div class="flex flex-wrap gap-2 mt-2">
+                                <!-- Recently active team members -->
+                                <div id="deal-viewers" class="flex items-center gap-1.5 mt-1.5 mb-1" style="min-height:20px"></div>
+                                <div class="flex flex-wrap gap-2 mt-1">
                                     <!-- Financial extraction status badge -->
                                     <span id="fin-status-badge"
                                         class="hidden px-2.5 py-0.5 rounded text-xs font-semibold border cursor-pointer transition-opacity hover:opacity-80"
@@ -505,6 +507,7 @@
     <script src="js/layoutComponents.js"></script>
     <script src="js/layout.js"></script>
     <script src="js/commandPalette.js"></script>
+    <script src="js/aiAssistant.js"></script>
     <script src="js/docPreview-modal.js"></script>
     <script src="js/docPreview.js"></script>
     <script src="js/notificationCenter.js"></script>
