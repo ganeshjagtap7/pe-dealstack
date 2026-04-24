@@ -363,10 +363,11 @@ export function AIAssistant() {
             </div>
 
             {/* messages */}
-            <div className="custom-scrollbar" style={S.messagesArea}>
+            <div className="ai-messages-area" style={S.messagesArea}>
               {messages.map((msg, i) => (
                 <div
                   key={i}
+                  className={msg.role === "assistant" ? "ai-msg-assistant" : undefined}
                   style={{
                     ...S.msgBase,
                     ...(msg.role === "user" ? S.msgUser : S.msgAssistant),
@@ -391,6 +392,7 @@ export function AIAssistant() {
             <div style={S.inputBar}>
               <input
                 ref={inputRef}
+                className="ai-input"
                 type="text"
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
@@ -411,6 +413,7 @@ export function AIAssistant() {
               />
               <button
                 type="button"
+                className="ai-send-btn"
                 onClick={sendMessage}
                 disabled={isLoading || !inputValue.trim()}
                 style={{

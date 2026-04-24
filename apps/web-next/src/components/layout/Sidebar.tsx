@@ -27,7 +27,7 @@ function NavLink({
       href={item.href}
       title={item.label}
       className={cn(
-        "flex items-center gap-3 rounded-lg transition-colors relative",
+        "nav-item flex items-center gap-3 rounded-lg transition-colors relative",
         collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
         isActive
           ? "bg-primary text-white shadow-sm"
@@ -43,14 +43,14 @@ function NavLink({
       >
         {item.icon}
       </span>
-      {!collapsed && <span className="text-sm font-medium truncate">{item.label}</span>}
+      {!collapsed && <span className="nav-label text-sm font-medium truncate">{item.label}</span>}
       {showDot && (
         <span
           className={cn(
-            "w-2 h-2 rounded-full bg-secondary shrink-0",
-            collapsed ? "absolute top-1.5 right-1.5" : "ml-auto",
+            "rounded-full bg-secondary shrink-0",
+            collapsed ? "absolute top-2 right-2 w-1.5 h-1.5" : "absolute top-2 right-2 w-1.5 h-1.5",
           )}
-          style={{ animation: "pulseDot 2s infinite" }}
+          style={{ boxShadow: "0 0 6px rgba(5,150,105,0.5)" }}
           aria-label="New activity"
         />
       )}
@@ -123,7 +123,7 @@ export function Sidebar() {
         <Link href="/dashboard" className="flex items-center gap-2 text-primary">
           <Logo className="size-7 shrink-0" />
           {!collapsed && (
-            <h2 className="text-xl font-bold tracking-tight text-primary">PE OS</h2>
+            <h2 className="logo-text text-xl font-bold tracking-tight text-primary">PE OS</h2>
           )}
         </Link>
       </div>
@@ -135,7 +135,7 @@ export function Sidebar() {
             item.divider ? (
               <div
                 key="divider"
-                className={cn("my-2 mx-2 border-t border-border-subtle", collapsed && "hidden")}
+                className={cn("sidebar-divider my-2 mx-2 border-t border-border-subtle", collapsed && "hidden")}
               />
             ) : (
               <NavLink
@@ -150,40 +150,41 @@ export function Sidebar() {
         </nav>
 
         {/* Bottom actions */}
-        <div className={cn("flex flex-col gap-2 mt-4 pt-4 border-t border-border-subtle", collapsed && "hidden")}>
+        <div className={cn("sidebar-actions flex flex-col gap-2 mt-4 pt-4 border-t border-border-subtle", collapsed && "hidden")}>
           {isMember && (
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
               title="Invite Team Members"
-              className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm text-text-secondary hover:bg-secondary-light hover:text-secondary"
+              className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm text-text-secondary hover:bg-secondary-light hover:text-secondary"
             >
               <span className="material-symbols-outlined text-[20px] text-secondary">person_add</span>
-              <span className="font-medium">Invite Team</span>
+              <span className="nav-label font-medium">Invite Team</span>
             </button>
           )}
           <Link
             href="/settings"
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm",
+              "nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm",
               activeId === "settings"
                 ? "bg-primary text-white shadow-sm"
                 : "text-text-secondary hover:bg-primary-light hover:text-primary"
             )}
           >
             <span className="material-symbols-outlined text-[20px]">settings</span>
-            <span className="font-medium">Settings</span>
+            <span className="nav-label font-medium">Settings</span>
           </Link>
         </div>
 
         {/* User profile */}
-        <div className="mt-4">
+        <div className="user-profile mt-4">
           <Link
             href="/settings"
             className={cn(
               "flex items-center gap-3 p-2.5 rounded-lg transition-all hover:shadow-sm border border-border-subtle bg-background-body/50 hover:border-primary hover:bg-primary-light",
               collapsed && "justify-center border-none bg-transparent p-2.5 hover:bg-[rgba(0,51,102,0.05)] hover:border-none hover:shadow-none"
             )}
+            title="View Profile & Settings"
           >
             <div
               className={cn(
@@ -195,7 +196,7 @@ export function Sidebar() {
               {initials}
             </div>
             {!collapsed && (
-              <div className="flex flex-col overflow-hidden">
+              <div className="user-info flex flex-col overflow-hidden">
                 <span className="text-xs font-bold truncate text-text-main">
                   {user?.name || "Loading..."}
                 </span>

@@ -389,7 +389,7 @@ export default function DealDetailPage() {
   const stageStyle = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
 
   return (
-    <div className="p-4 md:p-6 mx-auto max-w-[1400px] w-full flex flex-col gap-5">
+    <div className="p-4 md:p-6 mx-auto max-w-[1400px] w-full flex flex-col gap-6">
       {/* Breadcrumb bar with actions */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 text-sm text-text-muted">
@@ -441,12 +441,12 @@ export default function DealDetailPage() {
       </div>
 
       {/* Two-column layout */}
-      <div className="flex gap-5">
+      <div className="flex gap-6">
         {/* LEFT COLUMN */}
-        <div className="flex-1 min-w-0 flex flex-col gap-5">
+        <div className="flex-1 min-w-0 flex flex-col gap-6">
           {/* Deal header */}
           <div className="flex justify-between items-start">
-            <div className="flex items-center gap-4">
+            <div className="flex items-start gap-4">
               <div className="size-16 rounded-xl bg-white p-1 border border-border-subtle shadow-card">
                 <div className="w-full h-full bg-primary-light rounded-lg flex items-center justify-center border border-border-subtle">
                   <span className="material-symbols-outlined text-primary text-3xl">
@@ -504,13 +504,13 @@ export default function DealDetailPage() {
           <FinancialStatementsSection dealId={dealId} />
 
           {/* Tabs */}
-          <div className="flex items-center gap-1 border-b border-border-subtle">
+          <div className="flex items-center gap-1 border-b border-border-subtle mt-2">
             {(["Overview", "Documents", "Activity"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "px-4 py-2.5 text-sm font-medium transition-colors relative",
+                  "px-4 py-3 text-sm font-medium transition-colors relative",
                   activeTab === tab
                     ? "text-primary"
                     : "text-text-muted hover:text-text-secondary"

@@ -168,7 +168,7 @@ export function DocumentsTab({
           <p className="text-xs text-text-muted mt-1">Upload files to get started</p>
         </div>
       ) : (
-        <div className="bg-surface-card border border-border-subtle rounded-lg shadow-card divide-y divide-border-subtle">
+        <div className="rounded-xl divide-y divide-border-subtle" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
           {documents.map((doc) => (
             <div
               key={doc.id}

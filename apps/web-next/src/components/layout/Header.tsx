@@ -100,6 +100,7 @@ export function Header() {
           <button
             onClick={() => setDropdownOpen(!dropdownOpen)}
             className="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
+            title="Profile & Settings"
           >
             <div
               className="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm flex items-center justify-center bg-primary text-white text-xs font-bold"

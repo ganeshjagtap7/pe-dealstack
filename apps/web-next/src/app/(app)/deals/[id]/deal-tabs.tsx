@@ -296,7 +296,7 @@ export function ChatTab({
 
   return (
     <>
-      <div className="flex flex-col bg-background-body border border-border-subtle rounded-lg shadow-card overflow-hidden h-[calc(100vh-10rem)]">
+      <div className="flex flex-col bg-background-body border border-border-subtle rounded-xl shadow-card overflow-hidden h-[calc(100vh-10rem)]">
         {/* Header — matches legacy chat header */}
         <div className="h-14 border-b border-border-subtle flex items-center justify-between px-6 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
           <div className="flex items-center gap-2">
@@ -326,7 +326,7 @@ export function ChatTab({
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 flex flex-col custom-scrollbar">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 flex flex-col custom-scrollbar">
           {/* Welcome message when no history (matches legacy ai-intro-message) */}
           {messages.length === 0 && (
             <div className="ai-intro-message flex gap-4 max-w-[90%]">
@@ -439,7 +439,7 @@ export function ChatTab({
             </div>
           )}
 
-          <div className="relative bg-background-body rounded-lg border border-border-subtle shadow-inner focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+          <div className="relative bg-background-body rounded-xl border border-border-subtle shadow-inner focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
             <textarea
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
@@ -528,7 +528,7 @@ export function ActivityTab({
   }
 
   return (
-    <div className="bg-surface-card border border-border-subtle rounded-lg shadow-card p-5">
+    <div className="rounded-xl p-5" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
       <div className="relative">
         <div className="absolute left-[11px] top-2 bottom-2 w-0.5 bg-border-subtle" />
         <div className="space-y-5">

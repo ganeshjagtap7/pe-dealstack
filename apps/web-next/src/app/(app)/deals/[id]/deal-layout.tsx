@@ -23,7 +23,7 @@ export function StagePipeline({
   const isTerminal = TERMINAL_STAGES.includes(deal.stage);
 
   return (
-    <div className="bg-surface-card border border-border-subtle rounded-lg p-4 shadow-card">
+    <div className="rounded-xl p-4" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-bold text-text-main uppercase tracking-wider flex items-center gap-2">
           <span className="material-symbols-outlined text-primary text-sm">timeline</span>
@@ -65,7 +65,7 @@ export function StagePipeline({
                   <div
                     className={cn(
                       "flex-1 h-0.5",
-                      isPast || isCurrent ? "bg-emerald-500" : "bg-gray-200"
+                      isPast || isCurrent ? "bg-secondary" : "bg-gray-200"
                     )}
                   />
                 )}
@@ -73,7 +73,7 @@ export function StagePipeline({
                 <div
                   className={cn(
                     "size-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
-                    isPast && "bg-emerald-500 text-white",
+                    isPast && "bg-secondary text-white",
                     isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-lg",
                     isFuture && !isCurrent && "bg-gray-100 text-gray-400"
                   )}
@@ -88,7 +88,7 @@ export function StagePipeline({
                   <div
                     className={cn(
                       "flex-1 h-0.5",
-                      isPast ? "bg-emerald-500" : "bg-gray-200"
+                      isPast ? "bg-secondary" : "bg-gray-200"
                     )}
                   />
                 ) : (
@@ -98,7 +98,7 @@ export function StagePipeline({
               <span
                 className={cn(
                   "text-[10px] mt-1.5 text-center leading-tight whitespace-nowrap",
-                  isPast && "text-emerald-600 font-medium",
+                  isPast && "text-secondary font-medium",
                   isCurrent && "text-primary font-bold",
                   isFuture && !isCurrent && "text-gray-400"
                 )}
@@ -146,7 +146,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
   const analyst = deal.team?.find((m) => m.role === "MEMBER") ?? deal.team?.find((m) => m.role !== "LEAD") ?? deal.team?.[0];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-lg bg-background-body border border-border-subtle">
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
       <div>
         <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">
           Lead Partner
@@ -268,8 +268,8 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
 
   if (metrics.length === 0) {
     return (
-      <div className="bg-surface-card border border-border-subtle rounded-lg p-5 shadow-card text-center">
-        <span className="material-symbols-outlined text-text-muted text-2xl mb-2 block">analytics</span>
+      <div className="col-span-full rounded-xl p-6 text-center" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
+        <span className="material-symbols-outlined text-text-muted text-3xl mb-2 block">analytics</span>
         <p className="text-text-muted text-sm">
           No financial metrics yet. Upload a CIM or edit the deal to add data.
         </p>
@@ -278,17 +278,18 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
   }
 
   return (
-    <div className={cn("grid gap-4", metrics.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
+    <div className={cn("grid gap-4 items-stretch", metrics.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
       {metrics.map((m) => (
         <div
           key={m.key}
-          className="bg-surface-card border border-border-subtle rounded-lg p-4 shadow-card relative overflow-hidden group"
+          className="rounded-xl p-4 relative overflow-hidden group"
+          style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}
         >
-          <p className="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">{m.label}</p>
+          <p className="text-[11px] text-text-muted font-bold uppercase tracking-wide">{m.label}</p>
           <div className="flex items-center gap-2 mt-3">
             <span className="text-2xl font-bold text-text-main leading-none">{m.formatted}</span>
             {m.badge && (
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded">
+              <span className="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded">
                 {m.badge}
               </span>
             )}

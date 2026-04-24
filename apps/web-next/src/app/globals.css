@@ -528,3 +528,16 @@ select:focus-visible {
 
 /* Close button hover */
 .ai-close-btn:hover { background: rgba(255, 255, 255, 0.25) !important; }
+
+/* Messages scrollbar — legacy uses 4px, narrower than the generic custom-scrollbar */
+.ai-messages-area::-webkit-scrollbar { width: 4px; }
+.ai-messages-area::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 2px; }
+
+/* Bold text inside assistant messages — Banker Blue like legacy */
+.ai-msg-assistant strong { color: #003366; }
+
+/* Send button hover */
+.ai-send-btn:hover:not(:disabled) { background: #004488 !important; }
+
+/* Input placeholder */
+.ai-input::placeholder { color: #9CA3AF; }
