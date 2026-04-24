@@ -69,7 +69,7 @@
                             </div>
                             <div>
                                 <h3 class="text-text-main font-bold text-base leading-tight group-hover/card:text-primary transition-colors">${deal.name}</h3>
-                                <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
+                                <p class="text-text-muted text-xs font-medium">${deal.industry || '—'}</p>
                             </div>
                         </div>
                         <span class="inline-flex items-center px-2.5 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider whitespace-nowrap shrink-0 mr-8 leading-none">${style.label}</span>
@@ -342,7 +342,7 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <h4 class="text-sm font-semibold text-text-main truncate hover:text-primary transition-colors">${deal.name}</h4>
-                        <p class="text-[11px] text-text-muted truncate">${deal.industry || 'N/A'}</p>
+                        <p class="text-[11px] text-text-muted truncate">${deal.industry || '—'}</p>
                     </div>
                 </div>
 

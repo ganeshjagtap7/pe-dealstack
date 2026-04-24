@@ -5,7 +5,7 @@
 
 (function () {
   function formatFileSize(bytes) {
-    if (!bytes) return 'N/A';
+    if (!bytes) return '—';
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
     if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
     return bytes + ' B';
@@ -58,7 +58,7 @@
   //   USD/EUR/GBP/others: B, M, K
   // currency param is optional — defaults to '$' for backward compat.
   function formatCurrency(value, currency) {
-    if (value === null || value === undefined) return 'N/A';
+    if (value === null || value === undefined) return '—';
     var sym = getCurrencySymbol(currency);
     var absValue = Math.abs(value);
     var sign = value < 0 ? '-' : '';
@@ -97,7 +97,7 @@
 
   // Formats a raw number for display (e.g. in financial tables)
   function formatNumber(value, decimals) {
-    if (value === null || value === undefined) return 'N/A';
+    if (value === null || value === undefined) return '—';
     if (typeof decimals !== 'number') decimals = 1;
     return Number(value).toLocaleString('en-US', {
       minimumFractionDigits: decimals,
@@ -106,7 +106,7 @@
   }
 
   function formatRelativeTime(dateString) {
-    if (!dateString) return 'N/A';
+    if (!dateString) return '—';
     var date = new Date(dateString);
     var now = new Date();
     var diff = now - date;

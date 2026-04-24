@@ -190,7 +190,15 @@ select:focus-visible {
   border-radius: 4px;
 }
 
-/* ── Smooth scrollbar for all custom-scrollbar areas ── */
+/* ── Hide scrollbars globally — scroll still works ── */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
 .custom-scrollbar {
   scroll-behavior: smooth;
 }

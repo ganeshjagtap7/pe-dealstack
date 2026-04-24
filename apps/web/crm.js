@@ -34,13 +34,13 @@
             irrProjected: {
                 label: 'IRR (Proj)',
                 kanbanLabel: 'IRR',
-                format: (val) => val ? val.toFixed(1) + '%' : 'N/A',
+                format: (val) => val ? val.toFixed(1) + '%' : '—',
                 colorFn: () => 'text-text-main',
             },
             mom: {
                 label: 'MoM',
                 kanbanLabel: 'MoM',
-                format: (val) => val ? val.toFixed(1) + 'x' : 'N/A',
+                format: (val) => val ? val.toFixed(1) + 'x' : '—',
                 colorFn: (val) => val >= 3 ? 'text-secondary' : 'text-text-main',
             },
             ebitda: {

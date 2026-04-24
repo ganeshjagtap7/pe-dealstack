@@ -226,22 +226,17 @@ function populateDealPage(deal) {
     console.log('[Deal] Analyst:', analyst?.user?.name);
 
     const leadPartnerName = document.getElementById('lead-partner-name');
-    const leadPartnerDot = document.querySelector('#lead-partner-container .rounded-full');
     if (leadPartnerName) {
         const leadName = leadPartner?.user?.name || deal.assignedUser?.name || null;
         leadPartnerName.textContent = leadName || 'Not assigned';
-        leadPartnerName.className = leadName ? 'text-sm text-text-main font-bold' : 'text-sm text-text-muted font-medium italic';
-        if (leadPartnerDot) leadPartnerDot.style.display = leadName ? '' : 'none';
+        leadPartnerName.className = leadName ? 'text-[13px] text-text-main font-semibold' : 'text-[13px] text-text-muted font-normal italic';
     }
 
     const analystName = document.getElementById('analyst-name');
-    const analystDot = document.querySelector('#analyst-container .rounded-full');
     if (analystName) {
-        // Fallback: if no MEMBER role, use deal creator as analyst
         const aName = analyst?.user?.name || deal.assignedUser?.name || null;
         analystName.textContent = aName || 'Not assigned';
-        analystName.className = aName ? 'text-sm text-text-main font-bold' : 'text-sm text-text-muted font-medium italic';
-        if (analystDot) analystDot.style.display = aName ? '' : 'none';
+        analystName.className = aName ? 'text-[13px] text-text-main font-semibold' : 'text-[13px] text-text-muted font-normal italic';
     }
 
     // Update AI Thesis in chat intro
@@ -539,9 +534,9 @@ function renderDynamicMetrics(deal) {
         return `
             <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
                 <div class="absolute -right-4 -top-4 size-20 bg-${m.color}/5 rounded-full blur-xl group-hover:bg-${m.color}/10 transition-all"></div>
-                <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide">${m.label}</p>
-                <div class="flex items-center gap-2 mt-3">
-                    <span class="text-2xl font-bold text-text-main leading-none">${m.format()}</span>
+                <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider">${m.label}</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <span class="text-xl font-bold text-text-main leading-none tabular-nums">${m.format()}</span>
                     ${badgeHtml}
                 </div>
                 ${extraHtml}

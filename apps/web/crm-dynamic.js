@@ -111,7 +111,7 @@
                         </div>
                         <div>
                             <h3 class="text-text-main font-bold text-lg leading-tight group-hover:text-primary transition-colors">${deal.name}</h3>
-                            <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
+                            <p class="text-text-muted text-xs font-medium">${deal.industry || '—'}</p>
                         </div>
                     </div>
                     <span class="px-2.5 py-1 rounded-md bg-${stageColor}-50 border border-${stageColor}-100 text-${stageColor}-600 text-[10px] font-bold uppercase tracking-wider">${getStageLabel(deal.stage)}</span>
@@ -119,11 +119,11 @@
                 <div class="grid grid-cols-2 gap-px bg-border-subtle rounded-lg overflow-hidden border border-border-subtle mb-6">
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">IRR (Proj)</span>
-                        <span class="text-text-main font-bold text-lg tabular-nums">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : 'N/A'}</span>
+                        <span class="text-text-main font-bold text-lg tabular-nums">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : '—'}</span>
                     </div>
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">MoM</span>
-                        <span class="text-${deal.mom >= 3 ? 'emerald' : 'text'}-${deal.mom >= 3 ? '600' : 'main'} font-bold text-lg tabular-nums">${deal.mom ? deal.mom.toFixed(1) + 'x' : 'N/A'}</span>
+                        <span class="text-${deal.mom >= 3 ? 'emerald' : 'text'}-${deal.mom >= 3 ? '600' : 'main'} font-bold text-lg tabular-nums">${deal.mom ? deal.mom.toFixed(1) + 'x' : '—'}</span>
                     </div>
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>

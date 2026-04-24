@@ -211,7 +211,7 @@ async function showAISearchResult(query) {
             ` : ''}
             <div class="mt-4 pt-4 border-t border-border-subtle flex items-center justify-between text-xs text-text-muted">
                 <span>${data.context?.activeDeals || 0} active deals analyzed</span>
-                <span>Avg IRR: ${data.context?.avgIRR || 'N/A'}%</span>
+                <span>Avg IRR: ${data.context?.avgIRR || '—'}%</span>
             </div>
         `;
     } catch (error) {
