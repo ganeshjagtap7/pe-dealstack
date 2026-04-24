@@ -85,7 +85,28 @@
                     </div>
                     <p class="text-text-secondary text-xs leading-relaxed line-clamp-2">${deal.aiThesis || 'No AI analysis available yet.'}</p>
                 </div>
-                <div class="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
+                ${(() => {
+                    // Deal completeness indicator — how much data is filled
+                    let filled = 0;
+                    let total = 6;
+                    if (deal.revenue) filled++;
+                    if (deal.ebitda) filled++;
+                    if (deal.dealSize) filled++;
+                    if (deal.aiThesis && deal.aiThesis !== 'No AI analysis available yet.') filled++;
+                    if (deal.lastDocument) filled++;
+                    if (deal.industry) filled++;
+                    const completePct = Math.round((filled / total) * 100);
+                    const barColor = completePct >= 80 ? '#059669' : completePct >= 50 ? '#F59E0B' : '#9CA3AF';
+                    return `
+                    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle">
+                        <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Data</span>
+                        <div class="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-1.5 rounded-full transition-all" style="width:${completePct}%; background:${barColor}"></div>
+                        </div>
+                        <span class="text-[10px] font-bold" style="color:${barColor}">${completePct}%</span>
+                    </div>`;
+                })()}
+                <div class="flex items-center justify-between mt-3 pt-0 border-t-0">
                     <div class="flex items-center gap-1.5 text-text-muted">
                         <span class="material-symbols-outlined text-[14px]">${getDocIcon(deal.lastDocument)}</span>
                         <span class="text-[11px] font-medium truncate max-w-[100px]">${deal.lastDocument || 'No docs'}</span>
@@ -95,7 +116,7 @@
                             <span class="material-symbols-outlined text-[14px]">folder_open</span>
                             <span class="hidden sm:inline">VDR</span>
                         </a>
-                        <span class="text-[11px] text-text-muted font-medium">${formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}</span>
+                        <span class="text-[11px] text-text-muted font-medium live-timestamp" data-timestamp="${deal.lastDocumentUpdated || deal.updatedAt}">${formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}</span>
                     </div>
                 </div>
             </article>

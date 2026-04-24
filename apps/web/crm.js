@@ -236,4 +236,14 @@
 
             // Onboarding: feedback button + beta badge + step detection
             if (window.initOnboardingUI) initOnboardingUI();
+
+            // Live-update relative timestamps every 30s
+            setInterval(() => {
+                document.querySelectorAll('.live-timestamp[data-timestamp]').forEach(el => {
+                    const ts = el.dataset.timestamp;
+                    if (ts && typeof formatRelativeTime === 'function') {
+                        el.textContent = formatRelativeTime(ts);
+                    }
+                });
+            }, 30000);
         });
