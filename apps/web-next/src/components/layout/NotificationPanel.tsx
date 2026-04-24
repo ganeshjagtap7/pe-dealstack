@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/providers/AuthProvider";
+import { useNotificationCount } from "@/providers/NotificationCountProvider";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 
@@ -144,11 +145,14 @@ const FILTER_TABS: { key: FilterTab; label: string }[] = [
 export function NotificationCenter() {
   const { session } = useAuth();
   const userId = session?.user?.id;
+  const {
+    unreadCount,
+    setUnreadCount,
+  } = useNotificationCount();
 
   const [open, setOpen] = useState(false);
   const [closing, setClosing] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -164,15 +168,7 @@ export function NotificationCenter() {
     } catch (err) {
       console.warn("[notifications] load failed:", err);
     }
-  }, [userId]);
-
-  // Poll every 30s (always, so badge stays fresh even when panel is closed)
-  useEffect(() => {
-    if (!userId) return;
-    load();
-    const id = setInterval(load, POLL_INTERVAL_MS);
-    return () => clearInterval(id);
-  }, [userId, load]);
+  }, [userId, setUnreadCount]);
 
   // ── Open / close with animation ────────────────────────
   const handleOpen = useCallback(() => {

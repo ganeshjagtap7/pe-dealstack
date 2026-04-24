@@ -399,8 +399,39 @@ export function DealCard({
             </p>
           </div>
 
+          {/* Risk Flag: Low EBITDA Margin */}
+          {(deal.ebitda ?? 0) < 0 && (
+            <div className="flex items-center gap-1.5 mt-3">
+              <span className="material-symbols-outlined text-red-500 text-[14px]">warning</span>
+              <span className="text-red-500 text-[11px] font-semibold">Low EBITDA margin</span>
+            </div>
+          )}
+
+          {/* Data Completeness Bar */}
+          {(() => {
+            let filled = 0;
+            const total = 6;
+            if (deal.revenue) filled++;
+            if (deal.ebitda) filled++;
+            if (deal.dealSize) filled++;
+            if (deal.aiThesis && deal.aiThesis !== "No AI analysis available yet.") filled++;
+            if (deal.lastDocument) filled++;
+            if (deal.industry) filled++;
+            const completePct = Math.round((filled / total) * 100);
+            const barColor = completePct >= 80 ? "#059669" : completePct >= 50 ? "#F59E0B" : "#9CA3AF";
+            return (
+              <div className="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle">
+                <span className="text-[10px] font-bold text-text-muted uppercase tracking-wider">Data</span>
+                <div className="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                  <div className="h-1.5 rounded-full transition-all" style={{ width: `${completePct}%`, background: barColor }} />
+                </div>
+                <span className="text-[10px] font-bold" style={{ color: barColor }}>{completePct}%</span>
+              </div>
+            );
+          })()}
+
           {/* Footer */}
-          <div className="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
+          <div className="flex items-center justify-between mt-3 pt-0">
             <div className="flex items-center gap-1.5 text-text-muted min-w-0">
               <span className="material-symbols-outlined text-[14px] shrink-0">
                 {getDocIcon(deal.lastDocument)}

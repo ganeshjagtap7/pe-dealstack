@@ -5,18 +5,29 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Logo } from "./Logo";
 import { useUser } from "@/providers/UserProvider";
+import { useNotificationCount } from "@/providers/NotificationCountProvider";
 import { NAV_ITEMS, type NavItem } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { InviteTeamModal } from "./InviteTeamModal";
 
-function NavLink({ item, isActive, collapsed }: { item: NavItem; isActive: boolean; collapsed: boolean }) {
+function NavLink({
+  item,
+  isActive,
+  collapsed,
+  showDot,
+}: {
+  item: NavItem;
+  isActive: boolean;
+  collapsed: boolean;
+  showDot?: boolean;
+}) {
   return (
     <Link
       href={item.href}
       title={item.label}
       className={cn(
-        "flex items-center gap-3 rounded-lg transition-colors",
+        "flex items-center gap-3 rounded-lg transition-colors relative",
         collapsed ? "justify-center px-0 py-2.5" : "px-3 py-2.5",
         isActive
           ? "bg-primary text-white shadow-sm"
@@ -33,6 +44,16 @@ function NavLink({ item, isActive, collapsed }: { item: NavItem; isActive: boole
         {item.icon}
       </span>
       {!collapsed && <span className="text-sm font-medium truncate">{item.label}</span>}
+      {showDot && (
+        <span
+          className={cn(
+            "w-2 h-2 rounded-full bg-secondary shrink-0",
+            collapsed ? "absolute top-1.5 right-1.5" : "ml-auto",
+          )}
+          style={{ animation: "pulseDot 2s infinite" }}
+          aria-label="New activity"
+        />
+      )}
     </Link>
   );
 }
@@ -40,6 +61,7 @@ function NavLink({ item, isActive, collapsed }: { item: NavItem; isActive: boole
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
+  const { unreadCount } = useNotificationCount();
   const [collapsed, setCollapsed] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -116,7 +138,13 @@ export function Sidebar() {
                 className={cn("my-2 mx-2 border-t border-border-subtle", collapsed && "hidden")}
               />
             ) : (
-              <NavLink key={item.id} item={item} isActive={item.id === activeId} collapsed={collapsed} />
+              <NavLink
+                key={item.id}
+                item={item}
+                isActive={item.id === activeId}
+                collapsed={collapsed}
+                showDot={item.id === "deals" && activeId !== "deals" && unreadCount > 0}
+              />
             )
           )}
         </nav>

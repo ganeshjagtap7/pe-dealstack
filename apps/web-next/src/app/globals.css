@@ -211,6 +211,62 @@ body {
   background-color: #fafafa;
 }
 
+/* ============================================================
+   PE OS — Toast Notification System
+   Ported from apps/web/js/notifications.js. Stacked slide-in
+   toasts at top-right with progress timer bar.
+   ============================================================ */
+
+@keyframes peToastIn {
+  from { opacity: 0; transform: translateX(24px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes peToastOut {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(24px) scale(0.96); }
+}
+
+@keyframes peToastProgress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+.pe-toast {
+  min-width: 340px;
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+  animation: peToastIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pe-toast-removing {
+  animation: peToastOut 0.22s ease-in forwards;
+}
+
+.pe-toast-progress-bar {
+  height: 100%;
+  border-radius: 0 0 10px 10px;
+  animation: peToastProgress linear forwards;
+}
+
+/* ============================================================
+   PE OS — Page Transition Fade-in
+   Subtle fade-in on route load, matching legacy layout.js.
+   ============================================================ */
+
+@keyframes pageContentFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.page-transition-fade-in {
+  animation: pageContentFadeIn 0.18s ease-out;
+}
+
 /* AI chat bubble gradient — matches legacy deal.html .ai-bubble-gradient */
 .ai-bubble-gradient {
   background: linear-gradient(135deg, #E6EEF5 0%, #F8F9FA 100%);

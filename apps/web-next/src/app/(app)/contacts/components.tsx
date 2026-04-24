@@ -53,11 +53,12 @@ export const TYPE_CONFIG: Record<string, { label: string; bg: string; text: stri
   OTHER:     { label: "Other",     bg: "bg-gray-100",    text: "text-gray-700",    avatarBg: "#F3F4F6", avatarText: "#374151" },
 };
 
-export const SCORE_CONFIG: Record<string, { bg: string; text: string; dot: string }> = {
-  Cold:   { bg: "bg-blue-100",    text: "text-blue-700",    dot: "bg-blue-500" },
-  Warm:   { bg: "bg-amber-100",   text: "text-amber-700",   dot: "bg-amber-500" },
-  Active: { bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500" },
-  Strong: { bg: "bg-green-100",   text: "text-green-800",   dot: "bg-green-600" },
+export const SCORE_CONFIG: Record<string, { bg: string; text: string; dot: string; icon: string }> = {
+  Cold:   { bg: "bg-gray-100",    text: "text-gray-600",    dot: "bg-gray-400",    icon: "ac_unit" },
+  Warm:   { bg: "bg-amber-100",   text: "text-amber-700",   dot: "bg-amber-500",   icon: "sunny" },
+  Hot:    { bg: "bg-red-100",     text: "text-red-700",     dot: "bg-red-500",     icon: "local_fire_department" },
+  Active: { bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500", icon: "bolt" },
+  Strong: { bg: "bg-green-100",   text: "text-green-800",   dot: "bg-green-600",   icon: "star" },
 };
 
 const INTERACTION_ICONS: Record<string, string> = {
