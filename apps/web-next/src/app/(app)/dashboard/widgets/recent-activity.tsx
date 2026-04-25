@@ -123,10 +123,13 @@ export function RecentActivityWidget() {
                         )}
                       </div>
                       <div
-                        className="absolute -bottom-0.5 -right-0.5 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white"
+                        className="absolute -bottom-0.5 -right-0.5 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white overflow-hidden"
                         style={{ backgroundColor: "#003366" }}
                       >
-                        <span className="material-symbols-outlined text-white text-[10px]">{icon}</span>
+                        <span
+                          className="material-symbols-outlined text-white"
+                          style={{ fontSize: "10px", fontVariationSettings: "'opsz' 20, 'wght' 400, 'FILL' 1, 'GRAD' 0", lineHeight: 1 }}
+                        >{icon}</span>
                       </div>
                     </div>
                     <div className="flex-1 pt-0.5">
