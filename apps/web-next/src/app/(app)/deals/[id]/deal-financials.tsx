@@ -112,14 +112,17 @@ function ConfidenceBadge({ confidence }: { confidence?: number | null }) {
 
 // --- Shell wrapper (header + border) ---
 
-function FinancialShell({ children, avgConfidence, currency }: {
+function FinancialShell({ children, avgConfidence, currency, collapsed, onToggle }: {
   children: React.ReactNode; avgConfidence?: number | null; currency?: string;
+  collapsed?: boolean; onToggle?: () => void;
 }) {
   return (
     <div id="financials-section" className="overflow-hidden"
       style={{ borderRadius: 12, border: "2px solid #003366", boxShadow: "0 2px 8px rgba(0,51,102,0.15)", flexShrink: 0 }}>
-      <div className="flex items-center gap-2.5"
-        style={{ backgroundColor: "#003366", padding: "14px 20px", borderRadius: "10px 10px 0 0" }}>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-2.5 cursor-pointer"
+        style={{ backgroundColor: "#003366", padding: "14px 20px", borderRadius: collapsed ? "10px" : "10px 10px 0 0", border: "none" }}>
         <span className="material-symbols-outlined text-white text-[20px]">table_chart</span>
         <span className="text-white text-[13px] font-bold uppercase tracking-wider" style={{ letterSpacing: "0.05em" }}>
           Financial Statements
@@ -136,9 +139,27 @@ function FinancialShell({ children, avgConfidence, currency }: {
               {avgConfidence}% confidence
             </span>
           )}
+          <span
+            className="material-symbols-outlined text-[16px] transition-colors"
+            style={{ color: "rgba(255,255,255,0.5)" }}
+            title="Fullscreen"
+            onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "rgba(255,255,255,0.9)"; }}
+            onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "rgba(255,255,255,0.5)"; }}
+            onClick={(e) => { e.stopPropagation(); }}
+          >
+            open_in_full
+          </span>
+          <span
+            className="material-symbols-outlined text-[18px] transition-transform duration-200"
+            style={{ color: "rgba(255,255,255,0.75)", transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }}
+          >
+            expand_more
+          </span>
         </div>
-      </div>
-      <div className="bg-white" style={{ padding: 20, borderRadius: "0 0 10px 10px" }}>{children}</div>
+      </button>
+      {!collapsed && (
+        <div className="bg-white" style={{ padding: 20, borderRadius: "0 0 10px 10px" }}>{children}</div>
+      )}
     </div>
   );
 }
@@ -230,6 +251,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   const [statements, setStatements] = useState<FinancialStatement[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<StatementType>("INCOME_STATEMENT");
   const [chartVisible, setChartVisible] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("revenue");
@@ -285,10 +307,12 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
     setChartType(tab === "BALANCE_SHEET" ? "composition" : "revenue");
   }
 
+  const toggleCollapsed = () => setCollapsed((p) => !p);
+
   // Loading state
   if (loading) {
     return (
-      <FinancialShell>
+      <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
         <div className="text-center py-10">
           <span className="material-symbols-outlined text-gray-300 text-3xl animate-spin block mb-2">progress_activity</span>
           <p className="text-xs text-gray-400">Loading financial data...</p>
@@ -300,7 +324,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   // Error state
   if (error) {
     return (
-      <FinancialShell>
+      <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
         <div className="text-center py-10">
           <span className="material-symbols-outlined text-red-300 text-3xl block mb-2">error</span>
           <p className="text-xs text-gray-500">{error}</p>
@@ -313,7 +337,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   // Empty state
   if (!hasData) {
     return (
-      <FinancialShell>
+      <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
         <div className="text-center" style={{ padding: "40px 16px" }}>
           <span className="material-symbols-outlined text-gray-300 block mb-2" style={{ fontSize: 40 }}>table_chart</span>
           <p className="text-sm font-semibold text-gray-800" style={{ marginBottom: 4 }}>No Financial Data Yet</p>
@@ -347,7 +371,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   const showChart = chartVisible && (resolvedTab === "INCOME_STATEMENT" || resolvedTab === "BALANCE_SHEET");
 
   return (
-    <FinancialShell avgConfidence={avgConfidence} currency={detectedCurrency}>
+    <FinancialShell avgConfidence={avgConfidence} currency={detectedCurrency} collapsed={collapsed} onToggle={toggleCollapsed}>
       {/* Tabs + controls */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="flex gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">

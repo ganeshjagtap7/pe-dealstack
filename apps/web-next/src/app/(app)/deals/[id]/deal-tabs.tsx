@@ -101,28 +101,15 @@ const DEFAULT_PROMPTS: SuggestionPrompt[] = [
 function SuggestionChips({ deal, onPick }: { deal: DealDetail | null; onPick: (prompt: string) => void }) {
   const prompts = buildSuggestionPrompts(deal);
   return (
-    <div className="flex flex-wrap gap-1.5 px-3 pt-2 pb-1.5 border-t border-border-subtle bg-surface-card">
+    <div className="grid grid-cols-2 gap-2 px-4 pt-3 pb-2 border-t border-border-subtle bg-surface-card">
       {prompts.map((p) => (
         <button
           key={p.label}
           type="button"
           onClick={() => onPick(p.prompt)}
-          className="flex items-start gap-1.5 px-2 py-1.5 text-left text-[10px] font-medium rounded-md transition-colors cursor-pointer"
-          style={{
-            border: "1px solid #00336622",
-            color: "#003366",
-            background: "#f0f4f8",
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = "#e0e8f0";
-            e.currentTarget.style.borderColor = "#00336644";
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = "#f0f4f8";
-            e.currentTarget.style.borderColor = "#00336622";
-          }}
+          className="flex items-start gap-2 px-3.5 py-2.5 text-left text-sm text-text-secondary font-medium rounded-xl border border-gray-200 bg-white transition-all cursor-pointer hover:border-primary/30 hover:bg-primary-light/30"
         >
-          <span className="material-symbols-outlined text-xs mt-px shrink-0">{p.icon}</span>
+          <span className="material-symbols-outlined text-sm mt-px shrink-0 text-primary">{p.icon}</span>
           <span className="leading-relaxed">{p.label}</span>
         </button>
       ))}
@@ -296,7 +283,7 @@ export function ChatTab({
 
   return (
     <>
-      <div className="flex flex-col bg-background-body border border-border-subtle rounded-xl shadow-card overflow-hidden h-[calc(100vh-8rem)]">
+      <div className="flex flex-col overflow-hidden h-full">
         {/* Header — matches legacy chat header */}
         <div className="h-12 border-b border-border-subtle flex items-center justify-between px-4 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
           <div className="flex items-center gap-2">
@@ -336,8 +323,17 @@ export function ChatTab({
               <div className="flex flex-col gap-1">
                 <span className="text-xs font-bold text-text-muted ml-1">PE OS AI</span>
                 <div className="ai-bubble-gradient border border-border-subtle rounded-2xl rounded-tl-none p-4 text-sm text-text-secondary shadow-sm">
-                  <p>I&apos;m ready to help analyze this deal. Ask me about financials, risks, or any uploaded documents.</p>
-                  <p className="mt-2">What would you like to know?</p>
+                  {deal?.aiThesis ? (
+                    <>
+                      <p>I&apos;ve analyzed the documents for <strong>{deal.name}</strong>. {deal.aiThesis}</p>
+                      <p className="mt-2">What would you like to know about this deal?</p>
+                    </>
+                  ) : (
+                    <>
+                      <p>I&apos;m ready to help analyze this deal. Ask me about financials, risks, or any uploaded documents.</p>
+                      <p className="mt-2">What would you like to know?</p>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

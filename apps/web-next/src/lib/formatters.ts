@@ -23,7 +23,7 @@ export function getCurrencySymbol(currency?: string | null): string {
  * compatibility with call sites that predate the multi-currency port.
  */
 export function formatCurrency(value: number | null | undefined, currency?: string | null): string {
-  if (value === null || value === undefined) return "N/A";
+  if (value === null || value === undefined) return "\u2014";
   const sym = getCurrencySymbol(currency);
   const absValue = Math.abs(value);
   const sign = value < 0 ? "-" : "";
@@ -60,7 +60,7 @@ export function formatCurrency(value: number | null | undefined, currency?: stri
 }
 
 export function formatNumber(value: number | null | undefined, decimals = 1): string {
-  if (value === null || value === undefined) return "N/A";
+  if (value === null || value === undefined) return "\u2014";
   return Number(value).toLocaleString("en-US", {
     minimumFractionDigits: decimals,
     maximumFractionDigits: decimals,

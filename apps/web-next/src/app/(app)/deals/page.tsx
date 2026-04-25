@@ -318,19 +318,6 @@ export default function DealsPage() {
 
       {/* Filter Bar */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Search Input */}
-        <div className="relative group w-full sm:w-auto sm:min-w-[280px]">
-          <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-            <span className="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[20px]">search</span>
-          </div>
-          <input
-            type="text"
-            placeholder="Search deals by name, industry, or thesis..."
-            onChange={(e) => handleSearch(e.target.value)}
-            className="block w-full rounded-lg border border-border-subtle bg-surface-card py-2 pl-10 pr-3 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm"
-          />
-        </div>
-
         {/* Stage Filter */}
         <FilterDropdown label={filters.stage ? `Stage: ${STAGE_LABELS[filters.stage]}` : "Stage: All"} active={!!filters.stage}>
           {(close) => (
@@ -562,11 +549,11 @@ export default function DealsPage() {
           </button>
         </div>
       ) : deals.length === 0 ? (
-        hasActiveFilters || filters.search ? (
+        hasActiveFilters ? (
           <div className="flex flex-col items-center justify-center py-20">
             <span className="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
             <p className="text-text-main font-medium mb-2">No deals found</p>
-            <p className="text-text-muted text-sm">Try adjusting your filters or search query</p>
+            <p className="text-text-muted text-sm">Try adjusting your filters</p>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-20">

@@ -26,6 +26,7 @@ export function Header() {
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const showDealActions = pathname === "/deals";
+  const isDealDetailPage = /^\/deals\/[^/]+$/.test(pathname);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -50,13 +51,18 @@ export function Header() {
 
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "";
 
+  // Deal detail pages render their own full-width header that already includes
+  // breadcrumbs, team avatars, actions, notification bell, and user menu.
+  // Returning null here avoids the double-header effect.
+  if (isDealDetailPage) return null;
+
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-4 md:px-6 bg-surface-card z-40 sticky top-0 min-w-0">
       <div className="flex items-center gap-4 flex-1">
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className="relative hidden w-full max-w-lg md:flex items-center rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-muted cursor-pointer hover:border-primary/40 transition-all shadow-sm text-left"
+          className={`relative w-full max-w-lg items-center rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-muted cursor-pointer hover:border-primary/40 transition-all shadow-sm text-left ${isDealDetailPage ? "hidden" : "hidden md:flex"}`}
         >
           <div className="absolute inset-y-0 left-0 flex items-center pl-3">
             <span className="material-symbols-outlined text-text-muted text-[20px]">
@@ -179,7 +185,7 @@ export function Header() {
 // apps/web/js/layoutComponents.js generateHelpSupportModal (f23a61c).
 // ---------------------------------------------------------------------------
 
-function HelpSupportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function HelpSupportModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {

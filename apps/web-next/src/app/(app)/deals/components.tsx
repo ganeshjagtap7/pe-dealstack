@@ -323,7 +323,7 @@ export function DealCard({
                   {deal.companyName || deal.name}
                 </h3>
                 <p className="text-text-muted text-xs font-medium">
-                  {deal.industry || "N/A"}
+                  {deal.industry || "\u2014"}
                 </p>
               </div>
             </div>
@@ -364,9 +364,9 @@ export function DealCard({
                     !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
                   )}>
                     {key === "irrProjected"
-                      ? (value != null ? Number(value).toFixed(1) + "%" : "N/A")
+                      ? (value != null ? Number(value).toFixed(1) + "%" : "\u2014")
                       : key === "mom"
-                        ? (value != null ? Number(value).toFixed(1) + "x" : "N/A")
+                        ? (value != null ? Number(value).toFixed(1) + "x" : "\u2014")
                         : formatCurrency(value as number | null | undefined, deal.currency)}
                   </span>
                 </div>
@@ -522,9 +522,9 @@ export function KanbanCard({
                   !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
                 )}>
                   {key === "irrProjected"
-                    ? (value != null ? Number(value).toFixed(1) + "%" : "N/A")
+                    ? (value != null ? Number(value).toFixed(1) + "%" : "\u2014")
                     : key === "mom"
-                      ? (value != null ? Number(value).toFixed(1) + "x" : "N/A")
+                      ? (value != null ? Number(value).toFixed(1) + "x" : "\u2014")
                       : formatCurrency(value as number | null | undefined, deal.currency)}
                 </span>
               </div>

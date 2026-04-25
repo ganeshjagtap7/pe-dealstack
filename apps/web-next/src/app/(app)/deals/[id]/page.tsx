@@ -4,10 +4,12 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { api } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
-import { STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
 import { cn } from "@/lib/cn";
+import { useAuth } from "@/providers/AuthProvider";
 import { useUser } from "@/providers/UserProvider";
 import Link from "next/link";
+import { NotificationCenter } from "@/components/layout/NotificationPanel";
+import { HelpSupportModal } from "@/components/layout/Header";
 
 import {
   type DealDetail,
@@ -28,6 +30,8 @@ import {
   DealAnalysisSection,
   DealActionsMenu,
   TeamAvatarStack,
+  DealViewers,
+  FinancialStatusBadge,
 } from "./components";
 import { TerminalStageModal } from "./deal-panels";
 
@@ -41,7 +45,11 @@ export default function DealDetailPage() {
   const router = useRouter();
   const pathname = usePathname();
   const { user } = useUser();
+  const { signOut } = useAuth();
   const [linkCopied, setLinkCopied] = useState(false);
+  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
 
   const [deal, setDeal] = useState<DealDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -172,6 +180,17 @@ export default function DealDetailPage() {
 
     return () => clearInterval(interval);
   }, [deal]);
+
+  // Close user dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setUserDropdownOpen(false);
+      }
+    }
+    document.addEventListener("click", handleClickOutside);
+    return () => document.removeEventListener("click", handleClickOutside);
+  }, []);
 
   // -----------------------------------------------------------------------
   // Stage change
@@ -387,22 +406,32 @@ export default function DealDetailPage() {
     );
   }
 
-  const stageStyle = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
+  const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "";
 
   return (
-    <div className="p-3 md:p-4 mx-auto max-w-[1400px] w-full flex flex-col gap-3">
-      {/* Breadcrumb bar with actions */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-2 text-sm text-text-muted">
-          <Link href="/deals" className="hover:text-primary transition-colors">
-            Deals
-          </Link>
-          <span className="material-symbols-outlined text-[14px]">chevron_right</span>
-          <span className="text-text-main font-medium truncate max-w-[300px]">
-            {deal.name}
-          </span>
+    <>
+    <div className="flex flex-col h-full overflow-hidden">
+      {/* HEADER BAR — breadcrumb + actions, spans full width above both panels */}
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-10">
+        <div className="flex items-center gap-4 flex-1">
+          <nav className="flex items-center gap-1.5 text-sm">
+            <button
+              onClick={() => router.back()}
+              className="flex items-center justify-center size-7 rounded-md hover:bg-primary-light text-text-muted hover:text-primary transition-colors mr-1"
+              title="Go back"
+            >
+              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+            </button>
+            <Link href="/deals" className="text-text-muted hover:text-primary transition-colors">
+              Deals
+            </Link>
+            <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
+            <span className="text-text-main font-medium truncate max-w-[300px]">
+              {deal.name}
+            </span>
+          </nav>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {/* Team Avatar Stack */}
           <div className="hidden md:flex items-center cursor-pointer hover:opacity-80 transition-opacity">
             <TeamAvatarStack team={deal.team || []} />
@@ -432,51 +461,123 @@ export default function DealDetailPage() {
           </button>
           <button
             onClick={() => router.push(`/deals/${dealId}/edit`)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm transition-colors"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors"
             style={{ backgroundColor: "#003366" }}
           >
             <span className="material-symbols-outlined text-[18px]">edit_document</span>
             Edit Deal
           </button>
-        </div>
-      </div>
 
-      {/* Two-column layout */}
-      <div className="flex gap-4">
-        {/* LEFT COLUMN */}
-        <div className="flex-1 min-w-0 flex flex-col gap-3">
+          {/* Divider */}
+          <div className="h-6 w-px bg-border-subtle" />
+
+          {/* Notification bell */}
+          <NotificationCenter />
+
+          {/* Divider */}
+          <div className="h-6 w-px bg-border-subtle" />
+
+          {/* User menu */}
+          <div className="relative" ref={userDropdownRef}>
+            <button
+              onClick={() => setUserDropdownOpen(!userDropdownOpen)}
+              className="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
+              title="Profile & Settings"
+            >
+              <div
+                className="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm flex items-center justify-center bg-primary text-white text-xs font-bold"
+                style={user?.avatar ? { backgroundImage: `url('${encodeURI(user.avatar)}')` } : {}}
+              >
+                {initials}
+              </div>
+              <span className="hidden md:inline">{user?.name || "Loading..."}</span>
+              <span
+                className={`material-symbols-outlined text-[18px] text-text-muted transition-transform duration-200 ${
+                  userDropdownOpen ? "rotate-180" : ""
+                }`}
+              >
+                expand_more
+              </span>
+            </button>
+
+            {userDropdownOpen && (
+              <div className="absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50 bg-surface-card border border-border-subtle dropdown-animate">
+                <div className="px-4 py-3 border-b border-border-subtle">
+                  <p className="text-sm font-medium text-text-main">{user?.name}</p>
+                  <p className="text-xs text-text-muted truncate">{user?.role}</p>
+                </div>
+                <div className="py-1">
+                  <Link
+                    href="/settings"
+                    className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm text-text-secondary transition-colors"
+                    onClick={() => setUserDropdownOpen(false)}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">person</span>
+                    Profile
+                  </Link>
+                  <Link
+                    href="/settings"
+                    className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm text-text-secondary transition-colors"
+                    onClick={() => setUserDropdownOpen(false)}
+                  >
+                    <span className="material-symbols-outlined text-[18px]">settings</span>
+                    Settings
+                  </Link>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false);
+                      setHelpOpen(true);
+                    }}
+                    className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-text-secondary transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">help</span>
+                    Help &amp; Support
+                  </button>
+                </div>
+                <div className="border-t border-border-subtle py-1">
+                  <button
+                    onClick={signOut}
+                    className="user-dropdown-item-logout flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-red-600 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">logout</span>
+                    Log out
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* TWO-COLUMN LAYOUT — below header */}
+      <div className="flex flex-1 overflow-hidden">
+      {/* LEFT PANEL — deal content, scrolls independently */}
+      <section className="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar">
+
+        {/* Deal content */}
+        <div className="flex flex-col gap-3">
           {/* Deal header */}
           <div className="flex justify-between items-start">
-            <div className="flex items-start gap-3">
-              <div className="size-12 rounded-xl bg-white p-0.5 border border-border-subtle shadow-card">
+            <div className="flex items-start gap-4">
+              <div className="size-16 rounded-xl bg-white p-1 border border-border-subtle shadow-card">
                 <div className="w-full h-full bg-primary-light rounded-lg flex items-center justify-center border border-border-subtle">
-                  <span className="material-symbols-outlined text-primary text-2xl">
+                  <span className="material-symbols-outlined text-primary text-3xl">
                     {deal.icon || "business"}
                   </span>
                 </div>
               </div>
               <div>
-                <div className="flex items-center gap-2.5">
-                  <h1 className="text-xl font-bold text-text-main leading-tight">
-                    {deal.name}
-                  </h1>
-                  {deal.industry && (
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium",
-                        stageStyle.bg,
-                        stageStyle.text
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          "size-1.5 rounded-full",
-                          stageStyle.border.replace("border-", "bg-")
-                        )}
-                      />
-                      {STAGE_LABELS[deal.stage] || deal.stage}
-                    </span>
-                  )}
+                <h1 className="text-2xl font-bold text-text-main leading-tight">
+                  {deal.name}
+                </h1>
+                {/* Recently active team members ("@User on this deal") */}
+                {(deal.team?.length ?? 0) > 0 && (
+                  <DealViewers team={deal.team || []} />
+                )}
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {/* Financial status badge */}
+                  <FinancialStatusBadge dealId={dealId} />
                 </div>
               </div>
             </div>
@@ -551,24 +652,24 @@ export default function DealDetailPage() {
             )}
           </div>
         </div>
+      </section>
 
-        {/* RIGHT COLUMN -- AI Chat sidebar (sticky, desktop only) */}
-        <div className="hidden lg:block w-80 xl:w-96 shrink-0">
-          <div className="sticky top-4">
-            <ChatTab
-              deal={deal}
-              messages={messages}
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              chatSending={chatSending}
-              onSend={sendMessage}
-              onSendPrompt={sendPrompt}
-              onClearChat={clearChatHistory}
-              chatEndRef={chatEndRef}
-            />
-          </div>
-        </div>
-      </div>
+      {/* RIGHT PANEL — AI Chat (desktop only, fills remaining space) */}
+      <section className="hidden lg:flex flex-1 flex-col bg-background-body border-l border-border-subtle/60 shadow-inner relative">
+        <ChatTab
+          deal={deal}
+          messages={messages}
+          chatInput={chatInput}
+          setChatInput={setChatInput}
+          chatSending={chatSending}
+          onSend={sendMessage}
+          onSendPrompt={sendPrompt}
+          onClearChat={clearChatHistory}
+          chatEndRef={chatEndRef}
+        />
+      </section>
+      </div>{/* end two-column */}
+    </div>{/* end flex-col container */}
 
       {/* Stage Change Modal */}
       {stageModal && (
@@ -595,6 +696,9 @@ export default function DealDetailPage() {
           onClose={() => setShowTerminalModal(false)}
         />
       )}
-    </div>
+
+      {/* Help & Support Modal (opened from user dropdown) */}
+      <HelpSupportModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+    </>
   );
 }
