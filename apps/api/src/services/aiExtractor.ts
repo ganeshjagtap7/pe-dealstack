@@ -19,12 +19,12 @@ const ExtractionOutputSchema = z.object({
   companyName: z.object({
     value: z.string().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('Company name extracted from document'),
   industry: z.object({
     value: z.string().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('Industry classification'),
   description: z.object({
     value: z.string(),
@@ -34,12 +34,12 @@ const ExtractionOutputSchema = z.object({
   revenue: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('Annual revenue in millions (in the original document currency)'),
   ebitda: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('EBITDA in millions (in the original document currency)'),
   ebitdaMargin: z.object({
     value: z.number().nullable(),
@@ -48,7 +48,7 @@ const ExtractionOutputSchema = z.object({
   revenueGrowth: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('YoY revenue growth percentage'),
   employees: z.object({
     value: z.number().nullable(),
@@ -65,7 +65,7 @@ const ExtractionOutputSchema = z.object({
   dealSize: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('Enterprise value, asking price, or deal size in millions (in the original document currency). Look for terms like "enterprise value", "EV", "asking price", "valuation", "deal value". Return null if not mentioned.'),
   keyRisks: z.array(z.string()).describe('3-5 key investment risks'),
   investmentHighlights: z.array(z.string()).describe('3-5 positive investment points'),
