@@ -85,7 +85,6 @@ export function Header() {
             <kbd className="px-1.5 py-0.5 text-[10px] font-bold text-gray-400 bg-gray-100 rounded border border-gray-200">
               &#8984;K
             </kbd>
-            <span className="material-symbols-outlined text-[18px] text-text-muted">auto_awesome</span>
           </div>
         </button>
       </div>

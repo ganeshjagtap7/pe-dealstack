@@ -44,7 +44,7 @@ export default function DashboardPage() {
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [layoutEditing, setLayoutEditing] = useState(false);
   const [dragging, setDragging] = useState<WidgetId | null>(null);
-  const { visible, toggle, orderedVisible, reorder } = useVisibleWidgets();
+  const { visible, coreVisible, toggle, toggleCore, orderedVisible, reorder } = useVisibleWidgets();
 
   useEffect(() => {
     async function load() {
@@ -164,16 +164,18 @@ export default function DashboardPage() {
         <OnboardingChecklist />
 
         {/* Stats Cards */}
-        <StatCards
-          loading={loading}
-          sourcingCount={sourcingCount}
-          ddCount={ddCount}
-          loiCount={loiCount}
-          closedCount={closedCount}
-          closedTotal={closedTotal}
-          pct={pct}
-          onStageClick={setStageModal}
-        />
+        {coreVisible.has("stats-cards") && (
+          <StatCards
+            loading={loading}
+            sourcingCount={sourcingCount}
+            ddCount={ddCount}
+            loiCount={loiCount}
+            closedCount={closedCount}
+            closedTotal={closedTotal}
+            pct={pct}
+            onStageClick={setStageModal}
+          />
+        )}
 
         {/* Main widget grid — matches legacy dashboard.html:
              Active Priorities spans col-span-full (full-width hero row),
@@ -181,6 +183,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min items-start">
 
           {/* Active Priorities Table — full-width hero row */}
+          {coreVisible.has("active-priorities") && (
           <div className="col-span-full flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
             <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
               <h3 className="font-bold text-text-main text-base">Active Priorities</h3>
@@ -247,8 +250,10 @@ export default function DashboardPage() {
                 </table>
               </div>
             </div>
+          )}
 
           {/* My Tasks Widget */}
+          {coreVisible.has("my-tasks") && (
           <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
             <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
               <div className="flex items-center gap-2">
@@ -306,11 +311,15 @@ export default function DashboardPage() {
                 <button onClick={() => setTasksModalOpen(true)} className="text-xs font-bold text-primary hover:text-primary-hover transition-colors uppercase tracking-wide">View All Tasks</button>
               </div>
             </div>
+          )}
 
           {/* Portfolio Allocation */}
-          <PortfolioAllocation loading={loading} allocation={allocation} gradientParts={gradientParts} />
+          {coreVisible.has("portfolio-allocation") && (
+            <PortfolioAllocation loading={loading} allocation={allocation} gradientParts={gradientParts} />
+          )}
 
           {/* AI Deal Signals */}
+          {coreVisible.has("ai-deal-signals") && (
           <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
             <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
                 <div className="flex items-center gap-2">
@@ -355,6 +364,7 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          )}
 
         </div>{/* /dashboard-widget-grid */}
 
@@ -450,7 +460,9 @@ export default function DashboardPage() {
       <CustomizeDashboardModal
         open={customizeOpen}
         visible={visible}
+        coreVisible={coreVisible}
         onToggle={toggle}
+        onToggleCore={toggleCore}
         onClose={() => setCustomizeOpen(false)}
       />
 

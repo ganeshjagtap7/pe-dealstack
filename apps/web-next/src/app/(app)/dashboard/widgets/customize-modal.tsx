@@ -1,20 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { WIDGETS, WidgetId } from "./registry";
+import { WIDGETS, WidgetId, CoreWidgetId, CORE_WIDGETS } from "./registry";
+import { useToast } from "@/providers/ToastProvider";
 
 // ---------------------------------------------------------------------------
 // Category configuration — matches dashboard-widgets.js CATEGORY_LABELS
 // ---------------------------------------------------------------------------
 const CATEGORY_LABELS: Record<string, { name: string; icon: string }> = {
+  core:         { name: "Core Widgets", icon: "dashboard" },
+  ai:           { name: "AI-Powered", icon: "auto_awesome" },
   productivity: { name: "Productivity", icon: "task_alt" },
   deals:        { name: "Deal Flow & Pipeline", icon: "work" },
+  portfolio:    { name: "Portfolio & Fund", icon: "account_balance" },
   market:       { name: "Market & Research", icon: "insights" },
   team:         { name: "Team & Contacts", icon: "groups" },
   documents:    { name: "Documents & Alerts", icon: "folder" },
 };
 
-// Map each widget id to a category (mirrors dashboard-widgets.js WIDGET_CONFIG)
+// Map each optional widget id to a category (mirrors dashboard-widgets.js WIDGET_CONFIG)
 const WIDGET_CATEGORY: Record<WidgetId, string> = {
   "quick-actions":      "productivity",
   "quick-notes":        "productivity",
@@ -29,30 +33,107 @@ const WIDGET_CATEGORY: Record<WidgetId, string> = {
   "market-multiples":   "market",
 };
 
-const CATEGORY_ORDER = ["productivity", "deals", "market", "team", "documents"];
+// Core widgets that are not "coming soon" have CoreWidgetId; "market-sentiment"
+// is a special entry in CORE_WIDGETS that has no CoreWidgetId counterpart.
+type CoreOrComingSoonId = CoreWidgetId | "market-sentiment";
+
+const CATEGORY_ORDER = ["core", "ai", "productivity", "deals", "portfolio", "market", "team", "documents"];
 
 // ---------------------------------------------------------------------------
-// Customize Dashboard modal — matches apps/web/dashboard.html #add-widget-modal
-// Legacy layout: grouped checkboxes by category, Cancel + Save Changes buttons.
+// Unified entry type covering both core and optional widgets in the modal
+// ---------------------------------------------------------------------------
+interface ModalEntry {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  category: string;
+  isCore: boolean;
+  comingSoon?: boolean;
+}
+
+// Build the full list of entries the modal should show, in legacy order.
+function buildModalEntries(): ModalEntry[] {
+  const entries: ModalEntry[] = [];
+
+  // Core widgets (stats-cards through ai-deal-signals + market-sentiment)
+  CORE_WIDGETS.forEach((w) => {
+    // ai-deal-signals and market-sentiment go into "ai" category;
+    // everything else is "core".
+    const isAi = w.id === "ai-deal-signals" || w.id === "market-sentiment";
+    entries.push({
+      id: w.id,
+      title: w.title,
+      description: w.description,
+      icon: w.icon,
+      category: isAi ? "ai" : "core",
+      isCore: true,
+      comingSoon: w.comingSoon,
+    });
+  });
+
+  // Optional sidebar widgets
+  WIDGETS.forEach((w) => {
+    entries.push({
+      id: w.id,
+      title: w.title,
+      description: w.description,
+      icon: w.icon,
+      category: WIDGET_CATEGORY[w.id] || "productivity",
+      isCore: false,
+    });
+  });
+
+  return entries;
+}
+
+const ALL_ENTRIES = buildModalEntries();
+
+// ---------------------------------------------------------------------------
+// Draft state holds both core and optional visibility as string sets so we
+// can handle them uniformly in the UI.
+// ---------------------------------------------------------------------------
+interface DraftState {
+  core: Set<CoreOrComingSoonId>;
+  optional: Set<WidgetId>;
+}
+
+// ---------------------------------------------------------------------------
+// Customize Dashboard modal — shows ALL widgets including core sections.
+// Matches apps/web/dashboard-widgets.js openWidgetModal() full widget list.
 // ---------------------------------------------------------------------------
 export function CustomizeDashboardModal({
   open,
   visible,
+  coreVisible,
   onToggle,
+  onToggleCore,
   onClose,
 }: {
   open: boolean;
   visible: Set<WidgetId>;
+  coreVisible: Set<CoreWidgetId>;
   onToggle: (id: WidgetId) => void;
+  onToggleCore: (id: CoreWidgetId) => void;
   onClose: () => void;
 }) {
+  const { showToast } = useToast();
+
   // Local draft state so the user can Cancel without saving
-  const [draft, setDraft] = useState<Set<WidgetId>>(new Set(visible));
+  const [draft, setDraft] = useState<DraftState>({
+    core: new Set(coreVisible) as Set<CoreOrComingSoonId>,
+    optional: new Set(visible),
+  });
 
   // Sync draft when modal opens
   useEffect(() => {
-    if (open) setDraft(new Set(visible));
-  }, [open, visible]);
+    if (open) {
+      setDraft({
+        core: new Set(coreVisible) as Set<CoreOrComingSoonId>,
+        optional: new Set(visible),
+      });
+    }
+  }, [open, visible, coreVisible]);
 
   useEffect(() => {
     if (!open) return;
@@ -65,22 +146,57 @@ export function CustomizeDashboardModal({
 
   if (!open) return null;
 
-  // Group WIDGETS by category in category order
-  const grouped: Record<string, typeof WIDGETS> = {};
-  WIDGETS.forEach((w) => {
-    const cat = WIDGET_CATEGORY[w.id] || "productivity";
-    if (!grouped[cat]) grouped[cat] = [];
-    grouped[cat].push(w);
+  // Group all entries by category
+  const grouped: Record<string, ModalEntry[]> = {};
+  ALL_ENTRIES.forEach((entry) => {
+    if (!grouped[entry.category]) grouped[entry.category] = [];
+    grouped[entry.category].push(entry);
   });
 
+  const isEntryOn = (entry: ModalEntry): boolean => {
+    if (entry.comingSoon) return false;
+    if (entry.isCore) return draft.core.has(entry.id as CoreOrComingSoonId);
+    return draft.optional.has(entry.id as WidgetId);
+  };
+
+  const toggleDraft = (entry: ModalEntry) => {
+    if (entry.comingSoon) return; // cannot toggle coming-soon widgets
+    if (entry.isCore) {
+      setDraft((prev) => {
+        const next = new Set(prev.core);
+        const id = entry.id as CoreOrComingSoonId;
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return { ...prev, core: next };
+      });
+    } else {
+      setDraft((prev) => {
+        const next = new Set(prev.optional);
+        const id = entry.id as WidgetId;
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return { ...prev, optional: next };
+      });
+    }
+  };
+
   const handleSave = () => {
-    // Apply diff: toggle widgets that changed
+    // Apply diff for core widgets
+    CORE_WIDGETS.forEach((w) => {
+      if (w.comingSoon) return;
+      const id = w.id as CoreWidgetId;
+      const wasOn = coreVisible.has(id);
+      const nowOn = draft.core.has(id);
+      if (wasOn !== nowOn) onToggleCore(id);
+    });
+    // Apply diff for optional widgets
     WIDGETS.forEach((w) => {
       const wasOn = visible.has(w.id);
-      const nowOn = draft.has(w.id);
+      const nowOn = draft.optional.has(w.id);
       if (wasOn !== nowOn) onToggle(w.id);
     });
     onClose();
+    showToast("Dashboard layout saved.", "success", { title: "Layout Saved" });
   };
 
   return (
@@ -95,7 +211,7 @@ export function CustomizeDashboardModal({
         <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-gradient-to-r from-white to-gray-50">
           <div>
             <h2 className="text-lg font-bold text-text-main">Customize Dashboard</h2>
-            <p className="text-xs text-text-secondary mt-0.5">Select widgets to show on your dashboard</p>
+            <p className="text-xs text-text-secondary mt-0.5">Show or hide any section on your dashboard</p>
           </div>
           <button
             type="button"
@@ -121,36 +237,40 @@ export function CustomizeDashboardModal({
                   </div>
                   {/* Widget rows */}
                   <div className="grid gap-2">
-                    {grouped[cat].map((w) => {
-                      const isOn = draft.has(w.id);
+                    {grouped[cat].map((entry) => {
+                      const isOn = isEntryOn(entry);
+                      const disabled = !!entry.comingSoon;
                       return (
                         <label
-                          key={w.id}
-                          className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all group ${
-                            isOn
-                              ? "border-primary bg-primary-light/30"
-                              : "border-border-subtle hover:border-primary/50"
+                          key={entry.id}
+                          className={`flex items-center gap-3 p-3 rounded-lg border transition-all group ${
+                            disabled
+                              ? "border-border-subtle opacity-60 cursor-default"
+                              : isOn
+                                ? "border-primary bg-primary-light/30 cursor-pointer"
+                                : "border-border-subtle hover:border-primary/50 cursor-pointer"
                           }`}
                         >
                           <input
                             type="checkbox"
                             className="widget-checkbox size-4 rounded border-gray-300 text-primary focus:ring-primary"
                             checked={isOn}
-                            onChange={() => {
-                              setDraft((prev) => {
-                                const next = new Set(prev);
-                                if (next.has(w.id)) next.delete(w.id);
-                                else next.add(w.id);
-                                return next;
-                              });
-                            }}
+                            disabled={disabled}
+                            onChange={() => toggleDraft(entry)}
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className={`material-symbols-outlined text-[18px] ${isOn ? "text-primary" : "text-text-muted"}`}>{w.icon}</span>
-                              <span className="font-medium text-sm text-text-main truncate">{w.title}</span>
+                              <span className={`material-symbols-outlined text-[18px] ${isOn && !disabled ? "text-primary" : "text-text-muted"}`}>
+                                {entry.icon}
+                              </span>
+                              <span className="font-medium text-sm text-text-main truncate">{entry.title}</span>
+                              {disabled && (
+                                <span className="text-[10px] bg-gray-100 text-text-muted px-1.5 py-0.5 rounded font-medium shrink-0">
+                                  Soon
+                                </span>
+                              )}
                             </div>
-                            <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{w.description}</p>
+                            <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{entry.description}</p>
                           </div>
                         </label>
                       );

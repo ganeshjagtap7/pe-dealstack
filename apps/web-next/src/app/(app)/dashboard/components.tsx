@@ -428,11 +428,9 @@ export function PortfolioAllocation({ loading, allocation, gradientParts }: Port
             {/* Legend */}
             <div className="flex flex-col gap-3 flex-1 min-w-0">
               {displayItems.map((item) => (
-                <div key={item.label} className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="size-2.5 rounded-sm shadow-sm shrink-0" style={{ background: item.color }} />
-                    <span className="text-text-secondary font-medium truncate">{item.label}</span>
-                  </div>
+                <div key={item.label} className="flex items-start gap-2 text-xs">
+                  <div className="size-2.5 rounded-sm shadow-sm shrink-0 mt-0.5" style={{ background: item.color }} />
+                  <span className="text-text-secondary font-medium flex-1">{item.label}</span>
                   <span className="text-text-main font-bold shrink-0">{item.pct}%</span>
                 </div>
               ))}

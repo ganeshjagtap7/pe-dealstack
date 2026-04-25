@@ -13,6 +13,18 @@ import { TeamPerformanceWidget } from "./team-performance";
 import { DocumentAlertsWidget } from "./document-alerts";
 import { WatchlistWidget } from "./watchlist";
 
+// ---------------------------------------------------------------------------
+// Core widget IDs — rendered inline in page.tsx, not via the optional grid.
+// Visibility is persisted separately from optional widgets.
+// ---------------------------------------------------------------------------
+export type CoreWidgetId =
+  | "stats-cards"
+  | "active-priorities"
+  | "my-tasks"
+  | "portfolio-allocation"
+  | "ai-deal-signals";
+
+// Optional sidebar widget IDs — rendered via the DraggableWidget grid.
 export type WidgetId =
   | "quick-actions"
   | "quick-notes"
@@ -33,6 +45,58 @@ export interface WidgetMeta {
   icon: string;
   Component: ComponentType;
 }
+
+// ---------------------------------------------------------------------------
+// Core widget metadata — used only by the Customize Dashboard modal.
+// "Coming Soon" entries have comingSoon: true and no Component.
+// ---------------------------------------------------------------------------
+export interface CoreWidgetMeta {
+  id: CoreWidgetId | "market-sentiment";
+  title: string;
+  description: string;
+  icon: string;
+  comingSoon?: boolean;
+}
+
+export const CORE_WIDGETS: CoreWidgetMeta[] = [
+  {
+    id: "stats-cards",
+    title: "Pipeline Stats",
+    description: "Overview of deals across pipeline stages.",
+    icon: "analytics",
+  },
+  {
+    id: "active-priorities",
+    title: "Active Priorities",
+    description: "Table of high-priority deals requiring immediate attention.",
+    icon: "priority_high",
+  },
+  {
+    id: "my-tasks",
+    title: "My Tasks",
+    description: "Your pending tasks and to-dos.",
+    icon: "check_circle",
+  },
+  {
+    id: "portfolio-allocation",
+    title: "Portfolio Allocation",
+    description: "Sector allocation breakdown chart.",
+    icon: "pie_chart",
+  },
+  {
+    id: "ai-deal-signals",
+    title: "AI Deal Signals",
+    description: "AI-powered portfolio risk and opportunity scanner.",
+    icon: "radar",
+  },
+  {
+    id: "market-sentiment",
+    title: "Market Sentiment",
+    description: "AI-powered market analysis and sentiment index.",
+    icon: "psychology",
+    comingSoon: true,
+  },
+];
 
 // Order here is the default display order when a widget is enabled.
 export const WIDGETS: WidgetMeta[] = [
