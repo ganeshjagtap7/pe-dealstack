@@ -25,6 +25,7 @@
     { "source": "/api/conversations", "destination": "/api/ai" },
     { "source": "/api/conversations/(.*)", "destination": "/api/ai" },
     { "source": "/api/memos/(.*)", "destination": "/api/ai" },
+    { "source": "/api/ingest", "destination": "/api/ai" },
     { "source": "/api/ingest/(.*)", "destination": "/api/ai" },
     { "source": "/api/onboarding/(.*)", "destination": "/api/ai" },
     { "source": "/api/onboarding", "destination": "/api/ai" },
