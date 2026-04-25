@@ -29,6 +29,7 @@ export interface Deal {
   ebitda?: number;
   evMultiple?: number;
   companyId?: string;
+  company?: { name?: string } | null;
   irrProjected?: number;
   mom?: number;
   icon?: string;

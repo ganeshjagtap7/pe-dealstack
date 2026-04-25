@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef, type DragEvent } from "react";
-import { formatCurrency, formatRelativeTime, getDocIcon } from "@/lib/formatters";
+import { formatCurrency, formatRelativeTime, getDocIcon, getDealDisplayName } from "@/lib/formatters";
 import {
   STAGES,
   STAGE_STYLES,
@@ -328,8 +328,8 @@ export function DealCard({
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="text-text-main font-bold text-base leading-tight group-hover/card:text-[#003366] transition-colors truncate" title={deal.name}>
-                {deal.companyName || deal.name}
+              <h3 className="text-text-main font-bold text-base leading-tight group-hover/card:text-[#003366] transition-colors truncate" title={getDealDisplayName(deal)}>
+                {getDealDisplayName(deal)}
               </h3>
               <p className="text-text-muted text-xs font-medium truncate">
                 {deal.industry || "\u2014"}
@@ -506,8 +506,8 @@ export function KanbanCard({
             </span>
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-semibold text-text-main truncate hover:text-[#003366] transition-colors" title={deal.name}>
-              {deal.companyName || deal.name}
+            <h4 className="text-sm font-semibold text-text-main truncate hover:text-[#003366] transition-colors" title={getDealDisplayName(deal)}>
+              {getDealDisplayName(deal)}
             </h4>
             <p className="text-[11px] text-text-muted truncate">
               {deal.industry || "\u2014"}

@@ -106,6 +106,49 @@ export function getDocIcon(name: string | null | undefined): string {
   return "description";
 }
 
+/**
+ * Resolve the best display name for a deal.
+ *
+ * Priority: companyName > company.name > name (cleaned).
+ * If the final value looks like a URL, extract a readable domain name from it
+ * (e.g. "https://www.backlift.com/about" -> "Backlift").
+ */
+export function getDealDisplayName(deal: {
+  name: string;
+  companyName?: string | null;
+  company?: { name?: string | null } | null;
+}): string {
+  const raw = deal.companyName || deal.company?.name || deal.name;
+  return cleanNameIfUrl(raw);
+}
+
+/** If `value` looks like a URL, extract a human-readable domain name from it. */
+function cleanNameIfUrl(value: string): string {
+  if (!value) return value;
+  // Quick check: does it start with http(s):// or www. ?
+  const trimmed = value.trim();
+  if (!/^https?:\/\//i.test(trimmed) && !/^www\./i.test(trimmed)) {
+    return value;
+  }
+  try {
+    const urlStr = trimmed.startsWith("www.") ? `https://${trimmed}` : trimmed;
+    const hostname = new URL(urlStr).hostname;
+    // Strip "www." prefix
+    const domain = hostname.replace(/^www\./i, "");
+    // Take the main part before the TLD (e.g. "backlift.com" -> "backlift")
+    const parts = domain.split(".");
+    const name = parts.length > 1 ? parts.slice(0, -1).join(".") : domain;
+    // Capitalize first letter of each segment
+    return name
+      .split(/[.\-_]/)
+      .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
+      .join(" ");
+  } catch {
+    // Not a valid URL despite looking like one — return as-is
+    return value;
+  }
+}
+
 /** Extract initials from a name or firstName+lastName. Max 2 chars, uppercased. */
 export function getInitials(nameOrFirst?: string | null, lastName?: string): string {
   if (lastName !== undefined) {

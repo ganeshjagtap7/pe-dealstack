@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, useRouter, usePathname } from "next/navigation";
 import { api } from "@/lib/api";
+import { getDealDisplayName } from "@/lib/formatters";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/providers/AuthProvider";
@@ -496,7 +497,7 @@ export default function DealDetailPage() {
             </Link>
             <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
             <span className="text-text-main font-medium truncate max-w-[300px]">
-              {deal.name}
+              {getDealDisplayName(deal)}
             </span>
           </nav>
         </div>
@@ -642,7 +643,7 @@ export default function DealDetailPage() {
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-text-main leading-tight">
-                  {deal.name}
+                  {getDealDisplayName(deal)}
                 </h1>
                 {/* Recently active team members ("@User on this deal") */}
                 {(deal.team?.length ?? 0) > 0 && (

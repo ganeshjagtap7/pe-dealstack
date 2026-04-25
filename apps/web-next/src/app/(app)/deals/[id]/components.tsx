@@ -36,6 +36,7 @@ export interface DealDetail {
   description?: string;
   assignee?: string;
   assignedUser?: AssignedUser | null;
+  company?: { name?: string } | null;
   source?: string;
   icon?: string;
   createdAt: string;

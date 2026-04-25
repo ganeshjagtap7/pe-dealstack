@@ -84,9 +84,9 @@ export default function DealsPage() {
       if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
       params.set("limit", "50");
 
-      const data = await api.get<(Deal & { company?: { name?: string } })[]>(`/deals?${params}`);
+      const data = await api.get<Deal[]>(`/deals?${params}`);
       const raw = Array.isArray(data) ? data : [];
-      // Flatten company.name into companyName for display
+      // Flatten company.name into companyName so cards can display it
       const list = raw.map((d) => ({
         ...d,
         companyName: d.companyName || d.company?.name || undefined,
