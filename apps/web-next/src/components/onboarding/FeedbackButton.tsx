@@ -1,9 +1,23 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+
 const FEEDBACK_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLSet_GfebuKpdspK7aQ8yAFUF_l5yXeFczBRoKauGEg2GlpS5g/viewform";
 
+// Only show on pages that have feedback in the legacy app
+const FEEDBACK_PAGES = ["/dashboard", "/deals", "/contacts", "/settings"];
+
 export function FeedbackButton() {
+  const pathname = usePathname();
+
+  // Show on exact matches + deal detail pages (/deals/[id])
+  const show =
+    FEEDBACK_PAGES.includes(pathname) ||
+    /^\/deals\/[^/]+$/.test(pathname);
+
+  if (!show) return null;
+
   return (
     <button
       onClick={() => window.open(FEEDBACK_URL, "_blank", "noopener,noreferrer")}
