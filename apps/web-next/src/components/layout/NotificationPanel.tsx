@@ -195,13 +195,27 @@ export function NotificationCenter() {
     return () => document.removeEventListener("keydown", handler);
   }, [open, handleClose]);
 
-  // Lock body scroll while open
+  // Lock scrolling while the notification panel is open.
+  // Setting body overflow to hidden prevents page-level scroll, but on
+  // pages that use inner scroll containers (e.g. the deal detail page's
+  // overflow-y-auto panels) wheel events still reach those containers
+  // through the fixed overlay. A document-level wheel capture handler
+  // blocks all scroll-through so the user can only scroll the panel itself.
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = "hidden";
-    }
+    if (!open) return;
+
+    document.body.style.overflow = "hidden";
+
+    const blockWheel = (e: WheelEvent) => {
+      // Allow scrolling inside the notification panel itself
+      if (panelRef.current?.contains(e.target as Node)) return;
+      e.preventDefault();
+    };
+    document.addEventListener("wheel", blockWheel, { passive: false, capture: true });
+
     return () => {
       document.body.style.overflow = "";
+      document.removeEventListener("wheel", blockWheel, { capture: true } as EventListenerOptions);
     };
   }, [open]);
 
@@ -261,16 +275,19 @@ export function NotificationCenter() {
       {/* Slide-out panel + overlay */}
       {open && (
         <>
-          {/* Overlay */}
+          {/* Overlay -- onWheel + onTouchMove prevent scroll bleed-through
+              to underlying scrollable containers (e.g. deal detail panels). */}
           <div
             className={cn(
-              "fixed inset-0 z-[10000] bg-black/40 backdrop-blur-md",
+              "fixed inset-0 z-[10000] bg-black/40 backdrop-blur-md overscroll-contain",
               closing
                 ? "animate-[fadeOut_0.2s_ease-in_forwards]"
                 : "animate-[fadeIn_0.2s_ease-out]",
             )}
             data-modal-overlay
             onClick={handleClose}
+            onWheel={(e) => e.preventDefault()}
+            onTouchMove={(e) => e.preventDefault()}
             aria-hidden="true"
           />
 

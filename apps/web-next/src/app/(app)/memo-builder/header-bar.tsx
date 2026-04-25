@@ -37,29 +37,32 @@ export function DocumentHeaderBar({
 
   return (
     <header className="flex items-center justify-between whitespace-nowrap border-b border-solid border-slate-200 bg-white px-6 py-3 shrink-0 z-20 shadow-sm">
-      <div className="flex items-center gap-3">
-        <div
-          className="flex size-8 items-center justify-center rounded text-white"
-          style={{ backgroundColor: "#003366" }}
-        >
-          <span className="material-symbols-outlined">description</span>
-        </div>
-        <div>
-          <h2 className="text-[#0d131b] text-base font-bold leading-tight tracking-[-0.015em]">
-            {memo.projectName || memo.title}
-          </h2>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>{memo.title}</span>
-            <span className="size-1 rounded-full bg-slate-300" />
-            <span className={cn("font-medium px-1.5 rounded", statusStyle.bg, statusStyle.text)}>
-              {memo.status.charAt(0) + memo.status.slice(1).toLowerCase()}
-            </span>
-            <span className="size-1 rounded-full bg-slate-300" />
-            <span>Last edited {formatRelativeTime(memo.updatedAt)}</span>
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div
+            className="flex size-8 items-center justify-center rounded text-white"
+            style={{ backgroundColor: "#003366" }}
+          >
+            <span className="material-symbols-outlined">description</span>
+          </div>
+          <div>
+            <h2 className="text-[#0d131b] text-base font-bold leading-tight tracking-[-0.015em]">
+              {memo.projectName || memo.title}
+            </h2>
+            <div className="flex items-center gap-2 text-xs text-slate-500">
+              <span>{memo.title}</span>
+              <span className="size-1 rounded-full bg-slate-300" />
+              <span className={cn("font-medium px-1.5 rounded", statusStyle.bg, statusStyle.text)}>
+                {memo.status}
+              </span>
+              <span className="size-1 rounded-full bg-slate-300" />
+              <span>Last edited {formatRelativeTime(memo.updatedAt)}</span>
+            </div>
           </div>
         </div>
       </div>
       <div className="flex items-center gap-3">
+        {/* Generate All button — web-next addition, not in legacy but useful */}
         {sections.length > 0 && (
           <button
             onClick={onGenerateAll}
@@ -75,6 +78,7 @@ export function DocumentHeaderBar({
             <span>{generatingAll ? "Generating..." : "Generate All"}</span>
           </button>
         )}
+        {/* Share button — matches legacy */}
         <button
           onClick={onShare}
           className="flex items-center justify-center rounded-lg h-9 px-3 bg-white border border-slate-200 text-slate-700 text-sm font-semibold hover:bg-slate-50 transition-colors gap-2"
@@ -82,15 +86,14 @@ export function DocumentHeaderBar({
           <span className="material-symbols-outlined text-[20px]">share</span>
           <span>Share</span>
         </button>
+        {/* Export split button — matches legacy exactly */}
         <div className="relative" ref={exportMenuRef}>
-          <div
-            className="flex items-center rounded-lg overflow-hidden border border-primary"
-            style={{ backgroundColor: "#003366" }}
-          >
+          <div className="flex items-center rounded-lg overflow-visible" style={{ border: "1px solid #003366" }}>
             <button
               onClick={onExportPDF}
               disabled={disabled}
-              className="flex items-center justify-center h-9 px-4 text-white text-sm font-bold hover:opacity-90 transition-opacity disabled:opacity-50"
+              className="flex items-center justify-center h-9 px-4 text-white text-sm font-bold hover:opacity-90 transition-opacity rounded-l-lg disabled:opacity-50"
+              style={{ backgroundColor: "#003366" }}
             >
               Export to PDF
             </button>
@@ -100,12 +103,14 @@ export function DocumentHeaderBar({
                 setExportMenuOpen((v) => !v);
               }}
               disabled={disabled}
-              className="flex items-center justify-center h-9 px-2 text-white hover:opacity-90 transition-opacity border-l border-white/20 disabled:opacity-50"
+              className="flex items-center justify-center h-9 px-2 text-white hover:opacity-90 transition-opacity rounded-r-lg disabled:opacity-50"
+              style={{ backgroundColor: "#003366", borderLeft: "1px solid rgba(255,255,255,0.2)" }}
               aria-label="Export options"
             >
               <span className="material-symbols-outlined text-[20px]">arrow_drop_down</span>
             </button>
           </div>
+          {/* Export dropdown menu */}
           {exportMenuOpen && (
             <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
               <button

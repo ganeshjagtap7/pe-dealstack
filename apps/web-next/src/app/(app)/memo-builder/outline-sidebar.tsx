@@ -26,43 +26,43 @@ export function MemoOutlineSidebar({
           Sections
         </h3>
         <nav className="flex flex-col gap-1">
-          {sections.map((section, idx) => (
-            <button
-              key={section.id}
-              onClick={() => {
-                setActiveSection(section.id);
-                document
-                  .getElementById(`section-${section.id}`)
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }}
-              className={cn(
-                "flex items-center gap-2 w-full px-2.5 py-2 rounded-lg text-xs font-medium transition-colors text-left group",
-                activeSection === section.id
-                  ? "bg-surface-card shadow-sm border border-border-subtle text-primary"
-                  : "text-text-secondary hover:bg-surface-card/60"
-              )}
-            >
-              <span
+          {sections.map((section) => {
+            const isActive = activeSection === section.id;
+            return (
+              <button
+                key={section.id}
+                onClick={() => {
+                  setActiveSection(section.id);
+                  document
+                    .getElementById(`section-${section.id}`)
+                    ?.scrollIntoView({ behavior: "smooth", block: "start" });
+                }}
                 className={cn(
-                  "w-5 h-5 shrink-0 flex items-center justify-center rounded text-[10px] font-bold",
-                  activeSection === section.id
-                    ? "bg-primary text-white"
-                    : "bg-border-subtle text-text-muted"
+                  "flex items-center justify-between w-full px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left group",
+                  isActive
+                    ? "bg-white shadow-sm border border-slate-200 text-primary"
+                    : "text-slate-700 hover:bg-slate-100"
                 )}
               >
-                {idx + 1}
-              </span>
-              <span className="truncate flex-1">{section.title}</span>
-              {section.aiGenerated && (
-                <span
-                  className="material-symbols-outlined text-[12px] text-purple-500 shrink-0"
-                  title="AI generated"
-                >
-                  auto_awesome
-                </span>
-              )}
-            </button>
-          ))}
+                <div className="flex items-center gap-2 truncate">
+                  <span
+                    className={cn(
+                      "material-symbols-outlined text-[18px]",
+                      isActive
+                        ? "text-primary"
+                        : "text-slate-400 group-hover:text-primary"
+                    )}
+                  >
+                    drag_indicator
+                  </span>
+                  <span className="truncate">{section.title}</span>
+                </div>
+                {isActive && (
+                  <div className="size-1.5 rounded-full bg-primary shrink-0" />
+                )}
+              </button>
+            );
+          })}
         </nav>
         {sections.length === 0 && (
           <p className="text-[11px] text-text-muted text-center py-6">No sections yet</p>

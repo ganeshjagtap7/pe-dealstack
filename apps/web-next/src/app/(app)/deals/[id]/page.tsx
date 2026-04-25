@@ -481,7 +481,7 @@ export default function DealDetailPage() {
     <>
     <div className="flex flex-col h-full overflow-hidden">
       {/* HEADER BAR — breadcrumb + actions, spans full width above both panels */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-10">
+      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-40 relative">
         <div className="flex items-center gap-4 flex-1">
           <nav className="flex items-center gap-1.5 text-sm">
             <button

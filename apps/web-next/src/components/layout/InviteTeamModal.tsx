@@ -224,7 +224,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[10000]">
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-md"
+        className="absolute inset-0 bg-black/60 backdrop-blur-xl"
         data-modal-overlay
         onClick={onClose}
       />

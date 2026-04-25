@@ -87,7 +87,7 @@ export function Sidebar() {
   const getActiveId = () => {
     if (pathname === "/settings" || pathname.startsWith("/settings/")) return "settings";
     for (const item of NAV_ITEMS) {
-      if (item.divider) continue;
+      if (item.divider || !item.href) continue;
       if (pathname === item.href || pathname.startsWith(item.href + "/")) return item.id;
     }
     return "";

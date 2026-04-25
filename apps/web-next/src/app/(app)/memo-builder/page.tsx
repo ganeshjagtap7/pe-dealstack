@@ -460,29 +460,31 @@ export default function MemoBuilderPage() {
         </div>
 
         {!selectedMemo ? (
-          /* Empty state */
+          /* Empty state — matches legacy showEmptyMemoState */
           <div className="flex-1 flex items-center justify-center bg-background-body">
-            <div className="text-center max-w-sm">
-              <span className="material-symbols-outlined text-5xl text-text-muted mb-3 block">edit_note</span>
-              <h3 className="text-lg font-semibold text-text-main mb-2">Select or Create a Memo</h3>
-              <p className="text-sm text-text-muted mb-4">
+            <div className="flex flex-col items-center justify-center py-20 text-center">
+              <div className="size-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <span className="material-symbols-outlined text-primary text-3xl">edit_note</span>
+              </div>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">Select or Create a Memo</h3>
+              <p className="text-sm text-slate-500 mb-6 max-w-md">
                 Choose a memo from the sidebar, or create a new one to get started with the AI-powered memo builder.
               </p>
               <button
                 onClick={openCreateModal}
-                className="inline-flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: "#003366" }}
               >
-                <span className="material-symbols-outlined text-[18px]">add</span>
+                <span className="material-symbols-outlined text-[16px]">add</span>
                 New Memo
               </button>
             </div>
           </div>
         ) : loadingMemo ? (
           <div className="flex-1 flex items-center justify-center bg-background-body">
-            <div className="flex flex-col items-center gap-3">
-              <span className="material-symbols-outlined text-4xl animate-spin text-primary">progress_activity</span>
-              <p className="text-sm text-text-muted">Loading memo...</p>
+            <div className="flex flex-col items-center gap-4">
+              <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-slate-600 font-medium">Loading memo...</p>
             </div>
           </div>
         ) : (

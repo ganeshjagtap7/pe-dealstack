@@ -19,25 +19,24 @@ function renderTableData(tableData: TableData) {
   if (!tableData.headers || !tableData.rows) return null;
 
   return (
-    <div className="overflow-hidden border border-border-subtle rounded-lg bg-white shadow-sm mb-6">
+    <div className="overflow-hidden border border-slate-200 rounded-lg bg-white shadow-sm mb-6">
       <table className="w-full text-sm text-left">
-        <thead className="bg-[#f0f4f8] text-text-muted font-medium border-b border-border-subtle">
+        <thead className="bg-slate-50 text-slate-500 font-medium border-b border-slate-200">
           <tr>
             {tableData.headers.map((h, i) => (
               <th
                 key={i}
                 className={cn(
-                  "px-4 py-3 font-semibold text-[11px] uppercase tracking-[0.05em]",
-                  i === 0 ? "w-1/3 text-left text-primary" : "text-right text-primary"
+                  "px-4 py-3 font-semibold",
+                  i === 0 ? "w-1/3 text-left" : "text-right"
                 )}
-                style={{ borderRight: i < tableData.headers.length - 1 ? "1px solid #e2e8f0" : undefined }}
               >
                 {h}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-[#f1f5f9]">
+        <tbody className="divide-y divide-slate-100">
           {tableData.rows.map((row, rowIdx) => {
             let metric = "";
             let values: string[] = [];
@@ -62,14 +61,14 @@ function renderTableData(tableData: TableData) {
               <tr
                 key={rowIdx}
                 className={cn(
-                  "hover:bg-[#f8fafc]",
-                  isBold && "bg-[#f8fafc]"
+                  "hover:bg-slate-50/50",
+                  isBold && "bg-slate-50/30"
                 )}
               >
                 <td
                   className={cn(
                     "px-4 py-2.5",
-                    isBold ? "font-bold text-text-main" : isSubMetric ? "pl-8 text-text-muted italic" : "font-medium text-text-main"
+                    isBold ? "font-bold text-slate-900" : isSubMetric ? "pl-8 text-slate-500 italic" : "font-medium text-slate-800"
                   )}
                 >
                   {metric}
@@ -79,7 +78,7 @@ function renderTableData(tableData: TableData) {
                     key={ci}
                     className={cn(
                       "px-4 py-2.5 text-right font-mono",
-                      isBold ? "font-semibold text-text-main" : isSubMetric ? "text-text-muted" : "text-text-secondary"
+                      isBold ? "font-semibold text-slate-800" : isSubMetric ? "text-slate-500" : "text-slate-600"
                     )}
                   >
                     {v ?? ""}
@@ -91,8 +90,8 @@ function renderTableData(tableData: TableData) {
         </tbody>
       </table>
       {tableData.footnote && (
-        <div className="bg-[#f8fafc] border-t border-border-subtle px-4 py-2">
-          <p className="text-[10px] text-text-muted">{tableData.footnote}</p>
+        <div className="bg-slate-50 border-t border-slate-200 px-4 py-2">
+          <p className="text-[10px] text-slate-500">{tableData.footnote}</p>
         </div>
       )}
     </div>
@@ -155,27 +154,40 @@ export function MemoEditor({
     return () => el.removeEventListener("scroll", onScroll);
   }, [sections, activeSection, setActiveSection]);
 
+  // Estimate page count from content height
+  const pageCount = Math.max(1, Math.ceil((sections.length * 400) / 1056));
+
   return (
     <main
       ref={containerRef}
       className="flex-1 overflow-y-auto custom-scrollbar flex justify-center items-start p-8"
       style={{ backgroundColor: "#e8eaed" }}
     >
-      <div className="w-full max-w-[850px] bg-white flex flex-col rounded-sm shadow-[0_1px_3px_rgba(0,0,0,0.12),0_4px_16px_rgba(0,0,0,0.10)] min-h-[calc(100vh-120px)]">
+      <div
+        className="w-full max-w-[850px] bg-white flex flex-col"
+        style={{
+          boxShadow: "0 1px 3px rgba(0,0,0,0.12), 0 4px 16px rgba(0,0,0,0.10)",
+          borderRadius: "2px",
+          minHeight: "calc(100vh - 120px)",
+        }}
+      >
         {/* Document header */}
         <div className="px-14 pt-14 pb-6 border-b border-slate-200">
-          <h1 className="text-[26px] font-bold text-[#1a1a2e] tracking-tight mb-3 leading-tight">
+          <h1
+            className="font-bold text-[#1a1a2e] mb-3 leading-tight"
+            style={{ fontSize: "26px", letterSpacing: "-0.02em" }}
+          >
             {memo.title || "Investment Committee Memo"}
           </h1>
-          <div className="flex items-center flex-wrap gap-x-5 gap-y-1 text-[13px] text-text-secondary">
+          <div className="flex items-center flex-wrap gap-x-5 gap-y-1 text-[13px] text-slate-500">
             {memo.projectName && (
-              <span className="font-semibold text-text-main">{memo.projectName}</span>
+              <span className="font-semibold text-slate-800">{memo.projectName}</span>
             )}
-            <span className="text-text-muted">|</span>
+            <span className="text-slate-300">|</span>
             <span>{formatDocDate(memo.updatedAt)}</span>
             {memo.sponsor && (
               <>
-                <span className="text-text-muted">|</span>
+                <span className="text-slate-300">|</span>
                 <span>Sponsor: {memo.sponsor}</span>
               </>
             )}
@@ -195,10 +207,11 @@ export function MemoEditor({
               </p>
             </div>
           ) : (
-            sections.map((section) => (
+            sections.map((section, index) => (
               <DocSection
                 key={section.id}
                 section={section}
+                index={index}
                 isActive={activeSection === section.id}
                 content={editingContent[section.id] || ""}
                 onContentChange={(val) =>
@@ -214,11 +227,11 @@ export function MemoEditor({
           )}
         </div>
 
-        {/* Document footer */}
-        <div className="px-14 py-6 border-t border-slate-200 mt-auto bg-slate-50/50">
+        {/* Document footer — matches legacy: bg-slate-50/50, CONFIDENTIAL text */}
+        <div className="px-14 py-6 mt-auto" style={{ backgroundColor: "#f9fafb", borderTop: "1px solid #e5e7eb" }}>
           <div className="flex justify-between text-xs text-slate-400">
             <span>CONFIDENTIAL - FOR INTERNAL USE ONLY</span>
-            <span>Page 1 of {Math.max(1, sections.length)}</span>
+            <span>Page 1 of {pageCount}</span>
           </div>
         </div>
       </div>
@@ -232,6 +245,7 @@ export function MemoEditor({
 
 interface DocSectionProps {
   section: MemoSection;
+  index: number;
   isActive: boolean;
   content: string;
   onContentChange: (val: string) => void;
@@ -244,6 +258,7 @@ interface DocSectionProps {
 
 function DocSection({
   section,
+  index,
   isActive,
   content,
   onContentChange,
@@ -257,75 +272,81 @@ function DocSection({
   const hasHtml = /<[a-z][\s\S]*>/i.test(content);
 
   return (
-    <section id={`section-${section.id}`} className="group/section scroll-mt-8">
-      <div className="flex items-center justify-between mb-2.5 pb-1.5 border-b-2 border-primary">
-        <h2 className="text-[15px] font-bold text-primary uppercase tracking-[0.06em] flex items-center gap-2">
-          {section.title}
+    <section
+      id={`section-${section.id}`}
+      className={cn(
+        "group/section relative pl-4 -ml-4 transition-colors scroll-mt-8",
+        isActive
+          ? "border-l-2 border-primary/30 bg-primary/5 p-4 rounded-r-lg"
+          : "border-l-2 border-transparent hover:border-slate-200"
+      )}
+    >
+      {/* Section heading — matches legacy: numbered, with AI badge and icon-only action buttons */}
+      <div className="flex justify-between items-start mb-3">
+        <h2
+          className="font-bold text-[15px] text-primary uppercase flex items-center gap-2"
+          style={{ letterSpacing: "0.06em" }}
+        >
+          {index + 1}. {section.title}
           {section.aiGenerated && (
-            <span className="flex items-center gap-0.5 bg-purple-50 text-purple-600 text-[9px] font-medium px-1.5 py-0.5 rounded normal-case tracking-normal">
-              <span className="material-symbols-outlined text-[11px]">auto_awesome</span>
-              AI
+            <span className="bg-purple-100 text-purple-700 text-[10px] px-1.5 py-0.5 rounded font-medium uppercase tracking-wide">
+              AI Generated
             </span>
           )}
         </h2>
+        {/* Action buttons — icon-only compact buttons matching legacy */}
         <div
           className={cn(
-            "flex items-center gap-0.5 transition-opacity",
+            "flex gap-1 transition-opacity",
             isActive ? "opacity-100" : "opacity-0 group-hover/section:opacity-100"
           )}
         >
           <button
             onClick={onGenerate}
             disabled={generating}
-            className="h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-medium text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
-            title="Generate with AI"
+            className="p-1.5 rounded hover:bg-blue-100 text-primary hover:text-blue-800 transition-colors disabled:opacity-50"
+            title="Regenerate with AI"
           >
             {generating ? (
-              <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+              <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
             ) : (
-              <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+              <span className="material-symbols-outlined text-[16px]">refresh</span>
             )}
-            Generate
+          </button>
+          <button
+            onClick={() => setEditing(!editing)}
+            className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+            title="Edit content"
+          >
+            <span className="material-symbols-outlined text-[16px]">edit_note</span>
           </button>
           <button
             onClick={onSave}
             disabled={saving}
-            className="h-7 px-2 rounded-md flex items-center gap-1 text-[11px] font-medium text-text-secondary hover:bg-background-body transition-colors disabled:opacity-50"
-            title="Save"
+            className="p-1.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors disabled:opacity-50"
+            title="Save section"
           >
             {saving ? (
-              <span className="material-symbols-outlined text-[14px] animate-spin">progress_activity</span>
+              <span className="material-symbols-outlined text-[16px] animate-spin">sync</span>
             ) : (
-              <span className="material-symbols-outlined text-[14px]">save</span>
+              <span className="material-symbols-outlined text-[16px]">save</span>
             )}
-            Save
           </button>
           <button
             onClick={onDelete}
-            className="h-7 px-1.5 rounded-md flex items-center text-text-muted hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="p-1.5 rounded hover:bg-red-100 text-slate-400 hover:text-red-600 transition-colors"
             title="Delete section"
           >
-            <span className="material-symbols-outlined text-[14px]">delete</span>
+            <span className="material-symbols-outlined text-[16px]">delete</span>
           </button>
         </div>
       </div>
 
-      {hasHtml && !editing ? (
-        <div className="relative">
-          <div
-            className="memo-section-content max-w-none text-text-main text-[13.5px] leading-[1.75]"
-            dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
-            onClick={() => setEditing(true)}
-          />
-          <button
-            onClick={() => setEditing(true)}
-            className="mt-2 text-[11px] font-medium text-primary hover:underline flex items-center gap-1"
-          >
-            <span className="material-symbols-outlined text-[14px]">edit</span>
-            Edit
-          </button>
-        </div>
-      ) : (
+      {/* Section heading underline — matches legacy #sections-content h2 border-bottom */}
+      <div className="border-b-2 border-primary mb-3 -mt-1" />
+
+      {/* Content display or editing */}
+      {editing ? (
         <div>
           {hasHtml && (
             <button
@@ -339,10 +360,34 @@ function DocSection({
           <textarea
             value={content}
             onChange={(e) => onContentChange(e.target.value)}
-            rows={6}
-            className="w-full rounded-lg border border-border-subtle bg-[#fafbfc] px-4 py-3 text-[13.5px] text-text-main leading-[1.75] placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y"
-            placeholder="Write section content here or click Generate to use AI..."
+            rows={8}
+            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 leading-[1.75] placeholder-slate-400 focus:ring-2 focus:ring-primary/20 focus:border-primary resize-y font-mono"
+            placeholder="Write section content here (supports HTML)..."
           />
+          <p className="mt-2 text-xs text-slate-400">
+            You can use HTML tags like &lt;p&gt;, &lt;ul&gt;, &lt;li&gt;, &lt;strong&gt; for formatting.
+          </p>
+        </div>
+      ) : hasHtml ? (
+        <div
+          className="memo-section-content max-w-none"
+          dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
+        />
+      ) : content ? (
+        <div className="memo-section-content">
+          <p>{content}</p>
+        </div>
+      ) : (
+        <div className="p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center">
+          <button
+            onClick={onGenerate}
+            className="inline-flex flex-col items-center gap-2 text-slate-400 hover:text-primary transition-colors group/add"
+          >
+            <div className="size-8 rounded-full bg-slate-200 flex items-center justify-center group-hover/add:bg-primary/10 transition-colors">
+              <span className="material-symbols-outlined group-hover/add:text-primary">add</span>
+            </div>
+            <span className="text-sm font-medium">Generate content with AI</span>
+          </button>
         </div>
       )}
 
@@ -351,9 +396,9 @@ function DocSection({
 
       {/* Placeholder for missing content */}
       {section.hasPlaceholder && section.placeholderText && (
-        <div className="p-4 bg-[#f8fafc] rounded-lg border border-dashed border-border-subtle text-center">
-          <button className="inline-flex flex-col items-center gap-2 text-text-muted hover:text-primary transition-colors group/add">
-            <div className="size-8 rounded-full bg-border-subtle flex items-center justify-center group-hover/add:bg-primary/10 transition-colors">
+        <div className="p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center">
+          <button className="inline-flex flex-col items-center gap-2 text-slate-400 hover:text-primary transition-colors group/add">
+            <div className="size-8 rounded-full bg-slate-200 flex items-center justify-center group-hover/add:bg-primary/10 transition-colors">
               <span className="material-symbols-outlined group-hover/add:text-primary">add</span>
             </div>
             <span className="text-sm font-medium">{section.placeholderText}</span>
@@ -363,5 +408,3 @@ function DocSection({
     </section>
   );
 }
-
-// MemoChat and MemoChatCollapsed moved to chat.tsx

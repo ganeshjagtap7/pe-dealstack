@@ -47,6 +47,21 @@ body {
   background: #9CA3AF;
 }
 
+/* Hide scrollbar but keep functionality (memo-builder prompt chips, etc.) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Gradient mask for horizontal scroll */
+.mask-gradient {
+  mask-image: linear-gradient(to right, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+}
+
 /* Kanban card drag styles */
 .kanban-card {
   cursor: grab;

@@ -73,9 +73,10 @@ export interface TemplateOption {
 export const STATUS_FILTERS = ["ALL", "DRAFT", "REVIEW", "FINAL"] as const;
 
 export const STATUS_STYLES: Record<string, { bg: string; text: string }> = {
-  DRAFT: { bg: "bg-amber-50", text: "text-amber-700" },
-  REVIEW: { bg: "bg-blue-50", text: "text-blue-700" },
-  FINAL: { bg: "bg-green-50", text: "text-green-700" },
+  DRAFT: { bg: "bg-amber-100", text: "text-amber-700" },
+  REVIEW: { bg: "bg-blue-100", text: "text-blue-700" },
+  FINAL: { bg: "bg-green-100", text: "text-green-700" },
+  ARCHIVED: { bg: "bg-gray-100", text: "text-gray-500" },
 };
 
 export const SECTION_TYPES = [
@@ -174,7 +175,7 @@ export function MemoListSidebar({
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {loadingList ? (
           <div className="flex items-center justify-center py-12">
-            <span className="material-symbols-outlined text-2xl text-text-muted animate-spin">progress_activity</span>
+            <div className="size-8 border-3 border-primary border-t-transparent rounded-full animate-spin" />
           </div>
         ) : filteredMemos.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center px-4">
@@ -207,7 +208,7 @@ export function MemoListSidebar({
                   <p className="text-sm font-medium text-text-main truncate pr-2">
                     {memo.projectName || memo.title}
                   </p>
-                  <span className={cn("shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium", style.bg, style.text)}>
+                  <span className={cn("shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase", style.bg, style.text)}>
                     {memo.status}
                   </span>
                 </div>
@@ -258,70 +259,72 @@ export function CreateMemoModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface-card rounded-xl shadow-xl w-full max-w-lg mx-4 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-text-main">Create New Memo</h2>
-          <button onClick={onClose} className="text-text-muted hover:text-text-main transition-colors">
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
+      <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-lg mx-4">
+        <div className="p-6">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-lg font-bold text-slate-900">Create New Memo</h3>
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+              <span className="material-symbols-outlined text-slate-500">close</span>
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {/* Title */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Title</label>
+              <input
+                type="text"
+                value={createForm.title}
+                onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+                placeholder="Investment Committee Memo"
+              />
+            </div>
+
+            {/* Deal */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Deal (optional)</label>
+              <select
+                value={createForm.dealId}
+                onChange={(e) => setCreateForm((f) => ({ ...f, dealId: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+              >
+                <option value="">No deal selected</option>
+                {deals.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Template */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Template (optional)</label>
+              <select
+                value={createForm.templateId}
+                onChange={(e) => setCreateForm((f) => ({ ...f, templateId: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+              >
+                <option value="">Blank memo</option>
+                {templates.map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-4">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-text-main mb-1">Title</label>
-            <input
-              type="text"
-              value={createForm.title}
-              onChange={(e) => setCreateForm((f) => ({ ...f, title: e.target.value }))}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary"
-              placeholder="Investment Committee Memo"
-            />
-          </div>
-
-          {/* Deal */}
-          <div>
-            <label className="block text-sm font-medium text-text-main mb-1">Deal (optional)</label>
-            <select
-              value={createForm.dealId}
-              onChange={(e) => setCreateForm((f) => ({ ...f, dealId: e.target.value }))}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            >
-              <option value="">No deal selected</option>
-              {deals.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Template */}
-          <div>
-            <label className="block text-sm font-medium text-text-main mb-1">Template (optional)</label>
-            <select
-              value={createForm.templateId}
-              onChange={(e) => setCreateForm((f) => ({ ...f, templateId: e.target.value }))}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            >
-              <option value="">Blank memo</option>
-              {templates.map((t) => (
-                <option key={t.id} value={t.id}>{t.name}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-end gap-3 mt-6">
+        <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary border border-border-subtle hover:bg-background-body transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onCreate}
             disabled={!createForm.title.trim() || creatingMemo}
-            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             style={{ backgroundColor: "#003366" }}
           >
             {creatingMemo && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}
@@ -366,63 +369,61 @@ export function AddSectionModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className="relative bg-surface-card rounded-xl shadow-xl w-full max-w-md mx-4 p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-bold text-text-main">Add Section</h2>
-          <button onClick={onClose} className="text-text-muted hover:text-text-main">
-            <span className="material-symbols-outlined text-[20px]">close</span>
-          </button>
-        </div>
-        <div className="flex flex-col gap-4">
-          <div>
-            <label className="block text-sm font-medium text-text-main mb-1">Section Type</label>
-            <select
-              value={sectionType}
-              onChange={(e) => {
-                setSectionType(e.target.value);
-                if (e.target.value !== "CUSTOM") {
-                  setSectionTitle(SECTION_TYPES.find((t) => t.value === e.target.value)?.label || "");
-                }
-              }}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            >
-              {SECTION_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
+      <div className="absolute inset-0 bg-black/50 transition-opacity" onClick={onClose} />
+      <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-md mx-4">
+        <div className="p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-4">Add New Section</h3>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Section Type</label>
+              <select
+                value={sectionType}
+                onChange={(e) => {
+                  setSectionType(e.target.value);
+                  if (e.target.value !== "CUSTOM") {
+                    setSectionTitle(SECTION_TYPES.find((t) => t.value === e.target.value)?.label || "");
+                  }
+                }}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+              >
+                {SECTION_TYPES.map((t) => (
+                  <option key={t.value} value={t.value}>{t.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Section Title</label>
+              <input
+                type="text"
+                value={sectionTitle}
+                onChange={(e) => setSectionTitle(e.target.value)}
+                placeholder="Enter section title"
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="new-section-ai"
+                checked={generateAI}
+                onChange={(e) => setGenerateAI(e.target.checked)}
+                className="rounded border-slate-300 text-primary focus:ring-primary"
+              />
+              <label htmlFor="new-section-ai" className="text-sm text-slate-700">Generate content with AI</label>
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-text-main mb-1">Title</label>
-            <input
-              type="text"
-              value={sectionTitle}
-              onChange={(e) => setSectionTitle(e.target.value)}
-              placeholder={SECTION_TYPES.find((t) => t.value === sectionType)?.label || "Section title"}
-              className="w-full rounded-lg border border-border-subtle bg-background-body px-3 py-2 text-sm text-text-main placeholder-text-muted focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            />
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={generateAI}
-              onChange={(e) => setGenerateAI(e.target.checked)}
-              className="rounded border-gray-300 text-primary focus:ring-primary"
-            />
-            <span className="text-sm text-text-secondary">Generate content with AI</span>
-          </label>
         </div>
-        <div className="flex items-center justify-end gap-3 mt-6">
+        <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50 rounded-b-xl">
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-lg text-sm font-medium text-text-secondary border border-border-subtle hover:bg-background-body transition-colors"
+            className="px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={onAdd}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 text-white rounded-lg text-sm font-medium disabled:opacity-50 hover:opacity-90 transition-opacity"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg transition-colors disabled:opacity-50"
             style={{ backgroundColor: "#003366" }}
           >
             {loading && <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>}

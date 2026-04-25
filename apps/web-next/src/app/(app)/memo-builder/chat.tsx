@@ -7,15 +7,15 @@ import { renderMarkdown } from "@/lib/markdown";
 import type { ChatMessage } from "./components";
 
 /* ------------------------------------------------------------------ */
-/*  Prompt chips                                                       */
+/*  Prompt chips — with icons, matching legacy renderPromptChips()     */
 /* ------------------------------------------------------------------ */
 
-const PROMPT_CHIPS = [
-  "Summarize the key risks",
-  "Draft the executive summary",
-  "What financial data is missing?",
-  "Compare to industry benchmarks",
-  "Strengthen the investment thesis",
+const PROMPT_CHIPS: { icon: string; label: string; prompt: string }[] = [
+  { icon: "edit_note", label: "Rewrite for Tone", prompt: "Rewrite the active section for a more formal, investment-committee-ready tone" },
+  { icon: "bar_chart", label: "Add EBITDA Bridge", prompt: "Add an EBITDA bridge analysis" },
+  { icon: "trending_up", label: "Revenue Growth", prompt: "Analyze the revenue growth trajectory and key drivers" },
+  { icon: "warning", label: "Summarize Risks", prompt: "Summarize the key risks identified in this memo with severity ratings" },
+  { icon: "groups", label: "Add Competitors", prompt: "Generate a competitive landscape analysis section for this memo" },
 ];
 
 /* ------------------------------------------------------------------ */
@@ -47,8 +47,11 @@ export function MemoChat({
   if (!chatOpen) return null;
 
   return (
-    <aside className="w-[400px] shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden shadow-[-4px_0_24px_-12px_rgba(0,0,0,0.1)]">
-      {/* Header */}
+    <aside
+      className="shrink-0 border-l border-slate-200 bg-white flex flex-col overflow-hidden"
+      style={{ width: "400px", boxShadow: "-4px 0 24px -12px rgba(0,0,0,0.1)" }}
+    >
+      {/* Header — matches legacy AI panel header */}
       <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
           <div className="size-6 rounded bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm">
@@ -65,7 +68,7 @@ export function MemoChat({
         </button>
       </div>
 
-      {/* Messages */}
+      {/* Messages — bg-slate-50 matching legacy chat-messages */}
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 flex flex-col gap-4 bg-slate-50">
         {messages.map((msg) =>
           msg.role === "assistant" ? (
@@ -74,10 +77,10 @@ export function MemoChat({
                 <span className="material-symbols-outlined text-[16px]">smart_toy</span>
               </div>
               <div className="flex flex-col gap-1 max-w-[85%]">
-                <span className="text-[11px] font-semibold text-text-muted ml-1">
+                <span className="text-[11px] font-semibold text-slate-500 ml-1">
                   AI Analyst &bull; {msg.timestamp}
                 </span>
-                <div className="bg-surface-card border border-border-subtle rounded-xl rounded-tl-none p-3 shadow-sm text-sm text-text-secondary leading-relaxed">
+                <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-3 shadow-sm text-sm text-slate-700 leading-relaxed">
                   <div
                     className="chat-markdown space-y-1"
                     dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
@@ -88,36 +91,37 @@ export function MemoChat({
           ) : (
             <div key={msg.id} className="flex gap-3 flex-row-reverse">
               <div
-                className="size-8 shrink-0 rounded-full flex items-center justify-center mt-1"
+                className="size-8 shrink-0 rounded-full border border-white flex items-center justify-center mt-1"
                 style={{ backgroundColor: "#003366" }}
               >
                 <span className="text-[11px] text-white font-bold">U</span>
               </div>
               <div className="flex flex-col gap-1 items-end max-w-[85%]">
-                <span className="text-[11px] font-semibold text-text-muted mr-1">
+                <span className="text-[11px] font-semibold text-slate-500 mr-1">
                   You &bull; {msg.timestamp}
                 </span>
-                <div className="bg-primary text-white rounded-xl rounded-tr-none p-3 shadow-sm text-sm leading-relaxed">
+                <div className="bg-primary text-white rounded-2xl rounded-tr-none p-3 shadow-sm text-sm leading-relaxed">
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                 </div>
               </div>
             </div>
           )
         )}
+        {/* Typing indicator — matches legacy bouncing dots */}
         {sendingChat && (
           <div className="flex gap-3">
             <div className="size-8 shrink-0 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-sm mt-1">
               <span className="material-symbols-outlined text-[16px]">smart_toy</span>
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-[11px] font-semibold text-text-muted ml-1">
+              <span className="text-[11px] font-semibold text-slate-500 ml-1">
                 AI Analyst &bull; typing...
               </span>
-              <div className="bg-surface-card border border-border-subtle rounded-xl rounded-tl-none p-3 shadow-sm">
+              <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none p-3 shadow-sm">
                 <div className="flex gap-1">
-                  <span className="size-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="size-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="size-2 bg-text-muted rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="size-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="size-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="size-2 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                 </div>
               </div>
             </div>
@@ -126,28 +130,27 @@ export function MemoChat({
         <div ref={chatEndRef} />
       </div>
 
-      {/* Input area */}
+      {/* Input area — matches legacy structure */}
       <div className="p-4 bg-white border-t border-slate-200">
-        {/* Prompt chips */}
-        {messages.length < 3 && (
-          <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar">
-            {PROMPT_CHIPS.map((chip, i) => (
-              <button
-                key={chip}
-                onClick={() => setChatInput(chip)}
-                className={cn(
-                  "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-primary/10 hover:text-primary transition-colors border",
-                  i === 0
-                    ? "bg-primary-light text-primary border-primary/20"
-                    : "bg-background-body text-text-secondary border-border-subtle"
-                )}
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-        )}
-        {/* Input box */}
+        {/* Prompt chips — with icons, horizontal scroll, gradient mask */}
+        <div className="flex gap-2 overflow-x-auto pb-3 no-scrollbar mask-gradient">
+          {PROMPT_CHIPS.map((chip, i) => (
+            <button
+              key={chip.label}
+              onClick={() => setChatInput(chip.prompt)}
+              className={cn(
+                "shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium hover:bg-primary/20 hover:text-primary transition-colors border",
+                i === 0
+                  ? "bg-primary-light text-primary border-primary/20"
+                  : "bg-slate-100 text-slate-600 border-slate-200"
+              )}
+            >
+              <span className="material-symbols-outlined text-[14px]">{chip.icon}</span>
+              {chip.label}
+            </button>
+          ))}
+        </div>
+        {/* Input box — matches legacy textarea style */}
         <div className="relative">
           <textarea
             value={chatInput}

@@ -203,6 +203,14 @@ export function AIAssistant() {
   const inputRef = useRef<HTMLInputElement>(null);
   const hasInitRef = useRef(false);
 
+  // Deal detail pages have their own integrated AI chat panel in the
+  // right column, so hide the global FAB + drawer to avoid duplicate UI
+  // and the visual impression that a "Deal Assistant AI" sidebar item is
+  // active.  Data-room pages also render their own header.
+  const isDealDetailPage = /^\/deals\/[^/]+$/.test(pathname);
+  const isDataRoomPage = /^\/data-room\/[^/]/.test(pathname);
+  const hidden = isDealDetailPage || isDataRoomPage;
+
   // Re-detect context on route change
   useEffect(() => {
     const ctx = detectContext(pathname);
@@ -314,6 +322,9 @@ export function AIAssistant() {
   }, [inputValue, isLoading, context]);
 
   // ── Render ─────────────────────────────────────────────────────────────────
+
+  // Pages with their own embedded AI chat should not show the global FAB.
+  if (hidden) return null;
 
   return (
     <>
