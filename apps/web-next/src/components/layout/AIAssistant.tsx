@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, type CSSProperties } from "react";
 import { usePathname } from "next/navigation";
-import { api } from "@/lib/api";
+import { api, NotFoundError } from "@/lib/api";
 import { renderMarkdown } from "@/lib/markdown";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -294,14 +294,11 @@ export function AIAssistant() {
         "I received your message but couldn't generate a response.";
 
       setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Sorry, I couldn't connect to the AI service. Please check your connection and try again.",
-        },
-      ]);
+    } catch (err) {
+      const msg = err instanceof NotFoundError
+        ? "The AI assistant service isn't available yet. Please check back soon."
+        : "Sorry, I couldn't connect to the AI service. Please check your connection and try again.";
+      setMessages((prev) => [...prev, { role: "assistant", content: msg }]);
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -346,9 +343,11 @@ export function AIAssistant() {
                   AI Assistant
                 </div>
                 <div className="flex items-center gap-1 mt-0.5 text-[11px] font-medium text-white/80">
-                  <span className="material-symbols-outlined text-[14px]">
-                    {getContextIcon(context)}
-                  </span>
+                  {context.type !== "general" && (
+                    <span className="material-symbols-outlined text-[14px]">
+                      {getContextIcon(context)}
+                    </span>
+                  )}
                   {getContextLabel(context)}
                 </div>
               </div>

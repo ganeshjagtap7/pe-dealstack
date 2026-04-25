@@ -101,16 +101,19 @@ const DEFAULT_PROMPTS: SuggestionPrompt[] = [
 function SuggestionChips({ deal, onPick }: { deal: DealDetail | null; onPick: (prompt: string) => void }) {
   const prompts = buildSuggestionPrompts(deal);
   return (
-    <div className="grid grid-cols-2 gap-2 px-4 pt-3 pb-2 border-t border-border-subtle bg-surface-card">
+    <div className="grid grid-cols-2 gap-1.5 px-3 pt-2 pb-1.5 border-t border-border-subtle bg-surface-card">
       {prompts.map((p) => (
         <button
           key={p.label}
           type="button"
           onClick={() => onPick(p.prompt)}
-          className="flex items-start gap-2 px-3.5 py-2.5 text-left text-sm text-text-secondary font-medium rounded-xl border border-gray-200 bg-white transition-all cursor-pointer hover:border-primary/30 hover:bg-primary-light/30"
+          className="flex items-start gap-1.5 px-2.5 py-1.5 text-left text-xs font-medium rounded-lg border transition-all cursor-pointer"
+          style={{ color: "#003366", background: "#f0f4f8", borderColor: "rgba(0,51,102,0.13)" }}
+          onMouseOver={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#e0e8f0"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0,51,102,0.27)"; }}
+          onMouseOut={(e) => { (e.currentTarget as HTMLButtonElement).style.background = "#f0f4f8"; (e.currentTarget as HTMLButtonElement).style.borderColor = "rgba(0,51,102,0.13)"; }}
         >
-          <span className="material-symbols-outlined text-sm mt-px shrink-0 text-primary">{p.icon}</span>
-          <span className="leading-relaxed">{p.label}</span>
+          <span className="material-symbols-outlined text-sm mt-px shrink-0" style={{ color: "#003366" }}>{p.icon}</span>
+          <span className="leading-snug">{p.label}</span>
         </button>
       ))}
     </div>

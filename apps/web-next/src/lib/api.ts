@@ -6,6 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 // cross-origin URL unless you've also configured CORS on the API.
 const API_BASE_URL = "/api";
 
+// Typed error for 404 responses so callers can distinguish "endpoint not found
+// yet" from real errors and fail gracefully (empty state, no retry).
+export class NotFoundError extends Error {
+  readonly status = 404;
+  constructor(message = "Not found") {
+    super(message);
+    this.name = "NotFoundError";
+  }
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient();
   // Use getUser() — getSession() reads from local storage without server
@@ -39,6 +49,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   // DELETE endpoints return 204 No Content with empty body
   if (res.status === 204) {
     return undefined as T;
+  }
+
+  if (res.status === 404) {
+    throw new NotFoundError(`Not found: ${path}`);
   }
 
   if (!res.ok) {

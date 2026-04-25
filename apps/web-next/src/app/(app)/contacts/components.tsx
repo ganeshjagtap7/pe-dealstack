@@ -1,8 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { api } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/formatters";
+import { useState } from "react";
 import { cn } from "@/lib/cn";
 
 // ─── Shared Types & Constants ──────────────────────────────
@@ -59,10 +57,6 @@ export const SCORE_CONFIG: Record<string, { bg: string; text: string; dot: strin
   Hot:    { bg: "bg-red-100",     text: "text-red-700",     dot: "bg-red-500",     icon: "local_fire_department" },
   Active: { bg: "bg-emerald-100", text: "text-emerald-700", dot: "bg-emerald-500", icon: "bolt" },
   Strong: { bg: "bg-green-100",   text: "text-green-800",   dot: "bg-green-600",   icon: "star" },
-};
-
-const INTERACTION_ICONS: Record<string, string> = {
-  NOTE: "edit_note", MEETING: "groups", CALL: "call", EMAIL: "mail", OTHER: "more_horiz",
 };
 
 // Imported from shared formatters and re-exported for contacts/page.tsx
@@ -212,145 +206,9 @@ export function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => v
 
 // ─── Insight Cards ─────────────────────────────────────────
 
-export function InsightCards({ totalContacts }: { totalContacts: number }) {
-  const [stale, setStale] = useState<{ count: number; items: { id: string; firstName: string; lastName: string; company?: string; reason: string; type: string }[] }>({ count: 0, items: [] });
-  const [timeline, setTimeline] = useState<Interaction[]>([]);
-  const [duplicates, setDuplicates] = useState<{ contacts: { firstName: string; lastName: string }[]; reason: string; key: string }[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const [staleRes, timelineRes, dupsRes] = await Promise.allSettled([
-          api.get<{ contacts: typeof stale.items }>("/contacts/insights/stale?days=30"),
-          api.get<{ interactions: Interaction[] }>("/contacts/insights/timeline?limit=5"),
-          api.get<{ duplicates: typeof duplicates }>("/contacts/insights/duplicates"),
-        ]);
-        if (staleRes.status === "fulfilled") setStale({ count: staleRes.value.contacts?.length || 0, items: staleRes.value.contacts || [] });
-        if (timelineRes.status === "fulfilled") setTimeline(timelineRes.value.interactions || []);
-        if (dupsRes.status === "fulfilled") setDuplicates(dupsRes.value.duplicates || []);
-      } catch { /* silent */ }
-      setLoaded(true);
-    })();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      {/* Needs Attention */}
-      <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-amber-50/50">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-amber-600 text-[18px]">notifications_active</span>
-            <h3 className="text-sm font-bold text-text-main">Needs Attention</h3>
-          </div>
-          {stale.count > 0 && <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold">{stale.count}</span>}
-        </div>
-        <div className="max-h-[200px] overflow-y-auto">
-          {!loaded ? <Spinner /> : stale.items.length === 0 ? (
-            <div className="flex flex-col items-center py-6 text-text-muted">
-              <span className="material-symbols-outlined text-2xl mb-1 text-emerald-500 opacity-60">check_circle</span>
-              <p className="text-xs">All contacts are up to date!</p>
-            </div>
-          ) : stale.items.slice(0, 8).map((c) => {
-            const tc = TYPE_CONFIG[c.type] || TYPE_CONFIG.OTHER;
-            return (
-              <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-amber-50/50 transition-colors border-b border-border-subtle last:border-0">
-                <div className="size-7 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold" style={{ backgroundColor: tc.avatarBg, color: tc.avatarText }}>
-                  {getInitials(c.firstName, c.lastName)}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-text-main truncate">{c.firstName} {c.lastName}</p>
-                  <p className="text-[10px] text-text-muted truncate">{c.company ? `${c.company} · ` : ""}{c.reason}</p>
-                </div>
-                <span className="material-symbols-outlined text-amber-500 text-[16px] shrink-0">schedule</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Recent Activity */}
-      <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border-subtle bg-blue-50/30">
-          <span className="material-symbols-outlined text-[#003366] text-[18px]">history</span>
-          <h3 className="text-sm font-bold text-text-main">Recent Activity</h3>
-        </div>
-        <div className="max-h-[200px] overflow-y-auto">
-          {!loaded ? <Spinner /> : timeline.length === 0 ? (
-            <div className="flex flex-col items-center py-6 text-text-muted">
-              <span className="material-symbols-outlined text-2xl mb-1 opacity-40">history</span>
-              <p className="text-xs">No interactions yet</p>
-            </div>
-          ) : timeline.map((inter) => {
-            const contact = inter.Contact || {} as Interaction["Contact"];
-            const tc = TYPE_CONFIG[contact?.type || ""] || TYPE_CONFIG.OTHER;
-            const icon = INTERACTION_ICONS[inter.type] || INTERACTION_ICONS.OTHER;
-            return (
-              <div key={inter.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition-colors border-b border-border-subtle last:border-0">
-                <div className="size-7 rounded-full flex items-center justify-center shrink-0" style={{ backgroundColor: tc.avatarBg, color: tc.avatarText }}>
-                  <span className="material-symbols-outlined text-[14px]">{icon}</span>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-text-main truncate">{inter.title || inter.type}</p>
-                  <p className="text-[10px] text-text-muted truncate">with {contact?.firstName} {contact?.lastName}{contact?.company ? ` · ${contact.company}` : ""}</p>
-                </div>
-                <span className="text-[10px] text-text-muted shrink-0">{formatRelativeTime(inter.date || inter.createdAt)}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Possible Duplicates */}
-      <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border-subtle bg-red-50/50">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-red-500 text-[18px]">content_copy</span>
-            <h3 className="text-sm font-bold text-text-main">Possible Duplicates</h3>
-          </div>
-          {duplicates.length > 0 && <span className="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-bold">{duplicates.length}</span>}
-        </div>
-        <div className="max-h-[200px] overflow-y-auto">
-          {!loaded ? <Spinner /> : duplicates.length === 0 ? (
-            <div className="flex flex-col items-center py-6 text-text-muted">
-              <span className="material-symbols-outlined text-2xl mb-1 text-emerald-500 opacity-60">verified</span>
-              <p className="text-xs">No duplicates found</p>
-            </div>
-          ) : duplicates.map((dup, i) => (
-            <div key={i} className="flex items-center gap-3 px-4 py-2.5 hover:bg-red-50/50 transition-colors border-b border-border-subtle last:border-0">
-              <div className="size-7 rounded-full bg-red-100 flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined text-red-500 text-[14px]">{dup.reason === "Same email" ? "mail" : "person"}</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-text-main truncate">{dup.contacts.map((c) => `${c.firstName} ${c.lastName}`).join(", ")}</p>
-                <p className="text-[10px] text-text-muted">{dup.reason}: {dup.key}</p>
-              </div>
-              <span className="material-symbols-outlined text-red-400 text-[16px] shrink-0">warning</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Network Stats */}
-      <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-        <div className="flex items-center gap-2 px-4 py-3 border-b border-border-subtle bg-emerald-50/50">
-          <span className="material-symbols-outlined text-emerald-600 text-[18px]">hub</span>
-          <h3 className="text-sm font-bold text-text-main">Network Stats</h3>
-        </div>
-        <div className="px-4 py-4">
-          <p className="text-2xl font-bold text-text-main">{totalContacts}</p>
-          <p className="text-xs text-text-muted mt-0.5">Total contacts in your network</p>
-        </div>
-      </div>
-    </div>
-  );
+// Sections hidden for now: Needs Attention, Recent Activity, Possible Duplicates, Network Stats
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function InsightCards({ totalContacts: _totalContacts }: { totalContacts: number }) {
+  return null;
 }
 
-function Spinner() {
-  return (
-    <div className="flex items-center justify-center py-6">
-      <span className="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
-    </div>
-  );
-}

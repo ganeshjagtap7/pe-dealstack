@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback } from "react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { getCurrencySymbol } from "@/lib/formatters";
-import Link from "next/link";
 import {
   type FinancialStatement,
   RevenueChart,
@@ -256,6 +255,8 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   const [chartVisible, setChartVisible] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("revenue");
   const [periodFilter, setPeriodFilter] = useState<"all" | "annual" | "quarterly">("all");
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState("");
 
   const loadFinancials = useCallback(async () => {
     setLoading(true);
@@ -309,6 +310,22 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
 
   const toggleCollapsed = () => setCollapsed((p) => !p);
 
+  const handleExtract = useCallback(async () => {
+    if (extracting) return;
+    setExtracting(true);
+    setExtractError("");
+    try {
+      await api.post(`/deals/${dealId}/financials/extract`, {});
+      // Reload financials after extraction
+      await loadFinancials();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Extraction failed";
+      setExtractError(msg);
+    } finally {
+      setExtracting(false);
+    }
+  }, [dealId, extracting, loadFinancials]);
+
   // Loading state
   if (loading) {
     return (
@@ -344,12 +361,19 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
           <p className="text-xs text-gray-500" style={{ marginBottom: 20 }}>
             Upload a CIM, P&amp;L, or financial PDF to extract the 3-statement model automatically.
           </p>
-          <Link href={`/data-room/${dealId}`}
-            className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg transition-colors"
+          {extractError && (
+            <p className="text-xs text-red-500 mb-3">{extractError}</p>
+          )}
+          <button
+            onClick={handleExtract}
+            disabled={extracting}
+            className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60"
             style={{ padding: "10px 20px", backgroundColor: "#003366" }}>
-            <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-            Extract Financials
-          </Link>
+            <span className={cn("material-symbols-outlined text-[16px]", extracting && "animate-spin")}>
+              {extracting ? "progress_activity" : "auto_awesome"}
+            </span>
+            {extracting ? "Extracting… (30–60s)" : "Extract Financials"}
+          </button>
         </div>
       </FinancialShell>
     );

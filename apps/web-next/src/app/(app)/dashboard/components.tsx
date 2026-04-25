@@ -113,9 +113,14 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
           <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Sourcing</span>
           <span className="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">travel_explore</span>
         </div>
-        <div className="flex items-end gap-2 mt-3">
-          <span className="text-3xl font-bold text-primary tracking-tight">{loading ? "\u2014" : sourcingCount}</span>
-          <span className="text-xs font-medium text-text-secondary mb-1.5">{sourcingCount === 1 ? "deal" : "deals"}</span>
+        <div className="flex items-end justify-between mt-3">
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-bold text-primary tracking-tight">{loading ? "\u2014" : sourcingCount}</span>
+            <span className="text-xs font-medium text-text-secondary mb-1.5">{sourcingCount === 1 ? "deal" : "deals"}</span>
+          </div>
+          {!loading && sourcingCount > 0 && (
+            <span className="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style={{ color: "#059669", background: "#ECFDF5" }}>{pct(sourcingCount)}%</span>
+          )}
         </div>
         <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
           <div className="bg-blue-400 h-1.5 rounded-full transition-all" style={{ width: `${pct(sourcingCount)}%` }} />
@@ -129,9 +134,14 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
           <span className={cn("text-xs font-bold uppercase tracking-wider", ddCount > 0 ? "text-primary" : "text-text-secondary")}>Due Diligence</span>
           <span className={cn("material-symbols-outlined text-[20px]", ddCount > 0 ? "text-primary" : "text-text-muted group-hover:text-primary")}>saved_search</span>
         </div>
-        <div className="flex items-end gap-2 mt-3 relative z-10">
-          <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "\u2014" : ddCount}</span>
-          <span className="text-xs font-medium text-text-secondary mb-1.5">{ddCount === 1 ? "active" : "active"}</span>
+        <div className="flex items-end justify-between mt-3 relative z-10">
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "\u2014" : ddCount}</span>
+            <span className="text-xs font-medium text-text-secondary mb-1.5">{ddCount === 1 ? "active" : "active"}</span>
+          </div>
+          {!loading && ddCount > 0 && (
+            <span className="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style={{ color: "#003366", background: "#E6EEF5" }}>{pct(ddCount)}%</span>
+          )}
         </div>
         <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden relative z-10">
           <div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${pct(ddCount)}%` }} />
@@ -144,9 +154,14 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
           <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">LOI / Offer</span>
           <span className="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">description</span>
         </div>
-        <div className="flex items-end gap-2 mt-3">
-          <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "\u2014" : loiCount}</span>
-          <span className="text-xs font-medium text-text-secondary mb-1.5">Awaiting response</span>
+        <div className="flex items-end justify-between mt-3">
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "\u2014" : loiCount}</span>
+            <span className="text-xs font-medium text-text-secondary mb-1.5">Awaiting response</span>
+          </div>
+          {!loading && loiCount > 0 && (
+            <span className="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style={{ color: "#059669", background: "#ECFDF5" }}>{pct(loiCount)}%</span>
+          )}
         </div>
         <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
           <div className="bg-orange-400 h-1.5 rounded-full transition-all" style={{ width: `${pct(loiCount)}%` }} />
@@ -159,13 +174,18 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
           <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">Closed</span>
           <span className="material-symbols-outlined text-text-muted group-hover:text-primary transition-colors text-[20px]">verified</span>
         </div>
-        <div className="flex items-end gap-2 mt-3">
-          <span className="text-3xl font-bold text-text-main tracking-tight">
-            {loading ? "\u2014" : closedTotal > 0 ? formatCurrency(closedTotal) : closedCount}
-          </span>
-          <span className="text-xs font-medium text-text-secondary mb-1.5">
-            {closedTotal > 0 ? `${closedCount} ${closedCount === 1 ? "deal" : "deals"}` : closedCount === 1 ? "deal" : "deals"}
-          </span>
+        <div className="flex items-end justify-between mt-3">
+          <div className="flex items-end gap-2">
+            <span className="text-3xl font-bold text-text-main tracking-tight">
+              {loading ? "\u2014" : closedTotal > 0 ? formatCurrency(closedTotal) : closedCount}
+            </span>
+            <span className="text-xs font-medium text-text-secondary mb-1.5">
+              {closedTotal > 0 ? `${closedCount} ${closedCount === 1 ? "deal" : "deals"}` : closedCount === 1 ? "deal" : "deals"}
+            </span>
+          </div>
+          {!loading && closedCount > 0 && (
+            <span className="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style={{ color: "#059669", background: "#ECFDF5" }}>{pct(closedCount)}%</span>
+          )}
         </div>
         <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
           <div className="bg-secondary h-1.5 rounded-full transition-all" style={{ width: `${pct(closedCount)}%` }} />
@@ -360,7 +380,7 @@ interface PortfolioAllocationProps {
 
 export function PortfolioAllocation({ loading, allocation, gradientParts }: PortfolioAllocationProps) {
   return (
-    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden p-6 gap-5 group">
+    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card p-6 gap-5 group">
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
         <span className="material-symbols-outlined text-text-muted">pie_chart</span>
@@ -375,9 +395,9 @@ export function PortfolioAllocation({ loading, allocation, gradientParts }: Port
           <p className="text-xs">No deals yet</p>
         </div>
       ) : (
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-6 min-h-[9rem]">
           <div
-            className="size-28 rounded-full shrink-0 shadow-inner"
+            className="w-36 h-36 rounded-full shrink-0 shadow-inner"
             style={{
               background: `conic-gradient(${gradientParts.join(", ")})`,
               mask: "radial-gradient(circle at center, transparent 40%, black 41%)",

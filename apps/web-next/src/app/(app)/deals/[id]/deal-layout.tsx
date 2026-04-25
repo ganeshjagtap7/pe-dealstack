@@ -74,16 +74,16 @@ export function StagePipeline({
                 {index === 0 && <div className="flex-1" />}
                 <div
                   className={cn(
-                    "size-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
+                    "size-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
                     isPast && "bg-secondary text-white",
-                    isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-md",
+                    isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-sm",
                     isFuture && !isCurrent && "bg-gray-100 text-gray-400"
                   )}
                 >
                   {isPast ? (
-                    <span className="material-symbols-outlined text-sm">check</span>
+                    <span className="material-symbols-outlined text-[11px]">check</span>
                   ) : (
-                    <span className="material-symbols-outlined text-sm">{stage.icon}</span>
+                    <span className="material-symbols-outlined text-[11px]">{stage.icon}</span>
                   )}
                 </div>
                 {index < PIPELINE_STAGES.length - 1 ? (
@@ -99,7 +99,7 @@ export function StagePipeline({
               </div>
               <span
                 className={cn(
-                  "text-[10px] mt-1.5 text-center leading-tight whitespace-nowrap",
+                  "text-[9px] mt-1 text-center leading-tight whitespace-nowrap",
                   isPast && "text-secondary font-medium",
                   isCurrent && "text-primary font-bold",
                   isFuture && !isCurrent && "text-gray-400"
@@ -150,7 +150,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl bg-background-body border border-border-subtle">
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
           Lead Partner
         </p>
         <div className="flex items-center gap-2">
@@ -159,43 +159,38 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
               <div className="size-5 rounded-full bg-primary border border-primary/20 flex items-center justify-center text-[10px] font-bold text-white">
                 {leadPartner.name?.[0]?.toUpperCase() || "?"}
               </div>
-              <span className="text-sm text-text-main font-bold">{leadPartner.name}</span>
+              <span className="text-sm text-text-main font-medium">{leadPartner.name}</span>
             </>
           ) : (
-            <span className="text-sm text-text-muted font-bold">Not assigned</span>
+            <span className="text-sm text-gray-400 italic">Not assigned</span>
           )}
         </div>
       </div>
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
           Analyst
         </p>
         <div className="flex items-center gap-2">
           {analyst ? (
-            <>
-              <div className="size-5 rounded-full bg-secondary border border-secondary/20 flex items-center justify-center text-[10px] font-bold text-white">
-                {analyst.name?.[0]?.toUpperCase() || "?"}
-              </div>
-              <span className="text-sm text-text-main font-bold">{analyst.name}</span>
-            </>
+            <span className="text-sm text-text-main font-medium">{analyst.name}</span>
           ) : (
-            <span className="text-sm text-text-muted font-bold">&mdash;</span>
+            <span className="text-sm text-gray-400">&mdash;</span>
           )}
         </div>
       </div>
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
           Deal Source
         </p>
-        <span className="text-sm text-text-main font-bold">
+        <span className="text-sm text-text-main font-medium">
           {deal.source || "Proprietary"}
         </span>
       </div>
       <div>
-        <p className="text-[10px] text-text-muted font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
           Last Updated
         </p>
-        <span className="text-sm text-text-main font-bold">
+        <span className="text-sm text-text-main font-medium">
           {formatRelativeTime(deal.updatedAt)}
         </span>
       </div>
@@ -280,23 +275,23 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
   }
 
   return (
-    <div className={cn("grid gap-3 items-stretch", metrics.length <= 2 ? "grid-cols-2" : "grid-cols-2 lg:grid-cols-4")}>
+    <div className={cn("grid gap-3 w-full items-stretch", metrics.length <= 2 ? "grid-cols-2" : metrics.length === 3 ? "grid-cols-3" : "grid-cols-4")}>
       {metrics.map((m) => (
         <div
           key={m.key}
-          className="rounded-xl p-3 relative overflow-hidden group"
+          className="rounded-xl p-4 relative overflow-hidden group flex flex-col"
           style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}
         >
           <p className="text-[10px] text-text-muted font-bold uppercase tracking-wide">{m.label}</p>
-          <div className="flex items-center gap-1.5 mt-1.5">
-            <span className="text-lg font-bold text-text-main leading-none">{m.formatted}</span>
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-2xl font-bold text-text-main leading-none">{m.formatted}</span>
             {m.badge && (
               <span className="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded">
                 {m.badge}
               </span>
             )}
           </div>
-          {m.extra && <p className="text-[10px] text-text-muted font-medium mt-1">{m.extra}</p>}
+          {m.extra && <p className="text-[10px] text-text-muted font-medium mt-1.5">{m.extra}</p>}
           {/* Visual confidence indicators -- matches legacy mini charts */}
           {m.key === "revenue" && (
             <div className="h-8 mt-2 w-full flex items-end gap-1 opacity-80">
