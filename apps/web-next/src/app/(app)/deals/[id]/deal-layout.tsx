@@ -76,7 +76,7 @@ export function StagePipeline({
                     "size-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
                     isPast && "bg-secondary text-white",
                     isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-lg",
-                    isFuture && !isCurrent && "bg-gray-100 text-gray-400"
+                    isFuture && !isCurrent && "border-2 border-gray-200 text-gray-400 bg-white"
                   )}
                 >
                   {isPast ? (

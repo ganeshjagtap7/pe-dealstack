@@ -115,7 +115,7 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
         </div>
         <div className="flex items-end justify-between mt-3">
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-bold text-primary tracking-tight">{loading ? "\u2014" : sourcingCount}</span>
+            <span className={cn("text-3xl font-bold tracking-tight", sourcingCount > 0 ? "text-text-main" : "text-text-muted")}>{loading ? "\u2014" : sourcingCount}</span>
             <span className="text-xs font-medium text-text-secondary mb-1.5">{sourcingCount === 1 ? "deal" : "deals"}</span>
           </div>
           {!loading && sourcingCount > 0 && (
@@ -129,21 +129,20 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
 
       {/* Due Diligence */}
       <button onClick={() => onStageClick({ label: "Due Diligence", stages: DD_STAGES })} className={cn("text-left relative flex flex-col gap-1 rounded-lg bg-surface-card p-5 transition-all cursor-pointer group", ddCount > 0 ? "border border-primary shadow-glow" : "border border-border-subtle shadow-card hover:shadow-card-hover hover:border-primary/30")}>
-        {ddCount > 0 && <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-primary/5 to-transparent rounded-bl-3xl" />}
-        <div className="flex items-center justify-between relative z-10">
+        <div className="flex items-center justify-between">
           <span className={cn("text-xs font-bold uppercase tracking-wider", ddCount > 0 ? "text-primary" : "text-text-secondary")}>Due Diligence</span>
-          <span className={cn("material-symbols-outlined text-[20px]", ddCount > 0 ? "text-primary" : "text-text-muted group-hover:text-primary")}>saved_search</span>
+          <span className={cn("material-symbols-outlined text-[20px] transition-colors", ddCount > 0 ? "text-primary" : "text-text-muted group-hover:text-primary")}>saved_search</span>
         </div>
-        <div className="flex items-end justify-between mt-3 relative z-10">
+        <div className="flex items-end justify-between mt-3">
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "\u2014" : ddCount}</span>
-            <span className="text-xs font-medium text-text-secondary mb-1.5">{ddCount === 1 ? "active" : "active"}</span>
+            <span className={cn("text-3xl font-bold tracking-tight", ddCount > 0 ? "text-text-main" : "text-text-muted")}>{loading ? "\u2014" : ddCount}</span>
+            <span className="text-xs font-medium text-text-secondary mb-1.5">{ddCount === 1 ? "deal" : "deals"}</span>
           </div>
           {!loading && ddCount > 0 && (
             <span className="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style={{ color: "#003366", background: "#E6EEF5" }}>{pct(ddCount)}%</span>
           )}
         </div>
-        <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden relative z-10">
+        <div className="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
           <div className="bg-primary h-1.5 rounded-full transition-all" style={{ width: `${pct(ddCount)}%` }} />
         </div>
       </button>
@@ -156,8 +155,8 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
         </div>
         <div className="flex items-end justify-between mt-3">
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-bold text-text-main tracking-tight">{loading ? "\u2014" : loiCount}</span>
-            <span className="text-xs font-medium text-text-secondary mb-1.5">Awaiting response</span>
+            <span className={cn("text-3xl font-bold tracking-tight", loiCount > 0 ? "text-text-main" : "text-text-muted")}>{loading ? "\u2014" : loiCount}</span>
+            <span className="text-xs font-medium text-text-secondary mb-1.5">{loiCount === 1 ? "deal" : "deals"}</span>
           </div>
           {!loading && loiCount > 0 && (
             <span className="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style={{ color: "#059669", background: "#ECFDF5" }}>{pct(loiCount)}%</span>
@@ -176,7 +175,7 @@ export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCou
         </div>
         <div className="flex items-end justify-between mt-3">
           <div className="flex items-end gap-2">
-            <span className="text-3xl font-bold text-text-main tracking-tight">
+            <span className={cn("text-3xl font-bold tracking-tight", closedCount > 0 ? "text-text-main" : "text-text-muted")}>
               {loading ? "\u2014" : closedTotal > 0 ? formatCurrency(closedTotal) : closedCount}
             </span>
             <span className="text-xs font-medium text-text-secondary mb-1.5">
@@ -397,15 +396,15 @@ export function PortfolioAllocation({ loading, allocation, gradientParts }: Port
   })();
 
   return (
-    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
-      {/* Header — matches other widget headers */}
-      <div className="p-4 border-b border-border-subtle flex items-center justify-between">
-        <h3 className="font-bold text-text-main text-sm">Portfolio Allocation</h3>
-        <span className="material-symbols-outlined text-text-muted text-[20px]">pie_chart</span>
+    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden p-6 gap-5 group">
+      {/* Header — matches legacy portfolio-widget header (no border-b, just flex row in p-6 card) */}
+      <div className="flex items-center justify-between">
+        <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
+        <span className="material-symbols-outlined text-text-muted">pie_chart</span>
       </div>
 
       {/* Body */}
-      <div className="p-4">
+      <div>
         {loading ? (
           <div className="flex items-center justify-center py-6 text-text-muted text-xs">
             <span className="material-symbols-outlined text-xl animate-spin">sync</span>
@@ -416,25 +415,25 @@ export function PortfolioAllocation({ loading, allocation, gradientParts }: Port
             <p className="text-xs">No deals yet</p>
           </div>
         ) : (
-          <div className="flex items-center gap-4">
-            {/* Donut chart — 112px keeps it well within a grid cell */}
+          <div className="flex items-center gap-6">
+            {/* Donut chart — 112px (size-28 = 7rem) matching legacy */}
             <div
-              className="w-28 h-28 rounded-full shrink-0 shadow-inner"
+              className="size-28 rounded-full shrink-0 shadow-inner"
               style={{
                 background: `conic-gradient(${gradientParts.join(", ")})`,
-                mask: "radial-gradient(circle at center, transparent 38%, black 39%)",
-                WebkitMask: "radial-gradient(circle at center, transparent 38%, black 39%)",
+                mask: "radial-gradient(circle at center, transparent 40%, black 41%)",
+                WebkitMask: "radial-gradient(circle at center, transparent 40%, black 41%)",
               }}
             />
             {/* Legend */}
-            <div className="flex flex-col gap-2 flex-1 min-w-0">
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
               {displayItems.map((item) => (
-                <div key={item.label} className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <div className="size-2 rounded-sm shrink-0" style={{ background: item.color }} />
-                    <span className="text-[11px] text-text-secondary font-medium truncate">{item.label}</span>
+                <div key={item.label} className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="size-2.5 rounded-sm shadow-sm shrink-0" style={{ background: item.color }} />
+                    <span className="text-text-secondary font-medium truncate">{item.label}</span>
                   </div>
-                  <span className="text-[11px] text-text-main font-bold shrink-0">{item.pct}%</span>
+                  <span className="text-text-main font-bold shrink-0">{item.pct}%</span>
                 </div>
               ))}
             </div>

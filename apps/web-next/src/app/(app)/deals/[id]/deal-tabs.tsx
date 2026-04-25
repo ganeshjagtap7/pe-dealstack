@@ -239,6 +239,7 @@ export function ChatTab({
   const [showSettings, setShowSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; status: "uploading" | "done" | "error" }>>([]);
+  const [textareaFocused, setTextareaFocused] = useState(false);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -443,6 +444,8 @@ export function ChatTab({
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onFocus={() => setTextareaFocused(true)}
+              onBlur={() => setTextareaFocused(false)}
               className="w-full bg-transparent border-none text-text-main placeholder:text-text-muted px-4 py-3 pr-24 focus:ring-0 resize-none min-h-[50px] max-h-32 text-sm leading-relaxed"
               placeholder="Ask about the deal, financials, or risks..."
               rows={1}
@@ -455,13 +458,15 @@ export function ChatTab({
                 accept=".pdf,.xlsx,.xls,.csv,.doc,.docx,.txt"
                 onChange={handleFileAttach}
               />
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="p-1.5 text-text-muted hover:text-primary hover:bg-primary-light rounded-lg transition-colors"
-                title="Attach File"
-              >
-                <span className="material-symbols-outlined text-[20px]">attach_file</span>
-              </button>
+              {(textareaFocused || attachedFiles.length > 0) && (
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="p-1.5 text-text-muted hover:text-primary hover:bg-primary-light rounded-lg transition-colors"
+                  title="Attach File"
+                >
+                  <span className="material-symbols-outlined text-[20px]">attach_file</span>
+                </button>
+              )}
               <button
                 onClick={onSend}
                 disabled={!chatInput.trim() || chatSending}

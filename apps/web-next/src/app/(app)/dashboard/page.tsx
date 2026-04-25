@@ -181,7 +181,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min items-start">
 
           {/* Active Priorities Table — full-width hero row */}
-          <div className="col-span-full flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
+          <div className="col-span-full flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
             <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
               <h3 className="font-bold text-text-main text-base">Active Priorities</h3>
               <div className="flex gap-2">
@@ -354,26 +354,6 @@ export default function DashboardPage() {
                 <p className="text-xs text-text-muted">Click &quot;Scan Signals&quot; to analyze your portfolio for risks, opportunities, and actionable deal signals using AI.</p>
               </div>
             )}
-          </div>
-
-          {/* AI Market Sentiment — Coming Soon */}
-          <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
-            <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
-              <div className="flex items-center gap-2">
-                <div className="p-1.5 rounded border" style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}>
-                  <span className="material-symbols-outlined text-[20px] block" style={{ color: "#003366" }}>psychology</span>
-                </div>
-                <h3 className="font-bold text-text-main text-base">AI Market Sentiment</h3>
-              </div>
-              <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border" style={{ color: "#003366", background: "#EFF6FF", borderColor: "#BFDBFE" }}>Coming Soon</span>
-            </div>
-            <div className="flex flex-col items-center justify-center py-10 px-6 text-center flex-1">
-              <span className="material-symbols-outlined text-4xl mb-3" style={{ color: "#BFDBFE" }}>auto_awesome</span>
-              <p className="text-sm font-semibold text-text-main mb-1">AI Market Sentiment</p>
-              <p className="text-xs text-text-muted leading-relaxed max-w-xs">
-                Real-time AI-powered market sentiment analysis for your deal flow is coming soon.
-              </p>
-            </div>
           </div>
 
         </div>{/* /dashboard-widget-grid */}
