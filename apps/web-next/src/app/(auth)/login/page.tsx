@@ -141,12 +141,12 @@ export default function LoginPage() {
   return (
     <div className="flex h-screen w-full overflow-hidden">
       {/* Left Panel — Branding */}
-      <div className="hidden lg:flex w-1/2 relative flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: "#000000" }}>
+      <div className="hidden lg:flex w-1/2 relative flex-col items-center justify-center overflow-hidden" style={{ backgroundColor: "#0f1c2e" }}>
         <div
           className="absolute inset-0 z-0 opacity-20"
           style={{ backgroundImage: "radial-gradient(#ffffff 0.5px, transparent 0.5px)", backgroundSize: "24px 24px" }}
         />
-        <div className="absolute inset-0 bg-gradient-to-tr from-[#000000] via-transparent to-white/10 z-0" />
+        <div className="absolute inset-0 bg-gradient-to-tr from-[#0f1c2e] via-transparent to-white/10 z-0" />
 
         <div className="relative z-10 flex flex-col w-full max-w-2xl mx-auto px-12 py-16">
           {/* Header */}
