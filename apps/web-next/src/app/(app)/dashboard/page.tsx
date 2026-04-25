@@ -13,7 +13,6 @@ import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist
 import {
   Deal,
   Task,
-  MarketSentiment,
   SOURCING_STAGES,
   DD_STAGES,
   LOI_STAGES,
@@ -21,7 +20,6 @@ import {
   SECTOR_COLORS,
   getGreeting,
   StatCards,
-  MarketSentimentCard,
   StageDetailModal,
   fmtNextAction,
   PortfolioAllocation,
@@ -43,9 +41,6 @@ export default function DashboardPage() {
   const [signalResult, setSignalResult] = useState<{ signals?: Array<{ title: string; description: string; severity: string; signalType: string; dealName: string; suggestedAction: string }>; processedCount?: number } | null>(null);
   const [stageModal, setStageModal] = useState<{ label: string; stages: string[] } | null>(null);
   const [tasksModalOpen, setTasksModalOpen] = useState(false);
-  const [sentiment, setSentiment] = useState<MarketSentiment | null>(null);
-  const [sentimentLoading, setSentimentLoading] = useState(true);
-  const [sentimentError, setSentimentError] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [layoutEditing, setLayoutEditing] = useState(false);
   const [dragging, setDragging] = useState<WidgetId | null>(null);
@@ -85,18 +80,6 @@ export default function DashboardPage() {
       } finally { setLoading(false); }
     }
     load();
-
-    (async () => {
-      try {
-        const data = await api.get<MarketSentiment>("/ai/market-sentiment");
-        setSentiment(data);
-      } catch (err) {
-        console.warn("[dashboard] market-sentiment failed:", err);
-        setSentimentError(true);
-      } finally {
-        setSentimentLoading(false);
-      }
-    })();
   }, []);
 
   // Esc exits layout edit mode — mirrors onKeyDown in layout-editor.js
@@ -373,8 +356,25 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* AI Market Sentiment */}
-          <MarketSentimentCard sentiment={sentiment} sentimentLoading={sentimentLoading} sentimentError={sentimentError} />
+          {/* AI Market Sentiment — Coming Soon */}
+          <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden">
+            <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded border" style={{ background: "#EFF6FF", borderColor: "#BFDBFE" }}>
+                  <span className="material-symbols-outlined text-[20px] block" style={{ color: "#003366" }}>psychology</span>
+                </div>
+                <h3 className="font-bold text-text-main text-base">AI Market Sentiment</h3>
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border" style={{ color: "#003366", background: "#EFF6FF", borderColor: "#BFDBFE" }}>Coming Soon</span>
+            </div>
+            <div className="flex flex-col items-center justify-center py-10 px-6 text-center flex-1">
+              <span className="material-symbols-outlined text-4xl mb-3" style={{ color: "#BFDBFE" }}>auto_awesome</span>
+              <p className="text-sm font-semibold text-text-main mb-1">AI Market Sentiment</p>
+              <p className="text-xs text-text-muted leading-relaxed max-w-xs">
+                Real-time AI-powered market sentiment analysis for your deal flow is coming soon.
+              </p>
+            </div>
+          </div>
 
         </div>{/* /dashboard-widget-grid */}
 

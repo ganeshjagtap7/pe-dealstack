@@ -379,44 +379,68 @@ interface PortfolioAllocationProps {
 }
 
 export function PortfolioAllocation({ loading, allocation, gradientParts }: PortfolioAllocationProps) {
+  // Cap display to top 5 items; group the rest as "Others"
+  const displayItems: AllocationItem[] = (() => {
+    if (allocation.length <= 5) return allocation;
+    const top = allocation.slice(0, 4);
+    const othersCount = allocation.slice(4).reduce((s, a) => s + a.count, 0);
+    const othersTotal = allocation.reduce((s, a) => s + a.count, 0);
+    return [
+      ...top,
+      {
+        label: "Others",
+        count: othersCount,
+        pct: othersTotal > 0 ? Math.round((othersCount / othersTotal) * 100) : 0,
+        color: SECTOR_COLORS[SECTOR_COLORS.length - 1],
+      },
+    ];
+  })();
+
   return (
-    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card p-6 gap-5 group">
-      <div className="flex items-center justify-between">
-        <h3 className="font-bold text-text-main">Portfolio Allocation</h3>
-        <span className="material-symbols-outlined text-text-muted">pie_chart</span>
+    <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
+      {/* Header — matches other widget headers */}
+      <div className="p-4 border-b border-border-subtle flex items-center justify-between">
+        <h3 className="font-bold text-text-main text-sm">Portfolio Allocation</h3>
+        <span className="material-symbols-outlined text-text-muted text-[20px]">pie_chart</span>
       </div>
-      {loading ? (
-        <div className="flex items-center justify-center py-4 text-text-muted text-xs">
-          <span className="material-symbols-outlined text-xl animate-spin">sync</span>
-        </div>
-      ) : allocation.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-4 text-text-muted">
-          <span className="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span>
-          <p className="text-xs">No deals yet</p>
-        </div>
-      ) : (
-        <div className="flex items-center gap-6 min-h-[9rem]">
-          <div
-            className="w-36 h-36 rounded-full shrink-0 shadow-inner"
-            style={{
-              background: `conic-gradient(${gradientParts.join(", ")})`,
-              mask: "radial-gradient(circle at center, transparent 40%, black 41%)",
-              WebkitMask: "radial-gradient(circle at center, transparent 40%, black 41%)",
-            }}
-          />
-          <div className="flex flex-col gap-3 flex-1">
-            {allocation.map((item) => (
-              <div key={item.label} className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="size-2.5 rounded-sm shadow-sm shrink-0" style={{ background: item.color }} />
-                  <span className="text-text-secondary font-medium truncate">{item.label}</span>
-                </div>
-                <span className="text-text-main font-bold ml-2">{item.pct}%</span>
-              </div>
-            ))}
+
+      {/* Body */}
+      <div className="p-4">
+        {loading ? (
+          <div className="flex items-center justify-center py-6 text-text-muted text-xs">
+            <span className="material-symbols-outlined text-xl animate-spin">sync</span>
           </div>
-        </div>
-      )}
+        ) : allocation.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-6 text-text-muted">
+            <span className="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span>
+            <p className="text-xs">No deals yet</p>
+          </div>
+        ) : (
+          <div className="flex items-center gap-4">
+            {/* Donut chart — 112px keeps it well within a grid cell */}
+            <div
+              className="w-28 h-28 rounded-full shrink-0 shadow-inner"
+              style={{
+                background: `conic-gradient(${gradientParts.join(", ")})`,
+                mask: "radial-gradient(circle at center, transparent 38%, black 39%)",
+                WebkitMask: "radial-gradient(circle at center, transparent 38%, black 39%)",
+              }}
+            />
+            {/* Legend */}
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
+              {displayItems.map((item) => (
+                <div key={item.label} className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <div className="size-2 rounded-sm shrink-0" style={{ background: item.color }} />
+                    <span className="text-[11px] text-text-secondary font-medium truncate">{item.label}</span>
+                  </div>
+                  <span className="text-[11px] text-text-main font-bold shrink-0">{item.pct}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

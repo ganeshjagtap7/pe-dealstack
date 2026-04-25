@@ -314,14 +314,14 @@ export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
           <div className="col-span-full">
             <ResultField
               label="Company Name"
-              value={result.extraction.companyName?.value as string || "N/A"}
+              value={result.extraction.companyName?.value as string || "\u2014"}
               confidence={result.extraction.companyName?.confidence}
               source={result.extraction.companyName?.source}
             />
           </div>
           <ResultField
             label="Industry"
-            value={result.extraction.industry?.value as string || (result.extraction.industry?.confidence === 0 ? "Not Found" : "N/A")}
+            value={result.extraction.industry?.value as string || (result.extraction.industry?.confidence === 0 ? "Not Found" : "\u2014")}
             confidence={result.extraction.industry?.confidence}
             source={result.extraction.industry?.source}
           />
@@ -334,7 +334,7 @@ export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
             label="Revenue"
             value={result.extraction.revenue?.value != null
               ? formatCurrency(result.extraction.revenue.value as number, detectedCurrency)
-              : (result.extraction.revenue?.confidence === 0 ? "Not Found" : "N/A")}
+              : (result.extraction.revenue?.confidence === 0 ? "Not Found" : "\u2014")}
             confidence={result.extraction.revenue?.confidence}
             source={result.extraction.revenue?.source}
           />
@@ -342,7 +342,7 @@ export function ResultDisplay({ result, onReset }: ResultDisplayProps) {
             label="EBITDA"
             value={result.extraction.ebitda?.value != null
               ? formatCurrency(result.extraction.ebitda.value as number, detectedCurrency)
-              : (result.extraction.ebitda?.confidence === 0 ? "Not Found" : "N/A")}
+              : (result.extraction.ebitda?.confidence === 0 ? "Not Found" : "\u2014")}
             confidence={result.extraction.ebitda?.confidence}
             source={result.extraction.ebitda?.source}
           />

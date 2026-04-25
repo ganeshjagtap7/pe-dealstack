@@ -315,29 +315,27 @@ export function DealCard({
         onClick={() => router.push(`/deals/${deal.id}`)}
         onMouseEnter={() => router.prefetch(`/deals/${deal.id}`)}
         className={cn(
-          "bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden",
+          "bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative",
           isPassed && "opacity-70 hover:opacity-100",
           selected && "ring-2 ring-[#003366] border-[#003366]"
         )}
       >
           {/* Header */}
-          <div className="flex justify-between items-start mb-4">
-            <div className="flex gap-3 items-center pl-6">
-              <div className="size-10 rounded-lg bg-primary-light border border-primary/10 flex items-center justify-center text-[#003366]">
-                <span className="material-symbols-outlined text-[20px]">
-                  {deal.icon || "business_center"}
-                </span>
-              </div>
-              <div>
-                <h3 className="text-text-main font-bold text-base leading-tight group-hover/card:text-[#003366] transition-colors truncate max-w-[200px]" title={deal.name}>
-                  {deal.companyName || deal.name}
-                </h3>
-                <p className="text-text-muted text-xs font-medium">
-                  {deal.industry || "N/A"}
-                </p>
-              </div>
+          <div className="flex items-start gap-2 mb-4 pl-6 pr-8 min-w-0">
+            <div className="size-10 rounded-lg bg-primary-light border border-primary/10 flex items-center justify-center text-[#003366] shrink-0">
+              <span className="material-symbols-outlined text-[20px]">
+                {deal.icon || "business_center"}
+              </span>
             </div>
-            <div className="flex items-center gap-1 mr-8 shrink-0">
+            <div className="flex-1 min-w-0">
+              <h3 className="text-text-main font-bold text-base leading-tight group-hover/card:text-[#003366] transition-colors truncate" title={deal.name}>
+                {deal.companyName || deal.name}
+              </h3>
+              <p className="text-text-muted text-xs font-medium truncate">
+                {deal.industry || "\u2014"}
+              </p>
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
               <span
                 className={cn(
                   "px-2 py-1 rounded-md border text-[10px] font-bold uppercase tracking-wider whitespace-nowrap leading-none",
@@ -512,7 +510,7 @@ export function KanbanCard({
               {deal.companyName || deal.name}
             </h4>
             <p className="text-[11px] text-text-muted truncate">
-              {deal.industry || "N/A"}
+              {deal.industry || "\u2014"}
             </p>
           </div>
         </div>

@@ -289,16 +289,22 @@ export function AIAssistant() {
         });
       }
 
-      const aiText =
+      const rawText =
         data.response || data.message || data.reply || data.content ||
         "I received your message but couldn't generate a response.";
+      // Guard against non-string content (API may return an object on error)
+      const aiText = typeof rawText === "string"
+        ? rawText
+        : (rawText as unknown as { message?: string; error?: string })?.message
+          ?? (rawText as unknown as { message?: string; error?: string })?.error
+          ?? JSON.stringify(rawText);
 
       setMessages((prev) => [...prev, { role: "assistant", content: aiText }]);
     } catch (err) {
-      const msg = err instanceof NotFoundError
+      const errContent = err instanceof NotFoundError
         ? "The AI assistant service isn't available yet. Please check back soon."
         : "Sorry, I couldn't connect to the AI service. Please check your connection and try again.";
-      setMessages((prev) => [...prev, { role: "assistant", content: msg }]);
+      setMessages((prev) => [...prev, { role: "assistant", content: errContent }]);
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
@@ -371,7 +377,11 @@ export function AIAssistant() {
                     ...S.msgBase,
                     ...(msg.role === "user" ? S.msgUser : S.msgAssistant),
                   }}
-                  dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                  dangerouslySetInnerHTML={{
+                    __html: renderMarkdown(
+                      typeof msg.content === "string" ? msg.content : JSON.stringify(msg.content)
+                    ),
+                  }}
                 />
               ))}
 

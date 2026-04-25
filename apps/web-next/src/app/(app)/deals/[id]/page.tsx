@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/providers/AuthProvider";
 import { useUser } from "@/providers/UserProvider";
+import { useToast } from "@/providers/ToastProvider";
 import Link from "next/link";
 import { NotificationCenter } from "@/components/layout/NotificationPanel";
 import { HelpSupportModal } from "@/components/layout/Header";
@@ -34,6 +35,7 @@ import {
   FinancialStatusBadge,
 } from "./components";
 import { TerminalStageModal } from "./deal-panels";
+import { useResizablePanel } from "./use-resizable-panel";
 
 // ---------------------------------------------------------------------------
 // Page component
@@ -46,10 +48,23 @@ export default function DealDetailPage() {
   const pathname = usePathname();
   const { user } = useUser();
   const { signOut } = useAuth();
+  const { showToast } = useToast();
   const [linkCopied, setLinkCopied] = useState(false);
   const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Resizable panels (drag divider between deal content and chat)
+  const {
+    containerRef,
+    leftRef,
+    handleRef,
+    leftPanelStyle,
+    isDragging,
+    onMouseDown,
+    onTouchStart,
+    onDoubleClick,
+  } = useResizablePanel();
 
   const [deal, setDeal] = useState<DealDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -314,13 +329,34 @@ export default function DealDetailPage() {
     setChatSending(true);
 
     try {
-      const data = await api.post<{ response: string; model?: string }>(
+      const data = await api.post<{
+        response: string;
+        model?: string;
+        updates?: Array<{ field: string; value: unknown }>;
+        sideEffects?: Array<{
+          type: "note_added" | "extraction_triggered" | "scroll_to";
+          section?: string;
+          message?: string;
+        }>;
+      }>(
         `/deals/${dealId}/chat`,
         { message: trimmed }
       );
       const responseText =
         data.response || (data as unknown as { content?: string }).content || "";
-      if (responseText) {
+
+      // Show error-styled message if agent returned an error model
+      if ((data as unknown as { model?: string }).model === "error") {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            role: "assistant",
+            content: `\u26A0\uFE0F ${responseText}`,
+            createdAt: new Date().toISOString(),
+          },
+        ]);
+      } else if (responseText) {
         setMessages((prev) => [
           ...prev,
           {
@@ -330,6 +366,39 @@ export default function DealDetailPage() {
             createdAt: new Date().toISOString(),
           },
         ]);
+      }
+
+      // If there were deal-field updates, refresh the deal data
+      if (data.updates && data.updates.length > 0) {
+        showToast("Changes have been applied", "success", { title: "Deal Updated" });
+        try { await loadDeal(); } catch { /* ignore */ }
+      }
+
+      // Handle side effects (notes, extraction, scroll)
+      if (data.sideEffects && data.sideEffects.length > 0) {
+        for (const effect of data.sideEffects) {
+          if (effect.type === "note_added") {
+            showToast("Activity feed updated", "success", { title: "Note Added" });
+            try { await loadDeal(); } catch { /* ignore */ }
+          }
+          if (effect.type === "extraction_triggered") {
+            showToast(effect.message || "Financial extraction queued", "info", { title: "Extraction" });
+          }
+          if (effect.type === "scroll_to") {
+            const sectionMap: Record<string, string> = {
+              financials: "financials-section",
+              analysis: "analysis-section",
+              activity: "activity-feed",
+              documents: "documents-list",
+              risks: "key-risks-list",
+            };
+            const elId = effect.section ? sectionMap[effect.section] : undefined;
+            const el = elId ? document.getElementById(elId) : null;
+            if (el) {
+              el.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          }
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Something went wrong";
@@ -348,7 +417,7 @@ export default function DealDetailPage() {
     } finally {
       setChatSending(false);
     }
-  }, [dealId, chatSending]);
+  }, [dealId, chatSending, showToast, loadDeal]);
 
   const sendMessage = async () => {
     const text = chatInput.trim();
@@ -551,9 +620,13 @@ export default function DealDetailPage() {
       </header>
 
       {/* TWO-COLUMN LAYOUT — below header */}
-      <div className="flex flex-1 overflow-hidden">
+      <div ref={containerRef} className="flex flex-1 overflow-hidden">
       {/* LEFT PANEL — deal content, scrolls independently */}
-      <section className="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar">
+      <section
+        ref={leftRef}
+        className="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar"
+        style={leftPanelStyle}
+      >
 
         {/* Deal content */}
         <div className="flex flex-col gap-3">
@@ -654,8 +727,31 @@ export default function DealDetailPage() {
         </div>
       </section>
 
+      {/* RESIZE HANDLE — draggable divider between panels */}
+      <div
+        ref={handleRef}
+        onMouseDown={onMouseDown}
+        onTouchStart={onTouchStart}
+        onDoubleClick={onDoubleClick}
+        className={cn(
+          "hidden lg:flex w-1.5 cursor-col-resize flex-shrink-0 relative items-center justify-center z-10 transition-colors",
+          isDragging
+            ? "bg-[rgba(0,51,102,0.15)]"
+            : "hover:bg-primary/20 active:bg-primary/40",
+        )}
+        title="Drag to resize (double-click to reset)"
+      >
+        {/* Wider invisible hit area for easier grabbing */}
+        <div className="absolute inset-y-0 -left-2 -right-2" />
+        {/* Visual grip indicator */}
+        <div className={cn(
+          "w-0.5 h-8 rounded-full transition-colors",
+          isDragging ? "bg-primary/50 opacity-100" : "bg-gray-300 opacity-0 hover:opacity-100",
+        )} />
+      </div>
+
       {/* RIGHT PANEL — AI Chat (desktop only, fills remaining space) */}
-      <section className="hidden lg:flex flex-1 flex-col bg-background-body border-l border-border-subtle/60 shadow-inner relative">
+      <section className="hidden lg:flex flex-1 flex-col bg-background-body border-l border-border-subtle/60 shadow-inner relative" style={{ minWidth: 300 }}>
         <ChatTab
           deal={deal}
           messages={messages}

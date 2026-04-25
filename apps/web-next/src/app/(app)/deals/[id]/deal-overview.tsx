@@ -7,7 +7,7 @@ import { api } from "@/lib/api";
 import type { DealDetail, Activity, DocItem } from "./components";
 
 // ---------------------------------------------------------------------------
-// Overview Tab — always-visible left-panel content (Key Risks, AI Thesis,
+// Overview Tab — always-visible left-panel content (Key Risks,
 // Add Note, Activity Feed, Recent Documents).
 // Ported from deal.html left-panel + deal-activity.js + deal-stages.js
 // ---------------------------------------------------------------------------
@@ -29,30 +29,6 @@ export function OverviewTab({
   return (
     <div className="flex flex-col gap-3">
       <KeyRisksSection risks={risks} highlights={highlights} />
-
-      {/* AI Thesis */}
-      <div className="rounded-xl p-5" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
-        <div className="flex items-center gap-2 mb-3">
-          <span className="material-symbols-outlined text-[20px] text-primary">auto_awesome</span>
-          <h3 className="text-sm font-semibold text-text-main">AI Investment Thesis</h3>
-        </div>
-        {deal.aiThesis ? (
-          <p className="text-sm text-text-secondary leading-relaxed">{deal.aiThesis}</p>
-        ) : (
-          <p className="text-sm text-text-muted italic">
-            No AI thesis generated yet. Upload documents and use the chat to analyze this deal.
-          </p>
-        )}
-      </div>
-
-      {deal.description && (
-        <div className="rounded-xl p-5" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
-          <h3 className="text-sm font-semibold text-text-main mb-3">Description</h3>
-          <p className="text-sm text-text-secondary leading-relaxed whitespace-pre-line">
-            {deal.description}
-          </p>
-        </div>
-      )}
 
       <AddNoteSection dealId={deal.id} onNoteAdded={onRefreshActivities} />
 

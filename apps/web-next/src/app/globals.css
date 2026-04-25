@@ -438,14 +438,16 @@ a.nav-item:active,
 /* -- Card hover lift --------------------------------------- */
 .contact-card article,
 .widget-container,
-[data-deal-id] > a > article {
+[data-deal-id] > a > article,
+[data-deal-id] > article {
   transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
               box-shadow 0.2s ease,
               border-color 0.2s ease;
 }
 
 .contact-card article:hover,
-[data-deal-id] > a > article:hover {
+[data-deal-id] > a > article:hover,
+[data-deal-id] > article:hover {
   transform: translateY(-2px);
 }
 
@@ -487,6 +489,15 @@ select:focus-visible {
   outline: 2px solid #003366;
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* -- Hide scrollbars globally -- scroll still works ------- */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
 }
 
 /* -- Smooth scrollbar for all custom-scrollbar areas ------- */

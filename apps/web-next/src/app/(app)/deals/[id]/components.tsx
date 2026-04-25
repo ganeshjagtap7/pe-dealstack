@@ -97,7 +97,7 @@ export const PIPELINE_STAGES = [
   { key: "INITIAL_REVIEW", label: "Initial Review", icon: "search" },
   { key: "DUE_DILIGENCE", label: "Due Diligence", icon: "fact_check" },
   { key: "IOI_SUBMITTED", label: "IOI Submitted", icon: "description" },
-  { key: "LOI_SUBMITTED", label: "LOI Submitted", icon: "task_alt" },
+  { key: "LOI_SUBMITTED", label: "LOI Submitted", icon: "verified" },
   { key: "NEGOTIATION", label: "Negotiation", icon: "handshake" },
   { key: "CLOSING", label: "Closing", icon: "gavel" },
 ];

@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/cn";
 import { formatCurrency, formatRelativeTime } from "@/lib/formatters";
-import Link from "next/link";
 import { STAGE_LABELS } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { type DealDetail, type TeamMember, PIPELINE_STAGES, TERMINAL_STAGES } from "./components";
@@ -74,16 +73,16 @@ export function StagePipeline({
                 {index === 0 && <div className="flex-1" />}
                 <div
                   className={cn(
-                    "size-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
+                    "size-8 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 group-hover:scale-110",
                     isPast && "bg-secondary text-white",
-                    isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-sm",
+                    isCurrent && "bg-primary text-white ring-2 ring-primary/30 shadow-lg",
                     isFuture && !isCurrent && "bg-gray-100 text-gray-400"
                   )}
                 >
                   {isPast ? (
-                    <span className="material-symbols-outlined text-[11px]">check</span>
+                    <span className="material-symbols-outlined text-sm">check</span>
                   ) : (
-                    <span className="material-symbols-outlined text-[11px]">{stage.icon}</span>
+                    <span className="material-symbols-outlined text-sm">{stage.icon}</span>
                   )}
                 </div>
                 {index < PIPELINE_STAGES.length - 1 ? (
@@ -99,7 +98,7 @@ export function StagePipeline({
               </div>
               <span
                 className={cn(
-                  "text-[9px] mt-1 text-center leading-tight whitespace-nowrap",
+                  "text-[10px] mt-1.5 text-center leading-tight whitespace-nowrap",
                   isPast && "text-secondary font-medium",
                   isCurrent && "text-primary font-bold",
                   isFuture && !isCurrent && "text-gray-400"
@@ -148,49 +147,36 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
   const analyst = deal.team?.find((m) => m.role === "MEMBER") ?? deal.team?.find((m) => m.role !== "LEAD") ?? deal.team?.[0];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 rounded-xl bg-background-body border border-border-subtle">
+    <div className="grid grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
       <div>
-        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">
           Lead Partner
         </p>
-        <div className="flex items-center gap-2">
-          {leadPartner ? (
-            <>
-              <div className="size-5 rounded-full bg-primary border border-primary/20 flex items-center justify-center text-[10px] font-bold text-white">
-                {leadPartner.name?.[0]?.toUpperCase() || "?"}
-              </div>
-              <span className="text-sm text-text-main font-medium">{leadPartner.name}</span>
-            </>
-          ) : (
-            <span className="text-sm text-gray-400 italic">Not assigned</span>
-          )}
-        </div>
+        <span className={leadPartner ? "text-[13px] text-text-main font-semibold" : "text-[13px] text-text-muted font-normal italic"}>
+          {leadPartner?.name || "Not assigned"}
+        </span>
       </div>
       <div>
-        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">
           Analyst
         </p>
-        <div className="flex items-center gap-2">
-          {analyst ? (
-            <span className="text-sm text-text-main font-medium">{analyst.name}</span>
-          ) : (
-            <span className="text-sm text-gray-400">&mdash;</span>
-          )}
-        </div>
+        <span className={analyst ? "text-[13px] text-text-main font-semibold" : "text-[13px] text-text-muted font-normal italic"}>
+          {analyst?.name || "Not assigned"}
+        </span>
       </div>
       <div>
-        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">
           Deal Source
         </p>
-        <span className="text-sm text-text-main font-medium">
+        <span className="text-[13px] text-text-main font-semibold">
           {deal.source || "Proprietary"}
         </span>
       </div>
       <div>
-        <p className="text-[10px] text-gray-400 font-medium uppercase tracking-wider mb-0.5">
+        <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">
           Last Updated
         </p>
-        <span className="text-sm text-text-main font-medium">
+        <span className="text-[13px] text-text-muted font-medium">
           {formatRelativeTime(deal.updatedAt)}
         </span>
       </div>
@@ -219,7 +205,7 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
       key: "ebitdaMargin",
       label: "EBITDA Margin",
       value: hasMarginData ? deal.ebitda : null,
-      formatted: hasMarginData ? ((deal.ebitda! / deal.revenue!) * 100).toFixed(0) + "%" : "N/A",
+      formatted: hasMarginData ? ((deal.ebitda! / deal.revenue!) * 100).toFixed(0) + "%" : "\u2014",
     },
     {
       key: "ebitda",
@@ -238,7 +224,7 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
       key: "irr",
       label: "Projected IRR",
       value: deal.irrProjected,
-      formatted: deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "N/A",
+      formatted: deal.irrProjected != null ? deal.irrProjected.toFixed(1) + "%" : "\u2014",
       badge: "Target",
       extra: deal.mom != null ? `MoM: ${deal.mom.toFixed(1)}x` : undefined,
     },
@@ -246,7 +232,7 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
       key: "mom",
       label: "Money Multiple",
       value: deal.mom,
-      formatted: deal.mom != null ? deal.mom.toFixed(1) + "x" : "N/A",
+      formatted: deal.mom != null ? deal.mom.toFixed(1) + "x" : "\u2014",
     },
   ];
 
@@ -282,9 +268,9 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
           className="rounded-xl p-4 relative overflow-hidden group flex flex-col"
           style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}
         >
-          <p className="text-[10px] text-text-muted font-bold uppercase tracking-wide">{m.label}</p>
-          <div className="flex items-center gap-1.5 mt-2">
-            <span className="text-2xl font-bold text-text-main leading-none">{m.formatted}</span>
+          <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">{m.label}</p>
+          <div className="flex items-baseline gap-2 mt-2">
+            <span className="text-xl font-bold text-text-main leading-none tabular-nums">{m.formatted}</span>
             {m.badge && (
               <span className="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded">
                 {m.badge}

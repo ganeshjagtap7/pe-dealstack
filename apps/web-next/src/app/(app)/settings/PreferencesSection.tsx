@@ -115,7 +115,8 @@ export function PreferencesSection({ prefs, onChange }: Props) {
         </div>
       </section>
 
-      {/* Display Preferences */}
+      {/* Display Preferences — hidden until density/theme features are implemented */}
+      {false && (
       <section
         id="section-display"
         className="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden scroll-mt-6"
@@ -178,6 +179,7 @@ export function PreferencesSection({ prefs, onChange }: Props) {
           </div>
         </div>
       </section>
+      )}
 
       {/* Add Sector Modal */}
       {sectorModalOpen && (

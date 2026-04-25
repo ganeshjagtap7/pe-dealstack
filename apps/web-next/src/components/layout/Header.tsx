@@ -27,6 +27,7 @@ export function Header() {
 
   const showDealActions = pathname === "/deals";
   const isDealDetailPage = /^\/deals\/[^/]+$/.test(pathname);
+  const isDataRoomPage = pathname === "/data-room" || /^\/data-room\/[^/]/.test(pathname);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -51,18 +52,28 @@ export function Header() {
 
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "";
 
-  // Deal detail pages render their own full-width header that already includes
-  // breadcrumbs, team avatars, actions, notification bell, and user menu.
+  // Deal detail pages and data-room pages render their own full-width header
+  // that already includes breadcrumbs, actions, and user menu.
   // Returning null here avoids the double-header effect.
-  if (isDealDetailPage) return null;
+  if (isDealDetailPage || isDataRoomPage) return null;
 
   return (
     <header className="flex h-16 shrink-0 items-center justify-between border-b border-border-subtle px-4 md:px-6 bg-surface-card z-40 sticky top-0 min-w-0">
       <div className="flex items-center gap-4 flex-1">
+        {/* Breadcrumb nav — shown on pages that have a known parent context */}
+        {pathname === "/deals" && (
+          <nav className="hidden md:flex items-center gap-1.5 text-sm mr-4 shrink-0">
+            <Link href="/dashboard" className="text-text-muted hover:text-primary transition-colors">
+              Dashboard
+            </Link>
+            <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
+            <span className="text-text-main font-medium">Deals</span>
+          </nav>
+        )}
         <button
           type="button"
           onClick={() => setSearchOpen(true)}
-          className={`relative w-full max-w-lg items-center rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-muted cursor-pointer hover:border-primary/40 transition-all shadow-sm text-left ${isDealDetailPage ? "hidden" : "hidden md:flex"}`}
+          className="relative w-full max-w-lg items-center rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-muted cursor-pointer hover:border-primary/40 transition-all shadow-sm text-left hidden md:flex"
         >
           <div className="absolute inset-y-0 left-0 flex items-center pl-3">
             <span className="material-symbols-outlined text-text-muted text-[20px]">
@@ -74,7 +85,7 @@ export function Header() {
             <kbd className="px-1.5 py-0.5 text-[10px] font-bold text-gray-400 bg-gray-100 rounded border border-gray-200">
               &#8984;K
             </kbd>
-            <span className="material-symbols-outlined text-[18px] text-primary">auto_awesome</span>
+            <span className="material-symbols-outlined text-[18px] text-text-muted">auto_awesome</span>
           </div>
         </button>
       </div>

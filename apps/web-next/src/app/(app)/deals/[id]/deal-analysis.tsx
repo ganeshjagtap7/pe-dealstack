@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { api } from "@/lib/api";
+import { api, NotFoundError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
   type AnalysisTab,
@@ -30,11 +30,16 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
   const [insights, setInsights] = useState<InsightsData | null>(null);
   const [crossDoc, setCrossDoc] = useState<CrossDocData | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
+  // "error" = real server/network failure (5xx, network, etc). Never set for 404.
   const [error, setError] = useState(false);
+  // "noData" = all endpoints returned 404 — analysis not generated yet.
+  // The section renders with an empty state (not an error) in this case.
+  const [noData, setNoData] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
     setError(false);
+    setNoData(false);
     try {
       const [insightsRes, crossDocRes, benchmarkRes] = await Promise.allSettled([
         api.get<InsightsData>(`/deals/${dealId}/financials/insights`),
@@ -46,13 +51,20 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
       if (crossDocRes.status === "fulfilled") setCrossDoc(crossDocRes.value);
       if (benchmarkRes.status === "fulfilled") setBenchmark(benchmarkRes.value);
 
-      // If all three failed, mark as error
-      if (
+      const allRejected =
         insightsRes.status === "rejected" &&
         crossDocRes.status === "rejected" &&
-        benchmarkRes.status === "rejected"
-      ) {
-        setError(true);
+        benchmarkRes.status === "rejected";
+
+      if (allRejected) {
+        // 404 on every endpoint means no analysis has been generated yet.
+        // Treat as an empty state (not a real error — no retry needed).
+        const is404 = (r: PromiseRejectedResult) => r.reason instanceof NotFoundError;
+        if (is404(insightsRes) && is404(crossDocRes) && is404(benchmarkRes)) {
+          setNoData(true);
+        } else {
+          setError(true);
+        }
       }
     } catch {
       setError(true);
@@ -65,9 +77,11 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
     loadData();
   }, [loadData]);
 
-  // Hide section entirely if no data came back
+  // Hide section when fully loaded and there is real data (hasData flag) on none
+  // of the endpoints AND it wasn't a hard error. This handles the case where the
+  // API returns 200 but with hasData=false (analysis exists but no results yet).
   const hasAnyData = insights?.hasData || crossDoc?.hasData || benchmark?.hasData;
-  if (!loading && !hasAnyData && !error) return null;
+  if (!loading && !hasAnyData && !error && !noData) return null;
 
   return (
     <div
@@ -80,7 +94,7 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
         flexShrink: 0,
       }}
     >
-      {/* Gradient header */}
+      {/* Gradient header / collapsible toggle */}
       <button
         onClick={() => setCollapsed((p) => !p)}
         className="w-full flex items-center justify-between gap-2.5 cursor-pointer"
@@ -116,6 +130,8 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
             <LoadingState />
           ) : error ? (
             <ErrorState onRetry={loadData} />
+          ) : noData ? (
+            <NoDataState />
           ) : (
             <>
               {/* Tab bar */}
@@ -181,7 +197,7 @@ function QoEBadge({ score }: { score: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Loading / Error states
+// Loading / Error / No-data states
 // ---------------------------------------------------------------------------
 
 function LoadingState() {
@@ -195,13 +211,25 @@ function LoadingState() {
   );
 }
 
-function ErrorState({ onRetry }: { onRetry: () => void }) {
+function NoDataState() {
   return (
     <div className="text-center py-10">
       <span className="material-symbols-outlined text-4xl text-gray-300 block mb-2">analytics</span>
-      <p className="text-sm font-semibold text-gray-500 mb-1">No Analysis Available</p>
+      <p className="text-sm font-semibold text-gray-500 mb-1">No analysis data available yet</p>
+      <p className="text-xs text-gray-400 leading-relaxed max-w-xs mx-auto">
+        Upload financial documents and extract data to generate AI-powered analysis.
+      </p>
+    </div>
+  );
+}
+
+function ErrorState({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="text-center py-10">
+      <span className="material-symbols-outlined text-4xl text-red-300 block mb-2">error_outline</span>
+      <p className="text-sm font-semibold text-gray-500 mb-1">Failed to load analysis</p>
       <p className="text-xs text-gray-400 mb-4">
-        Upload financial documents and extract data to generate AI analysis.
+        Something went wrong loading the financial analysis. Please try again.
       </p>
       <button
         onClick={onRetry}

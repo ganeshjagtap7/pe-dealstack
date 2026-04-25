@@ -184,10 +184,19 @@ export default function DataRoomOverviewPage() {
         </div>
       )}
 
-      <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
-        <div>
-          <h1 className="text-lg font-bold text-slate-900">All Data Rooms</h1>
-          <p className="text-sm text-slate-500">{deals.length} active deals</p>
+      <header className="flex h-16 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
+        <div className="flex flex-col gap-0.5">
+          <nav className="flex items-center gap-1 text-xs text-slate-400">
+            <Link href="/dashboard" className="hover:text-slate-600 transition-colors">
+              Dashboard
+            </Link>
+            <span className="material-symbols-outlined text-[12px]">chevron_right</span>
+            <span className="text-slate-600 font-medium">Data Room</span>
+          </nav>
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-slate-900">All Data Rooms</h1>
+            <span className="text-sm text-slate-400">{deals.length} active deals</span>
+          </div>
         </div>
         <button
           type="button"

@@ -68,7 +68,7 @@ export function formatNumber(value: number | null | undefined, decimals = 1): st
 }
 
 export function formatRelativeTime(dateString: string | null | undefined): string {
-  if (!dateString) return "N/A";
+  if (!dateString) return "\u2014";
   const date = new Date(dateString);
   const now = new Date();
   const diff = now.getTime() - date.getTime();
@@ -87,7 +87,7 @@ export function formatRelativeTime(dateString: string | null | undefined): strin
 }
 
 export function formatFileSize(bytes: number | null | undefined): string {
-  if (!bytes) return "N/A";
+  if (!bytes) return "\u2014";
   if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + " MB";
   if (bytes >= 1024) return (bytes / 1024).toFixed(0) + " KB";
   return bytes + " B";
