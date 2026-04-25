@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { api } from "@/lib/api";
+import { api, NotFoundError } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -68,8 +68,12 @@ export default function MemoBuilderPage() {
       if (statusFilter !== "ALL") params.set("status", statusFilter);
       const data = await api.get<Memo[]>(`/memos${params.toString() ? "?" + params : ""}`);
       setMemos(Array.isArray(data) ? data : []);
-    } catch {
-      // API may not be available
+    } catch (err) {
+      // 404 means the endpoint isn't deployed yet — show empty state silently.
+      // Other errors are also swallowed here; the page degrades to an empty list.
+      if (!(err instanceof NotFoundError)) {
+        // Non-404 errors are unexpected but we still fail gracefully.
+      }
       setMemos([]);
     } finally {
       setLoadingList(false);
@@ -122,7 +126,12 @@ export default function MemoBuilderPage() {
         ]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load memo");
+      // 404: endpoint not yet deployed — clear selection and return to list.
+      if (err instanceof NotFoundError) {
+        setSelectedMemo(null);
+      } else {
+        setError(err instanceof Error ? err.message : "Failed to load memo");
+      }
     } finally {
       setLoadingMemo(false);
     }
@@ -391,10 +400,13 @@ export default function MemoBuilderPage() {
           setSuccessToast("Section removed.");
         }
       }
-    } catch {
+    } catch (err) {
+      const msg = err instanceof NotFoundError
+        ? "The AI assistant service isn't available for this memo yet."
+        : "Sorry, I encountered an error. Please try again.";
       setMessages((prev) => [
         ...prev,
-        { id: "err-" + Date.now(), role: "assistant", content: "Sorry, I encountered an error. Please try again.", timestamp: "Now" },
+        { id: "err-" + Date.now(), role: "assistant", content: msg, timestamp: "Now" },
       ]);
     } finally {
       setSendingChat(false);

@@ -207,8 +207,7 @@ export function DeleteConfirmModal({ onConfirm, onCancel }: { onConfirm: () => v
 // ─── Insight Cards ─────────────────────────────────────────
 
 // Sections hidden for now: Needs Attention, Recent Activity, Possible Duplicates, Network Stats
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function InsightCards({ totalContacts: _totalContacts }: { totalContacts: number }) {
+export function InsightCards(_props: { totalContacts: number }) {
   return null;
 }
 
