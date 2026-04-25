@@ -35,7 +35,7 @@ const ExtractionOutputSchema = z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
     source: z.string().nullable(),
-  }).describe('Annual revenue in millions (in the original document currency)'),
+  }).describe('Annual revenue in millions (in the original document currency). If only MRR (monthly recurring revenue) is given, multiply by 12 to get annual. If only ARR is given, use that directly. Always return the annualized figure.'),
   ebitda: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),

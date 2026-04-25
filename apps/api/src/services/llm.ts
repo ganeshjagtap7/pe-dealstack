@@ -36,7 +36,7 @@ const MODELS = {
   openai: {
     chat: process.env.LLM_CHAT_MODEL || 'gpt-4o',
     fast: process.env.LLM_FAST_MODEL || 'gpt-4o-mini',
-    extraction: 'gpt-4-turbo',
+    extraction: 'gpt-4o',
   },
   gemini: {
     chat: 'gemini-1.5-pro',
