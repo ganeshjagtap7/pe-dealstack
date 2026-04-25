@@ -5,7 +5,8 @@ import { api, NotFoundError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
   type AnalysisTab,
-  type InsightsData,
+  type AnalysisData,
+  type InsightsResponse,
   type CrossDocData,
   type BenchmarkData,
   BANKER_BLUE,
@@ -27,13 +28,15 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<AnalysisTab>("overview");
   const [loading, setLoading] = useState(true);
-  const [insights, setInsights] = useState<InsightsData | null>(null);
+  // Primary analysis data (from /analysis endpoint — quantitative)
+  const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
+  // Supplementary data
+  const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [crossDoc, setCrossDoc] = useState<CrossDocData | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
   // "error" = real server/network failure (5xx, network, etc). Never set for 404.
   const [error, setError] = useState(false);
-  // "noData" = all endpoints returned 404 — analysis not generated yet.
-  // The section renders with an empty state (not an error) in this case.
+  // "noData" = the /analysis endpoint returned hasData=false or 404 — no analysis yet.
   const [noData, setNoData] = useState(false);
 
   const loadData = useCallback(async () => {
@@ -41,31 +44,40 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
     setError(false);
     setNoData(false);
     try {
-      const [insightsRes, crossDocRes, benchmarkRes] = await Promise.allSettled([
-        api.get<InsightsData>(`/deals/${dealId}/financials/insights`),
+      // Step 1: Fetch primary analysis data (same as legacy analysis.js line 27)
+      let analysisData: AnalysisData | null = null;
+      try {
+        analysisData = await api.get<AnalysisData>(`/deals/${dealId}/financials/analysis`);
+      } catch (e) {
+        if (e instanceof NotFoundError) {
+          // No analysis available yet — show empty state
+          setNoData(true);
+          setLoading(false);
+          return;
+        }
+        throw e;
+      }
+
+      // If API returns 200 but hasData is false, treat as empty
+      if (!analysisData?.hasData) {
+        setNoData(true);
+        setLoading(false);
+        return;
+      }
+
+      setAnalysis(analysisData);
+
+      // Step 2: Fetch supplementary data in parallel (same as legacy lines 37-53)
+      const [crossDocRes, benchmarkRes, insightsRes] = await Promise.allSettled([
         api.get<CrossDocData>(`/deals/${dealId}/financials/cross-doc`),
         api.get<BenchmarkData>(`/deals/${dealId}/financials/benchmark`),
+        api.get<InsightsResponse>(`/deals/${dealId}/financials/insights`),
       ]);
 
-      if (insightsRes.status === "fulfilled") setInsights(insightsRes.value);
       if (crossDocRes.status === "fulfilled") setCrossDoc(crossDocRes.value);
       if (benchmarkRes.status === "fulfilled") setBenchmark(benchmarkRes.value);
-
-      const allRejected =
-        insightsRes.status === "rejected" &&
-        crossDocRes.status === "rejected" &&
-        benchmarkRes.status === "rejected";
-
-      if (allRejected) {
-        // 404 on every endpoint means no analysis has been generated yet.
-        // Treat as an empty state (not a real error — no retry needed).
-        const is404 = (r: PromiseRejectedResult) => r.reason instanceof NotFoundError;
-        if (is404(insightsRes) && is404(crossDocRes) && is404(benchmarkRes)) {
-          setNoData(true);
-        } else {
-          setError(true);
-        }
-      }
+      if (insightsRes.status === "fulfilled") setInsights(insightsRes.value);
+      // Supplementary endpoint failures are non-fatal (graceful degradation)
     } catch {
       setError(true);
     } finally {
@@ -77,11 +89,8 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
     loadData();
   }, [loadData]);
 
-  // Hide section when fully loaded and there is real data (hasData flag) on none
-  // of the endpoints AND it wasn't a hard error. This handles the case where the
-  // API returns 200 but with hasData=false (analysis exists but no results yet).
-  const hasAnyData = insights?.hasData || crossDoc?.hasData || benchmark?.hasData;
-  if (!loading && !hasAnyData && !error && !noData) return null;
+  // Hide section entirely when loaded, not an error, but no data exists
+  if (!loading && !analysis && !error && !noData) return null;
 
   return (
     <div
@@ -113,7 +122,7 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
           >
             AI Financial Analysis
           </span>
-          {insights?.qoe && <QoEBadge score={insights.qoe.score} />}
+          {analysis?.qoe && <QoEBadge score={analysis.qoe.score} />}
         </div>
         <span
           className="material-symbols-outlined text-white/80 text-[20px] transition-transform duration-200"
@@ -154,17 +163,19 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
               </div>
 
               {/* Tab panels */}
-              {activeTab === "overview" && <OverviewPanel insights={insights} />}
-              {activeTab === "valuation" && <ValuationPanel insights={insights} />}
-              {activeTab === "risk" && <RiskPanel insights={insights} crossDoc={crossDoc} />}
+              {activeTab === "overview" && <OverviewPanel analysis={analysis} insights={insights} />}
+              {activeTab === "valuation" && <ValuationPanel analysis={analysis} benchmark={benchmark} />}
+              {activeTab === "risk" && <RiskPanel analysis={analysis} crossDoc={crossDoc} />}
               {activeTab === "benchmarks" && <BenchmarksPanel benchmark={benchmark} />}
 
               {/* Footer */}
-              {insights?.analyzedAt && (
+              {analysis?.analyzedAt && (
                 <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-gray-100">
-                  <span className="text-[10px] text-gray-400">AI-generated analysis</span>
                   <span className="text-[10px] text-gray-400">
-                    {new Date(insights.analyzedAt).toLocaleString()}
+                    Analyzed {analysis.periods?.length || 0} period{(analysis.periods?.length || 0) !== 1 ? "s" : ""}
+                  </span>
+                  <span className="text-[10px] text-gray-400">
+                    {new Date(analysis.analyzedAt).toLocaleString()}
                   </span>
                 </div>
               )}

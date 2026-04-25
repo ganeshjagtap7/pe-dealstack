@@ -2,12 +2,14 @@
 
 import { cn } from "@/lib/cn";
 import {
-  type InsightsData,
+  type AnalysisData,
+  type InsightsResponse,
   type CrossDocData,
   type BenchmarkData,
   type QoEFlag,
   type KeyMetric,
   type RiskFactor,
+  type LBOScreen,
   BANKER_BLUE,
   BANKER_BLUE_MUTED,
   SEVERITY_STYLES,
@@ -79,6 +81,9 @@ function FlagCard({ flag }: { flag: QoEFlag }) {
           {flag.category && <span className="text-[10px] ml-auto opacity-50" style={{ color: s.text }}>{flag.category}</span>}
         </div>
         <p className="text-[11px] leading-relaxed opacity-85 m-0" style={{ color: s.text }}>{flag.detail}</p>
+        {flag.evidence && (
+          <p className="text-[10px] opacity-50 italic mt-1 mb-0" style={{ color: s.text }}>Evidence: {flag.evidence}</p>
+        )}
       </div>
     </div>
   );
@@ -100,7 +105,7 @@ function RiskScoreCard({ factor }: { factor: RiskFactor }) {
   );
 }
 
-function RevenueQualityCard({ rq }: { rq: NonNullable<InsightsData["revenueQuality"]> }) {
+function RevenueQualityCard({ rq }: { rq: NonNullable<AnalysisData["revenueQuality"]> }) {
   const scoreColor = (rq.consistencyScore ?? 0) >= 75 ? "#059669" : (rq.consistencyScore ?? 0) >= 50 ? "#d97706" : "#dc2626";
   const scoreLabel = (rq.consistencyScore ?? 0) >= 75 ? "Consistent" : (rq.consistencyScore ?? 0) >= 50 ? "Moderate" : "Volatile";
 
@@ -142,6 +147,68 @@ function RevenueQualityCard({ rq }: { rq: NonNullable<InsightsData["revenueQuali
 }
 
 // ---------------------------------------------------------------------------
+// EBITDA Bridge (matches legacy renderEBITDABridge)
+// ---------------------------------------------------------------------------
+
+function EBITDABridgeCard({ bridge, }: { bridge: NonNullable<AnalysisData["ebitdaBridge"]> }) {
+  const vp = bridge.periods.filter((p) => p.reportedEbitda != null);
+  if (!vp.length) return null;
+
+  // Collect all unique addback labels across periods
+  const allLabels = [...new Set(vp.flatMap((p) => p.addbacks.map((a) => a.label)))];
+
+  return (
+    <AnalysisCard>
+      <CardHeader icon="bar_chart" title="EBITDA Bridge">
+        <span className="text-[10px] text-gray-400 font-medium">Reported → Adjusted</span>
+      </CardHeader>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs border-collapse border border-gray-200 rounded-lg overflow-hidden">
+          <thead>
+            <tr className="bg-gray-50 border-b-2 border-gray-200">
+              <th className="text-left p-2.5 text-gray-500 font-semibold text-[10px] uppercase">Item</th>
+              {vp.map((p) => (
+                <th key={p.period} className="text-right p-2.5 text-gray-500 font-semibold text-[10px] uppercase">{p.period}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-gray-100">
+              <td className="p-2.5 font-semibold text-gray-800">Reported EBITDA</td>
+              {vp.map((p) => (
+                <td key={p.period} className="text-right p-2.5 font-semibold text-gray-800">${p.reportedEbitda}M</td>
+              ))}
+            </tr>
+            {allLabels.map((label) => (
+              <tr key={label} className="border-b border-gray-100">
+                <td className="p-2.5" style={{ color: "#059669" }}>+ {label}</td>
+                {vp.map((p) => {
+                  const ab = p.addbacks.find((a) => a.label === label);
+                  return (
+                    <td key={p.period} className="text-right p-2.5" style={{ color: "#059669" }}>
+                      {ab?.amount != null ? `+$${ab.amount}M` : "--"}
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+            <tr className="bg-gradient-to-r from-gray-100 to-gray-50 border-t-2 border-gray-200">
+              <td className="p-2.5 font-bold" style={{ color: BANKER_BLUE }}>Adjusted EBITDA</td>
+              {vp.map((p) => (
+                <td key={p.period} className="text-right p-2.5 font-bold" style={{ color: BANKER_BLUE }}>
+                  ${p.adjustedEbitda}M
+                  {p.adjustmentPct ? <span className="text-[9px] ml-1" style={{ color: "#059669" }}>(+{p.adjustmentPct}%)</span> : null}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </AnalysisCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Score Ring SVG
 // ---------------------------------------------------------------------------
 
@@ -174,25 +241,26 @@ export function ScoreRing({ score }: { score: number }) {
 }
 
 // ---------------------------------------------------------------------------
-// Overview Tab
+// Overview Tab (matches legacy renderOverviewTab)
 // ---------------------------------------------------------------------------
 
-export function OverviewPanel({ insights }: { insights: InsightsData | null }) {
-  const qoe = insights?.qoe;
+export function OverviewPanel({ analysis, insights }: { analysis: AnalysisData | null; insights: InsightsResponse | null }) {
+  const qoe = analysis?.qoe;
   const metrics: KeyMetric[] = [];
-  if (insights?.revenueQuality?.revenueCAGR != null)
-    metrics.push({ label: "Revenue CAGR", value: insights.revenueQuality.revenueCAGR + "%", color: insights.revenueQuality.revenueCAGR >= 0 ? "#059669" : "#dc2626" });
-  if (insights?.cashFlowAnalysis?.avgConversion != null)
-    metrics.push({ label: "FCF Conversion", value: insights.cashFlowAnalysis.avgConversion + "%", color: insights.cashFlowAnalysis.avgConversion >= 60 ? "#059669" : "#d97706" });
-  if (insights?.debtCapacity?.currentLeverage != null)
-    metrics.push({ label: "Net Leverage", value: insights.debtCapacity.currentLeverage + "x", color: insights.debtCapacity.currentLeverage <= 3 ? "#059669" : "#d97706" });
-  if (insights?.lboScreen?.passesScreen != null)
-    metrics.push({ label: "LBO Screen", value: insights.lboScreen.passesScreen ? "Pass" : "Fail", color: insights.lboScreen.passesScreen ? "#059669" : "#dc2626" });
+  if (analysis?.revenueQuality?.revenueCAGR != null)
+    metrics.push({ label: "Revenue CAGR", value: analysis.revenueQuality.revenueCAGR + "%", color: analysis.revenueQuality.revenueCAGR >= 0 ? "#059669" : "#dc2626" });
+  if (analysis?.cashFlowAnalysis?.avgConversion != null)
+    metrics.push({ label: "FCF Conversion", value: analysis.cashFlowAnalysis.avgConversion + "%", color: analysis.cashFlowAnalysis.avgConversion >= 60 ? "#059669" : "#d97706" });
+  if (analysis?.debtCapacity?.currentLeverage != null)
+    metrics.push({ label: "Net Leverage", value: analysis.debtCapacity.currentLeverage + "x", color: analysis.debtCapacity.currentLeverage <= 3 ? "#059669" : "#d97706" });
+  if (analysis?.lboScreen?.passesScreen != null)
+    metrics.push({ label: "LBO Screen", value: analysis.lboScreen.passesScreen ? "Pass" : "Fail", color: analysis.lboScreen.passesScreen ? "#059669" : "#dc2626" });
 
   if (!qoe && metrics.length === 0) return <EmptyTabState icon="dashboard" message="No overview data available yet." />;
 
   return (
     <div className="flex flex-col gap-4">
+      {/* QoE Score Hero */}
       {qoe && (
         <AnalysisCard className="bg-gradient-to-br from-[#FAFBFF] to-[#F0F4FA] border-[#D6DEE8]">
           <div className="flex gap-6 items-center flex-wrap">
@@ -216,6 +284,7 @@ export function OverviewPanel({ insights }: { insights: InsightsData | null }) {
         </AnalysisCard>
       )}
 
+      {/* QoE Flags */}
       {qoe && qoe.flags.length > 0 && (
         <AnalysisCard>
           <CardHeader icon="flag" title="Key Findings">
@@ -229,57 +298,210 @@ export function OverviewPanel({ insights }: { insights: InsightsData | null }) {
         </AnalysisCard>
       )}
 
-      {insights?.revenueQuality && <RevenueQualityCard rq={insights.revenueQuality} />}
+      {/* EBITDA Bridge */}
+      {analysis?.ebitdaBridge && <EBITDABridgeCard bridge={analysis.ebitdaBridge} />}
+
+      {/* Revenue Quality */}
+      {analysis?.revenueQuality && <RevenueQualityCard rq={analysis.revenueQuality} />}
+
+      {/* AI Insights (narrative text from /insights endpoint) */}
+      {insights?.hasData && insights.insights && <AIInsightsCard insights={insights.insights} />}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Valuation Tab
+// AI Insights Card (matches legacy renderAIInsightsTab sections)
 // ---------------------------------------------------------------------------
 
-export function ValuationPanel({ insights }: { insights: InsightsData | null }) {
-  const lbo = insights?.lboScreen;
+function AIInsightsCard({ insights }: { insights: NonNullable<InsightsResponse["insights"]> }) {
+  const sections: { key: string; title: string; icon: string }[] = [
+    { key: "executiveSummary", title: "Executive Summary", icon: "summarize" },
+    { key: "topThreeStrengths", title: "Key Strengths", icon: "thumb_up" },
+    { key: "keyStrengths", title: "Key Strengths", icon: "thumb_up" },
+    { key: "topThreeRisks", title: "Key Risks", icon: "warning" },
+    { key: "keyRisks", title: "Key Risks", icon: "warning" },
+    { key: "investmentThesis", title: "Investment Thesis", icon: "lightbulb" },
+    { key: "diligencePriorities", title: "Due Diligence Priorities", icon: "checklist" },
+    { key: "dueDiligencePriorities", title: "Due Diligence Priorities", icon: "checklist" },
+  ];
 
-  if (!lbo) return <EmptyTabState icon="rocket_launch" message="No valuation data available. Upload financial documents to generate DCF and comparable analysis." />;
+  // Deduplicate: prefer new keys over legacy aliases
+  const seen = new Set<string>();
+  const rendered = sections.filter((s) => {
+    const content = (insights as Record<string, unknown>)[s.key];
+    if (!content) return false;
+    if (Array.isArray(content) && content.length === 0) return false;
+    // Avoid rendering both "topThreeStrengths" and legacy "keyStrengths"
+    if (seen.has(s.title)) return false;
+    seen.add(s.title);
+    return true;
+  });
+
+  if (rendered.length === 0) return null;
+
+  return (
+    <AnalysisCard>
+      <CardHeader icon="auto_awesome" title="AI Insights" />
+      <div className="flex flex-col gap-4">
+        {rendered.map((s) => {
+          const content = (insights as Record<string, unknown>)[s.key];
+          const isList = Array.isArray(content);
+          return (
+            <div key={s.key}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="material-symbols-outlined text-[16px]" style={{ color: BANKER_BLUE }}>{s.icon}</span>
+                <span className="text-xs font-bold text-gray-800">{s.title}</span>
+              </div>
+              {isList ? (
+                <ul className="text-xs text-gray-600 leading-relaxed pl-4 m-0 list-disc">
+                  {(content as string[]).map((item, i) => <li key={i} className="mb-1.5">{item}</li>)}
+                </ul>
+              ) : (
+                <p className="text-xs text-gray-600 leading-relaxed m-0">{String(content)}</p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </AnalysisCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Valuation Tab (matches legacy renderValuationTab + renderLBOScreen)
+// ---------------------------------------------------------------------------
+
+export function ValuationPanel({ analysis, benchmark }: { analysis: AnalysisData | null; benchmark: BenchmarkData | null }) {
+  const lbo = analysis?.lboScreen;
+
+  if (!lbo) return <EmptyTabState icon="rocket_launch" message="No valuation data available. Upload financial documents to generate LBO screening and valuation analysis." />;
 
   return (
     <div className="flex flex-col gap-4">
-      <AnalysisCard>
-        <CardHeader icon="rocket_launch" title="LBO Quick Screen">
-          <span
-            className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
-            style={{
-              background: lbo.passesScreen ? "#05966915" : "#dc262615",
-              color: lbo.passesScreen ? "#059669" : "#dc2626",
-            }}
-          >
-            {lbo.passesScreen ? "PASSES SCREEN" : "BELOW THRESHOLD"}
-          </span>
-        </CardHeader>
-        <p className="text-xs text-gray-500">
-          LBO screening based on current financial metrics. Upload detailed projections for full DCF analysis.
-        </p>
-      </AnalysisCard>
+      <LBOScreenCard lbo={lbo} />
 
-      <AnalysisCard>
-        <CardHeader icon="compare_arrows" title="Comparable Multiples" />
-        <div className="text-center py-6">
-          <span className="material-symbols-outlined text-3xl text-gray-300 block mb-2">table_chart</span>
-          <p className="text-xs text-gray-400">Comparable multiples will appear once benchmark data is available.</p>
-        </div>
-      </AnalysisCard>
+      {/* Benchmark data shown here as well when available */}
+      {benchmark?.hasData && benchmark.peerCount > 0 && benchmark.benchmarks?.length > 0 ? (
+        <BenchmarkCard benchmark={benchmark} />
+      ) : (
+        <AnalysisCard>
+          <div className="text-center py-5">
+            <span className="material-symbols-outlined text-3xl text-gray-300 block mb-2">leaderboard</span>
+            <p className="text-xs text-gray-400">
+              Portfolio benchmarking requires 2+ deals with financials extracted.
+            </p>
+          </div>
+        </AnalysisCard>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Risk Profile Tab
+// LBO Screen Card (matches legacy renderLBOScreen exactly)
 // ---------------------------------------------------------------------------
 
-export function RiskPanel({ insights, crossDoc }: { insights: InsightsData | null; crossDoc: CrossDocData | null }) {
-  const redFlags = insights?.redFlags || [];
-  const qoeFlags = insights?.qoe?.flags || [];
+function LBOScreenCard({ lbo }: { lbo: LBOScreen }) {
+  const passColor = lbo.passesScreen ? "#059669" : "#dc2626";
+  const passLabel = lbo.passesScreen ? "PASSES SCREEN" : "BELOW THRESHOLD";
+
+  const hasScenarios = lbo.scenarios && lbo.scenarios.length > 0;
+  const entryMults = hasScenarios
+    ? [...new Set(lbo.scenarios.map((s) => s.entryMultiple))].sort((a, b) => a - b)
+    : [];
+  const exitMults = hasScenarios
+    ? [...new Set(lbo.scenarios.map((s) => s.exitMultiple))].sort((a, b) => a - b)
+    : [];
+
+  return (
+    <AnalysisCard>
+      <CardHeader icon="rocket_launch" title="LBO Quick Screen">
+        <span
+          className="text-[10px] font-bold px-2.5 py-0.5 rounded-full"
+          style={{ background: `${passColor}15`, color: passColor }}
+        >
+          {passLabel}
+        </span>
+      </CardHeader>
+
+      {/* Entry metrics */}
+      <div className="flex gap-3.5 flex-wrap mb-4">
+        {lbo.entryEbitda != null && (
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4">
+            <div className="text-[10px] text-gray-500 uppercase font-semibold">Entry EBITDA</div>
+            <div className="text-2xl font-extrabold" style={{ color: BANKER_BLUE }}>${lbo.entryEbitda}M</div>
+          </div>
+        )}
+        {hasScenarios && lbo.scenarios[0]?.growthRate != null && (
+          <div className="bg-gradient-to-br from-gray-50 to-gray-100 border border-gray-200 rounded-xl p-4">
+            <div className="text-[10px] text-gray-500 uppercase font-semibold">Growth Rate</div>
+            <div className="text-2xl font-extrabold" style={{ color: BANKER_BLUE }}>{lbo.scenarios[0].growthRate}%</div>
+          </div>
+        )}
+      </div>
+
+      {/* Scenario matrix */}
+      {hasScenarios && entryMults.length > 0 && exitMults.length > 0 && (
+        <>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse border border-gray-200 rounded-lg overflow-hidden">
+              <thead>
+                <tr className="bg-gray-50">
+                  <th rowSpan={2} className="text-left p-2.5 text-gray-500 font-semibold text-[10px] uppercase align-bottom border-b-2 border-gray-200">
+                    Entry Multiple
+                  </th>
+                  <th colSpan={exitMults.length} className="text-center p-2.5 text-gray-500 font-semibold text-[10px] uppercase border-b border-gray-200">
+                    Exit Multiple → MOIC / IRR
+                  </th>
+                </tr>
+                <tr className="bg-gray-50 border-b-2 border-gray-200">
+                  {exitMults.map((em) => (
+                    <th key={em} className="text-center p-2.5 text-gray-500 font-semibold text-[10px] uppercase">{em}x</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {entryMults.map((entry) => (
+                  <tr key={entry} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="p-2.5 font-bold text-gray-800">{entry}x</td>
+                    {exitMults.map((exit) => {
+                      const s = lbo.scenarios.find((sc) => sc.entryMultiple === entry && sc.exitMultiple === exit);
+                      if (!s) return <td key={exit} className="text-center p-2.5 text-gray-400">--</td>;
+                      const irrC = s.irr == null ? "#94A3B8" : s.irr >= 25 ? "#059669" : s.irr >= 20 ? "#d97706" : "#dc2626";
+                      return (
+                        <td key={exit} className="text-center p-2.5">
+                          <span className="font-bold text-gray-800 text-[13px]">{s.moic ?? "--"}x</span>
+                          <br />
+                          <span className="text-[10px] font-semibold" style={{ color: irrC }}>
+                            {s.irr != null ? `${s.irr}% IRR` : ""}
+                          </span>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-[10px] text-gray-400 mt-2.5">
+            Assumes 60% debt / 40% equity, 20% debt paydown over 5 years.{" "}
+            <span style={{ color: "#059669" }}>Green</span> IRR &gt;= 25%,{" "}
+            <span style={{ color: "#d97706" }}>Amber</span> &gt;= 20%.
+          </p>
+        </>
+      )}
+    </AnalysisCard>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Risk Profile Tab (matches legacy renderDiligenceTab)
+// ---------------------------------------------------------------------------
+
+export function RiskPanel({ analysis, crossDoc }: { analysis: AnalysisData | null; crossDoc: CrossDocData | null }) {
+  const redFlags = analysis?.redFlags || [];
+  const qoeFlags = analysis?.qoe?.flags || [];
   const conflicts = crossDoc?.conflicts || [];
 
   const riskFactors: RiskFactor[] = [];
@@ -306,8 +528,8 @@ export function RiskPanel({ insights, crossDoc }: { insights: InsightsData | nul
     });
   }
 
-  if (insights?.debtCapacity?.currentLeverage != null) {
-    const lev = insights.debtCapacity.currentLeverage;
+  if (analysis?.debtCapacity?.currentLeverage != null) {
+    const lev = analysis.debtCapacity.currentLeverage;
     riskFactors.push({
       category: "Leverage Risk",
       score: lev <= 2 ? 90 : lev <= 3 ? 70 : lev <= 4 ? 50 : 30,
@@ -329,6 +551,7 @@ export function RiskPanel({ insights, crossDoc }: { insights: InsightsData | nul
         </div>
       )}
 
+      {/* Red Flags (matches legacy renderRedFlags) */}
       {redFlags.length > 0 && (
         <AnalysisCard>
           <CardHeader icon="flag" title="Red Flag Analysis">
@@ -336,12 +559,21 @@ export function RiskPanel({ insights, crossDoc }: { insights: InsightsData | nul
               {redFlags.length} Flag{redFlags.length !== 1 ? "s" : ""}
             </span>
           </CardHeader>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             {redFlags.map((f, i) => <FlagCard key={i} flag={f} />)}
           </div>
         </AnalysisCard>
       )}
 
+      {/* No Red Flags - positive state (matches legacy) */}
+      {redFlags.length === 0 && riskFactors.length > 0 && (
+        <AnalysisCard>
+          <CardHeader icon="check_circle" title="No Red Flags Detected" />
+          <p className="text-xs text-gray-500">All automated deep detection checks passed.</p>
+        </AnalysisCard>
+      )}
+
+      {/* Cross-Doc Verification (matches legacy renderCrossDoc) */}
       {crossDoc?.hasData && conflicts.length > 0 && (
         <AnalysisCard>
           <CardHeader icon="compare" title="Cross-Document Verification">
@@ -350,19 +582,31 @@ export function RiskPanel({ insights, crossDoc }: { insights: InsightsData | nul
             </span>
           </CardHeader>
           <div className="overflow-x-auto">
-            <table className="w-full text-xs border-collapse">
+            <table className="w-full text-xs border-collapse border border-gray-200 rounded-lg overflow-hidden">
               <thead>
-                <tr className="border-b-2 border-gray-200">
+                <tr className="bg-gray-50 border-b-2 border-gray-200">
                   <th className="text-left p-2.5 text-gray-500 font-semibold text-[10px] uppercase">Period</th>
                   <th className="text-left p-2.5 text-gray-500 font-semibold text-[10px] uppercase">Field</th>
+                  <th className="text-left p-2.5 text-gray-500 font-semibold text-[10px] uppercase">Values by Document</th>
                   <th className="text-right p-2.5 text-gray-500 font-semibold text-[10px] uppercase">Deviation</th>
                 </tr>
               </thead>
               <tbody>
-                {conflicts.slice(0, 8).map((c, i) => (
+                {conflicts.slice(0, 10).map((c, i) => (
                   <tr key={i} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="p-2.5 font-semibold text-gray-800">{c.period}</td>
                     <td className="p-2.5 text-gray-600">{c.field.replace(/_/g, " ")}</td>
+                    <td className="p-2.5">
+                      {c.values.map((v, vi) => (
+                        <span
+                          key={vi}
+                          className="inline-block text-[10px] px-2 py-0.5 rounded-md mx-0.5 my-0.5"
+                          style={{ background: v.isActive ? "#D1FAE5" : "#F1F5F9" }}
+                        >
+                          {v.documentName}: ${v.value}M
+                        </span>
+                      ))}
+                    </td>
                     <td className="p-2.5 text-right font-bold" style={{ color: c.discrepancyPct > 10 ? "#dc2626" : "#d97706" }}>
                       {c.discrepancyPct}%
                     </td>
@@ -373,12 +617,24 @@ export function RiskPanel({ insights, crossDoc }: { insights: InsightsData | nul
           </div>
         </AnalysisCard>
       )}
+
+      {/* Cross-doc no conflicts (matches legacy) */}
+      {crossDoc?.hasData && conflicts.length === 0 && (
+        <AnalysisCard>
+          <div className="flex items-center gap-2.5 mb-2">
+            <span className="material-symbols-outlined text-[20px]" style={{ color: "#059669" }}>fact_check</span>
+            <span className="text-[13px] font-bold text-gray-900 uppercase tracking-wider" style={{ letterSpacing: "0.06em" }}>Cross-Document Verification</span>
+            <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: "#D1FAE5", color: "#059669" }}>No Conflicts</span>
+          </div>
+          <p className="text-xs text-gray-500">All financial figures are consistent across {crossDoc.documents?.length || 0} document(s).</p>
+        </AnalysisCard>
+      )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Benchmarks Tab
+// Benchmarks Tab (matches legacy renderBenchmark)
 // ---------------------------------------------------------------------------
 
 export function BenchmarksPanel({ benchmark }: { benchmark: BenchmarkData | null }) {
@@ -386,6 +642,10 @@ export function BenchmarksPanel({ benchmark }: { benchmark: BenchmarkData | null
     return <EmptyTabState icon="leaderboard" message="Portfolio benchmarking requires 2+ deals with financials extracted." />;
   }
 
+  return <BenchmarkCard benchmark={benchmark} />;
+}
+
+function BenchmarkCard({ benchmark }: { benchmark: BenchmarkData }) {
   return (
     <AnalysisCard>
       <CardHeader icon="leaderboard" title="Portfolio Benchmarking">

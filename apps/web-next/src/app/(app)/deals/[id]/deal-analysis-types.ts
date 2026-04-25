@@ -2,13 +2,17 @@
 // Types for the AI Financial Analysis section
 // ---------------------------------------------------------------------------
 
+// ── QoE (Quality of Earnings) ──────────────────────────────────────────────
+
 export interface QoEFlag {
+  id?: string;
   severity: "critical" | "warning" | "positive" | "info";
   title: string;
   detail: string;
   metric?: string;
   category?: string;
   icon?: string;
+  evidence?: string;
 }
 
 export interface QoEScore {
@@ -17,34 +21,183 @@ export interface QoEScore {
   flags: QoEFlag[];
 }
 
+// ── Key Metric (UI helper) ─────────────────────────────────────────────────
+
 export interface KeyMetric {
   label: string;
   value: string;
   color: string;
 }
 
-export interface InsightsData {
-  qoe?: QoEScore;
-  revenueQuality?: {
-    revenueCAGR?: number;
-    consistencyScore?: number;
-    organicGrowthRates?: { period: string; rate: number | null }[];
-  };
-  cashFlowAnalysis?: { avgConversion?: number };
-  debtCapacity?: { currentLeverage?: number };
-  lboScreen?: { passesScreen?: boolean };
-  redFlags?: QoEFlag[];
-  analyzedAt?: string;
-  hasData?: boolean;
+// ── Analysis Data — response from GET /deals/:id/financials/analysis ──────
+// This is the PRIMARY data source (all quantitative analysis). The legacy
+// code calls this first, then enriches with supplementary endpoints.
+
+export interface EBITDABridgePeriod {
+  period: string;
+  reportedEbitda: number | null;
+  addbacks: { label: string; amount: number | null }[];
+  adjustedEbitda: number | null;
+  adjustmentPct: number | null;
 }
 
-export interface ValuationScenario {
+export interface EBITDABridge {
+  periods: EBITDABridgePeriod[];
+}
+
+export interface RevenueQuality {
+  revenueCAGR: number | null;
+  organicGrowthRates: { period: string; rate: number | null }[];
+  revenuePerEmployee?: number | null;
+  consistencyScore: number;
+}
+
+export interface CashFlowPeriod {
+  period: string;
+  ebitda: number | null;
+  capex: number | null;
+  wcChange: number | null;
+  fcf: number | null;
+  ebitdaToFcfConversion: number | null;
+}
+
+export interface CashFlowAnalysis {
+  periods: CashFlowPeriod[];
+  avgConversion: number | null;
+  fcfTrend: "improving" | "declining" | "stable" | "insufficient";
+}
+
+export interface WorkingCapitalPeriod {
+  period: string;
+  ar: number | null;
+  inventory: number | null;
+  ap: number | null;
+  nwc: number | null;
+  nwcPctRevenue: number | null;
+}
+
+export interface WorkingCapital {
+  periods: WorkingCapitalPeriod[];
+  normalizedNwc: number | null;
+  nwcTrend: "improving" | "declining" | "stable" | "insufficient";
+}
+
+export interface CostStructurePeriod {
+  period: string;
+  cogsPct: number | null;
+  sgaPct: number | null;
+  rdPct: number | null;
+  opexPct: number | null;
+}
+
+export interface CostStructure {
+  periods: CostStructurePeriod[];
+  breakEvenRevenue: number | null;
+  operatingLeverage: "high" | "moderate" | "low" | "unknown";
+}
+
+export interface DebtCapacity {
+  currentLeverage: number | null;
+  maxDebt3x: number | null;
+  maxDebt4x: number | null;
+  maxDebt5x?: number | null;
+  dscr: number | null;
+  interestCoverage: number | null;
+  debtHeadroom: number | null;
+}
+
+export interface LBOScenario {
   entryMultiple: number;
   exitMultiple: number;
-  growthRate?: number;
-  moic?: number;
-  irr?: number;
+  growthRate: number;
+  equityRequired?: number | null;
+  exitEbitda?: number | null;
+  exitTEV?: number | null;
+  moic: number | null;
+  irr: number | null;
 }
+
+export interface LBOScreen {
+  entryEbitda: number | null;
+  scenarios: LBOScenario[];
+  passesScreen: boolean;
+}
+
+export interface RatioValue {
+  period: string;
+  value: number | null;
+}
+
+export interface Ratio {
+  name: string;
+  key: string;
+  periods: RatioValue[];
+  benchmark?: { low: number; mid: number; high: number };
+  unit: "%" | "x" | "$M" | "days" | "number";
+  trend: "improving" | "declining" | "stable" | "insufficient";
+  description: string;
+}
+
+export interface RatioGroup {
+  category: string;
+  icon: string;
+  ratios: Ratio[];
+}
+
+export interface DuPontPeriod {
+  period: string;
+  netProfitMargin: number | null;
+  assetTurnover: number | null;
+  equityMultiplier: number | null;
+  roe: number | null;
+}
+
+export interface DuPontDecomposition {
+  periods: DuPontPeriod[];
+}
+
+/** Full response from GET /deals/:id/financials/analysis */
+export interface AnalysisData {
+  hasData: boolean;
+  qoe: QoEScore;
+  ratios: RatioGroup[];
+  duPont?: DuPontDecomposition;
+  ebitdaBridge?: EBITDABridge;
+  revenueQuality?: RevenueQuality;
+  cashFlowAnalysis?: CashFlowAnalysis;
+  workingCapital?: WorkingCapital;
+  costStructure?: CostStructure;
+  debtCapacity?: DebtCapacity;
+  lboScreen?: LBOScreen;
+  redFlags?: QoEFlag[];
+  periods: string[];
+  analyzedAt: string;
+}
+
+// ── Insights Data — response from GET /deals/:id/financials/insights ──────
+// This is the AI-generated narrative. Separate from the quantitative analysis.
+
+export interface NarrativeInsights {
+  executiveSummary?: string;
+  topThreeRisks?: string[];
+  topThreeStrengths?: string[];
+  diligencePriorities?: string[];
+  modules?: Record<string, { title?: string; narrative?: string }>;
+  // Legacy keys (used by older legacy code)
+  keyStrengths?: string[];
+  keyRisks?: string[];
+  investmentThesis?: string;
+  dueDiligencePriorities?: string[];
+  generatedAt?: string;
+}
+
+export interface InsightsResponse {
+  hasData: boolean;
+  insights: NarrativeInsights | null;
+  fromCache?: boolean;
+}
+
+// ── Cross-Doc — response from GET /deals/:id/financials/cross-doc ─────────
 
 export interface CrossDocConflict {
   period: string;
@@ -55,14 +208,18 @@ export interface CrossDocConflict {
 
 export interface CrossDocData {
   hasData: boolean;
-  documents?: { name: string }[];
+  documents?: string[];
   conflicts?: CrossDocConflict[];
+  totalComparisons?: number;
 }
+
+// ── Benchmark — response from GET /deals/:id/financials/benchmark ─────────
 
 export interface BenchmarkItem {
   metric: string;
   dealValue: number;
   percentile: number;
+  peerMedian?: number | null;
   peerMin: number;
   peerMax: number;
   unit?: string;
@@ -74,6 +231,8 @@ export interface BenchmarkData {
   benchmarks: BenchmarkItem[];
 }
 
+// ── Risk Factor (UI-derived) ──────────────────────────────────────────────
+
 export interface RiskFactor {
   category: string;
   score: number;
@@ -81,6 +240,8 @@ export interface RiskFactor {
   detail: string;
   severity: "critical" | "warning" | "positive" | "info";
 }
+
+// ── Tabs ──────────────────────────────────────────────────────────────────
 
 export type AnalysisTab = "overview" | "valuation" | "risk" | "benchmarks";
 
