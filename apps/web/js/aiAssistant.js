@@ -314,7 +314,8 @@
     // ── Messages ────────────────────────────────────────
     function renderMessages() {
         return messages.map(m => {
-            const content = m.content
+            const raw = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+            const content = raw
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\n/g, '<br>');
             return `<div class="ai-msg ${m.role}">${content}</div>`;
@@ -327,7 +328,8 @@
     }
 
     function addMessage(role, content) {
-        messages.push({ role, content });
+        const safeContent = typeof content === 'string' ? content : (content?.message || content?.error || JSON.stringify(content));
+        messages.push({ role, content: safeContent });
         const container = document.getElementById('ai-messages');
         if (container) {
             container.innerHTML = renderMessages();
