@@ -250,9 +250,9 @@ export default function AdminPage() {
         <StatCard
           label="Overdue"
           icon="pending_actions"
-          value={overdueTasks.length}
+          value={overdueTasks.length > 0 ? overdueTasks.length : "—"}
           subtitle={`${dueThisWeek.length} due this week`}
-          valueColor="#003366"
+          valueColor={overdueTasks.length > 0 ? "#ef4444" : undefined}
           onClick={() => {
             setExternalTaskFilter("OVERDUE");
             scrollTo("task-table-body");

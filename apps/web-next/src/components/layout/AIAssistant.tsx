@@ -255,6 +255,8 @@ export function AIAssistant() {
         )
       ) {
         e.preventDefault();
+        // Don't open the AI drawer when a modal overlay is active
+        if (!isOpen && document.querySelector("[data-modal-overlay]")) return;
         toggleDrawer();
       }
       if (e.key === "Escape" && isOpen) {

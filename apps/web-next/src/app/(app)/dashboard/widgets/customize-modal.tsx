@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { WIDGETS, WidgetId, CoreWidgetId, CORE_WIDGETS } from "./registry";
 import { useToast } from "@/providers/ToastProvider";
 
@@ -96,7 +96,13 @@ const ALL_ENTRIES = buildModalEntries();
 interface DraftState {
   core: Set<CoreOrComingSoonId>;
   optional: Set<WidgetId>;
+  /** Ordered list of reorderable core IDs (excludes coming-soon entries) */
+  coreOrder: CoreWidgetId[];
 }
+
+// The reorderable core categories — entries in these categories can be dragged
+// to change their display position on the dashboard.
+const REORDERABLE_CATEGORIES = new Set(["core", "ai"]);
 
 // ---------------------------------------------------------------------------
 // Customize Dashboard modal — shows ALL widgets including core sections.
@@ -106,15 +112,19 @@ export function CustomizeDashboardModal({
   open,
   visible,
   coreVisible,
+  coreOrder: savedCoreOrder,
   onToggle,
   onToggleCore,
+  onReorderCore,
   onClose,
 }: {
   open: boolean;
   visible: Set<WidgetId>;
   coreVisible: Set<CoreWidgetId>;
+  coreOrder: CoreWidgetId[];
   onToggle: (id: WidgetId) => void;
   onToggleCore: (id: CoreWidgetId) => void;
+  onReorderCore: (ids: CoreWidgetId[]) => void;
   onClose: () => void;
 }) {
   const { showToast } = useToast();
@@ -123,7 +133,12 @@ export function CustomizeDashboardModal({
   const [draft, setDraft] = useState<DraftState>({
     core: new Set(coreVisible) as Set<CoreOrComingSoonId>,
     optional: new Set(visible),
+    coreOrder: savedCoreOrder,
   });
+
+  // Drag state for reordering core widgets inside the modal
+  const dragIdRef = useRef<string | null>(null);
+  const [dragOver, setDragOver] = useState<string | null>(null);
 
   // Sync draft when modal opens
   useEffect(() => {
@@ -131,9 +146,10 @@ export function CustomizeDashboardModal({
       setDraft({
         core: new Set(coreVisible) as Set<CoreOrComingSoonId>,
         optional: new Set(visible),
+        coreOrder: savedCoreOrder,
       });
     }
-  }, [open, visible, coreVisible]);
+  }, [open, visible, coreVisible, savedCoreOrder]);
 
   useEffect(() => {
     if (!open) return;
@@ -146,11 +162,40 @@ export function CustomizeDashboardModal({
 
   if (!open) return null;
 
-  // Group all entries by category
-  const grouped: Record<string, ModalEntry[]> = {};
+  // ---------------------------------------------------------------------------
+  // Build the ordered list of reorderable entries.
+  // All non-coming-soon core/ai entries are reorderable; their display order
+  // in the modal follows draft.coreOrder.
+  // ---------------------------------------------------------------------------
+  const allReorderableEntries: ModalEntry[] = ALL_ENTRIES.filter(
+    (e) => REORDERABLE_CATEGORIES.has(e.category) && !e.comingSoon,
+  );
+
+  // Map from id -> entry for fast lookup
+  const reorderableById = new Map(allReorderableEntries.map((e) => [e.id, e]));
+
+  // Build ordered list: saved order first, then any not yet in coreOrder
+  const orderedReorderable: ModalEntry[] = [];
+  const seen = new Set<string>();
+  for (const id of draft.coreOrder) {
+    const e = reorderableById.get(id);
+    if (e) { orderedReorderable.push(e); seen.add(id); }
+  }
+  for (const e of allReorderableEntries) {
+    if (!seen.has(e.id)) orderedReorderable.push(e);
+  }
+
+  // Coming-soon entries shown after reorderable ones (not draggable)
+  const comingSoonEntries: ModalEntry[] = ALL_ENTRIES.filter(
+    (e) => REORDERABLE_CATEGORIES.has(e.category) && e.comingSoon,
+  );
+
+  // Non-core categories grouped as before
+  const nonCoreGrouped: Record<string, ModalEntry[]> = {};
   ALL_ENTRIES.forEach((entry) => {
-    if (!grouped[entry.category]) grouped[entry.category] = [];
-    grouped[entry.category].push(entry);
+    if (REORDERABLE_CATEGORIES.has(entry.category)) return; // handled above
+    if (!nonCoreGrouped[entry.category]) nonCoreGrouped[entry.category] = [];
+    nonCoreGrouped[entry.category].push(entry);
   });
 
   const isEntryOn = (entry: ModalEntry): boolean => {
@@ -160,7 +205,7 @@ export function CustomizeDashboardModal({
   };
 
   const toggleDraft = (entry: ModalEntry) => {
-    if (entry.comingSoon) return; // cannot toggle coming-soon widgets
+    if (entry.comingSoon) return;
     if (entry.isCore) {
       setDraft((prev) => {
         const next = new Set(prev.core);
@@ -180,6 +225,57 @@ export function CustomizeDashboardModal({
     }
   };
 
+  // ---------------------------------------------------------------------------
+  // Reorder helpers
+  // ---------------------------------------------------------------------------
+  const moveCore = (id: string, direction: "up" | "down") => {
+    setDraft((prev) => {
+      const ids = [...orderedReorderable.map((e) => e.id)];
+      const idx = ids.indexOf(id);
+      if (idx === -1) return prev;
+      const newIdx = direction === "up" ? idx - 1 : idx + 1;
+      if (newIdx < 0 || newIdx >= ids.length) return prev;
+      const next = [...ids];
+      [next[idx], next[newIdx]] = [next[newIdx], next[idx]];
+      return { ...prev, coreOrder: next as CoreWidgetId[] };
+    });
+  };
+
+  const handleDragStart = (id: string) => {
+    dragIdRef.current = id;
+  };
+
+  const handleDragOver = (e: React.DragEvent, id: string) => {
+    e.preventDefault();
+    setDragOver(id);
+  };
+
+  const handleDrop = (targetId: string) => {
+    const sourceId = dragIdRef.current;
+    if (!sourceId || sourceId === targetId) {
+      setDragOver(null);
+      dragIdRef.current = null;
+      return;
+    }
+    setDraft((prev) => {
+      const ids = [...orderedReorderable.map((e) => e.id)];
+      const from = ids.indexOf(sourceId);
+      const to = ids.indexOf(targetId);
+      if (from === -1 || to === -1) return prev;
+      const next = [...ids];
+      next.splice(from, 1);
+      next.splice(to, 0, sourceId);
+      return { ...prev, coreOrder: next as CoreWidgetId[] };
+    });
+    setDragOver(null);
+    dragIdRef.current = null;
+  };
+
+  const handleDragEnd = () => {
+    setDragOver(null);
+    dragIdRef.current = null;
+  };
+
   const handleSave = () => {
     // Apply diff for core widgets
     CORE_WIDGETS.forEach((w) => {
@@ -195,6 +291,8 @@ export function CustomizeDashboardModal({
       const nowOn = draft.optional.has(w.id);
       if (wasOn !== nowOn) onToggle(w.id);
     });
+    // Persist core widget order
+    onReorderCore(draft.coreOrder);
     onClose();
     showToast("Dashboard layout saved.", "success", { title: "Layout Saved" });
   };
@@ -211,7 +309,7 @@ export function CustomizeDashboardModal({
         <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-gradient-to-r from-white to-gray-50">
           <div>
             <h2 className="text-lg font-bold text-text-main">Customize Dashboard</h2>
-            <p className="text-xs text-text-secondary mt-0.5">Show or hide any section on your dashboard</p>
+            <p className="text-xs text-text-secondary mt-0.5">Show, hide, or reorder sections on your dashboard</p>
           </div>
           <button
             type="button"
@@ -223,10 +321,134 @@ export function CustomizeDashboardModal({
           </button>
         </div>
 
-        {/* Body — 2-column grid matching legacy #widget-options */}
+        {/* Body */}
         <div className="flex-1 overflow-y-auto p-5 custom-scrollbar">
+          {/* ----------------------------------------------------------------
+              Reorderable core + AI widgets — rendered as a single ordered
+              list with drag handles and up/down arrows.
+          ---------------------------------------------------------------- */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-border-subtle">
+              <span className="material-symbols-outlined text-[18px] text-primary">dashboard</span>
+              <h3 className="text-sm font-bold text-text-main uppercase tracking-wide">Core &amp; AI Widgets</h3>
+              <span className="ml-auto text-[10px] text-text-muted font-medium bg-gray-100 px-2 py-0.5 rounded">Drag to reorder</span>
+            </div>
+            <div className="grid gap-2">
+              {orderedReorderable.map((entry, idx) => {
+                const isOn = isEntryOn(entry);
+                const isDragTarget = dragOver === entry.id;
+                return (
+                  <div
+                    key={entry.id}
+                    draggable
+                    onDragStart={() => handleDragStart(entry.id)}
+                    onDragOver={(e) => handleDragOver(e, entry.id)}
+                    onDrop={() => handleDrop(entry.id)}
+                    onDragEnd={handleDragEnd}
+                    className={`flex items-center gap-2 p-3 rounded-lg border transition-all ${
+                      isDragTarget
+                        ? "border-primary bg-primary-light/50 scale-[1.01]"
+                        : isOn
+                          ? "border-primary bg-primary-light/30"
+                          : "border-border-subtle hover:border-primary/50"
+                    }`}
+                  >
+                    {/* Drag handle */}
+                    <span
+                      className="material-symbols-outlined text-[18px] text-text-muted cursor-grab active:cursor-grabbing shrink-0 select-none"
+                      title="Drag to reorder"
+                    >
+                      drag_indicator
+                    </span>
+
+                    {/* Checkbox + content — click area */}
+                    <label className="flex items-center gap-3 flex-1 min-w-0 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="widget-checkbox size-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0"
+                        checked={isOn}
+                        onChange={() => toggleDraft(entry)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={`material-symbols-outlined text-[18px] ${isOn ? "text-primary" : "text-text-muted"}`}>
+                            {entry.icon}
+                          </span>
+                          <span className="font-medium text-sm text-text-main truncate">{entry.title}</span>
+                          {entry.category === "ai" && (
+                            <span className="text-[10px] bg-primary-light text-primary px-1.5 py-0.5 rounded font-medium shrink-0">
+                              AI
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{entry.description}</p>
+                      </div>
+                    </label>
+
+                    {/* Up / down arrow buttons — keyboard-accessible fallback */}
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => moveCore(entry.id, "up")}
+                        disabled={idx === 0}
+                        className="p-0.5 rounded hover:bg-gray-100 text-text-muted hover:text-text-main disabled:opacity-30 disabled:cursor-default transition-colors"
+                        aria-label={`Move ${entry.title} up`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">keyboard_arrow_up</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => moveCore(entry.id, "down")}
+                        disabled={idx === orderedReorderable.length - 1}
+                        className="p-0.5 rounded hover:bg-gray-100 text-text-muted hover:text-text-main disabled:opacity-30 disabled:cursor-default transition-colors"
+                        aria-label={`Move ${entry.title} down`}
+                      >
+                        <span className="material-symbols-outlined text-[14px]">keyboard_arrow_down</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Coming-soon entries — shown at bottom, not draggable */}
+              {comingSoonEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center gap-2 p-3 rounded-lg border border-border-subtle opacity-60"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-text-muted shrink-0 select-none">drag_indicator</span>
+                  <label className="flex items-center gap-3 flex-1 min-w-0 cursor-default">
+                    <input
+                      type="checkbox"
+                      className="widget-checkbox size-4 rounded border-gray-300 text-primary focus:ring-primary shrink-0"
+                      checked={false}
+                      disabled
+                      onChange={() => undefined}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[18px] text-text-muted">{entry.icon}</span>
+                        <span className="font-medium text-sm text-text-main truncate">{entry.title}</span>
+                        <span className="text-[10px] bg-gray-100 text-text-muted px-1.5 py-0.5 rounded font-medium shrink-0">
+                          Soon
+                        </span>
+                      </div>
+                      <p className="text-xs text-text-secondary mt-0.5 line-clamp-1">{entry.description}</p>
+                    </div>
+                  </label>
+                  <div className="w-8" />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ----------------------------------------------------------------
+              Non-core optional widget categories — 2-column grid as before
+          ---------------------------------------------------------------- */}
           <div className="grid md:grid-cols-2 gap-x-6">
-            {CATEGORY_ORDER.filter((cat) => grouped[cat]?.length).map((cat) => {
+            {CATEGORY_ORDER.filter(
+              (cat) => !REORDERABLE_CATEGORIES.has(cat) && nonCoreGrouped[cat]?.length,
+            ).map((cat) => {
               const catInfo = CATEGORY_LABELS[cat] || { name: cat, icon: "widgets" };
               return (
                 <div key={cat} className="mb-4">
@@ -237,7 +459,7 @@ export function CustomizeDashboardModal({
                   </div>
                   {/* Widget rows */}
                   <div className="grid gap-2">
-                    {grouped[cat].map((entry) => {
+                    {nonCoreGrouped[cat].map((entry) => {
                       const isOn = isEntryOn(entry);
                       const disabled = !!entry.comingSoon;
                       return (

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, NotFoundError } from "@/lib/api";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
 import { getCurrencySymbol } from "@/lib/formatters";
+import { useToast } from "@/providers/ToastProvider";
 import {
   type FinancialStatement,
   RevenueChart,
@@ -339,222 +339,6 @@ function ConflictBanner({ conflicts, onAutoResolve }: ConflictBannerProps) {
   );
 }
 
-// --- Extract Financials Modal ---
-
-async function uploadFileForExtraction(dealId: string, file: File): Promise<string> {
-  const supabase = createClient();
-  const { data: sessionData } = await supabase.auth.getSession();
-  const token = sessionData.session?.access_token;
-
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("type", "FINANCIALS");
-
-  const res = await fetch(`/api/deals/${dealId}/documents`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || `Upload failed (${res.status})`);
-  }
-  const doc = await res.json();
-  return doc.id as string;
-}
-
-interface ExtractFinancialsModalProps {
-  dealId: string;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-function ExtractFinancialsModal({ dealId, onClose, onSuccess }: ExtractFinancialsModalProps) {
-  const [step, setStep] = useState<"idle" | "uploading" | "extracting" | "done" | "error">("idle");
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [dragOver, setDragOver] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [progressMsg, setProgressMsg] = useState("");
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const ACCEPTED = ".pdf,.xlsx,.xls,.csv";
-
-  function handleFile(file: File) {
-    const ok = /\.(pdf|xlsx|xls|csv)$/i.test(file.name);
-    if (!ok) {
-      setErrorMsg("Please select a PDF, Excel, or CSV file.");
-      return;
-    }
-    setErrorMsg("");
-    setSelectedFile(file);
-  }
-
-  function onDrop(e: React.DragEvent) {
-    e.preventDefault();
-    setDragOver(false);
-    const f = e.dataTransfer.files[0];
-    if (f) handleFile(f);
-  }
-
-  async function runExtract() {
-    setErrorMsg("");
-    let documentId: string | undefined;
-
-    if (selectedFile) {
-      setStep("uploading");
-      setProgressMsg("Uploading document…");
-      try {
-        documentId = await uploadFileForExtraction(dealId, selectedFile);
-      } catch (err) {
-        setStep("error");
-        setErrorMsg(err instanceof Error ? err.message : "Upload failed");
-        return;
-      }
-    }
-
-    setStep("extracting");
-    const msgs = [
-      "Extracting… (reading file)",
-      "Extracting… (analyzing data)",
-      "Extracting… (almost done)",
-    ];
-    let msgIdx = 0;
-    setProgressMsg(msgs[0]);
-    const timer = setInterval(() => {
-      msgIdx = (msgIdx + 1) % msgs.length;
-      setProgressMsg(msgs[msgIdx]);
-    }, 15000);
-
-    try {
-      await api.post(`/deals/${dealId}/financials/extract`, documentId ? { documentId } : {});
-      setStep("done");
-      onSuccess();
-      setTimeout(onClose, 800);
-    } catch (err) {
-      setStep("error");
-      setErrorMsg(err instanceof Error ? err.message : "Extraction failed");
-    } finally {
-      clearInterval(timer);
-    }
-  }
-
-  const busy = step === "uploading" || step === "extracting";
-
-  return (
-    <div
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-      onClick={!busy ? onClose : undefined}
-    >
-      <div
-        className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-100" style={{ backgroundColor: "#003366" }}>
-          <div className="flex items-center gap-2.5">
-            <span className="material-symbols-outlined text-white text-[20px]">auto_awesome</span>
-            <h2 className="text-white text-sm font-bold">Extract Financials</h2>
-          </div>
-          {!busy && (
-            <button onClick={onClose} className="text-white/70 hover:text-white transition-colors">
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-          )}
-        </div>
-
-        {/* Body */}
-        <div className="p-6">
-          {step === "done" ? (
-            <div className="text-center py-4">
-              <span className="material-symbols-outlined text-emerald-500 text-4xl block mb-2">check_circle</span>
-              <p className="text-sm font-semibold text-gray-800">Extraction complete!</p>
-            </div>
-          ) : busy ? (
-            <div className="text-center py-6">
-              <span className="material-symbols-outlined text-[#003366] text-3xl animate-spin block mb-3">progress_activity</span>
-              <p className="text-sm font-medium text-gray-700">{progressMsg}</p>
-              <p className="text-xs text-gray-400 mt-1">This may take 30–60 seconds</p>
-            </div>
-          ) : (
-            <>
-              <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-                Upload a CIM, P&amp;L, or financial PDF/Excel to extract the 3-statement model automatically.
-                You can also extract from documents already in the Data Room.
-              </p>
-
-              {/* Drop zone */}
-              <div
-                className={cn(
-                  "relative border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all",
-                  dragOver ? "border-[#003366] bg-blue-50" : "border-gray-200 hover:border-gray-300 hover:bg-gray-50",
-                  selectedFile && "border-[#003366] bg-blue-50/40",
-                )}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={onDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={ACCEPTED}
-                  className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f); }}
-                />
-                {selectedFile ? (
-                  <>
-                    <span className="material-symbols-outlined text-[#003366] text-3xl block mb-1">description</span>
-                    <p className="text-sm font-semibold text-gray-800 truncate">{selectedFile.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{(selectedFile.size / 1024 / 1024).toFixed(1)} MB · Click to change</p>
-                  </>
-                ) : (
-                  <>
-                    <span className="material-symbols-outlined text-gray-300 text-3xl block mb-2">upload_file</span>
-                    <p className="text-sm font-medium text-gray-600">Drag &amp; drop or click to upload</p>
-                    <p className="text-xs text-gray-400 mt-1">PDF, Excel, or CSV · Max 50 MB</p>
-                  </>
-                )}
-              </div>
-
-              {errorMsg && (
-                <p className="text-xs text-red-500 mt-2">{errorMsg}</p>
-              )}
-
-              {/* Divider */}
-              <div className="flex items-center gap-3 my-4">
-                <div className="flex-1 h-px bg-gray-100" />
-                <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">or</span>
-                <div className="flex-1 h-px bg-gray-100" />
-              </div>
-
-              <p className="text-xs text-gray-500 text-center mb-4">
-                Extract from documents already in the Data Room (no upload needed)
-              </p>
-
-              <div className="flex gap-3">
-                <button
-                  onClick={onClose}
-                  className="flex-1 px-4 py-2.5 text-xs font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={runExtract}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 text-white text-xs font-semibold rounded-lg transition-colors"
-                  style={{ backgroundColor: "#003366" }}
-                >
-                  <span className="material-symbols-outlined text-[15px]">auto_awesome</span>
-                  {selectedFile ? "Upload & Extract" : "Extract from Data Room"}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // --- Shell wrapper (header + border) ---
 
 function FinancialShell({ children, avgConfidence, currency, collapsed, onToggle }: {
@@ -718,6 +502,7 @@ function FinancialTable({
 // --- Main Panel ---
 
 export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
+  const { showToast } = useToast();
   const [statements, setStatements] = useState<FinancialStatement[]>([]);
   const [serverValidation, setServerValidation] = useState<ValidationResult | null>(null);
   const [conflicts, setConflicts] = useState<ConflictGroup[]>([]);
@@ -728,7 +513,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   const [chartVisible, setChartVisible] = useState(false);
   const [chartType, setChartType] = useState<ChartType>("revenue");
   const [periodFilter, setPeriodFilter] = useState<"all" | "annual" | "quarterly">("all");
-  const [extractModalOpen, setExtractModalOpen] = useState(false);
+  const [extracting, setExtracting] = useState(false);
 
   const loadFinancials = useCallback(async () => {
     setLoading(true);
@@ -781,6 +566,61 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
       // Silently ignore — conflicts panel will still show
     }
   }, [dealId, loadFinancials]);
+
+  // Progress messages matching legacy (cycle every 15s)
+  const [extractLabel, setExtractLabel] = useState("");
+
+  const handleExtract = useCallback(async () => {
+    if (extracting) return;
+    setExtracting(true);
+    setExtractLabel("Extracting\u2026 (30\u201360s)");
+
+    const progressMsgs = [
+      "Extracting\u2026 (reading file)",
+      "Extracting\u2026 (analyzing data)",
+      "Extracting\u2026 (almost done)",
+    ];
+    let idx = 0;
+    const progressTimer = setInterval(() => {
+      idx = (idx + 1) % progressMsgs.length;
+      setExtractLabel(progressMsgs[idx]);
+    }, 15000);
+
+    try {
+      const result = await api.post<{
+        result?: { periodsStored?: number; warnings?: string[] };
+      }>(`/deals/${dealId}/financials/extract`, {});
+
+      await loadFinancials();
+
+      const stored = result?.result?.periodsStored ?? 0;
+      const warnings = result?.result?.warnings ?? [];
+
+      if (stored === 0) {
+        const warningMsg =
+          warnings.length > 0
+            ? warnings[0]
+            : "No financial data found in the document. Try uploading a P&L, Balance Sheet, or CIM.";
+        showToast(warningMsg, "warning", { title: "No Data Extracted" });
+      } else {
+        showToast(
+          `Extracted ${stored} period${stored > 1 ? "s" : ""} of financial data.`,
+          "success",
+          { title: "Financials Extracted" },
+        );
+      }
+    } catch (err) {
+      const msg =
+        err instanceof Error && err.name === "AbortError"
+          ? "Extraction timed out (>2 min). The file may be too large \u2014 try again or upload a simpler P&L."
+          : "Could not extract financial data \u2014 document may be encrypted or unsupported";
+      showToast(msg, "warning", { title: "No Data Extracted" });
+    } finally {
+      clearInterval(progressTimer);
+      setExtracting(false);
+      setExtractLabel("");
+    }
+  }, [dealId, extracting, loadFinancials, showToast]);
 
   useEffect(() => { loadFinancials(); }, [loadFinancials]);
 
@@ -854,31 +694,32 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   // Empty state
   if (!hasData) {
     return (
-      <>
-        <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
-          <div className="text-center" style={{ padding: "40px 16px" }}>
-            <span className="material-symbols-outlined text-gray-300 block mb-2" style={{ fontSize: 40 }}>table_chart</span>
-            <p className="text-sm font-semibold text-gray-800" style={{ marginBottom: 4 }}>No Financial Data Yet</p>
-            <p className="text-xs text-gray-500" style={{ marginBottom: 20 }}>
-              Upload a CIM, P&amp;L, or financial PDF to extract the 3-statement model automatically.
-            </p>
-            <button
-              onClick={() => setExtractModalOpen(true)}
-              className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg transition-colors"
-              style={{ padding: "10px 20px", backgroundColor: "#003366" }}>
-              <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-              Extract Financials
-            </button>
-          </div>
-        </FinancialShell>
-        {extractModalOpen && (
-          <ExtractFinancialsModal
-            dealId={dealId}
-            onClose={() => setExtractModalOpen(false)}
-            onSuccess={loadFinancials}
-          />
-        )}
-      </>
+      <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
+        <div className="text-center" style={{ padding: "40px 16px" }}>
+          <span className="material-symbols-outlined text-gray-300 block mb-2" style={{ fontSize: 40 }}>table_chart</span>
+          <p className="text-sm font-semibold text-gray-800" style={{ marginBottom: 4 }}>No Financial Data Yet</p>
+          <p className="text-xs text-gray-500" style={{ marginBottom: 20 }}>
+            Upload a CIM, P&amp;L, or financial PDF to extract the 3-statement model automatically.
+          </p>
+          <button
+            onClick={handleExtract}
+            disabled={extracting}
+            className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60"
+            style={{ padding: "10px 20px", backgroundColor: "#003366" }}>
+            {extracting ? (
+              <>
+                <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
+                {extractLabel || "Extracting\u2026 (30\u201360s)"}
+              </>
+            ) : (
+              <>
+                <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                Extract Financials
+              </>
+            )}
+          </button>
+        </div>
+      </FinancialShell>
     );
   }
 
@@ -898,68 +739,69 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   const showChart = chartVisible && (resolvedTab === "INCOME_STATEMENT" || resolvedTab === "BALANCE_SHEET");
 
   return (
-    <>
-      <FinancialShell avgConfidence={avgConfidence} currency={detectedCurrency} collapsed={collapsed} onToggle={toggleCollapsed}>
-        {/* Validation flags — collapsible amber/red warning card (mirrors legacy flagHtml) */}
-        <ValidationFlagsPanel flags={validationFlags} />
+    <FinancialShell avgConfidence={avgConfidence} currency={detectedCurrency} collapsed={collapsed} onToggle={toggleCollapsed}>
+      {/* Validation flags — collapsible amber/red warning card (mirrors legacy flagHtml) */}
+      <ValidationFlagsPanel flags={validationFlags} />
 
-        {/* Overlapping period conflict banner (mirrors legacy conflictBannerHtml) */}
-        <ConflictBanner conflicts={conflicts} onAutoResolve={handleAutoResolve} />
+      {/* Overlapping period conflict banner (mirrors legacy conflictBannerHtml) */}
+      <ConflictBanner conflicts={conflicts} onAutoResolve={handleAutoResolve} />
 
-        {/* Tabs + controls */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <div className="flex gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
-            {availableTabs.map((t) => (
-              <button key={t.key} onClick={() => handleTabSwitch(t.key)}
-                className={cn("flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-md transition-all",
-                  resolvedTab === t.key ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-100")}
-                style={resolvedTab === t.key ? { backgroundColor: "#003366" } : undefined}>
-                <span className="material-symbols-outlined text-sm">{t.icon}</span>{t.label}
-              </button>
+      {/* Tabs + controls */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
+        <div className="flex gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
+          {availableTabs.map((t) => (
+            <button key={t.key} onClick={() => handleTabSwitch(t.key)}
+              className={cn("flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-md transition-all",
+                resolvedTab === t.key ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-100")}
+              style={resolvedTab === t.key ? { backgroundColor: "#003366" } : undefined}>
+              <span className="material-symbols-outlined text-sm">{t.icon}</span>{t.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex gap-1.5">
+          {resolvedTab === "INCOME_STATEMENT" && (
+            <><ChartBtn type="revenue" label="Revenue" icon="bar_chart" /><ChartBtn type="growth" label="Growth" icon="trending_up" /></>
+          )}
+          {resolvedTab === "BALANCE_SHEET" && <ChartBtn type="composition" label="Composition" icon="donut_large" />}
+        </div>
+        {showPeriodToggle && (
+          <div className="flex gap-1 ml-auto bg-gray-50 rounded-lg p-0.5 border border-gray-100">
+            {(["all", "annual", "quarterly"] as const).map((p) => (
+              <button key={p} onClick={() => setPeriodFilter(p)}
+                className={cn("px-2.5 py-1 text-[10px] font-medium rounded-md transition-all capitalize",
+                  periodFilter === p ? "bg-white shadow-sm text-gray-800" : "text-gray-400 hover:text-gray-600")}>{p}</button>
             ))}
           </div>
-          <div className="flex gap-1.5">
-            {resolvedTab === "INCOME_STATEMENT" && (
-              <><ChartBtn type="revenue" label="Revenue" icon="bar_chart" /><ChartBtn type="growth" label="Growth" icon="trending_up" /></>
-            )}
-            {resolvedTab === "BALANCE_SHEET" && <ChartBtn type="composition" label="Composition" icon="donut_large" />}
-          </div>
-          {showPeriodToggle && (
-            <div className="flex gap-1 ml-auto bg-gray-50 rounded-lg p-0.5 border border-gray-100">
-              {(["all", "annual", "quarterly"] as const).map((p) => (
-                <button key={p} onClick={() => setPeriodFilter(p)}
-                  className={cn("px-2.5 py-1 text-[10px] font-medium rounded-md transition-all capitalize",
-                    periodFilter === p ? "bg-white shadow-sm text-gray-800" : "text-gray-400 hover:text-gray-600")}>{p}</button>
-              ))}
-            </div>
-          )}
-          {/* Re-extract button */}
-          <button
-            onClick={() => setExtractModalOpen(true)}
-            className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md px-3 py-1.5 transition-all hover:bg-gray-50"
-          >
-            <span className="material-symbols-outlined text-sm">refresh</span>
-            Re-extract
-          </button>
-        </div>
-        {/* Chart or Table */}
-        {showChart ? (
-          <>
-            {resolvedTab === "INCOME_STATEMENT" && chartType === "revenue" && <RevenueChart statements={filteredStatements} />}
-            {resolvedTab === "INCOME_STATEMENT" && chartType === "growth" && <GrowthChart statements={filteredStatements} />}
-            {resolvedTab === "BALANCE_SHEET" && chartType === "composition" && <BalanceSheetChart statements={filteredStatements} />}
-          </>
-        ) : (
-          <FinancialTable statements={filteredStatements} statementType={resolvedTab} conflicts={conflicts} />
         )}
-      </FinancialShell>
-      {extractModalOpen && (
-        <ExtractFinancialsModal
-          dealId={dealId}
-          onClose={() => setExtractModalOpen(false)}
-          onSuccess={loadFinancials}
-        />
+        {/* Re-extract button */}
+        <button
+          onClick={handleExtract}
+          disabled={extracting}
+          className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md px-3 py-1.5 transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
+        >
+          {extracting ? (
+            <>
+              <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
+              {extractLabel || "Extracting\u2026"}
+            </>
+          ) : (
+            <>
+              <span className="material-symbols-outlined text-sm">refresh</span>
+              Re-extract
+            </>
+          )}
+        </button>
+      </div>
+      {/* Chart or Table */}
+      {showChart ? (
+        <>
+          {resolvedTab === "INCOME_STATEMENT" && chartType === "revenue" && <RevenueChart statements={filteredStatements} />}
+          {resolvedTab === "INCOME_STATEMENT" && chartType === "growth" && <GrowthChart statements={filteredStatements} />}
+          {resolvedTab === "BALANCE_SHEET" && chartType === "composition" && <BalanceSheetChart statements={filteredStatements} />}
+        </>
+      ) : (
+        <FinancialTable statements={filteredStatements} statementType={resolvedTab} conflicts={conflicts} />
       )}
-    </>
+    </FinancialShell>
   );
 }

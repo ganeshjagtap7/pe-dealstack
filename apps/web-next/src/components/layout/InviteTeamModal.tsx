@@ -222,9 +222,10 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[1000]">
+    <div className="fixed inset-0 z-[10000]">
       <div
-        className="absolute inset-0 bg-black/10 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        data-modal-overlay
         onClick={onClose}
       />
       <div className="absolute inset-0 flex items-center justify-center p-4">

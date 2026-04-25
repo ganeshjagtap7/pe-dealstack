@@ -166,29 +166,29 @@ export function DataRoomHeader({
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0">
-      <nav className="flex items-center gap-1.5 text-sm">
+    <header className="flex h-14 items-center justify-between border-b border-slate-200 bg-white px-6 shrink-0 gap-4">
+      <nav className="flex items-center gap-1.5 text-sm min-w-0 overflow-hidden">
         <button
           type="button"
           onClick={onBack}
-          className="flex items-center justify-center size-7 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors mr-1"
+          className="flex items-center justify-center size-7 rounded-md hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors mr-1 shrink-0"
           title="Go back"
         >
           <span className="material-symbols-outlined text-[18px]">arrow_back</span>
         </button>
-        <Link href="/deals" className="text-slate-400 hover:text-blue-600 transition-colors">
+        <Link href="/deals" className="text-slate-400 hover:text-blue-600 transition-colors shrink-0">
           Deals
         </Link>
-        <span className="material-symbols-outlined text-[14px] text-slate-300">
+        <span className="material-symbols-outlined text-[14px] text-slate-300 shrink-0">
           chevron_right
         </span>
         <Link
           href={`/deals/${dealId}`}
-          className="text-slate-500 hover:text-blue-600 transition-colors truncate max-w-[150px]"
+          className="text-slate-500 hover:text-blue-600 transition-colors truncate max-w-[120px]"
         >
           {dealName || "Deal"}
         </Link>
-        <span className="material-symbols-outlined text-[14px] text-slate-300">
+        <span className="material-symbols-outlined text-[14px] text-slate-300 shrink-0">
           chevron_right
         </span>
         {activeFolder ? (
@@ -196,22 +196,22 @@ export function DataRoomHeader({
             <button
               type="button"
               onClick={onClearFolder}
-              className="text-slate-500 hover:text-blue-600 cursor-pointer transition-colors"
+              className="text-slate-500 hover:text-blue-600 cursor-pointer transition-colors shrink-0"
             >
               Data Room
             </button>
-            <span className="material-symbols-outlined text-[14px] text-slate-300">
+            <span className="material-symbols-outlined text-[14px] text-slate-300 shrink-0">
               chevron_right
             </span>
-            <span className="font-medium text-slate-900 truncate max-w-[150px]">
+            <span className="font-medium text-slate-900 truncate max-w-[120px]">
               {activeFolder.name}
             </span>
           </>
         ) : (
-          <span className="font-medium text-slate-900">Data Room</span>
+          <span className="font-medium text-slate-900 shrink-0">Data Room</span>
         )}
       </nav>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 shrink-0">
         {/* Team Members Avatar Group */}
         <div className="flex -space-x-2" title="Team members with access">
           {teamMembers.length > 0 ? (

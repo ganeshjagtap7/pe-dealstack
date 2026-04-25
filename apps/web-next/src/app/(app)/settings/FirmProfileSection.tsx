@@ -57,6 +57,7 @@ const FIELDS: { label: string; key: keyof FirmProfileData }[] = [
 export function FirmProfileSection() {
   const [firmProfile, setFirmProfile] = useState<FirmProfileData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshStatus, setRefreshStatus] = useState<{
     type: "success" | "error" | "loading";
@@ -74,8 +75,10 @@ export function FirmProfileSection() {
       setFirmProfile(orgSettings.firmProfile || null);
       setOrgWebsite(orgSettings.firmWebsite || data?.organization?.website || "");
       setOrgLinkedin(orgSettings.firmLinkedin || "");
+      setLoadError(false);
     } catch {
       setFirmProfile(null);
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -192,6 +195,8 @@ export function FirmProfileSection() {
       <div className="p-6">
         {loading ? (
           <p className="text-sm text-text-muted">Loading firm profile...</p>
+        ) : loadError ? (
+          <p className="text-sm text-text-muted">Could not load firm profile.</p>
         ) : !firmProfile || displayFields.length === 0 ? (
           <p className="text-sm text-text-muted">
             {firmProfile

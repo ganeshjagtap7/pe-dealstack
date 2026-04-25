@@ -52,6 +52,14 @@ export default function ContactsPage() {
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Refs for dropdown outside-click detection
+  const typeButtonRef = useRef<HTMLButtonElement>(null);
+  const typeDropdownRef = useRef<HTMLDivElement>(null);
+  const sortButtonRef = useRef<HTMLButtonElement>(null);
+  const sortDropdownRef = useRef<HTMLDivElement>(null);
+  const moreButtonRef = useRef<HTMLButtonElement>(null);
+  const moreDropdownRef = useRef<HTMLDivElement>(null);
+
   // ─── Data Loading ─────────────────────────────────────────
 
   const loadContacts = useCallback(async () => {
@@ -85,9 +93,30 @@ export default function ContactsPage() {
 
   useEffect(() => { loadContacts(); }, [loadContacts]);
 
-  // Close dropdowns on outside click
+  // Close dropdowns on outside click (ref-based, no stopPropagation needed)
   useEffect(() => {
-    const handler = () => { setMoreOpen(false); setSortOpen(false); setTypeOpen(false); };
+    const handler = (e: MouseEvent) => {
+      const target = e.target as Node;
+      // Only close a dropdown if the click was NOT inside its button or menu
+      if (
+        !typeButtonRef.current?.contains(target) &&
+        !typeDropdownRef.current?.contains(target)
+      ) {
+        setTypeOpen(false);
+      }
+      if (
+        !sortButtonRef.current?.contains(target) &&
+        !sortDropdownRef.current?.contains(target)
+      ) {
+        setSortOpen(false);
+      }
+      if (
+        !moreButtonRef.current?.contains(target) &&
+        !moreDropdownRef.current?.contains(target)
+      ) {
+        setMoreOpen(false);
+      }
+    };
     document.addEventListener("click", handler);
     return () => document.removeEventListener("click", handler);
   }, []);
@@ -325,13 +354,13 @@ export default function ContactsPage() {
 
           {/* Type Filter */}
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setTypeOpen(!typeOpen); setSortOpen(false); setMoreOpen(false); }}
+            <button ref={typeButtonRef} onClick={() => { setTypeOpen((v) => !v); setSortOpen(false); setMoreOpen(false); }}
               className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group text-sm font-medium text-text-secondary">
               {filters.type ? TYPE_CONFIG[filters.type]?.label : "All Types"}
               <span className="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
             </button>
             {typeOpen && (
-              <div className="absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
+              <div ref={typeDropdownRef} className="absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[160px] py-1">
                 <button onClick={() => { setFilters((f) => ({ ...f, type: "" })); setTypeOpen(false); }} className={cn("w-full text-left px-4 py-2 text-sm hover:bg-primary-light", !filters.type && "font-medium")}>All Types</button>
                 {CONTACT_TYPES.map((t) => (
                   <button key={t} onClick={() => { setFilters((f) => ({ ...f, type: t })); setTypeOpen(false); }} className={cn("w-full text-left px-4 py-2 text-sm hover:bg-primary-light", filters.type === t && "font-medium text-primary")}>{TYPE_CONFIG[t].label}</button>
@@ -342,14 +371,14 @@ export default function ContactsPage() {
 
           {/* Sort */}
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setSortOpen(!sortOpen); setTypeOpen(false); setMoreOpen(false); }}
+            <button ref={sortButtonRef} onClick={() => { setSortOpen((v) => !v); setTypeOpen(false); setMoreOpen(false); }}
               className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group text-sm font-medium text-text-secondary">
               <span className="material-symbols-outlined text-text-muted text-[16px]">swap_vert</span>
               <span className="whitespace-nowrap">{currentSortLabel}</span>
               <span className="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
             </button>
             {sortOpen && (
-              <div className="absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[200px] py-1">
+              <div ref={sortDropdownRef} className="absolute top-full left-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[200px] py-1">
                 <div className="px-3 py-1.5 text-[10px] font-bold text-text-muted uppercase tracking-wider">Sort by</div>
                 {SORT_OPTIONS.map((opt) => (
                   <button key={`${opt.sortBy}-${opt.sortOrder}`} onClick={() => { setFilters((f) => ({ ...f, sortBy: opt.sortBy, sortOrder: opt.sortOrder })); setSortOpen(false); }}
@@ -374,14 +403,14 @@ export default function ContactsPage() {
 
           {/* More Actions */}
           <div className="relative">
-            <button onClick={(e) => { e.stopPropagation(); setMoreOpen(!moreOpen); setTypeOpen(false); setSortOpen(false); }}
+            <button ref={moreButtonRef} onClick={() => { setMoreOpen((v) => !v); setTypeOpen(false); setSortOpen(false); }}
               className="flex h-9 shrink-0 items-center gap-2 rounded-lg bg-surface-card border border-border-subtle px-3.5 hover:border-primary/30 hover:shadow-sm transition-all group text-sm font-medium text-text-secondary">
               <span className="material-symbols-outlined text-text-muted text-[16px]">more_horiz</span>
               <span className="group-hover:text-text-main">More</span>
               <span className="material-symbols-outlined text-text-muted text-[16px]">keyboard_arrow_down</span>
             </button>
             {moreOpen && (
-              <div className="absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[200px] py-1">
+              <div ref={moreDropdownRef} className="absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[200px] py-1">
                 <button onClick={() => { setGroupByCompany(!groupByCompany); setMoreOpen(false); }} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-text-secondary hover:bg-primary-light hover:text-text-main transition-colors">
                   <span className="material-symbols-outlined text-[18px]">corporate_fare</span>{groupByCompany ? "Ungroup Contacts" : "Group by Company"}
                 </button>

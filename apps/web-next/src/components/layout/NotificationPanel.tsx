@@ -264,11 +264,12 @@ export function NotificationCenter() {
           {/* Overlay */}
           <div
             className={cn(
-              "fixed inset-0 z-[998] bg-black/30 backdrop-blur-[2px]",
+              "fixed inset-0 z-[10000] bg-black/40 backdrop-blur-sm",
               closing
                 ? "animate-[fadeOut_0.2s_ease-in_forwards]"
                 : "animate-[fadeIn_0.2s_ease-out]",
             )}
+            data-modal-overlay
             onClick={handleClose}
             aria-hidden="true"
           />
@@ -277,7 +278,7 @@ export function NotificationCenter() {
           <div
             ref={panelRef}
             className={cn(
-              "fixed top-0 right-0 bottom-0 z-[999] w-[420px] max-w-full",
+              "fixed top-0 right-0 bottom-0 z-[10001] w-[420px] max-w-full",
               "bg-white border-l border-border-subtle flex flex-col",
               "shadow-[-8px_0_24px_rgba(0,0,0,0.1)]",
               closing

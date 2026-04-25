@@ -43,12 +43,14 @@ export function Header() {
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key === "k") {
         e.preventDefault();
+        // If a modal overlay is already open (e.g. Invite Team), don't toggle search
+        if (!searchOpen && document.querySelector("[data-modal-overlay]")) return;
         setSearchOpen((prev) => !prev);
       }
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [searchOpen]);
 
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "";
 
@@ -214,7 +216,8 @@ export function HelpSupportModal({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
+      className="fixed inset-0 z-[10000] flex items-center justify-center"
+      data-modal-overlay
       style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

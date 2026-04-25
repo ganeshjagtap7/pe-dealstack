@@ -135,7 +135,7 @@ function Toast({
               {entry.title}
             </p>
           )}
-          <p className="text-xs text-text-secondary leading-relaxed mt-0.5">
+          <p className="text-xs leading-relaxed mt-0.5" style={{ color: "#6B7280" }}>
             {entry.message}
           </p>
         </div>
