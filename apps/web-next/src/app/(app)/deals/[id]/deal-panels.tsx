@@ -187,7 +187,7 @@ export function AISettingsModal({ onClose }: { onClose: () => void }) {
   });
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
         <div className="p-5 border-b border-border-subtle">
           <div className="flex items-center justify-between">
@@ -245,7 +245,7 @@ export function TerminalStageModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 bg-black/20 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 bg-black/20 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="bg-white/80 backdrop-blur-md rounded-xl shadow-lg max-w-md w-full border border-white/50">
         <div className="px-5 py-4 border-b border-border-subtle">
           <div className="flex items-center justify-between">

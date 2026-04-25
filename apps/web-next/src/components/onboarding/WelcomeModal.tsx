@@ -121,7 +121,7 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
       style={{ opacity: closing ? 0 : 1, transition: "opacity 0.2s ease-out" }}
     >
       <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/40 backdrop-blur-md"
         onClick={close}
       />
       <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto welcome-fade-in">

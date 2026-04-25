@@ -216,7 +216,7 @@ export function HelpSupportModal({ open, onClose }: { open: boolean; onClose: ()
 
   return (
     <div
-      className="fixed inset-0 z-[10000] flex items-center justify-center"
+      className="fixed inset-0 z-[10000] flex items-center justify-center backdrop-blur-md"
       data-modal-overlay
       style={{ backgroundColor: "rgba(0,0,0,0.5)" }}
       onClick={(e) => {

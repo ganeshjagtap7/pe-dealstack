@@ -282,7 +282,7 @@ export default function ContactsPage() {
             </div>
           )}
           <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
-            <span className="text-[11px] text-text-muted font-medium">{lastContacted}</span>
+            <span className="text-[11px] text-primary font-medium">{lastContacted}</span>
             <div className="flex items-center gap-2">
               {sd && <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold", sc.bg, sc.text)}><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", sc.dot)} />{sd.score}</span>}
               {linkedDealsCount > 0 && (
@@ -318,7 +318,7 @@ export default function ContactsPage() {
         <td className="px-4 py-3 text-sm text-text-secondary truncate max-w-[180px]">{contact.company || "--"}</td>
         <td className="px-4 py-3"><span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase", ts.bg, ts.text)}>{ts.label}</span></td>
         <td className="px-4 py-3 text-sm text-text-muted truncate max-w-[200px]">{contact.email || "--"}</td>
-        <td className="px-4 py-3 text-sm text-text-muted">{lastContacted}</td>
+        <td className="px-4 py-3 text-sm text-primary">{lastContacted}</td>
         <td className="px-4 py-3">{sd ? <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold", sc.bg, sc.text)}><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", sc.dot)} />{sd.score}</span> : <span className="text-text-muted text-xs">--</span>}</td>
       </tr>
     );

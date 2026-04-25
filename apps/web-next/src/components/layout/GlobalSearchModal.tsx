@@ -336,7 +336,7 @@ export function GlobalSearchModal({
     <div
       className="fixed inset-0 z-[10000] flex items-start justify-center pt-[18vh]"
       data-modal-overlay
-      style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}
+      style={{ backgroundColor: "rgba(0,0,0,0.4)", backdropFilter: "blur(12px)" }}
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}

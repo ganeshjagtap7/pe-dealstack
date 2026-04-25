@@ -298,7 +298,7 @@ interface StageDetailModalProps {
 export function StageDetailModal({ stageModal, deals, onClose }: StageDetailModalProps) {
   const filtered = deals.filter((d) => stageModal.stages.includes(d.stage));
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-md z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg max-h-[80vh] overflow-hidden" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-5 border-b border-border-subtle">
           <h3 className="text-lg font-bold text-text-main">{stageModal.label} Deals</h3>

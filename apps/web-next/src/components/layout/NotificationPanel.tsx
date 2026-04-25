@@ -264,7 +264,7 @@ export function NotificationCenter() {
           {/* Overlay */}
           <div
             className={cn(
-              "fixed inset-0 z-[10000] bg-black/40 backdrop-blur-sm",
+              "fixed inset-0 z-[10000] bg-black/40 backdrop-blur-md",
               closing
                 ? "animate-[fadeOut_0.2s_ease-in_forwards]"
                 : "animate-[fadeIn_0.2s_ease-out]",

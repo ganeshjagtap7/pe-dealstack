@@ -50,7 +50,7 @@ export function CreateFolderModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/50 backdrop-blur-md"
         onClick={onClose}
       />
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
@@ -306,7 +306,7 @@ export function UploadConfirmModal({
 }: UploadConfirmModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onCancel} />
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="p-4 border-b border-slate-200 flex items-center justify-between">
           <h3 className="text-base font-semibold text-slate-900">
@@ -395,7 +395,7 @@ export function LinkToDealModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-md" onClick={onClose} />
       <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md mx-4">
         <div className="p-4 border-b border-slate-200 flex items-center justify-between">
           <div>
