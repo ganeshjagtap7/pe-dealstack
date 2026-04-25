@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { api } from "@/lib/api";
 
 type Role = "VIEWER" | "MEMBER" | "ADMIN";
@@ -221,7 +222,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
     }
   };
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-[10000]">
       <div
         className="absolute inset-0 bg-black/60 backdrop-blur-xl"
@@ -457,6 +458,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -143,7 +143,7 @@ export function Sidebar() {
                 item={item}
                 isActive={item.id === activeId}
                 collapsed={collapsed}
-                showDot={item.id === "deals" && activeId !== "deals" && unreadCount > 0}
+                showDot={false}
               />
             )
           )}

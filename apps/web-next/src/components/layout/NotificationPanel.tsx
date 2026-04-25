@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { api } from "@/lib/api";
 import { useAuth } from "@/providers/AuthProvider";
@@ -272,8 +273,8 @@ export function NotificationCenter() {
         )}
       </button>
 
-      {/* Slide-out panel + overlay */}
-      {open && (
+      {/* Slide-out panel + overlay — portaled to body to escape stacking contexts */}
+      {open && createPortal(
         <>
           {/* Overlay -- onWheel + onTouchMove prevent scroll bleed-through
               to underlying scrollable containers (e.g. deal detail panels). */}
@@ -388,7 +389,8 @@ export function NotificationCenter() {
               )}
             </div>
           </div>
-        </>
+        </>,
+        document.body,
       )}
     </>
   );

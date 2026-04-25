@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import type { Deal } from "@/types";
@@ -332,7 +333,7 @@ export function GlobalSearchModal({
   // Global index counter for mapping selectedIndex across groups
   let globalIdx = 0;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[10000] flex items-start justify-center pt-[18vh]"
       data-modal-overlay
@@ -575,6 +576,7 @@ export function GlobalSearchModal({
           <span className="text-gray-400">PE OS Command Palette</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
