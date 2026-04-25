@@ -10,5 +10,11 @@ export const metadata: Metadata = {
 };
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  // The root body has overflow-hidden for the app shell, so we override it here
+  // to allow auth pages (signup, login) to scroll normally.
+  return (
+    <div className="overflow-y-auto" style={{ height: "100vh" }}>
+      {children}
+    </div>
+  );
 }

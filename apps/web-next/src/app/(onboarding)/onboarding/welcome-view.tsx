@@ -103,7 +103,7 @@ export function WelcomeView({
 
 function ChecklistCircle({ text }: { text: string }) {
   return (
-    <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-100 border border-border-subtle text-[11px] font-semibold text-gray-500">
+    <span className="inline-flex size-7 items-center justify-center rounded-full bg-gray-100 border border-border-subtle text-[13px] font-semibold text-gray-500">
       {text}
     </span>
   );

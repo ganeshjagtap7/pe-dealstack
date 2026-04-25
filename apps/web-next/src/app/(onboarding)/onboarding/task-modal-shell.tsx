@@ -10,6 +10,7 @@ export function TaskModalShell({
   onClose,
   onComplete,
   completeLabel = "Mark as done",
+  busyLabel = "Working...",
   canComplete = true,
   busy = false,
   children,
@@ -19,6 +20,7 @@ export function TaskModalShell({
   onClose: () => void;
   onComplete: () => void;
   completeLabel?: string;
+  busyLabel?: string;
   canComplete?: boolean;
   busy?: boolean;
   children: ReactNode;
@@ -76,7 +78,7 @@ export function TaskModalShell({
             className="inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[13px] font-semibold text-white transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ backgroundColor: "#003366" }}
           >
-            {busy ? "Working..." : completeLabel}
+            {busy ? busyLabel : completeLabel}
             {!busy && <span className="material-symbols-outlined text-[16px]">check</span>}
           </button>
         </div>

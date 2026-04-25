@@ -36,7 +36,7 @@ export function ChecklistView({
       : `${TASKS.length - doneCount} ${TASKS.length - doneCount === 1 ? "step" : "steps"} left. Your AI analyst is working in the background.`;
 
   return (
-    <main className="max-w-6xl mx-auto px-6 py-10">
+    <main className="max-w-6xl mx-auto px-6 py-10 pb-10 overflow-y-auto">
       <div className="mb-6">
         <div className="text-[11px] uppercase tracking-widest text-text-muted font-medium mb-2">
           Getting started · {doneCount} of {TASKS.length} complete

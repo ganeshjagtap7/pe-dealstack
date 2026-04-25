@@ -26,12 +26,17 @@ export function FilterDropdown({
   children,
   icon,
   borderless,
+  compact,
+  align = "left",
 }: {
   label: string;
   active: boolean;
   children: (close: () => void) => React.ReactNode;
   icon?: string;
   borderless?: boolean;
+  /** Slightly smaller sizing — used for right-side controls (sort, etc.) */
+  compact?: boolean;
+  align?: "left" | "right";
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -46,13 +51,15 @@ export function FilterDropdown({
 
   const buttonClass = borderless
     ? cn(
-        "flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-all",
+        "flex shrink-0 items-center gap-1.5 rounded-lg font-medium transition-all",
+        compact ? "h-8 px-2.5 text-xs" : "h-9 px-3 text-sm",
         active
           ? "text-[#003366] bg-blue-50"
           : "text-text-secondary hover:bg-primary-light"
       )
     : cn(
-        "flex h-9 shrink-0 items-center gap-2 rounded-lg border px-3.5 text-sm font-medium transition-all group",
+        "flex shrink-0 items-center gap-2 rounded-lg border font-medium transition-all group",
+        compact ? "h-8 px-3 text-xs" : "h-9 px-3.5 text-sm",
         active
           ? "border-[#B3C2D1] bg-primary-light text-[#003366]"
           : "border-border-subtle bg-surface-card text-text-secondary hover:border-primary/30 hover:shadow-sm"
@@ -62,17 +69,20 @@ export function FilterDropdown({
     <div className="relative" ref={ref}>
       <button onClick={() => setOpen((o) => !o)} className={buttonClass}>
         {icon && (
-          <span className="material-symbols-outlined text-text-muted text-[18px]">{icon}</span>
+          <span className={cn("material-symbols-outlined text-text-muted", compact ? "text-[15px]" : "text-[18px]")}>{icon}</span>
         )}
         {label}
         {!borderless && (
-          <span className="material-symbols-outlined text-text-muted text-[16px]">
+          <span className={cn("material-symbols-outlined text-text-muted", compact ? "text-[14px]" : "text-[16px]")}>
             keyboard_arrow_down
           </span>
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-48 bg-surface-card rounded-lg shadow-lg border border-border-subtle py-1 z-50">
+        <div className={cn(
+          "absolute top-full mt-2 bg-surface-card rounded-lg shadow-lg border border-border-subtle py-1 z-50 min-w-[180px]",
+          align === "right" ? "right-0" : "left-0"
+        )}>
           {children(() => setOpen(false))}
         </div>
       )}
@@ -305,7 +315,7 @@ export function DealCard({
         onClick={() => router.push(`/deals/${deal.id}`)}
         onMouseEnter={() => router.prefetch(`/deals/${deal.id}`)}
         className={cn(
-          "bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-sm hover:shadow-md relative overflow-hidden",
+          "bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all cursor-pointer flex flex-col h-full shadow-card hover:shadow-card-hover relative overflow-hidden",
           isPassed && "opacity-70 hover:opacity-100",
           selected && "ring-2 ring-[#003366] border-[#003366]"
         )}
@@ -323,7 +333,7 @@ export function DealCard({
                   {deal.companyName || deal.name}
                 </h3>
                 <p className="text-text-muted text-xs font-medium">
-                  {deal.industry || "\u2014"}
+                  {deal.industry || "N/A"}
                 </p>
               </div>
             </div>
@@ -358,7 +368,7 @@ export function DealCard({
                     {cfg.label}
                   </span>
                   <span className={cn(
-                    "font-bold text-base",
+                    "font-bold text-lg",
                     key === "mom" && value != null && value >= 3 ? "text-secondary" : "",
                     key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
                     !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
@@ -507,7 +517,7 @@ export function KanbanCard({
           </div>
         </div>
         {/* Dynamic compact metrics (first 3) */}
-        <div className="flex gap-2 mb-2">
+        <div className="flex gap-3 mb-2">
           {kanbanMetrics.map((key) => {
             const cfg = METRIC_CONFIG[key];
             if (!cfg) return null;
@@ -591,11 +601,11 @@ export function MetricsDropdown({
     <div className="relative" ref={ref}>
       <button
         onClick={() => { setOpen((o) => !o); if (!open) setChecked(new Set(activeMetrics)); }}
-        className="flex h-9 shrink-0 items-center gap-2 rounded-lg px-3 hover:bg-primary-light transition-all"
+        className="flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 hover:bg-primary-light transition-all"
         title="Customize Metrics"
       >
-        <span className="material-symbols-outlined text-text-muted text-[18px]">tune</span>
-        <span className="text-text-secondary text-sm font-medium hidden lg:block">Metrics</span>
+        <span className="material-symbols-outlined text-text-muted text-[16px]">tune</span>
+        <span className="text-text-secondary text-xs font-medium hidden lg:block">Metrics</span>
       </button>
       {open && (
         <div className="absolute top-full right-0 mt-2 bg-surface-card border border-border-subtle rounded-lg shadow-lg z-50 min-w-[220px] py-2">
@@ -651,13 +661,13 @@ export function UploadCard({ onClick }: { onClick?: () => void }) {
   return (
     <article
       onClick={onClick}
-      className="bg-surface-card/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-primary/30 hover:bg-primary-light/50 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4"
+      className="bg-surface-card/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-primary hover:bg-primary-light/30 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4"
     >
       <div className="size-14 rounded-full bg-surface-card border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-primary/30 transition-all shadow-sm">
-        <span className="material-symbols-outlined text-text-muted group-hover:text-[#003366] text-xl">add</span>
+        <span className="material-symbols-outlined text-text-muted group-hover:text-primary text-2xl">add</span>
       </div>
       <div>
-        <h3 className="text-text-main font-bold text-base group-hover:text-[#003366] transition-colors">
+        <h3 className="text-text-main font-bold text-base group-hover:text-primary transition-colors">
           Upload Documents
         </h3>
         <p className="text-text-muted text-sm mt-1 max-w-[180px]">

@@ -41,6 +41,8 @@ export default function OnboardingPage() {
   const [createdDealId, setCreatedDealId] = useState<string | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
   const confettiFiredRef = useRef(false);
+  // Tracks which task is currently submitting (so modals can show loading state)
+  const [busyTask, setBusyTask] = useState<TaskId | null>(null);
 
   // ─── Load existing progress from the API ────────────────────────
   useEffect(() => {
@@ -83,7 +85,10 @@ export default function OnboardingPage() {
   const completeTask = useCallback(
     async (taskId: TaskId) => {
       // If completing CIM with a sample deal picked, ask the API to spin up the demo.
+      // Mirror legacy behavior: button shows "Creating demo deal..." while waiting
+      // (apps/web/js/onboarding/onboarding-flow.js completeTask, lines 318-335).
       if (taskId === "cim" && sampleDealId) {
+        setBusyTask(taskId);
         try {
           const res = await api.post<{ dealId?: string }>("/onboarding/create-demo-deal", {
             sampleId: sampleDealId,
@@ -91,6 +96,8 @@ export default function OnboardingPage() {
           if (res?.dealId) setCreatedDealId(res.dealId);
         } catch {
           // Best-effort — user still gets marked done
+        } finally {
+          setBusyTask(null);
         }
       }
 
@@ -200,6 +207,7 @@ export default function OnboardingPage() {
           onSample={setSampleDealId}
           onClose={() => setActiveTask(null)}
           onComplete={() => completeTask("cim")}
+          busy={busyTask === "cim"}
         />
       )}
       {activeTask === "team" && (

@@ -18,30 +18,28 @@ interface ContactResult {
 }
 
 // ---------------------------------------------------------------------------
-// Static pages — matching legacy commandPalette.js PAGES array
+// Quick Actions — matching legacy command palette "QUICK ACTIONS" section
 // ---------------------------------------------------------------------------
-interface PageEntry {
+interface QuickAction {
   label: string;
   route: string;
   icon: string;
   keywords: string;
 }
 
-const PAGES: PageEntry[] = [
-  { label: "Dashboard", route: "/dashboard", icon: "dashboard", keywords: "home overview" },
-  { label: "Deals", route: "/deals", icon: "work", keywords: "pipeline crm deals" },
-  { label: "Data Room", route: "/data-room", icon: "folder_open", keywords: "vdr documents files" },
-  { label: "Contacts", route: "/contacts", icon: "groups", keywords: "crm people network" },
-  { label: "AI Reports", route: "/memo-builder", icon: "auto_awesome", keywords: "memo ic report" },
-  { label: "Admin", route: "/admin", icon: "admin_panel_settings", keywords: "admin tasks team" },
-  { label: "Settings", route: "/settings", icon: "settings", keywords: "profile preferences account" },
+const QUICK_ACTIONS: QuickAction[] = [
+  { label: "Create New Deal",        route: "/deal-intake",   icon: "add_circle",          keywords: "new deal create intake" },
+  { label: "Go to Deal Pipeline",    route: "/deals",         icon: "work",                keywords: "pipeline crm deals" },
+  { label: "Open Data Room",         route: "/data-room",     icon: "folder_open",         keywords: "vdr documents files" },
+  { label: "Investment Memo Builder",route: "/memo-builder",  icon: "auto_awesome",        keywords: "memo ic report ai" },
+  { label: "Settings",               route: "/settings",      icon: "settings",            keywords: "profile preferences account" },
 ];
 
 // ---------------------------------------------------------------------------
-// Result union type — Pages, Deals, Contacts (matching legacy groups)
+// Result union type — Quick Actions, Deals, Contacts
 // ---------------------------------------------------------------------------
 type SearchResult =
-  | { type: "page"; entry: PageEntry }
+  | { type: "quick-action"; entry: QuickAction }
   | { type: "deal"; deal: Deal }
   | { type: "contact"; contact: ContactResult };
 
@@ -158,22 +156,22 @@ export function GlobalSearchModal({
   }, []);
 
   // -----------------------------------------------------------------------
-  // Build default result set (pages only, no query)
+  // Build default result set (quick actions only, no query)
   // -----------------------------------------------------------------------
   const buildDefaultResults = useCallback((): SearchResult[] => {
-    return PAGES.map((p) => ({ type: "page" as const, entry: p }));
+    return QUICK_ACTIONS.map((a) => ({ type: "quick-action" as const, entry: a }));
   }, []);
 
   // -----------------------------------------------------------------------
-  // Search across all three groups (Pages, Deals, Contacts) — client-side
-  // filtering against the prefetched cache, matching legacy behaviour.
+  // Search across all three groups (Quick Actions, Deals, Contacts) —
+  // client-side filtering against the prefetched cache, matching legacy.
   // Up to 12 results total.
   // -----------------------------------------------------------------------
   const searchAll = useCallback(
     (q: string): SearchResult[] => {
-      const pageResults: SearchResult[] = PAGES.filter((p) =>
-        matchesQuery(`${p.label} ${p.keywords}`, q),
-      ).map((p) => ({ type: "page" as const, entry: p }));
+      const actionResults: SearchResult[] = QUICK_ACTIONS.filter((a) =>
+        matchesQuery(`${a.label} ${a.keywords}`, q),
+      ).map((a) => ({ type: "quick-action" as const, entry: a }));
 
       const dealResults: SearchResult[] = (dealsCacheRef.current || [])
         .filter((d) =>
@@ -193,7 +191,7 @@ export function GlobalSearchModal({
         )
         .map((c) => ({ type: "contact" as const, contact: c }));
 
-      return [...pageResults, ...dealResults, ...contactResults].slice(0, 12);
+      return [...actionResults, ...dealResults, ...contactResults].slice(0, 12);
     },
     [],
   );
@@ -222,7 +220,7 @@ export function GlobalSearchModal({
 
     const trimmed = query.trim();
 
-    // No query — show pages
+    // No query — show quick actions
     if (!trimmed) {
       setResults(buildDefaultResults());
       setSelectedIndex(0);
@@ -316,11 +314,11 @@ export function GlobalSearchModal({
   if (!open) return null;
 
   // -----------------------------------------------------------------------
-  // Group results by type — Pages, Deals, Contacts (matching legacy order)
+  // Group results by type — Quick Actions, Deals, Contacts (legacy order)
   // -----------------------------------------------------------------------
-  const pageResults = results.filter((r) => r.type === "page") as Extract<
+  const quickActionResults = results.filter((r) => r.type === "quick-action") as Extract<
     SearchResult,
-    { type: "page" }
+    { type: "quick-action" }
   >[];
   const dealResults = results.filter((r) => r.type === "deal") as Extract<
     SearchResult,
@@ -343,7 +341,7 @@ export function GlobalSearchModal({
       }}
     >
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-[560px] mx-4 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-        {/* Search Input */}
+        {/* Search Input — border/outline matching legacy cp-input-wrapper */}
         <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-gray-200">
           <span className="material-symbols-outlined text-gray-400" style={{ fontSize: 22 }}>
             search
@@ -351,8 +349,9 @@ export function GlobalSearchModal({
           <input
             ref={inputRef}
             type="text"
-            className="flex-1 text-[15px] outline-none placeholder-gray-400 bg-transparent font-sans"
-            placeholder="Search deals, contacts, pages..."
+            className="flex-1 text-[15px] bg-transparent font-sans text-gray-900 placeholder-gray-400"
+            style={{ outline: "none", border: "none" }}
+            placeholder="Search deals, documents, or type a command..."
             autoComplete="off"
             spellCheck={false}
             value={query}
@@ -397,13 +396,13 @@ export function GlobalSearchModal({
           {/* Results list */}
           {!loading && !error && results.length > 0 && (
             <>
-              {/* Pages section */}
-              {pageResults.length > 0 && (
+              {/* Quick Actions section */}
+              {quickActionResults.length > 0 && (
                 <>
                   <div className="px-2.5 pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-[0.06em]">
-                    Pages
+                    Quick Actions
                   </div>
-                  {pageResults.map((r) => {
+                  {quickActionResults.map((r) => {
                     const idx = globalIdx++;
                     const isSelected = idx === selectedIndex;
                     return (
@@ -424,7 +423,7 @@ export function GlobalSearchModal({
                           style={
                             isSelected
                               ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
-                              : { backgroundColor: "#E6EEF5", color: "#003366" }
+                              : { backgroundColor: "#FEF3C7", color: "#D97706" }
                           }
                         >
                           <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
@@ -451,9 +450,10 @@ export function GlobalSearchModal({
                   {dealResults.map((r) => {
                     const idx = globalIdx++;
                     const isSelected = idx === selectedIndex;
-                    const sub = [r.deal.stage ? formatStage(r.deal.stage) : null, r.deal.industry]
-                      .filter(Boolean)
-                      .join(" \u00B7 ");
+                    const industry = r.deal.industry || "";
+                    const stage = r.deal.stage ? formatStage(r.deal.stage) : "";
+                    // Format: "Industry • Stage" matching legacy sub: [deal.stage, deal.industry].filter(Boolean).join(' · ')
+                    const sub = [industry, stage].filter(Boolean).join(" \u2022 ");
                     return (
                       <div
                         key={r.deal.id}
@@ -558,29 +558,20 @@ export function GlobalSearchModal({
           )}
         </div>
 
-        {/* Footer — keyboard hints matching legacy cp-footer */}
-        <div className="flex items-center gap-4 px-4 py-2 border-t border-gray-200 text-[11px] text-gray-400">
+        {/* Footer — keyboard hints + "PE OS Command Palette" label matching legacy */}
+        <div className="flex items-center justify-between px-4 py-2 border-t border-gray-200 text-[11px] text-gray-400">
           <span>
             <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
-              &uarr;
+              &uarr;&darr;
             </kbd>
+            {" "}Navigate
+            {" "}&#xB7;{" "}
             <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
-              &darr;
+              &#x21B5;
             </kbd>
-            {" "}navigate
+            {" "}Select
           </span>
-          <span>
-            <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
-              Enter
-            </kbd>
-            {" "}open
-          </span>
-          <span>
-            <kbd className="inline-block text-[10px] font-semibold bg-gray-100 border border-gray-200 rounded px-1 py-px font-sans mx-0.5">
-              ESC
-            </kbd>
-            {" "}close
-          </span>
+          <span className="text-gray-400">PE OS Command Palette</span>
         </div>
       </div>
     </div>

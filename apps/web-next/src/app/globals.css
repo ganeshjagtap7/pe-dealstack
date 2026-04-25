@@ -47,6 +47,20 @@ body {
   background: #9CA3AF;
 }
 
+/* Kanban card drag styles */
+.kanban-card {
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.kanban-card:active {
+  cursor: grabbing;
+}
+.kanban-card.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg) scale(1.02);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
 /* Animations */
 @keyframes slideIn {
   from {

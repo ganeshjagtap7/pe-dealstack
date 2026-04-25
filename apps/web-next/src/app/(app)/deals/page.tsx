@@ -297,11 +297,11 @@ export default function DealsPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold text-text-main tracking-tight">Deal Pipeline</h1>
-          <p className="text-text-secondary text-sm mt-0.5 flex items-center gap-2">
+          <h1 className="text-2xl font-bold text-text-main tracking-tight font-display">Deal Pipeline</h1>
+          <p className="text-text-secondary text-sm flex items-center gap-2">
             {!loading && (
               <>
-                <span className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_rgba(5,150,105,0.4)]" />
+                <span className="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(5,150,105,0.4)]" />
                 {deals.filter((d) => d.status !== "PASSED").length} Active Opportunities
               </>
             )}
@@ -317,172 +317,178 @@ export default function DealsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex flex-wrap items-center gap-3">
-        {/* Stage Filter */}
-        <FilterDropdown label={filters.stage ? `Stage: ${STAGE_LABELS[filters.stage]}` : "Stage: All"} active={!!filters.stage}>
-          {(close) => (
-            <>
-              <button
-                onClick={() => { setFilters((f) => ({ ...f, stage: "" })); close(); }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
-              >
-                All Stages
-              </button>
-              {STAGES.map((s) => (
+      <div className="flex items-center justify-between gap-3">
+        {/* Left: filter dropdowns — allowed to wrap */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Stage Filter */}
+          <FilterDropdown label={filters.stage ? `Stage: ${STAGE_LABELS[filters.stage]}` : "Stage: All"} active={!!filters.stage}>
+            {(close) => (
+              <>
                 <button
-                  key={s}
-                  onClick={() => { setFilters((f) => ({ ...f, stage: s })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
+                  onClick={() => { setFilters((f) => ({ ...f, stage: "" })); close(); }}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
                 >
-                  {STAGE_LABELS[s]}
+                  All Stages
                 </button>
-              ))}
-            </>
-          )}
-        </FilterDropdown>
-
-        {/* Industry Filter */}
-        <FilterDropdown label={filters.industry ? `Industry: ${filters.industry}` : "Industry: All"} active={!!filters.industry}>
-          {(close) => (
-            <>
-              <button
-                onClick={() => { setFilters((f) => ({ ...f, industry: "" })); close(); }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
-              >
-                All Industries
-              </button>
-              {industries.map((ind) => (
-                <button
-                  key={ind}
-                  onClick={() => { setFilters((f) => ({ ...f, industry: ind })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
-                >
-                  {ind}
-                </button>
-              ))}
-            </>
-          )}
-        </FilterDropdown>
-
-        {/* Deal Size Filter */}
-        <FilterDropdown label={dealSizeLabel} active={!!filters.minDealSize || !!filters.maxDealSize}>
-          {(close) =>
-            DEAL_SIZE_OPTIONS.map((opt) => (
-              <button
-                key={opt.label}
-                onClick={() => {
-                  setFilters((f) => ({ ...f, minDealSize: opt.min, maxDealSize: opt.max }));
-                  close();
-                }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
-              >
-                {opt.label}
-              </button>
-            ))
-          }
-        </FilterDropdown>
-
-        {/* Priority Filter */}
-        <FilterDropdown
-          label={filters.priority ? `Priority: ${PRIORITY_LABELS[filters.priority]}` : "Priority: All"}
-          active={!!filters.priority}
-        >
-          {(close) => (
-            <>
-              <button
-                onClick={() => { setFilters((f) => ({ ...f, priority: "" })); close(); }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
-              >
-                All Priorities
-              </button>
-              {PRIORITY_OPTIONS.map((p) => (
-                <button
-                  key={p}
-                  onClick={() => { setFilters((f) => ({ ...f, priority: p })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
-                >
-                  {PRIORITY_LABELS[p]}
-                </button>
-              ))}
-            </>
-          )}
-        </FilterDropdown>
-
-        <div className="h-6 w-px bg-border-subtle mx-1 hidden sm:block" />
-
-        {/* Clear Filters */}
-        {hasActiveFilters && (
-          <button
-            onClick={clearFilters}
-            className="flex items-center gap-1 h-9 px-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium transition-colors"
-          >
-            <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-            Clear
-          </button>
-        )}
-
-        <div className="flex-1" />
-
-        {/* View Toggle */}
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => toggleView("list")}
-            title="List View"
-            className={cn(
-              "p-2 rounded-md transition-all",
-              view === "list"
-                ? "text-primary bg-primary/10"
-                : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+                {STAGES.map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => { setFilters((f) => ({ ...f, stage: s })); close(); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
+                  >
+                    {STAGE_LABELS[s]}
+                  </button>
+                ))}
+              </>
             )}
-          >
-            <span className="material-symbols-outlined text-[20px]">view_list</span>
-          </button>
-          <button
-            onClick={() => toggleView("kanban")}
-            title="Kanban View"
-            className={cn(
-              "p-2 rounded-md transition-all",
-              view === "kanban"
-                ? "text-primary bg-primary/10"
-                : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+          </FilterDropdown>
+
+          {/* Industry Filter */}
+          <FilterDropdown label={filters.industry ? `Industry: ${filters.industry}` : "Industry: All"} active={!!filters.industry}>
+            {(close) => (
+              <>
+                <button
+                  onClick={() => { setFilters((f) => ({ ...f, industry: "" })); close(); }}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
+                >
+                  All Industries
+                </button>
+                {industries.map((ind) => (
+                  <button
+                    key={ind}
+                    onClick={() => { setFilters((f) => ({ ...f, industry: ind })); close(); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
+                  >
+                    {ind}
+                  </button>
+                ))}
+              </>
             )}
-          >
-            <span className="material-symbols-outlined text-[20px]">view_kanban</span>
-          </button>
-        </div>
+          </FilterDropdown>
 
-        {/* Customize Metrics */}
-        <MetricsDropdown activeMetrics={activeMetrics} onApply={handleMetricsApply} />
-
-        <div className="h-6 w-px bg-border-subtle hidden sm:block" />
-
-        {/* Sort */}
-        {view === "list" && (
-          <FilterDropdown
-            label={`Sort by: ${sortLabel}`}
-            active={false}
-            icon="sort"
-            borderless
-          >
+          {/* Deal Size Filter */}
+          <FilterDropdown label={dealSizeLabel} active={!!filters.minDealSize || !!filters.maxDealSize}>
             {(close) =>
-              SORT_OPTIONS.map((opt) => (
+              DEAL_SIZE_OPTIONS.map((opt) => (
                 <button
                   key={opt.label}
                   onClick={() => {
-                    setFilters((f) => ({ ...f, sortBy: opt.sortBy, sortOrder: opt.sortOrder }));
+                    setFilters((f) => ({ ...f, minDealSize: opt.min, maxDealSize: opt.max }));
                     close();
                   }}
-                  className={cn(
-                    "w-full text-left px-4 py-2 text-sm hover:bg-primary-light",
-                    filters.sortBy === opt.sortBy && filters.sortOrder === opt.sortOrder && "font-medium text-[#003366]"
-                  )}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
                 >
                   {opt.label}
                 </button>
               ))
             }
           </FilterDropdown>
-        )}
+
+          {/* Priority Filter */}
+          <FilterDropdown
+            label={filters.priority ? `Priority: ${PRIORITY_LABELS[filters.priority]}` : "Priority: All"}
+            active={!!filters.priority}
+          >
+            {(close) => (
+              <>
+                <button
+                  onClick={() => { setFilters((f) => ({ ...f, priority: "" })); close(); }}
+                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
+                >
+                  All Priorities
+                </button>
+                {PRIORITY_OPTIONS.map((p) => (
+                  <button
+                    key={p}
+                    onClick={() => { setFilters((f) => ({ ...f, priority: p })); close(); }}
+                    className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
+                  >
+                    {PRIORITY_LABELS[p]}
+                  </button>
+                ))}
+              </>
+            )}
+          </FilterDropdown>
+
+          <div className="h-6 w-px bg-border-subtle mx-1 hidden sm:block" />
+
+          {/* Clear Filters */}
+          {hasActiveFilters && (
+            <button
+              onClick={clearFilters}
+              className="flex items-center gap-1 h-9 px-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium transition-colors"
+            >
+              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
+              Clear
+            </button>
+          )}
+        </div>
+
+        {/* Right: view toggle + metrics + sort — shrink-0 keeps them always on the same row */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* View Toggle */}
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={() => toggleView("list")}
+              title="List View"
+              className={cn(
+                "p-1.5 rounded-md transition-all",
+                view === "list"
+                  ? "text-primary bg-primary/10"
+                  : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">view_list</span>
+            </button>
+            <button
+              onClick={() => toggleView("kanban")}
+              title="Kanban View"
+              className={cn(
+                "p-1.5 rounded-md transition-all",
+                view === "kanban"
+                  ? "text-primary bg-primary/10"
+                  : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
+              )}
+            >
+              <span className="material-symbols-outlined text-[18px]">view_kanban</span>
+            </button>
+          </div>
+
+          {/* Customize Metrics */}
+          <MetricsDropdown activeMetrics={activeMetrics} onApply={handleMetricsApply} />
+
+          <div className="h-6 w-px bg-border-subtle hidden sm:block" />
+
+          {/* Sort */}
+          {view === "list" && (
+            <FilterDropdown
+              label={`Sort by: ${sortLabel}`}
+              active={false}
+              icon="sort"
+              borderless
+              compact
+              align="right"
+            >
+              {(close) =>
+                SORT_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.label}
+                    onClick={() => {
+                      setFilters((f) => ({ ...f, sortBy: opt.sortBy, sortOrder: opt.sortOrder }));
+                      close();
+                    }}
+                    className={cn(
+                      "w-full text-left px-4 py-2 text-sm hover:bg-primary-light whitespace-nowrap",
+                      filters.sortBy === opt.sortBy && filters.sortOrder === opt.sortOrder && "font-medium text-[#003366]"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))
+              }
+            </FilterDropdown>
+          )}
+        </div>
       </div>
 
       {/* Bulk Actions Bar */}
@@ -556,27 +562,33 @@ export default function DealsPage() {
             <p className="text-text-muted text-sm">Try adjusting your filters</p>
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center py-20">
-            <div
-              className="w-20 h-20 rounded-2xl flex items-center justify-center mb-4"
-              style={{ backgroundColor: "#E6EEF5" }}
-            >
-              <span className="material-symbols-outlined text-[36px]" style={{ color: "#003366" }}>
+          <div className="flex flex-col items-center justify-center py-24">
+            <div className="w-20 h-20 rounded-2xl bg-primary-light border border-primary/10 flex items-center justify-center mb-6 shadow-sm">
+              <span className="material-symbols-outlined text-primary" style={{ fontSize: "36px" }}>
                 rocket_launch
               </span>
             </div>
-            <p className="text-text-main font-semibold text-xl mb-2">Welcome to Your Deal Pipeline</p>
-            <p className="text-text-muted text-sm text-center max-w-md mb-5">
-              Start building your deal flow. Create your first deal to track it through sourcing, due diligence, and close.
+            <p className="text-text-main font-bold text-xl mb-2 tracking-tight">Welcome to Your Deal Pipeline</p>
+            <p className="text-text-muted text-sm text-center max-w-md mb-8 leading-relaxed">
+              Start building your deal flow. Create your first deal or import from a spreadsheet to track through sourcing, due diligence, and close.
             </p>
-            <Link
-              href="/deal-intake"
-              className="inline-flex items-center gap-2 px-5 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition-all text-sm font-semibold"
-              style={{ backgroundColor: "#003366" }}
-            >
-              <span className="material-symbols-outlined text-[18px]">add_circle</span>
-              Create Your First Deal
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/deal-intake"
+                className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-semibold"
+                style={{ backgroundColor: "#003366" }}
+              >
+                <span className="material-symbols-outlined text-[18px]">add_circle</span>
+                Create Your First Deal
+              </Link>
+              <Link
+                href="/deal-intake"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary transition-all"
+              >
+                <span className="material-symbols-outlined text-[18px]">upload_file</span>
+                Import Deals
+              </Link>
+            </div>
           </div>
         )
       ) : view === "list" ? (
@@ -602,7 +614,7 @@ export default function DealsPage() {
             const stageDeals = deals.filter((d) => d.stage === stage);
             return (
               <div key={stage} className="min-w-[300px] w-[300px] shrink-0" data-stage={stage}>
-                <div className="bg-surface-card rounded-lg border border-border-subtle overflow-hidden h-full flex flex-col">
+                <div className="bg-surface-card rounded-xl border border-border-subtle overflow-hidden h-full flex flex-col">
                   <div className={cn("px-4 py-3 border-b border-border-subtle", s.bg)}>
                     <div className="flex items-center justify-between">
                       <span className={cn("px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider", s.bg, s.border, s.text)}>
@@ -615,7 +627,7 @@ export default function DealsPage() {
                   </div>
                   <div
                     className={cn(
-                      "flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-320px)] border-2 border-dashed border-transparent rounded-lg transition-all",
+                      "flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-320px)] border-2 border-dashed border-transparent rounded-lg transition-all custom-scrollbar",
                       dragOverStage === stage && "bg-[rgba(0,51,102,0.05)] border-[rgba(0,51,102,0.3)]",
                     )}
                     style={{ minHeight: 100 }}

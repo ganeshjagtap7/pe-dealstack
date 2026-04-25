@@ -17,6 +17,7 @@ export function CimTaskModal({
   onSample,
   onClose,
   onComplete,
+  busy = false,
 }: {
   file: File | null;
   onFile: (f: File | null) => void;
@@ -24,6 +25,7 @@ export function CimTaskModal({
   onSample: (id: string | null) => void;
   onClose: () => void;
   onComplete: () => void;
+  busy?: boolean;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -63,6 +65,8 @@ export function CimTaskModal({
       onClose={onClose}
       onComplete={onComplete}
       canComplete={canComplete}
+      busy={busy}
+      busyLabel="Creating demo deal..."
     >
       <p className="text-[13.5px] text-text-secondary mb-4">
         Drop a CIM, teaser, or balance sheet. We&apos;ll parse every table and chart.

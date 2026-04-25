@@ -87,11 +87,11 @@ export function Header() {
                 in docs/planning/WEB-NEXT-PORT-PLAN.md. */}
             <Link
               href="/deal-intake"
-              className="flex items-center gap-2 px-4 py-2 text-white rounded-lg shadow-sm hover:bg-[#002855] transition-colors text-sm font-medium"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-white rounded-lg shadow-sm hover:bg-[#002855] transition-colors text-sm font-medium"
               style={{ backgroundColor: "#003366" }}
             >
-              <span className="material-symbols-outlined text-[18px]">add</span>
-              New Deal
+              <span className="material-symbols-outlined text-[16px]">smart_toy</span>
+              Ingest Deal Data
             </Link>
           </div>
         )}
