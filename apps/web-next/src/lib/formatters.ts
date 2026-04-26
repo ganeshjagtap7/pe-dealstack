@@ -1,6 +1,6 @@
 // ISO 4217 → display symbol. Port of CURRENCY_SYMBOLS in
 // apps/web/js/formatters.js. Unknown codes fall through to "<CODE> ".
-const CURRENCY_SYMBOLS: Record<string, string> = {
+export const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", INR: "₹", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥",
   CAD: "C$", AUD: "A$", CHF: "CHF ", SGD: "S$", HKD: "HK$",
   AED: "AED ", SAR: "SAR ", BRL: "R$", KRW: "₩", ZAR: "R",

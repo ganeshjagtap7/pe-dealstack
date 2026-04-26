@@ -4,6 +4,8 @@ import { useState } from "react";
 import { STAGE_LABELS } from "@/lib/constants";
 import type { TeamMember } from "./components";
 
+export { EditDealModal } from "./edit-deal-modal";
+
 // ---------------------------------------------------------------------------
 // Deal Actions Menu (more_vert dropdown: Meeting Prep, Draft Email, Data Room, Delete)
 // Ported from deal.js toggleDealActionsMenu + deal-actions-menu HTML

@@ -68,8 +68,8 @@ export default function DealIntakePage() {
     if (query.length < 2) { setDealOptions([]); return; }
     setLoadingDeals(true);
     try {
-      const res = await api.get<{ deals: DealOption[] }>(`/deals?search=${encodeURIComponent(query)}&limit=10`);
-      setDealOptions(res.deals || []);
+      const res = await api.get<DealOption[] | { deals: DealOption[] }>(`/deals?search=${encodeURIComponent(query)}&limit=10`);
+      setDealOptions(Array.isArray(res) ? res.slice(0, 10) : (res?.deals ?? []));
     } catch { setDealOptions([]); }
     finally { setLoadingDeals(false); }
   }, []);

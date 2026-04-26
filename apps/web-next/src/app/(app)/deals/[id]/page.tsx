@@ -35,7 +35,7 @@ import {
   DealViewers,
   FinancialStatusBadge,
 } from "./components";
-import { TerminalStageModal } from "./deal-panels";
+import { EditDealModal, TerminalStageModal } from "./deal-panels";
 import { useResizablePanel } from "./use-resizable-panel";
 
 // ---------------------------------------------------------------------------
@@ -80,6 +80,9 @@ export default function DealDetailPage() {
 
   // Terminal stage modal (Close Deal: Won/Lost/Passed)
   const [showTerminalModal, setShowTerminalModal] = useState(false);
+
+  // Edit deal modal
+  const [showEditModal, setShowEditModal] = useState(false);
 
   // Documents
   const [documents, setDocuments] = useState<DocItem[]>([]);
@@ -530,7 +533,7 @@ export default function DealDetailPage() {
             <span className="material-symbols-outlined text-[20px]">{linkCopied ? "check" : "link"}</span>
           </button>
           <button
-            onClick={() => router.push(`/deals/${dealId}/edit`)}
+            onClick={() => setShowEditModal(true)}
             className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors"
             style={{ backgroundColor: "#003366" }}
           >
@@ -791,6 +794,19 @@ export default function DealDetailPage() {
           dealName={deal.name}
           onSelect={handleTerminalSelect}
           onClose={() => setShowTerminalModal(false)}
+        />
+      )}
+
+      {/* Edit Deal Modal */}
+      {showEditModal && deal && (
+        <EditDealModal
+          deal={deal}
+          onClose={() => setShowEditModal(false)}
+          onSaved={(updated) => {
+            setDeal((prev) => (prev ? { ...prev, ...updated } : updated));
+            showToast("Deal details have been saved", "success", { title: "Deal Updated" });
+            loadActivities();
+          }}
         />
       )}
 
