@@ -39,13 +39,37 @@ const PALETTE_ACTIONS: PaletteAction[] = [
   { label: "Open Settings",        href: "/settings",     icon: "settings",     keywords: "profile preferences account settings" },
 ];
 
+// Per-page keyword expansion (mirrors apps/web/js/commandPalette.js PAGES).
+// Lets queries like "pipeline" or "vdr" match Deals / Data Room.
+const PAGE_KEYWORDS: Record<string, string> = {
+  dashboard: "home overview",
+  deals: "pipeline crm",
+  "data-room": "vdr documents files",
+  crm: "crm people network contacts",
+  admin: "tasks team users",
+  "ai-reports": "memo ic report ai investment",
+};
+
+// ---------------------------------------------------------------------------
+// Contact API row (matches /api/contacts response shape).
+// ---------------------------------------------------------------------------
+interface ContactRow {
+  id: string;
+  firstName?: string;
+  lastName?: string;
+  title?: string;
+  company?: string;
+  email?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Result discriminated union — used so renderer can switch on .kind.
 // ---------------------------------------------------------------------------
 
 type PaletteResult =
   | { kind: "page"; id: string; label: string; href: string; icon: string; keywords: string }
-  | { kind: "deal"; id: string; label: string; href: string; icon: string; sub: string }
+  | { kind: "deal"; id: string; label: string; href: string; icon: string; sub: string; keywords: string }
+  | { kind: "contact"; id: string; label: string; href: string; icon: string; sub: string; keywords: string }
   | { kind: "action"; label: string; href: string; icon: string; keywords: string };
 
 // ---------------------------------------------------------------------------
@@ -71,19 +95,23 @@ function formatStage(stage: string | undefined): string {
 // ---------------------------------------------------------------------------
 
 const GROUP_ICON_STYLES: Record<PaletteResult["kind"], { bg: string; color: string }> = {
-  page:   { bg: "#E6EEF5", color: "#003366" },
-  deal:   { bg: "#DBEAFE", color: "#1D4ED8" },
-  action: { bg: "#FEF3C7", color: "#D97706" },
+  page:    { bg: "#E6EEF5", color: "#003366" },
+  deal:    { bg: "#DBEAFE", color: "#1D4ED8" },
+  contact: { bg: "#FCE7F3", color: "#BE185D" },
+  action:  { bg: "#FEF3C7", color: "#D97706" },
 };
 
+// Group label varies for deals: "Recent Deals" when showing the lazy
+// 5-deal preview on empty query, plain "Deals" once the user types.
 const GROUP_LABELS: Record<PaletteResult["kind"], string> = {
-  page:   "Pages",
-  deal:   "Recent Deals",
-  action: "Actions",
+  page:    "Pages",
+  deal:    "Deals",
+  contact: "Contacts",
+  action:  "Actions",
 };
 
-// Render order — Pages first, then Recent Deals, then Actions.
-const GROUP_ORDER: PaletteResult["kind"][] = ["page", "deal", "action"];
+// Render order — Pages first, then Deals, then Contacts, then Actions.
+const GROUP_ORDER: PaletteResult["kind"][] = ["page", "deal", "contact", "action"];
 
 // ---------------------------------------------------------------------------
 // Component
@@ -99,7 +127,11 @@ export function CommandPalette() {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [recentDeals, setRecentDeals] = useState<Deal[]>([]);
-  const dealsFetchedRef = useRef(false);
+  const [allDeals, setAllDeals] = useState<Deal[]>([]);
+  const [allContacts, setAllContacts] = useState<ContactRow[]>([]);
+  const recentDealsFetchedRef = useRef(false);
+  const allDealsFetchedRef = useRef(false);
+  const allContactsFetchedRef = useRef(false);
 
   // -----------------------------------------------------------------------
   // Visibility filters — match Sidebar role gating exactly.
@@ -122,9 +154,9 @@ export function CommandPalette() {
       label: item.label,
       href: item.href,
       icon: item.icon,
-      // Lightweight keyword expansion so common synonyms (e.g. "crm",
-      // "pipeline") still match relevant pages.
-      keywords: `${item.label} ${item.id}`.toLowerCase(),
+      // Per-page keyword synonyms (PAGE_KEYWORDS) ported from legacy so
+      // searches like "pipeline", "vdr", "memo" still match relevant pages.
+      keywords: `${item.label} ${item.id} ${PAGE_KEYWORDS[item.id] ?? ""}`.toLowerCase(),
     }));
   }, [isAdmin, isMember]);
 
@@ -142,12 +174,12 @@ export function CommandPalette() {
   }, [isMember]);
 
   // -----------------------------------------------------------------------
-  // Recent deals — fetched once on first open. Fall back gracefully on any
-  // error (matches legacy "silent" behaviour).
+  // Recent deals — 5-item preview shown on empty query (fetched once on
+  // first open). Falls back silently on any error (matches legacy).
   // -----------------------------------------------------------------------
   const fetchRecentDeals = useCallback(async () => {
-    if (dealsFetchedRef.current) return;
-    dealsFetchedRef.current = true;
+    if (recentDealsFetchedRef.current) return;
+    recentDealsFetchedRef.current = true;
     try {
       const data = await api.get<Deal[] | { deals: Deal[] }>(
         "/deals?sortBy=updatedAt&sortOrder=desc&limit=5",
@@ -155,43 +187,105 @@ export function CommandPalette() {
       const list = Array.isArray(data) ? data : (data?.deals ?? []);
       setRecentDeals(list.slice(0, 5));
     } catch (err) {
-      // Endpoint not deployed yet or transient error — stay empty.
+      if (!(err instanceof NotFoundError)) {
+        console.warn("[CommandPalette] recent /deals fetch failed:", err);
+      }
+    }
+  }, []);
+
+  // -----------------------------------------------------------------------
+  // Full deals list — fetched once when the user starts typing. Mirrors
+  // legacy commandPalette.js dealsCache.
+  // -----------------------------------------------------------------------
+  const fetchAllDeals = useCallback(async () => {
+    if (allDealsFetchedRef.current) return;
+    allDealsFetchedRef.current = true;
+    try {
+      const data = await api.get<Deal[] | { deals: Deal[] }>("/deals");
+      const list = Array.isArray(data) ? data : (data?.deals ?? []);
+      setAllDeals(list);
+    } catch (err) {
       if (!(err instanceof NotFoundError)) {
         console.warn("[CommandPalette] /deals fetch failed:", err);
       }
     }
   }, []);
 
-  const recentDealResults = useMemo<PaletteResult[]>(() => {
-    return recentDeals.map((d) => ({
-      kind: "deal" as const,
+  // -----------------------------------------------------------------------
+  // Full contacts list — fetched once on first input. Mirrors legacy
+  // commandPalette.js contactsCache.
+  // -----------------------------------------------------------------------
+  const fetchAllContacts = useCallback(async () => {
+    if (allContactsFetchedRef.current) return;
+    allContactsFetchedRef.current = true;
+    try {
+      const data = await api.get<ContactRow[] | { contacts: ContactRow[] }>("/contacts");
+      const list = Array.isArray(data) ? data : (data?.contacts ?? []);
+      setAllContacts(list);
+    } catch (err) {
+      if (!(err instanceof NotFoundError)) {
+        console.warn("[CommandPalette] /contacts fetch failed:", err);
+      }
+    }
+  }, []);
+
+  // Trigger lazy fetches once the user starts typing.
+  useEffect(() => {
+    if (query.trim().length === 0) return;
+    fetchAllDeals();
+    fetchAllContacts();
+  }, [query, fetchAllDeals, fetchAllContacts]);
+
+  // -----------------------------------------------------------------------
+  // Result builders.
+  // -----------------------------------------------------------------------
+  function dealToResult(d: Deal): PaletteResult {
+    return {
+      kind: "deal",
       id: d.id,
       label: d.name,
       href: `/deals/${d.id}`,
       icon: "work",
       sub: [d.industry, formatStage(d.stage)].filter(Boolean).join(" · "),
-    }));
-  }, [recentDeals]);
+      keywords: `${d.name} ${d.industry ?? ""} ${formatStage(d.stage)}`.toLowerCase(),
+    };
+  }
+
+  function contactToResult(c: ContactRow): PaletteResult {
+    const name = `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || c.email || "Unnamed";
+    return {
+      kind: "contact",
+      id: c.id,
+      label: name,
+      href: `/contacts#detail-${c.id}`,
+      icon: "person",
+      sub: [c.title, c.company].filter(Boolean).join(" · "),
+      keywords: `${name} ${c.company ?? ""} ${c.email ?? ""}`.toLowerCase(),
+    };
+  }
 
   // -----------------------------------------------------------------------
-  // Combined results — empty query shows all groups; with query, filter by
-  // label + sub + keywords. Cap at 12 results to keep the list readable.
+  // Combined results.
+  // - Empty query: pages + 5 recent deals + actions (preview).
+  // - With query: pages + ALL deals + ALL contacts + actions, filtered.
+  // Capped at 12 to keep the list readable (matches legacy).
   // -----------------------------------------------------------------------
   const results = useMemo<PaletteResult[]>(() => {
-    const all = [...pages, ...recentDealResults, ...actions];
     const trimmed = query.trim();
-    if (!trimmed) return all;
 
-    return all
-      .filter((r) => {
-        const haystack =
-          r.kind === "deal"
-            ? `${r.label} ${r.sub}`
-            : `${r.label} ${r.keywords}`;
-        return matchesQuery(haystack, trimmed);
-      })
+    if (!trimmed) {
+      const recent = recentDeals.map(dealToResult);
+      return [...pages, ...recent, ...actions];
+    }
+
+    const dealResults = allDeals.map(dealToResult);
+    const contactResults = allContacts.map(contactToResult);
+    const haystack = (r: PaletteResult) => `${r.label} ${r.kind === "page" || r.kind === "action" ? r.keywords : `${r.sub} ${r.keywords}`}`;
+
+    return [...pages, ...dealResults, ...contactResults, ...actions]
+      .filter((r) => matchesQuery(haystack(r), trimmed))
       .slice(0, 12);
-  }, [pages, recentDealResults, actions, query]);
+  }, [pages, actions, query, recentDeals, allDeals, allContacts]);
 
   // -----------------------------------------------------------------------
   // Open / close helpers — the modal's open state is tracked here so the
@@ -316,9 +410,14 @@ export function CommandPalette() {
   const grouped: Record<PaletteResult["kind"], PaletteResult[]> = {
     page: [],
     deal: [],
+    contact: [],
     action: [],
   };
   for (const r of results) grouped[r.kind].push(r);
+
+  // When showing the empty-query preview, label the deals group
+  // "Recent Deals" instead of "Deals".
+  const dealGroupLabel = query.trim() ? "Deals" : "Recent Deals";
 
   let globalIdx = 0;
 
@@ -376,14 +475,14 @@ export function CommandPalette() {
               return (
                 <div key={kind}>
                   <div className="px-2.5 pt-2 pb-1 text-[10px] font-bold text-gray-400 uppercase tracking-[0.06em]">
-                    {GROUP_LABELS[kind]}
+                    {kind === "deal" ? dealGroupLabel : GROUP_LABELS[kind]}
                   </div>
                   {items.map((item) => {
                     const idx = globalIdx++;
                     const isActive = idx === activeIndex;
-                    const sub = item.kind === "deal" ? item.sub : "";
+                    const sub = item.kind === "deal" || item.kind === "contact" ? item.sub : "";
                     const itemKey =
-                      item.kind === "deal" || item.kind === "page"
+                      item.kind === "deal" || item.kind === "page" || item.kind === "contact"
                         ? `${item.kind}:${item.id}`
                         : `action:${item.href}`;
                     return (
