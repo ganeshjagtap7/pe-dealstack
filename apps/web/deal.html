@@ -312,7 +312,11 @@
                             Key Risks
                         </h3>
                         <div id="key-risks-list" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                            <p class="text-sm text-text-muted py-4">Loading risks...</p>
+                            <div class="space-y-2">
+                                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100/50"><div class="skeleton" style="width:100%;height:14px;border-radius:4px"></div></div>
+                                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100/50"><div class="skeleton" style="width:85%;height:14px;border-radius:4px"></div></div>
+                                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100/50"><div class="skeleton" style="width:70%;height:14px;border-radius:4px"></div></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -351,10 +355,9 @@
                         </button>
                     </div>
                     <div id="activity-feed" class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
-                        <div class="flex items-center justify-center py-8 text-text-muted">
-                            <span class="material-symbols-outlined animate-spin text-primary mr-2">sync</span>
-                            Loading activities...
-                        </div>
+                        <div class="flex items-start gap-3 p-2"><div class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></div><div class="flex-1"><div class="skeleton" style="width:60%;height:12px;border-radius:4px;margin-bottom:6px"></div><div class="skeleton" style="width:40%;height:10px;border-radius:4px"></div></div></div>
+                        <div class="flex items-start gap-3 p-2"><div class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></div><div class="flex-1"><div class="skeleton" style="width:75%;height:12px;border-radius:4px;margin-bottom:6px"></div><div class="skeleton" style="width:35%;height:10px;border-radius:4px"></div></div></div>
+                        <div class="flex items-start gap-3 p-2"><div class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></div><div class="flex-1"><div class="skeleton" style="width:50%;height:12px;border-radius:4px;margin-bottom:6px"></div><div class="skeleton" style="width:30%;height:10px;border-radius:4px"></div></div></div>
                     </div>
                 </div>
 
@@ -362,7 +365,9 @@
                 <div class="mt-auto pt-6 border-t border-border-subtle">
                     <h3 class="text-sm font-bold text-text-main mb-3">Recent Documents</h3>
                     <div id="documents-list" class="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-                        <p class="text-sm text-text-muted py-2">No documents uploaded yet.</p>
+                        <div class="skeleton" style="width:140px;height:64px;border-radius:10px;flex-shrink:0"></div>
+                        <div class="skeleton" style="width:140px;height:64px;border-radius:10px;flex-shrink:0"></div>
+                        <div class="skeleton" style="width:140px;height:64px;border-radius:10px;flex-shrink:0"></div>
                     </div>
                 </div>
             </section>
@@ -464,8 +469,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/formatters.js"></script>
-    <script src="js/notifications.js"></script>
+    <script src="js/cache.js"></script>
+    <script defer src="js/formatters.js"></script>
+    <script defer src="js/notifications.js"></script>
     <!-- Share Link Popup (positioned with JS) -->
     <div id="share-link-popup"
         class="hidden fixed bg-white rounded-xl shadow-2xl border border-border-subtle p-4 z-[100] w-72"
@@ -485,17 +491,17 @@
         </div>
     </div>
 
-    <script src="js/layoutComponents.js"></script>
-    <script src="js/layout.js"></script>
-    <script src="js/commandPalette.js"></script>
-    <script src="js/aiAssistant.js"></script>
-    <script src="js/docPreview-modal.js"></script>
-    <script src="js/docPreview.js"></script>
-    <script src="js/notificationCenter.js"></script>
-    <script src="js/globalSearch.js"></script>
-    <script src="js/shareModal.js"></script>
-    <script src="js/inviteModal-template.js"></script>
-    <script src="js/inviteModal.js"></script>
+    <script defer src="js/layoutComponents.js"></script>
+    <script defer src="js/layout.js"></script>
+    <script defer src="js/commandPalette.js"></script>
+    <script defer src="js/aiAssistant.js"></script>
+    <script defer src="js/docPreview-modal.js"></script>
+    <script defer src="js/docPreview.js"></script>
+    <script defer src="js/notificationCenter.js"></script>
+    <script defer src="js/globalSearch.js"></script>
+    <script defer src="js/shareModal.js"></script>
+    <script defer src="js/inviteModal-template.js"></script>
+    <script defer src="js/inviteModal.js"></script>
 
     <!-- Clear Chat Confirmation Modal -->
     <div id="clear-chat-modal" class="fixed inset-0 z-50 hidden">
@@ -517,36 +523,36 @@
         </div>
     </div>
 
-    <script src="deal-activity.js"></script>
-    <script src="deal-chat-responses.js"></script>
-    <script src="deal-chat-attachments.js"></script>
-    <script src="deal-chat.js"></script>
-    <script src="deal-chat-resize.js"></script>
-    <script src="deal-stages.js"></script>
-    <script src="deal-team.js"></script>
-    <script src="deal-documents.js"></script>
-    <script src="deal-edit.js"></script>
-    <script src="js/ai-tools.js"></script>
-    <script src="js/ai-email-drafter.js"></script>
-    <script src="deal.js"></script>
-    <script src="js/financials-helpers.js"></script>
-    <script src="js/financials-charts.js"></script>
-    <script src="js/financials-merge.js"></script>
-    <script src="js/financials.js"></script>
-    <script src="js/analysis-styles.js"></script>
-    <script src="js/analysis-valuation.js"></script>
-    <script src="js/analysis-charts.js"></script>
-    <script src="js/analysis-modules.js"></script>
-    <script src="js/analysis.js"></script>
+    <script defer src="deal-activity.js"></script>
+    <script defer src="deal-chat-responses.js"></script>
+    <script defer src="deal-chat-attachments.js"></script>
+    <script defer src="deal-chat.js"></script>
+    <script defer src="deal-chat-resize.js"></script>
+    <script defer src="deal-stages.js"></script>
+    <script defer src="deal-team.js"></script>
+    <script defer src="deal-documents.js"></script>
+    <script defer src="deal-edit.js"></script>
+    <script defer src="js/ai-tools.js"></script>
+    <script defer src="js/ai-email-drafter.js"></script>
+    <script defer src="deal.js"></script>
+    <script defer src="js/financials-helpers.js"></script>
+    <script defer src="js/financials-charts.js"></script>
+    <script defer src="js/financials-merge.js"></script>
+    <script defer src="js/financials.js"></script>
+    <script defer src="js/analysis-styles.js"></script>
+    <script defer src="js/analysis-valuation.js"></script>
+    <script defer src="js/analysis-charts.js"></script>
+    <script defer src="js/analysis-modules.js"></script>
+    <script defer src="js/analysis.js"></script>
 
     <!-- Fullscreen expand for Financial Statements & Analysis sections -->
-    <script src="js/dealFullscreen.js"></script>
+    <script defer src="js/dealFullscreen.js"></script>
 
     <!-- Onboarding modules -->
     <script src="js/onboarding/onboarding-config.js"></script>
-    <script src="js/onboarding/onboarding-api.js"></script>
-    <script src="js/onboarding/onboarding-celebrate.js"></script>
-    <script src="js/onboarding/onboarding-feedback.js"></script>
+    <script defer src="js/onboarding/onboarding-api.js"></script>
+    <script defer src="js/onboarding/onboarding-celebrate.js"></script>
+    <script defer src="js/onboarding/onboarding-feedback.js"></script>
 </body>
 
 </html>
