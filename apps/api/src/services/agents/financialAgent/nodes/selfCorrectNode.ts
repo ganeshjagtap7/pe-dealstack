@@ -159,6 +159,8 @@ export async function selfCorrectNode(
     let correctedClassification: ClassificationResult | null = null;
 
     // ── Text path: targeted GPT-4o re-extraction ──
+    let correctionTokens = 0;
+    let correctionCost = 0;
     if (rawText && rawText.trim().length >= 200 && isAIEnabled() && openai) {
       steps.push(step('self_correct', 'Re-extracting with targeted GPT-4o prompt'));
 
@@ -173,6 +175,11 @@ export async function selfCorrectNode(
         temperature: 0.05,
         max_tokens: 16000,
       }, { timeout: 90000 });
+
+      const promptTok = response.usage?.prompt_tokens ?? 0;
+      const completionTok = response.usage?.completion_tokens ?? 0;
+      correctionTokens = promptTok + completionTok;
+      correctionCost = (promptTok * 5e-6) + (completionTok * 15e-6);
 
       const content = response.choices[0]?.message?.content;
       if (content) {
@@ -231,6 +238,8 @@ export async function selfCorrectNode(
       overallConfidence: newConfidence,
       retryCount: retryCount + 1,
       status: 'validating',
+      tokensUsed: correctionTokens,
+      estimatedCostUsd: correctionCost,
       warnings: [
         ...state.warnings,
         ...(correctedClassification.warnings ?? []),

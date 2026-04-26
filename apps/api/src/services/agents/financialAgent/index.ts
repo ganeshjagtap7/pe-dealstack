@@ -47,6 +47,10 @@ export interface FinancialAgentResult {
   warnings: string[];
   error: string | null;
   steps: FinancialAgentStateType['steps'];
+  /** Total tokens consumed across all LLM calls in this agent run */
+  tokensUsed: number;
+  /** Estimated USD cost for this agent run (gpt-4o pricing) */
+  estimatedCostUsd: number;
 }
 
 // ─── Run Agent ───────────────────────────────────────────────
@@ -103,6 +107,8 @@ export async function runFinancialAgent(
       warnings: finalState.warnings ?? [],
       error: finalState.error ?? null,
       steps: finalState.steps ?? [],
+      tokensUsed: finalState.tokensUsed ?? 0,
+      estimatedCostUsd: finalState.estimatedCostUsd ?? 0,
     };
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -119,6 +125,8 @@ export async function runFinancialAgent(
       retryCount: 0,
       warnings: [],
       error: err instanceof Error ? err.message : String(err),
+      tokensUsed: 0,
+      estimatedCostUsd: 0,
       steps: [{
         timestamp: new Date().toISOString(),
         node: 'agent',

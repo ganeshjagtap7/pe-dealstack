@@ -134,10 +134,20 @@ export async function verifyNode(
       max_tokens: 4000,
     }, { timeout: 30000 });
 
+    const promptTok = response.usage?.prompt_tokens ?? 0;
+    const completionTok = response.usage?.completion_tokens ?? 0;
+    const verifyTokens = promptTok + completionTok;
+    // gpt-4o-mini pricing: $0.15/1M input, $0.60/1M output
+    const verifyCost = (promptTok * 0.15e-6) + (completionTok * 0.60e-6);
+
     const content = response.choices[0]?.message?.content;
     if (!content) {
       steps.push(step('verify', 'Verification skipped — no response from verifier'));
-      return { steps };
+      return { 
+        steps,
+        tokensUsed: verifyTokens,
+        estimatedCostUsd: verifyCost,
+      };
     }
 
     const result = JSON.parse(content) as {
@@ -202,6 +212,8 @@ export async function verifyNode(
 
         return {
           statements: updatedStatements,
+          tokensUsed: verifyTokens,
+          estimatedCostUsd: verifyCost,
           steps,
         };
       }
@@ -209,7 +221,11 @@ export async function verifyNode(
 
     // All good
     steps.push(step('verify', `Verification passed (confidence: ${result.confidence}%) — no corrections needed`));
-    return { steps };
+    return { 
+      steps,
+      tokensUsed: verifyTokens,
+      estimatedCostUsd: verifyCost,
+    };
 
   } catch (error) {
     // Verification is best-effort — don't block the pipeline on failure

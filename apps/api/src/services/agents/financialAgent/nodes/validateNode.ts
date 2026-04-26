@@ -14,6 +14,7 @@
  */
 
 import { validateStatements } from '../../../financialValidator.js';
+import { validateExtraction } from '../../../extraction/validator.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep, FailedCheck, ValidationResult } from '../state.js';
 
@@ -58,11 +59,18 @@ export async function validateNode(
   const totalPeriods = statements.reduce((sum, s) => sum + s.periods.length, 0);
   steps.push(step('validate', `Validating ${stmtTypes} (${totalPeriods} periods)`));
 
-  // ── Run existing 3-statement validation ──
-  const result = validateStatements(statements);
+  // ── Run extended 7-rule validation (wraps existing validateStatements) ──
+  const pipelineResult = validateExtraction(statements);
+  const result = {
+    checks: pipelineResult.checks,
+    errorCount: pipelineResult.errorCount,
+    warningCount: pipelineResult.warningCount,
+    infoCount: pipelineResult.infoCount,
+    overallPassed: pipelineResult.overallPassed,
+  };
 
   const validationResult: ValidationResult = {
-    checks: result.checks.map(c => ({
+    checks: result.checks.map((c: any) => ({
       check: c.check,
       passed: c.passed,
       severity: c.severity,
@@ -76,14 +84,14 @@ export async function validateNode(
   };
 
   // Log summary
-  const failedErrors = result.checks.filter(c => !c.passed && c.severity === 'error');
-  const failedWarnings = result.checks.filter(c => !c.passed && c.severity === 'warning');
+  const failedErrors = result.checks.filter((c: any) => !c.passed && c.severity === 'error');
+  const failedWarnings = result.checks.filter((c: any) => !c.passed && c.severity === 'warning');
 
   if (failedErrors.length > 0) {
-    steps.push(step('validate', `Found ${failedErrors.length} error(s)`, failedErrors.map(c => c.message).join('; ')));
+    steps.push(step('validate', `Found ${failedErrors.length} error(s)`, failedErrors.map((c: any) => c.message).join('; ')));
   }
   if (failedWarnings.length > 0) {
-    steps.push(step('validate', `Found ${failedWarnings.length} warning(s)`, failedWarnings.map(c => c.message).join('; ')));
+    steps.push(step('validate', `Found ${failedWarnings.length} warning(s)`, failedWarnings.map((c: any) => c.message).join('; ')));
   }
   if (failedErrors.length === 0 && failedWarnings.length === 0) {
     steps.push(step('validate', 'All math checks passed'));
