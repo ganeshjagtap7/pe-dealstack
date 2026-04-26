@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Logo } from "./Logo";
 import { useUser } from "@/providers/UserProvider";
-import { useNotificationCount } from "@/providers/NotificationCountProvider";
 import { usePresence } from "@/providers/PresenceProvider";
 import { NAV_ITEMS, type NavItem } from "@/lib/constants";
 import { cn } from "@/lib/cn";
@@ -62,7 +61,6 @@ function NavLink({
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
-  const { unreadCount } = useNotificationCount();
   const { teamHasRecentActivity } = usePresence();
   const [collapsed, setCollapsed] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -145,14 +143,6 @@ export function Sidebar() {
                 item={item}
                 isActive={item.id === activeId}
                 collapsed={collapsed}
-                // Activity dot: ported from apps/web/js/layout.js@1e843b9.
-                // Show green dot on Deals nav when there are unread notifications
-                // and the user isn't already on /deals. Polling cadence is
-                // controlled by NotificationCountProvider (30s) — that provider
-                // is the only "team activity" signal the API exposes today.
-                // TODO(presence): replace with /presence endpoint once API
-                // adds a per-team activity feed.
-                showDot={item.id === "deals" && unreadCount > 0 && activeId !== "deals"}
               />
             )
           )}
