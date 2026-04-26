@@ -2,6 +2,7 @@ import * as Sentry from '@sentry/node';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import dealsRouter from './routes/deals.js';
@@ -72,6 +73,9 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 }
 
 const app = express();
+
+// Response compression (gzip)
+app.use(compression());
 
 // Security headers
 app.use(helmet({
