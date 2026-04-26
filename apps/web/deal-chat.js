@@ -131,8 +131,7 @@ function initChatInterface() {
 
     if (!textarea || !sendButton) return;
 
-    // Load chat history from database
-    loadChatHistory();
+    // Chat history already loaded in parallel from deal.js loadDealData()
 
     // Auto-resize textarea
     textarea.addEventListener('input', function () {

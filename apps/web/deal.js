@@ -147,11 +147,30 @@ async function loadDealData() {
 
     state.dealId = dealId;
 
-    try {
-        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`);
-        if (!response.ok) throw new Error('Deal not found');
+    // Show cached deal data instantly (stale-while-revalidate)
+    const cached = window.PECache?.get('deal-' + dealId);
+    if (cached) {
+        state.dealData = cached;
+        populateDealPage(cached);
+        console.log('[Deal] Rendered from cache, refreshing in background...');
+    }
 
-        const deal = await response.json();
+    try {
+        // Fire all requests in parallel — don't wait for deal data before starting financials/chat
+        const [dealResponse, financialsResult, chatResult] = await Promise.allSettled([
+            PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`),
+            typeof loadFinancials === 'function' ? loadFinancials(dealId) : Promise.resolve(),
+            typeof loadChatHistory === 'function' ? loadChatHistory() : Promise.resolve(),
+        ]);
+
+        // Process deal data
+        if (dealResponse.status === 'rejected' || !dealResponse.value?.ok) {
+            throw new Error('Deal not found');
+        }
+        const deal = await dealResponse.value.json();
+
+        // Cache for next visit (2 min TTL)
+        if (window.PECache) PECache.set('deal-' + dealId, deal, 120000);
         state.dealData = deal;
         state.contextDocuments = deal.documents?.map(d => d.name) || [];
         state.attachedFiles = deal.documents?.map((d, i) => ({
@@ -165,12 +184,7 @@ async function loadDealData() {
 
         populateDealPage(deal);
 
-        // Load financial statements (non-blocking)
-        if (typeof loadFinancials === 'function') {
-            loadFinancials(dealId);
-        }
-
-        // Load AI financial analysis (non-blocking)
+        // Load AI financial analysis (needs deal data context, fires after deal loads)
         if (typeof loadAnalysis === 'function') {
             loadAnalysis(dealId);
         }
