@@ -209,15 +209,24 @@ export function CommandPalette() {
   }, []);
 
   // -----------------------------------------------------------------------
-  // Global Cmd/Ctrl+K + Escape listener — registered on capture phase with
-  // stopImmediatePropagation so existing Header.tsx Cmd+K listener (which
-  // opens GlobalSearchModal) is suppressed in favor of this palette.
+  // Global Cmd/Ctrl+K + Escape listener. Also listens for an
+  // "open-command-palette" window event so the Header search bar (and any
+  // other UI affordance) can open the palette programmatically without a
+  // competing keyboard handler.
   // -----------------------------------------------------------------------
   useEffect(() => {
+    function open() {
+      setOpen((prev) => {
+        if (prev) return prev;
+        setQuery("");
+        setActiveIndex(0);
+        fetchRecentDeals();
+        return true;
+      });
+    }
     function handleKeyDown(e: KeyboardEvent) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        e.stopImmediatePropagation();
         setOpen((prev) => {
           if (prev) return false;
           setQuery("");
@@ -225,15 +234,17 @@ export function CommandPalette() {
           fetchRecentDeals();
           return true;
         });
-      } else if (e.key === "Escape" && open) {
-        e.stopImmediatePropagation();
-        setOpen(false);
+      } else if (e.key === "Escape") {
+        setOpen((prev) => (prev ? false : prev));
       }
     }
-    document.addEventListener("keydown", handleKeyDown, { capture: true });
-    return () =>
-      document.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [open, fetchRecentDeals]);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("open-command-palette", open);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("open-command-palette", open);
+    };
+  }, [fetchRecentDeals]);
 
   // -----------------------------------------------------------------------
   // Focus the input shortly after the modal mounts (matches legacy 50ms

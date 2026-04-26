@@ -6,7 +6,6 @@ import { useUser } from "@/providers/UserProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NotificationCenter } from "./NotificationPanel";
-import { GlobalSearchModal } from "./GlobalSearchModal";
 
 // Ported from apps/web/js/onboarding/onboarding-config.js (f23a61c).
 // Hardcoded here for now — web-next doesn't yet have a runtime config layer.
@@ -22,7 +21,6 @@ export function Header() {
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const showDealActions = pathname === "/deals";
@@ -38,19 +36,6 @@ export function Header() {
     document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, []);
-
-  useEffect(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        // If a modal overlay is already open (e.g. Invite Team), don't toggle search
-        if (!searchOpen && document.querySelector("[data-modal-overlay]")) return;
-        setSearchOpen((prev) => !prev);
-      }
-    }
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [searchOpen]);
 
   const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "";
 
@@ -74,7 +59,7 @@ export function Header() {
         )}
         <button
           type="button"
-          onClick={() => setSearchOpen(true)}
+          onClick={() => window.dispatchEvent(new Event("open-command-palette"))}
           className="relative w-full max-w-lg items-center rounded-md border border-border-subtle bg-background-body py-2 pl-10 pr-10 text-sm text-text-muted cursor-pointer hover:border-primary/40 transition-all shadow-sm text-left hidden md:flex"
         >
           <div className="absolute inset-y-0 left-0 flex items-center pl-3">
@@ -82,7 +67,7 @@ export function Header() {
               search
             </span>
           </div>
-          <span>Ask AI anything about your portfolio...</span>
+          <span>Search deals, pages, and actions...</span>
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 gap-1">
             <kbd className="px-1.5 py-0.5 text-[10px] font-bold text-gray-400 bg-gray-100 rounded border border-gray-200">
               &#8984;K
@@ -184,7 +169,6 @@ export function Header() {
           )}
         </div>
       </div>
-      <GlobalSearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
       <HelpSupportModal open={helpOpen} onClose={() => setHelpOpen(false)} />
     </header>
   );
