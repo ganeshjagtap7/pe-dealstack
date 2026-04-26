@@ -63,6 +63,11 @@ export interface TeamMember {
   email?: string;
   avatar?: string;
   role?: string;
+  // Optional ISO timestamp — populated by a future presence endpoint.
+  // TODO(presence): wire to a real /api/presence or /api/users/online
+  // route once the backend supports it. Until then, callers leave this
+  // undefined and the UI renders "Offline".
+  lastActiveAt?: string;
 }
 
 export interface ChatMessage {

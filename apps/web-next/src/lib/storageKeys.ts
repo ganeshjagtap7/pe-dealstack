@@ -10,4 +10,5 @@ export const STORAGE_KEYS = {
   sidebarCollapsed: "pe-sidebar-collapsed",
   dealsView: "pe-deals-view",
   dealCardMetrics: "pe-deal-card-metrics",
+  aiAssistantHistory: "pe-ai-assistant-history",
 } as const;

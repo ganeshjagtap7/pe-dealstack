@@ -3,6 +3,7 @@
 import { cn } from "@/lib/cn";
 import { formatCurrency, formatRelativeTime } from "@/lib/formatters";
 import { STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
+import { Skeleton } from "@/components/ui/Skeleton";
 import Link from "next/link";
 
 // ---------------------------------------------------------------------------
@@ -105,6 +106,28 @@ interface StatCardsProps {
 }
 
 export function StatCards({ loading, sourcingCount, ddCount, loiCount, closedCount, closedTotal, pct, onStageClick }: StatCardsProps) {
+  if (loading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="relative flex flex-col gap-1 rounded-lg border border-border-subtle bg-surface-card p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <Skeleton.Line width={70} height={11} />
+              <Skeleton width={20} height={20} rounded="sm" />
+            </div>
+            <div className="flex items-end justify-between mt-3">
+              <div className="flex items-end gap-2">
+                <Skeleton width={48} height={28} />
+                <Skeleton.Line width={40} height={10} className="mb-1.5" />
+              </div>
+            </div>
+            <Skeleton width="100%" height={6} rounded="full" className="mt-4" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
       {/* Sourcing */}
@@ -406,8 +429,17 @@ export function PortfolioAllocation({ loading, allocation, gradientParts }: Port
       {/* Body */}
       <div>
         {loading ? (
-          <div className="flex items-center justify-center py-6 text-text-muted text-xs">
-            <span className="material-symbols-outlined text-xl animate-spin">sync</span>
+          <div className="flex items-center gap-6">
+            <Skeleton width={112} height={112} rounded="full" className="shrink-0" />
+            <div className="flex flex-col gap-3 flex-1 min-w-0">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Skeleton width={10} height={10} rounded="sm" />
+                  <Skeleton.Line width={`${70 - i * 10}%`} height={12} className="flex-1" />
+                  <Skeleton.Line width={28} height={12} />
+                </div>
+              ))}
+            </div>
           </div>
         ) : allocation.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 text-text-muted">

@@ -29,6 +29,7 @@ import { CustomizeDashboardModal } from "./widgets/customize-modal";
 import { DraggableWidget } from "./widgets/draggable-widget";
 import { useVisibleWidgets } from "./widgets/useVisibleWidgets";
 import { useToast } from "@/providers/ToastProvider";
+import { Skeleton } from "@/components/ui/Skeleton";
 import type { WidgetId, CoreWidgetId } from "./widgets/registry";
 
 export default function DashboardPage() {
@@ -319,7 +320,25 @@ export default function DashboardPage() {
                         </thead>
                         <tbody className="divide-y divide-border-subtle bg-white">
                           {loading ? (
-                            <tr><td colSpan={5} className="px-5 py-8 text-center text-text-muted">Loading...</td></tr>
+                            Array.from({ length: 4 }).map((_, i) => (
+                              <tr key={i}>
+                                <td className="px-5 py-4">
+                                  <div className="flex flex-col gap-1.5">
+                                    <Skeleton.Line width="65%" height={14} />
+                                    <Skeleton.Line width="40%" height={11} />
+                                  </div>
+                                </td>
+                                <td className="px-5 py-4"><Skeleton.Badge width={88} /></td>
+                                <td className="px-5 py-4"><Skeleton.Line width="60%" height={14} /></td>
+                                <td className="px-5 py-4"><Skeleton.Line width="80%" height={13} /></td>
+                                <td className="px-5 py-4">
+                                  <div className="flex items-center -space-x-1.5">
+                                    <Skeleton.Circle size={28} />
+                                    <Skeleton.Circle size={28} />
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
                           ) : deals.length === 0 ? (
                             <tr><td colSpan={5} className="px-5 py-10 text-center">
                               <span className="material-symbols-outlined text-text-muted text-[32px] mb-2 block opacity-60">priority_high</span>
@@ -388,9 +407,16 @@ export default function DashboardPage() {
                     )}
                     <div>
                       {loading ? (
-                        <div className="flex items-center justify-center py-8 text-text-muted">
-                          <span className="material-symbols-outlined animate-spin mr-2 text-lg">sync</span>
-                          <span className="text-sm">Loading tasks...</span>
+                        <div className="flex flex-col">
+                          {Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className={cn("flex items-start gap-3 p-4", i < 3 && "border-b border-border-subtle/50")}>
+                              <Skeleton width={16} height={16} rounded="sm" className="mt-1" />
+                              <div className="flex-1 flex flex-col gap-1.5">
+                                <Skeleton.Line width={`${75 - i * 5}%`} height={13} />
+                                <Skeleton.Line width="50%" height={11} />
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       ) : tasks.length === 0 ? (
                         <div className="flex flex-col items-center justify-center py-8 text-text-muted">

@@ -296,6 +296,18 @@ body {
   animation: pageContentFadeIn 0.18s ease-out;
 }
 
+/* Top-level route change: fade + subtle upward slide.
+   Keyed off the pathname in (app)/layout.tsx so a new animation fires
+   whenever the user navigates between top-level pages. */
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-fade-in {
+  animation: fadeSlide 200ms ease-out;
+}
+
 /* AI chat bubble gradient — matches legacy deal.html .ai-bubble-gradient */
 .ai-bubble-gradient {
   background: linear-gradient(135deg, #E6EEF5 0%, #F8F9FA 100%);

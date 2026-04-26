@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { STAGE_LABELS } from "@/lib/constants";
+import { usePresence, formatPresenceStatus } from "@/providers/PresenceProvider";
 import type { TeamMember } from "./components";
 
 export { EditDealModal } from "./edit-deal-modal";
@@ -87,6 +88,11 @@ export function DealActionsMenu({
 // ---------------------------------------------------------------------------
 
 export function TeamAvatarStack({ team }: { team: TeamMember[] }) {
+  // TODO(presence): once a backend /presence endpoint is live, the deal page
+  // can hydrate `member.lastActiveAt` directly from /deals/:id (joining users
+  // with their last activity). Until then `usePresence()` is the source of
+  // truth — see apps/web-next/src/providers/PresenceProvider.tsx.
+  const { isOnline, getLastActiveAt } = usePresence();
   const maxVisible = 3;
   const visible = team.slice(0, maxVisible);
   const remaining = Math.max(0, team.length - maxVisible);
@@ -108,14 +114,36 @@ export function TeamAvatarStack({ team }: { team: TeamMember[] }) {
           const initials = member.name
             ? member.name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase()
             : "?";
+          // Prefer the member's own lastActiveAt (if the API ever populates
+          // it on the deal payload), then fall back to the presence map.
+          const lastActiveAt = member.lastActiveAt ?? getLastActiveAt(member.id);
+          const online = member.lastActiveAt
+            ? Date.now() - new Date(member.lastActiveAt).getTime() < 5 * 60 * 1000
+            : isOnline(member.id);
+          const presenceLabel = online ? "Online" : formatPresenceStatus(lastActiveAt);
           return (
             <div
               key={member.id || i}
-              className="w-8 h-8 rounded-full bg-primary/10 border-2 border-white flex items-center justify-center text-primary font-semibold text-xs shadow-sm"
+              className="relative"
               style={{ zIndex: maxVisible - i }}
-              title={`${member.name || "Unknown"} (${member.role || "Member"})`}
             >
-              {initials}
+              <div
+                className="w-8 h-8 rounded-full bg-primary/10 border-2 border-white flex items-center justify-center text-primary font-semibold text-xs shadow-sm"
+                title={`${member.name || "Unknown"} (${member.role || "Member"}) — ${presenceLabel}`}
+              >
+                {initials}
+              </div>
+              <span
+                aria-label={presenceLabel}
+                title={presenceLabel}
+                className="absolute bottom-0 right-0 block rounded-full border-2 border-white"
+                style={{
+                  width: 10,
+                  height: 10,
+                  backgroundColor: online ? "#10B981" : "#9CA3AF",
+                  boxShadow: online ? "0 0 4px rgba(16,185,129,0.6)" : "none",
+                }}
+              />
             </div>
           );
         })}

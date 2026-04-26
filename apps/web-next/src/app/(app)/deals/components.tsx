@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef, type DragEvent } from "react";
-import { formatCurrency, formatRelativeTime, getDocIcon, getDealDisplayName } from "@/lib/formatters";
+import { formatCurrency, getDocIcon, getDealDisplayName } from "@/lib/formatters";
+import { useLiveTime } from "@/lib/useLiveTime";
 import {
   STAGES,
   STAGE_STYLES,
@@ -213,6 +214,7 @@ export function DealCard({
   const style = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
   const isPassed = deal.status === "PASSED" || deal.stage === "PASSED";
   const hasRiskFlag = (deal.ebitda ?? 0) < 0 || deal.stage === "PASSED";
+  const liveUpdated = useLiveTime(deal.lastDocumentUpdated || deal.updatedAt);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -459,7 +461,7 @@ export function DealCard({
                 <span className="hidden sm:inline">VDR</span>
               </Link>
               <span className="text-[11px] text-text-muted font-medium">
-                {formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}
+                {liveUpdated}
               </span>
             </div>
           </div>

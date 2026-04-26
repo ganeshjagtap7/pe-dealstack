@@ -12,6 +12,7 @@ import {
 } from "./components";
 import { DetailPanel } from "./detail-panel";
 import { CSVImportModal } from "./csv-import-modal";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 // ─── Constants ─────────────────────────────────────────────
 
@@ -436,10 +437,63 @@ export default function ContactsPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <span className="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
-          <p className="text-text-muted text-sm font-medium">Loading contacts...</p>
-        </div>
+        viewMode === "grid" ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <article key={i} className="bg-surface-card rounded-lg border border-border-subtle p-5 flex flex-col gap-3">
+                <div className="flex items-start gap-3.5">
+                  <Skeleton.Circle size={44} />
+                  <div className="flex-1 flex flex-col gap-2">
+                    <Skeleton.Line width="70%" height={15} />
+                    <Skeleton.Line width="50%" height={12} />
+                  </div>
+                  <Skeleton.Badge width={64} height={20} />
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <Skeleton.Line width="60%" height={13} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Skeleton.Line width="80%" height={12} />
+                  <Skeleton.Line width="55%" height={12} />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  <Skeleton.Badge width={48} height={18} />
+                  <Skeleton.Badge width={56} height={18} />
+                </div>
+                <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
+                  <Skeleton.Line width="40%" height={11} />
+                  <Skeleton.Badge width={36} height={16} />
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
+            <table className="w-full min-w-[600px]">
+              {tableHead}
+              <tbody>
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <tr key={i} className="border-b border-border-subtle">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <Skeleton.Circle size={32} />
+                        <div className="flex-1 flex flex-col gap-1.5">
+                          <Skeleton.Line width="70%" height={13} />
+                          <Skeleton.Line width="50%" height={11} />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3"><Skeleton.Line width="60%" height={13} /></td>
+                    <td className="px-4 py-3"><Skeleton.Badge width={56} /></td>
+                    <td className="px-4 py-3"><Skeleton.Line width="75%" height={13} /></td>
+                    <td className="px-4 py-3"><Skeleton.Line width="40%" height={13} /></td>
+                    <td className="px-4 py-3"><Skeleton.Badge width={36} height={16} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )
       ) : error ? (
         <div className="flex flex-col items-center justify-center py-20">
           <span className="material-symbols-outlined text-red-500 text-4xl mb-4">error</span>
