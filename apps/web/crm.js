@@ -34,31 +34,31 @@
             irrProjected: {
                 label: 'IRR (Proj)',
                 kanbanLabel: 'IRR',
-                format: (val) => val ? val.toFixed(1) + '%' : 'N/A',
+                format: (val) => val ? val.toFixed(1) + '%' : '—',
                 colorFn: () => 'text-text-main',
             },
             mom: {
                 label: 'MoM',
                 kanbanLabel: 'MoM',
-                format: (val) => val ? val.toFixed(1) + 'x' : 'N/A',
+                format: (val) => val ? val.toFixed(1) + 'x' : '—',
                 colorFn: (val) => val >= 3 ? 'text-secondary' : 'text-text-main',
             },
             ebitda: {
                 label: 'EBITDA',
                 kanbanLabel: 'EBITDA',
-                format: (val) => formatCurrency(val),
+                format: (val, deal) => formatCurrency(val, deal?.currency),
                 colorFn: (val) => val < 0 ? 'text-red-600' : 'text-text-main',
             },
             revenue: {
                 label: 'Revenue',
                 kanbanLabel: 'Revenue',
-                format: (val) => formatCurrency(val),
+                format: (val, deal) => formatCurrency(val, deal?.currency),
                 colorFn: () => 'text-text-main',
             },
             dealSize: {
                 label: 'Deal Size',
                 kanbanLabel: 'Size',
-                format: (val) => formatCurrency(val),
+                format: (val, deal) => formatCurrency(val, deal?.currency),
                 colorFn: () => 'text-text-main',
             },
         };
@@ -76,12 +76,24 @@
         // Load deals from API
         async function loadDeals() {
             const grid = document.getElementById('deals-grid');
-            grid.innerHTML = `
-        <div class="col-span-full flex flex-col items-center justify-center py-20">
-            <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
-            <p class="text-text-muted text-sm font-medium">Loading deals...</p>
-        </div>
-    `;
+
+            // Show cached deals instantly (stale-while-revalidate)
+            const cachedDeals = window.PECache?.get('deals-list');
+            if (cachedDeals && cachedDeals.length > 0) {
+                allDeals = cachedDeals;
+                grid.innerHTML = cachedDeals.map(deal => renderDealCard(deal)).join('') + renderUploadCard();
+                const activeDeals = cachedDeals.filter(d => d.status !== 'PASSED').length;
+                const countEl = document.getElementById('deal-count');
+                if (countEl) countEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-secondary shadow-[0_0_8px_rgba(5,150,105,0.4)]"></span> ${activeDeals} Active Opportunities`;
+                console.log('[CRM] Rendered from cache, refreshing...');
+            } else {
+                grid.innerHTML = `
+            <div class="col-span-full flex flex-col items-center justify-center py-20">
+                <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
+                <p class="text-text-muted text-sm font-medium">Loading deals...</p>
+            </div>
+        `;
+            }
 
             try {
                 const queryString = buildQueryString();
@@ -93,6 +105,9 @@
 
                 const deals = await response.json();
                 allDeals = deals; // Store for bulk operations
+
+                // Cache for next visit (5 min TTL)
+                if (window.PECache) PECache.set('deals-list', deals, 300000);
 
                 // Onboarding: mark createDeal step as complete if user has deals
                 if (deals.length > 0 && window.OnboardingAPI) {
@@ -236,4 +251,14 @@
 
             // Onboarding: feedback button + beta badge + step detection
             if (window.initOnboardingUI) initOnboardingUI();
+
+            // Live-update relative timestamps every 30s
+            setInterval(() => {
+                document.querySelectorAll('.live-timestamp[data-timestamp]').forEach(el => {
+                    const ts = el.dataset.timestamp;
+                    if (ts && typeof formatRelativeTime === 'function') {
+                        el.textContent = formatRelativeTime(ts);
+                    }
+                });
+            }, 30000);
         });

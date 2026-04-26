@@ -1,7 +1,5 @@
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
-import { createSampleDeal } from './sampleDealService.js';
-
 /**
  * Find user by authId (or legacy id), or create if not exists.
  * On first signup: also creates the Organization if firmName is provided.
@@ -49,32 +47,46 @@ export async function findOrCreateUser(authUser: {
       if (existingOrg) {
         organizationId = existingOrg.id;
       } else {
-        // Create new Organization
-        const slug = authUser.firmName
+        // Create new Organization with unique slug
+        const baseSlug = authUser.firmName
           .toLowerCase()
           .replace(/[^a-z0-9\s-]/g, '')
           .replace(/\s+/g, '-')
           .substring(0, 100);
+        const uniqueSlug = `${baseSlug || 'org'}-${Date.now().toString(36)}`;
 
         const { data: newOrg, error: orgError } = await supabase
           .from('Organization')
           .insert({
             name: authUser.firmName,
-            slug: slug || `org-${Date.now()}`,
+            slug: uniqueSlug,
           })
           .select()
           .single();
 
         if (orgError) {
           log.error('Failed to create organization', orgError);
-          throw orgError;
+          // If slug conflict, try to find existing org by name and use that
+          if (orgError.code === '23505') {
+            const { data: fallbackOrg } = await supabase
+              .from('Organization')
+              .select('id')
+              .eq('name', authUser.firmName)
+              .single();
+            if (fallbackOrg) {
+              organizationId = fallbackOrg.id;
+              log.info('Using existing organization after slug conflict', { orgId: fallbackOrg.id });
+            } else {
+              throw orgError;
+            }
+          } else {
+            throw orgError;
+          }
         }
         organizationId = newOrg.id;
         log.info('Organization created on signup', { orgId: newOrg.id, name: authUser.firmName });
-        // Create sample deal for new org (fire-and-forget — never blocks signup)
-        createSampleDeal(newOrg.id, authUser.id).catch(err => {
-          log.error('Sample deal creation failed', err, { orgId: newOrg.id });
-        });
+        // Sample deal is now created during onboarding (POST /api/onboarding/create-demo-deal)
+        // instead of auto-creating on signup
       }
     }
 

@@ -119,6 +119,11 @@ export const FinancialAgentState = Annotation.Root({
     reducer: (_prev, next) => next,
     default: () => 3,
   }),
+  /** Skip the verify node to reduce execution time (for serverless timeouts) */
+  skipVerify: Annotation<boolean>({
+    reducer: (_prev, next) => next,
+    default: () => false,
+  }),
   failedChecks: Annotation<FailedCheck[]>({
     reducer: (_prev, next) => next,
     default: () => [],

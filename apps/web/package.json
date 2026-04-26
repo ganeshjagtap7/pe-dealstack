@@ -13,7 +13,6 @@
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {
-    "@openreplay/tracker": "^17.1.6",
     "@sentry/browser": "^10.38.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
@@ -21,6 +20,8 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.58.1",
+    "@tailwindcss/container-queries": "^0.1.1",
+    "@tailwindcss/forms": "^0.5.11",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.2.0",

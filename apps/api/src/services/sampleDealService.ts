@@ -93,7 +93,7 @@ const CASH_FLOW_ITEMS: Record<string, Record<string, number>> = {
   },
 };
 
-export async function createSampleDeal(orgId: string, userId: string): Promise<void> {
+export async function createSampleDeal(orgId: string, userId: string): Promise<string | null> {
   try {
     // 1. Create Company
     const { data: company, error: companyErr } = await supabase
@@ -201,8 +201,9 @@ export async function createSampleDeal(orgId: string, userId: string): Promise<v
     await supabase.from('Activity').insert(activities);
 
     log.info('Sample deal created for new org', { orgId, dealId: deal.id, company: 'Lukhtara Industries' });
+    return deal.id;
   } catch (error) {
-    // Sample deal creation should never block signup
     log.error('Failed to create sample deal', error, { orgId });
+    return null;
   }
 }

@@ -90,24 +90,9 @@
                 renderUploadCard();
         }
 
-        // Format currency — values stored in millions USD
-        function formatCurrency(value) {
-            if (value === null || value === undefined) return 'N/A';
-            const absValue = Math.abs(value);
-            const sign = value < 0 ? '-' : '';
-            if (absValue >= 1000) {
-                const b = absValue / 1000;
-                return `${sign}$${b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)}B`;
-            }
-            if (absValue >= 1) {
-                return `${sign}$${absValue >= 100 ? absValue.toFixed(0) : absValue >= 10 ? absValue.toFixed(1) : absValue.toFixed(2)}M`;
-            }
-            const k = absValue * 1000;
-            if (k >= 1) {
-                return `${sign}$${k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)}K`;
-            }
-            const dollars = absValue * 1000000;
-            return `${sign}$${dollars.toLocaleString('en-US', { maximumFractionDigits: 0 })}`;
+        // Format currency — use global formatCurrency with deal currency support
+        function fmtDealCurrency(value, currency) {
+            return window.formatCurrency(value, currency);
         }
 
         function renderDealCard(deal) {
@@ -126,7 +111,7 @@
                         </div>
                         <div>
                             <h3 class="text-text-main font-bold text-lg leading-tight group-hover:text-primary transition-colors">${deal.name}</h3>
-                            <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
+                            <p class="text-text-muted text-xs font-medium">${deal.industry || '—'}</p>
                         </div>
                     </div>
                     <span class="px-2.5 py-1 rounded-md bg-${stageColor}-50 border border-${stageColor}-100 text-${stageColor}-600 text-[10px] font-bold uppercase tracking-wider">${getStageLabel(deal.stage)}</span>
@@ -134,19 +119,19 @@
                 <div class="grid grid-cols-2 gap-px bg-border-subtle rounded-lg overflow-hidden border border-border-subtle mb-6">
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">IRR (Proj)</span>
-                        <span class="text-text-main font-bold text-lg tabular-nums">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : 'N/A'}</span>
+                        <span class="text-text-main font-bold text-lg tabular-nums">${deal.irrProjected ? deal.irrProjected.toFixed(1) + '%' : '—'}</span>
                     </div>
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">MoM</span>
-                        <span class="text-${deal.mom >= 3 ? 'emerald' : 'text'}-${deal.mom >= 3 ? '600' : 'main'} font-bold text-lg tabular-nums">${deal.mom ? deal.mom.toFixed(1) + 'x' : 'N/A'}</span>
+                        <span class="text-${deal.mom >= 3 ? 'emerald' : 'text'}-${deal.mom >= 3 ? '600' : 'main'} font-bold text-lg tabular-nums">${deal.mom ? deal.mom.toFixed(1) + 'x' : '—'}</span>
                     </div>
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">EBITDA</span>
-                        <span class="text-${deal.ebitda < 0 ? 'red' : 'text'}-${deal.ebitda < 0 ? '500' : 'main'} font-bold text-lg tabular-nums">${formatCurrency(deal.ebitda)}</span>
+                        <span class="text-${deal.ebitda < 0 ? 'red' : 'text'}-${deal.ebitda < 0 ? '500' : 'main'} font-bold text-lg tabular-nums">${fmtDealCurrency(deal.ebitda, deal.currency)}</span>
                     </div>
                     <div class="bg-surface-white p-3.5 flex flex-col items-center">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider mb-1">Revenue</span>
-                        <span class="text-text-main font-bold text-lg tabular-nums">${formatCurrency(deal.revenue)}</span>
+                        <span class="text-text-main font-bold text-lg tabular-nums">${fmtDealCurrency(deal.revenue, deal.currency)}</span>
                     </div>
                 </div>
                 <div class="bg-slate-50 rounded-lg p-4 border border-border-subtle mt-auto">

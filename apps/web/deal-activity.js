@@ -109,7 +109,131 @@ function initActivityFeed() {
                 addNote();
             }
         });
+        initMentionAutocomplete(noteInput);
     }
+}
+
+// ─── @Mention Autocomplete ──────────────────────────────────
+let _mentionUsers = null;
+let _mentionActive = false;
+let _mentionStart = -1;
+let _mentionSelectedIdx = 0;
+
+async function fetchOrgUsers() {
+    if (_mentionUsers) return _mentionUsers;
+    try {
+        const res = await PEAuth.authFetch(`${API_BASE_URL}/users`);
+        if (res.ok) {
+            const data = await res.json();
+            _mentionUsers = (data.users || data || []).map(u => ({
+                id: u.id,
+                name: u.name || u.email?.split('@')[0] || 'Unknown',
+                email: u.email || '',
+                initials: (u.name || '??').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2),
+            }));
+        }
+    } catch (e) { console.warn('Failed to fetch users for mentions', e); }
+    return _mentionUsers || [];
+}
+
+function initMentionAutocomplete(input) {
+    const dropdown = document.getElementById('mention-dropdown');
+    if (!dropdown) return;
+
+    input.addEventListener('input', async () => {
+        const val = input.value;
+        const cursor = input.selectionStart;
+        // Find @ before cursor
+        const before = val.slice(0, cursor);
+        const atIdx = before.lastIndexOf('@');
+
+        if (atIdx === -1 || (atIdx > 0 && before[atIdx - 1] !== ' ')) {
+            closeMentionDropdown();
+            return;
+        }
+
+        const query = before.slice(atIdx + 1).toLowerCase();
+        _mentionStart = atIdx;
+        _mentionActive = true;
+
+        const users = await fetchOrgUsers();
+        const filtered = users.filter(u =>
+            u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query)
+        ).slice(0, 6);
+
+        if (filtered.length === 0) {
+            closeMentionDropdown();
+            return;
+        }
+
+        _mentionSelectedIdx = 0;
+        dropdown.innerHTML = filtered.map((u, i) => `
+            <button type="button" class="mention-option w-full text-left px-3 py-2 flex items-center gap-2.5 hover:bg-primary/5 transition-colors ${i === 0 ? 'bg-primary/5' : ''}" data-idx="${i}" data-name="${escapeHtml(u.name)}">
+                <span class="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style="background:#003366;">${u.initials}</span>
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold text-gray-800 truncate">${escapeHtml(u.name)}</p>
+                    <p class="text-[10px] text-gray-400 truncate">${escapeHtml(u.email)}</p>
+                </div>
+            </button>
+        `).join('');
+        dropdown.classList.remove('hidden');
+
+        // Click handler
+        dropdown.querySelectorAll('.mention-option').forEach(opt => {
+            opt.addEventListener('mousedown', (e) => {
+                e.preventDefault();
+                insertMention(input, opt.dataset.name);
+            });
+        });
+    });
+
+    input.addEventListener('keydown', (e) => {
+        if (!_mentionActive) return;
+        const options = dropdown.querySelectorAll('.mention-option');
+        if (!options.length) return;
+
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            _mentionSelectedIdx = Math.min(_mentionSelectedIdx + 1, options.length - 1);
+            updateMentionSelection(options);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            _mentionSelectedIdx = Math.max(_mentionSelectedIdx - 1, 0);
+            updateMentionSelection(options);
+        } else if (e.key === 'Enter' && _mentionActive) {
+            e.preventDefault();
+            const selected = options[_mentionSelectedIdx];
+            if (selected) insertMention(input, selected.dataset.name);
+        } else if (e.key === 'Escape') {
+            closeMentionDropdown();
+        }
+    });
+
+    input.addEventListener('blur', () => {
+        setTimeout(closeMentionDropdown, 200);
+    });
+}
+
+function updateMentionSelection(options) {
+    options.forEach((opt, i) => {
+        opt.classList.toggle('bg-primary/5', i === _mentionSelectedIdx);
+    });
+}
+
+function insertMention(input, name) {
+    const val = input.value;
+    const before = val.slice(0, _mentionStart);
+    const after = val.slice(input.selectionStart);
+    input.value = before + '@' + name + ' ' + after;
+    const newCursor = before.length + name.length + 2;
+    input.setSelectionRange(newCursor, newCursor);
+    input.focus();
+    closeMentionDropdown();
+}
+
+function closeMentionDropdown() {
+    _mentionActive = false;
+    document.getElementById('mention-dropdown')?.classList.add('hidden');
 }
 
 async function addNote() {

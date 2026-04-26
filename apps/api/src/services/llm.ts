@@ -45,9 +45,9 @@ const useOpenRouter = isOpenRouterEnabled();
 
 const MODELS = {
   openai: {
-    chat: process.env.LLM_CHAT_MODEL || (useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4.1'),
-    fast: process.env.LLM_FAST_MODEL || (useOpenRouter ? AI_MODELS.TIER3 : 'gpt-4.1-mini'),
-    extraction: useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4.1',
+    chat: process.env.LLM_CHAT_MODEL || (useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4o'),
+    fast: process.env.LLM_FAST_MODEL || (useOpenRouter ? AI_MODELS.TIER3 : 'gpt-4o-mini'),
+    extraction: useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4o',
   },
   gemini: {
     chat: 'gemini-1.5-pro',

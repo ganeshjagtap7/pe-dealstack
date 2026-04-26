@@ -6,75 +6,12 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
     <title>Deal Intelligence - PE OS</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg" />
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet" />
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#003366",
-                        "primary-hover": "#002855",
-                        "primary-light": "#E6EEF5",
-                        "secondary": "#059669",
-                        "secondary-light": "#D1FAE5",
-                        "background-body": "#F8F9FA",
-                        "surface-card": "#FFFFFF",
-                        "border-subtle": "#E5E7EB",
-                        "border-focus": "#CBD5E1",
-                        "text-main": "#111827",
-                        "text-secondary": "#4B5563",
-                        "text-muted": "#9CA3AF",
-                    },
-                    fontFamily: {
-                        "sans": ["Inter", "sans-serif"],
-                        "display": ["Inter", "sans-serif"],
-                    },
-                    boxShadow: {
-                        "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
-                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                        "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.5rem",
-                        "md": "0.375rem",
-                        "lg": "0.5rem",
-                        "xl": "0.75rem",
-                    },
-                    animation: {
-                        fadeIn: 'fadeIn 0.5s ease-in forwards',
-                    },
-                    keyframes: {
-                        fadeIn: {
-                            '0%': { opacity: '0', transform: 'translateY(10px)' },
-                            '100%': { opacity: '1', transform: 'translateY(0)' },
-                        }
-                    }
-                },
-            },
-        }
-    </script>
-    <style>
-        .custom-scrollbar::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-            background: #D1D5DB;
-            border-radius: 3px;
-        }
-
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-            background: #9CA3AF;
-        }
-
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
+<style>
         body {
             font-feature-settings: "cv11", "ss01";
             -webkit-font-smoothing: antialiased;
@@ -104,6 +41,7 @@
         }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+    <link rel="stylesheet" href="/css/app.css" />
 </head>
 
 <body class="bg-background-body text-text-main font-sans overflow-hidden h-screen flex">
@@ -128,7 +66,7 @@
                     </button>
                     <a class="text-text-muted hover:text-primary transition-colors" href="/crm.html">Deals</a>
                     <span class="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
-                    <span id="breadcrumb-deal" class="text-text-main font-medium truncate max-w-[300px]">Loading...</span>
+                    <span id="breadcrumb-deal" class="text-text-main font-medium truncate max-w-[300px]"><span class="skeleton inline-block" style="width:6rem;height:0.875rem;vertical-align:middle"></span></span>
                 </nav>
             </div>
             <div class="flex items-center gap-4">
@@ -166,23 +104,52 @@
                     <span class="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-500 border border-white"></span>
                 </button>
                 <div class="h-6 w-px bg-border-subtle"></div>
-                <button
-                    class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
-                    id="user-menu-btn">
-                    <div
-                        class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm bg-primary flex items-center justify-center text-white text-xs font-bold">
+                <div class="relative" id="user-menu-container">
+                    <button
+                        class="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
+                        id="user-menu-btn" title="Profile & Settings">
+                        <div
+                            class="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm bg-primary flex items-center justify-center text-white text-xs font-bold">
+                        </div>
+                        <span class="hidden md:inline">Loading...</span>
+                        <span class="material-symbols-outlined text-[18px] text-text-muted user-menu-chevron transition-transform duration-200">expand_more</span>
+                    </button>
+                    <div id="user-dropdown" class="hidden absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50 bg-white border border-border-subtle">
+                        <div class="px-4 py-3 border-b border-border-subtle">
+                            <p class="text-sm font-medium text-text-main" id="dropdown-user-name">Loading...</p>
+                            <p class="text-xs truncate text-text-muted" id="dropdown-user-role"></p>
+                        </div>
+                        <div class="py-1">
+                            <a href="/settings.html" class="flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">person</span>
+                                Profile
+                            </a>
+                            <a href="/settings.html" class="flex items-center gap-3 px-4 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">settings</span>
+                                Settings
+                            </a>
+                            <button id="help-support-btn" class="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-text-secondary hover:bg-primary-light hover:text-primary transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">help</span>
+                                Help & Support
+                            </button>
+                        </div>
+                        <div class="border-t border-border-subtle py-1">
+                            <button id="logout-btn" class="flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-red-600 hover:bg-red-50 transition-colors">
+                                <span class="material-symbols-outlined text-[18px]">logout</span>
+                                Log out
+                            </button>
+                        </div>
                     </div>
-                    <span class="hidden md:inline">Loading...</span>
-                    <span class="material-symbols-outlined text-[18px] text-text-muted">expand_more</span>
-                </button>
+                </div>
             </div>
         </header>
 
         <!-- Main Content - Two Column Layout -->
         <main class="flex-1 flex overflow-hidden">
             <!-- Left Panel - Deal Details -->
-            <section
-                class="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar">
+            <section id="deal-left-panel"
+                class="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar"
+                style="min-width: 400px;">
                 <!-- Deal Header -->
                 <div class="flex flex-col gap-6 mb-8">
                     <div class="flex justify-between items-start">
@@ -195,9 +162,11 @@
                                 </div>
                             </div>
                             <div>
-                                <h2 id="deal-title" class="text-2xl font-bold text-text-main leading-tight">Loading...
+                                <h2 id="deal-title" class="text-2xl font-bold text-text-main leading-tight"><span class="skeleton inline-block" style="width:12rem;height:1.75rem;vertical-align:middle"></span>
                                 </h2>
-                                <div class="flex flex-wrap gap-2 mt-2">
+                                <!-- Recently active team members -->
+                                <div id="deal-viewers" class="flex items-center gap-1.5 mt-1.5 mb-1" style="min-height:20px"></div>
+                                <div class="flex flex-wrap gap-2 mt-1">
                                     <!-- Financial extraction status badge -->
                                     <span id="fin-status-badge"
                                         class="hidden px-2.5 py-0.5 rounded text-xs font-semibold border cursor-pointer transition-opacity hover:opacity-80"
@@ -259,37 +228,32 @@
                             <!-- Pipeline stages will be rendered by JS -->
                         </div>
                     </div>
-                    <div
-                        class="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
+                    <div class="grid grid-cols-4 gap-4 p-4 rounded-xl bg-background-body border border-border-subtle">
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Lead Partner
-                            </p>
-                            <div id="lead-partner-container" class="flex items-center gap-2">
-                                <div class="size-5 rounded-full bg-primary border border-primary/20"></div>
-                                <span id="lead-partner-name" class="text-sm text-text-main font-bold">—</span>
-                            </div>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Lead Partner</p>
+                            <span id="lead-partner-name" class="text-[13px] text-text-main font-semibold">—</span>
                         </div>
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Analyst</p>
-                            <div id="analyst-container" class="flex items-center gap-2">
-                                <div class="size-5 rounded-full bg-secondary border border-secondary/20"></div>
-                                <span id="analyst-name" class="text-sm text-text-main font-bold">—</span>
-                            </div>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Analyst</p>
+                            <span id="analyst-name" class="text-[13px] text-text-main font-semibold">—</span>
                         </div>
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Deal Source</p>
-                            <span id="deal-source" class="text-sm text-text-main font-bold">—</span>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Deal Source</p>
+                            <span id="deal-source" class="text-[13px] text-text-main font-semibold">—</span>
                         </div>
                         <div>
-                            <p class="text-xs text-text-muted font-medium uppercase tracking-wider mb-1">Last Updated
-                            </p>
-                            <span id="deal-updated" class="text-sm text-text-main font-bold">—</span>
+                            <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider mb-1">Last Updated</p>
+                            <span id="deal-updated" class="text-[13px] text-text-muted font-medium">—</span>
                         </div>
                     </div>
                 </div>
 
                 <!-- Dynamic Financial Metrics (only shows metrics that have data) -->
                 <div id="deal-metrics-grid" class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8 items-stretch">
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:4rem"></div><div class="skeleton skeleton-text-lg" style="width:5rem;margin-top:0.5rem"></div></div>
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:3.5rem"></div><div class="skeleton skeleton-text-lg" style="width:4rem;margin-top:0.5rem"></div></div>
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-text-lg" style="width:3.5rem;margin-top:0.5rem"></div></div>
+                    <div class="skeleton-stat-card"><div class="skeleton skeleton-text-sm" style="width:4.5rem"></div><div class="skeleton skeleton-text-lg" style="width:4.5rem;margin-top:0.5rem"></div></div>
                 </div>
 
                 <!-- Financials Section -->
@@ -348,7 +312,11 @@
                             Key Risks
                         </h3>
                         <div id="key-risks-list" class="flex-1 min-h-0 overflow-y-auto custom-scrollbar pr-1">
-                            <p class="text-sm text-text-muted py-4">Loading risks...</p>
+                            <div class="space-y-2">
+                                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100/50"><div class="skeleton" style="width:100%;height:14px;border-radius:4px"></div></div>
+                                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100/50"><div class="skeleton" style="width:85%;height:14px;border-radius:4px"></div></div>
+                                <div class="flex items-start gap-2 p-2 rounded-lg bg-amber-50/50 border border-amber-100/50"><div class="skeleton" style="width:70%;height:14px;border-radius:4px"></div></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -359,9 +327,12 @@
                         <span class="material-symbols-outlined text-amber-500 text-lg">sticky_note_2</span>
                         Add Note
                     </h3>
-                    <div class="flex gap-2">
-                        <input type="text" id="note-input" placeholder="Add a note about this deal..."
-                            class="flex-1 px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" />
+                    <div class="flex gap-2 relative">
+                        <div class="flex-1 relative">
+                            <input type="text" id="note-input" placeholder="Add a note about this deal... (type @ to mention)"
+                                class="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary" autocomplete="off" />
+                            <div id="mention-dropdown" class="hidden absolute left-0 bottom-full mb-1 w-64 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-48 overflow-y-auto"></div>
+                        </div>
                         <button id="add-note-btn"
                             class="px-4 py-2 bg-primary hover:bg-primary-hover text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1">
                             <span class="material-symbols-outlined text-lg">add</span>
@@ -384,10 +355,9 @@
                         </button>
                     </div>
                     <div id="activity-feed" class="space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
-                        <div class="flex items-center justify-center py-8 text-text-muted">
-                            <span class="material-symbols-outlined animate-spin text-primary mr-2">sync</span>
-                            Loading activities...
-                        </div>
+                        <div class="flex items-start gap-3 p-2"><div class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></div><div class="flex-1"><div class="skeleton" style="width:60%;height:12px;border-radius:4px;margin-bottom:6px"></div><div class="skeleton" style="width:40%;height:10px;border-radius:4px"></div></div></div>
+                        <div class="flex items-start gap-3 p-2"><div class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></div><div class="flex-1"><div class="skeleton" style="width:75%;height:12px;border-radius:4px;margin-bottom:6px"></div><div class="skeleton" style="width:35%;height:10px;border-radius:4px"></div></div></div>
+                        <div class="flex items-start gap-3 p-2"><div class="skeleton" style="width:32px;height:32px;border-radius:50%;flex-shrink:0"></div><div class="flex-1"><div class="skeleton" style="width:50%;height:12px;border-radius:4px;margin-bottom:6px"></div><div class="skeleton" style="width:30%;height:10px;border-radius:4px"></div></div></div>
                     </div>
                 </div>
 
@@ -395,14 +365,23 @@
                 <div class="mt-auto pt-6 border-t border-border-subtle">
                     <h3 class="text-sm font-bold text-text-main mb-3">Recent Documents</h3>
                     <div id="documents-list" class="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-                        <p class="text-sm text-text-muted py-2">No documents uploaded yet.</p>
+                        <div class="skeleton" style="width:140px;height:64px;border-radius:10px;flex-shrink:0"></div>
+                        <div class="skeleton" style="width:140px;height:64px;border-radius:10px;flex-shrink:0"></div>
+                        <div class="skeleton" style="width:140px;height:64px;border-radius:10px;flex-shrink:0"></div>
                     </div>
                 </div>
             </section>
 
+            <!-- Resize Handle -->
+            <div id="chat-resize-handle" class="hidden lg:flex w-1.5 cursor-col-resize hover:bg-primary/20 active:bg-primary/40 transition-colors flex-shrink-0 relative items-center justify-center z-10" title="Drag to resize">
+                <div class="absolute inset-y-0 -left-2 -right-2"></div>
+                <div class="w-0.5 h-8 bg-gray-300 group-hover:bg-primary/50 rounded-full transition-colors opacity-0 hover:opacity-100"></div>
+            </div>
+
             <!-- Right Panel - AI Chat -->
-            <section
-                class="flex-1 flex flex-col bg-background-body relative border-l border-border-subtle/60 shadow-inner">
+            <section id="deal-right-panel"
+                class="flex-1 flex flex-col bg-background-body relative border-l border-border-subtle/60 shadow-inner"
+                style="min-width: 300px;">
                 <!-- Chat Header -->
                 <div
                     class="h-14 border-b border-border-subtle flex items-center justify-between px-6 bg-surface-card/80 backdrop-blur z-20 sticky top-0">
@@ -451,8 +430,11 @@
                     </div>
                 </div>
 
+                <!-- Suggested Prompts (populated dynamically by deal-chat.js) -->
+                <div id="chat-suggestions" class="px-4 pt-3 pb-2 bg-surface-card border-t border-border-subtle flex gap-2 flex-wrap"></div>
+
                 <!-- Chat Input -->
-                <div class="p-4 bg-surface-card border-t border-border-subtle relative z-30">
+                <div class="p-4 bg-surface-card border-t-0 relative z-30">
                     <div id="attached-files" class="flex gap-2 mb-3 overflow-x-auto custom-scrollbar">
                         <!-- Attached files will be inserted here -->
                     </div>
@@ -487,8 +469,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/formatters.js"></script>
-    <script src="js/notifications.js"></script>
+    <script src="js/cache.js"></script>
+    <script defer src="js/formatters.js"></script>
+    <script defer src="js/notifications.js"></script>
     <!-- Share Link Popup (positioned with JS) -->
     <div id="share-link-popup"
         class="hidden fixed bg-white rounded-xl shadow-2xl border border-border-subtle p-4 z-[100] w-72"
@@ -508,15 +491,17 @@
         </div>
     </div>
 
-    <script src="js/layoutComponents.js"></script>
-    <script src="js/layout.js"></script>
-    <script src="js/docPreview-modal.js"></script>
-    <script src="js/docPreview.js"></script>
-    <script src="js/notificationCenter.js"></script>
-    <script src="js/globalSearch.js"></script>
-    <script src="js/shareModal.js"></script>
-    <script src="js/inviteModal-template.js"></script>
-    <script src="js/inviteModal.js"></script>
+    <script defer src="js/layoutComponents.js"></script>
+    <script defer src="js/layout.js"></script>
+    <script defer src="js/commandPalette.js"></script>
+    <script defer src="js/aiAssistant.js"></script>
+    <script defer src="js/docPreview-modal.js"></script>
+    <script defer src="js/docPreview.js"></script>
+    <script defer src="js/notificationCenter.js"></script>
+    <script defer src="js/globalSearch.js"></script>
+    <script defer src="js/shareModal.js"></script>
+    <script defer src="js/inviteModal-template.js"></script>
+    <script defer src="js/inviteModal.js"></script>
 
     <!-- Clear Chat Confirmation Modal -->
     <div id="clear-chat-modal" class="fixed inset-0 z-50 hidden">
@@ -538,35 +523,36 @@
         </div>
     </div>
 
-    <script src="deal-activity.js"></script>
-    <script src="deal-chat-responses.js"></script>
-    <script src="deal-chat-attachments.js"></script>
-    <script src="deal-chat.js"></script>
-    <script src="deal-stages.js"></script>
-    <script src="deal-team.js"></script>
-    <script src="deal-documents.js"></script>
-    <script src="deal-edit.js"></script>
-    <script src="js/ai-tools.js"></script>
-    <script src="js/ai-email-drafter.js"></script>
-    <script src="deal.js"></script>
-    <script src="js/financials-helpers.js"></script>
-    <script src="js/financials-charts.js"></script>
-    <script src="js/financials-merge.js"></script>
-    <script src="js/financials.js"></script>
-    <script src="js/analysis-styles.js"></script>
-    <script src="js/analysis-valuation.js"></script>
-    <script src="js/analysis-charts.js"></script>
-    <script src="js/analysis-modules.js"></script>
-    <script src="js/analysis.js"></script>
+    <script defer src="deal-activity.js"></script>
+    <script defer src="deal-chat-responses.js"></script>
+    <script defer src="deal-chat-attachments.js"></script>
+    <script defer src="deal-chat.js"></script>
+    <script defer src="deal-chat-resize.js"></script>
+    <script defer src="deal-stages.js"></script>
+    <script defer src="deal-team.js"></script>
+    <script defer src="deal-documents.js"></script>
+    <script defer src="deal-edit.js"></script>
+    <script defer src="js/ai-tools.js"></script>
+    <script defer src="js/ai-email-drafter.js"></script>
+    <script defer src="deal.js"></script>
+    <script defer src="js/financials-helpers.js"></script>
+    <script defer src="js/financials-charts.js"></script>
+    <script defer src="js/financials-merge.js"></script>
+    <script defer src="js/financials.js"></script>
+    <script defer src="js/analysis-styles.js"></script>
+    <script defer src="js/analysis-valuation.js"></script>
+    <script defer src="js/analysis-charts.js"></script>
+    <script defer src="js/analysis-modules.js"></script>
+    <script defer src="js/analysis.js"></script>
 
     <!-- Fullscreen expand for Financial Statements & Analysis sections -->
-    <script src="js/dealFullscreen.js"></script>
+    <script defer src="js/dealFullscreen.js"></script>
 
     <!-- Onboarding modules -->
     <script src="js/onboarding/onboarding-config.js"></script>
-    <script src="js/onboarding/onboarding-api.js"></script>
-    <script src="js/onboarding/onboarding-celebrate.js"></script>
-    <script src="js/onboarding/onboarding-feedback.js"></script>
+    <script defer src="js/onboarding/onboarding-api.js"></script>
+    <script defer src="js/onboarding/onboarding-celebrate.js"></script>
+    <script defer src="js/onboarding/onboarding-feedback.js"></script>
 </body>
 
 </html>

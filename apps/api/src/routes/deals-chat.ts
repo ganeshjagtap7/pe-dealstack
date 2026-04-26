@@ -14,7 +14,7 @@ router.use('/', dealsChatAiRouter);
 
 // Pagination schema
 const paginationSchema = z.object({
-  limit: z.coerce.number().int().min(1).max(100).optional(),
+  limit: z.coerce.number().int().min(1).max(500).optional(),
   offset: z.coerce.number().int().min(0).optional(),
 });
 
@@ -30,16 +30,20 @@ router.get('/:dealId/chat/history', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
-    const { limit = 50, offset = 0 } = chatHistoryQuerySchema.parse(req.query);
+    const { limit = 200, offset = 0 } = chatHistoryQuerySchema.parse(req.query);
 
     log.debug('Fetching chat history', { dealId, limit, offset });
 
+    // Fetch the most recent messages (descending), then reverse to chronological order
     const { data: messages, error } = await supabase
       .from('ChatMessage')
       .select('id, role, content, metadata, createdAt')
       .eq('dealId', dealId)
-      .order('createdAt', { ascending: true })
+      .order('createdAt', { ascending: false })
       .range(offset, offset + limit - 1);
+
+    // Reverse to chronological order for display
+    if (messages) messages.reverse();
 
     if (error) {
       log.error('Database error fetching chat history', { error, dealId });

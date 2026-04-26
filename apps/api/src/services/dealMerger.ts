@@ -82,7 +82,6 @@ export async function mergeIntoExistingDeal(
   // Merge each financial field: update if existing is null or new confidence is higher
   if (aiData.revenue.value != null && (existingDeal.revenue == null || aiData.revenue.confidence > existingConf)) {
     updates.revenue = aiData.revenue.value;
-    updates.dealSize = aiData.revenue.value;
   }
   if (aiData.ebitda.value != null && (existingDeal.ebitda == null || aiData.ebitda.confidence > existingConf)) {
     updates.ebitda = aiData.ebitda.value;

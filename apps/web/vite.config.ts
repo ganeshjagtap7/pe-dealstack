@@ -7,20 +7,15 @@ import { copyFileSync, mkdirSync, readdirSync, existsSync, statSync } from 'fs'
 // This allows plain <script> files (like auth.js) to access env config via window.__ENV
 function injectEnvConfig(): Plugin {
   let envConfig: string
-  let hasOpenReplayKey = false
   return {
     name: 'inject-env-config',
     configResolved(config) {
       const env = loadEnv(config.mode, config.root, 'VITE_')
-      // Fall back to non-VITE_ prefixed process.env vars (for Vercel/production builds)
-      const openReplayKey = env.VITE_OPENREPLAY_KEY || process.env.OPENREPLAY_KEY || ''
-      hasOpenReplayKey = !!openReplayKey
       envConfig = JSON.stringify({
         SUPABASE_URL: env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || '',
         SUPABASE_ANON_KEY: env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || '',
         API_URL: env.VITE_API_URL || process.env.API_URL || '',
         SENTRY_DSN: env.VITE_SENTRY_DSN || process.env.SENTRY_DSN || '',
-        OPENREPLAY_KEY: openReplayKey,
       })
     },
     transformIndexHtml(html) {
@@ -32,9 +27,7 @@ function injectEnvConfig(): Plugin {
       }
     } catch(e) { console.warn('Sentry init skipped:', e.message); }
   </script>`
-      // Only inject OpenReplay script if key is available (avoids 404 in production when .ts source isn't served)
-      const openReplayTag = hasOpenReplayKey ? `\n  <script type="module" src="/src/openreplay-init.ts"></script>` : ''
-      return html.replace('</head>', `  <script>window.__ENV=${envConfig}</script>\n  ${sentryScript}${openReplayTag}\n</head>`)
+      return html.replace('</head>', `  <script>window.__ENV=${envConfig}</script>\n  ${sentryScript}\n</head>`)
     },
   }
 }
@@ -121,6 +114,7 @@ export default defineConfig({
         'help-center': resolve(__dirname, 'help-center.html'),
         templates: resolve(__dirname, 'templates.html'),
         'contacts': resolve(__dirname, 'contacts.html'),
+        'onboarding': resolve(__dirname, 'onboarding.html'),
       },
     },
   },

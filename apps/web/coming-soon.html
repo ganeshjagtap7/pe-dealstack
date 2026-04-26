@@ -5,41 +5,12 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Coming Soon - PE OS</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-    <link href="https://fonts.googleapis.com" rel="preconnect"/>
-    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#003366",
-                        "primary-hover": "#002855",
-                        "primary-light": "#E6EEF5",
-                        "secondary": "#059669",
-                        "secondary-light": "#D1FAE5",
-                        "background-body": "#F8F9FA",
-                        "surface-card": "#FFFFFF",
-                        "border-subtle": "#E5E7EB",
-                        "border-focus": "#CBD5E1",
-                        "text-main": "#111827",
-                        "text-secondary": "#4B5563",
-                        "text-muted": "#9CA3AF",
-                    },
-                    fontFamily: {
-                        "sans": ["Inter", "sans-serif"],
-                        "display": ["Inter", "sans-serif"],
-                    },
-                    boxShadow: {
-                        "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
-                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                    },
-                },
-            },
-        }
-    </script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
+<link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="font-sans bg-background-body text-text-main min-h-screen">
 
@@ -100,6 +71,8 @@
 <script src="js/auth.js"></script>
 <script src="js/layoutComponents.js"></script>
 <script src="js/layout.js"></script>
+<script src="js/commandPalette.js"></script>
+<script src="js/aiAssistant.js"></script>
 <script>
     // Feature configurations
     const features = {

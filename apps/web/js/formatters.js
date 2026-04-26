@@ -5,7 +5,7 @@
 
 (function () {
   function formatFileSize(bytes) {
-    if (!bytes) return 'N/A';
+    if (!bytes) return '—';
     if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
     if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
     return bytes + ' B';
@@ -38,30 +38,66 @@
     return 'slate';
   }
 
-  // Values are stored in millions USD in the database.
-  // Displays in the most natural unit: B, M, K, or $
-  function formatCurrency(value) {
-    if (value === null || value === undefined) return 'N/A';
+  // Currency symbol lookup — ISO 4217 code → display symbol
+  var CURRENCY_SYMBOLS = {
+    USD: '$', INR: '₹', EUR: '€', GBP: '£', JPY: '¥', CNY: '¥',
+    CAD: 'C$', AUD: 'A$', CHF: 'CHF ', SGD: 'S$', HKD: 'HK$',
+    AED: 'AED ', SAR: 'SAR ', BRL: 'R$', KRW: '₩', ZAR: 'R',
+    MXN: 'MX$', SEK: 'kr', NOK: 'kr', DKK: 'kr', PLN: 'zł',
+    THB: '฿', MYR: 'RM', IDR: 'Rp', PHP: '₱', VND: '₫',
+  };
+
+  function getCurrencySymbol(currency) {
+    if (!currency) return '$';
+    return CURRENCY_SYMBOLS[currency.toUpperCase()] || currency.toUpperCase() + ' ';
+  }
+
+  // Values are stored in millions in the database.
+  // Displays in locale-appropriate units:
+  //   INR: Cr (crore=10M), L (lakh=0.1M)
+  //   USD/EUR/GBP/others: B, M, K
+  // currency param is optional — defaults to '$' for backward compat.
+  function formatCurrency(value, currency) {
+    if (value === null || value === undefined) return '—';
+    var sym = getCurrencySymbol(currency);
     var absValue = Math.abs(value);
     var sign = value < 0 ? '-' : '';
+    var code = (currency || 'USD').toUpperCase();
+
+    // INR: use Crore / Lakh system
+    if (code === 'INR') {
+      // absValue is in millions. 1 Cr = 10M, 1L = 0.1M
+      var crores = absValue / 10;
+      if (crores >= 1) {
+        return sign + sym + (crores >= 100 ? crores.toFixed(0) : crores >= 10 ? crores.toFixed(1) : crores.toFixed(2)) + 'Cr';
+      }
+      var lakhs = absValue * 10;
+      if (lakhs >= 1) {
+        return sign + sym + (lakhs >= 100 ? lakhs.toFixed(0) : lakhs >= 10 ? lakhs.toFixed(1) : lakhs.toFixed(2)) + 'L';
+      }
+      var rupees = absValue * 1000000;
+      return sign + sym + rupees.toLocaleString('en-IN', { maximumFractionDigits: 0 });
+    }
+
+    // USD, EUR, GBP, and all others: B / M / K
     if (absValue >= 1000) {
       var b = absValue / 1000;
-      return sign + '$' + (b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)) + 'B';
+      return sign + sym + (b >= 100 ? b.toFixed(0) : b >= 10 ? b.toFixed(1) : b.toFixed(2)) + 'B';
     }
     if (absValue >= 1) {
-      return sign + '$' + (absValue >= 100 ? absValue.toFixed(0) : absValue >= 10 ? absValue.toFixed(1) : absValue.toFixed(2)) + 'M';
+      return sign + sym + (absValue >= 100 ? absValue.toFixed(0) : absValue >= 10 ? absValue.toFixed(1) : absValue.toFixed(2)) + 'M';
     }
     var k = absValue * 1000;
     if (k >= 1) {
-      return sign + '$' + (k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)) + 'K';
+      return sign + sym + (k >= 100 ? k.toFixed(0) : k >= 10 ? k.toFixed(1) : k.toFixed(2)) + 'K';
     }
-    var dollars = absValue * 1000000;
-    return sign + '$' + dollars.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    var base = absValue * 1000000;
+    return sign + sym + base.toLocaleString('en-US', { maximumFractionDigits: 0 });
   }
 
   // Formats a raw number for display (e.g. in financial tables)
   function formatNumber(value, decimals) {
-    if (value === null || value === undefined) return 'N/A';
+    if (value === null || value === undefined) return '—';
     if (typeof decimals !== 'number') decimals = 1;
     return Number(value).toLocaleString('en-US', {
       minimumFractionDigits: decimals,
@@ -70,7 +106,7 @@
   }
 
   function formatRelativeTime(dateString) {
-    if (!dateString) return 'N/A';
+    if (!dateString) return '—';
     var date = new Date(dateString);
     var now = new Date();
     var diff = now - date;
@@ -112,6 +148,8 @@
     formatRelativeTime: formatRelativeTime,
     formatTimeAgo: formatTimeAgo,
     escapeHtml: escapeHtml,
+    getCurrencySymbol: getCurrencySymbol,
+    CURRENCY_SYMBOLS: CURRENCY_SYMBOLS,
   };
 
   // Bare globals for backward compat (existing code calls formatCurrency() directly)
@@ -124,4 +162,6 @@
   window.formatTimeAgo = formatTimeAgo;
   window.timeAgo = timeAgo;
   window.escapeHtml = escapeHtml;
+  window.getCurrencySymbol = getCurrencySymbol;
+  window.CURRENCY_SYMBOLS = CURRENCY_SYMBOLS;
 })();

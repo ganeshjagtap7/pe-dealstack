@@ -5,33 +5,12 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Institutional Login - PE OS</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <script>
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#1a3b5b",
-                        "navy-custom": "#003366",
-                        "background-light": "#f6f7f8",
-                        "background-dark": "#13191f",
-                    },
-                    fontFamily: {
-                        "display": ["Inter", "sans-serif"]
-                    },
-                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
-                    boxShadow: {
-                        'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
-                        'floating': '0 20px 50px -12px rgba(0, 0, 0, 0.15)',
-                    }
-                },
-            },
-        }
-    </script>
-    <style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
+<style>
         body {
             font-family: 'Inter', sans-serif;
         }
@@ -48,6 +27,7 @@
             border-color: #1a3b5b;
         }
     </style>
+    <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#121417] dark:text-white font-display overflow-hidden">
     <!-- Loading Screen -->
@@ -66,35 +46,119 @@
             <!-- Gradient overlay -->
             <div class="absolute inset-0 bg-gradient-to-tr from-navy-custom via-transparent to-white/10 z-0"></div>
 
-            <div class="relative z-10 flex flex-col items-center w-full px-12">
-                <!-- Dashboard Preview Card -->
-                <div class="w-full max-w-2xl relative transform transition-all duration-700 hover:scale-[1.01] hover:-translate-y-1">
-                    <!-- Glow effect -->
-                    <div class="absolute -inset-2 bg-gradient-to-r from-blue-400/30 to-purple-300/20 rounded-xl blur-xl opacity-40"></div>
+            <div class="relative z-10 flex flex-col w-full px-12 py-16 max-w-2xl mx-auto">
+                <!-- Header -->
+                <div class="mb-8">
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/30 mb-5">
+                        <span class="relative flex h-2 w-2">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+                        </span>
+                        <span class="text-[11px] font-semibold text-emerald-300 uppercase tracking-wider">7 AI agents · Live</span>
+                    </div>
+                    <h2 class="text-4xl font-bold text-white tracking-tight leading-tight mb-3">
+                        Your AI deal team,<br/>working 24/7.
+                    </h2>
+                    <p class="text-blue-100/70 text-base leading-relaxed max-w-md">
+                        Purpose-built AI agents for private equity. From sourcing to close — automate the work that bankers, analysts, and associates do every day.
+                    </p>
+                </div>
 
-                    <div class="relative rounded-xl overflow-hidden shadow-2xl border border-white/20 bg-gray-900">
-                        <!-- Window controls -->
-                        <div class="h-8 bg-gray-800/80 backdrop-blur border-b border-white/10 flex items-center px-4 space-x-2">
-                            <div class="w-3 h-3 rounded-full bg-red-400"></div>
-                            <div class="w-3 h-3 rounded-full bg-amber-400"></div>
-                            <div class="w-3 h-3 rounded-full bg-green-400"></div>
+                <!-- AI Agents Grid -->
+                <div class="grid grid-cols-2 gap-3 mb-8">
+                    <!-- Agent 1: Financial Extraction -->
+                    <div class="group relative bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg p-3.5 transition-all duration-300 hover:border-white/25 hover:-translate-y-0.5">
+                        <div class="flex items-start gap-2.5">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-md bg-gradient-to-br from-blue-400/30 to-blue-600/30 border border-blue-300/30 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-blue-200 text-[18px]">table_chart</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[12px] font-semibold text-white mb-0.5">Financial Extractor</div>
+                                <div class="text-[10px] text-blue-100/60 leading-snug">Auto-parses CIMs & balance sheets in seconds</div>
+                            </div>
                         </div>
-                        <!-- Dashboard preview image -->
-                        <div class="aspect-[16/9] w-full bg-cover bg-top"
-                             data-alt="Abstract dashboard interface showing financial charts and data grids"
-                             style='background: linear-gradient(135deg, #003366 0%, #004488 50%, #0055AA 100%);'>
-                            <div class="absolute inset-0 bg-navy-custom/10 mix-blend-overlay"></div>
+                    </div>
+
+                    <!-- Agent 2: Deal Chat -->
+                    <div class="group relative bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg p-3.5 transition-all duration-300 hover:border-white/25 hover:-translate-y-0.5">
+                        <div class="flex items-start gap-2.5">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-md bg-gradient-to-br from-purple-400/30 to-purple-600/30 border border-purple-300/30 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-purple-200 text-[18px]">smart_toy</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[12px] font-semibold text-white mb-0.5">Deal Chat AI</div>
+                                <div class="text-[10px] text-blue-100/60 leading-snug">Ask anything — instant answers from your data</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent 3: Memo Builder -->
+                    <div class="group relative bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg p-3.5 transition-all duration-300 hover:border-white/25 hover:-translate-y-0.5">
+                        <div class="flex items-start gap-2.5">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-md bg-gradient-to-br from-emerald-400/30 to-emerald-600/30 border border-emerald-300/30 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-emerald-200 text-[18px]">description</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[12px] font-semibold text-white mb-0.5">Memo Builder</div>
+                                <div class="text-[10px] text-blue-100/60 leading-snug">Drafts IC memos in minutes, not weeks</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent 4: QoE Agent -->
+                    <div class="group relative bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg p-3.5 transition-all duration-300 hover:border-white/25 hover:-translate-y-0.5">
+                        <div class="flex items-start gap-2.5">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-md bg-gradient-to-br from-amber-400/30 to-amber-600/30 border border-amber-300/30 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-amber-200 text-[18px]">verified</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[12px] font-semibold text-white mb-0.5">Quality of Earnings</div>
+                                <div class="text-[10px] text-blue-100/60 leading-snug">Detects red flags, validates EBITDA quality</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent 5: Portfolio Monitor -->
+                    <div class="group relative bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg p-3.5 transition-all duration-300 hover:border-white/25 hover:-translate-y-0.5">
+                        <div class="flex items-start gap-2.5">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-md bg-gradient-to-br from-rose-400/30 to-rose-600/30 border border-rose-300/30 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-rose-200 text-[18px]">monitoring</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[12px] font-semibold text-white mb-0.5">Portfolio Monitor</div>
+                                <div class="text-[10px] text-blue-100/60 leading-snug">24/7 signal scanning across holdings</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Agent 6: Meeting Prep -->
+                    <div class="group relative bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 rounded-lg p-3.5 transition-all duration-300 hover:border-white/25 hover:-translate-y-0.5">
+                        <div class="flex items-start gap-2.5">
+                            <div class="flex-shrink-0 w-8 h-8 rounded-md bg-gradient-to-br from-cyan-400/30 to-cyan-600/30 border border-cyan-300/30 flex items-center justify-center">
+                                <span class="material-symbols-outlined text-cyan-200 text-[18px]">event_note</span>
+                            </div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-[12px] font-semibold text-white mb-0.5">Meeting Prep</div>
+                                <div class="text-[10px] text-blue-100/60 leading-snug">Briefs auto-generated before every call</div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tagline -->
-                <div class="mt-12 text-center space-y-3">
-                    <h2 class="text-3xl font-semibold text-white tracking-tight">The Operating System for Modern Capital</h2>
-                    <p class="text-blue-100/80 text-base max-w-md mx-auto leading-relaxed">
-                        Unified intelligence for private equity.
-                        Streamline your deal flow and portfolio monitoring in one secure environment.
-                    </p>
+                <!-- Stats / Trust strip -->
+                <div class="flex items-center justify-between gap-4 pt-6 border-t border-white/10">
+                    <div>
+                        <div class="text-2xl font-bold text-white tracking-tight">10x</div>
+                        <div class="text-[10px] text-blue-100/60 uppercase tracking-wider mt-0.5">Faster diligence</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-white tracking-tight">15hrs</div>
+                        <div class="text-[10px] text-blue-100/60 uppercase tracking-wider mt-0.5">Saved per deal</div>
+                    </div>
+                    <div>
+                        <div class="text-2xl font-bold text-white tracking-tight">SOC 2</div>
+                        <div class="text-[10px] text-blue-100/60 uppercase tracking-wider mt-0.5">Enterprise ready</div>
+                    </div>
                 </div>
             </div>
         </div>

@@ -95,6 +95,7 @@ export interface AuditLogEntry {
   userId?: string;
   userEmail?: string;
   userRole?: string;
+  organizationId?: string;
   action: AuditAction;
   resourceType?: ResourceType;
   resourceId?: string;
@@ -136,6 +137,7 @@ export async function logAuditEvent(entry: AuditLogEntry, req?: Request): Promis
       userId: entry.userId,
       userEmail: entry.userEmail,
       userRole: entry.userRole,
+      organizationId: entry.organizationId,
       action: entry.action,
       entityType: entry.resourceType,
       entityId: entry.resourceId,
@@ -177,6 +179,7 @@ export async function logFromRequest(
     userId: req.user?.id,
     userEmail: req.user?.email,
     userRole: req.user?.role,
+    organizationId: (req.user as any)?.organizationId,
     action,
     ...options,
   }, req);

@@ -19,27 +19,28 @@ const ExtractionOutputSchema = z.object({
   companyName: z.object({
     value: z.string().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('Company name extracted from document'),
   industry: z.object({
     value: z.string().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('Industry classification'),
   description: z.object({
     value: z.string(),
     confidence: z.number().min(0).max(100),
   }).describe('2-3 sentence business description'),
+  currency: z.string().describe('ISO 4217 currency code detected from document (e.g. USD, INR, EUR, GBP). Default to USD if not detected.'),
   revenue: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
-  }).describe('Annual revenue in millions USD'),
+    source: z.string().nullable(),
+  }).describe('Annual revenue in millions (in the original document currency). If only MRR (monthly recurring revenue) is given, multiply by 12 to get annual. If only ARR is given, use that directly. Always return the annualized figure.'),
   ebitda: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
-  }).describe('EBITDA in millions USD'),
+    source: z.string().nullable(),
+  }).describe('EBITDA in millions (in the original document currency)'),
   ebitdaMargin: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
@@ -47,7 +48,7 @@ const ExtractionOutputSchema = z.object({
   revenueGrowth: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
-    source: z.string().optional(),
+    source: z.string().nullable(),
   }).describe('YoY revenue growth percentage'),
   employees: z.object({
     value: z.number().nullable(),
@@ -61,6 +62,11 @@ const ExtractionOutputSchema = z.object({
     value: z.string().nullable(),
     confidence: z.number().min(0).max(100),
   }).describe('City, State or City, Country'),
+  dealSize: z.object({
+    value: z.number().nullable(),
+    confidence: z.number().min(0).max(100),
+    source: z.string().nullable(),
+  }).describe('Enterprise value, asking price, or deal size in millions (in the original document currency). Look for terms like "enterprise value", "EV", "asking price", "valuation", "deal value". Return null if not mentioned.'),
   keyRisks: z.array(z.string()).describe('3-5 key investment risks'),
   investmentHighlights: z.array(z.string()).describe('3-5 positive investment points'),
   summary: z.string().describe('3-4 sentence executive summary'),
@@ -78,9 +84,11 @@ export interface ExtractedDealData {
   companyName: ExtractedField<string | null>;
   industry: ExtractedField<string | null>;
   description: ExtractedField<string>;
+  currency: string;
   revenue: ExtractedField<number | null>;
   ebitda: ExtractedField<number | null>;
   ebitdaMargin: ExtractedField<number | null>;
+  dealSize: ExtractedField<number | null>;
   revenueGrowth: ExtractedField<number | null>;
   employees: ExtractedField<number | null>;
   foundedYear: ExtractedField<number | null>;
@@ -118,16 +126,18 @@ CRITICAL INSTRUCTIONS:
    - 50-69: Data is inferred from partial information
    - 0-49: Data is estimated or uncertain
 3. Include a source quote for each extraction when confidence is below 90
-4. Financial figures MUST be in millions USD - convert if necessary
-5. If you cannot find data, set value to null with confidence 0
+4. Detect the currency from the document (look for $, ₹, €, £, ¥, or text like USD, INR, EUR, GBP, JPY, Crores, Lakhs, etc.)
+5. Set the "currency" field to the ISO 4217 code (e.g. "USD", "INR", "EUR", "GBP"). Default to "USD" if not detected.
+6. Financial figures MUST be in millions in the ORIGINAL currency — do NOT convert between currencies
+7. If you cannot find data, set value to null with confidence 0
 
 COMMON PATTERNS TO LOOK FOR:
-- Revenue: "revenue of $X", "sales of $X", "top-line of $X", "$X in revenue"
+- Revenue: "revenue of $X", "sales of $X", "top-line of $X", "$X in revenue", "₹X Crores"
 - EBITDA: "EBITDA of $X", "Adjusted EBITDA", "run-rate EBITDA"
 - Company Name: Usually in header, "Company Overview", or "About [Company]"
 - Industry: Look for sector descriptions, market focus, business type
 
-FINANCIAL CONVERSION (always convert to millions USD):
+FINANCIAL CONVERSION (always convert to millions in the original currency — do NOT convert between currencies):
 - "50 million" or "$50M" or "$50,000,000" = 50
 - "1.5 billion" or "$1.5B" = 1500
 - "$500,000" or "500K" = 0.5
@@ -135,6 +145,8 @@ FINANCIAL CONVERSION (always convert to millions USD):
 - "$6,000" = 0.006
 - "$1,800" = 0.0018
 - "$500" = 0.0005
+- "₹9 Crores" = 90 (1 Crore = 10 Million)
+- "₹50 Lakhs" = 5 (1 Lakh = 0.1 Million)
 - Remove commas and convert to number
 - IMPORTANT: Small values are valid! Do NOT round small amounts to 0 or null.`;
 
@@ -170,9 +182,11 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
       companyName: normalizeField(extracted.companyName, null),
       industry: normalizeField(extracted.industry, null),
       description: normalizeField(extracted.description, 'No description available'),
+      currency: extracted.currency || 'USD',
       revenue: normalizeNumericField(extracted.revenue),
       ebitda: normalizeNumericField(extracted.ebitda),
       ebitdaMargin: normalizeNumericField(extracted.ebitdaMargin),
+      dealSize: normalizeNumericField(extracted.dealSize),
       revenueGrowth: normalizeNumericField(extracted.revenueGrowth),
       employees: normalizeNumericField(extracted.employees),
       foundedYear: normalizeNumericField(extracted.foundedYear),

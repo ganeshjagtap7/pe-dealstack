@@ -354,6 +354,20 @@ export async function extractFinancials(dealId: string, documentId: string): Pro
 }
 
 /**
+ * Re-analyze a document — triggers text extraction + RAG embedding
+ */
+export async function analyzeDocument(documentId: string): Promise<any> {
+  const response = await authFetch(`${API_BASE_URL}/documents/${documentId}/analyze`, {
+    method: 'POST',
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || `Analysis failed (${response.status})`);
+  }
+  return await response.json();
+}
+
+/**
  * Create a new deal (for VDR without existing deal)
  */
 export async function createDeal(name: string): Promise<any | null> {
@@ -463,11 +477,11 @@ export function transformDocument(apiDoc: APIDocument): import('../types/vdr.typ
     }
   }
 
-  // Determine analysis info
-  let analysisType: 'key-insight' | 'warning' | 'standard' | 'complete' = 'standard';
+  // Determine analysis info — three-state: Pending → Ready for AI → Analyzed
+  let analysisType: 'key-insight' | 'warning' | 'standard' | 'complete' | 'ready' = 'standard';
   let analysisLabel = 'Pending Analysis';
-  let analysisDescription = 'Document awaiting AI analysis.';
-  let analysisColor: 'primary' | 'orange' | 'slate' = 'slate';
+  let analysisDescription = 'Document awaiting text extraction.';
+  let analysisColor: 'primary' | 'orange' | 'slate' | 'green' = 'slate';
 
   if (apiDoc.aiAnalysis) {
     const ai = apiDoc.aiAnalysis;
@@ -492,6 +506,11 @@ export function transformDocument(apiDoc: APIDocument): import('../types/vdr.typ
     analysisLabel = 'Analysis Complete';
     analysisDescription = 'Document has been analyzed.';
     analysisColor = 'primary';
+  } else if (apiDoc.extractedText) {
+    analysisType = 'ready';
+    analysisLabel = '✅ Ready for AI';
+    analysisDescription = 'Text extracted. Ready for AI analysis.';
+    analysisColor = 'green';
   }
 
   return {

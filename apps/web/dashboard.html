@@ -4,48 +4,12 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Analyst Overview Dashboard - PE OS</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
-    tailwind.config = {
-        theme: {
-            extend: {
-                colors: {
-                    "primary": "#003366",
-                    "primary-hover": "#002855",
-                    "primary-light": "#E6EEF5",
-                    "secondary": "#059669",
-                    "secondary-light": "#D1FAE5",
-                    "background-body": "#F8F9FA",
-                    "surface-card": "#FFFFFF",
-                    "border-subtle": "#E5E7EB",
-                    "border-focus": "#CBD5E1",
-                    "text-main": "#111827",
-                    "text-secondary": "#4B5563",
-                    "text-muted": "#9CA3AF",
-                },
-                fontFamily: {
-                    "sans": ["Inter", "sans-serif"],
-                    "display": ["Inter", "sans-serif"],
-                },
-                boxShadow: {
-                    "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
-                    "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                    "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
-                },
-                borderRadius: {
-                    "DEFAULT": "0.5rem",
-                    "md": "0.375rem",
-                    "lg": "0.5rem",
-                    "xl": "0.75rem",
-                }
-            },
-        },
-    }
-</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
+<link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-background-body text-text-main font-sans overflow-hidden">
 <div class="flex h-screen w-full overflow-hidden">
@@ -71,35 +35,27 @@
 
 <!-- Pipeline Stats (loaded dynamically from real deal data) -->
 <div id="stats-cards" data-widget="stats-cards" class="widget-container grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-    <div class="col-span-full text-center py-4 text-text-muted text-sm">Loading pipeline...</div>
+    <!-- Skeleton stat cards — replaced when real data loads -->
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:6.5rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:5.5rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
+    <div class="skeleton-stat-card"><div class="flex items-center justify-between"><div class="skeleton skeleton-text-sm" style="width:4rem"></div><div class="skeleton skeleton-circle" style="width:20px;height:20px"></div></div><div class="flex items-end gap-2 mt-3"><div class="skeleton skeleton-text-lg" style="width:2.5rem;height:2rem"></div><div class="skeleton skeleton-text-sm" style="width:2rem"></div></div><div class="skeleton" style="height:6px;width:100%;margin-top:1rem;border-radius:9999px"></div></div>
 </div>
 <script>
 (async function loadPipelineStats() {
     const container = document.getElementById('stats-cards');
     if (!container) return;
-    // Wait for auth
-    const waitForAuth = () => new Promise(resolve => {
-        const check = setInterval(() => {
-            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
-        }, 100);
-        setTimeout(() => { clearInterval(check); resolve(); }, 3000);
-    });
-    await waitForAuth();
-    try {
-        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
-        if (!resp.ok) throw new Error('Failed');
-        const deals = await resp.json();
-        const active = deals.filter(d => d.status !== 'ARCHIVED');
 
-        const stages = [
-            { label: 'Sourcing', key: 'INITIAL_REVIEW', icon: 'travel_explore', color: 'blue-400' },
-            { label: 'Due Diligence', key: 'DUE_DILIGENCE', icon: 'saved_search', color: 'primary' },
-            { label: 'LOI / Offer', key: 'LOI_SUBMITTED', icon: 'description', color: 'orange-400', also: ['IOI_SUBMITTED'] },
-            { label: 'Closed', key: 'CLOSED_WON', icon: 'verified', color: 'secondary', also: ['CLOSING', 'NEGOTIATION'] },
-        ];
+    const STAGES = [
+        { label: 'Sourcing', key: 'INITIAL_REVIEW', icon: 'travel_explore', color: 'blue-400' },
+        { label: 'Due Diligence', key: 'DUE_DILIGENCE', icon: 'saved_search', color: 'primary' },
+        { label: 'LOI / Offer', key: 'LOI_SUBMITTED', icon: 'description', color: 'orange-400', also: ['IOI_SUBMITTED'] },
+        { label: 'Closed', key: 'CLOSED_WON', icon: 'verified', color: 'secondary', also: ['CLOSING', 'NEGOTIATION'] },
+    ];
 
+    function renderCards(active) {
         const total = Math.max(active.length, 1);
-        container.innerHTML = stages.map(s => {
+        container.innerHTML = STAGES.map(s => {
             const keys = [s.key, ...(s.also || [])];
             const count = active.filter(d => keys.includes(d.stage)).length;
             const pct = Math.round((count / total) * 100);
@@ -110,28 +66,54 @@
                         <span class="text-xs font-bold uppercase tracking-wider ${isHighlight ? 'text-primary' : 'text-text-secondary'}">${s.label}</span>
                         <span class="material-symbols-outlined ${isHighlight ? 'text-primary' : 'text-text-muted group-hover:text-primary'} transition-colors text-[20px]">${s.icon}</span>
                     </div>
-                    <div class="flex items-end gap-2 mt-3">
-                        <span class="text-3xl font-bold ${count > 0 ? 'text-text-main' : 'text-text-muted'} tracking-tight">${count}</span>
-                        <span class="text-xs font-medium text-text-secondary mb-1.5">${count === 1 ? 'deal' : 'deals'}</span>
+                    <div class="flex items-end justify-between mt-3">
+                        <div class="flex items-end gap-2">
+                            <span class="text-3xl font-bold ${count > 0 ? 'text-text-main' : 'text-text-muted'} tracking-tight">${count}</span>
+                            <span class="text-xs font-medium text-text-secondary mb-1.5">${count === 1 ? 'deal' : 'deals'}</span>
+                        </div>
+                        ${count > 0 ? `<span class="text-xs font-bold mb-1.5 px-1.5 py-0.5 rounded" style="color: ${isHighlight ? '#003366' : '#059669'}; background: ${isHighlight ? '#E6EEF5' : '#ECFDF5'};">${pct}%</span>` : ''}
                     </div>
                     <div class="w-full bg-gray-100 h-1.5 mt-4 rounded-full overflow-hidden">
                         <div class="bg-${s.color} h-1.5 rounded-full transition-all" style="width: ${pct}%"></div>
                     </div>
                 </div>`;
         }).join('');
+    }
+
+    // Render zero-count cards immediately so the layout never collapses
+    renderCards([]);
+
+    // Wait for auth, then fetch real data and re-render
+    const waitForAuth = () => new Promise(resolve => {
+        const check = setInterval(() => {
+            if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
+        }, 100);
+        setTimeout(() => { clearInterval(check); resolve(); }, 5000);
+    });
+    await waitForAuth();
+    try {
+        const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
+        if (!resp.ok) return; // keep the zero-count cards
+        const deals = await resp.json();
+        const list = Array.isArray(deals) ? deals : (deals?.deals || []);
+        const active = list.filter(d => d.status !== 'ARCHIVED');
+        renderCards(active);
     } catch (e) {
-        container.innerHTML = '<div class="col-span-full text-center py-4 text-text-muted text-sm">No pipeline data yet</div>';
+        // Keep the zero-count cards already rendered above
+        console.warn('Pipeline stats fetch failed:', e);
     }
 })();
 </script>
 
-<!-- Main Content Grid -->
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-<!-- Left Column (2/3) -->
-<div class="lg:col-span-2 flex flex-col gap-6">
+<!-- Main Content — single CSS Grid where all widgets tile uniformly.
+     Active Priorities spans the full row (col-span-full) because it's a wide
+     5-column table; other widgets are 1 column each on lg, 2 cols on md.
+     This replaces the old 2-column layout that left a tall empty space below
+     Active Priorities when the right column had many more widgets. -->
+<div id="dashboard-widget-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min items-start">
 
-<!-- Active Priorities Table -->
-<div id="priorities-widget" data-widget="active-priorities" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden h-full group">
+<!-- Active Priorities Table — full-width hero row -->
+<div id="priorities-widget" data-widget="active-priorities" class="widget-container col-span-full flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
 <div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
 <h3 class="font-bold text-text-main text-base">Active Priorities</h3>
 <div class="flex gap-2">
@@ -150,15 +132,14 @@
 </tr>
 </thead>
 <tbody id="priorities-table" class="divide-y divide-border-subtle bg-white">
-<!-- Populated dynamically by dashboard.js — shows empty state if no deals -->
+<tr class="skeleton-row"><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:70%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-badge"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:50%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:80%"></div></td><td class="px-5 py-3.5"><div class="flex gap-1"><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div></div></td></tr>
+<tr class="skeleton-row"><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:55%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-badge"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:40%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:65%"></div></td><td class="px-5 py-3.5"><div class="flex gap-1"><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div></div></td></tr>
+<tr class="skeleton-row"><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:60%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-badge"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:45%"></div></td><td class="px-5 py-3.5"><div class="skeleton skeleton-text" style="width:75%"></div></td><td class="px-5 py-3.5"><div class="flex gap-1"><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div><div class="skeleton skeleton-circle" style="width:24px;height:24px"></div></div></td></tr>
 </tbody>
 </table>
 </div>
 </div>
-</div>
 
-<!-- Right Column (1/3) -->
-<div class="flex flex-col gap-6">
 <!-- My Tasks Widget -->
 <div id="tasks-widget" data-widget="my-tasks" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
 <div class="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
@@ -212,8 +193,11 @@
 <span class="material-symbols-outlined text-text-muted">pie_chart</span>
 </div>
 <div id="portfolio-allocation-content" class="flex items-center gap-6">
-    <div class="flex items-center justify-center py-4 w-full">
-        <span class="material-symbols-outlined text-text-muted text-xl animate-spin">sync</span>
+    <div class="skeleton skeleton-circle" style="width:7rem;height:7rem;flex-shrink:0"></div>
+    <div class="flex flex-col gap-3 flex-1">
+        <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="skeleton" style="width:10px;height:10px;border-radius:2px"></div><div class="skeleton skeleton-text-sm" style="width:4rem"></div></div><div class="skeleton skeleton-text-sm" style="width:1.5rem"></div></div>
+        <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="skeleton" style="width:10px;height:10px;border-radius:2px"></div><div class="skeleton skeleton-text-sm" style="width:5rem"></div></div><div class="skeleton skeleton-text-sm" style="width:1.5rem"></div></div>
+        <div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="skeleton" style="width:10px;height:10px;border-radius:2px"></div><div class="skeleton skeleton-text-sm" style="width:3.5rem"></div></div><div class="skeleton skeleton-text-sm" style="width:1.5rem"></div></div>
     </div>
 </div>
 </div>
@@ -225,14 +209,15 @@
         const check = setInterval(() => {
             if (window.PEAuth && PEAuth.authFetch) { clearInterval(check); resolve(); }
         }, 100);
-        setTimeout(() => { clearInterval(check); resolve(); }, 3000);
+        setTimeout(() => { clearInterval(check); resolve(); }, 5000);
     });
     await waitForAuth();
     try {
         const resp = await PEAuth.authFetch(`${API_BASE_URL}/deals`);
         if (!resp.ok) throw new Error('Failed');
         const deals = await resp.json();
-        const active = deals.filter(d => d.status !== 'ARCHIVED');
+        const list = Array.isArray(deals) ? deals : (deals?.deals || []);
+        const active = list.filter(d => d.status !== 'ARCHIVED');
 
         if (active.length === 0) {
             content.innerHTML = '<div class="flex flex-col items-center justify-center py-4 w-full text-text-muted"><span class="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span><p class="text-xs">No deals yet</p></div>';
@@ -279,7 +264,9 @@
             <div class="size-28 rounded-full shrink-0 shadow-inner" style="background: conic-gradient(${gradientParts.join(', ')}); mask: radial-gradient(circle at center, transparent 40%, black 41%); -webkit-mask: radial-gradient(circle at center, transparent 40%, black 41%);"></div>
             <div class="flex flex-col gap-3 flex-1">${legendHTML}</div>`;
     } catch (e) {
-        content.innerHTML = '<div class="text-xs text-text-muted text-center w-full py-4">Unable to load allocation</div>';
+        // Friendly fallback — same shape as the real chart so the layout doesn't collapse
+        content.innerHTML = '<div class="flex flex-col items-center justify-center py-4 w-full text-text-muted"><span class="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span><p class="text-xs">No deals yet</p></div>';
+        console.warn('Portfolio allocation fetch failed:', e);
     }
 })();
 </script>
@@ -304,18 +291,102 @@ Scan Signals
 </div>
 </div>
 
-<!-- Add Widget Button -->
-<button id="add-widget-btn" class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
+<!-- ============================================================ -->
+<!-- 12 EXPANSION WIDGETS — opt-in via Customize Dashboard modal  -->
+<!-- ============================================================ -->
+
+<div id="quick-actions-widget" data-widget="quick-actions" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">bolt</span>
+<h3 class="font-bold text-text-main text-base">Quick Actions</h3>
+</div>
+</div>
+
+<div id="quick-notes-widget" data-widget="notes-memo" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">sticky_note_2</span>
+<h3 class="font-bold text-text-main text-base">Quick Notes</h3>
+</div>
+</div>
+
+<div id="deal-funnel-widget" data-widget="deal-funnel" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">filter_alt</span>
+<h3 class="font-bold text-text-main text-base">Deal Funnel</h3>
+</div>
+</div>
+
+<div id="recent-activity-widget" data-widget="recent-activity" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">history</span>
+<h3 class="font-bold text-text-main text-base">Recent Activity</h3>
+</div>
+</div>
+
+<div id="upcoming-deadlines-widget" data-widget="upcoming-deadlines" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">event_upcoming</span>
+<h3 class="font-bold text-text-main text-base">Upcoming Deadlines</h3>
+</div>
+</div>
+
+<div id="calendar-widget" data-widget="calendar" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">calendar_month</span>
+<h3 class="font-bold text-text-main text-base">This Week</h3>
+</div>
+</div>
+
+<div id="key-contacts-widget" data-widget="key-contacts" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">contacts</span>
+<h3 class="font-bold text-text-main text-base">Key Contacts</h3>
+</div>
+</div>
+
+<div id="team-performance-widget" data-widget="team-performance" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">groups</span>
+<h3 class="font-bold text-text-main text-base">Team Performance</h3>
+</div>
+</div>
+
+<div id="document-alerts-widget" data-widget="document-alerts" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">report</span>
+<h3 class="font-bold text-text-main text-base">Document Alerts</h3>
+</div>
+</div>
+
+<div id="watchlist-widget" data-widget="watchlist" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">visibility</span>
+<h3 class="font-bold text-text-main text-base">Watchlist</h3>
+</div>
+</div>
+
+<div id="market-multiples-widget" data-widget="market-multiples" class="widget-container flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group" style="display:none">
+<div class="p-5 border-b border-border-subtle flex items-center gap-2 bg-white">
+<span class="material-symbols-outlined text-primary text-[20px]">insert_chart</span>
+<h3 class="font-bold text-text-main text-base">Market Multiples</h3>
+</div>
+</div>
+
+</div><!-- /dashboard-widget-grid -->
+
+<!-- Footer row — Add Widget + Customize Dashboard buttons live OUTSIDE
+     the grid so the layout editor can't drag widgets past them. -->
+<div class="flex flex-col sm:flex-row gap-3 mt-2">
+<button id="add-widget-btn" class="flex-1 flex items-center justify-center gap-2 rounded-lg border border-dashed border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all group bg-surface-card/50">
 <span class="material-symbols-outlined group-hover:scale-110 transition-transform">add_circle</span>
 <span class="text-sm font-semibold">Add Widget</span>
 </button>
 
-<!-- Widget Settings Button (for managing all widgets) -->
-<button id="widget-settings-btn" class="flex items-center justify-center gap-2 rounded-lg border border-border-subtle p-3 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50">
+<!-- Customize Dashboard Button — drag-and-drop layout editor. Hidden on mobile. -->
+<button id="widget-settings-btn" class="hidden md:flex flex-1 items-center justify-center gap-2 rounded-lg border border-border-subtle p-4 text-text-muted hover:border-primary hover:text-primary hover:bg-primary-light/50 transition-all bg-surface-card/50">
 <span class="material-symbols-outlined text-[18px]">tune</span>
-<span class="text-xs font-medium">Customize Dashboard</span>
+<span class="text-sm font-medium">Customize Dashboard</span>
 </button>
-</div>
 </div>
 </div>
 </div>
@@ -326,20 +397,22 @@ Scan Signals
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/config.js"></script>
-<script src="js/formatters.js"></script>
-<script src="js/notifications.js"></script>
-<script src="js/layoutComponents.js"></script>
-<script src="js/layout.js"></script>
-<script src="js/inviteModal-template.js"></script>
-<script src="js/inviteModal.js"></script>
+<script defer src="js/formatters.js"></script>
+<script defer src="js/notifications.js"></script>
+<script defer src="js/layoutComponents.js"></script>
+<script defer src="js/layout.js"></script>
+<script defer src="js/commandPalette.js"></script>
+<script defer src="js/aiAssistant.js"></script>
+<script defer src="js/inviteModal-template.js"></script>
+<script defer src="js/inviteModal.js"></script>
 <!-- Onboarding modules -->
 <script src="js/onboarding/onboarding-config.js"></script>
-<script src="js/onboarding/onboarding-api.js"></script>
-<script src="js/onboarding/onboarding-empty.js"></script>
-<script src="js/onboarding/onboarding-welcome.js"></script>
-<script src="js/onboarding/onboarding-checklist.js"></script>
-<script src="js/onboarding/onboarding-celebrate.js"></script>
-<script src="js/onboarding/onboarding-feedback.js"></script>
+<script defer src="js/onboarding/onboarding-api.js"></script>
+<script defer src="js/onboarding/onboarding-empty.js"></script>
+<script defer src="js/onboarding/onboarding-welcome.js"></script>
+<script defer src="js/onboarding/onboarding-checklist.js"></script>
+<script defer src="js/onboarding/onboarding-celebrate.js"></script>
+<script defer src="js/onboarding/onboarding-feedback.js"></script>
 <script>
     // Initialize PE OS Layout with collapsible sidebar
     document.addEventListener('DOMContentLoaded', async function() {
@@ -348,10 +421,33 @@ Scan Signals
         const auth = await PEAuth.checkAuth();
         if (!auth) return; // Will redirect to login
 
+        // Check if user needs onboarding (new users who haven't completed setup)
+        try {
+            const obResp = await PEAuth.authFetch(`${API_BASE_URL}/onboarding/status`);
+            if (obResp.ok) {
+                const obData = await obResp.json();
+                const steps = obData.steps || {};
+                const allDone = Object.values(steps).every(v => v === true);
+                const dismissed = obData.checklistDismissed === true;
+                const welcomeShown = obData.welcomeShown === true;
+                const seenLocally = sessionStorage.getItem('pe_onboarding_seen') === 'true';
+                // Redirect to onboarding if: not all steps done, not dismissed, and welcome never shown
+                // (welcome never shown = brand new user who hasn't seen the app yet)
+                if (!allDone && !dismissed && !welcomeShown && !seenLocally) {
+                    window.location.href = '/onboarding.html';
+                    return;
+                }
+            }
+        } catch {
+            // If check fails, continue to dashboard normally
+        }
+
         PELayout.init('dashboard', { collapsible: true });
 
-        // Initialize onboarding (welcome modal + checklist + feedback button + beta badge)
-        if (window.initWelcomeModal) await initWelcomeModal();
+        // Initialize onboarding (checklist + feedback button + beta badge)
+        // Skip old welcome modal if user went through new onboarding flow
+        const seenNewOnboarding = sessionStorage.getItem('pe_onboarding_seen') === 'true';
+        if (window.initWelcomeModal && !seenNewOnboarding) await initWelcomeModal();
         if (window.initOnboardingChecklist) await initOnboardingChecklist();
         if (window.initOnboardingUI) initOnboardingUI();
     });
@@ -384,10 +480,30 @@ Scan Signals
 </div>
 </div>
 
-<script src="js/ai-tools.js"></script>
-<script src="js/ai-email-drafter.js"></script>
-<script src="dashboard-tasks.js"></script>
-<script src="dashboard-widgets.js"></script>
-<script src="dashboard-search.js"></script>
-<script src="dashboard.js"></script>
+<script defer src="js/ai-tools.js"></script>
+<script defer src="js/ai-email-drafter.js"></script>
+<script defer src="dashboard-tasks.js"></script>
+<script defer src="dashboard-widgets.js"></script>
+<script defer src="dashboard-search.js"></script>
+
+<!-- Dashboard Widgets — Phase 0 foundations + 12 widget files + registry -->
+<script defer src="js/widgets/widget-base.js"></script>
+<script defer src="js/widgets/activity-formatters.js"></script>
+<script defer src="js/widgets/market-multiples-data.js"></script>
+<script defer src="js/widgets/quick-actions.js"></script>
+<script defer src="js/widgets/quick-notes.js"></script>
+<script defer src="js/widgets/deal-funnel.js"></script>
+<script defer src="js/widgets/recent-activity.js"></script>
+<script defer src="js/widgets/upcoming-deadlines.js"></script>
+<script defer src="js/widgets/calendar.js"></script>
+<script defer src="js/widgets/key-contacts.js"></script>
+<script defer src="js/widgets/team-performance.js"></script>
+<script defer src="js/widgets/document-alerts.js"></script>
+<script defer src="js/widgets/market-multiples.js"></script>
+<script defer src="js/widgets/watchlist-modal.js"></script>
+<script defer src="js/widgets/watchlist.js"></script>
+<script defer src="js/widgets/layout-editor.js"></script>
+<script defer src="js/widgets/index.js"></script>
+
+<script defer src="dashboard.js"></script>
 </body></html>

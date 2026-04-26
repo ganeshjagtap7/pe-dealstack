@@ -4,48 +4,12 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Deal Intake - PE OS</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
-    tailwind.config = {
-        theme: {
-            extend: {
-                colors: {
-                    "primary": "#003366",
-                    "primary-hover": "#002855",
-                    "primary-light": "#E6EEF5",
-                    "secondary": "#059669",
-                    "secondary-light": "#D1FAE5",
-                    "background-body": "#F8F9FA",
-                    "surface-card": "#FFFFFF",
-                    "border-subtle": "#E5E7EB",
-                    "border-focus": "#CBD5E1",
-                    "text-main": "#111827",
-                    "text-secondary": "#4B5563",
-                    "text-muted": "#9CA3AF",
-                },
-                fontFamily: {
-                    "sans": ["Inter", "sans-serif"],
-                    "display": ["Inter", "sans-serif"],
-                },
-                boxShadow: {
-                    "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
-                    "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                    "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
-                },
-                borderRadius: {
-                    "DEFAULT": "0.5rem",
-                    "md": "0.375rem",
-                    "lg": "0.5rem",
-                    "xl": "0.75rem",
-                }
-            },
-        },
-    }
-</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
+<link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-background-body text-text-main font-sans overflow-hidden">
 <div class="flex h-screen w-full overflow-hidden">
@@ -64,7 +28,7 @@
 <!-- Page Header -->
 <div class="flex flex-col gap-1">
 <h1 class="text-2xl font-bold text-text-main tracking-tight font-display">Deal Intake</h1>
-<p class="text-text-secondary text-sm">Upload a document, paste text, or enter a company URL to create a new deal.</p>
+<p class="text-text-secondary text-sm">Upload a document or paste text to create a new deal.</p>
 </div>
 
 <!-- Tab Navigation -->
@@ -76,10 +40,6 @@ Upload File
 <button id="tab-text" class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all text-text-secondary hover:text-text-main" onclick="switchTab('text')">
 <span class="material-symbols-outlined text-[18px]">edit_note</span>
 Paste Text
-</button>
-<button id="tab-url" class="tab-btn flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-md text-sm font-medium transition-all text-text-secondary hover:text-text-main" onclick="switchTab('url')">
-<span class="material-symbols-outlined text-[18px]">language</span>
-Enter URL
 </button>
 </div>
 
@@ -131,25 +91,6 @@ Extract & Create Deal
 <button id="text-btn" onclick="extractFromText()" disabled class="mt-4 w-full py-2.5 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
 <span class="material-symbols-outlined text-[18px]">auto_awesome</span>
 Extract & Create Deal
-</button>
-</div>
-</div>
-
-<!-- Enter URL Tab -->
-<div id="panel-url" class="tab-panel hidden">
-<div class="rounded-lg border border-border-subtle bg-surface-card p-6 shadow-card">
-<label class="block text-sm font-medium text-text-main mb-2">Company website URL</label>
-<div class="flex gap-3">
-<div class="relative flex-1">
-<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-[18px]">link</span>
-<input id="url-input" type="url" class="w-full rounded-lg border border-border-subtle bg-white pl-10 pr-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" placeholder="https://www.example.com" />
-</div>
-</div>
-<label class="block text-sm font-medium text-text-main mt-4 mb-2">Company name <span class="text-text-muted font-normal">(optional override)</span></label>
-<input id="url-company-name" type="text" class="w-full rounded-lg border border-border-subtle bg-white px-4 py-2.5 text-sm text-text-main placeholder-text-muted focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors" placeholder="e.g. Acme Healthcare" />
-<button id="url-btn" onclick="extractFromURL()" disabled class="mt-4 w-full py-2.5 px-4 rounded-lg bg-primary text-white text-sm font-medium hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-[18px]">auto_awesome</span>
-Scrape & Create Deal
 </button>
 </div>
 </div>
@@ -282,10 +223,12 @@ Add Another
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/config.js"></script>
-<script src="js/formatters.js"></script>
-<script src="js/notifications.js"></script>
-<script src="js/layoutComponents.js"></script>
-<script src="js/layout.js"></script>
+<script defer src="js/formatters.js"></script>
+<script defer src="js/notifications.js"></script>
+<script defer src="js/layoutComponents.js"></script>
+<script defer src="js/layout.js"></script>
+<script defer src="js/commandPalette.js"></script>
+<script defer src="js/aiAssistant.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', async function() {
         try {
@@ -299,5 +242,5 @@ Add Another
         }
     });
 </script>
-<script src="js/deal-intake.js"></script>
+<script defer src="js/deal-intake.js"></script>
 </body></html>

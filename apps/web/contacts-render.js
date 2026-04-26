@@ -106,16 +106,22 @@ function renderContactCard(contact) {
 
 function renderEmptyState() {
     return `
-        <div class="col-span-full flex flex-col items-center justify-center py-20">
-            <div class="size-20 rounded-full bg-primary-light/60 flex items-center justify-center mb-5">
-                <span class="material-symbols-outlined text-primary text-4xl">groups</span>
+        <div class="col-span-full flex flex-col items-center justify-center py-24">
+            <div class="size-20 rounded-2xl bg-primary-light flex items-center justify-center mb-6 shadow-sm border border-primary/10">
+                <span class="material-symbols-outlined text-primary" style="font-size:36px">groups</span>
             </div>
-            <h3 class="text-lg font-bold text-text-main mb-2">Start building your network</h3>
-            <p class="text-text-muted text-sm mb-6 text-center max-w-xs">Add contacts to track relationships with bankers, advisors, executives, and LPs.</p>
-            <button onclick="openContactModal()" class="flex items-center gap-2 px-5 py-2.5 bg-primary text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors text-sm font-medium">
-                <span class="material-symbols-outlined text-[18px]">person_add</span>
-                Add Your First Contact
-            </button>
+            <h3 class="text-xl font-bold text-text-main mb-2 tracking-tight">Start Building Your Network</h3>
+            <p class="text-text-muted text-sm mb-8 text-center max-w-sm leading-relaxed">Add contacts to track relationships with bankers, advisors, executives, and LPs across your deal flow.</p>
+            <div class="flex items-center gap-3">
+                <button onclick="openContactModal()" class="flex items-center gap-2 px-5 py-2.5 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-semibold" style="background-color: #003366;">
+                    <span class="material-symbols-outlined text-[18px]">person_add</span>
+                    Add Your First Contact
+                </button>
+                <button onclick="document.querySelector('[onclick*=importCSV], #import-csv-btn')?.click()" class="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary transition-all">
+                    <span class="material-symbols-outlined text-[18px]">upload_file</span>
+                    Import CSV
+                </button>
+            </div>
         </div>
     `;
 }

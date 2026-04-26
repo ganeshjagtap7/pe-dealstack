@@ -61,7 +61,7 @@ async function initAdminDashboard() {
 
     renderStatsCards();
     try {
-        await renderResourceAllocation();
+        renderResourceAllocation();
     } catch (e) {
         const container = document.getElementById('resource-allocation');
         if (container) {
@@ -204,7 +204,7 @@ function initCardScrollLinks() {
 
 let resourceExpanded = false;
 
-async function renderResourceAllocation() {
+function renderResourceAllocation() {
     const container = document.getElementById('resource-allocation');
     if (!container) return;
 
@@ -222,24 +222,29 @@ async function renderResourceAllocation() {
         return;
     }
 
+    // Build memberId → [dealNames] map from already-loaded allDeals.
+    // This replaces N sequential HTTP calls (one per member) with a single pass.
+    const dealsByMember = new Map();
+    allDeals.forEach(d => {
+        const name = d.name || d.dealName || 'Unknown';
+        (d.teamMembers || []).forEach(tm => {
+            // Handle both shapes: nested {user: {id}} from joined query, or flat {userId}
+            const uid = tm.user?.id || tm.userId;
+            if (!uid) return;
+            if (!dealsByMember.has(uid)) dealsByMember.set(uid, []);
+            dealsByMember.get(uid).push(name);
+        });
+    });
+
     const displayLimit = resourceExpanded ? teamMembers.length : 8;
     const membersToShow = teamMembers.slice(0, displayLimit);
     const memberHtml = [];
 
     for (const member of membersToShow) {
-        let dealNames = [];
-        let taskCount = 0;
-
-        try {
-            const resp = await PEAuth.authFetch(`${API_BASE_URL}/users/${member.id}/deals`);
-            if (resp.ok) {
-                const deals = await resp.json();
-                dealNames = (Array.isArray(deals) ? deals : []).slice(0, 3).map(d => d.name || d.dealName || 'Unknown');
-            }
-        } catch (e) { /* ignore per-member failure */ }
-
-        taskCount = allTasks.filter(t => t.assignedTo === member.id && t.status !== 'COMPLETED').length;
-        const capacity = Math.min(100, Math.round((dealNames.length / 5) * 100));
+        const memberDeals = dealsByMember.get(member.id) || [];
+        const dealNames = memberDeals.slice(0, 3);
+        const taskCount = allTasks.filter(t => t.assignedTo === member.id && t.status !== 'COMPLETED').length;
+        const capacity = Math.min(100, Math.round((memberDeals.length / 5) * 100));
         const initials = getInitials(member.name || member.email);
         const capacityColor = capacity >= 80 ? '#ef4444' : capacity >= 50 ? '#f59e0b' : '#003366';
 
@@ -360,53 +365,10 @@ async function loadActivityFeed(append = false) {
     }
 }
 
-function groupLogsByDay(logs) {
-    const groups = new Map();
-    const now = new Date();
-    const today = now.toDateString();
-    const yesterday = new Date(now.getTime() - 86400000).toDateString();
-
-    for (const log of logs) {
-        const date = new Date(log.createdAt);
-        const dateStr = date.toDateString();
-        let label;
-
-        if (dateStr === today) label = 'Today';
-        else if (dateStr === yesterday) label = 'Yesterday';
-        else label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-        if (!groups.has(label)) groups.set(label, []);
-        groups.get(label).push(log);
-    }
-
-    return groups;
-}
-
-function renderActivityItem(log) {
-    const userName = log.userName || log.userEmail?.split('@')[0] || 'System';
-    const initials = getInitials(userName);
-    const { text, icon } = formatAuditAction(log);
-    const timeAgo = getTimeAgo(log.createdAt);
-    const isAI = log.action?.startsWith('AI_');
-
-    return `
-        <div class="flex gap-3 relative z-10 mb-4">
-            <div class="relative flex-shrink-0">
-                <div class="w-9 h-9 rounded-full text-white text-xs font-medium flex items-center justify-center" style="background-color: #003366">
-                    ${isAI ? '<span class="material-symbols-outlined text-[18px]">auto_awesome</span>' : initials}
-                </div>
-                <div class="absolute -bottom-0.5 -right-0.5 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white" style="background-color: #003366">
-                    <span class="material-symbols-outlined text-white text-[10px]">${icon}</span>
-                </div>
-            </div>
-            <div class="flex-1 pt-0.5">
-                <p class="text-sm text-text-main">
-                    <span class="font-semibold${isAI ? ' text-primary' : ''}">${isAI ? 'PE OS AI' : escapeHtml(userName)}</span> ${text}
-                </p>
-                <p class="text-xs text-text-muted mt-1">${timeAgo}</p>
-            </div>
-        </div>`;
-}
+// groupLogsByDay, renderActivityItem, formatAuditAction, getInitials, getTimeAgo
+// are now provided by js/widgets/activity-formatters.js (loaded in admin-dashboard.html
+// before this file). Both this page and the dashboard's Recent Activity widget use
+// the same implementations.
 
 function updateLoadMoreButton(hasMore) {
     const btn = document.getElementById('load-more-activity');
@@ -431,38 +393,7 @@ function initLoadMoreActivity() {
     }
 }
 
-function formatAuditAction(log) {
-    const entity = log.entityName || log.resourceName || '';
-    const entityHtml = entity ? `<span class="text-primary font-medium">${escapeHtml(entity)}</span>` : '';
-
-    const actionMap = {
-        'DEAL_CREATED': { text: `created deal ${entityHtml}`, icon: 'add_circle' },
-        'DEAL_UPDATED': { text: `updated ${entityHtml}`, icon: 'edit' },
-        'DEAL_DELETED': { text: `deleted deal ${entityHtml}`, icon: 'delete' },
-        'DEAL_STAGE_CHANGED': { text: `moved ${entityHtml} to a new stage`, icon: 'arrow_forward' },
-        'DEAL_ASSIGNED': { text: `assigned ${entityHtml}`, icon: 'person_add' },
-        'DOCUMENT_UPLOADED': { text: `uploaded ${entityHtml}`, icon: 'upload_file' },
-        'DOCUMENT_DELETED': { text: `deleted document ${entityHtml}`, icon: 'delete' },
-        'DOCUMENT_DOWNLOADED': { text: `downloaded ${entityHtml}`, icon: 'download' },
-        'MEMO_CREATED': { text: `created memo ${entityHtml}`, icon: 'description' },
-        'MEMO_UPDATED': { text: `updated memo ${entityHtml}`, icon: 'edit_note' },
-        'MEMO_EXPORTED': { text: `exported memo ${entityHtml}`, icon: 'file_download' },
-        'USER_CREATED': { text: `added team member ${entityHtml}`, icon: 'person_add' },
-        'USER_UPDATED': { text: `updated user ${entityHtml}`, icon: 'manage_accounts' },
-        'USER_INVITED': { text: `invited ${entityHtml}`, icon: 'mail' },
-        'INVITATION_SENT': { text: `sent invitation to ${entityHtml}`, icon: 'send' },
-        'INVITATION_ACCEPTED': { text: `${entityHtml} accepted invitation`, icon: 'how_to_reg' },
-        'AI_INGEST': { text: `ingested document ${entityHtml}`, icon: 'auto_awesome' },
-        'AI_GENERATE': { text: `generated analysis for ${entityHtml}`, icon: 'auto_awesome' },
-        'LOGIN': { text: 'logged in', icon: 'login' },
-        'SETTINGS_CHANGED': { text: 'updated settings', icon: 'settings' },
-    };
-
-    return actionMap[log.action] || { text: `performed ${log.action || 'an action'}`, icon: 'info' };
-}
-
-// getTimeAgo -> use formatRelativeTime() from js/formatters.js
-var getTimeAgo = formatRelativeTime;
+// formatAuditAction + getTimeAgo provided by js/widgets/activity-formatters.js
 
 // ─── UI Helpers ──────────────────────────────────────────────
 
@@ -474,10 +405,7 @@ function updateLastUpdated() {
 // formatCurrency, escapeHtml — now in js/formatters.js
 // showNotification — now in js/notifications.js
 
-function getInitials(name) {
-    if (!name) return '?';
-    return name.split(/[\s@]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join('');
-}
+// getInitials provided by js/widgets/activity-formatters.js
 
 // Export for potential external use
 window.AdminDashboard = {

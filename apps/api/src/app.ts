@@ -2,12 +2,15 @@ import * as Sentry from '@sentry/node';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import rateLimit from 'express-rate-limit';
 import dealsRouter from './routes/deals.js';
 import companiesRouter from './routes/companies.js';
 import activitiesRouter from './routes/activities.js';
 import documentsRouter from './routes/documents.js';
+import documentsAlertsRouter from './routes/documents-alerts.js';
+import watchlistRouter from './routes/watchlist.js';
 import aiRouter from './routes/ai.js';
 import foldersRouter from './routes/folders.js';
 import usersRouter from './routes/users.js';
@@ -72,6 +75,9 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 
 const app = express();
 
+// Response compression (gzip)
+app.use(compression());
+
 // Security headers
 app.use(helmet({
   contentSecurityPolicy: {
@@ -120,12 +126,25 @@ app.use(cors({
 }));
 
 // Rate limiting - protect API from abuse
+// Use Authorization header as key so each user gets their own bucket,
+// falling back to IP for unauthenticated requests.
+// This prevents Vercel CDN IP sharing from causing false 429s.
+const rateLimitKeyGenerator = (req: express.Request) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    return 'user:' + authHeader.slice(-16);
+  }
+  // Fallback to forwarded IP header (Vercel/proxy) or socket address
+  return (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+};
+
 const generalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 200, // 200 requests per 15 min for general API
+  max: 600, // 600 requests per 15 min per user (was 200 — too low for SPA navigation)
   message: { error: 'Too many requests, please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitKeyGenerator,
 });
 
 const aiLimiter = rateLimit({
@@ -134,6 +153,7 @@ const aiLimiter = rateLimit({
   message: { error: 'Too many AI requests, please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitKeyGenerator,
 });
 
 const writeLimiter = rateLimit({
@@ -142,6 +162,7 @@ const writeLimiter = rateLimit({
   message: { error: 'Too many write operations, please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
+  keyGenerator: rateLimitKeyGenerator,
 });
 
 app.use('/api/', generalLimiter);
@@ -150,7 +171,8 @@ app.use('/api/memos/*/chat', aiLimiter);
 app.use('/api/memos/*/sections/*/generate', aiLimiter);
 app.use('/api/ingest', writeLimiter);
 
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request ID for error correlation
 app.use(requestIdMiddleware);
@@ -238,6 +260,7 @@ app.use('/api/deals/import', authMiddleware, orgMiddleware, dealImportRouter);
 app.use('/api/deals', authMiddleware, orgMiddleware, dealsRouter);
 app.use('/api/companies', authMiddleware, orgMiddleware, companiesRouter);
 app.use('/api', authMiddleware, orgMiddleware, activitiesRouter);
+app.use('/api/documents', authMiddleware, orgMiddleware, documentsAlertsRouter);
 app.use('/api', authMiddleware, orgMiddleware, documentsRouter);
 app.use('/api', authMiddleware, orgMiddleware, foldersRouter);
 app.use('/api/users', authMiddleware, orgMiddleware, usersRouter);
@@ -253,6 +276,7 @@ app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
+app.use('/api/watchlist', authMiddleware, orgMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
 
 // ========================================

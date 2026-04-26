@@ -4,48 +4,11 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>CRM - PE OS</title>
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script id="tailwind-config">
-    tailwind.config = {
-        theme: {
-            extend: {
-                colors: {
-                    "primary": "#003366",
-                    "primary-hover": "#002855",
-                    "primary-light": "#E6EEF5",
-                    "secondary": "#059669",
-                    "secondary-light": "#D1FAE5",
-                    "background-body": "#F8F9FA",
-                    "surface-card": "#FFFFFF",
-                    "border-subtle": "#E5E7EB",
-                    "border-focus": "#CBD5E1",
-                    "text-main": "#111827",
-                    "text-secondary": "#4B5563",
-                    "text-muted": "#9CA3AF",
-                },
-                fontFamily: {
-                    "sans": ["Inter", "sans-serif"],
-                    "display": ["Inter", "sans-serif"],
-                },
-                boxShadow: {
-                    "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
-                    "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                    "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
-                },
-                borderRadius: {
-                    "DEFAULT": "0.5rem",
-                    "md": "0.375rem",
-                    "lg": "0.5rem",
-                    "xl": "0.75rem",
-                }
-            },
-        },
-    }
-</script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
 <style>
     .slide-over-enter { animation: slideOverIn 0.3s ease-out; }
     .slide-over-leave { animation: slideOverOut 0.2s ease-in forwards; }
@@ -72,6 +35,7 @@
     .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
     body { font-feature-settings: "cv11", "ss01"; -webkit-font-smoothing: antialiased; }
 </style>
+    <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-background-body text-text-main font-sans overflow-hidden">
 <div class="flex h-screen w-full overflow-hidden">
@@ -197,10 +161,14 @@
 
 <!-- Contacts Grid -->
 <div id="contacts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 pb-2">
-    <!-- Loading state -->
-    <div id="loading-state" class="col-span-full flex flex-col items-center justify-center py-20">
-        <span class="material-symbols-outlined text-primary text-4xl animate-spin mb-4">sync</span>
-        <p class="text-text-muted text-sm font-medium">Loading contacts...</p>
+    <!-- Skeleton loading state — shimmer contact cards -->
+    <div id="loading-state" class="col-span-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div class="skeleton-card flex flex-col gap-4"><div class="flex items-start gap-3.5"><div class="skeleton skeleton-circle" style="width:44px;height:44px"></div><div class="flex-1 min-w-0"><div class="skeleton skeleton-text" style="width:60%"></div><div class="skeleton skeleton-text-sm" style="width:40%;margin-top:0.25rem"></div></div><div class="skeleton skeleton-badge"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:50%"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:65%"></div></div><div class="flex items-center justify-between pt-3 border-t border-gray-100 mt-1"><div class="skeleton skeleton-text-sm" style="width:6rem"></div><div class="skeleton skeleton-circle" style="width:28px;height:28px"></div></div></div>
+        <div class="skeleton-card flex flex-col gap-4"><div class="flex items-start gap-3.5"><div class="skeleton skeleton-circle" style="width:44px;height:44px"></div><div class="flex-1 min-w-0"><div class="skeleton skeleton-text" style="width:50%"></div><div class="skeleton skeleton-text-sm" style="width:35%;margin-top:0.25rem"></div></div><div class="skeleton skeleton-badge"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:55%"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:70%"></div></div><div class="flex items-center justify-between pt-3 border-t border-gray-100 mt-1"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-circle" style="width:28px;height:28px"></div></div></div>
+        <div class="skeleton-card flex flex-col gap-4"><div class="flex items-start gap-3.5"><div class="skeleton skeleton-circle" style="width:44px;height:44px"></div><div class="flex-1 min-w-0"><div class="skeleton skeleton-text" style="width:55%"></div><div class="skeleton skeleton-text-sm" style="width:45%;margin-top:0.25rem"></div></div><div class="skeleton skeleton-badge"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:60%"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:45%"></div></div><div class="flex items-center justify-between pt-3 border-t border-gray-100 mt-1"><div class="skeleton skeleton-text-sm" style="width:7rem"></div><div class="skeleton skeleton-circle" style="width:28px;height:28px"></div></div></div>
+        <div class="hidden md:flex skeleton-card flex-col gap-4"><div class="flex items-start gap-3.5"><div class="skeleton skeleton-circle" style="width:44px;height:44px"></div><div class="flex-1 min-w-0"><div class="skeleton skeleton-text" style="width:65%"></div><div class="skeleton skeleton-text-sm" style="width:30%;margin-top:0.25rem"></div></div><div class="skeleton skeleton-badge"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:50%"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:55%"></div></div><div class="flex items-center justify-between pt-3 border-t border-gray-100 mt-1"><div class="skeleton skeleton-text-sm" style="width:5.5rem"></div><div class="skeleton skeleton-circle" style="width:28px;height:28px"></div></div></div>
+        <div class="hidden lg:flex skeleton-card flex-col gap-4"><div class="flex items-start gap-3.5"><div class="skeleton skeleton-circle" style="width:44px;height:44px"></div><div class="flex-1 min-w-0"><div class="skeleton skeleton-text" style="width:45%"></div><div class="skeleton skeleton-text-sm" style="width:50%;margin-top:0.25rem"></div></div><div class="skeleton skeleton-badge"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:60%"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:40%"></div></div><div class="flex items-center justify-between pt-3 border-t border-gray-100 mt-1"><div class="skeleton skeleton-text-sm" style="width:6.5rem"></div><div class="skeleton skeleton-circle" style="width:28px;height:28px"></div></div></div>
+        <div class="hidden lg:flex skeleton-card flex-col gap-4"><div class="flex items-start gap-3.5"><div class="skeleton skeleton-circle" style="width:44px;height:44px"></div><div class="flex-1 min-w-0"><div class="skeleton skeleton-text" style="width:70%"></div><div class="skeleton skeleton-text-sm" style="width:40%;margin-top:0.25rem"></div></div><div class="skeleton skeleton-badge"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:48%"></div></div><div class="flex items-center gap-1.5"><div class="skeleton skeleton-circle" style="width:16px;height:16px"></div><div class="skeleton skeleton-text-sm" style="width:58%"></div></div><div class="flex items-center justify-between pt-3 border-t border-gray-100 mt-1"><div class="skeleton skeleton-text-sm" style="width:5rem"></div><div class="skeleton skeleton-circle" style="width:28px;height:28px"></div></div></div>
     </div>
 </div>
 
@@ -542,21 +510,23 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="js/auth.js"></script>
 <script src="js/config.js"></script>
-<script src="js/formatters.js"></script>
-<script src="js/notifications.js"></script>
-<script src="js/layoutComponents.js"></script>
-<script src="js/layout.js"></script>
-<script src="js/notificationCenter.js"></script>
-<script src="contacts-csv.js"></script>
-<script src="contacts-render.js"></script>
-<script src="contacts-modals.js"></script>
-<script src="contacts-detail.js"></script>
-<script src="js/ai-tools.js"></script>
-<script src="js/ai-email-drafter.js"></script>
+<script defer src="js/formatters.js"></script>
+<script defer src="js/notifications.js"></script>
+<script defer src="js/layoutComponents.js"></script>
+<script defer src="js/layout.js"></script>
+<script defer src="js/commandPalette.js"></script>
+<script defer src="js/aiAssistant.js"></script>
+<script defer src="js/notificationCenter.js"></script>
+<script defer src="contacts-csv.js"></script>
+<script defer src="contacts-render.js"></script>
+<script defer src="contacts-modals.js"></script>
+<script defer src="contacts-detail.js"></script>
+<script defer src="js/ai-tools.js"></script>
+<script defer src="js/ai-email-drafter.js"></script>
 <script src="js/onboarding/onboarding-config.js"></script>
-<script src="js/onboarding/onboarding-api.js"></script>
-<script src="js/onboarding/onboarding-feedback.js"></script>
-<script src="contacts.js"></script>
+<script defer src="js/onboarding/onboarding-api.js"></script>
+<script defer src="js/onboarding/onboarding-feedback.js"></script>
+<script defer src="contacts.js"></script>
 </body></html>
 
 

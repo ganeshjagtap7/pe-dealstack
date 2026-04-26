@@ -72,7 +72,7 @@ window.ONBOARDING_CONFIG = {
             {
                 id: 'inviteTeamMember',
                 label: 'Invite a team member',
-                href: '/settings.html',
+                href: '/settings.html#invite',
                 icon: 'person_add',
                 description: 'Add an analyst or partner to your organization'
             }
@@ -129,5 +129,17 @@ window.ONBOARDING_CONFIG = {
     betaBadge: {
         text: 'BETA',
         show: true,
+    },
+
+    // ==========================================
+    // Help & Support (modal opened from user dropdown)
+    // ==========================================
+    support: {
+        // 30-min booking page (Google Calendar appointment schedule)
+        bookingUrl: 'https://calendar.app.google/vRexQ5AmhivWx2PH6',
+        // Falls back to feedback.formUrl above if not set
+        formUrl: null,
+        // Urgent contact emails shown at bottom of modal (array → both opened in mailto)
+        urgentEmails: ['tech@pocketfund.org', 'hello@pocketfund.org'],
     },
 };

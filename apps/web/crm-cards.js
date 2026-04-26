@@ -18,7 +18,7 @@
                 return `
                     <div class="bg-background-body rounded-md p-3">
                         <span class="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">${config.label}</span>
-                        <span class="${colorClass} font-bold text-lg">${config.format(value)}</span>
+                        <span class="${colorClass} font-bold text-lg">${config.format(value, deal)}</span>
                     </div>
                 `;
             }).join('');
@@ -69,10 +69,10 @@
                             </div>
                             <div>
                                 <h3 class="text-text-main font-bold text-base leading-tight group-hover/card:text-primary transition-colors">${deal.name}</h3>
-                                <p class="text-text-muted text-xs font-medium">${deal.industry || 'N/A'}</p>
+                                <p class="text-text-muted text-xs font-medium">${deal.industry || '—'}</p>
                             </div>
                         </div>
-                        <span class="px-2 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider mr-8">${style.label}</span>
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-md ${style.bg} border ${style.border} ${style.text} text-[10px] font-bold uppercase tracking-wider whitespace-nowrap shrink-0 mr-8 leading-none">${style.label}</span>
                         ${deal.tags && deal.tags.includes('sample') ? '<span class="ml-1 px-2 py-1 rounded-md bg-amber-50 border border-amber-200 text-amber-700 text-[10px] font-bold uppercase tracking-wider">Sample</span>' : ''}
                     </div>
                 <div class="grid ${gridCols} gap-3 mb-4">
@@ -85,7 +85,28 @@
                     </div>
                     <p class="text-text-secondary text-xs leading-relaxed line-clamp-2">${deal.aiThesis || 'No AI analysis available yet.'}</p>
                 </div>
-                <div class="flex items-center justify-between mt-4 pt-3 border-t border-border-subtle">
+                ${(() => {
+                    // Deal completeness indicator — how much data is filled
+                    let filled = 0;
+                    let total = 6;
+                    if (deal.revenue) filled++;
+                    if (deal.ebitda) filled++;
+                    if (deal.dealSize) filled++;
+                    if (deal.aiThesis && deal.aiThesis !== 'No AI analysis available yet.') filled++;
+                    if (deal.lastDocument) filled++;
+                    if (deal.industry) filled++;
+                    const completePct = Math.round((filled / total) * 100);
+                    const barColor = completePct >= 80 ? '#059669' : completePct >= 50 ? '#F59E0B' : '#9CA3AF';
+                    return `
+                    <div class="flex items-center gap-2 mt-3 pt-3 border-t border-border-subtle">
+                        <span class="text-[10px] font-bold text-text-muted uppercase tracking-wider">Data</span>
+                        <div class="flex-1 bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                            <div class="h-1.5 rounded-full transition-all" style="width:${completePct}%; background:${barColor}"></div>
+                        </div>
+                        <span class="text-[10px] font-bold" style="color:${barColor}">${completePct}%</span>
+                    </div>`;
+                })()}
+                <div class="flex items-center justify-between mt-3 pt-0 border-t-0">
                     <div class="flex items-center gap-1.5 text-text-muted">
                         <span class="material-symbols-outlined text-[14px]">${getDocIcon(deal.lastDocument)}</span>
                         <span class="text-[11px] font-medium truncate max-w-[100px]">${deal.lastDocument || 'No docs'}</span>
@@ -95,7 +116,7 @@
                             <span class="material-symbols-outlined text-[14px]">folder_open</span>
                             <span class="hidden sm:inline">VDR</span>
                         </a>
-                        <span class="text-[11px] text-text-muted font-medium">${formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}</span>
+                        <span class="text-[11px] text-text-muted font-medium live-timestamp" data-timestamp="${deal.lastDocumentUpdated || deal.updatedAt}">${formatRelativeTime(deal.lastDocumentUpdated || deal.updatedAt)}</span>
                     </div>
                 </div>
             </article>
@@ -141,18 +162,25 @@
 
             if (!hasActiveFilters && allDeals.length === 0) {
                 return `
-        <div class="col-span-full flex flex-col items-center justify-center py-20">
-            <div class="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
-                <span class="material-symbols-outlined text-primary text-3xl">rocket_launch</span>
+        <div class="col-span-full flex flex-col items-center justify-center py-24">
+            <div class="w-20 h-20 rounded-2xl bg-primary-light flex items-center justify-center mb-6 shadow-sm border border-primary/10">
+                <span class="material-symbols-outlined text-primary" style="font-size:36px">rocket_launch</span>
             </div>
-            <p class="text-text-main font-semibold text-lg mb-2">Welcome to Your Deal Pipeline</p>
-            <p class="text-text-muted text-sm mb-6 max-w-md text-center">Start building your deal flow. Create your first deal to track it through sourcing, due diligence, and close.</p>
-            <button onclick="document.getElementById('new-deal-btn')?.click() || (window.location.href='deal-intake.html')"
-                    class="px-5 py-2.5 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm"
-                    style="background-color: #003366;">
-                <span class="material-symbols-outlined text-[18px] align-middle mr-1">add_circle</span>
-                Create Your First Deal
-            </button>
+            <p class="text-text-main font-bold text-xl mb-2 tracking-tight">Welcome to Your Deal Pipeline</p>
+            <p class="text-text-muted text-sm mb-8 max-w-md text-center leading-relaxed">Start building your deal flow. Create your first deal or import from a spreadsheet to track through sourcing, due diligence, and close.</p>
+            <div class="flex items-center gap-3">
+                <button onclick="document.getElementById('new-deal-btn')?.click() || (window.location.href='deal-intake.html')"
+                        class="px-5 py-2.5 text-white rounded-lg text-sm font-semibold hover:opacity-90 transition-colors shadow-sm"
+                        style="background-color: #003366;">
+                    <span class="material-symbols-outlined text-[18px] align-middle mr-1">add_circle</span>
+                    Create Your First Deal
+                </button>
+                <button onclick="document.getElementById('import-deals-btn')?.click()"
+                        class="px-5 py-2.5 rounded-lg text-sm font-semibold border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary transition-all">
+                    <span class="material-symbols-outlined text-[18px] align-middle mr-1">upload_file</span>
+                    Import Deals
+                </button>
+            </div>
         </div>
     `;
             }
@@ -295,7 +323,7 @@
                 return `
                     <div class="flex-1 bg-background-body rounded px-2 py-1.5">
                         <span class="text-[9px] text-text-muted font-medium uppercase block">${config.kanbanLabel}</span>
-                        <span class="text-xs font-bold ${colorClass}">${config.format(value)}</span>
+                        <span class="text-xs font-bold ${colorClass}">${config.format(value, deal)}</span>
                     </div>
                 `;
             }).join('');
@@ -314,7 +342,7 @@
                     </div>
                     <div class="min-w-0 flex-1">
                         <h4 class="text-sm font-semibold text-text-main truncate hover:text-primary transition-colors">${deal.name}</h4>
-                        <p class="text-[11px] text-text-muted truncate">${deal.industry || 'N/A'}</p>
+                        <p class="text-[11px] text-text-muted truncate">${deal.industry || '—'}</p>
                     </div>
                 </div>
 

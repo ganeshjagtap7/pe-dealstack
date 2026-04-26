@@ -18,6 +18,19 @@ function stripHtml(html: string): string {
     .trim();
 }
 
+/** Map AI agent section types to valid DB types (CHECK constraint) */
+const SECTION_TYPE_MAP: Record<string, string> = {
+  'EXIT_ANALYSIS': 'EXIT_STRATEGY',
+  'VALUE_CREATION_PLAN': 'VALUE_CREATION',
+  'QUALITY_OF_EARNINGS': 'FINANCIAL_PERFORMANCE',
+  'MANAGEMENT_ASSESSMENT': 'CUSTOM',
+  'OPERATIONAL_DEEP_DIVE': 'CUSTOM',
+};
+
+function normalizeDbSectionType(type: string): string {
+  return SECTION_TYPE_MAP[type] || type;
+}
+
 // ─── Factory ──────────────────────────────────────────────────────────────────
 
 /** Create all memo agent tools with memoId/dealId/orgId baked in via closures */
@@ -367,20 +380,92 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
   // ── 10. add_section ──────────────────────────────────────────────────────
 
   const addSectionTool = tool(
-    async ({ sectionType, title }) => {
-      return JSON.stringify({
-        action: 'confirm',
-        sectionType,
-        title,
-        type: 'new_section',
-      });
+    async ({ sectionType, title, content }) => {
+      try {
+        // Get max sortOrder
+        const { data: existingSections } = await supabase
+          .from('MemoSection')
+          .select('sortOrder')
+          .eq('memoId', memoId)
+          .order('sortOrder', { ascending: false })
+          .limit(1);
+
+        const maxSortOrder = existingSections?.[0]?.sortOrder ?? -1;
+
+        const { data: section, error } = await supabase
+          .from('MemoSection')
+          .insert({
+            memoId,
+            type: normalizeDbSectionType(sectionType),
+            title,
+            content: content || '',
+            aiGenerated: true,
+            sortOrder: maxSortOrder + 1,
+          })
+          .select('id, title')
+          .single();
+
+        if (error) throw error;
+
+        return JSON.stringify({
+          action: 'applied',
+          sectionId: section.id,
+          title: section.title,
+          type: 'new_section',
+        });
+      } catch (error) {
+        log.error('addSection tool error', error);
+        return JSON.stringify({ success: false, error: 'Failed to create section' });
+      }
     },
     {
       name: 'add_section',
-      description: 'Propose adding a new section to the memo. Returns a confirmation request before the section is created. Use when the user asks to add a section that does not yet exist (e.g., "Add a Market Dynamics section").',
+      description: `Add a new section to the memo with AI-generated content. You MUST provide the full HTML content for the section — do NOT leave it empty. Use <h3> sub-headings, <p> paragraphs, <ul>/<li> lists, and <strong> for key metrics. The content should be professional PE memo quality.`,
       schema: z.object({
-        sectionType: z.string().describe('Section type key (e.g., EXECUTIVE_SUMMARY, FINANCIAL_PERFORMANCE, RISK_ASSESSMENT, MARKET_DYNAMICS, EXIT_ANALYSIS, etc.)'),
-        title: z.string().describe('Display title for the new section (e.g., "Market Dynamics")'),
+        sectionType: z.string().describe('Section type key (e.g., EXECUTIVE_SUMMARY, FINANCIAL_PERFORMANCE, RISK_ASSESSMENT, MARKET_DYNAMICS, EXIT_ANALYSIS, COMPETITIVE_LANDSCAPE, VALUE_CREATION_PLAN, CUSTOM)'),
+        title: z.string().describe('Display title for the new section (e.g., "Exit Strategy", "Strategic Initiatives")'),
+        content: z.string().describe('Full HTML content for the section. Must include <h3> sub-headings and <p> paragraphs. Write 3-5 detailed sub-sections with real analysis based on deal data.'),
+      }),
+    }
+  );
+
+  // ── 11. remove_section ───────────────────────────────────────────────────
+
+  const removeSectionTool = tool(
+    async ({ sectionId }) => {
+      try {
+        const { data: section } = await supabase
+          .from('MemoSection')
+          .select('id, title')
+          .eq('id', sectionId)
+          .eq('memoId', memoId)
+          .single();
+
+        if (!section) return JSON.stringify({ success: false, error: 'Section not found' });
+
+        const { error } = await supabase
+          .from('MemoSection')
+          .delete()
+          .eq('id', sectionId);
+
+        if (error) throw error;
+
+        return JSON.stringify({
+          action: 'applied',
+          sectionId,
+          removed: true,
+          title: section.title,
+        });
+      } catch (error) {
+        log.error('removeSectionTool error', error);
+        return JSON.stringify({ success: false, error: 'Failed to remove section' });
+      }
+    },
+    {
+      name: 'remove_section',
+      description: 'Delete/remove a section from the memo. Use when the user asks to delete, remove, or get rid of a specific section. First call get_memo_sections to find the section ID.',
+      schema: z.object({
+        sectionId: z.string().describe('UUID of the memo section to remove'),
       }),
     }
   );
@@ -398,5 +483,6 @@ export function getMemoAgentTools(memoId: string, dealId: string, orgId: string)
     generateTableTool,
     generateChartTool,
     addSectionTool,
+    removeSectionTool,
   ];
 }

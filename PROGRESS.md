@@ -5,6 +5,1357 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 63 — April 24, 2026
+
+#### Timestamp: April 24, 2026 — 20:00-21:30 IST
+
+#### Goal: Deal Chat Agent Superpowers + Ingest Bug Fixes + UI Polish
+
+---
+
+#### Bug Fixes
+
+1. **Ingest context fields 500 error** — `targetCloseDate` received `"60 days"` string but DB expects ISO date. Fixed by converting timeline strings ("30 days", "6 months") to actual dates in `ingest-upload.ts`.
+
+2. **Deal size = revenue copy bug** — `dealSize` was being set to `revenue` value during ingest, causing identical Revenue and Deal Size on CRM cards. Fixed:
+   - Added `dealSize` field to AI extraction schema (`aiExtractor.ts`) — GPT-4o now looks for enterprise value / asking price in documents
+   - Removed the `revenue → dealSize` copy in `ingest-upload.ts` and `dealMerger.ts`
+   - Cleaned up 44 existing deals in DB that had the bug
+   - Removed bad EBITDA×8x estimation fallback after user feedback
+
+#### New Features
+
+3. **Resizable chat panel** — New draggable border between deal details and chat panel. Drag to resize, double-click to reset. Persists to localStorage. New file: `deal-chat-resize.js`.
+
+4. **Deal Chat Agent — 14 tools (was 6):**
+   - **Expanded `update_deal_field`** — now handles 15 fields (was 6): name, currency, revenue, ebitda, dealSize, irrProjected, mom, grossMargin, targetCloseDate + original 6
+   - **New `change_deal_stage`** — change pipeline stage directly from chat (INITIAL_REVIEW → CLOSING → CLOSED_WON etc.)
+   - **New `add_note`** — add notes/calls/meetings to activity feed
+   - **New `trigger_financial_extraction`** — check documents available for extraction
+   - **New `generate_meeting_prep`** — generate full meeting brief via chat
+   - **New `draft_email`** — draft professional emails via chat
+   - **New `get_analysis_summary`** — QoE scores, red flags, financial ratios
+   - **New `list_documents`** — list all uploaded docs with AI status
+   - **New `scroll_to_section`** — scroll deal page to any section from chat
+   - **New `sideEffects` protocol** — frontend handles note_added, extraction_triggered, scroll_to events
+
+5. **Max tokens increased** — Chat agent output limit raised from 1500 → 2500 tokens for richer responses (meeting briefs, email drafts).
+
+#### UI Polish
+
+6. **N/A → em dash (—)** — Replaced all "N/A" with "—" across 6 frontend files (formatters.js, crm-cards.js, crm.js, crm-dynamic.js, templates.js, dashboard-search.js).
+
+7. **Hidden scrollbars globally** — Added CSS to hide all scrollbars while keeping scroll functionality (`skeleton.css`).
+
+8. **Deal page metadata grid** — Cleaned up Lead Partner / Analyst / Source / Updated row — removed avatar circles, consistent 13px semibold font, proper background.
+
+9. **Deal metrics cards polish** — Tighter typography (10px labels, text-xl values, tabular-nums).
+
+---
+
+### Files Changed — Session 63
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/routes/ingest-upload.ts` | Timeline-to-date conversion, dealSize fix, dealSize extraction from AI |
+| `apps/api/src/services/aiExtractor.ts` | Added `dealSize` to Zod schema, interface, result builder |
+| `apps/api/src/services/dealMerger.ts` | Removed revenue→dealSize copy |
+| `apps/api/src/services/agents/dealChatAgent/tools.ts` | 8 new tools, expanded update_deal_field (6→15 fields), +316 lines |
+| `apps/api/src/services/agents/dealChatAgent/index.ts` | Updated system prompt, sideEffects parsing, max tokens 1500→2500 |
+| `apps/web/deal-chat-resize.js` | **New** — resizable chat panel (drag, localStorage, touch) |
+| `apps/web/deal-chat.js` | sideEffects handler (note_added, extraction_triggered, scroll_to) |
+| `apps/web/deal.html` | Resize handle, metadata grid redesign, removed inline scrollbar CSS |
+| `apps/web/deal.js` | Simplified lead/analyst rendering, metrics card polish |
+| `apps/web/js/formatters.js` | N/A → — (em dash) globally |
+| `apps/web/crm-cards.js` | N/A → — |
+| `apps/web/crm.js` | N/A → — |
+| `apps/web/crm-dynamic.js` | N/A → — |
+| `apps/web/templates.js` | N/A → — |
+| `apps/web/dashboard-search.js` | N/A → — |
+| `apps/web/css/skeleton.css` | Global scrollbar hiding |
+| `apps/web/js/deal-intake-template.js` | (context fields UI — no code change, template only) |
+
+---
+
+### Session 62 — April 24, 2026
+
+#### Timestamp: April 24, 2026 — 05:30-07:00 IST
+
+#### Goal: Premium UX Features — Notification Center, Data Visualization, AI Assistant, Real-Time Indicators
+
+---
+
+#### 1. Notification Center — Full Slide-Out Panel (#D)
+
+**What changed:** Replaced the basic notification dropdown (small fixed box) with a full-height slide-out panel from the right edge.
+
+**Features:**
+- 420px wide panel with backdrop blur overlay
+- Time-grouped notifications: Today / Yesterday / This Week / This Month / Older (sticky headers)
+- 4 filter tabs: All / Unread / AI / Team
+- "Mark all read" button in header with unread count pill
+- Color-coded type icons (Deal=navy, Document=blue, AI=amber, Task=green, Comment=cyan)
+- Click notification → navigates to deal page
+- Escape key / backdrop click to close
+- Slide-in/out animations
+
+**Files:** `apps/web/js/notificationCenter.js` (complete rewrite — 400 lines)
+
+---
+
+#### 2. Data Visualization — Dashboard (#F)
+
+**Portfolio Metrics Bar:**
+- 4 metric cards below stat cards: Total Pipeline, Avg Deal Size, Conversion Rate, Total Revenue
+- All computed from real deal data (not hardcoded)
+- Colored icons: navy (pipeline), blue (avg size), green (conversion), amber (revenue)
+
+**Pipeline Funnel Chart:**
+- Horizontal bar chart showing Sourcing → Due Diligence → LOI/Offer → Closed
+- Labels outside bars for visibility, counts and percentages
+- Color-coded per stage, proportional bar widths
+
+**Stat Card Pipeline % Badge:**
+- Each stat card now shows a colored percentage badge (e.g. "67%") indicating pipeline share
+
+**Deal Card Completeness Bar:**
+- Each deal card on CRM page shows a data completeness indicator
+- Green (≥80%), amber (≥50%), gray (<50%)
+- Checks: revenue, EBITDA, dealSize, aiThesis, documents, industry
+
+**Files:** `apps/web/dashboard.html`, `apps/web/crm-cards.js`, `apps/web/crm.js`
+
+---
+
+#### 3. Contextual AI Assistant (#C)
+
+**What built:** Floating "Ask AI" button (sparkle icon, Banker Blue) on bottom-right of all 11 app pages. Opens a chat drawer that's context-aware.
+
+**Features:**
+- Page-aware context: shows "Deal: Luktara Industries" on deal page, "Portfolio" on dashboard, "Contacts" on contacts page
+- Welcome message customized per context
+- Sends to deal chat API when on deal page, portfolio AI on other pages
+- Typing indicator with animated dots
+- Markdown bold support in responses
+- Shift+Space keyboard shortcut
+- Positioned above Feedback button (no overlap)
+- Hidden on login/signup/onboarding pages
+
+**Files:** `apps/web/js/aiAssistant.js` (new — 310 lines), all 11 HTML pages updated
+
+---
+
+#### 4. Real-Time Indicators (#B)
+
+**Team Avatars on Deal Page:**
+- Overlapping avatar circles below deal title showing team members
+- Shows initials + "Ganesh, John on this deal" text
+
+**Live Timestamps on CRM Cards:**
+- Deal card timestamps (e.g. "2m ago") auto-update every 30 seconds
+- Uses `data-timestamp` attributes + interval ticker
+
+**Sidebar Activity Dot:**
+- Small green dot with glow appears on "Deals" nav item when unread notifications exist
+- Updates every 31 seconds (synced with notification polling)
+- Hidden when on the Deals page or no unread notifications
+
+**Files:** `apps/web/deal.js`, `apps/web/deal.html`, `apps/web/js/layout.js`, `apps/web/js/layoutComponents.js`
+
+---
+
+#### Session 62 Summary
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Notification Center — slide-out panel | Done |
+| 2 | Portfolio Metrics Bar | Done |
+| 3 | Pipeline Funnel Chart | Done |
+| 4 | Stat Card % Badges | Done |
+| 5 | Deal Completeness Bar | Done |
+| 6 | Contextual AI Assistant | Done |
+| 7 | Team Avatars on Deal Page | Done |
+| 8 | Live Timestamps on CRM | Done |
+| 9 | Sidebar Activity Dot | Done |
+
+### Files Changed — Session 62
+
+| File | Changes |
+|------|---------|
+| `apps/web/js/notificationCenter.js` | Complete rewrite — slide-out panel |
+| `apps/web/js/aiAssistant.js` | **New** — contextual AI assistant |
+| `apps/web/dashboard.html` | Portfolio metrics + pipeline funnel + stat % badges |
+| `apps/web/crm-cards.js` | Deal completeness bar + live timestamp data attrs |
+| `apps/web/crm.js` | Live timestamp ticker (30s interval) |
+| `apps/web/deal.html` | Team viewers container |
+| `apps/web/deal.js` | Team avatar rendering |
+| `apps/web/js/layout.js` | Sidebar activity dot logic |
+| `apps/web/js/layoutComponents.js` | Nav item data-nav-id + activity dot HTML |
+| All 11 app HTML files | aiAssistant.js script tag |
+
+---
+
+### Session 61 — April 24, 2026
+
+#### Timestamp: April 24, 2026 — 03:00-05:30 IST
+
+#### Goal: Page Load Performance Optimization + Premium UX Polish
+
+---
+
+#### Part 1: Performance Optimization (Cold Starts, CSS, Auth, Fonts)
+
+##### 1. Split API into Lite + AI Serverless Functions
+
+**Problem:** Single Vercel serverless function loaded ALL routes including 50MB of AI dependencies (LangChain 24MB, OpenAI 13MB, Azure 13MB) on every cold start. Simple CRUD requests like `/api/users/me` took 3-5s on cold start.
+
+**Root Cause:** `api/index.ts` imported `app.ts` which statically imported all 20+ route modules, including AI-heavy ones.
+
+**Fix:**
+- Created `apps/api/src/app-lite.ts` — lightweight Express app with 17 CRUD routes only (deals, companies, contacts, users, notifications, etc.)
+- Created `apps/api/src/app-ai.ts` — AI Express app with 6 AI-heavy routes (ai, chat, financials, memos, ingest, onboarding)
+- Created `api/ai.ts` — separate Vercel serverless handler for AI function
+- Updated `vercel.json` with two functions + 15 AI-specific rewrites before catch-all
+- Added `Cache-Control: immutable` headers for `/js/` and `/assets/` static files
+- Lite function: `maxDuration: 60s`. AI function: `maxDuration: 300s`
+- **Cold start improvement: 3-5s → <500ms for 90% of page navigations**
+
+##### 2. Fix Transitive AI Import Leaks
+
+**Problem:** Three "lite" routes had transitive imports to LangChain via service files, defeating the split.
+
+**Root Cause:**
+- `dealImportMapper.ts` → `@langchain/core/messages` (static import)
+- `contacts.ts` → `contactEnrichment/index.ts` → `@langchain/langgraph` (static import)
+- `deals.ts` → `followUpQuestions.ts` → `@langchain/core/messages` (static import)
+
+**Fix:** Converted all three to dynamic `import()` calls inside the functions that use them. Modules load on-demand, not at cold start.
+
+##### 3. Replace Tailwind CDN with Build-Time CSS
+
+**Problem:** Every HTML page loaded `cdn.tailwindcss.com` which JIT-compiles CSS client-side — adding 100-200ms per page.
+
+**Fix:**
+- Created `apps/web/css/app.css` with `@tailwind` directives
+- Installed `@tailwindcss/forms` + `@tailwindcss/container-queries` plugins
+- Updated `tailwind.config.js` with merged theme config from inline CDN configs
+- Removed CDN script + inline config from all 29 HTML files
+- Added `<link rel="stylesheet" href="/css/app.css" />` to all pages
+- **Also fixed:** content paths missing `./*.js` (root-level JS files like `contacts-render.js` weren't scanned, causing class purging). Added `navy-custom` color for login page.
+
+##### 4. Optimize Google Fonts Loading
+
+**Problem:** Google Fonts loaded synchronously without `display=swap`, blocking first paint by 300-500ms.
+
+**Fix:** Added `rel="preload" as="style"` for Inter font, ensured `display=swap` on all links, removed duplicate Material Symbols links, updated Material Symbols to include optical size axis. Applied to all 29 HTML files.
+
+##### 5. Cache Supabase Session + User Data
+
+**Problem:** 4 sequential network calls per page: `getUser()` called both `client.auth.getUser()` AND `client.auth.getSession()`, then `loadUserData()` called `getAccessToken()` → `getSession()` again, then `/api/users/me`.
+
+**Fix:**
+- `auth.js`: Session cached in memory per page lifecycle. Concurrent `getSession()` calls share one promise. `getUser()` derives from cached session instead of separate API call.
+- `layout.js`: User data cached in `sessionStorage` with 2-minute TTL. Skips `/api/users/me` call when cache is fresh.
+- **Reduced from 4 sequential calls → 0-1 per page navigation**
+
+##### 6. Fix 429 Rate Limiting
+
+**Problem:** Users randomly hit HTTP 429 "Too Many Requests". Rate limiter was IP-based at 200 req/15min. On Vercel, CDN IP sharing caused all users to share one bucket.
+
+**Root Cause:** Each page load makes 5-8 API calls + notification polling every 30s. 25 navigations easily exceeded 200 limit.
+
+**Fix:** Rate limit key now uses auth token (per-user) with `x-forwarded-for` fallback. Limit raised to 600 req/15min. Applied to all 3 app files (app.ts, app-lite.ts, app-ai.ts).
+
+---
+
+#### Part 2: Premium UX Polish (6 Features)
+
+##### 7. Skeleton Loading Shimmer (4 pages)
+
+Replaced "Loading..." text and spinning icons with animated gray shimmer placeholders that match the shape of actual content:
+- **Dashboard:** 4 stat cards, 3 priority table rows, portfolio chart (circle + legend)
+- **CRM:** 3-4 shimmer deal cards (icon, name, metrics, avatars)
+- **Contacts:** 3-6 shimmer contact cards (avatar, name, company, badge)
+- **Deal Detail:** title, breadcrumb, 4 metric cards
+
+Shared CSS module: `apps/web/css/skeleton.css` (reusable across all pages).
+
+##### 8. Page Transition Animations
+
+Sidebar link clicks now fade-out main content (120ms) then fade-in on new page (180ms). Sidebar stays static throughout — no flicker. Respects Cmd/Ctrl+click for new tab. Implemented in `layout.js` — applies to all pages automatically.
+
+##### 9. Command Palette (Cmd+K)
+
+Spotlight-style search overlay for quick navigation:
+- Opens with Cmd+K (Mac) or Ctrl+K (Windows)
+- Searches pages (7), deals, and contacts
+- Keyboard navigation: arrow keys, Enter to open, Escape to close
+- Grouped results by type (Pages / Deals / Contacts)
+- Prefetches deal + contact data on open
+- Added to all 11 app pages via `js/commandPalette.js`
+
+##### 10. Premium Toast Notifications
+
+Upgraded `showNotification()` with:
+- Colored type icons (blue info, green success, amber warning, red error)
+- Countdown progress bar at bottom
+- Pause-on-hover (progress bar freezes while reading)
+- Slide-in/slide-out animations
+- Smooth vertical stacking with repositioning
+- Same API — fully backward compatible
+
+##### 11. Smart Empty States
+
+Upgraded CRM and Contacts empty states:
+- Larger icon in rounded square with soft shadow
+- Bolder title with tighter tracking
+- Two action buttons: primary CTA + secondary outline (Import Deals / Import CSV)
+- More breathing room
+
+##### 12. Hover & Micro-interactions (CSS-only)
+
+Global polish via `css/skeleton.css`:
+- Card hover lift: `translateY(-2px)` on deal/contact cards
+- Button press feedback: `scale(0.97)` on click
+- Dropdown slide-in animations
+- Notification dot pulse animation
+- Focus-visible keyboard ring (Banker Blue)
+- Smooth scrollbar behavior
+
+---
+
+#### Session 61 Summary
+
+| # | Task | Status |
+|---|------|--------|
+| 1 | Split API into lite + AI serverless functions | Done |
+| 2 | Fix transitive AI import leaks (dynamic import) | Done |
+| 3 | Replace Tailwind CDN with build-time CSS | Done |
+| 4 | Optimize Google Fonts (preload + display=swap) | Done |
+| 5 | Cache Supabase session + user data (2min TTL) | Done |
+| 6 | Fix 429 rate limit (per-user keying + 600/15min) | Done |
+| 7 | Skeleton loading shimmer (4 pages) | Done |
+| 8 | Page transition animations | Done |
+| 9 | Command palette (Cmd+K) | Done |
+| 10 | Premium toast notifications | Done |
+| 11 | Smart empty states | Done |
+| 12 | Hover & micro-interactions | Done |
+
+### Files Changed — Session 61
+
+| File | Changes |
+|------|---------|
+| `api/index.ts` | Rewritten to import `app-lite.js` |
+| `api/ai.ts` | **New** — Vercel handler for AI function |
+| `apps/api/src/app-lite.ts` | **New** — lightweight Express app (17 CRUD routes) |
+| `apps/api/src/app-ai.ts` | **New** — AI Express app (6 AI routes) |
+| `apps/api/src/app.ts` | Rate limiter: per-user keying + 600/15min |
+| `apps/api/src/routes/deals.ts` | Dynamic import for followUpQuestions |
+| `apps/api/src/routes/contacts.ts` | Dynamic import for contactEnrichment + llm |
+| `apps/api/src/services/dealImportMapper.ts` | Dynamic import for langchain + llm |
+| `vercel.json` | Two functions, 15 AI rewrites, cache headers |
+| `apps/web/css/skeleton.css` | **New** — shimmer + micro-interaction CSS |
+| `apps/web/css/app.css` | Tailwind entry + skeleton import |
+| `apps/web/tailwind.config.js` | Full theme, plugins, content paths |
+| `apps/web/js/layout.js` | Page transition + user cache TTL |
+| `apps/web/js/auth.js` | Session caching + promise dedup |
+| `apps/web/js/notifications.js` | Premium toast rewrite |
+| `apps/web/js/commandPalette.js` | **New** — Cmd+K search overlay |
+| `apps/web/dashboard.html` | Skeleton loaders + CSS link |
+| `apps/web/crm.html` | Skeleton loaders + CSS link |
+| `apps/web/contacts.html` | Skeleton loaders + CSS link |
+| `apps/web/deal.html` | Skeleton loaders + CSS link |
+| `apps/web/crm-cards.js` | Smart empty state |
+| `apps/web/contacts-render.js` | Smart empty state |
+| All 29 `.html` files | Tailwind CDN → build CSS, font optimization |
+
+---
+
+### Session 60 — April 20, 2026
+
+#### Timestamp: April 20, 2026 — IST
+
+#### Goal: Deal Import QA Bug Fixes — 5 bugs reported by tester
+
+---
+
+#### 1. Fix: ARR/MRR Columns Misclassified as EBITDA
+
+**Problem:** When importing deals from Notion, columns named "ARR" (Annual Recurring Revenue) or "MRR" were being mapped by GPT-4o to the EBITDA field instead of Revenue. This caused misleading financial numbers in the preview and on imported deals — e.g., ARR of $5.5M showing as EBITDA $5.5.
+
+**Root Cause:** The GPT-4o column mapping prompt (`dealImportMapper.ts`) listed `ebitda` and `revenue` as separate fields but gave no guidance about SaaS metrics like ARR/MRR. GPT-4o picked `ebitda` as the closest match since both are financial metrics.
+
+**Fix (2-layer):**
+1. Updated GPT-4o prompt to explicitly state: "Only map columns labeled EBITDA to ebitda. Map ARR, MRR, Sales, Turnover to revenue."
+2. Added deterministic post-AI overrides — regex patterns force-correct known column names (`/\b(arr|mrr|sales|turnover)\b/i` → `revenue`) regardless of what GPT-4o returns. Also handles `Enterprise Value` → `dealSize` and `MOIC` → `mom`.
+
+**Files Changed:**
+- `apps/api/src/services/dealImportMapper.ts` — prompt update + deterministic override block
+
+---
+
+#### 2. Fix: Only ~80 of 430 Deals Imported (Serverless Timeout)
+
+**Problem:** User imported 436 deals from Notion CSV. Preview showed "430 valid" but only ~80 actually imported. The rest silently failed.
+
+**Root Cause:** The import endpoint processed deals **sequentially** — each deal required 3 separate Supabase queries (company lookup, duplicate check, insert). For 430 deals = ~1,290 DB roundtrips. On Vercel serverless (10-30s timeout), the function was killed after ~80 deals. The response never reached the frontend.
+
+**Fix:** Rewrote the entire import endpoint from sequential to **5-phase batched approach**:
+- Phase 1: Pre-fetch ALL existing deal names in one paginated query (handles >1000 deals)
+- Phase 2: Pre-fetch ALL existing companies in one query
+- Phase 3: Validate all rows + detect duplicates in-memory (zero DB calls)
+- Phase 4: Batch-create missing companies (groups of 50)
+- Phase 5: Batch-insert deals (groups of 50) with fallback to individual inserts on error
+
+Result: ~1,290 queries reduced to ~15 total. 430 deals should complete in 2-4 seconds.
+
+**Files Changed:**
+- `apps/api/src/routes/deal-import.ts` — full rewrite of POST `/api/deals/import`
+
+---
+
+#### 3. Fix: "Import Failed" Shown Despite Partial Success
+
+**Problem:** After the timeout killed the import (Bug #2), the frontend showed "Import failed" even though ~80 deals were successfully inserted in the DB.
+
+**Root Cause:** The `fetch()` promise rejected on timeout → catch block showed generic "Import failed" message with no awareness of partial success state.
+
+**Fix:**
+- Added 3-state result display: full success (green checkmark), partial success (amber warning: "X of Y deals imported"), total failure (red error)
+- Catch block now detects timeout-like errors and shows: "Request timed out. Some deals may have been imported — refresh the CRM page to check."
+- Added guard for server 500 errors (when response has no `imported` field)
+
+**Files Changed:**
+- `apps/web/js/deal-import.js` — result display logic + catch block improvement
+
+---
+
+#### 4. Fix: Financial Values Not Formatted in Preview Table
+
+**Problem:** Dollar amounts, percentages, and multiples in the Step 3 preview table appeared as raw numbers (e.g., "50000000" instead of "$50,000,000").
+
+**Root Cause:** The formatting code used `typeof val === 'number'` guard, but values coming from the transform pipeline could remain as strings (e.g., `"50000000"`) if no transform was applied. String values bypassed all formatting.
+
+**Fix:** Replaced `typeof` guard with `Number(val)` coercion — now formats any value that can be parsed as a number, regardless of whether it's stored as string or number type.
+
+**Files Changed:**
+- `apps/web/js/deal-import.js` — preview table formatting in `applyMappingAndPreview()`
+
+---
+
+#### 5. Fix: Duplicate Deals Allowed on Re-Import
+
+**Problem:** Re-importing the same Notion CSV created duplicate deals in the CRM instead of rejecting them.
+
+**Root Cause (3 causes):**
+1. **Primary:** Bug #2 (timeout) — first import only got ~80 deals. Second import: those 80 caught as duplicates, but the ~350 that failed silently now imported fresh → user sees "duplicates"
+2. **Case-sensitive matching:** Old code used `eq('name', deal.name)` — exact match. "Acme Corp" ≠ "acme corp"
+3. **No intra-file dedup:** If CSV had "Acme" twice, both would import
+
+**Fix:**
+- Pre-fetch ALL existing deal names (paginated for >1000), stored in Set with lowercase keys
+- Case-insensitive comparison via `.toLowerCase().trim()`
+- Intra-batch dedup: checks each incoming deal name against already-validated deals in same import
+- Company dedup: uses Map keyed by lowercase to prevent "Acme Corp" and "acme corp" creating two companies
+
+**Files Changed:**
+- `apps/api/src/routes/deal-import.ts` — duplicate detection logic
+
+---
+
+#### Summary of Files Changed
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/services/dealImportMapper.ts` | GPT-4o prompt update + deterministic ARR/MRR/EV/MOIC overrides |
+| `apps/api/src/routes/deal-import.ts` | Full rewrite: batched inserts, paginated pre-fetch, case-insensitive dedup |
+| `apps/web/js/deal-import.js` | 3-state results, timeout handling, `Number()` formatting fix, server error guard |
+
+---
+
+### Session 59 — April 19, 2026
+
+#### Timestamp: April 19, 2026 — IST
+
+#### Goal: Deal Page Bug Fixes — Document Preview, Excel Rendering, Header Image
+
+---
+
+#### 1. Fix: "Project Apex" Ghost Popup on Document Click
+
+**Problem:** Clicking any document in Recent Documents on the deal page showed a hardcoded "Project Apex Logistics — Q3 2023 Financial Summary" popup first, then the real document preview stacked on top. Users couldn't properly open or download files.
+
+**Root Cause:** Legacy `initDocumentPreviews()` function in `deal-documents.js` used a broad CSS selector (`.flex.items-center.gap-3.p-2`) that matched document cards. It called `showDocumentPreview()` — a function containing **hardcoded demo content** ("Project Apex Logistics - Confidential", fake financial metrics). This legacy handler fired alongside the correct modern `.doc-preview-item` click handlers. The `downloadDocument()` function was also fake — just showed a notification with no actual download.
+
+**Fix:** Removed `initDocumentPreviews()`, `showDocumentPreview()`, and `downloadDocument()` entirely from `deal-documents.js`. Removed the `initDocumentPreviews()` call from `deal.js`. The modern handlers in `updateDocumentsList()` (which call `fetchAndPreviewDocument()` / `fetchAndShowAnalysis()` via `PEDocPreview`) now work without interference.
+
+**Files Changed:**
+- `apps/web/deal-documents.js` — removed ~80 lines of legacy preview code
+- `apps/web/deal.js` — removed `initDocumentPreviews()` call
+
+---
+
+#### 2. Fix: Excel/Spreadsheet Preview Showing Single Column
+
+**Problem:** Excel file preview in the document modal only showed row labels (Line Item, Revenue, Cost of Revenue, etc.) in a single column with no numeric values. The table was missing all data columns.
+
+**Root Cause:** `buildTable()` in `docPreview.js` assumed `sheetData[0]` (first row) was the header row and used its `.length` to determine column count. In financial models, row 0 is typically just a company name like `"Luktara Inc."` — a single cell. So `headers.length === 1`, and only 1 column was rendered for all rows.
+
+**Fix:** Rewrote `buildTable()` with smart detection:
+- Scans ALL rows to find max column count (not just row 0)
+- Auto-detects header row (first row with data in 40%+ of columns)
+- Renders title rows (company name, subtitle) as text above the table
+- Number formatting with commas, negatives in red
+- Financial-aware styling: section headers get gray bg, total/subtotal rows get bold + blue tint + top border
+- Right-aligned numeric columns
+- Increased row limit from 100 to 200
+
+**Files Changed:**
+- `apps/web/js/docPreview.js` — rewrote `buildTable()` function
+
+---
+
+#### 3. Fix: Broken Image in Deal Page Header
+
+**Problem:** A broken image icon appeared in the deal page header next to the team avatars, between the deal name and "Data Room" button.
+
+**Root Cause:** `deal-team.js` rendered an `<img>` tag whenever `user.avatar` was truthy, but if the avatar value was an empty string or invalid URL (not starting with `http`), the browser showed a broken image icon.
+
+**Fix:** Added URL validation (`user.avatar.startsWith('http')`) so only valid URLs render as images. Added `onerror="this.style.display='none'"` fallback to hide the image if it still fails to load. Invalid avatars now fall through to the initials display.
+
+**Files Changed:**
+- `apps/web/deal-team.js` — avatar URL validation + onerror fallback
+
+---
+
+### Session 57-58 — April 18-19, 2026
+
+#### Timestamp: April 18-19, 2026 — 5:00 PM to 12:30 AM IST
+
+#### Goal: New Onboarding Flow + Firm Research Agent + Deep Research
+
+---
+
+#### 1. New Onboarding Flow (from Claude Design handoff)
+
+**Problem:** Users were confused about what PE OS does and how to get started. The existing onboarding (welcome modal + 5-step checklist on dashboard) was passive and didn't teach the product.
+
+**Solution:** Built a standalone onboarding page (`/onboarding.html`) with a 3-step guided checklist that replaces the old flow entirely.
+
+**Flow:** Signup (Name, Email, Firm, Password) → Onboarding Welcome Screen → 3-Step Checklist → Completion with AI Findings
+
+**Steps:**
+1. **Define your investment focus** — Firm website, LinkedIn, fund size, sectors. Auto-enriched by AI research agent.
+2. **Upload your first deal** — CIM dropzone + sample demo deals (Luktara Industries, Pinecrest Dermatology).
+3. **Invite your team** — Optional. Email + role rows.
+
+**Signup redesigned:** Removed Title dropdown (redundant with onboarding). Clean design matching onboarding aesthetic (Manrope/Inter, navy #003366). Redirects to `/onboarding.html` after account creation.
+
+**Auth redirect:** Dashboard checks `onboardingStatus.welcomeShown` — new users (never seen welcome) get redirected to onboarding. Default post-login redirect changed from `/crm.html` to `/dashboard.html`.
+
+**Files Created (3):**
+- `apps/web/onboarding.html` — standalone page with welcome + checklist + modals + completion CTA
+- `apps/web/js/onboarding/onboarding-flow.js` — flow controller, state, progress, confetti, dynamic findings
+- `apps/web/js/onboarding/onboarding-tasks.js` — modal body renderers + hydrators for 3 tasks
+
+**Files Modified (4):**
+- `apps/web/signup.html` — complete redesign, removed Title, redirects to onboarding
+- `apps/web/dashboard.html` — added onboarding redirect check for new users
+- `apps/web/js/auth.js` — default post-login redirect changed to `/dashboard.html`
+- `apps/web/settings.html` + `apps/web/settings.js` — added Firm Profile section
+
+---
+
+#### 2. Firm Research Agent (LangGraph, 6 nodes)
+
+**Problem:** Users enter their firm website + LinkedIn during onboarding, but the system did nothing meaningful with those URLs. The deal chat agent had zero knowledge of the firm's strategy, sectors, fund size, or portfolio.
+
+**Solution:** Built a LangGraph research agent that scrapes websites, searches DuckDuckGo, extracts profiles via GPT-4o, cross-validates, and stores for AI context.
+
+**Architecture:** `scrape → searchFirm → searchPerson → synthesize → verify → save`
+
+**Nodes:**
+- **scrape** — Fetches homepage + 10 subpages (/about, /team, /portfolio, etc.), 15s timeout, SSRF prevention, 20K char cap
+- **searchFirm** — 3 DuckDuckGo Lite queries (firm + PE, portfolio/deals, fund raise)
+- **searchPerson** — 4 DuckDuckGo queries (slug + linkedin, slug + firm, firm founder/team). Fixed LinkedIn country subdomain issue (in.linkedin.com, uk.linkedin.com).
+- **synthesize** — GPT-4o structured extraction with Zod schemas. 8 strict accuracy rules (no guessing, verbatim only, empty > wrong).
+- **verify** — Cross-validates portfolio companies (DDG co-occurrence), person-firm match, sector source backing. Sets confidence: high/medium/low.
+- **save** — Stores FirmProfile on `Organization.settings.firmProfile` (JSONB), PersonProfile on `User.onboardingStatus.personProfile`. Audit trail (last 5 runs). Manual override protection.
+
+**Entry point:** `runFirmResearch(input)` with 60s timeout + concurrent lock per org.
+
+**Web Search:** `apps/api/src/services/webSearch.ts` — DuckDuckGo Lite scraper (NOT html.duckduckgo.com which is broken). No API key. Retry on failure.
+
+**Frontend:** Auto-triggers on URL blur in onboarding. Shows preview card with "Use this profile" button. Pre-fills fund size + sector chips from enrichment results.
+
+**Files Created (10):**
+- `apps/api/src/services/webSearch.ts`
+- `apps/api/src/services/agents/firmResearchAgent/state.ts`
+- `apps/api/src/services/agents/firmResearchAgent/graph.ts`
+- `apps/api/src/services/agents/firmResearchAgent/index.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/scrape.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/searchFirm.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/searchPerson.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/synthesize.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/verify.ts`
+- `apps/api/src/services/agents/firmResearchAgent/nodes/save.ts`
+
+---
+
+#### 3. Phase 2 Deep Research (Background, 60-120s)
+
+**Problem:** Phase 1 runs 5 fixed queries and stops. Shallow results. Doesn't follow leads.
+
+**Solution:** After Phase 1 returns to the user, Phase 2 fires in the background. GPT-4o reads Phase 1 results and generates 8-12 targeted follow-up queries across 6 categories.
+
+**Categories:** Person deep-dive, deal history, portfolio deep-dive, firm reputation, social presence, network/community.
+
+**Follow-the-thread:** After each search batch, extracts new capitalized names via regex. If a name appears 2+ times, spawns a follow-up query. Max 6 follow-ups, max 18 total searches.
+
+**URL scraping:** Scrapes up to 3 high-value article URLs (Crunchbase, TechCrunch, Forbes, press pages).
+
+**Final synthesis:** GPT-4o merges Phase 1 + Phase 2 into enriched profile. Never overwrites Phase 1 data — only adds.
+
+**Enriched fields (Phase 2 adds):** socialPresence (twitter, youtube, newsletter, podcast, blog), pressArticles[], communityMentions[], coInvestors[], competitorFirms[], socialHandles, interviews[], publicContent[], networkConnections[].
+
+**Frontend:** Polls `/api/onboarding/research-status` every 5s. Shows "Researching deeper..." spinner in preview card. Slide-in notification on completion screen. 90s safety timeout on spinner.
+
+**Files Created (1):**
+- `apps/api/src/services/agents/firmResearchAgent/deepResearch.ts`
+
+---
+
+#### 4. Deal Chat Context Injection
+
+**Problem:** Deal chat agent had no knowledge of the firm's investment strategy, sectors, or portfolio. Couldn't say "this deal doesn't match your criteria."
+
+**Fix:** Added firm profile injection to `deals-chat-ai.ts`. System prompt now includes:
+```
+=== YOUR FIRM CONTEXT ===
+Firm: {description}
+Strategy: {strategy}
+Sectors: {sectors}
+Check Size: {checkSizeRange}
+Investment Criteria: {investmentCriteria}
+Portfolio: {portfolioCompanies}
+Your Role: {personProfile.title} — {personProfile.bio}
+```
+
+**Files Modified:** `apps/api/src/routes/deals-chat-ai.ts`
+
+---
+
+#### 5. Shared URL Helpers
+
+**Problem:** LinkedIn URLs with country subdomains (`in.linkedin.com` for India, `uk.linkedin.com` for UK) were silently rejected by URL validation regex across the codebase.
+
+**Root cause:** Regex `(www\.)?linkedin\.com` only accepted `www.` or bare `linkedin.com`. Country subdomains like `in.` were rejected.
+
+**Fix:** Created shared utility `apps/api/src/utils/urlHelpers.ts` with 8 functions:
+- `normalizeUrl()` — adds https://, validates via URL constructor
+- `isLinkedInUrl()` — accepts ANY LinkedIn subdomain
+- `extractLinkedInSlug()` — extracts profile slug
+- `isPrivateUrl()` — SSRF prevention (full RFC 1918 range)
+- `extractBaseDomain()` — strips subdomains
+- `extractNameFromDomain()` — readable name from domain
+- `isSocialMediaUrl()` — checks social domains
+- `isHighValueUrl()` — checks if URL worth scraping
+
+Updated 5 files across the codebase to use shared utility.
+
+---
+
+#### 6. Bug Fixes During Session
+
+| Bug | Root Cause | Fix |
+|-----|-----------|-----|
+| DuckDuckGo search returned 0 results | `html.duckduckgo.com` endpoint broken for server-side requests | Switched to `lite.duckduckgo.com` |
+| LinkedIn enrichment skipped silently | URL validation rejected country subdomains (`in.linkedin.com`) | Created `urlHelpers.ts` with proper URL parsing |
+| Enrichment endpoint 500 error for new users | `getOrgId()` throws when org not resolved yet | Fallback: direct DB lookup → auto-create as last resort |
+| Phase 2 spinner never stops | No frontend timeout; Phase 2 may fail silently | Added 90s safety timeout on spinner |
+
+---
+
+#### 7. Documentation Created (4 files)
+
+- `docs/onboarding-agent-architecture.md` — 3 Mermaid diagrams (user flow, agent pipeline, system integration)
+- `docs/firm-research-agent-documentation.md` — Technical docs (API, schemas, guardrails, troubleshooting)
+- `docs/testing-guide-onboarding-flow.md` — 11 test scenarios for non-tech team member
+- `docs/testing-guide-firm-research-agent.md` — 10 test scenarios for non-tech team member
+
+---
+
+#### 8. Specs & Plans Created (4 files)
+
+- `docs/superpowers/specs/2026-04-18-firm-research-agent-design.md`
+- `docs/superpowers/specs/2026-04-19-deep-research-agent-design.md`
+- `docs/superpowers/plans/2026-04-18-firm-research-agent.md`
+- `docs/superpowers/plans/2026-04-19-deep-research-agent.md`
+
+---
+
+#### 9. Code Review Polish (Session 58 continued)
+
+Ran full code review (reuse + quality + efficiency) and fixed 13 issues:
+
+**Code quality fixes:**
+- Removed direct LangGraph state mutations in searchFirm, searchPerson, verify nodes (return partial state only)
+- Deleted dead `firmEnrichment.ts` (replaced by agent, no imports remaining)
+- Fixed 172.x.x.x private IP range check — proper numeric range (16-31) instead of buggy string prefix matching
+- Removed dead variable (`existingPerson = null ? null : null`), unused constant (`NODE_TIMEOUT_MS` in synthesize), meaningless audit field (`duration: Date.now()`)
+- Added serverless lock limitation comment on `runningEnrichments` Set
+- Removed duplicate `_startDeepResearchPolling()` call
+
+**Efficiency fix:**
+- Phase 2 deep research queries now run in parallel batches of 3 via `Promise.all` (was sequential — cuts wall-clock time by ~60%)
+
+**Functional fixes:**
+- LinkedIn search queries improved: added `"name" "firm" linkedin` pattern (returns cached LinkedIn profile with education + experience), `"slug" bio OR about` (catches Twitter/X bios)
+- Demo deal sample buttons (Luktara/Pinecrest) now show visual confirmation — green checkmark + "Demo data will be loaded" replaces the dropzone
+
+**Next session:** Build full Luktara demo deal with hardcoded financials, documents, chat history, red flags, analysis.
+
+---
+
+#### 10. Apify Integration (Session 58 continued)
+
+**Problem:** DuckDuckGo rate-limits after ~30 searches from same IP. LinkedIn data was limited to search snippets (80 chars). Testing was blocked for hours.
+
+**Solution:** Integrated Apify as primary search + LinkedIn scraping provider. DDG kept as free fallback.
+
+**Changes:**
+- `npm install apify-client` — added to `apps/api/package.json`
+- `webSearch.ts` rewritten: Apify Google Search actor (primary) → DDG Lite (fallback) → DDG HTML (last resort)
+- `scrapeLinkedInProfile()` added — Apify LinkedIn Profile Scraper returns full profile (name, headline, experience, education, skills)
+- `searchPerson.ts` — LinkedIn scrape + search queries now run in parallel via `Promise.all` (was sequential, caused 60s timeout)
+- Agent timeout increased from 60s to 120s (Apify actors need startup time)
+- `APIFY_API_KEY` added to `.env`
+
+**Cost:** ~$0.03-0.05 per enrichment. Free $5/month covers ~100 enrichments.
+
+---
+
+#### 11. Profile Report Modal (Session 58 continued)
+
+**Problem:** Preview card showed minimal data (3-4 fields). Agent collects much more (experience, education, portfolio, deals) but user couldn't see it.
+
+**Solution:** Added "View full report" button that opens a detailed modal with all collected data:
+- Firm section: description, strategy, sectors, check size, AUM, team size, HQ, founded year, investment criteria, key differentiators
+- Portfolio companies with verified badges + sector + exit status
+- Recent deals with dates
+- Person section: title, role, bio, education, years in PE, expertise, experience, notable deals
+- Sources list at bottom
+
+---
+
+#### 12. UX Polish + Bug Fixes (Session 58 continued)
+
+**Fixes from live testing:**
+- Team invite dropdown aligned — fixed 110px width, consistent height, custom chevron arrow
+- Fund size options changed: `<$1M`, `$1-10M`, `$10-50M`, `$50-100M` (was $100M-$1B+ range, wrong for micro PE)
+- Custom sector input — "+ Other" dashed button → text input → "Add" creates new chip (Enter key supported)
+- Skip setup: replaced `window.confirm()` with custom modal (navy icon, "Continue setup" / "Skip to dashboard" buttons)
+- Skip redirect loop fixed: `markWelcomeShown()` + `markOnboardingSkipped()` now awaited before redirect + sessionStorage backup flag
+- Old welcome modal suppressed for users who went through new onboarding flow
+- Firm task completion now persists (`firm` → `createDeal` mapping — was missing, caused 2/3 restore on page reload)
+
+---
+
+#### 13. Auth/Org Fixes (Session 58 continued)
+
+**Problem:** New test accounts couldn't load any pages — all org-scoped routes returned 500.
+
+**Root cause chain:**
+1. Multiple test signups with same firm name → Organization slug collision (unique constraint `Organization_slug_key`)
+2. `findOrCreateUser` threw on slug conflict → User created without `organizationId`
+3. `orgMiddleware` found User with `organizationId: null` → silently continued
+4. All routes called `getOrgId(req)` → threw "Organization ID not available" → 500
+
+**Fixes applied:**
+- `userService.ts`: Slug now includes timestamp hash (`pocket-fund-k8x3f`) for uniqueness. On 23505 conflict, falls back to finding existing org by name.
+- `orgScope.ts`: If User exists but `organizationId` is null, auto-creates Organization (first checks for existing org by name, then creates with unique slug if needed).
+- `orgScope.ts`: Auto-links orphaned users to their org.
+
+---
+
+#### Summary
+
+- **17 commits** pushed to origin on main
+- **0 TypeScript errors**
+- **All commits:**
+  - `f5e8d94` — code review polish (state mutations, dead code, parallel queries)
+  - `e92046e` — LinkedIn-only enrichment + DDG UA rotation
+  - `bab9083` — DDG search fallback (Lite → HTML → retry)
+  - `aa65c72` — better error message when search unavailable
+  - `b7462b8` — Apify integration (Google Search + LinkedIn scraping)
+  - `aec7d2f` — parallel LinkedIn scrape + search, timeout to 120s
+  - `9948dcf` — full profile report modal
+  - `64762c6` — team invite row alignment
+  - `1a2114c` — firm task completion persists (redirect loop fix)
+  - `1ae82dc` — skip setup waits for API before redirect
+  - `5fa58c6` — custom skip modal (replaces browser confirm)
+  - `c987ade` — sessionStorage backup for redirect loop
+  - `994b094` — skip old welcome modal for new onboarding users
+  - `c613195` — fund size ranges + custom sector input
+  - `18b203e` — auto-create Organization for users without one
+  - `cacdf67` — handle slug conflict in org auto-create
+  - `0865168` — unique slug in findOrCreateUser + fallback on conflict
+
+**Next session:** Full Luktara demo deal (hardcoded financials, docs, chat, red flags, analysis)
+
+---
+
+### Session 56 — April 17, 2026
+
+#### 🕐 Timestamp: April 17, 2026 — 9:40 PM IST
+
+#### Goal: Fix Ingest Deal Modal — file size limit + upload error
+
+---
+
+#### 1. Fix File Size Limit (4.5MB → 50MB)
+
+**Problem:** Ingest Deal Data modal showed "Max 4.5MB" and rejected files larger than 4.5MB, even though the backend (multer + Express) already accepts up to 50MB.
+
+**Root cause:** Frontend had a hardcoded `MAX_FILE_SIZE = 4.5 * 1024 * 1024` from an old Vercel limit assumption. Backend was already configured for 50MB (`ingest-shared.ts` multer config).
+
+**Fix:** Updated all 4 frontend references from 4.5MB to 50MB:
+- `deal-intake-actions.js:35` — `MAX_FILE_SIZE` constant
+- `deal-intake-actions.js:41` — validation warning message
+- `deal-intake-actions.js:130` — 413 error message
+- `deal-intake-template.js:127` — UI label text
+
+**Files Modified:** 2 files
+- `apps/web/js/deal-intake-actions.js`
+- `apps/web/js/deal-intake-template.js`
+
+---
+
+#### 2. Fix "Upload Failed — Failed to process document" Error
+
+**Problem:** Uploading a PDF in the Ingest Deal modal returned a 500 error with unhelpful message "Failed to process document".
+
+**Fix:** Improved error reporting in both backend and frontend:
+- `ingest-upload.ts:443` — catch block now returns the actual `error.message` in the response
+- `deal-intake-actions.js:134` — frontend now shows `data.message` (detailed error) instead of generic "Failed to process document"
+
+**Files Modified:** 2 files
+- `apps/api/src/routes/ingest-upload.ts`
+- `apps/web/js/deal-intake-actions.js`
+
+---
+
+#### 3. AI Follow-Up Questions Service (new)
+
+**Context:** `followUpQuestions.ts` was already created — generates 3-4 contextual follow-up questions after deal extraction using GPT-4o-mini (~$0.003/call). Endpoint: `POST /api/deals/:id/follow-up-questions`. Uses LangChain structured output with Zod schema. Falls back to 4 default questions if LLM unavailable.
+
+**Files:** `apps/api/src/services/followUpQuestions.ts` (new), `apps/api/src/routes/deals.ts` (modified)
+
+---
+
+### Session 55 — April 17, 2026
+
+#### 🕐 Timestamp: April 17, 2026 — IST
+
+#### Goal: Deal Import QA Test Guide + Dashboard "undefined Deals" bug fix
+
+---
+
+#### 1. Deal Import QA Testing Guide
+
+Created `docs/DEAL-IMPORT-TEST-GUIDE.md` — a comprehensive testing document for team members to test the Deal Import feature end-to-end.
+
+**Contents:**
+- How to export from Notion (CSV export or copy-paste)
+- Full step-by-step walkthrough of all 4 import steps
+- Post-import verification checklist (deal names, companies, stages, financials, custom fields)
+- 14 edge cases to test (empty files, wrong types, duplicates, large files, special characters, etc.)
+- Column mapping reference table (Notion column → CRM field)
+- Pipeline stage mapping table
+- Supported input formats
+- Troubleshooting guide
+- 23-item pass/fail checklist
+
+**Files Created:** 1 file
+- `docs/DEAL-IMPORT-TEST-GUIDE.md`
+
+---
+
+#### 2. Fix Dashboard "undefined Deals" Modal Bug
+
+**Problem:** Clicking on ANY dashboard widget opened a modal titled "undefined Deals" with an empty body.
+
+**Root cause:** The old `initStatCards()` function used the CSS selector `.grid.grid-cols-1.md:grid-cols-2 > div` to attach click handlers to stat cards. After the dashboard layout refactor (Session 54), this selector matched **every widget container** in the dashboard grid — not just the 4 pipeline stat cards. When clicking any widget beyond index 3, `stages[index]` returned `undefined`, producing the "undefined Deals" modal title.
+
+**Fix:** The local code already had a `return;` early exit in `initStatCards()`, but the dead `showStatDetail()` function (with its hardcoded sample data) remained. Removed the entire dead code path — `showStatDetail()` and its `dealsData` object (~45 lines). Synced to `dist/`.
+
+**Note:** The fix was already partially applied locally but had NOT been deployed to production (immos.ai). This commit + push deploys the fix.
+
+**Files Changed:** 2 files
+- `apps/web/dashboard.js` — removed `showStatDetail()` dead code, kept `initStatCards()` as no-op
+- `apps/web/dist/dashboard.js` — synced
+
+---
+
+#### 3. Route Ordering Fix (app.ts)
+
+Moved `documentsAlertsRouter` mount above the general `documentsRouter` to ensure `/api/documents/alerts` is matched before the catch-all `/api/documents` routes.
+
+**Files Changed:** 1 file
+- `apps/api/src/app.ts`
+
+---
+
+### Session 54 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST (Late Night)
+
+#### Goal: Dashboard Widget Expansion (12 widgets) + Admin Team Activity Bug Fix + Drag-and-Drop Layout Editor + UX cleanup sprint
+
+This session was a marathon — covered 6 distinct workstreams. Documented in roughly chronological order.
+
+---
+
+#### 1. Removed "Enter URL" Tab from Deal Intake Modal
+
+**Problem:** The deal intake modal at `/deal-intake.html` had three tabs (Upload File / Paste Text / Enter URL), but URL scraping wasn't a requested feature for v1.
+
+**Fix:** Removed the Enter URL tab button + panel + extractFromURL JS handler. Updated header copy to "Upload a document or paste text to create a new deal."
+
+**Files Changed:** 2 files
+- `apps/web/deal-intake.html` — removed tab button + URL panel
+- `apps/web/js/deal-intake.js` — removed `extractFromURL`, `urlInput` listeners, and `resetForm` references
+
+---
+
+#### 2. Profile Dropdown Cleanup — Help & Support + Sign Out wired to real handlers
+
+**Problem:** On the dashboard, clicking any item in the user-menu dropdown (top-right avatar) would just fire a `showNotification('Settings', 'X clicked')` toast. The buttons were stubs that did nothing real. Also: TWO dropdowns existed (`#user-dropdown` from layoutComponents + `#user-menu-dropdown` from dashboard.js), both bound to the same `#user-menu-btn` — they would toggle simultaneously, with the dashboard one rendering on top.
+
+**Root cause:** Dashboard.js's `initSettings()` created a duplicate dropdown that was never wired to real navigation. Layout.js already had a working dropdown for the rest of the app.
+
+**Fix:**
+- **Deleted** the duplicate `initSettings()` in `dashboard.js` entirely
+- **Added Help & Support** to the shared layout dropdown (`layoutComponents.js`) so every page gets it
+- Wired Help & Support → opens `ONBOARDING_CONFIG.feedback.formUrl` in new tab
+- (Layer 2: in a follow-on commit, Help & Support became a modal with Book a Call + Written Feedback options — that work was completed in Session 53.)
+
+**Files Changed:** 3 files
+- `apps/web/dashboard.js` — removed `initSettings()` function and its call site (~80 lines deleted)
+- `apps/web/js/layoutComponents.js` — added Help & Support button to user dropdown
+- `apps/web/js/layout.js` — wired Help & Support click to open feedback URL
+
+---
+
+#### 3. Onboarding Checklist Navigation Fix
+
+**Problem:** Clicking a checklist step on the dashboard navigated to `/deal.html?id={dealId}#financials-section`, but the deal page renders content dynamically — the browser's native hash-scroll fired BEFORE the target element existed, so users landed at the top of the deal page instead of scrolling to financials/chat/documents.
+
+**Fix:** Added a polling hash-scroller at the bottom of `deal.js` that waits up to 8 seconds for the target element to appear, then smooth-scrolls to it.
+
+**Files Changed:** 1 file
+- `apps/web/deal.js` — added `scrollToHashWhenReady` IIFE (~20 lines)
+
+---
+
+#### 4. Admin Dashboard Slow Load (N+1 Query Fix)
+
+**Problem:** The admin dashboard's stats cards rendered fast, but Resource Allocation, Global Task Management, Team Activity, and Upcoming Reviews all sat at "Loading..." for several seconds.
+
+**Root cause:** `renderResourceAllocation()` was making **N sequential `await` fetches** (one per team member) to `/users/${id}/deals`, AND `initAdminDashboard` was awaiting the whole thing before rendering everything below it. With 5 team members that's 5 serial round-trips gating the rest of the page render.
+
+**Fix:**
+1. **Replaced N HTTP calls with a client-side map** built from already-loaded `allDeals` (each Deal has `teamMembers` joined inline via `DealTeamMember` → `User`). Zero extra requests, runs in microseconds.
+2. Made `renderResourceAllocation` synchronous and dropped the `await` so task table / reviews / activity feed render immediately in parallel.
+3. Handles both data shapes: `tm.user?.id` (joined) and `tm.userId` (flat) for safety.
+
+**Files Changed:** 1 file
+- `apps/web/admin-dashboard.js` — `renderResourceAllocation()` now sync, no per-member API calls
+
+---
+
+#### 5. ⭐ Major Feature: Dashboard Widget Expansion (12 new widgets) + Admin Team Activity Bug Fix
+
+**Goal:** The Customize Dashboard modal advertised 20 widgets but only 5 actually rendered — the other 15 showed a "Soon" badge. Built 12 of the 15 missing widgets and hardened the audit logging system that powers the admin Team Activity feed.
+
+##### 5a. Root cause: Admin Team Activity always showed "No activity yet"
+
+**Bug:** `apps/api/src/services/auditLog.ts` `logAuditEvent()` inserts into the `AuditLog` table on every audited action — but it **never set `organizationId`** in the insert payload. Meanwhile `getAuditLogs()` filters by `organizationId`. Result: every audit row had `organizationId = NULL`, every org-scoped query returned zero rows. The Team Activity card was permanently empty.
+
+The schema column **already existed** (added by `apps/api/organization-migration.sql:65`). The middleware **already populated** `req.user.organizationId` (`orgScope.ts:50`). The fix was a 3-line patch to `auditLog.ts`: add `organizationId` to `AuditLogEntry` interface, include it in the insert payload, and pass it via `logFromRequest`.
+
+**One-shot backfill SQL** (user runs in Supabase SQL editor):
+```sql
+UPDATE "AuditLog" a
+SET "organizationId" = u."organizationId"
+FROM "User" u
+WHERE a."userId" = u.id AND a."organizationId" IS NULL;
+```
+
+##### 5b. 12 New Widgets — Full List
+
+| # | Widget | Data source | Special notes |
+|---|---|---|---|
+| 1 | **Quick Actions** | UI only — links to existing pages | Hides "Create Task" for non-admin roles |
+| 2 | **Quick Notes** | `localStorage`, namespaced as `pe-quick-notes:${userId}` | Per-user namespacing prevents cross-user leak on shared browsers |
+| 3 | **Deal Funnel** | `GET /api/deals` → group by stage | Horizontal bars per stage with count + share-of-pipeline % |
+| 4 | **Recent Activity** | `GET /api/audit?limit=10` | Reuses the same renderer as admin Team Activity |
+| 5 | **Upcoming Deadlines** | `GET /api/tasks?limit=100` | Filters to dueDate ≤ 14 days, color-coded overdue/this-week/later |
+| 6 | **Calendar (This Week)** | Union of `Task.dueDate` + `Deal.targetCloseDate` | Day-grouped list, next 7 days, user-local timezone |
+| 7 | **Key Contacts** | `GET /api/contacts` + `GET /api/contacts/insights/scores` | Two-fetch merge, top 5 by relationship score, initials avatars |
+| 8 | **Team Performance** | `GET /api/users` + `GET /api/deals` | Reuses `Deal.teamMembers` join — no new endpoint |
+| 9 | **Document Alerts** | **NEW** `GET /api/documents/alerts` | Cross-deal docs needing review (no extracted text or no AI analysis) |
+| 10 | **Watchlist** | **NEW** `GET/POST/DELETE /api/watchlist` + new `Watchlist` table | Add/delete via inline modal (`watchlist-modal.js`) |
+| 11 | **Market Multiples** | Static reference data file | Date-stamped + disclaimer footer to prevent users treating illustrative numbers as live data |
+
+**Deal Sources** stayed in "Coming Soon" — Deal table has no `source` column, so shipping it honestly would have required a schema migration + per-deal UI to set source values.
+
+**Tier C "Coming Soon" remains:** Market News, Capital Deployed, Fund Performance, Exit Tracker, Co-Investor Activity, AI Market Sentiment, Deal Sources.
+
+##### 5c. Architecture — `apps/web/js/widgets/` directory
+
+To prevent ~200 lines of duplicated plumbing across 12 widgets, built a shared foundations layer:
+
+**`widget-base.js`** — leaf utility module exposing `window.WidgetBase`:
+- `waitForAuth()` — replaces the 6-line auth poll previously duplicated in dashboard inline scripts
+- `getJSON(path)` — wraps `PEAuth.authFetch` + JSON parse + error normalization
+- `dealsCache()` / `tasksCache()` — **request coalescing**: multiple widgets requesting `/deals` share a single in-flight promise per page load. Fixes the "4 widgets each fetching /deals independently" perf cliff.
+- `getOrCreateBody(container)` / `setBody(container, html)` — lazily creates a `.widget-body` div under the static title bar so widget JS files don't wipe the title bar when rendering content
+- `renderEmpty` / `renderError` / `renderLoading` — consistent fallback states
+- `getCurrentUserId()` — for localStorage namespacing
+- `isWidgetVisible(widgetId)` — checks user prefs before fetching to avoid wasted requests on hidden widgets
+
+**`activity-formatters.js`** — extracted `groupLogsByDay`, `renderActivityItem`, `formatAuditAction`, `getInitials`, `getTimeAgo` from `admin-dashboard.js`. Both the admin Team Activity feed AND the new Recent Activity widget use these globals — single source of truth.
+
+**`widgets/index.js`** — registry mapping `widgetId → initFn`. `dashboard.js` calls `WidgetRegistry.initAll()` during page load. Registry is **idempotent** (tracks initialized widgets in a `Set`) so re-running it after the user enables a new widget doesn't double-initialize.
+
+**12 widget files** — one per widget, each ~30-100 lines. Each file exports `init<Name>Widget(container)` and uses only `WidgetBase` + (where relevant) `activity-formatters` globals. No circular imports possible — registry is the single fan-out point.
+
+##### 5d. Backend additions
+
+**New routes:**
+- `apps/api/src/routes/watchlist.ts` — `GET`, `POST`, `DELETE /api/watchlist/:id`. All org-scoped via `getOrgId(req)`. DELETE returns 404 (not 403) on org mismatch to prevent enumeration.
+- `apps/api/src/routes/documents-alerts.ts` — `GET /api/documents/alerts`. Joins `Document` to `Deal` to filter by `Deal.organizationId`, returns docs where `extractedText IS NULL OR aiAnalyzedAt IS NULL`. Limit 20.
+
+**New table:**
+- `apps/api/watchlist-migration.sql` — `Watchlist(id, organizationId, companyName, industry, notes, addedBy, createdAt, updatedAt)` + RLS policies + index on `organizationId`. **User ran this migration successfully in Supabase before testing.**
+
+**Mounting:**
+- `apps/api/src/app.ts` — mounted both new routes through `authMiddleware + orgMiddleware`
+
+##### 5e. Two compounding bugs found during initial QA
+
+**Bug A — Widgets showed only their static title bar after user enabled them.**
+
+Root cause: registry's `initAll()` only ran at page load. Since all 12 new widgets default to `defaultVisible: false`, `isWidgetVisible()` returned `false` at boot → init was skipped. When the user enabled them via the Customize modal, `applyWidgetPreferences()` removed `display:none` but **never re-invoked the init functions**, so the containers stayed empty.
+
+Fix: Made the registry idempotent and called `WidgetRegistry.initAll()` at the end of `saveWidgetSelection()` so newly-enabled widgets initialize on save.
+
+**Bug B — Widget files would wipe the static title bar.**
+
+Even after fixing Bug A, every widget did `container.innerHTML = ...` which overwrites everything inside the `<div data-widget>` container — including the static title bar from `dashboard.html`.
+
+Fix: Added `WidgetBase.getOrCreateBody(container)` and `WidgetBase.setBody(container, html)`. They lazily create a `<div class="widget-body">` UNDER the static title bar and write content there. All 11 widget files updated to use `WidgetBase.setBody()` instead of `container.innerHTML`. `renderEmpty`/`renderError`/`renderLoading` automatically target the body.
+
+##### 5f. Document Alerts icon bug
+
+**Bug:** The Document Alerts entry in the Customize Dashboard modal showed "_ALERT" in big text where the icon should have been. Cause: `WIDGET_CONFIG['document-alerts'].icon` was `'folder_alert'` — **not a real Material Symbols icon name**. When Material Symbols can't find a name in its font, it falls back to rendering the literal text.
+
+**Fix:** Changed icon to `'report'` (a real Material Symbols name) in both `dashboard-widgets.js` and the widget's title bar in `dashboard.html`.
+
+---
+
+#### 6. ⭐ Drag-and-Drop Dashboard Layout Editor
+
+**Goal:** Two buttons sat below the widget list — "Add Widget" and "Customize Dashboard" — but they opened the same widget picker modal. User asked: Add Widget should remain the picker (choose what appears), and Customize Dashboard should let users **drag and drop** widgets to reorder.
+
+**Brainstormed scope and chose v1 = "reorder within columns only"** (option A). Resize, cross-column moves, and free positioning explicitly deferred to v2/v3 if usage shows demand.
+
+**Spec written and committed:** `docs/superpowers/specs/2026-04-06-dashboard-layout-editor-design.md`
+
+##### 6a. UX flow
+
+```
+[Normal] → click "Customize Dashboard"
+       → [Edit mode ON]
+         • Every visible widget gets dotted blue outline + drag handle
+         • Banner at top: "Drag widgets by the handle to reorder · Click Done"
+         • Customize button transforms → "Done" (filled blue)
+       → drag widget by handle → drop in new position → instant save to localStorage
+       → click Done or Esc → exit edit mode → toast: "Layout saved"
+```
+
+##### 6b. Architecture
+
+**New file:** `apps/web/js/widgets/layout-editor.js` (~250 lines, no dependencies, native HTML5 drag-and-drop)
+- `LayoutEditor.{enter, exit, toggle, isEditing}` — public API
+- Self-contained: knows nothing about widgets, preferences, or the registry
+- **Two handle strategies**:
+  1. **Inline handle** (inside the widget's title bar) for widgets that have one — uses `findTitleBar()` heuristic that checks for `h1`-`h4` or `border-b` class
+  2. **Floating handle** (absolute-positioned top-right with white pill background and shadow) for widgets WITHOUT a title bar (Pipeline Stats grid) — sets `position: relative` on the widget temporarily so the handle anchors correctly, restores it on exit
+
+**Modified files:**
+- `apps/web/dashboard-widgets.js` — added 3 new functions: `getWidgetOrder()`, `saveWidgetOrder(orderArray)`, `applyWidgetOrder()`. Wired the existing `widget-settings-btn` to call `LayoutEditor.toggle()`. Calls `applyWidgetOrder()` after `applyWidgetPreferences()` on init.
+- `apps/web/dashboard.html` — loads `layout-editor.js` and hides Customize button on mobile via `hidden md:flex`
+
+##### 6c. Data model
+
+Two **separate** localStorage keys, by design:
+```js
+localStorage["pe-dashboard-widgets"]      // existing — visibility only
+localStorage["pe-dashboard-widget-order"] // NEW — array of widget IDs in display order
+```
+
+**`applyWidgetOrder()` algorithm:** groups saved widget IDs by their parent DOM container, then re-appends children in order WITHIN each parent. Cross-container moves are not supported in v1 (column widths differ — left col 2/3, right col 1/3 — dropping a narrow widget into the wide column would break the layout).
+
+##### 6d. Constraints honored
+- **Same-parent reorder only.** `onDragOver` returns early if `target.parentNode !== dragSrc.parentNode`.
+- **Mobile hidden.** HTML5 D&D has spotty touch support, so the Customize Dashboard button is `hidden md:flex` (desktop only).
+- **Esc exits cleanly.**
+- **Widget alone in its parent** (Pipeline Stats and Active Priorities) → handle visible but drag is no-op — visually editable but no siblings to swap with.
+
+---
+
+#### 7. Active Priorities Sizing Fix
+
+**Problem:** Active Priorities table on the dashboard was stretching to fill the entire 2/3-width left column even when the table body was empty. Looked broken.
+
+**Root cause:** Two issues compounded:
+1. The widget had `h-full` class forcing it to match the right column's height
+2. The `<tbody>` was completely empty — `dashboard.js initPriorityTable()` doesn't actually fetch deals or render rows, it just adds cursor styling
+
+**Fix:**
+1. Removed `h-full`, added `self-start` so the widget sizes to its content
+2. Added a real empty state inside the `<tbody>` with the `priority_high` icon
+
+**Files Changed:** 1 file
+- `apps/web/dashboard.html` — table sizing + empty state row
+
+---
+
+### Session 54 Summary
+
+| Workstream | Files New | Files Modified |
+|---|---|---|
+| Deal intake URL removal | 0 | 2 |
+| Profile dropdown cleanup | 0 | 3 |
+| Checklist hash-scroll | 0 | 1 |
+| Admin N+1 fix | 0 | 1 |
+| Widget expansion + audit fix | 19 | 7 |
+| Layout editor | 2 | 2 |
+| Active Priorities sizing | 0 | 1 |
+
+**Verification:** TypeScript `tsc --noEmit` clean. All 17 widget JS files pass `node --check`. `dashboard.html` parses cleanly.
+
+---
+
+### Session 53 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST (Late Evening)
+
+#### Goal: Help & Support Modal — Booking Call + Written Feedback
+
+**Problem:** The "Help & Support" button in the user dropdown (top-right avatar menu) opened a Google form directly in a new tab. Users had no way to book a live support call, and the single-action behavior gave no choice between async vs synchronous help.
+
+**Solution:** Replaced the direct link with a clean professional modal offering two clear options.
+
+**Modal design (480px wide, Banker Blue theme):**
+- **Header:** Banker Blue help icon + "Help & Support" title + close button
+- **Two large clickable cards:**
+  1. **Book a Support Call** (calendar icon) → opens Google Calendar appointment schedule (`https://calendar.app.google/vRexQ5AmhivWx2PH6`)
+  2. **Send Written Feedback** (edit_note icon) → opens existing Google form
+- **Footer:** Urgent contact emails (`tech@pocketfund.org` or `hello@pocketfund.org`) as clickable mailto links
+
+**Behavior:**
+- Closes on ✕ button, backdrop click, or Escape key
+- Hover state on cards: Banker Blue border + soft slate background + shadow
+- Both URLs and emails are configurable in `onboarding-config.js` — no hardcoded values in component code
+- Modal injected once per page after the header is built (idempotent — checks `getElementById` first)
+
+**Why this approach:**
+- Modal lives in `layoutComponents.js` (shared header component) so **every page that uses the layout gets it for free** — dashboard, CRM, contacts, deal page, settings, VDR, admin. Zero per-page wiring.
+- Config-driven: change booking URL, form URL, or urgent emails in one file (`onboarding-config.js`) without touching component code
+- `urgentEmails` is an array — adding more emails later just means appending to the array; modal renders them with " or " between
+
+**Files Changed:** 3 files modified
+- `apps/web/js/onboarding/onboarding-config.js` — new `support` block with `bookingUrl`, `formUrl` (fallback to `feedback.formUrl`), `urgentEmails` array
+- `apps/web/js/layoutComponents.js` — new `generateHelpSupportModal()` function returns the full modal HTML
+- `apps/web/js/layout.js` — modal injection in `injectLayout()` + click handlers (open/close, backdrop, Escape, both card buttons, dynamic email link rendering)
+
+**Verification:** All 3 JS files pass `node -c` syntax check.
+
+---
+
+### Session 52 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST (Evening)
+
+#### Goal: Onboarding Checklist Bug Fixes + Team Invitation UI
+
+**Part 1: Onboarding Checklist Items Not Clickable**
+
+**Problem:** On the dashboard's "Getting Started" checklist, only "Create your first deal" was clickable. Three of five rows (Upload CIM, Review extraction, Try Deal Chat) did nothing on click and had no cursor pointer.
+
+**Root cause:** `onboarding-config.js` had `href: null` on those steps with a comment "navigates to deal page" — but no logic was ever written to resolve that. The renderer at `onboarding-checklist.js:46-47` only attached click handlers when `step.href` was truthy, so the rows were silently inert.
+
+**Fix:** Added `resolveStepHrefs()` in the checklist init flow that fetches the user's most recent deal once per render and points each `null`-href step at the right section of `/deal.html?id={dealId}`:
+- `uploadDocument` → `#documents-list`
+- `reviewExtraction` → `#financials-section`
+- `tryDealChat` → `#chat-messages`
+- Falls back to `/crm.html` if no deal exists yet
+
+Config file unchanged — `href: null` is now the marker for "resolve at runtime".
+
+**Part 2: Steps Not Auto-Checking on Return**
+
+**Problem:** After visiting a linked page (or even uploading a document via the VDR), the checklist didn't reflect completion when returning to the dashboard. Manual check-off was also impossible — clicking the empty circle did nothing.
+
+**Root cause:** Backend hooks fired on `documents-upload.ts` and `invitations.ts`, but:
+1. Users coming through alternative paths (e.g. existing data, deal intake flow) bypassed those hooks
+2. No backfill from actual activity ever ran on the status endpoint
+3. The circle was a `<div>`, not a button — no click handler
+
+**Fix 1: Backend backfill in `GET /api/onboarding/status`**
+- Added `backfillStepsFromActivity()` that checks all 5 steps against real data on every dashboard load:
+  - `createDeal` → Deal exists in org
+  - `uploadDocument` → Document exists for any deal in org
+  - `reviewExtraction` → FinancialStatement exists
+  - `tryDealChat` → ChatMessage exists
+  - `inviteTeamMember` → Invitation exists
+- Persists changes immediately so subsequent loads are fast
+- Best-effort — never blocks status fetch on individual query failure
+
+**Fix 2: Manual check-off**
+- Converted the circle from `<div>` to `<button>` with `data-step-toggle` attribute
+- Click stops propagation, calls `OnboardingAPI.completeStep(stepId)`, re-renders
+- Forward-only (no un-check) to keep state intuitive
+- Row click separated from circle click via `e.target.closest('[data-step-toggle]')` check
+
+**Part 3: Missing Invite Modal in Settings**
+
+**Problem:** "Invite a team member" checklist item routed to `/settings.html` but the page had zero invite UI. `POST /api/invitations` existed and even auto-completed the onboarding step, but there was no way to trigger it from the UI.
+
+**Fix:** Added complete Team & Invitations section to settings:
+- New "Team" sidebar nav entry (`#section-team`)
+- Section card with "Invite Team Member" button + invitation list
+- Two-panel modal: form panel (email + role: Member/Viewer/Admin) → after sending, swaps to **link panel** with read-only invite URL + Copy button
+- Modal auto-opens when settings.html loads with `#invite` hash
+- Updated `inviteTeamMember` checklist href → `/settings.html#invite`
+- Closes on backdrop click or Escape
+
+**Part 4: Manual Invite Link Sharing**
+
+**User feedback:** "When inviting team member we can't send auto links → user should be able to copy the invite link manually and send to teammates also."
+
+**Backend changes** (`apps/api/src/routes/invitations.ts`):
+- `POST /api/invitations` now **always** returns `inviteUrl` (was only on email failure)
+- `GET /api/invitations` now selects `token` and decorates each PENDING row with a full `inviteUrl`; tokens are stripped from accepted/expired rows so they aren't leaked
+
+**Frontend changes** (`apps/web/js/settingsInvite.js` + `settings.html`):
+- Modal success state shows the link in a read-only input + Copy button (with green "Copied" feedback for 1.5s)
+- Footer has Done + "Invite Another" buttons (no more auto-close)
+- Each PENDING row in the invitation list has an inline "Copy Link" button next to the status badge
+- Uses `navigator.clipboard.writeText` with `document.execCommand('copy')` fallback for non-HTTPS contexts
+- Banner explains email send status and the manual fallback path
+
+**Part 5: Deal Card "INITIAL REVIEW" Badge Wrapping**
+
+**Problem:** The stage badge on deal cards was wrapping "INITIAL REVIEW" to two lines, looking misaligned.
+
+**Root cause:** [crm-cards.js:75](apps/web/crm-cards.js#L75) — badge was missing `whitespace-nowrap` and `shrink-0`, so flexbox squeezed it and the text wrapped.
+
+**Fix:** Added `inline-flex items-center whitespace-nowrap shrink-0 leading-none px-2.5` to the badge — single-line, properly centered, slightly more horizontal padding.
+
+**Files Changed:** 8 files (1 new + 7 modified)
+- `apps/api/src/routes/onboarding.ts` — added `backfillStepsFromActivity()` helper, integrated into GET /status
+- `apps/api/src/routes/invitations.ts` — always return `inviteUrl` on POST, decorate GET list with `inviteUrl`, strip token from non-pending
+- `apps/web/js/onboarding/onboarding-checklist.js` — `resolveStepHrefs()` + manual click-off button + row/button click separation
+- `apps/web/js/onboarding/onboarding-config.js` — changed `inviteTeamMember` href to `/settings.html#invite`
+- `apps/web/settings.html` — Team section, invite modal with two-panel design, Team sidebar nav
+- `apps/web/js/settingsInvite.js` — **NEW** modal logic, invite list rendering, copy-to-clipboard with fallback, hash auto-open
+- `apps/web/crm-cards.js` — fixed stage badge wrapping (whitespace-nowrap + shrink-0)
+
+**Verification:** Zero TypeScript errors, all JS files pass `node -c` syntax check.
+
+---
+
+### Session 51 — April 6, 2026
+
+#### 🕐 Timestamp: April 6, 2026 — IST
+
+#### Goal: Fix Deal Chat "Math Failure" Bug + Chat History Fix
+
+**Problem:** The Deal Chat AI was hallucinating financial numbers because it had no table data in its prompt context. Users asking "What's the EBITDA margin?" or "Calculate revenue growth" got fabricated answers or "no data available" responses — even though financial statements were visible on the deal page.
+
+**Root Cause:** The ReAct agent relied on a `get_deal_financials` tool call to fetch data on-demand, but the tool used the wrong column name (`extractedData` instead of `lineItems`), so every fetch silently returned empty. The agent had zero financial context.
+
+**Fix 1: Financial Context Injection into System Prompt**
+- **Route** (`apps/api/src/routes/deals-chat-ai.ts`):
+  - Added `buildFinancialMarkdown()` utility that fetches all `FinancialStatement` rows (using correct `lineItems` column) and transforms raw JSONB into LLM-optimized Markdown tables grouped by statement type (Income Statement, Balance Sheet, Cash Flow) with periods as columns
+  - Format: `| Metric | 2007 | 2008 | ... | 2021 |` — clean, parseable by GPT-4o
+  - Handles empty state: "No extracted financial data available yet"
+  - Error handling for Supabase fetch failures (logs error, continues gracefully)
+- **Agent** (`apps/api/src/services/agents/dealChatAgent/index.ts`):
+  - Replaced soft guidelines with strict **Financial Data Protocol** in system prompt
+  - Tables labeled as "VERIFIED SOURCE OF TRUTH"
+  - 4 strict rules: (1) always quote exact numbers and show work, (2) never guess/hallucinate, (3) fall back to tool only if data missing, (4) cite every cell for multi-period calculations
+  - `get_deal_financials` tool kept as fallback for edge cases
+
+**Fix 2: Chat History Loading Most Recent Messages**
+- **Problem:** Chat history loaded oldest 50 messages (`ORDER BY createdAt ASC LIMIT 50`). Deals with 50+ messages lost recent conversations on page refresh.
+- **Root cause:** Query in `apps/api/src/routes/deals-chat.ts` fetched first 50 chronologically
+- **Fix:** Changed to fetch most recent messages (`ORDER BY createdAt DESC`), then reverse to chronological order for display. Increased default from 50 → 200, max cap from 100 → 500.
+
+**Verified Results (UI tested):**
+- ✅ "Compare COGS across all years" — listed all 15 years (2007-2021) with exact numbers
+- ✅ "What's the debt-to-equity ratio?" — quoted Long-term Debt ($0M) / Total Equity ($672.2M) = 0
+- ✅ "Calculate revenue growth from 2012 to 2016" — $299.4M → $431.3M = 44.04%, showed formula
+- ✅ "What's the EBITDA margin for 2023?" — correctly quoted $7.6M / $28.1M = 27.0%
+- ✅ "Revenue growth 2021 to 2023" — correctly said 2023 data doesn't exist (deal has 2007-2021 only)
+
+**Files Changed:** 4 files (3 modified + 1 new spec)
+- `apps/api/src/routes/deals-chat-ai.ts` — financial context injection + Markdown table builder
+- `apps/api/src/services/agents/dealChatAgent/index.ts` — Financial Data Protocol in system prompt
+- `apps/api/src/routes/deals-chat.ts` — chat history: most recent 200 messages
+- `docs/superpowers/specs/2026-04-06-financial-context-injection-design.md` — design spec
+
+**Part 2: Fix "Pending Analysis" VDR Bottleneck**
+
+**Problem:** Non-PDF files (Excel, Word) uploaded to VDR were permanently stuck in "Pending Analysis" because no text extraction ran on them. The AI was blind to spreadsheet data.
+
+**Root Cause:** Only PDFs had inline extraction via `pdf-parse`. Excel files were stored but `extractedText` stayed null, so the frontend showed "Pending Analysis" forever.
+
+**Fix 1: Excel Auto-Extraction to Markdown Tables on Upload**
+- Created `excelToMarkdown.ts` utility — converts Excel sheets to LLM-optimized Markdown tables with `## Sheet: Name` headings, pipe-delimited tables, unit scale detection
+- Reuses sheet-scoring logic from `excelFinancialExtractor.ts` (exported `scoreSheet`, `detectUnitScale`, `SKIP_PATTERNS`)
+- Added Excel branch in `documents-upload.ts` — detects Excel MIME types, converts to Markdown, stores in `extractedText`, triggers RAG embedding automatically
+
+**Fix 2: Three-State Badge in VDR UI**
+- **Before:** Only "Pending Analysis" (gray) and "Analysis Complete" (blue)
+- **After:** "Pending Analysis" (gray hourglass) → "✅ Ready for AI" (green checkmark) → "AI Analyzed" (blue sparkle)
+- New `ready` analysis type checks for `extractedText` presence without `aiAnalysis`
+- Added "Ready for AI" smart filter preset in FiltersBar
+
+**Fix 3: Re-analyze Button for Old Files**
+- Added "Re-analyze" button (Banker Blue) on files stuck in "Pending Analysis"
+- Backend: `POST /api/documents/:id/analyze` — downloads file from Supabase Storage, routes by MIME type (PDF → pdf-parse, Excel → excelToMarkdown), updates `extractedText`, triggers RAG
+- Extracted `pdfExtractor.ts` shared utility (was inline in documents-upload.ts)
+- Returns 422 for unsupported types (Word, etc.)
+
+**Files Changed:** 10 files (2 new + 8 modified)
+- `apps/api/src/services/excelToMarkdown.ts` — **NEW** Excel → Markdown converter
+- `apps/api/src/services/pdfExtractor.ts` — **NEW** shared PDF extraction utility
+- `apps/api/src/services/excelFinancialExtractor.ts` — exported 3 helpers
+- `apps/api/src/routes/documents-upload.ts` — Excel extraction branch on upload
+- `apps/api/src/routes/documents.ts` — POST /documents/:id/analyze endpoint
+- `apps/web/src/types/vdr.types.ts` — added 'ready' type + 'green' color
+- `apps/web/src/services/vdrApi.ts` — "Ready for AI" badge + analyzeDocument() API
+- `apps/web/src/components/FileTable.tsx` — ready style + re-analyze button
+- `apps/web/src/components/FiltersBar.tsx` — "Ready for AI" filter preset
+- `apps/web/src/vdr.tsx` — handleReanalyze callback
+
+---
+
 ### Session 50 — April 4-5, 2026
 
 #### 🕐 Timestamp: April 4-5, 2026 — IST

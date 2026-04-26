@@ -9,28 +9,11 @@
 <meta property="og:description" content="Flexible pricing plans for private equity firms of all sizes."/>
 <meta property="og:type" content="website"/>
 <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#003366",
-                        "background-light": "#f8fafc",
-                        "background-dark": "#101822",
-                    },
-                    fontFamily: {
-                        "display": ["Manrope", "sans-serif"],
-                        "sans": ["Manrope", "sans-serif"]
-                    },
-                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
-                },
-            },
-        }
-    </script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@200;300;400;500;600;700;800&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
 <style>
         .material-symbols-outlined {
             font-variation-settings:
@@ -40,6 +23,7 @@
             'opsz' 24
         }
     </style>
+    <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-background-light dark:bg-background-dark text-[#111418] dark:text-white font-display">
 <div class="relative flex h-auto min-h-screen w-full flex-col group/design-root overflow-x-hidden">
@@ -319,7 +303,7 @@
 </div>
 </div>
 <!-- FAQ / Bottom CTA -->
-<div class="flex flex-col items-center justify-center p-8 md:p-12 rounded-2xl bg-gradient-to-br from-[#E6EDF5] to-[#F0F4F8] border border-[#E0E8F0]">
+<div class="flex flex-col items-center justify-center p-8 md:p-12 rounded-2xl bg-gradient-to-br from-[#1269e2]/10 to-[#1269e2]/5 border border-[#1269e2]/10">
 <h2 class="text-2xl md:text-3xl font-bold text-[#111418] dark:text-white mb-4 text-center">Ready to modernize your deal flow?</h2>
 <p class="text-[#64748b] dark:text-gray-400 text-center max-w-2xl mb-8">Join the hundreds of investment firms already using PE OS to gain a competitive information advantage.</p>
 <div class="flex flex-col sm:flex-row gap-4">

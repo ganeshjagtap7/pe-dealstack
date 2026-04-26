@@ -61,3 +61,6 @@ skill.md
 # Test/sample files
 *.sample.xlsx
 generate_*.py
+
+# Local automation scripts (contain API keys, machine-specific paths)
+scripts/

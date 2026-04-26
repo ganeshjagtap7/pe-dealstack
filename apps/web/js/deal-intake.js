@@ -1,6 +1,6 @@
 /**
  * PE OS - Deal Intake Page
- * Handles file upload, text paste, and URL scraping for deal creation.
+ * Handles file upload and text paste for deal creation.
  */
 
 const API_BASE = API_BASE_URL; // from js/config.js
@@ -155,49 +155,6 @@ async function extractFromText() {
     }
 }
 
-// ─── URL Scraping ───────────────────────────────────────────
-
-const urlInput = document.getElementById('url-input');
-const urlBtn = document.getElementById('url-btn');
-
-if (urlInput) {
-    urlInput.addEventListener('input', () => {
-        try {
-            new URL(urlInput.value);
-            urlBtn.disabled = false;
-        } catch {
-            urlBtn.disabled = true;
-        }
-    });
-}
-
-async function extractFromURL() {
-    const url = urlInput.value.trim();
-    if (!url) return;
-
-    showLoading();
-
-    try {
-        const companyName = document.getElementById('url-company-name').value.trim() || undefined;
-
-        const response = await PEAuth.authFetch(`${API_BASE}/ingest/url`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ url, companyName }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'URL scraping failed');
-        }
-
-        showExtractionPreview(data);
-    } catch (error) {
-        showError('URL scraping failed', error.message);
-    }
-}
-
 // ─── Extraction Preview ─────────────────────────────────────
 
 function showExtractionPreview(data) {
@@ -335,8 +292,6 @@ function resetForm() {
     // Reset all inputs
     clearFile();
     if (textInput) { textInput.value = ''; charCount.textContent = '0'; textBtn.disabled = true; }
-    if (urlInput) { urlInput.value = ''; urlBtn.disabled = true; }
-    document.getElementById('url-company-name').value = '';
     createdDealId = null;
 
     // Reset view deal button

@@ -250,7 +250,15 @@ document.addEventListener('DOMContentLoaded', async function() {
             return;
         }
     } else {
-        showErrorState('No deal or memo specified. Open this page from a deal.');
+        // No params — show list of saved memos
+        showLoadingState('Loading your memos...');
+        const allMemos = await listMemosAPI();
+        hideLoadingState();
+        if (allMemos.length > 0) {
+            showMemoListView(allMemos);
+        } else {
+            showEmptyMemoState();
+        }
         return;
     }
 
@@ -268,6 +276,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     setupDragDrop();
 
     updateModeIndicators();
+    // Calculate dynamic page count after content is rendered
+    setTimeout(() => updatePageCount(), 300);
 });
 
 /**
@@ -529,7 +539,8 @@ function setupEventHandlers() {
     document.getElementById('close-ai-panel').addEventListener('click', toggleAIPanel);
     document.getElementById('expand-ai-panel').addEventListener('click', expandAIPanel);
     document.getElementById('export-btn').addEventListener('click', exportToPDF);
-    document.getElementById('share-btn').addEventListener('click', () => alert('Share functionality coming soon!'));
+    document.getElementById('share-btn').addEventListener('click', shareMemo);
+    setupExportDropdown();
     document.getElementById('attach-btn').addEventListener('click', () => document.getElementById('file-input').click());
     document.getElementById('file-input').addEventListener('change', handleFileAttachment);
 
@@ -763,6 +774,107 @@ async function postProactiveWelcome() {
         }];
         renderMessages();
     }
+}
+
+// ============================================================
+// Memo List View (when no params)
+// ============================================================
+function showMemoListView(memos) {
+    const editor = document.getElementById('document-editor');
+    const aiPanel = document.getElementById('ai-panel');
+    const aiPanelCollapsed = document.getElementById('ai-panel-collapsed');
+    const resizeHandle = document.getElementById('ai-resize-handle');
+
+    // Hide AI panel for list view
+    if (aiPanel) aiPanel.classList.add('hidden');
+    if (aiPanelCollapsed) aiPanelCollapsed.classList.add('hidden');
+    if (resizeHandle) resizeHandle.classList.add('hidden');
+
+    if (!editor) return;
+
+    const statusColors = {
+        DRAFT: 'bg-amber-100 text-amber-700',
+        REVIEW: 'bg-blue-100 text-blue-700',
+        FINAL: 'bg-green-100 text-green-700',
+        ARCHIVED: 'bg-gray-100 text-gray-500',
+    };
+
+    const memoCards = memos.map(m => {
+        const sc = statusColors[m.status] || statusColors.DRAFT;
+        const edited = m.updatedAt ? formatRelativeTime(new Date(m.updatedAt)) : '';
+        const sectionCount = m.sections?.length || 0;
+        const dealName = m.projectName || m.deal?.name || '';
+        return `
+            <a href="/memo-builder.html?id=${m.id}" class="block p-5 rounded-xl border border-slate-200 hover:border-primary/40 hover:shadow-md transition-all group bg-white">
+                <div class="flex items-start justify-between mb-2">
+                    <div class="flex-1 min-w-0">
+                        <h3 class="font-bold text-slate-900 group-hover:text-primary transition-colors truncate">${dealName || m.title || 'Untitled Memo'}</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">${m.title || 'Investment Committee Memo'}</p>
+                    </div>
+                    <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md ${sc} shrink-0 ml-3">${m.status}</span>
+                </div>
+                <div class="flex items-center gap-4 mt-3 text-xs text-slate-400">
+                    ${edited ? `<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">schedule</span> ${edited}</span>` : ''}
+                    ${sectionCount ? `<span class="flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">article</span> ${sectionCount} sections</span>` : ''}
+                </div>
+            </a>
+        `;
+    }).join('');
+
+    editor.innerHTML = `
+        <div class="max-w-3xl mx-auto px-8 py-10">
+            <div class="flex items-center justify-between mb-8">
+                <div>
+                    <h1 class="text-2xl font-bold text-slate-900">Investment Memos</h1>
+                    <p class="text-sm text-slate-500 mt-1">${memos.length} saved memo${memos.length !== 1 ? 's' : ''}</p>
+                </div>
+            </div>
+            <div class="grid gap-4">
+                ${memoCards}
+            </div>
+        </div>
+    `;
+}
+
+function showEmptyMemoState() {
+    const editor = document.getElementById('document-editor');
+    const aiPanel = document.getElementById('ai-panel');
+    const aiPanelCollapsed = document.getElementById('ai-panel-collapsed');
+    const resizeHandle = document.getElementById('ai-resize-handle');
+
+    if (aiPanel) aiPanel.classList.add('hidden');
+    if (aiPanelCollapsed) aiPanelCollapsed.classList.add('hidden');
+    if (resizeHandle) resizeHandle.classList.add('hidden');
+
+    if (!editor) return;
+
+    editor.innerHTML = `
+        <div class="flex flex-col items-center justify-center py-20 text-center">
+            <div class="size-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
+                <span class="material-symbols-outlined text-primary text-3xl">edit_note</span>
+            </div>
+            <h3 class="text-lg font-bold text-slate-900 mb-2">No Memos Yet</h3>
+            <p class="text-sm text-slate-500 mb-6 max-w-md">Investment memos are created from deal pages. Go to a deal and click "Create Memo" to get started.</p>
+            <a href="/crm.html" class="px-5 py-2.5 rounded-lg text-sm font-medium text-white" style="background:#003366">
+                <span class="material-symbols-outlined text-[16px] align-middle mr-1">business_center</span>Go to Deals
+            </a>
+        </div>
+    `;
+}
+
+// ============================================================
+// Dynamic Page Count
+// ============================================================
+function updatePageCount() {
+    const indicator = document.getElementById('page-indicator');
+    if (!indicator) return;
+    // Estimate pages based on content height (letter-size page ~1056px at 96 DPI)
+    const content = document.getElementById('document-editor');
+    if (!content) return;
+    const pageHeight = 1056;
+    const totalHeight = content.scrollHeight;
+    const pageCount = Math.max(1, Math.ceil(totalHeight / pageHeight));
+    indicator.textContent = `Page 1 of ${pageCount}`;
 }
 
 console.log('PE OS Memo Builder script loaded');

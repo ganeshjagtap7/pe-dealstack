@@ -298,6 +298,8 @@ router.post('/:id/chat', async (req, res) => {
       chartConfig: result.chartConfig,
       insertPosition: result.insertPosition,
       type: result.type,
+      sectionType: result.sectionType,
+      title: result.title,
     });
   } catch (error: any) {
     if (error instanceof z.ZodError) {

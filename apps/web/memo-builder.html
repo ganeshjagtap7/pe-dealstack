@@ -5,57 +5,12 @@
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Automated Investment Memo Builder | PE OS</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg"/>
-    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <script>
-        // PE OS Design System Tailwind Config
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#003366",
-                        "primary-hover": "#002855",
-                        "primary-light": "#E6EEF5",
-                        "secondary": "#059669",
-                        "secondary-light": "#D1FAE5",
-                        "background-body": "#F8F9FA",
-                        "background-light": "#F8F9FA",
-                        "background-dark": "#101822",
-                        "surface-card": "#FFFFFF",
-                        "surface-light": "#FFFFFF",
-                        "surface-dark": "#1a2430",
-                        "border-subtle": "#E5E7EB",
-                        "border-light": "#E5E7EB",
-                        "border-dark": "#2d3748",
-                        "border-focus": "#CBD5E1",
-                        "text-main": "#111827",
-                        "text-secondary": "#4B5563",
-                        "text-muted": "#9CA3AF",
-                    },
-                    fontFamily: {
-                        "display": ["Inter", "sans-serif"],
-                        "body": ["Inter", "sans-serif"],
-                        "sans": ["Inter", "sans-serif"]
-                    },
-                    boxShadow: {
-                        "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
-                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                        "glow": "0 0 15px rgba(0, 51, 102, 0.1)",
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.5rem",
-                        "md": "0.375rem",
-                        "lg": "0.5rem",
-                        "xl": "0.75rem",
-                        "2xl": "1rem",
-                        "full": "9999px"
-                    },
-                },
-            },
-        }
-    </script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
+<link rel="stylesheet" href="/css/app.css" />
     <style>
         body { font-family: 'Inter', sans-serif; }
         /* Custom scrollbar for cleaner look */
@@ -104,6 +59,45 @@
         /* Small icon buttons */
         .icon-btn {
             @apply p-1.5 rounded hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors;
+        }
+        /* Memo section content typography */
+        .memo-section-content h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0d131b;
+            margin-top: 1.25rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 0.25rem;
+        }
+        .memo-section-content h3:first-child {
+            margin-top: 0;
+        }
+        .memo-section-content p {
+            color: #334155;
+            line-height: 1.7;
+            margin-bottom: 0.75rem;
+            font-size: 0.9375rem;
+        }
+        .memo-section-content ul, .memo-section-content ol {
+            margin: 0.5rem 0 0.75rem 1.25rem;
+            color: #334155;
+            font-size: 0.9375rem;
+        }
+        .memo-section-content li {
+            margin-bottom: 0.35rem;
+            line-height: 1.6;
+        }
+        .memo-section-content strong {
+            color: #0d131b;
+        }
+        .memo-section-content .highlight-positive {
+            color: #166534;
+            font-weight: 600;
+        }
+        .memo-section-content .highlight-negative {
+            color: #991b1b;
+            font-weight: 600;
         }
         /* Resize handle */
         #ai-resize-handle {
@@ -251,13 +245,30 @@
                 <span class="material-symbols-outlined text-[20px]">share</span>
                 <span>Share</span>
             </button>
-            <div class="flex items-center rounded-lg border border-primary overflow-hidden">
-                <button id="export-btn" class="flex items-center justify-center h-9 px-4 bg-primary text-white text-sm font-bold hover:bg-primary-hover transition-colors">
-                    Export to PDF
-                </button>
-                <button id="export-dropdown" class="flex items-center justify-center h-9 px-2 bg-primary border-l border-primary-hover text-white hover:bg-primary-hover transition-colors">
-                    <span class="material-symbols-outlined text-[20px]">arrow_drop_down</span>
-                </button>
+            <div class="relative">
+                <div class="flex items-center rounded-lg border border-primary overflow-visible">
+                    <button id="export-btn" class="flex items-center justify-center h-9 px-4 bg-primary text-white text-sm font-bold hover:bg-primary-hover transition-colors rounded-l-lg" style="background-color: #003366;">
+                        Export to PDF
+                    </button>
+                    <button id="export-dropdown" class="flex items-center justify-center h-9 px-2 border-l border-white/20 text-white hover:bg-primary-hover transition-colors rounded-r-lg" style="background-color: #003366;">
+                        <span class="material-symbols-outlined text-[20px]">arrow_drop_down</span>
+                    </button>
+                </div>
+                <!-- Export Dropdown Menu -->
+                <div id="export-menu" class="hidden absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-50">
+                    <button id="export-pdf" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px] text-red-500">picture_as_pdf</span>
+                        Export as PDF
+                    </button>
+                    <button id="export-markdown" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px] text-slate-500">code</span>
+                        Export as Markdown
+                    </button>
+                    <button id="export-clipboard" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors">
+                        <span class="material-symbols-outlined text-[18px] text-blue-500">content_copy</span>
+                        Copy to Clipboard
+                    </button>
+                </div>
             </div>
         </div>
     </header>
@@ -514,15 +525,17 @@
     <!-- Auth Helper -->
     <script src="js/auth.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/formatters.js"></script>
-    <script src="js/notifications.js"></script>
+    <script defer src="js/formatters.js"></script>
+    <script defer src="js/notifications.js"></script>
     <!-- Shared Layout -->
-    <script src="js/layoutComponents.js"></script>
-    <script src="js/layout.js"></script>
-    <script src="js/inviteModal-template.js"></script>
-    <script src="js/inviteModal.js"></script>
+    <script defer src="js/layoutComponents.js"></script>
+    <script defer src="js/layout.js"></script>
+    <script defer src="js/commandPalette.js"></script>
+    <script defer src="js/aiAssistant.js"></script>
+    <script defer src="js/inviteModal-template.js"></script>
+    <script defer src="js/inviteModal.js"></script>
     <!-- html2pdf for export -->
-    <script src="https://cdnjs.cloudflare.com/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <!-- Initialize Layout -->
     <script>
         document.addEventListener('DOMContentLoaded', async function() {
@@ -536,14 +549,14 @@
         });
     </script>
     <!-- Memo API Functions -->
-    <script src="memo-api.js"></script>
+    <script defer src="memo-api.js"></script>
     <!-- Memo Chat Module -->
-    <script src="memo-chat.js"></script>
+    <script defer src="memo-chat.js"></script>
     <!-- Memo Section Rendering & Actions -->
-    <script src="memo-sections.js"></script>
+    <script defer src="memo-sections.js"></script>
     <!-- Memo Editor Modals, Export & Panel Resize -->
-    <script src="memo-editor.js"></script>
+    <script defer src="memo-editor.js"></script>
     <!-- Main Page Script (state, init, sidebar, drag & drop) -->
-    <script src="memo-builder.js"></script>
+    <script defer src="memo-builder.js"></script>
 </body>
 </html>

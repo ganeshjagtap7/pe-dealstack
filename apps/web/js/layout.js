@@ -38,10 +38,22 @@ function getCachedUser() {
 
 function cacheUserData(userData) {
     try {
+        userData._cachedAt = Date.now();
         sessionStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData));
     } catch (e) {
         // Storage full or unavailable — not critical
     }
+}
+
+function isCacheFresh() {
+    try {
+        const cached = sessionStorage.getItem(USER_CACHE_KEY);
+        if (cached) {
+            const parsed = JSON.parse(cached);
+            return parsed._cachedAt && (Date.now() - parsed._cachedAt) < 120000;
+        }
+    } catch (e) {}
+    return false;
 }
 
 // User data — immediately use cache if available, otherwise show Loading...
@@ -57,6 +69,15 @@ let USER = cachedUser || {
 
 // Load user data from API (and refresh cache)
 async function loadUserData() {
+    // If cache is fresh (< 2 min old), skip the API call
+    if (isCacheFresh() && cachedUser && cachedUser.name && cachedUser.name !== 'Loading...') {
+        USER = cachedUser;
+        updateUserDisplay();
+        updateSidebarForRole();
+        window.dispatchEvent(new CustomEvent('pe-user-loaded', { detail: { user: USER } }));
+        return;
+    }
+
     try {
         if (typeof PEAuth !== 'undefined' && PEAuth.authFetch) {
             const response = await PEAuth.authFetch(`${API_BASE_URL}/users/me`);
@@ -262,6 +283,11 @@ function initPELayout(activePage, options = {}) {
         headerRoot.outerHTML = generateHeader(options);
     }
 
+    // Inject Help & Support modal once per page (after header is in place)
+    if (typeof generateHelpSupportModal === 'function' && !document.getElementById('help-support-modal')) {
+        document.body.insertAdjacentHTML('beforeend', generateHelpSupportModal());
+    }
+
     // Setup sidebar collapse toggle
     if (collapsible) {
         const collapseBtn = document.getElementById('sidebar-collapse-btn');
@@ -336,6 +362,57 @@ function initPELayout(activePage, options = {}) {
         });
     }
 
+    // Setup Help & Support button — opens modal with two options
+    const helpBtn = document.getElementById('help-support-btn');
+    const helpModal = document.getElementById('help-support-modal');
+    if (helpBtn && helpModal) {
+        const supportCfg = window.ONBOARDING_CONFIG?.support || {};
+        const feedbackCfg = window.ONBOARDING_CONFIG?.feedback || {};
+        const bookingUrl = supportCfg.bookingUrl || 'https://calendar.app.google/vRexQ5AmhivWx2PH6';
+        const formUrl = supportCfg.formUrl || feedbackCfg.formUrl || 'mailto:hello@pocketfund.org';
+        // Accept either urgentEmails (array) or legacy urgentEmail (string)
+        const urgentEmails = Array.isArray(supportCfg.urgentEmails)
+            ? supportCfg.urgentEmails
+            : (supportCfg.urgentEmail ? [supportCfg.urgentEmail] : ['hello@pocketfund.org']);
+
+        const openModal = () => {
+            helpModal.classList.remove('hidden');
+            helpModal.classList.add('flex');
+            if (userDropdown) userDropdown.classList.add('hidden');
+        };
+        const closeModal = () => {
+            helpModal.classList.add('hidden');
+            helpModal.classList.remove('flex');
+        };
+
+        helpBtn.addEventListener('click', openModal);
+
+        document.getElementById('help-support-close')?.addEventListener('click', closeModal);
+        helpModal.addEventListener('click', (e) => {
+            if (e.target === helpModal) closeModal();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !helpModal.classList.contains('hidden')) closeModal();
+        });
+
+        document.getElementById('help-support-book')?.addEventListener('click', () => {
+            window.open(bookingUrl, '_blank', 'noopener,noreferrer');
+            closeModal();
+        });
+        document.getElementById('help-support-form')?.addEventListener('click', () => {
+            window.open(formUrl, '_blank', 'noopener,noreferrer');
+            closeModal();
+        });
+
+        // Render the urgent emails — each is a clickable mailto link
+        const emailsContainer = document.getElementById('help-support-emails');
+        if (emailsContainer) {
+            emailsContainer.innerHTML = urgentEmails
+                .map(e => `<a href="mailto:${e}" class="font-semibold" style="color: ${PE_COLORS.primary};">${e}</a>`)
+                .join(' or ');
+        }
+    }
+
     // Setup logout button
     const logoutBtn = document.getElementById('logout-btn');
     if (logoutBtn) {
@@ -364,6 +441,49 @@ function initPELayout(activePage, options = {}) {
     }
     // Then refresh from API in background (updates cache for next navigation)
     loadUserData();
+
+    // ── Sidebar activity dots ─────────────────────────────
+    // Show green dot on "Deals" nav when there are unread notifications
+    function updateSidebarActivityDots() {
+        const unread = window.PENotifications?.getUnreadCount?.() || 0;
+        const dealsDot = document.querySelector('[data-nav-id="deals"] .nav-activity-dot');
+        if (dealsDot) {
+            if (unread > 0 && activePage !== 'deals') dealsDot.classList.remove('hidden');
+            else dealsDot.classList.add('hidden');
+        }
+    }
+    // Check every 30s (after notification poll refreshes)
+    setInterval(updateSidebarActivityDots, 31000);
+    // Also check after a short delay on load
+    setTimeout(updateSidebarActivityDots, 3000);
+
+    // ── Page Transitions ─────────────────────────────────
+    // Fade-in content on load, fade-out on navigation.
+    // Sidebar stays static — only <main> transitions.
+    const mainEl = document.querySelector('main');
+    if (mainEl) {
+        // Fade in on page load
+        mainEl.style.opacity = '0';
+        mainEl.style.transition = 'opacity 0.18s ease-out';
+        requestAnimationFrame(() => { mainEl.style.opacity = '1'; });
+
+        // Intercept sidebar nav clicks — fade out, then navigate
+        const sidebarLinks = document.querySelectorAll('#pe-sidebar .nav-item[href]');
+        sidebarLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                const href = link.getAttribute('href');
+                // Skip if same page, external link, or modifier key held
+                if (!href || href === '#' || e.metaKey || e.ctrlKey || e.shiftKey) return;
+                const currentPath = window.location.pathname;
+                if (currentPath === href || currentPath.endsWith(href)) return;
+
+                e.preventDefault();
+                mainEl.style.transition = 'opacity 0.12s ease-in';
+                mainEl.style.opacity = '0';
+                setTimeout(() => { window.location.href = href; }, 120);
+            });
+        });
+    }
 
     // Dispatch custom event to signal layout is ready
     window.dispatchEvent(new CustomEvent('pe-layout-ready', { detail: { activePage } }));

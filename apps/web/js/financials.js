@@ -11,6 +11,7 @@ const finState = {
   statements: [],      // raw rows from GET /financials (each has Document: {id, name})
   validation: null,    // result from GET /financials/validation
   conflicts: [],       // from GET /financials/conflicts — overlapping period versions
+  currency: 'USD',     // detected currency from financial statements
   activeTab: 'INCOME_STATEMENT',
   extracting: false,
   chartVisible: false,
@@ -37,8 +38,19 @@ async function loadFinancials(dealId) {
     console.warn('[financials] load error', err);
   }
 
+  // Detect currency from financial statements (use most common non-USD, or first available)
+  if (finState.statements.length > 0) {
+    const currencies = finState.statements.map(s => s.currency).filter(Boolean);
+    finState.currency = currencies[0] || 'USD';
+  }
+
   renderFinancialSection();
   renderFinStatusBadge();
+
+  // Re-render deal metrics with detected currency (they render before financials load)
+  if (finState.currency !== 'USD' && typeof renderDynamicMetrics === 'function' && window.state?.dealData) {
+    renderDynamicMetrics(window.state.dealData);
+  }
 
   // Onboarding: mark reviewExtraction step when user views extracted financials
   if (finState.statements.length > 0 && window.OnboardingAPI) {
@@ -194,6 +206,7 @@ function buildStatementTable(statementType) {
   rows.sort((a, b) => a.period.localeCompare(b.period));
 
   const unitScale = rows[0]?.unitScale ?? 'ACTUALS';
+  const currency = rows[0]?.currency ?? 'USD';
 
   const allKeys = new Set();
   rows.forEach(r => Object.keys(r.lineItems ?? {}).forEach(k => allKeys.add(k)));
@@ -243,7 +256,7 @@ function buildStatementTable(statementType) {
 
     const cells = rows.map(r => {
       const val = (r.lineItems ?? {})[key];
-      const display = isPct ? fmtPct(val) : fmtMoney(val, unitScale);
+      const display = isPct ? fmtPct(val) : fmtMoney(val, unitScale, currency);
       const isProjected = r.periodType === 'PROJECTED';
       const valCls = isProjected ? 'text-gray-400 italic' : (isSubtotal ? 'text-gray-900 font-semibold' : 'text-gray-700');
       return `
@@ -281,7 +294,7 @@ function buildStatementTable(statementType) {
         <thead>
           <tr style="background:#fafbfc;">
             <th class="px-3 py-3 text-left text-[11px] font-semibold text-gray-500 sticky left-0 min-w-[160px]" style="background:#fafbfc;z-index:3;box-shadow:2px 0 4px -2px rgba(0,0,0,0.06);">
-              Line Item <span class="text-[10px] font-normal text-gray-400">(${unitScale === 'MILLIONS' ? '$M' : unitScale === 'THOUSANDS' ? '$K' : '$'})</span>
+              Line Item <span class="text-[10px] font-normal text-gray-400">(${getCurrencySymbol(currency)}${currency === 'INR' ? (unitScale === 'MILLIONS' ? 'Cr' : unitScale === 'THOUSANDS' ? 'L' : '') : (unitScale === 'MILLIONS' ? 'M' : unitScale === 'THOUSANDS' ? 'K' : '')})</span>
             </th>
             ${headerCells}
           </tr>
@@ -363,16 +376,15 @@ async function handleExtract(documentId) {
     const stored = result.result?.periodsStored ?? 0;
     const warnings = result.result?.warnings ?? [];
 
+    await loadFinancials(dealId);
+
     if (stored === 0) {
       const warningMsg = warnings.length > 0 ? warnings[0] : 'No financial data found in the document. Try uploading a P&L, Balance Sheet, or CIM.';
       showNotification('No Data Extracted', warningMsg, 'warning');
-    } else if (result.hasConflicts) {
-      showNotification('Conflicts Detected', `${stored} period${stored !== 1 ? 's' : ''} extracted — overlapping data found from multiple documents. Review the merge view.`, 'warning');
     } else {
-      showNotification('Financials Extracted', `${stored} period${stored !== 1 ? 's' : ''} stored (AI extraction)`, 'success');
+      showExtractionResultModal(result);
     }
 
-    await loadFinancials(dealId);
     // Refresh analysis after extraction
     if (typeof loadAnalysis === 'function') loadAnalysis(dealId);
   } catch (err) {
@@ -389,6 +401,179 @@ async function handleExtract(documentId) {
     clearTimeout(timeoutId);
     finState.extracting = false;
   }
+}
+
+// ─── Extraction Result Modal ──────────────────────────────────
+function showExtractionResultModal(extractionResult) {
+  // Remove any existing modal
+  document.getElementById('fin-extraction-modal')?.remove();
+
+  const result = extractionResult.result || {};
+  const agent = extractionResult.agent || {};
+  const docName = extractionResult.documentUsed?.name || 'Unknown document';
+  const method = extractionResult.extractionMethod || 'gpt4o';
+  const periodsStored = result.periodsStored || 0;
+  const overallConf = result.overallConfidence || 0;
+  const warnings = result.warnings || [];
+  const hasConflicts = result.hasConflicts || false;
+  const retryCount = agent.retryCount || 0;
+
+  // Derive summary from finState.statements (already reloaded)
+  const stmts = finState.statements;
+  const currency = finState.currency || 'USD';
+  const sym = getCurrencySymbol(currency);
+
+  // Count by type
+  const incomeCount = stmts.filter(s => s.statementType === 'INCOME_STATEMENT').length;
+  const balanceCount = stmts.filter(s => s.statementType === 'BALANCE_SHEET').length;
+  const cashFlowCount = stmts.filter(s => s.statementType === 'CASH_FLOW').length;
+
+  // Get latest revenue & EBITDA from income statements
+  const incomeStmts = stmts
+    .filter(s => s.statementType === 'INCOME_STATEMENT')
+    .sort((a, b) => b.period.localeCompare(a.period));
+  const latestIncome = incomeStmts[0]?.lineItems || {};
+  const revenue = latestIncome.revenue;
+  const ebitda = latestIncome.ebitda;
+  const grossMargin = latestIncome.gross_margin_pct;
+  const ebitdaMargin = latestIncome.ebitda_margin_pct;
+  const latestPeriod = incomeStmts[0]?.period || '';
+
+  // Confidence color
+  let confColor, confBg, confBorder;
+  if (overallConf >= 80) { confColor = '#059669'; confBg = '#ecfdf5'; confBorder = '#a7f3d0'; }
+  else if (overallConf >= 50) { confColor = '#d97706'; confBg = '#fffbeb'; confBorder = '#fde68a'; }
+  else { confColor = '#dc2626'; confBg = '#fef2f2'; confBorder = '#fecaca'; }
+
+  // Format extracted values
+  const fmtVal = (val) => {
+    if (val == null) return '—';
+    return formatCurrency(val, currency);
+  };
+  const fmtPctVal = (val) => {
+    if (val == null) return '—';
+    return val.toFixed(1) + '%';
+  };
+
+  // Status badge
+  const statusHtml = hasConflicts
+    ? `<span class="px-2.5 py-1 rounded-full text-xs font-medium" style="background:#fffbeb;color:#92400e;border:1px solid #fde68a;">
+        <span class="material-symbols-outlined text-xs align-middle mr-0.5">warning</span> Conflicts Found
+      </span>`
+    : `<span class="px-2.5 py-1 rounded-full text-xs font-medium" style="background:#ecfdf5;color:#065f46;border:1px solid #a7f3d0;">
+        <span class="material-symbols-outlined text-xs align-middle mr-0.5">check_circle</span> Extraction Complete
+      </span>`;
+
+  const warningsHtml = warnings.length > 0 ? `
+    <div class="mt-4 p-3 rounded-lg" style="background:#fffbeb;border:1px solid #fde68a;">
+      <p class="text-xs font-medium" style="color:#92400e;">Warnings:</p>
+      <ul class="text-xs mt-1 space-y-0.5" style="color:#a16207;">
+        ${warnings.map(w => `<li class="flex items-start gap-1.5"><span class="mt-0.5 shrink-0">•</span>${escapeHtml(w)}</li>`).join('')}
+      </ul>
+    </div>` : '';
+
+  const modal = document.createElement('div');
+  modal.id = 'fin-extraction-modal';
+  modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
+  modal.innerHTML = `
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('fin-extraction-modal')?.remove()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden" style="animation:slideUp 0.3s ease-out;">
+      <!-- Header -->
+      <div class="px-6 pt-6 pb-4 border-b border-gray-100">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="material-symbols-outlined text-xl" style="color:#003366;">auto_awesome</span>
+            <h3 class="text-base font-bold text-gray-900">Extraction Results</h3>
+          </div>
+          ${statusHtml}
+        </div>
+        <p class="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
+          <span class="material-symbols-outlined text-xs">description</span>
+          ${escapeHtml(docName)}
+          <span class="mx-1">·</span>
+          ${method.toUpperCase()}
+          ${retryCount > 0 ? `<span class="mx-1">·</span>${retryCount} retries` : ''}
+        </p>
+      </div>
+
+      <!-- Confidence -->
+      <div class="px-6 py-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-xs font-medium text-gray-600">Overall Confidence</span>
+          <span class="text-sm font-bold" style="color:${confColor};">${overallConf}%</span>
+        </div>
+        <div class="w-full h-2 rounded-full overflow-hidden" style="background:#f3f4f6;">
+          <div class="h-2 rounded-full transition-all" style="width:${overallConf}%;background:${confColor};"></div>
+        </div>
+      </div>
+
+      <!-- Extracted Metrics -->
+      <div class="px-6 pb-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div class="p-3 rounded-lg" style="background:#f8fafc;border:1px solid #e2e8f0;">
+            <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Revenue ${latestPeriod ? '(' + latestPeriod + ')' : ''}</p>
+            <p class="text-sm font-bold text-gray-900 mt-1">${fmtVal(revenue)}</p>
+          </div>
+          <div class="p-3 rounded-lg" style="background:#f8fafc;border:1px solid #e2e8f0;">
+            <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wide">EBITDA</p>
+            <p class="text-sm font-bold text-gray-900 mt-1">${fmtVal(ebitda)}</p>
+          </div>
+          <div class="p-3 rounded-lg" style="background:#f8fafc;border:1px solid #e2e8f0;">
+            <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Gross Margin</p>
+            <p class="text-sm font-bold text-gray-900 mt-1">${fmtPctVal(grossMargin)}</p>
+          </div>
+          <div class="p-3 rounded-lg" style="background:#f8fafc;border:1px solid #e2e8f0;">
+            <p class="text-[10px] font-medium text-gray-500 uppercase tracking-wide">EBITDA Margin</p>
+            <p class="text-sm font-bold text-gray-900 mt-1">${fmtPctVal(ebitdaMargin)}</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Statement counts -->
+      <div class="px-6 pb-4">
+        <div class="flex gap-2">
+          ${incomeCount > 0 ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold" style="background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe;">Income: ${incomeCount} period${incomeCount > 1 ? 's' : ''}</span>` : ''}
+          ${balanceCount > 0 ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold" style="background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;">Balance: ${balanceCount} period${balanceCount > 1 ? 's' : ''}</span>` : ''}
+          ${cashFlowCount > 0 ? `<span class="px-2.5 py-1 rounded-full text-[10px] font-semibold" style="background:#fefce8;color:#854d0e;border:1px solid #fef08a;">Cash Flow: ${cashFlowCount} period${cashFlowCount > 1 ? 's' : ''}</span>` : ''}
+        </div>
+        <p class="text-xs text-gray-500 mt-2">Currency: <span class="font-semibold text-gray-700">${sym.trim()} (${currency})</span></p>
+      </div>
+
+      ${warningsHtml}
+
+      <!-- Actions -->
+      <div class="px-6 py-4 border-t border-gray-100 flex gap-3">
+        <button onclick="document.getElementById('fin-extraction-modal')?.remove();"
+          class="flex-1 py-2.5 px-4 rounded-lg text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
+          style="background:#003366;">
+          <span class="material-symbols-outlined text-[18px]">table_chart</span>
+          View Financials
+        </button>
+        ${hasConflicts ? `
+        <button onclick="document.getElementById('fin-extraction-modal')?.remove();openMergeView();"
+          class="py-2.5 px-4 rounded-lg border text-sm font-medium transition-all flex items-center justify-center gap-2"
+          style="border-color:#fde68a;color:#92400e;background:#fffbeb;">
+          <span class="material-symbols-outlined text-[18px]">compare_arrows</span>
+          Review Conflicts
+        </button>` : ''}
+      </div>
+    </div>`;
+
+  // Add animation style
+  if (!document.getElementById('fin-modal-style')) {
+    const s = document.createElement('style');
+    s.id = 'fin-modal-style';
+    s.textContent = '@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }';
+    document.head.appendChild(s);
+  }
+
+  document.body.appendChild(modal);
+
+  // Close on Escape
+  const escHandler = (e) => {
+    if (e.key === 'Escape') { modal.remove(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
 }
 
 // ─── Inline cell editing ───────────────────────────────────────

@@ -147,11 +147,30 @@ async function loadDealData() {
 
     state.dealId = dealId;
 
-    try {
-        const response = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`);
-        if (!response.ok) throw new Error('Deal not found');
+    // Show cached deal data instantly (stale-while-revalidate)
+    const cached = window.PECache?.get('deal-' + dealId);
+    if (cached) {
+        state.dealData = cached;
+        populateDealPage(cached);
+        console.log('[Deal] Rendered from cache, refreshing in background...');
+    }
 
-        const deal = await response.json();
+    try {
+        // Fire all requests in parallel — don't wait for deal data before starting financials/chat
+        const [dealResponse, financialsResult, chatResult] = await Promise.allSettled([
+            PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}`),
+            typeof loadFinancials === 'function' ? loadFinancials(dealId) : Promise.resolve(),
+            typeof loadChatHistory === 'function' ? loadChatHistory() : Promise.resolve(),
+        ]);
+
+        // Process deal data
+        if (dealResponse.status === 'rejected' || !dealResponse.value?.ok) {
+            throw new Error('Deal not found');
+        }
+        const deal = await dealResponse.value.json();
+
+        // Cache for next visit (2 min TTL)
+        if (window.PECache) PECache.set('deal-' + dealId, deal, 120000);
         state.dealData = deal;
         state.contextDocuments = deal.documents?.map(d => d.name) || [];
         state.attachedFiles = deal.documents?.map((d, i) => ({
@@ -165,12 +184,7 @@ async function loadDealData() {
 
         populateDealPage(deal);
 
-        // Load financial statements (non-blocking)
-        if (typeof loadFinancials === 'function') {
-            loadFinancials(dealId);
-        }
-
-        // Load AI financial analysis (non-blocking)
+        // Load AI financial analysis (needs deal data context, fires after deal loads)
         if (typeof loadAnalysis === 'function') {
             loadAnalysis(dealId);
         }
@@ -226,22 +240,17 @@ function populateDealPage(deal) {
     console.log('[Deal] Analyst:', analyst?.user?.name);
 
     const leadPartnerName = document.getElementById('lead-partner-name');
-    const leadPartnerDot = document.querySelector('#lead-partner-container .rounded-full');
     if (leadPartnerName) {
         const leadName = leadPartner?.user?.name || deal.assignedUser?.name || null;
         leadPartnerName.textContent = leadName || 'Not assigned';
-        leadPartnerName.className = leadName ? 'text-sm text-text-main font-bold' : 'text-sm text-text-muted font-medium italic';
-        if (leadPartnerDot) leadPartnerDot.style.display = leadName ? '' : 'none';
+        leadPartnerName.className = leadName ? 'text-[13px] text-text-main font-semibold' : 'text-[13px] text-text-muted font-normal italic';
     }
 
     const analystName = document.getElementById('analyst-name');
-    const analystDot = document.querySelector('#analyst-container .rounded-full');
     if (analystName) {
-        // Fallback: if no MEMBER role, use deal creator as analyst
         const aName = analyst?.user?.name || deal.assignedUser?.name || null;
         analystName.textContent = aName || 'Not assigned';
-        analystName.className = aName ? 'text-sm text-text-main font-bold' : 'text-sm text-text-muted font-medium italic';
-        if (analystDot) analystDot.style.display = aName ? '' : 'none';
+        analystName.className = aName ? 'text-[13px] text-text-main font-semibold' : 'text-[13px] text-text-muted font-normal italic';
     }
 
     // Update AI Thesis in chat intro
@@ -267,6 +276,23 @@ function populateDealPage(deal) {
 
     // Render team avatars in header
     renderTeamAvatars(deal.teamMembers || []);
+
+    // Show recently active team members
+    const viewersEl = document.getElementById('deal-viewers');
+    if (viewersEl && teamMembers.length > 0) {
+        const colors = ['#003366', '#059669', '#D97706', '#7C3AED', '#DC2626'];
+        const avatars = teamMembers.slice(0, 3).map((m, i) => {
+            const name = m.user?.name || 'User';
+            const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
+            return `<div class="size-5 rounded-full flex items-center justify-center text-white text-[8px] font-bold border-2 border-white shadow-sm" style="background:${colors[i % colors.length]};margin-left:${i > 0 ? '-4px' : '0'}" title="${name}">${initials}</div>`;
+        }).join('');
+        const names = teamMembers.slice(0, 2).map(m => (m.user?.name || 'User').split(' ')[0]).join(', ');
+        const extra = teamMembers.length > 2 ? ` +${teamMembers.length - 2}` : '';
+        viewersEl.innerHTML = `
+            <div class="flex items-center">${avatars}</div>
+            <span class="text-[11px] text-text-muted font-medium">${names}${extra} on this deal</span>
+        `;
+    }
 }
 
 // ============================================================
@@ -298,7 +324,8 @@ function initializeFeatures() {
     initStagePipeline();
     initActivityFeed();
     initCitationButtons();
-    initDocumentPreviews();
+    // Legacy initDocumentPreviews() removed — was showing hardcoded "Project Apex" modal.
+    // Modern .doc-preview-item handlers in updateDocumentsList() handle previews correctly.
     initAIResponseActions();
     initContextSettings();
     initBreadcrumbNavigation();
@@ -401,7 +428,7 @@ function renderDynamicMetrics(deal) {
             key: 'revenue',
             label: 'Revenue (LTM)',
             value: deal.revenue,
-            format: () => formatCurrency(deal.revenue),
+            format: () => formatCurrency(deal.revenue, deal.currency || window.finState?.currency),
             color: 'secondary',
             extra: () => {
                 // Mini bar chart
@@ -431,14 +458,14 @@ function renderDynamicMetrics(deal) {
             key: 'ebitda',
             label: 'EBITDA',
             value: deal.ebitda,
-            format: () => formatCurrency(deal.ebitda),
+            format: () => formatCurrency(deal.ebitda, deal.currency || window.finState?.currency),
             color: 'primary',
         },
         {
             key: 'dealSize',
             label: 'Deal Size',
             value: deal.dealSize,
-            format: () => formatCurrency(deal.dealSize),
+            format: () => formatCurrency(deal.dealSize, deal.currency || window.finState?.currency),
             color: 'purple-500',
             extra: () => {
                 if (deal.dealSize && deal.ebitda) {
@@ -521,14 +548,36 @@ function renderDynamicMetrics(deal) {
         return `
             <div class="glass-panel p-4 rounded-xl relative overflow-hidden group">
                 <div class="absolute -right-4 -top-4 size-20 bg-${m.color}/5 rounded-full blur-xl group-hover:bg-${m.color}/10 transition-all"></div>
-                <p class="text-[11px] text-text-muted font-bold uppercase tracking-wide">${m.label}</p>
-                <div class="flex items-center gap-2 mt-3">
-                    <span class="text-2xl font-bold text-text-main leading-none">${m.format()}</span>
+                <p class="text-[10px] text-text-muted font-semibold uppercase tracking-wider">${m.label}</p>
+                <div class="flex items-baseline gap-2 mt-2">
+                    <span class="text-xl font-bold text-text-main leading-none tabular-nums">${m.format()}</span>
                     ${badgeHtml}
                 </div>
                 ${extraHtml}
             </div>`;
     }).join('');
 }
+
+// ============================================================
+// Hash-scroll — when arriving with #section in URL, wait for
+// dynamically rendered element then scroll to it smoothly.
+// Used by the onboarding checklist (e.g. #financials-section).
+// ============================================================
+(function scrollToHashWhenReady() {
+    const hash = window.location.hash?.slice(1);
+    if (!hash) return;
+
+    let attempts = 0;
+    const maxAttempts = 40; // ~8 seconds
+    const interval = setInterval(() => {
+        const el = document.getElementById(hash);
+        if (el) {
+            clearInterval(interval);
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else if (++attempts >= maxAttempts) {
+            clearInterval(interval);
+        }
+    }, 200);
+})();
 
 console.log('PE OS Deal Intelligence page fully initialized');

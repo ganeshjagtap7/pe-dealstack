@@ -94,6 +94,12 @@ export async function verifyNode(
   const steps: AgentStep[] = [];
   const { statements, rawText } = state;
 
+  // Skip if flag is set (serverless timeout optimization)
+  if (state.skipVerify) {
+    steps.push(step('verify', 'Skipping verification (fast mode)'));
+    return { steps };
+  }
+
   // Skip if no statements or no source text to verify against
   if (!statements || statements.length === 0 || !rawText) {
     steps.push(step('verify', 'Skipping verification — no statements or source text'));

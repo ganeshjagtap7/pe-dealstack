@@ -169,13 +169,68 @@ const WIDGET_CONFIG = {
     'document-alerts': {
         name: 'Document Alerts',
         description: 'Documents pending review or expiring soon',
-        icon: 'folder_alert',
+        icon: 'report',
         defaultVisible: false,
         category: 'documents'
     }
 };
 
 const WIDGET_STORAGE_KEY = 'pe-dashboard-widgets';
+
+// ============================================================
+// Widget Layout Order — separate concern from visibility
+// ============================================================
+const WIDGET_ORDER_KEY = 'pe-dashboard-widget-order';
+
+function getWidgetOrder() {
+    try {
+        const stored = localStorage.getItem(WIDGET_ORDER_KEY);
+        return stored ? JSON.parse(stored) : null;
+    } catch (e) {
+        console.warn('Error reading widget order:', e);
+        return null;
+    }
+}
+
+function saveWidgetOrder(orderArray) {
+    try {
+        localStorage.setItem(WIDGET_ORDER_KEY, JSON.stringify(orderArray));
+    } catch (e) {
+        console.warn('Error saving widget order:', e);
+    }
+}
+
+/**
+ * Re-order DOM children to match the saved order. Widgets are grouped by their
+ * parent container and re-appended in the saved order WITHIN that container.
+ * Widgets not in the saved order keep their HTML position (so newly added
+ * widgets land at the bottom). Safe to call multiple times.
+ */
+function applyWidgetOrder() {
+    const order = getWidgetOrder();
+    if (!order || !Array.isArray(order) || order.length === 0) return;
+
+    // Group saved widgets by their parent container
+    const groupedByParent = new Map();
+    order.forEach(widgetId => {
+        const el = document.querySelector(`[data-widget="${widgetId}"]`);
+        if (!el || !el.parentNode) return;
+        const parent = el.parentNode;
+        if (!groupedByParent.has(parent)) groupedByParent.set(parent, []);
+        groupedByParent.get(parent).push(el);
+    });
+
+    // For each parent, re-append children in the saved order. Appending an
+    // existing child moves it; widgets not in the order array stay put.
+    groupedByParent.forEach((children, parent) => {
+        children.forEach(el => parent.appendChild(el));
+    });
+}
+
+// Expose for layout-editor.js to call
+window.saveWidgetOrder = saveWidgetOrder;
+window.getWidgetOrder = getWidgetOrder;
+window.applyWidgetOrder = applyWidgetOrder;
 
 function getWidgetPreferences() {
     try {
@@ -341,12 +396,21 @@ function saveWidgetSelection() {
     saveWidgetPreferences(prefs);
     applyWidgetPreferences();
     closeWidgetModal();
+
+    // Initialize any widgets the user just enabled. The registry tracks which
+    // widgets have already been initialized, so already-rendered widgets are
+    // skipped — only newly-visible widgets fetch data.
+    if (window.WidgetRegistry) {
+        WidgetRegistry.initAll();
+    }
+
     showNotification('Dashboard Updated', 'Your widget preferences have been saved.', 'success');
 }
 
 function initWidgetManagement() {
-    // Apply saved preferences
+    // Apply saved preferences (visibility) THEN saved order
     applyWidgetPreferences();
+    applyWidgetOrder();
 
     // Setup remove buttons
     document.querySelectorAll('.widget-remove-btn').forEach(btn => {
@@ -365,10 +429,14 @@ function initWidgetManagement() {
         addBtn.addEventListener('click', openWidgetModal);
     }
 
-    // Setup customize dashboard button
+    // Setup customize dashboard button — toggles drag-and-drop layout editor
     const settingsBtn = document.getElementById('widget-settings-btn');
     if (settingsBtn) {
-        settingsBtn.addEventListener('click', openWidgetModal);
+        settingsBtn.addEventListener('click', () => {
+            if (window.LayoutEditor) {
+                window.LayoutEditor.toggle();
+            }
+        });
     }
 
     // Setup modal close buttons

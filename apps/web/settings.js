@@ -45,6 +45,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         initializeEventListeners();
         initializeSlider();
         initializeMFA();
+        initFirmProfileSection();
     } catch (err) {
         console.error('Initialization error:', err);
     }
@@ -404,6 +405,101 @@ function markChanged() {
 // Functions below are provided by js/settingsProfile.js:
 // renderNotificationToggles, initPasswordForm, handleAvatarUpload,
 // saveProfile, showToast
+
+// ─── Firm Profile Section ────────────────────────────
+async function initFirmProfileSection() {
+  const container = document.getElementById('firm-profile-content');
+  if (!container) return;
+
+  try {
+    const resp = await PEAuth.authFetch(`${API_BASE_URL}/users/me`);
+    if (!resp.ok) return;
+    const user = await resp.json();
+    const orgSettings = user?.organization?.settings || {};
+    const firmProfile = orgSettings.firmProfile || null;
+
+    if (firmProfile) {
+      renderFirmProfile(container, firmProfile);
+    } else {
+      container.innerHTML = '<p class="text-sm text-text-muted">No firm profile yet. Click "Refresh profile" to generate one using AI research.</p>';
+    }
+  } catch {
+    container.innerHTML = '<p class="text-sm text-text-muted">Could not load firm profile.</p>';
+  }
+}
+
+function renderFirmProfile(container, profile) {
+  const fields = [
+    { label: 'Firm Name', value: profile.firmName },
+    { label: 'Description', value: profile.description },
+    { label: 'Headquarters', value: profile.headquarters },
+    { label: 'Founded', value: profile.founded },
+    { label: 'AUM', value: profile.aum },
+    { label: 'Investment Focus', value: Array.isArray(profile.investmentFocus) ? profile.investmentFocus.join(', ') : profile.investmentFocus },
+    { label: 'Sector Focus', value: Array.isArray(profile.sectorFocus) ? profile.sectorFocus.join(', ') : profile.sectorFocus },
+    { label: 'Deal Size', value: profile.dealSize },
+    { label: 'Notable Deals', value: Array.isArray(profile.notableDeals) ? profile.notableDeals.join(', ') : profile.notableDeals },
+    { label: 'Team Size', value: profile.teamSize },
+    { label: 'Website', value: profile.website },
+  ].filter(f => f.value);
+
+  if (fields.length === 0) {
+    container.innerHTML = '<p class="text-sm text-text-muted">No firm profile data available. Click "Refresh profile" to generate one.</p>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      ${fields.map(f => `
+        <div>
+          <p class="text-xs font-bold text-text-secondary uppercase tracking-wider mb-1">${escapeHtml(f.label)}</p>
+          <p class="text-sm text-text-main">${escapeHtml(String(f.value))}</p>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
+async function refreshFirmProfile() {
+  const statusEl = document.getElementById('firm-refresh-status');
+  const btn = document.getElementById('firm-refresh-btn');
+  if (!statusEl || !btn) return;
+
+  btn.disabled = true;
+  statusEl.innerHTML = '<div class="flex items-center gap-2 text-sm text-primary"><div class="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>Researching your firm (15-25 seconds)...</div>';
+
+  try {
+    // Get current org website + linkedin from settings
+    const meResp = await PEAuth.authFetch(`${API_BASE_URL}/users/me`);
+    const me = await meResp.json();
+    const orgSettings = me?.organization?.settings || {};
+
+    const resp = await PEAuth.authFetch(`${API_BASE_URL}/onboarding/enrich-firm`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        websiteUrl: orgSettings.firmWebsite || me?.organization?.website || '',
+        linkedinUrl: orgSettings.firmLinkedin || '',
+      }),
+    });
+
+    const result = await resp.json();
+
+    if (result.success) {
+      statusEl.innerHTML = '<div class="text-sm text-green-600 flex items-center gap-2"><span class="material-symbols-outlined" style="font-size:16px;font-variation-settings:\'FILL\' 1">check_circle</span>Profile refreshed successfully</div>';
+      // Reload the page section to show updated data
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      statusEl.innerHTML = `<div class="text-sm text-red-500">${escapeHtml(result.error || 'Refresh failed. Try again.')}</div>`;
+    }
+  } catch {
+    statusEl.innerHTML = '<div class="text-sm text-red-500">Refresh failed. Try again.</div>';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+window.refreshFirmProfile = refreshFirmProfile;
 
 // ─── MFA / Two-Factor Authentication ───────────────────────
 

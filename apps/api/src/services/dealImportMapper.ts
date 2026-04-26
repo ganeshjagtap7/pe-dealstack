@@ -1,7 +1,5 @@
 import { parse } from 'csv-parse/sync';
 import XLSX from 'xlsx';
-import { getChatModel } from './llm.js';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 
 // ============================================
@@ -118,8 +116,8 @@ Given CSV/spreadsheet column headers and sample data rows, map each column to th
 - stage: Pipeline stage. Must be one of: INITIAL_REVIEW, DUE_DILIGENCE, IOI_SUBMITTED, LOI_SUBMITTED, NEGOTIATION, CLOSING, PASSED, CLOSED_WON, CLOSED_LOST
 - status: ACTIVE, PROCESSING, PASSED, ARCHIVED
 - dealSize: Total deal/enterprise value in USD (store as raw number — NOT in millions)
-- ebitda: EBITDA in USD (raw number)
-- revenue: Revenue in USD (raw number)
+- ebitda: EBITDA in USD (raw number). Only map columns explicitly labeled "EBITDA". Do NOT map ARR, MRR, Revenue, or Sales to ebitda.
+- revenue: Revenue in USD (raw number). Map ARR (Annual Recurring Revenue), MRR (Monthly Recurring Revenue), Sales, Turnover, and similar top-line metrics here — NOT to ebitda.
 - irrProjected: Projected IRR as decimal (e.g., 0.25 for 25%)
 - mom: Multiple on Money as decimal (e.g., 2.5)
 - industry: Industry sector (free text)
@@ -167,7 +165,9 @@ export async function analyzeImportData(
   const headers = Object.keys(rows[0]);
   const sampleRows = rows.slice(0, 3);
 
-  // Call AI for mapping
+  // Call GPT-4o for mapping (dynamic import to avoid pulling LangChain into lite bundle)
+  const { getChatModel } = await import('./llm.js');
+  const { HumanMessage, SystemMessage } = await import('@langchain/core/messages');
   const model = getChatModel(0.1, 2000);
   const userPrompt = `Column headers: ${JSON.stringify(headers)}
 
@@ -190,6 +190,35 @@ Map each column to our Deal schema. Return JSON only.`;
   } catch (err) {
     log.error('Failed to parse AI mapping response', err);
     throw new Error('AI mapping failed. Please try again.');
+  }
+
+  // Deterministic overrides — force-correct known column names the AI might mismap
+  for (const header of headers) {
+    const h = header.toLowerCase().trim();
+    const mapping = aiResult.mapping[header];
+    if (!mapping) continue;
+
+    // ARR / MRR / Sales / Turnover → always revenue, never ebitda
+    if (/\b(arr|annual recurring revenue|mrr|monthly recurring revenue|sales|turnover)\b/i.test(h)) {
+      if (mapping.field === 'ebitda' || mapping.field === 'dealSize') {
+        mapping.field = 'revenue';
+        mapping.confidence = 0.95;
+        aiResult.warnings = aiResult.warnings || [];
+        aiResult.warnings.push(`"${header}" mapped to Revenue (detected as recurring/sales metric)`);
+      }
+    }
+
+    // EV / Enterprise Value → always dealSize, never ebitda/revenue
+    if (/\b(enterprise value|ev)\b/i.test(h) && mapping.field !== 'dealSize') {
+      mapping.field = 'dealSize';
+      mapping.confidence = 0.95;
+    }
+
+    // MOIC → always mom
+    if (/\b(moic|multiple on invested capital)\b/i.test(h) && mapping.field !== 'mom') {
+      mapping.field = 'mom';
+      mapping.confidence = 0.95;
+    }
   }
 
   // Apply mapping to generate preview (first 10 rows)

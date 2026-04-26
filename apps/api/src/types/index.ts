@@ -78,6 +78,7 @@ export interface Deal {
   tags: string[] | null;
   targetCloseDate: string | null;
   source: string | null;
+  currency: string;
   extractionConfidence: number | null;
   needsReview: boolean;
   reviewReasons: string[] | null;

@@ -113,15 +113,53 @@ async function signOut() {
   return { error };
 }
 
+// Session cache — avoids redundant Supabase API calls within same page
+let _cachedSession = null;
+let _cachedUser = null;
+let _sessionFetchPromise = null;
+
 /**
- * Get the current authenticated user
+ * Get the current session (cached within page lifecycle)
+ * Only makes one Supabase call per page load
+ */
+async function getSession() {
+  if (_cachedSession) return { session: _cachedSession };
+
+  // Deduplicate concurrent calls (e.g., checkAuth + authFetch racing)
+  if (_sessionFetchPromise) return _sessionFetchPromise;
+
+  _sessionFetchPromise = (async () => {
+    try {
+      const client = await initSupabase();
+      const { data: { session } } = await client.auth.getSession();
+      _cachedSession = session;
+      return { session };
+    } catch (err) {
+      console.error('Get session error:', err);
+      return { session: null };
+    } finally {
+      _sessionFetchPromise = null;
+    }
+  })();
+
+  return _sessionFetchPromise;
+}
+
+/**
+ * Get the current authenticated user (uses cached session)
  */
 async function getUser() {
+  if (_cachedUser && _cachedSession) {
+    return { user: _cachedUser, session: _cachedSession };
+  }
+
   try {
-    const client = await initSupabase();
-    const { data: { user } } = await client.auth.getUser();
-    const { data: { session } } = await client.auth.getSession();
-    return { user, session };
+    const { session } = await getSession();
+    if (session) {
+      _cachedUser = session.user;
+      return { user: session.user, session };
+    }
+    return { user: null, session: null };
   } catch (err) {
     console.error('Get user error:', err);
     return { user: null, session: null };
@@ -129,21 +167,7 @@ async function getUser() {
 }
 
 /**
- * Get the current session
- */
-async function getSession() {
-  try {
-    const client = await initSupabase();
-    const { data: { session } } = await client.auth.getSession();
-    return { session };
-  } catch (err) {
-    console.error('Get session error:', err);
-    return { session: null };
-  }
-}
-
-/**
- * Get the access token for API calls
+ * Get the access token for API calls (uses cached session)
  */
 async function getAccessToken() {
   const { session } = await getSession();
@@ -170,22 +194,6 @@ async function checkAuth(redirectTo = null) {
     return null;
   }
 
-  // Identify user in OpenReplay for session replay filtering
-  if (window.__openReplayTracker) {
-    try {
-      window.__openReplayTracker.setUserID(user.email || user.id);
-      if (user.user_metadata?.full_name) {
-        window.__openReplayTracker.setMetadata('name', user.user_metadata.full_name);
-      }
-      if (user.user_metadata?.firm_name) {
-        window.__openReplayTracker.setMetadata('firm', user.user_metadata.firm_name);
-      }
-      if (user.user_metadata?.role) {
-        window.__openReplayTracker.setMetadata('role', user.user_metadata.role);
-      }
-    } catch (e) { /* OpenReplay not loaded yet, ignore */ }
-  }
-
   return { user, session };
 }
 
@@ -197,8 +205,8 @@ async function checkNotAuth() {
   const { user, session } = await getUser();
 
   if (user && session) {
-    // Get redirect destination or default to CRM
-    const redirect = sessionStorage.getItem('authRedirect') || '/crm.html';
+    // Get redirect destination or default to dashboard (which checks onboarding)
+    const redirect = sessionStorage.getItem('authRedirect') || '/dashboard.html';
     sessionStorage.removeItem('authRedirect');
     window.location.href = redirect;
     return false;

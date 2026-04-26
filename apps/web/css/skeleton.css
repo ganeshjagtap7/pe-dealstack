@@ -1,0 +1,204 @@
+/* ============================================================
+   PE OS — Skeleton Loading Shimmer
+   Reusable skeleton classes for premium loading states.
+   Uses the existing design system colors.
+   ============================================================ */
+
+/* Base shimmer animation */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* Base skeleton element — apply to any div/span */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #F0F0F0 25%,
+    #E0E0E0 37%,
+    #F0F0F0 63%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 0.375rem;
+}
+
+/* Text line — single line of text */
+.skeleton-text {
+  height: 0.875rem;
+  width: 60%;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-text-sm {
+  height: 0.625rem;
+  width: 40%;
+}
+
+.skeleton-text-lg {
+  height: 1.25rem;
+  width: 50%;
+}
+
+/* Heading */
+.skeleton-heading {
+  height: 1.5rem;
+  width: 35%;
+  margin-bottom: 0.5rem;
+}
+
+/* Circle — avatar placeholder */
+.skeleton-circle {
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* Badge — small pill */
+.skeleton-badge {
+  height: 1.25rem;
+  width: 4rem;
+  border-radius: 9999px;
+}
+
+/* Card — full card placeholder */
+.skeleton-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background: #FFFFFF;
+  padding: 1.25rem;
+}
+
+/* Stat card skeleton */
+.skeleton-stat-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background: #FFFFFF;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Table row skeleton */
+.skeleton-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 2fr 1fr;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid #F3F4F6;
+  align-items: center;
+}
+
+/* Widget skeleton */
+.skeleton-widget {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background: #FFFFFF;
+  overflow: hidden;
+}
+
+.skeleton-widget-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skeleton-widget-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Fade out skeleton when data loads */
+.skeleton-fade-out {
+  animation: skeletonFadeOut 0.3s ease-out forwards;
+}
+
+@keyframes skeletonFadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+
+/* ============================================================
+   PE OS — Micro-interactions & Hover Effects
+   Premium polish layer. Applied globally.
+   ============================================================ */
+
+/* ── Button press feedback ──────────────────────────── */
+button:active:not(:disabled),
+a.nav-item:active,
+[role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* ── Card hover lift ────────────────────────────────── */
+.contact-card article,
+.widget-container,
+[data-deal-id] > a > article {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s ease,
+              border-color 0.2s ease;
+}
+
+.contact-card article:hover,
+[data-deal-id] > a > article:hover {
+  transform: translateY(-2px);
+}
+
+/* ── Dropdown menus — slide in ──────────────────────── */
+[id$="-dropdown"]:not(.hidden),
+[id$="-menu"]:not(.hidden) {
+  animation: menuSlideIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes menuSlideIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Sidebar nav items — smooth icon color ──────────── */
+.nav-item {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-item .material-symbols-outlined {
+  transition: color 0.15s ease;
+}
+
+/* ── Badge pulse on new items ───────────────────────── */
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+#notification-dot:not(.hidden) {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* ── Focus ring — accessible keyboard focus ─────────── */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #003366;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ── Hide scrollbars globally — scroll still works ── */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+.custom-scrollbar {
+  scroll-behavior: smooth;
+}

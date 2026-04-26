@@ -4,42 +4,12 @@
     <meta charset="utf-8"/>
     <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
     <title>Template Manager - PE OS</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#003366",
-                        "primary-hover": "#002855",
-                        "primary-light": "#E6EEF5",
-                        "secondary": "#059669",
-                        "secondary-light": "#D1FAE5",
-                        "background-body": "#F8F9FA",
-                        "surface-card": "#FFFFFF",
-                        "border-subtle": "#E5E7EB",
-                        "border-focus": "#CBD5E1",
-                        "text-main": "#111827",
-                        "text-secondary": "#4B5563",
-                        "text-muted": "#9CA3AF",
-                        "accent-warning": "#F59E0B",
-                        "accent-danger": "#EF4444",
-                    },
-                    fontFamily: {
-                        "sans": ["Inter", "sans-serif"],
-                    },
-                    boxShadow: {
-                        "card": "0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05)",
-                        "card-hover": "0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05)",
-                        "float": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
-                    }
-                },
-            },
-        }
-    </script>
-    <style>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL@20..48,100..700,0..1&display=swap" />
+<style>
         body {
             font-family: 'Inter', sans-serif;
             font-feature-settings: "cv11", "ss01";
@@ -73,6 +43,7 @@
             overflow: hidden;
         }
     </style>
+    <link rel="stylesheet" href="/css/app.css" />
 </head>
 <body class="bg-background-body text-text-main overflow-hidden h-screen">
     <div class="flex h-full">
@@ -325,12 +296,14 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/config.js"></script>
-    <script src="js/formatters.js"></script>
-    <script src="js/notifications.js"></script>
-    <script src="js/layoutComponents.js"></script>
-    <script src="js/layout.js"></script>
-    <script src="js/inviteModal-template.js"></script>
-    <script src="js/inviteModal.js"></script>
+    <script defer src="js/formatters.js"></script>
+    <script defer src="js/notifications.js"></script>
+    <script defer src="js/layoutComponents.js"></script>
+    <script defer src="js/layout.js"></script>
+    <script defer src="js/commandPalette.js"></script>
+    <script defer src="js/aiAssistant.js"></script>
+    <script defer src="js/inviteModal-template.js"></script>
+    <script defer src="js/inviteModal.js"></script>
     <script>
         // Initialize PE OS Layout
         document.addEventListener('DOMContentLoaded', async function() {
@@ -342,9 +315,9 @@
             PELayout.init('templates', { collapsible: true });
         });
     </script>
-    <script src="js/templates-api.js"></script>
-    <script src="js/templates-sections.js"></script>
-    <script src="js/templates-editor.js"></script>
-    <script src="templates.js"></script>
+    <script defer src="js/templates-api.js"></script>
+    <script defer src="js/templates-sections.js"></script>
+    <script defer src="js/templates-editor.js"></script>
+    <script defer src="templates.js"></script>
 </body>
 </html>

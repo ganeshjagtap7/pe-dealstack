@@ -26,6 +26,56 @@ export interface GeneratedSection {
   sortOrder?: number;
 }
 
+// ─── Rate-limit helpers ──────────────────────────────────────────────────────
+
+const BATCH_SIZE = 3; // Max concurrent LLM calls to avoid 429s
+const BATCH_DELAY_MS = 2000; // Pause between batches
+const MAX_RETRIES = 2;
+const RETRY_DELAY_MS = 5000; // Wait before retrying a 429
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Post-process AI output to ensure proper HTML structure.
+ * Catches cases where GPT returns a wall of text without tags.
+ */
+function ensureHtmlFormatting(html: string): string {
+  if (!html || html.trim().length === 0) return html;
+
+  // If content already has <h3> or <p> tags, it's likely well-formatted
+  if (/<h3[\s>]/i.test(html) && /<p[\s>]/i.test(html)) return html;
+
+  // If content has no HTML block tags at all, wrap paragraphs
+  if (!/<(?:p|h[1-6]|ul|ol|li|div|table|section)[\s>]/i.test(html)) {
+    // Split on double newlines or bold markers that look like sub-headings
+    const lines = html.split(/\n{2,}/);
+    return lines
+      .map((block) => {
+        const trimmed = block.trim();
+        if (!trimmed) return '';
+        // Detect bold sub-heading patterns like "**Valuation**:" or "Valuation:"
+        const headingMatch = trimmed.match(/^\*\*(.+?)\*\*[:\s]/);
+        if (headingMatch) {
+          const heading = headingMatch[1];
+          const rest = trimmed.slice(headingMatch[0].length).trim();
+          return `<h3>${heading}</h3>\n<p>${rest}</p>`;
+        }
+        return `<p>${trimmed}</p>`;
+      })
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  // If it has some tags but no <p> wrapping, wrap loose text nodes
+  if (!/<p[\s>]/i.test(html)) {
+    return html.replace(/(?:^|\n)([^<\n][^\n]*)/g, '\n<p>$1</p>');
+  }
+
+  return html;
+}
+
 // ─── Placeholder helpers ──────────────────────────────────────────────────────
 
 const FINANCIAL_PLACEHOLDER =
@@ -55,6 +105,7 @@ export async function generateSection(
   context: MemoContext,
   customPrompt?: string,
   sortOrder?: number,
+  retryCount?: number,
 ): Promise<GeneratedSection> {
   const promptConfig = SECTION_PROMPTS[sectionType];
 
@@ -125,7 +176,7 @@ export async function generateSection(
     return {
       type: sectionType,
       title,
-      content,
+      content: ensureHtmlFormatting(content),
       ...(tableData !== undefined ? { tableData } : {}),
       ...(chartConfig !== undefined ? { chartConfig } : {}),
       aiGenerated: true,
@@ -133,6 +184,14 @@ export async function generateSection(
       ...(sortOrder !== undefined ? { sortOrder } : {}),
     };
   } catch (err: any) {
+    // Retry on 429 rate limit errors
+    const is429 = err?.message?.includes('429') || err?.message?.includes('Rate limit');
+    if (is429 && (retryCount ?? 0) < MAX_RETRIES) {
+      const attempt = (retryCount ?? 0) + 1;
+      log.warn(`[memoAgent/pipeline] Rate limited on ${sectionType}, retrying (${attempt}/${MAX_RETRIES}) after ${RETRY_DELAY_MS}ms`);
+      await sleep(RETRY_DELAY_MS * attempt);
+      return generateSection(sectionType, context, customPrompt, sortOrder, attempt);
+    }
     log.error(`[memoAgent/pipeline] Error generating section ${sectionType}: ${err?.message}`);
     return makePlaceholder(
       sectionType,
@@ -160,13 +219,26 @@ export async function generateAllSections(
   log.info(`[memoAgent/pipeline] Building memo context for deal ${dealId}`);
   const context = await buildMemoContext(dealId, orgId);
 
-  log.info(`[memoAgent/pipeline] Generating ${types.length} sections in parallel`);
+  log.info(`[memoAgent/pipeline] Generating ${types.length} sections in batches of ${BATCH_SIZE}`);
 
-  const sections = await Promise.all(
-    types.map((sectionType, index) =>
-      generateSection(sectionType, context, undefined, index + 1),
-    ),
-  );
+  const sections: GeneratedSection[] = [];
+
+  // Process in batches to avoid 429 rate limits
+  for (let i = 0; i < types.length; i += BATCH_SIZE) {
+    const batch = types.slice(i, i + BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map((sectionType, batchIndex) =>
+        generateSection(sectionType, context, undefined, i + batchIndex + 1),
+      ),
+    );
+    sections.push(...batchResults);
+
+    // Pause between batches (skip after the last batch)
+    if (i + BATCH_SIZE < types.length) {
+      log.debug(`[memoAgent/pipeline] Batch ${Math.floor(i / BATCH_SIZE) + 1} complete, pausing ${BATCH_DELAY_MS}ms`);
+      await sleep(BATCH_DELAY_MS);
+    }
+  }
 
   const generated = sections.filter((s) => s.aiGenerated).length;
   const failed = sections.filter((s) => s.aiModel === 'error').length;

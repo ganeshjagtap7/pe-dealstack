@@ -39,17 +39,21 @@ Your task: find ALL financial statements in the document text and return them as
 
 RULES:
 1. Extract EVERY year/period column you find — do not skip any
-2. Normalize ALL values to MILLIONS USD (see conversion below)
-3. Label each period: HISTORICAL (past actuals), PROJECTED (forecasts/estimates), or LTM (last twelve months)
-4. Projected periods are identified by: "E", "F", "Est", "Forecast", "Budget", "Proj" suffix, or future years
-5. If a value is not present, use null — never guess
-6. confidence: 90-100 = explicitly stated, 70-89 = clearly implied, 50-69 = partially inferred, 0-49 = uncertain
+2. Normalize ALL values to MILLIONS in the ORIGINAL currency of the document (see conversion below)
+3. Detect the currency from the document (look for symbols like $, ₹, €, £, ¥, or text like USD, INR, EUR, GBP, JPY, etc.)
+4. Set the "currency" field to the ISO 4217 code (e.g. "USD", "INR", "EUR", "GBP", "JPY"). If no currency is detected, default to "USD"
+5. Label each period: HISTORICAL (past actuals), PROJECTED (forecasts/estimates), or LTM (last twelve months)
+6. Projected periods are identified by: "E", "F", "Est", "Forecast", "Budget", "Proj" suffix, or future years
+7. If a value is not present, use null — never guess
+8. confidence: 90-100 = explicitly stated, 70-89 = clearly implied, 50-69 = partially inferred, 0-49 = uncertain
 
-UNIT CONVERSION (always convert to millions USD):
-- "$50M" or "50,000" (when header says $000s) → 50
-- "$1.5B" or "1,500,000" (when header says $000s) → 1500
-- "$500K" or "500" (when header says $000s) → 0.5
-- "$38,200" (raw dollars) → 0.0382
+UNIT CONVERSION (always convert to millions in the original currency — do NOT convert between currencies):
+- "50M" or "50,000" (when header says 000s) → 50
+- "1.5B" or "1,500,000" (when header says 000s) → 1500
+- "500K" or "500" (when header says 000s) → 0.5
+- "38,200" (raw units) → 0.0382
+- "₹50 Cr" (crore = 10M) → 500
+- "₹50 Lakh" (lakh = 0.1M) → 5
 - If units are unclear, pick the most likely based on company size context
 
 INCOME STATEMENT line item keys (use exactly these keys):

@@ -136,88 +136,134 @@ router.post('/', async (req: Request, res: Response) => {
       errors: [] as Array<{ row: number; reason: string }>,
     };
 
-    // Cache company lookups to avoid repeated queries
-    const companyCache = new Map<string, string>(); // companyName -> companyId
+    // ---- Phase 1: Pre-fetch all existing deal names (case-insensitive) ----
+    // Supabase returns max 1000 rows by default — paginate to get all
+    const existingDealNames = new Set<string>();
+    let dealOffset = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+      const { data: dealPage } = await supabase
+        .from('Deal')
+        .select('name')
+        .eq('organizationId', orgId)
+        .range(dealOffset, dealOffset + PAGE_SIZE - 1);
+
+      if (!dealPage || dealPage.length === 0) break;
+      for (const d of dealPage) {
+        existingDealNames.add(d.name.toLowerCase().trim());
+      }
+      if (dealPage.length < PAGE_SIZE) break;
+      dealOffset += PAGE_SIZE;
+    }
+
+    // ---- Phase 2: Pre-fetch all existing companies ----
+    const { data: existingCompanies } = await supabase
+      .from('Company')
+      .select('id, name')
+      .eq('organizationId', orgId)
+      .limit(5000);
+
+    const companyCache = new Map<string, string>();
+    for (const c of existingCompanies || []) {
+      companyCache.set(c.name.toLowerCase().trim(), c.id);
+    }
+
+    // ---- Phase 3: Validate all rows + detect duplicates upfront ----
+    const validatedDeals: Array<{ index: number; deal: z.infer<typeof importDealSchema> }> = [];
 
     for (let i = 0; i < deals.length; i++) {
-      try {
-        // Validate the row
-        const rowValidation = validateDealRow(deals[i], i);
-        if (!rowValidation.valid) {
-          results.failed++;
-          results.errors.push({ row: i + 1, reason: rowValidation.errors.join('; ') });
-          continue;
-        }
+      const rowValidation = validateDealRow(deals[i], i);
+      if (!rowValidation.valid) {
+        results.failed++;
+        results.errors.push({ row: i + 1, reason: rowValidation.errors.join('; ') });
+        continue;
+      }
 
-        // Parse through Zod (lenient — fills defaults)
-        const parsed = importDealSchema.safeParse(deals[i]);
-        if (!parsed.success) {
-          results.failed++;
-          results.errors.push({
-            row: i + 1,
-            reason: parsed.error.errors.map(e => e.message).join('; '),
-          });
-          continue;
-        }
+      const parsed = importDealSchema.safeParse(deals[i]);
+      if (!parsed.success) {
+        results.failed++;
+        results.errors.push({ row: i + 1, reason: parsed.error.errors.map(e => e.message).join('; ') });
+        continue;
+      }
 
-        const deal = parsed.data;
+      const deal = parsed.data;
+      const nameKey = deal.name.toLowerCase().trim();
 
-        // Resolve or create company
-        let companyId = companyCache.get(deal.companyName.toLowerCase());
-        if (!companyId) {
-          // Check if company exists in this org
-          const { data: existing } = await supabase
-            .from('Company')
-            .select('id')
-            .eq('organizationId', orgId)
-            .ilike('name', deal.companyName)
-            .limit(1)
-            .single();
+      // Check against existing deals in DB (case-insensitive)
+      if (existingDealNames.has(nameKey)) {
+        results.failed++;
+        results.errors.push({ row: i + 1, reason: `Duplicate deal name: "${deal.name}" already exists` });
+        continue;
+      }
 
-          if (existing) {
-            companyId = existing.id;
-          } else {
-            // Create new company
-            const { data: newCompany, error: companyError } = await supabase
-              .from('Company')
-              .insert({
-                name: deal.companyName,
-                industry: deal.industry || null,
-                organizationId: orgId,
-              })
-              .select('id')
-              .single();
+      // Check against deals earlier in THIS import batch (prevent intra-file duplicates)
+      if (validatedDeals.some(vd => vd.deal.name.toLowerCase().trim() === nameKey)) {
+        results.failed++;
+        results.errors.push({ row: i + 1, reason: `Duplicate deal name within import: "${deal.name}"` });
+        continue;
+      }
 
-            if (companyError) {
-              results.failed++;
-              results.errors.push({ row: i + 1, reason: `Failed to create company: ${companyError.message}` });
-              continue;
-            }
-            companyId = newCompany.id;
+      validatedDeals.push({ index: i, deal });
+    }
+
+    // ---- Phase 4: Create missing companies in batch ----
+    // Use Map keyed by lowercase to deduplicate case variants (e.g., "Acme Corp" vs "acme corp")
+    const newCompanyMap = new Map<string, string>(); // lowercase → original name (first occurrence wins)
+    for (const { deal } of validatedDeals) {
+      const key = deal.companyName.toLowerCase().trim();
+      if (!companyCache.has(key) && !newCompanyMap.has(key)) {
+        newCompanyMap.set(key, deal.companyName);
+      }
+    }
+
+    if (newCompanyMap.size > 0) {
+      // Batch-insert new companies (groups of 50)
+      const companyBatches = Array.from(newCompanyMap.values());
+      for (let b = 0; b < companyBatches.length; b += 50) {
+        const batch = companyBatches.slice(b, b + 50).map(name => {
+          // Find a deal with this company to get the industry
+          const matchingDeal = validatedDeals.find(
+            vd => vd.deal.companyName.toLowerCase().trim() === name.toLowerCase().trim()
+          );
+          return {
+            name,
+            industry: matchingDeal?.deal.industry || null,
+            organizationId: orgId,
+          };
+        });
+
+        const { data: created, error: companyErr } = await supabase
+          .from('Company')
+          .insert(batch)
+          .select('id, name');
+
+        if (companyErr) {
+          log.error('Batch company create error', companyErr);
+        } else if (created) {
+          for (const c of created) {
+            companyCache.set(c.name.toLowerCase().trim(), c.id);
             results.companiesCreated++;
           }
-          companyCache.set(deal.companyName.toLowerCase(), companyId!);
         }
+      }
+    }
 
-        // Check for duplicate deal name in org
-        const { data: existingDeal } = await supabase
-          .from('Deal')
-          .select('id')
-          .eq('organizationId', orgId)
-          .eq('name', deal.name)
-          .limit(1)
-          .single();
+    // ---- Phase 5: Batch-insert deals (groups of 50) ----
+    for (let b = 0; b < validatedDeals.length; b += 50) {
+      const batch = validatedDeals.slice(b, b + 50);
+      const dealRows: Array<{ rowIndex: number; data: Record<string, any> }> = [];
 
-        if (existingDeal) {
+      for (const { index, deal } of batch) {
+        const companyId = companyCache.get(deal.companyName.toLowerCase().trim());
+        if (!companyId) {
           results.failed++;
-          results.errors.push({ row: i + 1, reason: `Duplicate deal name: "${deal.name}" already exists` });
+          results.errors.push({ row: index + 1, reason: `Company not found: "${deal.companyName}"` });
           continue;
         }
 
-        // Insert deal
-        const { error: dealError } = await supabase
-          .from('Deal')
-          .insert({
+        dealRows.push({
+          rowIndex: index,
+          data: {
             name: deal.name,
             companyId,
             stage: deal.stage,
@@ -236,17 +282,35 @@ router.post('/', async (req: Request, res: Response) => {
             customFields: deal.customFields || {},
             icon: 'business_center',
             organizationId: orgId,
-          });
+          },
+        });
+      }
 
-        if (dealError) {
-          results.failed++;
-          results.errors.push({ row: i + 1, reason: dealError.message });
+      if (dealRows.length > 0) {
+        const insertData = dealRows.map(r => r.data);
+        const { data: inserted, error: dealErr } = await supabase
+          .from('Deal')
+          .insert(insertData)
+          .select('id');
+
+        if (dealErr) {
+          log.error('Batch deal insert error', dealErr);
+          // Fall back to individual inserts for this batch
+          for (const { rowIndex, data } of dealRows) {
+            const { error: singleErr } = await supabase
+              .from('Deal')
+              .insert(data);
+
+            if (singleErr) {
+              results.failed++;
+              results.errors.push({ row: rowIndex + 1, reason: singleErr.message });
+            } else {
+              results.imported++;
+            }
+          }
         } else {
-          results.imported++;
+          results.imported += inserted?.length || dealRows.length;
         }
-      } catch (rowErr: any) {
-        results.failed++;
-        results.errors.push({ row: i + 1, reason: rowErr.message || 'Unknown error' });
       }
     }
 
