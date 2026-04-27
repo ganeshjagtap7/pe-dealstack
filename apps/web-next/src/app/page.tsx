@@ -3,8 +3,14 @@ import { Logo } from "@/components/layout/Logo";
 import { LandingNavbar } from "@/components/layout/LandingNavbar";
 
 export default function LandingPage() {
+  // The root body has overflow-hidden for the (app) shell — wrap in a
+  // 100vh scroll container so this long marketing page scrolls naturally.
+  // Same pattern as (auth)/layout.tsx and (onboarding)/layout.tsx.
   return (
-    <div className="bg-[#f8fafc] text-[#1e293b] font-sans overflow-x-hidden antialiased">
+    <div
+      className="bg-[#f8fafc] text-[#1e293b] font-sans overflow-x-hidden overflow-y-auto antialiased"
+      style={{ height: "100vh" }}
+    >
       {/* Navbar (client component for mobile menu interactivity) */}
       <LandingNavbar />
 
