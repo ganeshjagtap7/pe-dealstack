@@ -192,6 +192,7 @@ function renderFinancialSection() {
     ? `<div id="fin-chart-area" class="relative w-full bg-white rounded-lg border border-gray-200 p-4" style="height:320px"><canvas id="fin-chart-canvas"></canvas></div>`
     : buildStatementTable(finState.activeTab);
 
+  const legendHtml = !showChart ? trustLegendHtml() : '';
   container.innerHTML = flagHtml + conflictBannerHtml + `
     <div class="flex items-center gap-2 mb-4 flex-wrap">
       <div class="flex gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
@@ -200,6 +201,7 @@ function renderFinancialSection() {
       <div class="flex gap-1.5">${showChartBtns}</div>
       ${extractBtn}
     </div>
+    ${legendHtml}
     ${contentHtml}`;
 
   // Render chart after DOM is set
@@ -279,11 +281,22 @@ function buildStatementTable(statementType) {
       const display = isPct ? fmtPct(val) : fmtMoney(val, unitScale, currency);
       const isProjected = r.periodType === 'PROJECTED';
       const valCls = isProjected ? 'text-gray-400 italic' : (isSubtotal ? 'text-gray-900 font-semibold' : 'text-gray-700');
+      // Trust tier: background color based on confidence + source citation
+      const sourceQuote = (r.lineItems ?? {})[key + '_source'] ?? null;
+      const trust = getCellTrustTier(r.extractionConfidence, sourceQuote);
+      const trustBg = trust.bg ? `background:${trust.bg};` : '';
+      const warnIcon = trust.tier !== 'verified' && val != null
+        ? '<span class="material-symbols-outlined" style="font-size:9px;vertical-align:super;color:#d97706;margin-right:1px;">warning</span>'
+        : '';
+      const tipAttrs = cellTooltipAttrs(key, r.lineItems ?? {}, r.extractionConfidence, r.extractionSource, r.Document?.name);
       return `
-        <td class="px-3 py-2 text-right text-xs ${valCls} cursor-pointer hover:bg-blue-50/50 transition-colors"
+        <td class="px-3 py-2 text-right text-xs ${valCls} cursor-pointer transition-colors"
+          style="${trustBg}"
           onclick="editFinancialCell(this, '${r.id}', '${escapeHtml(key)}', ${JSON.stringify(val)}, '${isPct ? 'pct' : 'money'}')"
+          ${tipAttrs}
+          onmouseenter="showCellTooltip(event)" onmouseleave="hideCellTooltip()"
           data-statement-id="${r.id}" data-key="${escapeHtml(key)}">
-          ${escapeHtml(display)}
+          ${warnIcon}${escapeHtml(display)}
         </td>`;
     }).join('');
 
@@ -339,8 +352,63 @@ function switchFinancialTab(tabType) {
   renderFinancialSection();
 }
 
+// ─── Document Type Picker ──────────────────────────────────────
+function showDocumentTypePicker(documentId) {
+  // Remove existing picker
+  document.getElementById('fin-type-picker')?.remove();
+
+  const types = [
+    { id: 'financial_statements', icon: 'table_chart', label: 'Financial Statements', desc: 'CIM, P&L, Balance Sheet, Cash Flow' },
+    { id: 'payment_data', icon: 'credit_card', label: 'Payment Data', desc: 'Stripe, PayPal, Square CSV export' },
+    { id: 'bank_statement', icon: 'account_balance', label: 'Bank Statement', desc: 'Bank PDF or CSV statement' },
+    { id: 'accounting_export', icon: 'receipt_long', label: 'Accounting Export', desc: 'QuickBooks, Xero export' },
+    { id: 'auto_detect', icon: 'auto_awesome', label: 'Auto-detect', desc: 'Let AI figure it out' },
+  ];
+
+  const modal = document.createElement('div');
+  modal.id = 'fin-type-picker';
+  modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
+  modal.innerHTML = `
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('fin-type-picker')?.remove()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden" style="animation:slideUp 0.3s ease-out;">
+      <div class="px-6 pt-6 pb-4 border-b border-gray-100">
+        <div class="flex items-center gap-2.5">
+          <span class="material-symbols-outlined text-xl" style="color:#003366;">description</span>
+          <h3 class="text-base font-bold text-gray-900">What type of document is this?</h3>
+        </div>
+        <p class="text-xs text-gray-500 mt-1.5">Choose the format so we use the right extraction method.</p>
+      </div>
+      <div class="p-4 grid gap-2">
+        ${types.map(t => `
+          <button onclick="document.getElementById('fin-type-picker')?.remove();executeExtraction(${documentId ? "'" + documentId + "'" : 'null'}, '${t.id}')"
+            class="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all text-left group">
+            <span class="material-symbols-outlined text-lg" style="color:#003366;">${t.icon}</span>
+            <div class="flex-1">
+              <span class="text-sm font-semibold text-gray-900 group-hover:text-blue-900">${t.label}</span>
+              <p class="text-[11px] text-gray-500">${t.desc}</p>
+            </div>
+            <span class="material-symbols-outlined text-gray-300 group-hover:text-blue-400 text-sm">chevron_right</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+        <button onclick="document.getElementById('fin-type-picker')?.remove()"
+          class="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
 // ─── Extract financials ────────────────────────────────────────
 async function handleExtract(documentId) {
+  if (finState.extracting) return;
+  const dealId = state.dealId;
+  if (!dealId) return;
+  showDocumentTypePicker(documentId);
+}
+
+async function executeExtraction(documentId, documentType) {
   if (finState.extracting) return;
   const dealId = state.dealId;
   if (!dealId) return;
@@ -379,7 +447,7 @@ async function handleExtract(documentId) {
   const timeoutId = setTimeout(() => controller.abort(), 120000);
 
   try {
-    const body = documentId ? { documentId } : {};
+    const body = { ...(documentId ? { documentId } : {}), documentType: documentType || 'auto_detect' };
     const res = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials/extract`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

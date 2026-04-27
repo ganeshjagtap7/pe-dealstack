@@ -262,3 +262,91 @@ function showConfidencePopup(event) {
     });
   }, 0);
 }
+
+// ─── Cell Trust Helpers ──────────────────────────────────────
+
+/**
+ * Determine trust tier for a table cell based on confidence and source citation.
+ * @param {number|null} confidence - extraction confidence (0-100)
+ * @param {string|null} sourceQuote - the _source citation string
+ * @returns {{ tier: 'verified'|'review'|'unverified', bg: string }}
+ */
+function getCellTrustTier(confidence, sourceQuote) {
+  const conf = confidence ?? 0;
+  const hasSource = sourceQuote && typeof sourceQuote === 'string' && sourceQuote.length > 0;
+  if (conf >= 80 && hasSource) return { tier: 'verified', bg: '' };
+  if (conf < 60) return { tier: 'unverified', bg: '#FEF2F2' };
+  return { tier: 'review', bg: '#FFFBEB' };
+}
+
+/**
+ * Build data attributes for cell tooltip.
+ */
+function cellTooltipAttrs(key, lineItems, confidence, extractionSource, docName) {
+  const source = lineItems[key + '_source'] ?? null;
+  const conf = confidence ?? 0;
+  const method = extractionSource ?? 'gpt4o';
+  const doc = docName ?? '';
+  const s = source ? escapeHtml(source) : '';
+  return `data-tip-source="${s}" data-tip-conf="${conf}" data-tip-method="${method}" data-tip-doc="${escapeHtml(doc)}"`;
+}
+
+/**
+ * Show a tooltip near a table cell with source citation info.
+ */
+function showCellTooltip(event) {
+  hideCellTooltip();
+  const td = event.currentTarget;
+  const source = td.getAttribute('data-tip-source');
+  const conf = td.getAttribute('data-tip-conf');
+  const method = td.getAttribute('data-tip-method');
+  const doc = td.getAttribute('data-tip-doc');
+
+  const hasSource = source && source.length > 0;
+  const confNum = parseInt(conf) || 0;
+
+  const tip = document.createElement('div');
+  tip.id = 'fin-cell-tooltip';
+  tip.style.cssText = 'position:fixed;z-index:9999;max-width:320px;padding:10px 14px;background:#fff;border:1px solid #e2e8f0;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.12);font-size:11px;line-height:1.5;color:#374151;pointer-events:none;';
+
+  if (hasSource) {
+    tip.innerHTML = `
+      <div style="color:#1f2937;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;">
+        <span class="material-symbols-outlined" style="font-size:13px;color:#059669;">verified</span> Source Citation
+      </div>
+      <div style="color:#4b5563;font-style:italic;margin-bottom:8px;padding:6px 8px;background:#f9fafb;border-radius:4px;border-left:3px solid #003366;">"${source}"</div>
+      <div style="color:#9ca3af;font-size:10px;">Confidence: <strong style="color:#374151;">${conf}%</strong> &middot; ${method.toUpperCase()} &middot; ${doc}</div>`;
+  } else {
+    tip.innerHTML = `
+      <div style="color:#92400e;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:4px;">
+        <span class="material-symbols-outlined" style="font-size:13px;color:#d97706;">warning</span> No Source Citation
+      </div>
+      <div style="color:#78716c;margin-bottom:8px;">This value was inferred by AI but could not be traced to a specific location in the document. Verify manually.</div>
+      <div style="color:#9ca3af;font-size:10px;">Confidence: <strong style="color:#374151;">${conf}%</strong> &middot; ${method.toUpperCase()}</div>`;
+  }
+
+  document.body.appendChild(tip);
+
+  // Position near cell
+  const rect = td.getBoundingClientRect();
+  let left = rect.left + rect.width / 2 - tip.offsetWidth / 2;
+  let top = rect.top - tip.offsetHeight - 8;
+  if (top < 8) top = rect.bottom + 8;
+  if (left < 8) left = 8;
+  if (left + tip.offsetWidth > window.innerWidth - 8) left = window.innerWidth - tip.offsetWidth - 8;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+}
+
+function hideCellTooltip() {
+  document.getElementById('fin-cell-tooltip')?.remove();
+}
+
+/** Trust legend HTML — inserted above the table */
+function trustLegendHtml() {
+  return `<div class="flex items-center gap-4 text-[10px] text-gray-500 mb-2 px-1">
+    <span class="flex items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#059669;display:inline-block;"></span> Verified (80%+)</span>
+    <span class="flex items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#d97706;display:inline-block;"></span> Review suggested</span>
+    <span class="flex items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#dc2626;display:inline-block;"></span> Unverified</span>
+  </div>`;
+}
