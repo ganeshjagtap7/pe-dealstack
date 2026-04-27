@@ -216,36 +216,21 @@ function ValidationFlagsPanel({ flags }: { flags: ValidationCheck[] }) {
   const hasErrors = errorFlags.length > 0;
 
   return (
-    <div className={cn(
-      "mb-4 rounded-lg border overflow-hidden",
-      hasErrors ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50",
-    )}>
+    <div className="mb-4 rounded-lg border overflow-hidden border-amber-200 bg-amber-50">
       <button
         onClick={() => setOpen((p) => !p)}
-        className={cn(
-          "w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors",
-          hasErrors ? "hover:bg-red-100/50" : "hover:bg-amber-100/50",
-        )}
+        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-amber-100/50"
         aria-expanded={open}
       >
-        <span className={cn(
-          "material-symbols-outlined text-base",
-          hasErrors ? "text-red-500" : "text-amber-500",
-        )}>
+        <span className="material-symbols-outlined text-base text-amber-500">
           warning
         </span>
-        <span className={cn(
-          "text-xs font-semibold",
-          hasErrors ? "text-red-800" : "text-amber-800",
-        )}>
+        <span className="text-xs font-semibold text-amber-800">
           {flags.length} Validation Flag{flags.length > 1 ? "s" : ""}
           {hasErrors && ` (${errorFlags.length} error${errorFlags.length > 1 ? "s" : ""})`}
         </span>
         <span
-          className={cn(
-            "material-symbols-outlined text-sm ml-auto transition-transform duration-200",
-            hasErrors ? "text-red-400" : "text-amber-400",
-          )}
+          className="material-symbols-outlined text-sm ml-auto transition-transform duration-200 text-amber-400"
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
           aria-hidden
         >
@@ -254,24 +239,16 @@ function ValidationFlagsPanel({ flags }: { flags: ValidationCheck[] }) {
       </button>
 
       {open && (
-        <div className={cn(
-          "px-4 pb-3 border-t",
-          hasErrors ? "border-red-200/60" : "border-amber-200/60",
-        )}>
-          <ul className={cn(
-            "text-xs space-y-1 mt-2",
-            hasErrors ? "text-red-700" : "text-amber-700",
-          )}>
+        <div className="px-4 pb-3 border-t border-amber-200/60">
+          <ul className="text-xs space-y-1 mt-2 text-amber-700">
             {flags.map((f, i) => (
               <li key={`${f.check}-${i}`} className="flex items-start gap-1.5">
                 <span
                   className={cn(
                     "mt-0.5 shrink-0 material-symbols-outlined",
-                    f.severity === "error"
-                      ? "text-red-400 text-xs"
-                      : f.severity === "warning"
-                        ? "text-amber-400 text-xs"
-                        : "text-gray-400 text-xs",
+                    f.severity === "error" || f.severity === "warning"
+                      ? "text-amber-400 text-xs"
+                      : "text-gray-400 text-xs",
                   )}
                   style={{ fontSize: 12 }}
                 >
