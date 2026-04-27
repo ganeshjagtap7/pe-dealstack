@@ -242,8 +242,18 @@ export interface RiskFactor {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
+// Mirrors legacy `TABS` in apps/web/js/analysis-styles.js — same id/label/icon
+// and same order. DO NOT diverge from legacy without a corresponding update
+// there (the user-visible header copy must match across both apps).
 
-export type AnalysisTab = "overview" | "valuation" | "risk" | "benchmarks";
+export type AnalysisTab =
+  | "overview"
+  | "deepdive"
+  | "cashcap"
+  | "valuation"
+  | "diligence"
+  | "aiinsights"
+  | "memo";
 
 // ---------------------------------------------------------------------------
 // Shared style constants (matching legacy analysis-styles.js)
@@ -264,8 +274,29 @@ export const SEVERITY_STYLES: Record<
 };
 
 export const ANALYSIS_TABS: { id: AnalysisTab; label: string; icon: string }[] = [
-  { id: "overview", label: "Overview", icon: "dashboard" },
-  { id: "valuation", label: "Valuation", icon: "rocket_launch" },
-  { id: "risk", label: "Risk Profile", icon: "shield" },
-  { id: "benchmarks", label: "Benchmarks", icon: "leaderboard" },
+  { id: "overview",   label: "Overview",       icon: "dashboard" },
+  { id: "deepdive",   label: "Deep Dive",      icon: "analytics" },
+  { id: "cashcap",    label: "Cash & Capital", icon: "payments" },
+  { id: "valuation",  label: "Valuation",      icon: "rocket_launch" },
+  { id: "diligence",  label: "Diligence",      icon: "verified" },
+  { id: "aiinsights", label: "AI Insights",    icon: "auto_awesome" },
+  { id: "memo",       label: "Memo",           icon: "description" },
+];
+
+// AI Insights subsections (mirrors `sections` array in legacy
+// renderAIInsightsTab around analysis.js line 358). Keep in this exact
+// order with these exact titles + Material Symbol icons.
+export const AI_INSIGHT_SECTIONS: {
+  key: keyof Pick<
+    NarrativeInsights,
+    "executiveSummary" | "keyStrengths" | "keyRisks" | "investmentThesis" | "dueDiligencePriorities"
+  >;
+  title: string;
+  icon: string;
+}[] = [
+  { key: "executiveSummary",       title: "Executive Summary",        icon: "summarize" },
+  { key: "keyStrengths",           title: "Key Strengths",            icon: "thumb_up" },
+  { key: "keyRisks",               title: "Key Risks",                icon: "warning" },
+  { key: "investmentThesis",       title: "Investment Thesis",        icon: "lightbulb" },
+  { key: "dueDiligencePriorities", title: "Due Diligence Priorities", icon: "checklist" },
 ];

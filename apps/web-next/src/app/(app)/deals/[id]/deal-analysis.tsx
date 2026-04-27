@@ -8,15 +8,20 @@ import {
   type AnalysisData,
   type CrossDocData,
   type BenchmarkData,
+  type InsightsResponse,
+  type NarrativeInsights,
   BANKER_BLUE,
   BANKER_BLUE_LIGHT,
   ANALYSIS_TABS,
 } from "./deal-analysis-types";
 import {
   OverviewPanel,
+  DeepDivePanel,
+  CashCapitalPanel,
   ValuationPanel,
-  RiskPanel,
-  BenchmarksPanel,
+  DiligencePanel,
+  AIInsightsPanel,
+  MemoPanel,
 } from "./deal-analysis-panels";
 
 // ---------------------------------------------------------------------------
@@ -32,6 +37,7 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
   // Supplementary data
   const [crossDoc, setCrossDoc] = useState<CrossDocData | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
+  const [insights, setInsights] = useState<NarrativeInsights | null>(null);
   // "error" = real server/network failure (5xx, network, etc). Never set for 404.
   const [error, setError] = useState(false);
   // "noData" = the /analysis endpoint returned hasData=false or 404 — no analysis yet.
@@ -66,13 +72,15 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
       setAnalysis(analysisData);
 
       // Step 2: Fetch supplementary data in parallel (same as legacy lines 37-53)
-      const [crossDocRes, benchmarkRes] = await Promise.allSettled([
+      const [crossDocRes, benchmarkRes, insightsRes] = await Promise.allSettled([
         api.get<CrossDocData>(`/deals/${dealId}/financials/cross-doc`),
         api.get<BenchmarkData>(`/deals/${dealId}/financials/benchmark`),
+        api.get<InsightsResponse>(`/deals/${dealId}/financials/insights`),
       ]);
 
       if (crossDocRes.status === "fulfilled") setCrossDoc(crossDocRes.value);
       if (benchmarkRes.status === "fulfilled") setBenchmark(benchmarkRes.value);
+      if (insightsRes.status === "fulfilled") setInsights(insightsRes.value.insights);
       // Supplementary endpoint failures are non-fatal (graceful degradation)
     } catch {
       setError(true);
@@ -111,10 +119,10 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
         }}
       >
         <div className="flex items-center gap-2.5">
-          <span className="material-symbols-outlined text-white text-[20px]">auto_awesome</span>
+          <span className="material-symbols-outlined text-white text-[20px]">insights</span>
           <span
             className="text-white text-[13px] font-bold uppercase tracking-wider"
-            style={{ letterSpacing: "0.05em" }}
+            style={{ letterSpacing: "0.06em" }}
           >
             AI Financial Analysis
           </span>
@@ -158,11 +166,14 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
                 ))}
               </div>
 
-              {/* Tab panels */}
-              {activeTab === "overview" && <OverviewPanel analysis={analysis} />}
-              {activeTab === "valuation" && <ValuationPanel analysis={analysis} benchmark={benchmark} />}
-              {activeTab === "risk" && <RiskPanel analysis={analysis} crossDoc={crossDoc} />}
-              {activeTab === "benchmarks" && <BenchmarksPanel benchmark={benchmark} />}
+              {/* Tab panels — order matches legacy TABS array exactly */}
+              {activeTab === "overview"   && <OverviewPanel analysis={analysis} />}
+              {activeTab === "deepdive"   && <DeepDivePanel analysis={analysis} />}
+              {activeTab === "cashcap"    && <CashCapitalPanel analysis={analysis} />}
+              {activeTab === "valuation"  && <ValuationPanel analysis={analysis} benchmark={benchmark} />}
+              {activeTab === "diligence"  && <DiligencePanel analysis={analysis} crossDoc={crossDoc} />}
+              {activeTab === "aiinsights" && <AIInsightsPanel insights={insights} />}
+              {activeTab === "memo"       && <MemoPanel analysis={analysis} dealId={dealId} />}
 
               {/* Footer */}
               {analysis?.analyzedAt && (
