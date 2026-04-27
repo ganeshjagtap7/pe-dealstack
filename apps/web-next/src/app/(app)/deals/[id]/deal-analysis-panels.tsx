@@ -3,7 +3,6 @@
 import { cn } from "@/lib/cn";
 import {
   type AnalysisData,
-  type InsightsResponse,
   type CrossDocData,
   type BenchmarkData,
   type QoEFlag,
@@ -244,7 +243,7 @@ export function ScoreRing({ score }: { score: number }) {
 // Overview Tab (matches legacy renderOverviewTab)
 // ---------------------------------------------------------------------------
 
-export function OverviewPanel({ analysis, insights }: { analysis: AnalysisData | null; insights: InsightsResponse | null }) {
+export function OverviewPanel({ analysis }: { analysis: AnalysisData | null }) {
   const qoe = analysis?.qoe;
   const metrics: KeyMetric[] = [];
   if (analysis?.revenueQuality?.revenueCAGR != null)
@@ -303,68 +302,7 @@ export function OverviewPanel({ analysis, insights }: { analysis: AnalysisData |
 
       {/* Revenue Quality */}
       {analysis?.revenueQuality && <RevenueQualityCard rq={analysis.revenueQuality} />}
-
-      {/* AI Insights (narrative text from /insights endpoint) */}
-      {insights?.hasData && insights.insights && <AIInsightsCard insights={insights.insights} />}
     </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// AI Insights Card (matches legacy renderAIInsightsTab sections)
-// ---------------------------------------------------------------------------
-
-function AIInsightsCard({ insights }: { insights: NonNullable<InsightsResponse["insights"]> }) {
-  const sections: { key: string; title: string; icon: string }[] = [
-    { key: "executiveSummary", title: "Executive Summary", icon: "summarize" },
-    { key: "topThreeStrengths", title: "Key Strengths", icon: "thumb_up" },
-    { key: "keyStrengths", title: "Key Strengths", icon: "thumb_up" },
-    { key: "topThreeRisks", title: "Key Risks", icon: "warning" },
-    { key: "keyRisks", title: "Key Risks", icon: "warning" },
-    { key: "investmentThesis", title: "Investment Thesis", icon: "lightbulb" },
-    { key: "diligencePriorities", title: "Due Diligence Priorities", icon: "checklist" },
-    { key: "dueDiligencePriorities", title: "Due Diligence Priorities", icon: "checklist" },
-  ];
-
-  // Deduplicate: prefer new keys over legacy aliases
-  const seen = new Set<string>();
-  const rendered = sections.filter((s) => {
-    const content = (insights as Record<string, unknown>)[s.key];
-    if (!content) return false;
-    if (Array.isArray(content) && content.length === 0) return false;
-    // Avoid rendering both "topThreeStrengths" and legacy "keyStrengths"
-    if (seen.has(s.title)) return false;
-    seen.add(s.title);
-    return true;
-  });
-
-  if (rendered.length === 0) return null;
-
-  return (
-    <AnalysisCard>
-      <CardHeader icon="auto_awesome" title="AI Insights" />
-      <div className="flex flex-col gap-4">
-        {rendered.map((s) => {
-          const content = (insights as Record<string, unknown>)[s.key];
-          const isList = Array.isArray(content);
-          return (
-            <div key={s.key}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="material-symbols-outlined text-[16px]" style={{ color: BANKER_BLUE }}>{s.icon}</span>
-                <span className="text-xs font-bold text-gray-800">{s.title}</span>
-              </div>
-              {isList ? (
-                <ul className="text-xs text-gray-600 leading-relaxed pl-4 m-0 list-disc">
-                  {(content as string[]).map((item, i) => <li key={i} className="mb-1.5">{item}</li>)}
-                </ul>
-              ) : (
-                <p className="text-xs text-gray-600 leading-relaxed m-0">{String(content)}</p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </AnalysisCard>
   );
 }
 

@@ -6,7 +6,6 @@ import { cn } from "@/lib/cn";
 import {
   type AnalysisTab,
   type AnalysisData,
-  type InsightsResponse,
   type CrossDocData,
   type BenchmarkData,
   BANKER_BLUE,
@@ -31,7 +30,6 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
   // Primary analysis data (from /analysis endpoint — quantitative)
   const [analysis, setAnalysis] = useState<AnalysisData | null>(null);
   // Supplementary data
-  const [insights, setInsights] = useState<InsightsResponse | null>(null);
   const [crossDoc, setCrossDoc] = useState<CrossDocData | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkData | null>(null);
   // "error" = real server/network failure (5xx, network, etc). Never set for 404.
@@ -68,15 +66,13 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
       setAnalysis(analysisData);
 
       // Step 2: Fetch supplementary data in parallel (same as legacy lines 37-53)
-      const [crossDocRes, benchmarkRes, insightsRes] = await Promise.allSettled([
+      const [crossDocRes, benchmarkRes] = await Promise.allSettled([
         api.get<CrossDocData>(`/deals/${dealId}/financials/cross-doc`),
         api.get<BenchmarkData>(`/deals/${dealId}/financials/benchmark`),
-        api.get<InsightsResponse>(`/deals/${dealId}/financials/insights`),
       ]);
 
       if (crossDocRes.status === "fulfilled") setCrossDoc(crossDocRes.value);
       if (benchmarkRes.status === "fulfilled") setBenchmark(benchmarkRes.value);
-      if (insightsRes.status === "fulfilled") setInsights(insightsRes.value);
       // Supplementary endpoint failures are non-fatal (graceful degradation)
     } catch {
       setError(true);
@@ -163,7 +159,7 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
               </div>
 
               {/* Tab panels */}
-              {activeTab === "overview" && <OverviewPanel analysis={analysis} insights={insights} />}
+              {activeTab === "overview" && <OverviewPanel analysis={analysis} />}
               {activeTab === "valuation" && <ValuationPanel analysis={analysis} benchmark={benchmark} />}
               {activeTab === "risk" && <RiskPanel analysis={analysis} crossDoc={crossDoc} />}
               {activeTab === "benchmarks" && <BenchmarksPanel benchmark={benchmark} />}
