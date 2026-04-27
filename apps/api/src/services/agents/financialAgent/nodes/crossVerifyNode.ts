@@ -290,11 +290,8 @@ export async function crossVerifyNode(
       log.warn('crossVerifyNode: model disagreements detected', { flagged: reconciled.flaggedValues });
     }
 
-    // crossVerifyResult will be stored in state once Task 12 adds it to the schema.
-    // For now, return steps only — TypeScript would warn on unknown property.
     return {
       steps,
-      // @ts-expect-error — crossVerifyResult added to state schema in Task 12
       crossVerifyResult: reconciled,
     };
 

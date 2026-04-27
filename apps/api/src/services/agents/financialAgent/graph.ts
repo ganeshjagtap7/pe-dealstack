@@ -21,6 +21,7 @@ import { StateGraph, END, START } from '@langchain/langgraph';
 import { FinancialAgentState } from './state.js';
 import { extractNode } from './nodes/extractNode.js';
 import { verifyNode } from './nodes/verifyNode.js';
+import { crossVerifyNode } from './nodes/crossVerifyNode.js';
 import { validateNode } from './nodes/validateNode.js';
 import { selfCorrectNode } from './nodes/selfCorrectNode.js';
 import { storeNode } from './nodes/storeNode.js';
@@ -52,6 +53,7 @@ function buildFinancialAgentGraph() {
     // Add nodes
     .addNode('extract', extractNode)
     .addNode('verify', verifyNode)
+    .addNode('cross_verify', crossVerifyNode)
     .addNode('validate', validateNode)
     .addNode('self_correct', selfCorrectNode)
     .addNode('store', storeNode)
@@ -65,8 +67,9 @@ function buildFinancialAgentGraph() {
       [END]: END,
     })
 
-    // Verify → Validate (always — verify is best-effort)
-    .addEdge('verify', 'validate')
+    // Verify → Cross-Verify → Validate (both best-effort)
+    .addEdge('verify', 'cross_verify')
+    .addEdge('cross_verify', 'validate')
 
     // Validate → self_correct or store
     .addConditionalEdges('validate', routeAfterValidate, {

@@ -13,6 +13,7 @@
 
 import { Annotation } from '@langchain/langgraph';
 import type { ClassificationResult, ClassifiedStatement } from '../../financialClassifier.js';
+import type { ReconcileResult } from './nodes/crossVerifyNode.js';
 
 // ─── Supporting Types ────────────────────────────────────────────────
 
@@ -127,6 +128,11 @@ export const FinancialAgentState = Annotation.Root({
   failedChecks: Annotation<FailedCheck[]>({
     reducer: (_prev, next) => next,
     default: () => [],
+  }),
+  /** Cross-verification result from Claude */
+  crossVerifyResult: Annotation<ReconcileResult | null>({
+    reducer: (_prev, next) => next,
+    default: () => null,
   }),
 
   // ── Storage output ──
