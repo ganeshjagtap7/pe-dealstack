@@ -100,6 +100,21 @@ export async function storeNode(
     steps.push(step('store', `Composite confidence: ${compositeScore}% (tier: ${tier})`,
       `LLM: ${state.overallConfidence}%, Source: ${sourceMatchAvg}%, Math: ${mathScore}%, CrossModel: ${crossModelScore ?? 'N/A'}%`));
 
+    // Add warnings for cross-verify flagged values
+    if (crossVerifyResult && crossVerifyResult.flaggedValues.length > 0) {
+      const flagWarnings = crossVerifyResult.flaggedValues.map(f =>
+        `Cross-verification disagreement on ${f.field}: primary=${f.gpt4o_value}, verified=${f.claude_value}${f.issue ? ` (${f.issue})` : ''}`
+      );
+      classificationToStore.warnings = [
+        ...(classificationToStore.warnings || []),
+        ...flagWarnings,
+      ];
+      steps.push(step('store',
+        `${crossVerifyResult.flaggedValues.length} values flagged by cross-verification`,
+        flagWarnings.join('; '),
+      ));
+    }
+
     // Confidence-gated storage
     if (tier === 'very_low') {
       steps.push(step('store', 'Confidence too low (<60%) — NOT storing. User must review manually.'));
