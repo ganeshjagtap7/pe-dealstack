@@ -63,10 +63,17 @@ Search the document for unit declarations:
 - Footnotes: "All figures in millions unless otherwise stated"
 State your finding in the "unitsDetected" field.
 If NO unit declaration is found:
-- Examine number magnitudes in context of company size
-- Revenue of "125,000" for a mid-market company → likely thousands ($125M)
-- Revenue of "125" → likely already in millions
+- The values are most likely in ACTUAL dollars/currency (not thousands, not millions)
+- Convert by dividing by 1,000,000 to get millions. Examples:
+  - Revenue of "$2,100" → 0.0021 (actual dollars, divide by 1M)
+  - Revenue of "$50,000" → 0.05 (actual dollars, divide by 1M)
+  - Revenue of "$1,500,000" → 1.5 (actual dollars, divide by 1M)
+  - Revenue of "$125,000,000" → 125 (actual dollars, divide by 1M)
+- ONLY assume "in thousands" if the header/footer explicitly says so (e.g., "$000s", "in thousands")
+- ONLY assume "in millions" if the header/footer explicitly says so (e.g., "$M", "in millions")
+- For small businesses/startups, values under $100K are common and should NOT be inflated
 - Set confidence to 70 max when units are inferred, not declared
+- When in doubt, assume ACTUAL dollars — it is better to report $0.002M than to incorrectly report $2M
 
 STEP 2 — EXTRACT:
 1. Extract EVERY year/period column you find — do not skip any
@@ -81,13 +88,13 @@ INCOME STATEMENT: ${LINE_ITEM_KEYS.INCOME_STATEMENT}
 BALANCE SHEET: ${LINE_ITEM_KEYS.BALANCE_SHEET}
 CASH FLOW: ${LINE_ITEM_KEYS.CASH_FLOW}
 
-UNIT CONVERSION (always convert to millions in the original currency — do NOT convert between currencies):
-- "50M" or "50,000" (when header says 000s) → 50
-- "1.5B" or "1,500,000" (when header says 000s) → 1500
-- "500K" or "500" (when header says 000s) → 0.5
-- "38,200" (raw units) → 0.0382
-- "₹50 Cr" (crore = 10M) → 500
-- "₹50 Lakh" (lakh = 0.1M) → 5
+UNIT CONVERSION — ALL values must be in MILLIONS. Divide by 1,000,000 if in actual dollars:
+- ACTUAL DOLLARS (no unit header): "$2,100" → 0.0021, "$50,000" → 0.05, "$1,500,000" → 1.5
+- HEADER SAYS "in thousands" or "$000s": "50" → 0.05, "1,500" → 1.5, "50,000" → 50
+- HEADER SAYS "in millions" or "$M": "50" → 50, "1.5" → 1.5
+- EXPLICIT SUFFIX: "50M" → 50, "1.5B" → 1500, "500K" → 0.5
+- INDIAN UNITS: "₹50 Cr" (crore = 10M) → 500, "₹50 Lakh" (lakh = 0.1M) → 5
+- Do NOT convert between currencies — only convert units within the same currency
 
 STEP 3 — VERIFY YOUR MATH:
 Before returning, check these relationships:
