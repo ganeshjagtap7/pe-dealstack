@@ -1,5 +1,6 @@
 {
   "version": 2,
+  "installCommand": "rm -f package-lock.json && npm install --include=dev",
   "buildCommand": "npm run build:api && npm run build:web",
   "outputDirectory": "apps/web/dist",
   "functions": {
