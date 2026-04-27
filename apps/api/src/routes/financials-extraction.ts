@@ -74,6 +74,7 @@ function detectFileType(mimeType?: string | null, fileName?: string | null): Fil
 
 const extractSchema = z.object({
   documentId: z.string().uuid().optional(),
+  documentType: z.enum(['financial_statements', 'payment_data', 'bank_statement', 'accounting_export', 'auto_detect']).optional().default('auto_detect'),
 });
 
 // ─── 5d: POST /api/deals/:dealId/financials/extract ──────────
@@ -86,7 +87,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
     const dealAccess = await verifyDealAccess(dealId, orgId);
     if (!dealAccess) return res.status(404).json({ error: 'Deal not found' });
 
-    const { documentId } = extractSchema.parse(req.body);
+    const { documentId, documentType } = extractSchema.parse(req.body);
 
     // Find the document to extract from
     let doc: any = null;
@@ -133,7 +134,29 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
       return res.status(422).json({ error: 'Could not download document file' });
     }
 
-    // Run the LangGraph financial agent
+    // Route to appropriate parser based on document type
+    if (documentType === 'payment_data') {
+      // Import and use payment parser
+      const { parsePaymentCSV } = await import('../services/parsers/stripeParser.js');
+      const result = await parsePaymentCSV(fileBuffer, doc.name, dealId, doc.id);
+      return res.json({
+        success: true,
+        documentUsed: { id: doc.id, name: doc.name },
+        extractionMethod: 'csv_parser',
+        result: {
+          statementsStored: result.periodsStored,
+          periodsStored: result.periodsStored,
+          overallConfidence: 100,
+          statementIds: result.statementIds,
+          warnings: result.warnings,
+          hasConflicts: false,
+        },
+        hasConflicts: false,
+        agent: { status: 'completed', retryCount: 0, steps: result.steps },
+      });
+    }
+
+    // For financial_statements, auto_detect, or unsupported types: use existing agent
     if (!acquireExtractionSlot(orgId)) {
       return res.status(429).json({
         error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',

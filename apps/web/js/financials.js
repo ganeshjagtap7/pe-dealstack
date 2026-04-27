@@ -352,8 +352,63 @@ function switchFinancialTab(tabType) {
   renderFinancialSection();
 }
 
+// ─── Document Type Picker ──────────────────────────────────────
+function showDocumentTypePicker(documentId) {
+  // Remove existing picker
+  document.getElementById('fin-type-picker')?.remove();
+
+  const types = [
+    { id: 'financial_statements', icon: 'table_chart', label: 'Financial Statements', desc: 'CIM, P&L, Balance Sheet, Cash Flow' },
+    { id: 'payment_data', icon: 'credit_card', label: 'Payment Data', desc: 'Stripe, PayPal, Square CSV export' },
+    { id: 'bank_statement', icon: 'account_balance', label: 'Bank Statement', desc: 'Bank PDF or CSV statement' },
+    { id: 'accounting_export', icon: 'receipt_long', label: 'Accounting Export', desc: 'QuickBooks, Xero export' },
+    { id: 'auto_detect', icon: 'auto_awesome', label: 'Auto-detect', desc: 'Let AI figure it out' },
+  ];
+
+  const modal = document.createElement('div');
+  modal.id = 'fin-type-picker';
+  modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
+  modal.innerHTML = `
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="document.getElementById('fin-type-picker')?.remove()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 overflow-hidden" style="animation:slideUp 0.3s ease-out;">
+      <div class="px-6 pt-6 pb-4 border-b border-gray-100">
+        <div class="flex items-center gap-2.5">
+          <span class="material-symbols-outlined text-xl" style="color:#003366;">description</span>
+          <h3 class="text-base font-bold text-gray-900">What type of document is this?</h3>
+        </div>
+        <p class="text-xs text-gray-500 mt-1.5">Choose the format so we use the right extraction method.</p>
+      </div>
+      <div class="p-4 grid gap-2">
+        ${types.map(t => `
+          <button onclick="document.getElementById('fin-type-picker')?.remove();executeExtraction(${documentId ? "'" + documentId + "'" : 'null'}, '${t.id}')"
+            class="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-all text-left group">
+            <span class="material-symbols-outlined text-lg" style="color:#003366;">${t.icon}</span>
+            <div class="flex-1">
+              <span class="text-sm font-semibold text-gray-900 group-hover:text-blue-900">${t.label}</span>
+              <p class="text-[11px] text-gray-500">${t.desc}</p>
+            </div>
+            <span class="material-symbols-outlined text-gray-300 group-hover:text-blue-400 text-sm">chevron_right</span>
+          </button>
+        `).join('')}
+      </div>
+      <div class="px-6 py-3 border-t border-gray-100 bg-gray-50/50">
+        <button onclick="document.getElementById('fin-type-picker')?.remove()"
+          class="text-xs text-gray-500 hover:text-gray-700">Cancel</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(modal);
+}
+
 // ─── Extract financials ────────────────────────────────────────
 async function handleExtract(documentId) {
+  if (finState.extracting) return;
+  const dealId = state.dealId;
+  if (!dealId) return;
+  showDocumentTypePicker(documentId);
+}
+
+async function executeExtraction(documentId, documentType) {
   if (finState.extracting) return;
   const dealId = state.dealId;
   if (!dealId) return;
@@ -392,7 +447,7 @@ async function handleExtract(documentId) {
   const timeoutId = setTimeout(() => controller.abort(), 120000);
 
   try {
-    const body = documentId ? { documentId } : {};
+    const body = { ...(documentId ? { documentId } : {}), documentType: documentType || 'auto_detect' };
     const res = await PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials/extract`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
