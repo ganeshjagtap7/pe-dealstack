@@ -125,7 +125,8 @@ export function validateFinancials(data: {
 
 // ─── 3-Statement Cross-Check Validators ──────────────────────
 
-const TOLERANCE = 0.05; // 5% tolerance for math cross-checks
+const TOLERANCE_LARGE = 0.01; // 1% for values > $1M
+const TOLERANCE_SMALL = 0.02; // 2% for values <= $1M
 
 function pct(numerator: number, denominator: number): number {
   return (numerator / denominator) * 100;
@@ -133,7 +134,8 @@ function pct(numerator: number, denominator: number): number {
 
 function withinTolerance(a: number, b: number): boolean {
   if (b === 0) return a === 0;
-  return Math.abs(a - b) / Math.abs(b) <= TOLERANCE;
+  const tolerance = Math.abs(b) > 1 ? TOLERANCE_LARGE : TOLERANCE_SMALL;
+  return Math.abs(a - b) / Math.abs(b) <= tolerance;
 }
 
 /** Subtask 4a — Income statement math checks */

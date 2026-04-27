@@ -21,6 +21,7 @@
 import { getFinancialAgentGraph } from './graph.js';
 import { log } from '../../../utils/logger.js';
 import type { FileType, FinancialAgentStateType } from './state.js';
+import type { ReconcileResult } from './nodes/crossVerifyNode.js';
 
 // ─── Input Types ─────────────────────────────────────────────
 
@@ -47,6 +48,7 @@ export interface FinancialAgentResult {
   warnings: string[];
   error: string | null;
   steps: FinancialAgentStateType['steps'];
+  crossVerifyResult: ReconcileResult | null;
 }
 
 // ─── Run Agent ───────────────────────────────────────────────
@@ -74,8 +76,8 @@ export async function runFinancialAgent(
       fileName: input.fileName,
       fileType: input.fileType,
       organizationId: input.organizationId ?? null,
-      maxRetries: input.maxRetries ?? 1,
-      skipVerify: true,
+      maxRetries: input.maxRetries ?? 3,
+      skipVerify: false,
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -103,6 +105,7 @@ export async function runFinancialAgent(
       warnings: finalState.warnings ?? [],
       error: finalState.error ?? null,
       steps: finalState.steps ?? [],
+      crossVerifyResult: finalState.crossVerifyResult ?? null,
     };
   } catch (err) {
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
@@ -119,6 +122,7 @@ export async function runFinancialAgent(
       retryCount: 0,
       warnings: [],
       error: err instanceof Error ? err.message : String(err),
+      crossVerifyResult: null,
       steps: [{
         timestamp: new Date().toISOString(),
         node: 'agent',

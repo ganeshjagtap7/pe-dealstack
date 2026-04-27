@@ -13,6 +13,13 @@ import { recordExtractionLearning } from '../../../agentMemory.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep } from '../state.js';
+import {
+  computeCompositeConfidence,
+  getConfidenceTier,
+  scoreSourceMatch,
+  scoreMathValidation,
+  scoreCrossModel,
+} from '../../../compositeConfidence.js';
 
 /** Create a timestamped agent step */
 function step(node: string, message: string, detail?: string): AgentStep {
@@ -29,7 +36,7 @@ export async function storeNode(
   state: FinancialAgentStateType,
 ): Promise<Partial<FinancialAgentStateType>> {
   const steps: AgentStep[] = [];
-  const { dealId, documentId, statements, classification, rawText, extractionSource } = state;
+  const { dealId, documentId, statements, classification, rawText, extractionSource, crossVerifyResult } = state;
 
   if (!statements || statements.length === 0) {
     steps.push(step('store', 'No statements to store'));
@@ -53,6 +60,56 @@ export async function storeNode(
       overallConfidence: state.overallConfidence,
       warnings: state.warnings,
     };
+
+    // Compute composite confidence
+    const mathScore = scoreMathValidation(
+      state.validationResult?.errorCount ?? 0,
+      state.validationResult?.warningCount ?? 0,
+    );
+
+    const crossModelScore = crossVerifyResult
+      ? scoreCrossModel(crossVerifyResult.agreedCount, crossVerifyResult.flaggedValues.length)
+      : null;
+
+    // Average source match across all periods
+    let sourceMatchAvg = 20; // default if no source quotes
+    if (rawText && statements.length > 0) {
+      const scores: number[] = [];
+      for (const stmt of statements) {
+        for (const period of stmt.periods) {
+          for (const [key, val] of Object.entries(period.lineItems || {})) {
+            if (key.endsWith('_source') && typeof val === 'string') {
+              scores.push(scoreSourceMatch(val, rawText));
+            }
+          }
+        }
+      }
+      if (scores.length > 0) {
+        sourceMatchAvg = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+      }
+    }
+
+    const compositeScore = computeCompositeConfidence({
+      llmConfidence: state.overallConfidence,
+      sourceMatch: sourceMatchAvg,
+      mathValidation: mathScore,
+      crossModelAgreement: crossModelScore,
+    });
+
+    const tier = getConfidenceTier(compositeScore);
+    steps.push(step('store', `Composite confidence: ${compositeScore}% (tier: ${tier})`,
+      `LLM: ${state.overallConfidence}%, Source: ${sourceMatchAvg}%, Math: ${mathScore}%, CrossModel: ${crossModelScore ?? 'N/A'}%`));
+
+    // Confidence-gated storage
+    if (tier === 'very_low') {
+      steps.push(step('store', 'Confidence too low (<60%) — NOT storing. User must review manually.'));
+      return {
+        status: 'completed',
+        overallConfidence: compositeScore,
+        warnings: [...(state.warnings || []), `Extraction confidence too low (${compositeScore}%). Manual review required.`],
+        steps,
+      };
+    }
 
     const result = await runDeepPass({
       text: rawText,
