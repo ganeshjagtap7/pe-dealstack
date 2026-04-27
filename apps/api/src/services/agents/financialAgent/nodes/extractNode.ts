@@ -20,12 +20,10 @@ import { extractTablesFromPdf, isAzureConfigured } from '../../../azureDocIntell
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { ExtractionSource, AgentStep } from '../state.js';
+import { CHUNK_THRESHOLD, MAX_CHUNK_SIZE, MAX_CHUNKS, MIN_TEXT_LENGTH } from '../config.js';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
-
-/** Minimum chars of extracted text to consider "text-rich" */
-const MIN_TEXT_LENGTH = 200;
 
 /** Create a timestamped agent step */
 function step(node: string, message: string, detail?: string): AgentStep {
@@ -152,14 +150,14 @@ export async function extractNode(
     if (pdfText && pdfText.trim().length >= MIN_TEXT_LENGTH) {
       steps.push(step('extract', `Extracted ${pdfText.length} chars — classifying with AI`));
 
-      if (pdfText.length > 100000) {
-        const chunks = chunkDocument(pdfText, 100000);
+      if (pdfText.length > CHUNK_THRESHOLD) {
+        const chunks = chunkDocument(pdfText, MAX_CHUNK_SIZE);
         steps.push(step('extract', `Document is ${pdfText.length} chars — split into ${chunks.length} chunks`));
 
         const chunkResults = await Promise.all(
-          chunks.slice(0, 4).map(async (chunk, i) => {
+          chunks.slice(0, MAX_CHUNKS).map(async (chunk, i) => {
             try {
-              steps.push(step('extract', `Extracting from chunk ${i + 1}/${Math.min(chunks.length, 4)} (relevance: ${chunk.relevanceScore})`));
+              steps.push(step('extract', `Extracting from chunk ${i + 1}/${Math.min(chunks.length, MAX_CHUNKS)} (relevance: ${chunk.relevanceScore})`));
               return await classifyFinancials(chunk.text);
             } catch (err) {
               steps.push(step('extract', `Chunk ${i + 1} extraction failed`, String(err)));

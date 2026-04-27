@@ -21,6 +21,7 @@
     { "source": "/api/deals/:dealId/analyze-risks", "destination": "/api/ai" },
     { "source": "/api/deals/:dealId/ai-cache", "destination": "/api/ai" },
     { "source": "/api/deals/:dealId/conversations/(.*)", "destination": "/api/ai" },
+    { "source": "/api/deals/:dealId/financials", "destination": "/api/ai" },
     { "source": "/api/deals/:dealId/financials/(.*)", "destination": "/api/ai" },
     { "source": "/api/documents/:documentId/extract-financials", "destination": "/api/ai" },
     { "source": "/api/conversations", "destination": "/api/ai" },

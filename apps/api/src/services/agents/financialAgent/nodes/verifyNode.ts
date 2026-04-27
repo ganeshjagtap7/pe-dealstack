@@ -19,6 +19,7 @@ import { openai, isAIEnabled } from '../../../../openai.js';
 import { MODEL_FAST } from '../../../../utils/aiModels.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
+import { VERIFY_SAMPLE_SIZE } from '../config.js';
 import type { AgentStep } from '../state.js';
 import type { ClassifiedStatement } from '../../../financialClassifier.js';
 
@@ -119,7 +120,7 @@ export async function verifyNode(
     const extractionSummary = buildExtractionSummary(statements);
 
     // Use a relevant sample of source text (first 15K chars — enough for verification)
-    const sourceTextSample = rawText.slice(0, 15000);
+    const sourceTextSample = rawText.slice(0, VERIFY_SAMPLE_SIZE);
 
     const response = await openai.chat.completions.create({
       model: MODEL_FAST, // cheap + fast for verification

@@ -30,31 +30,46 @@ export async function analyzeFinancials(dealId: string, rows: any[]): Promise<An
 
   const data = prepareData(rows);
 
-  // Phase 2: QoE
-  const flags = computeQoEFlags(data);
+  // All analysis modules read from `data` (immutable) and write to independent outputs.
+  // Group into parallel batches for throughput:
+  //   Group A: QoE, ratios, DuPont (income statement focused)
+  //   Group B: EBITDA bridge, revenue quality, cost structure (income statement trends)
+  //   Group C: Cash flow analysis, working capital (CF + balance sheet)
+  //   Group D: Debt capacity, LBO screen, workforce, red flags (cross-statement)
+  const [
+    [flags, ratios, duPont],
+    [ebitdaBridge, revenueQuality, costStructure],
+    [cashFlowAnalysis, workingCapital],
+    [debtCapacity, lboScreen, workforceMetrics, redFlags],
+  ] = await Promise.all([
+    // Group A
+    Promise.all([
+      Promise.resolve(computeQoEFlags(data)),
+      Promise.resolve(computeRatios(data)),
+      Promise.resolve(computeDuPont(data)),
+    ]),
+    // Group B
+    Promise.all([
+      Promise.resolve(computeEBITDABridge(data)),
+      Promise.resolve(computeRevenueQuality(data)),
+      Promise.resolve(computeCostStructure(data)),
+    ]),
+    // Group C
+    Promise.all([
+      Promise.resolve(computeCashFlowAnalysis(data)),
+      Promise.resolve(computeWorkingCapital(data)),
+    ]),
+    // Group D
+    Promise.all([
+      Promise.resolve(computeDebtCapacity(data)),
+      Promise.resolve(computeLBOScreen(data)),
+      Promise.resolve(computeWorkforceMetrics(data)),
+      Promise.resolve(computeRedFlags(data)),
+    ]),
+  ]);
+
   const score = computeQoEScore(flags);
   const summary = generateQoESummary(score, flags);
-
-  // Phase 2.5A: Ratios + DuPont
-  const ratios = computeRatios(data);
-  const duPont = computeDuPont(data);
-
-  // Phase 2.5B-F: Operational analysis
-  const ebitdaBridge = computeEBITDABridge(data);
-  const revenueQuality = computeRevenueQuality(data);
-  const cashFlowAnalysis = computeCashFlowAnalysis(data);
-  const workingCapital = computeWorkingCapital(data);
-  const costStructure = computeCostStructure(data);
-
-  // Phase 2.5G-H: Debt & LBO
-  const debtCapacity = computeDebtCapacity(data);
-  const lboScreen = computeLBOScreen(data);
-
-  // Phase 2.5L: Workforce
-  const workforceMetrics = computeWorkforceMetrics(data);
-
-  // Phase 3: Red Flags
-  const redFlags = computeRedFlags(data);
 
   log.info('Financial analysis complete', {
     dealId,

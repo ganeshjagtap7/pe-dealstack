@@ -1,5 +1,6 @@
 import { log } from '../utils/logger.js';
 import type { ClassifiedStatement } from './financialClassifier.js';
+import { TOLERANCE_LARGE, TOLERANCE_SMALL } from './agents/financialAgent/config.js';
 
 export interface ValidationResult {
   isValid: boolean;
@@ -124,9 +125,7 @@ export function validateFinancials(data: {
 }
 
 // ─── 3-Statement Cross-Check Validators ──────────────────────
-
-const TOLERANCE_LARGE = 0.01; // 1% for values > $1M
-const TOLERANCE_SMALL = 0.02; // 2% for values <= $1M
+// TOLERANCE_LARGE and TOLERANCE_SMALL are imported from agents/financialAgent/config.ts
 
 function pct(numerator: number, denominator: number): number {
   return (numerator / denominator) * 100;

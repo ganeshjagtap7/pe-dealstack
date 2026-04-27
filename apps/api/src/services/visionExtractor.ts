@@ -11,70 +11,11 @@
 
 import { openaiDirect } from '../openai.js';
 import { log } from '../utils/logger.js';
+import { buildExtractionPrompt } from './extractionPrompt.js';
 import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, StatementType, PeriodType, UnitScale } from './financialClassifier.js';
 
 // ─── System prompt (same intent as classifyFinancials, optimised for vision) ──
-
-const VISION_SYSTEM_PROMPT = `You are a senior private equity analyst extracting structured financial data from deal documents (CIMs, teasers, standalone financials).
-
-Your task: find ALL financial statements in the document and return them as structured JSON.
-
-RULES:
-1. Extract EVERY year/period column you find — do not skip any
-2. Normalize ALL values to MILLIONS in the ORIGINAL currency of the document (do NOT convert between currencies)
-3. Detect the currency from the document (look for symbols like $, ₹, €, £, ¥, or text like USD, INR, EUR, GBP, JPY, etc.)
-4. Set the "currency" field to the ISO 4217 code (e.g. "USD", "INR", "EUR", "GBP", "JPY"). If no currency is detected, default to "USD"
-5. Label each period: HISTORICAL (past actuals), PROJECTED (forecasts/estimates), or LTM (last twelve months)
-6. Projected periods are identified by: "E", "F", "Est", "Forecast", "Budget", "Proj" suffix, or future years
-7. If a value is not present, use null — never guess
-8. confidence: 90-100 = explicitly stated, 70-89 = clearly implied, 50-69 = partially inferred, 0-49 = uncertain
-
-UNIT CONVERSION (always convert to millions in the original currency — do NOT convert between currencies):
-- "$50M" or "50,000" (when header says $000s) → 50
-- "$1.5B" or "1,500,000" (when header says $000s) → 1500
-- "$500K" or "500" (when header says $000s) → 0.5
-- If units are unclear, pick the most likely based on company size context
-
-INCOME STATEMENT line item keys (use exactly these keys):
-revenue, cogs, gross_profit, gross_margin_pct,
-sga, rd, other_opex, total_opex,
-ebitda, ebitda_margin_pct, da, ebit,
-interest_expense, ebt, tax, net_income, sde
-
-BALANCE SHEET line item keys:
-cash, accounts_receivable, inventory, other_current_assets, total_current_assets,
-ppe_net, goodwill, intangibles, total_assets,
-accounts_payable, short_term_debt, other_current_liabilities, total_current_liabilities,
-long_term_debt, total_liabilities, total_equity
-
-CASH FLOW line item keys:
-operating_cf, capex, fcf, acquisitions, debt_repayment, dividends, net_change_cash
-
-IMPORTANT: margins/percentages as numbers (e.g. 25.5 means 25.5%), NOT decimals.
-
-Return ONLY valid JSON:
-{
-  "statements": [
-    {
-      "statementType": "INCOME_STATEMENT",
-      "unitScale": "MILLIONS",
-      "currency": "USD",
-      "periods": [
-        {
-          "period": "2022",
-          "periodType": "HISTORICAL",
-          "confidence": 90,
-          "lineItems": { "revenue": 12.5, "ebitda": 3.1, "ebitda_margin_pct": 24.8 }
-        }
-      ]
-    }
-  ],
-  "overallConfidence": 88,
-  "warnings": []
-}
-
-If no financial data exists, return:
-{ "statements": [], "overallConfidence": 0, "warnings": ["No financial data found"] }`;
+// Prompt is built via shared extractionPrompt.ts — single source of truth.
 
 // ─── Main export ───────────────────────────────────────────────
 
@@ -114,7 +55,7 @@ export async function classifyFinancialsVision(
     // Must hit OpenAI directly — OpenRouter does not proxy /v1/responses.
     const response = await (openaiDirect as any).responses.create({
       model: 'gpt-4.1',
-      instructions: VISION_SYSTEM_PROMPT,
+      instructions: buildExtractionPrompt({ includeSourceCitations: false, currencyHint }),
       input: [
         {
           role: 'user',
@@ -126,7 +67,7 @@ export async function classifyFinancialsVision(
             },
             {
               type: 'input_text',
-              text: `Extract all financial statements from this document and return JSON.${currencyHint ? ` The document currency is likely ${currencyHint}.` : ''}`,
+              text: 'Extract all financial statements from this document and return JSON.',
             },
           ],
         },
