@@ -26,6 +26,7 @@ import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
+import financialExtractionRouter from './routes/financial-extraction.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
 import { supabase } from './supabase.js';
@@ -271,6 +272,7 @@ app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
+app.use('/api/financial-extraction', authMiddleware, orgMiddleware, financialExtractionRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)

@@ -108,6 +108,8 @@ export async function storeNode(
       periodsStored: result.periodsStored,
       hasConflicts: result.hasConflicts,
       status: 'completed',
+      tokensUsed: 0,
+      estimatedCostUsd: 0,
       steps,
     };
   } catch (err) {

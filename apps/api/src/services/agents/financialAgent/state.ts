@@ -162,6 +162,16 @@ export const FinancialAgentState = Annotation.Root({
     reducer: (prev, next) => [...prev, ...next],
     default: () => [],
   }),
+
+  // ── Token usage tracking (accumulates across all LLM calls) ──
+  tokensUsed: Annotation<number>({
+    reducer: (prev, next) => prev + next,
+    default: () => 0,
+  }),
+  estimatedCostUsd: Annotation<number>({
+    reducer: (prev, next) => prev + next,
+    default: () => 0,
+  }),
 });
 
 /** Inferred type for use in node functions */

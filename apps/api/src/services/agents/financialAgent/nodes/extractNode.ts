@@ -15,9 +15,12 @@ import { classifyFinancials } from '../../../financialClassifier.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { extractTextFromExcel, isExcelFile } from '../../../excelFinancialExtractor.js';
 import { extractTablesFromPdf, isAzureConfigured } from '../../../azureDocIntelligence.js';
+import { classifyExtraction } from '../../../extraction/financialClassifier.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { ExtractionSource, AgentStep } from '../state.js';
+import type { ClassifiedStatement } from '../../../financialClassifier.js';
+
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
@@ -68,7 +71,12 @@ export async function extractNode(
       }
 
       steps.push(step('extract', `Extracted ${excelText.length} chars from Excel, classifying with GPT-4o`));
-      const classification = await classifyFinancials(excelText);
+      const classifyResult = await classifyExtraction(excelText);
+      const classification = classifyResult.statements.length > 0
+        ? { statements: classifyResult.statements, overallConfidence: classifyResult.overallConfidence, warnings: classifyResult.warnings }
+        : null;
+      const extractTokens = classifyResult.usage.promptTokens + classifyResult.usage.completionTokens;
+      const extractCost = (classifyResult.usage.promptTokens * 5e-6) + (classifyResult.usage.completionTokens * 15e-6);
 
       if (!classification || classification.statements.length === 0) {
         return {
@@ -79,12 +87,14 @@ export async function extractNode(
           overallConfidence: 0,
           warnings: classification?.warnings ?? ['No financial data found in Excel file'],
           status: 'validating',
+          tokensUsed: extractTokens,
+          estimatedCostUsd: extractCost,
           steps: [...steps, step('extract', 'No financial statements found in Excel')],
         };
       }
 
-      const stmtTypes = classification.statements.map(s => s.statementType).join(', ');
-      const totalPeriods = classification.statements.reduce((sum, s) => sum + s.periods.length, 0);
+      const stmtTypes = classification.statements.map((s: ClassifiedStatement) => s.statementType).join(', ');
+      const totalPeriods = classification.statements.reduce((sum: number, s: ClassifiedStatement) => sum + s.periods.length, 0);
       steps.push(step('extract', `Found: ${stmtTypes} (${totalPeriods} periods, confidence ${classification.overallConfidence}%)`));
 
       return {
@@ -95,6 +105,8 @@ export async function extractNode(
         overallConfidence: classification.overallConfidence,
         warnings: classification.warnings,
         status: 'validating',
+        tokensUsed: extractTokens,
+        estimatedCostUsd: extractCost,
         steps,
       };
     }
@@ -148,11 +160,16 @@ export async function extractNode(
 
     if (pdfText && pdfText.trim().length >= MIN_TEXT_LENGTH) {
       steps.push(step('extract', `Extracted ${pdfText.length} chars — classifying with GPT-4o`));
-      const classification = await classifyFinancials(pdfText);
+      const pdfClassifyResult = await classifyExtraction(pdfText);
+      const classification = pdfClassifyResult.statements.length > 0
+        ? { statements: pdfClassifyResult.statements, overallConfidence: pdfClassifyResult.overallConfidence, warnings: pdfClassifyResult.warnings }
+        : null;
+      const pdfTokens = pdfClassifyResult.usage.promptTokens + pdfClassifyResult.usage.completionTokens;
+      const pdfCost = (pdfClassifyResult.usage.promptTokens * 5e-6) + (pdfClassifyResult.usage.completionTokens * 15e-6);
 
       if (classification && classification.statements.length > 0) {
-        const stmtTypes = classification.statements.map(s => s.statementType).join(', ');
-        const totalPeriods = classification.statements.reduce((sum, s) => sum + s.periods.length, 0);
+        const stmtTypes = classification.statements.map((s: ClassifiedStatement) => s.statementType).join(', ');
+        const totalPeriods = classification.statements.reduce((sum: number, s: ClassifiedStatement) => sum + s.periods.length, 0);
         steps.push(step('extract', `Found: ${stmtTypes} (${totalPeriods} periods, confidence ${classification.overallConfidence}%)`));
 
         return {
@@ -163,6 +180,8 @@ export async function extractNode(
           overallConfidence: classification.overallConfidence,
           warnings: classification.warnings,
           status: 'validating',
+          tokensUsed: pdfTokens,
+          estimatedCostUsd: pdfCost,
           steps,
         };
       }
