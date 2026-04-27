@@ -13,6 +13,8 @@
 import { createRequire } from 'module';
 import { classifyFinancials } from '../../../financialClassifier.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
+import { chunkDocument, mergeExtractionResults } from '../../../documentChunker.js';
+import type { ClassificationResult } from '../../../documentChunker.js';
 import { extractTextFromExcel, isExcelFile } from '../../../excelFinancialExtractor.js';
 import { extractTablesFromPdf, isAzureConfigured } from '../../../azureDocIntelligence.js';
 import { log } from '../../../../utils/logger.js';
@@ -148,7 +150,35 @@ export async function extractNode(
 
     if (pdfText && pdfText.trim().length >= MIN_TEXT_LENGTH) {
       steps.push(step('extract', `Extracted ${pdfText.length} chars — classifying with GPT-4o`));
-      const classification = await classifyFinancials(pdfText);
+
+      let textClassification: ClassificationResult | null = null;
+
+      if (pdfText.length > 100000) {
+        const chunks = chunkDocument(pdfText, 100000);
+        steps.push(step('extract', `Document is ${pdfText.length} chars — split into ${chunks.length} chunks`));
+
+        const chunkResults = await Promise.all(
+          chunks.slice(0, 4).map(async (chunk, i) => {
+            try {
+              steps.push(step('extract', `Extracting from chunk ${i + 1}/${Math.min(chunks.length, 4)} (relevance: ${chunk.relevanceScore})`));
+              return await classifyFinancials(chunk.text);
+            } catch (err) {
+              steps.push(step('extract', `Chunk ${i + 1} extraction failed`, String(err)));
+              return null;
+            }
+          })
+        );
+
+        const validResults = chunkResults.filter((r): r is ClassificationResult => r !== null);
+        if (validResults.length > 0) {
+          textClassification = mergeExtractionResults(validResults);
+          steps.push(step('extract', `Merged ${validResults.length} chunk results`));
+        }
+      } else {
+        textClassification = await classifyFinancials(pdfText);
+      }
+
+      const classification = textClassification;
 
       if (classification && classification.statements.length > 0) {
         const stmtTypes = classification.statements.map(s => s.statementType).join(', ');
