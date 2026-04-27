@@ -3,7 +3,7 @@
  *
  * Routes the file to the best extraction layer:
  *   Excel → xlsx parser → CSV text → GPT-4o classifier
- *   PDF Layer 1 → Azure Document Intelligence (if configured)
+ *   PDF Layer 1 → LlamaParse structured markdown (if configured)
  *   PDF Layer 2 → pdf-parse text → GPT-4o classifier (text-rich)
  *   PDF Layer 3 → GPT-4o Vision (scanned/image PDFs)
  *
@@ -16,7 +16,7 @@ import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { chunkDocument, mergeExtractionResults } from '../../../documentChunker.js';
 import type { ClassificationResult } from '../../../documentChunker.js';
 import { extractTextFromExcel, isExcelFile } from '../../../excelFinancialExtractor.js';
-import { extractTablesFromPdf, isAzureConfigured } from '../../../azureDocIntelligence.js';
+import { parseWithLlama, isLlamaParseEnabled } from '../../../llamaParse.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { ExtractionSource, AgentStep } from '../state.js';
@@ -101,38 +101,60 @@ export async function extractNode(
 
     // ── PDF Paths ──────────────────────────────────────────────
 
-    // Layer 1: Azure Document Intelligence
-    if (isAzureConfigured()) {
-      steps.push(step('extract', 'Trying Azure Document Intelligence (Layer 1)'));
+    // Layer 1: LlamaParse (structured markdown extraction)
+    if (isLlamaParseEnabled()) {
+      steps.push(step('extract', 'Trying LlamaParse (Layer 1) — structured markdown extraction'));
       try {
-        const azureResult = await extractTablesFromPdf(fileBuffer);
-        if (azureResult && azureResult.text.trim().length > 50) {
-          steps.push(step('extract', `Azure extracted ${azureResult.tableCount} tables from ${azureResult.pageCount} pages`));
-          steps.push(step('extract', 'Classifying Azure output with GPT-4o'));
+        const llamaResult = await parseWithLlama(fileBuffer, fileName || 'document.pdf');
+        if (llamaResult && llamaResult.text.trim().length > MIN_TEXT_LENGTH) {
+          steps.push(step('extract', `LlamaParse extracted ${llamaResult.text.length} chars from ${llamaResult.pages} pages`));
 
-          const classification = await classifyFinancials(azureResult.text);
-          if (classification && classification.statements.length > 0) {
-            const stmtTypes = classification.statements.map(s => s.statementType).join(', ');
-            const totalPeriods = classification.statements.reduce((sum, s) => sum + s.periods.length, 0);
-            steps.push(step('extract', `Found: ${stmtTypes} (${totalPeriods} periods, confidence ${classification.overallConfidence}%)`));
+          // Use the clean markdown text for classification
+          let llamaClassification: ClassificationResult | null = null;
+
+          if (llamaResult.text.length > CHUNK_THRESHOLD) {
+            const chunks = chunkDocument(llamaResult.text, MAX_CHUNK_SIZE);
+            steps.push(step('extract', `LlamaParse text split into ${chunks.length} chunks`));
+            const chunkResults = await Promise.all(
+              chunks.slice(0, MAX_CHUNKS).map(async (chunk, i) => {
+                try {
+                  return await classifyFinancials(chunk.text);
+                } catch (err) {
+                  steps.push(step('extract', `LlamaParse chunk ${i + 1} failed`, String(err)));
+                  return null;
+                }
+              })
+            );
+            const validResults = chunkResults.filter((r): r is ClassificationResult => r !== null);
+            if (validResults.length > 0) {
+              llamaClassification = mergeExtractionResults(validResults);
+            }
+          } else {
+            llamaClassification = await classifyFinancials(llamaResult.text);
+          }
+
+          if (llamaClassification && llamaClassification.statements.length > 0) {
+            const stmtTypes = llamaClassification.statements.map(s => s.statementType).join(', ');
+            const totalPeriods = llamaClassification.statements.reduce((sum, s) => sum + s.periods.length, 0);
+            steps.push(step('extract', `Found: ${stmtTypes} (${totalPeriods} periods, confidence ${llamaClassification.overallConfidence}%)`));
 
             return {
-              rawText: azureResult.text,
-              extractionSource: 'azure',
-              classification,
-              statements: classification.statements,
-              overallConfidence: classification.overallConfidence,
-              warnings: classification.warnings,
+              rawText: llamaResult.text,
+              extractionSource: 'gpt4o',
+              classification: llamaClassification,
+              statements: llamaClassification.statements,
+              overallConfidence: llamaClassification.overallConfidence,
+              warnings: llamaClassification.warnings,
               status: 'validating',
               steps,
             };
           }
-          steps.push(step('extract', 'Azure returned tables but classifier found no financials — falling through'));
+          steps.push(step('extract', 'LlamaParse returned text but no financials found — falling through to pdf-parse'));
         } else {
-          steps.push(step('extract', 'Azure returned no tables — falling through'));
+          steps.push(step('extract', 'LlamaParse returned no useful text — falling through'));
         }
       } catch (err) {
-        steps.push(step('extract', 'Azure failed — falling through to text extraction', String(err)));
+        steps.push(step('extract', 'LlamaParse failed — falling through to pdf-parse', String(err)));
       }
     }
 
