@@ -88,6 +88,7 @@ If no financial data exists, return:
 export async function classifyFinancialsVision(
   pdfBuffer: Buffer,
   filename: string = 'document.pdf',
+  currencyHint?: string,
 ): Promise<ClassificationResult | null> {
   if (!isAIEnabled() || !openai) {
     log.warn('Vision extractor: OpenAI not configured, skipping');
@@ -124,7 +125,7 @@ export async function classifyFinancialsVision(
             },
             {
               type: 'input_text',
-              text: 'Extract all financial statements from this document and return JSON.',
+              text: `Extract all financial statements from this document and return JSON.${currencyHint ? ` The document currency is likely ${currencyHint}.` : ''}`,
             },
           ],
         },

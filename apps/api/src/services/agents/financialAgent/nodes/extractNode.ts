@@ -141,6 +141,7 @@ export async function extractNode(
     // Layer 2: pdf-parse text → GPT-4o
     steps.push(step('extract', 'Extracting text with pdf-parse (Layer 2)'));
     let pdfText: string | null = null;
+    let textClassification: ClassificationResult | null = null;
     try {
       const parsed = await pdfParse(fileBuffer);
       pdfText = parsed.text || null;
@@ -151,7 +152,6 @@ export async function extractNode(
     if (pdfText && pdfText.trim().length >= MIN_TEXT_LENGTH) {
       steps.push(step('extract', `Extracted ${pdfText.length} chars — classifying with GPT-4o`));
 
-      let textClassification: ClassificationResult | null = null;
 
       if (pdfText.length > 100000) {
         const chunks = chunkDocument(pdfText, 100000);
@@ -204,7 +204,11 @@ export async function extractNode(
 
     // Layer 3: GPT-4o Vision (scanned / image-only PDFs)
     steps.push(step('extract', 'Switching to GPT-4o Vision (Layer 3)'));
-    const visionClassification = await classifyFinancialsVision(fileBuffer, fileName || 'document.pdf');
+    const visionClassification = await classifyFinancialsVision(
+      fileBuffer,
+      fileName || 'document.pdf',
+      textClassification?.statements?.[0]?.currency,
+    );
 
     if (!visionClassification || visionClassification.statements.length === 0) {
       return {
