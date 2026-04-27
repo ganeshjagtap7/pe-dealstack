@@ -21,21 +21,38 @@ const finState = {
 
 // ─── Main entry point ─────────────────────────────────────────
 async function loadFinancials(dealId) {
-  try {
-    const [stmtsRes, validRes, conflictsRes] = await Promise.all([
-      PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials`),
-      PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials/validation`),
-      PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials/conflicts`),
-    ]);
+  // Use allSettled so one failing endpoint doesn't prevent the others from loading
+  const [stmtsResult, validResult, conflictsResult] = await Promise.allSettled([
+    PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials`),
+    PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials/validation`),
+    PEAuth.authFetch(`${API_BASE_URL}/deals/${dealId}/financials/conflicts`),
+  ]);
 
-    if (stmtsRes.ok) finState.statements = await stmtsRes.json();
-    if (validRes.ok) finState.validation = await validRes.json();
-    if (conflictsRes.ok) {
-      const conflictData = await conflictsRes.json();
-      finState.conflicts = conflictData.conflicts ?? [];
+  // Process statements (critical)
+  if (stmtsResult.status === 'fulfilled' && stmtsResult.value.ok) {
+    try {
+      finState.statements = await stmtsResult.value.json();
+    } catch (err) {
+      console.warn('[financials] Failed to parse statements response', err);
     }
-  } catch (err) {
-    console.warn('[financials] load error', err);
+  } else {
+    const reason = stmtsResult.status === 'rejected' ? stmtsResult.reason : `HTTP ${stmtsResult.value?.status}`;
+    console.warn('[financials] Failed to load statements:', reason);
+  }
+
+  // Process validation (non-critical)
+  if (validResult.status === 'fulfilled' && validResult.value.ok) {
+    try {
+      finState.validation = await validResult.value.json();
+    } catch (err) { /* ignore parse error */ }
+  }
+
+  // Process conflicts (non-critical)
+  if (conflictsResult.status === 'fulfilled' && conflictsResult.value.ok) {
+    try {
+      const conflictData = await conflictsResult.value.json();
+      finState.conflicts = conflictData.conflicts ?? [];
+    } catch (err) { /* ignore parse error */ }
   }
 
   // Detect currency from financial statements (use most common non-USD, or first available)
@@ -472,6 +489,31 @@ function showExtractionResultModal(extractionResult) {
       </ul>
     </div>` : '';
 
+  // Flagged values section (from cross-verification disagreements)
+  const flaggedValues = extractionResult.agent?.crossVerifyResult?.flaggedValues || [];
+  const flaggedHtml = flaggedValues.length > 0 ? `
+    <div class="px-6 pb-4">
+      <div class="rounded-lg border-2 border-amber-300 bg-amber-50 p-4">
+        <div class="flex items-center gap-2 mb-3">
+          <span class="material-symbols-outlined text-amber-600 text-base">rate_review</span>
+          <span class="text-xs font-bold text-amber-900">Review Required — ${flaggedValues.length} value${flaggedValues.length > 1 ? 's' : ''} need confirmation</span>
+        </div>
+        <div class="space-y-2">
+          ${flaggedValues.map(f => `
+            <div class="flex items-center gap-3 bg-white rounded-md p-2.5 border border-amber-200">
+              <span class="text-xs font-semibold text-gray-700 min-w-[100px]">${escapeHtml(f.field.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()))}</span>
+              <div class="flex-1 flex items-center gap-2">
+                <span class="text-xs text-gray-500">Primary: <strong>${fmtVal(f.gpt4o_value)}</strong></span>
+                <span class="text-xs text-gray-400">|</span>
+                <span class="text-xs text-gray-500">Verified: <strong class="text-amber-700">${fmtVal(f.claude_value)}</strong></span>
+              </div>
+              ${f.issue ? `<span class="text-[10px] text-amber-600 italic">${escapeHtml(f.issue)}</span>` : ''}
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    </div>` : '';
+
   const modal = document.createElement('div');
   modal.id = 'fin-extraction-modal';
   modal.className = 'fixed inset-0 z-[9999] flex items-center justify-center';
@@ -540,6 +582,8 @@ function showExtractionResultModal(extractionResult) {
       </div>
 
       ${warningsHtml}
+
+      ${flaggedHtml}
 
       <!-- Actions -->
       <div class="px-6 py-4 border-t border-gray-100 flex gap-3">

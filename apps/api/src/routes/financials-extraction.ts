@@ -162,6 +162,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         validationResult: agentResult.validationResult,
         steps: agentResult.steps,
         error: agentResult.error,
+        crossVerifyResult: agentResult.crossVerifyResult || null,
       },
     });
   } catch (err: any) {
@@ -277,6 +278,7 @@ router.post('/documents/:documentId/extract-financials', async (req, res) => {
         validationResult: agentResult.validationResult,
         steps: agentResult.steps,
         error: agentResult.error,
+        crossVerifyResult: agentResult.crossVerifyResult || null,
       },
     });
   } catch (err: any) {
