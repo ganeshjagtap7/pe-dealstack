@@ -137,7 +137,7 @@ export async function classifyFinancials(
 
   // Use up to 60,000 chars — GPT-4o supports 128K context, so we can safely send more
   // This catches financial data buried deep in 50+ page CIMs that were previously cut off
-  const truncatedText = text.slice(0, 60000);
+  const truncatedText = text.slice(0, 120000);
 
   log.debug('Financial classifier starting', { textLength: truncatedText.length });
 
