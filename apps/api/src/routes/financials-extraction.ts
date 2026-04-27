@@ -12,6 +12,7 @@ import type { ClassifiedStatement } from '../services/financialClassifier.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { runFinancialAgent } from '../services/agents/financialAgent/index.js';
 import type { FileType } from '../services/agents/financialAgent/index.js';
+import { acquireExtractionSlot, releaseExtractionSlot } from '../services/agents/financialAgent/concurrency.js';
 import { downloadFileBuffer, extractStoragePath } from '../utils/storage.js';
 
 const require = createRequire(import.meta.url);
@@ -133,14 +134,25 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
     }
 
     // Run the LangGraph financial agent
-    const agentResult = await runFinancialAgent({
-      dealId,
-      documentId: doc.id,
-      fileBuffer,
-      fileName: doc.name ?? 'document',
-      fileType: detectFileType(doc.mimeType, doc.name),
-      organizationId: orgId,
-    });
+    if (!acquireExtractionSlot(orgId)) {
+      return res.status(429).json({
+        error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',
+      });
+    }
+
+    let agentResult;
+    try {
+      agentResult = await runFinancialAgent({
+        dealId,
+        documentId: doc.id,
+        fileBuffer,
+        fileName: doc.name ?? 'document',
+        fileType: detectFileType(doc.mimeType, doc.name),
+        organizationId: orgId,
+      });
+    } finally {
+      releaseExtractionSlot(orgId);
+    }
 
     res.json({
       success: agentResult.status === 'completed',
@@ -250,14 +262,25 @@ router.post('/documents/:documentId/extract-financials', async (req, res) => {
     }
 
     // Run the LangGraph financial agent
-    const agentResult = await runFinancialAgent({
-      dealId: doc.dealId,
-      documentId: doc.id,
-      fileBuffer,
-      fileName: doc.name ?? 'document',
-      fileType: detectFileType(doc.mimeType, doc.name),
-      organizationId: orgId,
-    });
+    if (!acquireExtractionSlot(orgId)) {
+      return res.status(429).json({
+        error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',
+      });
+    }
+
+    let agentResult;
+    try {
+      agentResult = await runFinancialAgent({
+        dealId: doc.dealId,
+        documentId: doc.id,
+        fileBuffer,
+        fileName: doc.name ?? 'document',
+        fileType: detectFileType(doc.mimeType, doc.name),
+        organizationId: orgId,
+      });
+    } finally {
+      releaseExtractionSlot(orgId);
+    }
 
     res.json({
       success: agentResult.status === 'completed',
