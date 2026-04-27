@@ -16,9 +16,7 @@
 import { validateStatements } from '../../../financialValidator.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep, FailedCheck, ValidationResult } from '../state.js';
-
-/** Confidence threshold — periods below this are flagged for self-correction */
-const CONFIDENCE_THRESHOLD = 80;
+import { CONFIDENCE_THRESHOLD } from '../config.js';
 
 /** Create a timestamped agent step */
 function step(node: string, message: string, detail?: string): AgentStep {

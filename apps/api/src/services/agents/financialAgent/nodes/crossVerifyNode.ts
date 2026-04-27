@@ -13,6 +13,7 @@ import { anthropic, isClaudeEnabled } from '../../../../services/anthropic.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType, AgentStep } from '../state.js';
 import type { ClassifiedStatement } from '../../../financialClassifier.js';
+import { VERIFY_SAMPLE_SIZE } from '../config.js';
 
 // ─── Interfaces ──────────────────────────────────────────────
 
@@ -246,7 +247,7 @@ export async function crossVerifyNode(
   steps.push(step('crossVerify', `Sending ${fieldCount} financial value(s) to Claude Haiku for cross-verification`));
 
   try {
-    const sourceTextSample = rawText.slice(0, 15000);
+    const sourceTextSample = rawText.slice(0, VERIFY_SAMPLE_SIZE);
     const userPrompt = buildVerifyPrompt(extractedValues, sourceTextSample);
 
     const message = await anthropic.messages.create({

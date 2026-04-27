@@ -22,6 +22,7 @@ import { getFinancialAgentGraph } from './graph.js';
 import { log } from '../../../utils/logger.js';
 import type { FileType, FinancialAgentStateType } from './state.js';
 import type { ReconcileResult } from './nodes/crossVerifyNode.js';
+import { DEFAULT_MAX_RETRIES } from './config.js';
 
 // ─── Input Types ─────────────────────────────────────────────
 
@@ -76,7 +77,7 @@ export async function runFinancialAgent(
       fileName: input.fileName,
       fileType: input.fileType,
       organizationId: input.organizationId ?? null,
-      maxRetries: input.maxRetries ?? 3,
+      maxRetries: input.maxRetries ?? DEFAULT_MAX_RETRIES,
       skipVerify: false,
     });
 
