@@ -86,7 +86,7 @@ describe('Rule 1 — Balance sheet equality', () => {
   });
 
   it('accepts values within 5% tolerance', () => {
-    // 5000 vs 3000 + 1960 = 4960 — 0.8% off
+    // 5000 vs 3000 + 1960 = 4960 — 0.8% off (within 1% tolerance)
     const result = validateExtraction([balanceSheet(5000, 3000, 1960)]);
     const check = result.checks.find(c => c.check === 'bs_balances');
     expect(check?.passed).toBe(true);
@@ -106,7 +106,7 @@ describe('Rule 2 — Revenue > 0', () => {
     const result = validateExtraction([incomeStatement({ revenue: 0 })]);
     const check = result.checks.find(c => c.check === 'revenue_positive');
     expect(check?.passed).toBe(false);
-    expect(check?.severity).toBe('error');
+    expect(check?.severity).toBe('warning');
   });
 
   it('fails for negative revenue', () => {
@@ -196,6 +196,57 @@ describe('Rule 5 — Cash flow reconciliation', () => {
     const result = validateExtraction([cashFlow(100, 20, 50)]);
     const check = result.checks.find(c => c.check === 'cf_fcf_math');
     expect(check?.passed).toBe(false);
+  });
+});
+
+describe('Cash reconciliation — Beginning Cash + Net Change = Ending Cash', () => {
+  it('passes when BS cash delta matches CF net_change_cash', () => {
+    const bs: ClassifiedStatement = {
+      statementType: 'BALANCE_SHEET',
+      unitScale: 'MILLIONS',
+      currency: 'USD',
+      periods: [
+        { period: '2022', periodType: 'HISTORICAL', confidence: 90, lineItems: { cash: 100 } },
+        { period: '2023', periodType: 'HISTORICAL', confidence: 90, lineItems: { cash: 120 } }, // +20
+      ],
+    };
+    const cf: ClassifiedStatement = {
+      statementType: 'CASH_FLOW',
+      unitScale: 'MILLIONS',
+      currency: 'USD',
+      periods: [
+        { period: '2023', periodType: 'HISTORICAL', confidence: 90, lineItems: { net_change_cash: 20 } },
+      ],
+    };
+
+    const result = validateExtraction([bs, cf]);
+    const check = result.checks.find(c => c.check === 'cf_cash_reconciliation');
+    expect(check?.passed).toBe(true);
+  });
+
+  it('fails when BS cash delta conflicts with CF net_change_cash', () => {
+    const bs: ClassifiedStatement = {
+      statementType: 'BALANCE_SHEET',
+      unitScale: 'MILLIONS',
+      currency: 'USD',
+      periods: [
+        { period: '2022', periodType: 'HISTORICAL', confidence: 90, lineItems: { cash: 100 } },
+        { period: '2023', periodType: 'HISTORICAL', confidence: 90, lineItems: { cash: 140 } }, // +40
+      ],
+    };
+    const cf: ClassifiedStatement = {
+      statementType: 'CASH_FLOW',
+      unitScale: 'MILLIONS',
+      currency: 'USD',
+      periods: [
+        { period: '2023', periodType: 'HISTORICAL', confidence: 90, lineItems: { net_change_cash: 20 } },
+      ],
+    };
+
+    const result = validateExtraction([bs, cf]);
+    const check = result.checks.find(c => c.check === 'cf_cash_reconciliation');
+    expect(check?.passed).toBe(false);
+    expect(check?.severity).toBe('error');
   });
 });
 

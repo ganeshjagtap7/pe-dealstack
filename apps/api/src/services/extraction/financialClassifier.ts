@@ -10,7 +10,7 @@
  * Types re-use the canonical ClassifiedStatement from the root classifier.
  */
 
-import { classifyFinancials } from '../financialClassifier.js';
+import { classifyFinancialsWithUsage } from '../financialClassifier.js';
 import { log } from '../../utils/logger.js';
 import type { ClassifiedStatement } from '../financialClassifier.js';
 
@@ -89,40 +89,51 @@ export async function classifyExtraction(
   // Truncate to match classifyFinancials() behaviour (60k chars)
   const truncated = text.slice(0, 60000);
 
-  let usage: TokenUsage = { promptTokens: 0, completionTokens: 0 };
+  // ── Use root classifier for canonical normalization + exact usage ──────────
+  let attempt = 0;
+  while (attempt < 2) {
+    attempt++;
+    try {
+      const withUsage = await classifyFinancialsWithUsage(truncated);
 
-  // Estimate token usage from text length — avoids a redundant GPT-4o call just for counting
-  // Standard approximation: ~1 token per 4 characters
-  const estimatedPromptTokens = Math.ceil(truncated.length / 4) + 200; // +200 for system prompt overhead
-  const estimatedCompletionTokens = 600; // typical structured JSON response
-  usage = {
-    promptTokens: estimatedPromptTokens,
-    completionTokens: estimatedCompletionTokens,
-  };
+      if (!withUsage?.result) {
+        return {
+          statements: [],
+          usage: { promptTokens: 0, completionTokens: 0 },
+          warnings: ['Classification returned no result'],
+          overallConfidence: 0,
+        };
+      }
 
-  // ── Use root classifier for canonical normalization ──────────
-  const result = await classifyFinancials(truncated);
+      log.info('classifyExtraction completed', {
+        statementsFound: withUsage.result.statements.length,
+        overallConfidence: withUsage.result.overallConfidence,
+        promptTokens: withUsage.usage.promptTokens,
+        completionTokens: withUsage.usage.completionTokens,
+        attempt,
+      });
 
-  if (!result) {
-    return {
-      statements: [],
-      usage,
-      warnings: ['Classification returned no result'],
-      overallConfidence: 0,
-    };
+      return {
+        statements: withUsage.result.statements,
+        usage: {
+          promptTokens: withUsage.usage.promptTokens,
+          completionTokens: withUsage.usage.completionTokens,
+        },
+        warnings: withUsage.result.warnings,
+        overallConfidence: withUsage.result.overallConfidence,
+      };
+    } catch (err: any) {
+      // Retry once on transient failures
+      log.warn('classifyExtraction failed, retrying', { attempt, error: err?.message });
+      if (attempt >= 2) throw err;
+    }
   }
 
-  log.info('classifyExtraction completed', {
-    statementsFound: result.statements.length,
-    overallConfidence: result.overallConfidence,
-    promptTokens: usage.promptTokens,
-    completionTokens: usage.completionTokens,
-  });
-
+  // Unreachable (loop returns or throws)
   return {
-    statements: result.statements,
-    usage,
-    warnings: result.warnings,
-    overallConfidence: result.overallConfidence,
+    statements: [],
+    usage: { promptTokens: 0, completionTokens: 0 },
+    warnings: ['Unexpected classifier failure'],
+    overallConfidence: 0,
   };
 }

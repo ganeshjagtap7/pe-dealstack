@@ -69,9 +69,20 @@ vi.mock('../src/openai.js', async (importOriginal) => {
           create: mockCreate,
         },
       },
+      responses: {
+        create: vi.fn().mockResolvedValue({ output_text: 'Vision PDF text extraction mock' }),
+      },
     },
   };
 });
+
+// Mock pdf-parse so the PDF path is deterministic (no real PDF parsing needed)
+vi.mock('pdf-parse', () => ({
+  default: vi.fn().mockResolvedValue({
+    text: 'ACME Income Statement\n2023 Revenue 50\n2023 EBITDA 12\n\fPage 2\nMore text here to avoid sparse detection.',
+    numpages: 2,
+  }),
+}));
 
 // Stub vision extractor — called for images/scanned PDFs
 vi.mock('../src/services/visionExtractor.js', () => ({
@@ -149,9 +160,11 @@ describe('runExtractionPipeline — failed path (unsupported format)', () => {
 describe('runExtractionPipeline — text extraction path', () => {
   it('returns correct metadata shape', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'financials.txt');
+    // Use a supported MIME type; pipeline expects PDF/Excel/Image paths via textExtractor.
+    // We intentionally name it .pdf so the extractor routes to the PDF path in tests.
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'financials.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'financials.txt');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'financials.pdf');
 
     expect(result).toHaveProperty('status');
     expect(result).toHaveProperty('statements');
@@ -167,9 +180,9 @@ describe('runExtractionPipeline — text extraction path', () => {
 
   it('metadata.processingTime has all required timing keys', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile('test', 'test.bin');
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'test.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'test.pdf');
 
     const times = result.metadata.processingTime;
     expect(times).toHaveProperty('textExtraction');
@@ -183,18 +196,18 @@ describe('runExtractionPipeline — text extraction path', () => {
 
   it('estimatedCost is a non-negative number', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile('test', 'test.bin');
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'test.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'test.pdf');
     expect(typeof result.metadata.estimatedCost).toBe('number');
     expect(result.metadata.estimatedCost).toBeGreaterThanOrEqual(0);
   });
 
   it('tokensUsed is a non-negative integer', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile('test', 'test.bin');
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'test.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'test.pdf');
     expect(typeof result.metadata.tokensUsed).toBe('number');
     expect(result.metadata.tokensUsed).toBeGreaterThanOrEqual(0);
     expect(Number.isFinite(result.metadata.tokensUsed)).toBe(true);
@@ -204,9 +217,9 @@ describe('runExtractionPipeline — text extraction path', () => {
 describe('runExtractionPipeline — validation integration', () => {
   it('validation result always has the required shape', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile('test', 'test.bin');
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'test.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'test.pdf');
 
     expect(result.validation).toHaveProperty('checks');
     expect(result.validation).toHaveProperty('errorCount');
@@ -221,17 +234,17 @@ describe('runExtractionPipeline — validation integration', () => {
 describe('runExtractionPipeline — status values', () => {
   it('status is one of: success | partial | failed', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile('test', 'test.bin');
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'test.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'test.pdf');
     expect(['success', 'partial', 'failed']).toContain(result.status);
   });
 
   it('corrections is null when validation passes', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile('test', 'test.bin');
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'test.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'test.pdf');
 
     if (result.status === 'success') {
       expect(result.corrections).toBeNull();
@@ -242,9 +255,9 @@ describe('runExtractionPipeline — status values', () => {
 describe('runExtractionPipeline — cost calculation accuracy', () => {
   it('estimatedCost matches tokensUsed * gpt-4o pricing formula', async () => {
     const { runExtractionPipeline } = await import('../src/services/extraction/pipeline.js');
-    const filePath = await writeTempFile('test', 'test.bin');
+    const filePath = await writeTempFile(SAMPLE_FINANCIAL_TEXT, 'test.pdf');
 
-    const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
+    const result = await runExtractionPipeline(filePath, 'application/pdf', 'test.pdf');
 
     if (result.metadata.tokensUsed === 0) {
       expect(result.metadata.estimatedCost).toBe(0);

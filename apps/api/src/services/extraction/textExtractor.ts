@@ -14,7 +14,7 @@
 import fs from 'fs/promises';
 import { createRequire } from 'module';
 import { extractTextFromExcel, isExcelFile } from '../excelFinancialExtractor.js';
-import { classifyFinancialsVision } from '../visionExtractor.js';
+import { openai, isAIEnabled } from '../../openai.js';
 import { log } from '../../utils/logger.js';
 
 const require = createRequire(import.meta.url);
@@ -32,7 +32,7 @@ export interface TextExtractionMeta {
   format: 'pdf' | 'excel' | 'image';
   pageCount: number;
   fileSize: number;
-  extractionMethod: 'pdf-parse' | 'excel-xlsx' | 'gpt-4o-vision';
+  extractionMethod: 'pdf-parse' | 'excel-xlsx' | 'gpt-4o-vision' | 'gpt-4o-vision-ocr';
   isScanned: boolean;
 }
 
@@ -109,28 +109,117 @@ async function extractViaVision(
   filePath: string,
   fileSize: number,
 ): Promise<TextExtractionResult> {
+  if (!isAIEnabled() || !openai) {
+    throw new Error('OpenAI not configured — cannot run Vision extraction');
+  }
+
   const buffer = await fs.readFile(filePath);
-  const fileName = filePath.split(/[/\\]/).pop() ?? 'document.pdf';
+  const fileName = filePath.split(/[/\\]/).pop() ?? 'document';
 
-  log.info('textExtractor: falling back to GPT-4o Vision', { fileName, fileSize });
+  log.info('textExtractor: running GPT-4o Vision OCR', { fileName, fileSize });
 
-  const classification = await classifyFinancialsVision(buffer, fileName);
+  const base64 = buffer.toString('base64');
+  const mime = fileName.toLowerCase().endsWith('.png')
+    ? 'image/png'
+    : fileName.toLowerCase().endsWith('.webp')
+      ? 'image/webp'
+      : 'image/jpeg';
 
-  // Vision returns a ClassificationResult, not raw text.
-  // We serialise the statements to a human-readable text blob for the pipeline.
-  const text = classification
-    ? JSON.stringify(classification, null, 2)
-    : '';
+  const dataUrl = `data:${mime};base64,${base64}`;
+
+  const response = await openai.chat.completions.create({
+    model: 'gpt-4o',
+    messages: [
+      {
+        role: 'system',
+        content:
+          'Extract ALL visible text and tables from the image. ' +
+          'Preserve table structure where possible using markdown tables. ' +
+          'Do not summarize. Do not invent values. Output plain text/markdown only.',
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'Please extract all text and tables exactly as shown.' },
+          { type: 'image_url', image_url: { url: dataUrl } },
+        ],
+      },
+    ],
+    temperature: 0,
+    max_tokens: 4000,
+  }, { timeout: 60000 });
+
+  const text = response.choices?.[0]?.message?.content ?? '';
+  if (!text || text.trim().length < 20) {
+    throw new Error('Vision OCR returned empty text');
+  }
 
   return {
     text,
     sections: [{
       name: 'Vision Extraction',
       text,
-      hasTabularData: (classification?.statements?.length ?? 0) > 0,
+      hasTabularData: detectTabularData(text),
     }],
     metadata: {
       format: 'image',
+      pageCount: 1,
+      fileSize,
+      extractionMethod: 'gpt-4o-vision-ocr',
+      isScanned: true,
+    },
+  };
+}
+
+async function extractPdfViaVisionText(
+  filePath: string,
+  fileSize: number,
+): Promise<TextExtractionResult> {
+  if (!isAIEnabled() || !openai) {
+    throw new Error('OpenAI not configured — cannot run Vision extraction');
+  }
+
+  const buffer = await fs.readFile(filePath);
+  const fileName = filePath.split(/[/\\]/).pop() ?? 'document.pdf';
+  const base64 = buffer.toString('base64');
+  const fileDataUrl = `data:application/pdf;base64,${base64}`;
+
+  log.info('textExtractor: running GPT-4o PDF vision text extraction', { fileName, fileSize });
+
+  // Use Responses API for native PDF input (same approach as visionExtractor.ts)
+  const response = await (openai as any).responses.create({
+    model: 'gpt-4o',
+    instructions:
+      'Extract ALL visible text and tables from the PDF. ' +
+      'Preserve table structure where possible using markdown tables. ' +
+      'Do not summarize. Do not invent values. Output plain text/markdown only.',
+    input: [
+      {
+        role: 'user',
+        content: [
+          { type: 'input_file', filename: fileName, file_data: fileDataUrl },
+          { type: 'input_text', text: 'Please extract all text and tables exactly as shown.' },
+        ],
+      },
+    ],
+  });
+
+  const text: string = response.output_text ?? '';
+  if (!text || text.trim().length < 20) {
+    throw new Error('Vision PDF extraction returned empty text');
+  }
+
+  const sections: TextSection[] = [{
+    name: 'Vision PDF Extraction',
+    text,
+    hasTabularData: detectTabularData(text),
+  }];
+
+  return {
+    text,
+    sections,
+    metadata: {
+      format: 'pdf',
       pageCount: 1,
       fileSize,
       extractionMethod: 'gpt-4o-vision',
@@ -210,7 +299,7 @@ export async function extractText(
         log.info('textExtractor: sparse/scanned PDF — switching to Vision', {
           textLength: text.trim().length,
         });
-        return extractViaVision(filePath, fileSize);
+        return extractPdfViaVisionText(filePath, fileSize);
       }
 
       const sections = splitPdfIntoSections(text, pdfData.numpages ?? 1);
@@ -232,7 +321,7 @@ export async function extractText(
       }
       // pdf-parse failure → Vision fallback
       log.warn('textExtractor: pdf-parse failed, trying Vision', { error: err.message });
-      return extractViaVision(filePath, fileSize);
+      return extractPdfViaVisionText(filePath, fileSize);
     }
   }
 

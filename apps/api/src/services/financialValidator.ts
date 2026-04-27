@@ -125,7 +125,9 @@ export function validateFinancials(data: {
 
 // ─── 3-Statement Cross-Check Validators ──────────────────────
 
-const TOLERANCE = 0.05; // 5% tolerance for math cross-checks
+// Assignment spec uses 1% tolerance for core financial math cross-checks.
+// Keep this strict to catch unit-scale and row-mapping extraction errors early.
+const TOLERANCE = 0.01; // 1% tolerance for math cross-checks
 
 function pct(numerator: number, denominator: number): number {
   return (numerator / denominator) * 100;

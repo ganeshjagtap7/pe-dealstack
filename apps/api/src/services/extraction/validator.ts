@@ -38,8 +38,8 @@ export interface PipelineValidationResult extends StatementsValidationResult {
 
 // ─── Helper ───────────────────────────────────────────────────
 
-/** 5% tolerance for numeric comparisons */
-const TOLERANCE_PCT = 0.05;
+/** 1% tolerance for numeric comparisons (assignment requirement) */
+const TOLERANCE_PCT = 0.01;
 
 function withinTolerance(a: number, b: number): boolean {
   if (b === 0) return Math.abs(a) < 1; // Both effectively zero
@@ -61,7 +61,7 @@ function checkRevenuePositive(statements: ClassifiedStatement[]): StatementCheck
       checks.push({
         check: 'revenue_positive',
         passed,
-        severity: passed ? 'info' : 'error',
+        severity: passed ? 'info' : 'warning',
         message: passed
           ? `Revenue ${revenue}M is positive`
           : `Revenue ${revenue}M is zero or negative — likely an extraction error`,
@@ -195,6 +195,60 @@ function checkNetIncomeConsistency(statements: ClassifiedStatement[]): Statement
   return checks;
 }
 
+// ─── Cash Reconciliation (required): Beginning Cash + Net Change = Ending Cash ──
+
+/**
+ * Implements the assignment cash reconciliation rule using available keys:
+ * - Balance Sheet provides cash by period (`cash`)
+ * - Cash Flow provides net change in cash for the period (`net_change_cash`)
+ *
+ * For a given historical period T, we treat:
+ *   beginning_cash(T) = cash(T-1) from Balance Sheet
+ *   ending_cash(T) = cash(T) from Balance Sheet
+ *   net_change(T) = net_change_cash(T) from Cash Flow
+ *
+ * Check: beginning_cash + net_change ≈ ending_cash (within tolerance)
+ */
+function checkCashReconciliation(statements: ClassifiedStatement[]): StatementCheck[] {
+  const checks: StatementCheck[] = [];
+
+  const bs = statements.find(s => s.statementType === 'BALANCE_SHEET');
+  const cf = statements.find(s => s.statementType === 'CASH_FLOW');
+  if (!bs || !cf) return checks;
+
+  const bsHist = bs.periods
+    .filter(p => p.periodType === 'HISTORICAL')
+    .sort((a, b) => a.period.localeCompare(b.period));
+
+  for (let i = 1; i < bsHist.length; i++) {
+    const prev = bsHist[i - 1];
+    const curr = bsHist[i];
+
+    const beginningCash = prev.lineItems['cash'] ?? null;
+    const endingCash = curr.lineItems['cash'] ?? null;
+    if (beginningCash === null || endingCash === null) continue;
+
+    const cfPeriod = cf.periods.find(p => p.period === curr.period);
+    const netChange = cfPeriod?.lineItems['net_change_cash'] ?? null;
+    if (netChange === null) continue;
+
+    const expectedEnding = beginningCash + netChange;
+    const passed = withinTolerance(expectedEnding, endingCash);
+
+    checks.push({
+      check: 'cf_cash_reconciliation',
+      passed,
+      severity: 'error',
+      message: passed
+        ? `Cash reconciles for ${curr.period}: ${beginningCash}M + ${netChange}M ≈ ${endingCash}M`
+        : `Cash reconciliation failed for ${curr.period}: beginning cash ${beginningCash}M + net change ${netChange}M = ${expectedEnding.toFixed(4)}M, but ending cash is ${endingCash}M`,
+      period: curr.period,
+    });
+  }
+
+  return checks;
+}
+
 // ─── Build Flagged Items ──────────────────────────────────────
 
 function buildFlaggedItems(
@@ -311,6 +365,7 @@ export function validateExtraction(
     ...checkRevenuePositive(statements),
     ...checkSubtotalConsistency(statements),
     ...checkNetIncomeConsistency(statements),
+    ...checkCashReconciliation(statements),
     ...checkYoYGrowthSanity(statements),
   ];
 

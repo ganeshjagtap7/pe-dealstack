@@ -30,6 +30,16 @@ export interface ClassificationResult {
   warnings: string[];   // e.g. "No balance sheet found", "Units unclear"
 }
 
+export interface ClassificationUsage {
+  promptTokens: number;
+  completionTokens: number;
+}
+
+export interface ClassificationWithUsage {
+  result: ClassificationResult;
+  usage: ClassificationUsage;
+}
+
 // ─── Prompt ──────────────────────────────────────────────────
 
 const CLASSIFICATION_SYSTEM_PROMPT = `You are a senior private equity analyst extracting structured financial data from deal documents (CIMs, teasers, standalone financials).
@@ -125,6 +135,18 @@ If no financial data exists in the document, return:
 export async function classifyFinancials(
   text: string,
 ): Promise<ClassificationResult | null> {
+  const withUsage = await classifyFinancialsWithUsage(text);
+  return withUsage?.result ?? null;
+}
+
+/**
+ * Same as classifyFinancials(), but also returns exact OpenAI token usage.
+ * This lets downstream pipelines report accurate cost estimates without
+ * duplicating the prompt or making redundant LLM calls.
+ */
+export async function classifyFinancialsWithUsage(
+  text: string,
+): Promise<ClassificationWithUsage | null> {
   if (!isAIEnabled() || !openai) {
     log.warn('Financial classifier skipped: OpenAI not configured');
     return null;
@@ -173,7 +195,13 @@ export async function classifyFinancials(
       warnings: result.warnings,
     });
 
-    return result;
+    return {
+      result,
+      usage: {
+        promptTokens: response.usage?.prompt_tokens ?? 0,
+        completionTokens: response.usage?.completion_tokens ?? 0,
+      },
+    };
   } catch (error) {
     log.error('Financial classifier error', error);
     return null;
