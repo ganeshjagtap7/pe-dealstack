@@ -192,6 +192,7 @@ function renderFinancialSection() {
     ? `<div id="fin-chart-area" class="relative w-full bg-white rounded-lg border border-gray-200 p-4" style="height:320px"><canvas id="fin-chart-canvas"></canvas></div>`
     : buildStatementTable(finState.activeTab);
 
+  const legendHtml = !showChart ? trustLegendHtml() : '';
   container.innerHTML = flagHtml + conflictBannerHtml + `
     <div class="flex items-center gap-2 mb-4 flex-wrap">
       <div class="flex gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
@@ -200,6 +201,7 @@ function renderFinancialSection() {
       <div class="flex gap-1.5">${showChartBtns}</div>
       ${extractBtn}
     </div>
+    ${legendHtml}
     ${contentHtml}`;
 
   // Render chart after DOM is set
@@ -279,11 +281,22 @@ function buildStatementTable(statementType) {
       const display = isPct ? fmtPct(val) : fmtMoney(val, unitScale, currency);
       const isProjected = r.periodType === 'PROJECTED';
       const valCls = isProjected ? 'text-gray-400 italic' : (isSubtotal ? 'text-gray-900 font-semibold' : 'text-gray-700');
+      // Trust tier: background color based on confidence + source citation
+      const sourceQuote = (r.lineItems ?? {})[key + '_source'] ?? null;
+      const trust = getCellTrustTier(r.extractionConfidence, sourceQuote);
+      const trustBg = trust.bg ? `background:${trust.bg};` : '';
+      const warnIcon = trust.tier !== 'verified' && val != null
+        ? '<span class="material-symbols-outlined" style="font-size:9px;vertical-align:super;color:#d97706;margin-right:1px;">warning</span>'
+        : '';
+      const tipAttrs = cellTooltipAttrs(key, r.lineItems ?? {}, r.extractionConfidence, r.extractionSource, r.Document?.name);
       return `
-        <td class="px-3 py-2 text-right text-xs ${valCls} cursor-pointer hover:bg-blue-50/50 transition-colors"
+        <td class="px-3 py-2 text-right text-xs ${valCls} cursor-pointer transition-colors"
+          style="${trustBg}"
           onclick="editFinancialCell(this, '${r.id}', '${escapeHtml(key)}', ${JSON.stringify(val)}, '${isPct ? 'pct' : 'money'}')"
+          ${tipAttrs}
+          onmouseenter="showCellTooltip(event)" onmouseleave="hideCellTooltip()"
           data-statement-id="${r.id}" data-key="${escapeHtml(key)}">
-          ${escapeHtml(display)}
+          ${warnIcon}${escapeHtml(display)}
         </td>`;
     }).join('');
 
