@@ -135,14 +135,27 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
     }
 
     // Route to appropriate parser based on document type
-    if (documentType === 'payment_data') {
-      // Import and use payment parser
-      const { parsePaymentCSV } = await import('../services/parsers/stripeParser.js');
-      const result = await parsePaymentCSV(fileBuffer, doc.name, dealId, doc.id);
+    if (documentType === 'payment_data' || documentType === 'bank_statement' || documentType === 'accounting_export') {
+      let result;
+      let method = 'csv_parser';
+
+      if (documentType === 'payment_data') {
+        const { parsePaymentData } = await import('../services/parsers/parserRouter.js');
+        result = await parsePaymentData(fileBuffer, doc.name, dealId, doc.id);
+      } else if (documentType === 'bank_statement') {
+        const { parseBankCSV } = await import('../services/parsers/bankParser.js');
+        result = await parseBankCSV(fileBuffer, doc.name, dealId, doc.id);
+        method = 'bank_parser';
+      } else {
+        const { parseAccountingCSV } = await import('../services/parsers/accountingParser.js');
+        result = await parseAccountingCSV(fileBuffer, doc.name, dealId, doc.id);
+        method = 'accounting_parser';
+      }
+
       return res.json({
         success: true,
         documentUsed: { id: doc.id, name: doc.name },
-        extractionMethod: 'csv_parser',
+        extractionMethod: method,
         result: {
           statementsStored: result.periodsStored,
           periodsStored: result.periodsStored,
