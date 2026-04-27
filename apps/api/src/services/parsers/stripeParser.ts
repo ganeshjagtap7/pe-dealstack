@@ -271,7 +271,7 @@ export async function parsePaymentCSV(
         currency,
         unitScale: 'ACTUALS',
         extractionConfidence: 100,
-        extractionSource: 'csv_parser',
+        extractionSource: 'manual',  // DB CHECK constraint only allows gpt4o/azure/vision/manual
         extractedAt: now,
         isActive: true,
         mergeStatus: 'auto',
