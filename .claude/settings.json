@@ -9,20 +9,5 @@
       "Bash(ps -p 10339,10426,35968,37305 -o pid,command)",
       "Bash(kill 37305)"
     ]
-  },
-  "hooks": {
-    "PostToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r '.tool_input.command // \"\"' | grep -q 'git commit' && cd \"/Users/ganesh/AI CRM\" && /Users/ganesh/AI CRM/scripts/sync-to-linear.sh || true",
-            "async": true,
-            "statusMessage": "Syncing commit to Linear..."
-          }
-        ]
-      }
-    ]
   }
 }
