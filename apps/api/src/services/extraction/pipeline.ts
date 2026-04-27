@@ -41,11 +41,11 @@ import type { SelfCorrectionResult } from './selfCorrector.js';
 export type PipelineStatus = 'success' | 'partial' | 'failed';
 
 export interface ProcessingTimes {
-  textExtractionMs: number;
-  classificationMs: number;
-  validationMs: number;
-  selfCorrectionMs: number;
-  totalMs: number;
+  textExtraction: number;
+  classification: number;
+  validation: number;
+  selfCorrection: number;
+  total: number;
 }
 
 export interface PipelineMetadata {
@@ -101,11 +101,11 @@ export async function runExtractionPipeline(
   fileName: string,
 ): Promise<PipelineResult> {
   const times: ProcessingTimes = {
-    textExtractionMs: 0,
-    classificationMs: 0,
-    validationMs: 0,
-    selfCorrectionMs: 0,
-    totalMs: 0,
+    textExtraction: 0,
+    classification: 0,
+    validation: 0,
+    selfCorrection: 0,
+    total: 0,
   };
   const pipelineStart = performance.now();
 
@@ -116,16 +116,16 @@ export async function runExtractionPipeline(
   const t1 = performance.now();
   try {
     textResult = await extractText(filePath, mimeType);
-    times.textExtractionMs = performance.now() - t1;
+    times.textExtraction = performance.now() - t1;
     log.info('pipeline: text extraction done', {
       format: textResult.metadata.format,
       sections: textResult.sections.length,
       chars: textResult.text.length,
-      ms: times.textExtractionMs.toFixed(0),
+      ms: times.textExtraction.toFixed(0),
     });
   } catch (err: any) {
-    times.textExtractionMs = performance.now() - t1;
-    times.totalMs = performance.now() - pipelineStart;
+    times.textExtraction = performance.now() - t1;
+    times.total = performance.now() - pipelineStart;
     log.error('pipeline: text extraction failed', err);
     return {
       status: 'failed',
@@ -149,16 +149,16 @@ export async function runExtractionPipeline(
   let classifyResult: Awaited<ReturnType<typeof classifyExtraction>>;
   try {
     classifyResult = await classifyExtraction(textResult.text);
-    times.classificationMs = performance.now() - t2;
+    times.classification = performance.now() - t2;
     log.info('pipeline: classification done', {
       statements: classifyResult.statements.length,
       promptTokens: classifyResult.usage.promptTokens,
       completionTokens: classifyResult.usage.completionTokens,
-      ms: times.classificationMs.toFixed(0),
+      ms: times.classification.toFixed(0),
     });
   } catch (err: any) {
-    times.classificationMs = performance.now() - t2;
-    times.totalMs = performance.now() - pipelineStart;
+    times.classification = performance.now() - t2;
+    times.total = performance.now() - pipelineStart;
     log.error('pipeline: classification failed', err);
     return {
       status: 'failed',
@@ -178,7 +178,7 @@ export async function runExtractionPipeline(
   }
 
   if (classifyResult.statements.length === 0) {
-    times.totalMs = performance.now() - pipelineStart;
+    times.total = performance.now() - pipelineStart;
     return {
       status: 'failed',
       statements: [],
@@ -202,16 +202,16 @@ export async function runExtractionPipeline(
   let validation: PipelineValidationResult;
   try {
     validation = validateExtraction(classifyResult.statements);
-    times.validationMs = performance.now() - t3;
+    times.validation = performance.now() - t3;
     log.info('pipeline: validation done', {
       passed: validation.overallPassed,
       errors: validation.errorCount,
       warnings: validation.warningCount,
-      ms: times.validationMs.toFixed(0),
+      ms: times.validation.toFixed(0),
     });
   } catch (err: any) {
     // Validation crash is non-fatal — proceed with no flags
-    times.validationMs = performance.now() - t3;
+    times.validation = performance.now() - t3;
     log.error('pipeline: validation crashed (non-fatal)', err);
     validation = emptyValidation();
   }
@@ -233,21 +233,21 @@ export async function runExtractionPipeline(
       finalStatements = correctionResult.correctedStatements;
       finalValidation = correctionResult.finalValidation;
       correctionUsage = correctionResult.usage;
-      times.selfCorrectionMs = performance.now() - t4;
+      times.selfCorrection = performance.now() - t4;
       log.info('pipeline: self-correction done', {
         attempts: correctionResult.corrections.length,
         needsManualReview: correctionResult.needsManualReview,
         promptTokens: correctionUsage.promptTokens,
-        ms: times.selfCorrectionMs.toFixed(0),
+        ms: times.selfCorrection.toFixed(0),
       });
     } catch (err: any) {
-      times.selfCorrectionMs = performance.now() - t4;
+      times.selfCorrection = performance.now() - t4;
       log.error('pipeline: self-correction crashed (non-fatal)', err);
       // Keep original statements + validation if correction crashes
     }
   }
 
-  times.totalMs = performance.now() - pipelineStart;
+  times.total = performance.now() - pipelineStart;
 
   // ── Token Accounting ───────────────────────────────────────
   const totalPromptTokens = classifyResult.usage.promptTokens + correctionUsage.promptTokens;
@@ -270,7 +270,7 @@ export async function runExtractionPipeline(
     fileName,
     status,
     statementsFound: finalStatements.length,
-    totalMs: times.totalMs.toFixed(0),
+    totalMs: times.total.toFixed(0),
     totalTokens,
     estimatedCostUsd: estimatedCost.toFixed(4),
   });

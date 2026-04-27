@@ -15,9 +15,6 @@
  * Each node reads/writes to the shared FinancialAgentState.
  * The validate node decides whether to self-correct or store
  * based on failed checks and retry count.
- *
- * NOTE: Token usage and estimated costs are accumulated across all nodes
- * into the state.tokensUsed and state.estimatedCostUsd fields.
  */
 
 import { StateGraph, END, START } from '@langchain/langgraph';

@@ -172,13 +172,13 @@ describe('runExtractionPipeline — text extraction path', () => {
     const result = await runExtractionPipeline(filePath, 'text/plain', 'test.bin');
 
     const times = result.metadata.processingTime;
-    expect(times).toHaveProperty('textExtractionMs');
-    expect(times).toHaveProperty('classificationMs');
-    expect(times).toHaveProperty('validationMs');
-    expect(times).toHaveProperty('selfCorrectionMs');
-    expect(times).toHaveProperty('totalMs');
-    expect(typeof times.totalMs).toBe('number');
-    expect(times.totalMs).toBeGreaterThanOrEqual(0);
+    expect(times).toHaveProperty('textExtraction');
+    expect(times).toHaveProperty('classification');
+    expect(times).toHaveProperty('validation');
+    expect(times).toHaveProperty('selfCorrection');
+    expect(times).toHaveProperty('total');
+    expect(typeof times.total).toBe('number');
+    expect(times.total).toBeGreaterThanOrEqual(0);
   });
 
   it('estimatedCost is a non-negative number', async () => {

@@ -149,37 +149,35 @@ describe('Rule 3 — EBITDA margin sanity', () => {
 // ─── Rule 4: YoY growth sanity ────────────────────────────────
 
 describe('Rule 4 — YoY growth sanity', () => {
-  it('flags >100% revenue growth between historical periods', () => {
+  it('flags >500% YoY growth as warning (assignment threshold)', () => {
     const stmt: ClassifiedStatement = {
       statementType: 'INCOME_STATEMENT',
       unitScale: 'MILLIONS',
       currency: 'USD',
       periods: [
         { period: '2021', periodType: 'HISTORICAL', confidence: 90, lineItems: { revenue: 10 } },
-        { period: '2022', periodType: 'HISTORICAL', confidence: 90, lineItems: { revenue: 35 } }, // 250% growth
+        { period: '2022', periodType: 'HISTORICAL', confidence: 90, lineItems: { revenue: 80 } }, // 700% growth
       ],
     };
-
     const result = validateExtraction([stmt]);
-    const check = result.checks.find(c => c.check === 'yoy_revenue_growth_sane');
-    expect(check?.passed).toBe(false);
+    const check = result.checks.find(c => c.check === 'yoy_growth_sanity' && !c.passed);
+    expect(check).toBeDefined();
+    expect(check?.severity).toBe('warning');
   });
 
-  it('does not flag normal revenue growth', () => {
+  it('does NOT flag growth under 500%', () => {
     const stmt: ClassifiedStatement = {
       statementType: 'INCOME_STATEMENT',
       unitScale: 'MILLIONS',
       currency: 'USD',
       periods: [
         { period: '2021', periodType: 'HISTORICAL', confidence: 90, lineItems: { revenue: 10 } },
-        { period: '2022', periodType: 'HISTORICAL', confidence: 90, lineItems: { revenue: 12 } }, // 20% growth
+        { period: '2022', periodType: 'HISTORICAL', confidence: 90, lineItems: { revenue: 30 } }, // 200% growth — under threshold
       ],
     };
-
     const result = validateExtraction([stmt]);
-    const growthCheck = result.checks.find(c => c.check === 'yoy_revenue_growth_sane');
-    // Should not exist (only emitted when flagged)
-    expect(growthCheck).toBeUndefined();
+    const check = result.checks.find(c => c.check === 'yoy_growth_sanity' && !c.passed);
+    expect(check).toBeUndefined();
   });
 });
 

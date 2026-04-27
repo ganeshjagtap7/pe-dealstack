@@ -20,6 +20,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { runExtractionPipeline } from '../services/extraction/pipeline.js';
 import { log } from '../utils/logger.js';
+import { logAuditEvent, AUDIT_ACTIONS, RESOURCE_TYPES } from '../services/auditLog.js';
+import { getOrgId } from '../middleware/orgScope.js';
 
 const router = Router();
 
@@ -128,6 +130,34 @@ router.post('/extract', upload.single('file'), async (req, res) => {
         message: result.metadata.error ?? 'Could not extract financial data from the document.',
       });
     }
+
+    // Audit log — fire and forget, never blocks the HTTP response
+    const dealId = req.body?.dealId as string | undefined;
+    logAuditEvent(
+      {
+        action: AUDIT_ACTIONS.DOCUMENT_UPLOADED,
+        userId: (req as any).user?.id,
+        organizationId: getOrgId(req),
+        resourceType: RESOURCE_TYPES.DOCUMENT,
+        resourceId: dealId,
+        resourceName: req.file.originalname,
+        description: `Financial extraction: ${result.status}`,
+        metadata: {
+          event: 'financial_extraction',
+          status: result.status,
+          format: result.metadata.format,
+          statementsExtracted: result.statements.length,
+          tokensUsed: result.metadata.tokensUsed,
+          estimatedCostUsd: result.metadata.estimatedCost,
+          processingTimeMs: result.metadata.processingTime.total,
+          validationPassed: result.validation.overallPassed,
+          needsManualReview: result.corrections?.needsManualReview ?? false,
+        },
+      },
+      req,
+    ).catch(() => {
+      // Non-fatal — never surface audit errors to the user
+    });
 
     return res.status(200).json(result);
   } catch (err: any) {

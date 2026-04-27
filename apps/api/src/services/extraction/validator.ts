@@ -237,6 +237,42 @@ function buildFlaggedItems(
 
 // ─── Main Export ─────────────────────────────────────────────
 
+/** Assignment Rule 5: Flag any line item growing > 500% YoY */
+function checkYoYGrowthSanity(statements: ClassifiedStatement[]): StatementCheck[] {
+  const checks: StatementCheck[] = [];
+
+  for (const stmt of statements) {
+    const historical = stmt.periods
+      .filter(p => p.periodType === 'HISTORICAL')
+      .sort((a, b) => a.period.localeCompare(b.period));
+
+    for (let i = 1; i < historical.length; i++) {
+      const prev = historical[i - 1];
+      const curr = historical[i];
+
+      for (const key of ['revenue', 'ebitda', 'net_income']) {
+        const prevVal = prev.lineItems[key] ?? null;
+        const currVal = curr.lineItems[key] ?? null;
+        if (prevVal === null || currVal === null || prevVal === 0) continue;
+
+        const growth = ((currVal - prevVal) / Math.abs(prevVal)) * 100;
+
+        if (Math.abs(growth) > 500) {
+          checks.push({
+            check: 'yoy_growth_sanity',
+            passed: false,
+            severity: 'warning',
+            message: `${key} grew ${growth.toFixed(0)}% from ${prev.period} (${prevVal}M) to ${curr.period} (${currVal}M) — exceeds 500% threshold`,
+            period: curr.period,
+          });
+        }
+      }
+    }
+  }
+
+  return checks;
+}
+
 /**
  * Run all 7 financial validation rules on extracted statements.
  *
@@ -275,6 +311,7 @@ export function validateExtraction(
     ...checkRevenuePositive(statements),
     ...checkSubtotalConsistency(statements),
     ...checkNetIncomeConsistency(statements),
+    ...checkYoYGrowthSanity(statements),
   ];
 
   const allChecks = [...base.checks, ...additionalChecks];
