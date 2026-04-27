@@ -82,7 +82,7 @@ export default function DataRoomOverviewPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full w-full bg-slate-50">
+      <div className="flex items-center justify-center min-h-[calc(100vh-4rem)] w-full bg-slate-50">
         <div className="text-center">
           <div
             className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4"
