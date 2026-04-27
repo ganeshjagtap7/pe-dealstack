@@ -283,6 +283,11 @@ function normalizeUnitScale(raw: string): UnitScale {
 function normalizeLineItems(raw: Record<string, any>): Record<string, number | null> {
   const result: Record<string, number | null> = {};
   for (const [key, val] of Object.entries(raw)) {
+    // Preserve _source citation fields as strings (stored alongside numeric values in JSONB)
+    if (key.endsWith('_source')) {
+      if (typeof val === 'string') (result as any)[key] = val;
+      continue;
+    }
     if (val === null || val === undefined) {
       result[key] = null;
     } else {

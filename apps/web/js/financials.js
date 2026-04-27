@@ -226,7 +226,10 @@ function buildStatementTable(statementType) {
   const currency = rows[0]?.currency ?? 'USD';
 
   const allKeys = new Set();
-  rows.forEach(r => Object.keys(r.lineItems ?? {}).forEach(k => allKeys.add(k)));
+  rows.forEach(r => Object.keys(r.lineItems ?? {}).forEach(k => {
+    // Skip _source citation fields — they're strings, not numeric values
+    if (!k.endsWith('_source')) allKeys.add(k);
+  }));
 
   const orderedKeys = [
     'revenue', 'cogs', 'gross_profit', 'gross_margin_pct',
