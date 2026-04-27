@@ -2,6 +2,7 @@ import { openai, isAIEnabled } from '../openai.js';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
+import { validateLineItems } from './financialSchema.js';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -127,9 +128,14 @@ function normalizeClassificationResult(raw: any): ClassificationResult {
       for (const p of stmt.periods) {
         const periodType = normalizePeriodType(p.periodType);
         const lineItems = normalizeLineItems(p.lineItems ?? {});
+        // Validate and normalize line item keys
+        const { normalized: validatedItems, warnings: itemWarnings } = validateLineItems(statementType, lineItems);
+        if (itemWarnings.length > 0) {
+          warnings.push(...itemWarnings.map(w => `${statementType} ${p.period}: ${w}`));
+        }
         // Auto-calculate derived fields if missing
         if (statementType === 'INCOME_STATEMENT') {
-          computeDerivedFields(lineItems);
+          computeDerivedFields(validatedItems);
         }
         const confidence = clamp(Number(p.confidence) || 0, 0, 100);
 
@@ -138,7 +144,7 @@ function normalizeClassificationResult(raw: any): ClassificationResult {
         periods.push({
           period: String(p.period).trim(),
           periodType,
-          lineItems,
+          lineItems: validatedItems,
           confidence,
         });
       }
