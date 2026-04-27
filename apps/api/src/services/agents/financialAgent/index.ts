@@ -74,8 +74,8 @@ export async function runFinancialAgent(
       fileName: input.fileName,
       fileType: input.fileType,
       organizationId: input.organizationId ?? null,
-      maxRetries: input.maxRetries ?? 1,
-      skipVerify: true,
+      maxRetries: input.maxRetries ?? 3,
+      skipVerify: false,
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
