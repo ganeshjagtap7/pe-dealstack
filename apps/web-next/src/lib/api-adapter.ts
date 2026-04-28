@@ -301,7 +301,15 @@ export async function proxyToExpress(
 
   await readyPromise;
 
-  return new Response(responseStream, {
+  // Per the Fetch spec, "null body statuses" (101, 103, 204, 205, 304) MUST
+  // be constructed with a null body — passing a stream throws:
+  //   TypeError: Response constructor: Invalid response status code 304
+  // Express commonly emits 304 from its conditional-GET handling (etag /
+  // if-none-match) for endpoints like /api/notifications, so this matters.
+  const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
+  const body = NULL_BODY_STATUSES.has(statusCode) ? null : responseStream;
+
+  return new Response(body, {
     status: statusCode,
     statusText: statusMessage,
     headers: responseHeaders,
