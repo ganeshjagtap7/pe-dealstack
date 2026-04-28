@@ -21,6 +21,7 @@ import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
+import financialExtractionRouter from './routes/financials-extraction.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -77,8 +78,8 @@ const allowedOrigins = [
 ];
 app.use(cors({
   origin: (origin, callback) => {
-    // Allow requests with no origin (mobile apps, Postman, same-origin)
-    if (!origin || allowedOrigins.includes(origin)) {
+    // Allow requests with no origin (mobile apps, Postman, same-origin) or if wildcard is set
+    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
       callback(null, true);
     } else {
       log.warn('CORS request rejected', { origin });
@@ -173,6 +174,9 @@ app.get('/health/ready', async (_req, res) => {
 });
 
 // API routes
+// ── Standalone financial extraction (assignment demo) ──
+app.use('/api/financial-extraction', financialExtractionRouter);
+
 app.get('/api', (_req, res) => {
   res.json({
     message: 'AI CRM API v0.1.0',
@@ -214,6 +218,7 @@ app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
+
 
 // ========================================
 // Public Invitation Routes (no auth for verify/accept)

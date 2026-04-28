@@ -19,6 +19,8 @@
     "dev:api": "npm run dev --workspace=@ai-crm/api"
   },
   "devDependencies": {
+    "@types/supertest": "^7.2.0",
+    "supertest": "^7.2.2",
     "turbo": "^2.0.0"
   },
   "engines": {

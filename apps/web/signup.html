@@ -451,7 +451,8 @@
                         message = error.message;
                     }
                 }
-                errorMessage.textContent = message;
+                errorMessage.textContent = message + (error.stack ? ' (Network Error)' : '');
+                console.error('Signup detailed error:', error);
                 errorMessage.classList.remove('hidden');
             } finally {
                 if (!successMessage.classList.contains('hidden') && successMessage.textContent.includes('Check your email')) {
