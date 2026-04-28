@@ -1,9 +1,11 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
-// Single source of truth for the API origin. All client code calls /api/* and
-// Next's rewrite proxies to this URL server-side — keeping requests same-origin
-// and avoiding CORS. Set API_PROXY_URL in production env; localhost is dev-only.
+// Dev-only proxy: forward /api/* to the local Express API on :3001 so client
+// fetches stay same-origin. In prod on Vercel the API is co-located as a
+// Vercel Function (api/index.ts) and reached via vercel.json rewrites — no
+// Next.js rewrite needed. Pointing this at the same Vercel domain triggers
+// DNS_HOSTNAME_RESOLVED_PRIVATE (Vercel blocks self-loops) and 404s /api/*.
 const API_PROXY_URL = process.env.API_PROXY_URL || "http://localhost:3001";
 
 const nextConfig: NextConfig = {
@@ -29,6 +31,7 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
+    if (process.env.NODE_ENV !== "development") return [];
     return [
       {
         source: "/api/:path*",
