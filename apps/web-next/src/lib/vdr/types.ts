@@ -126,7 +126,7 @@ export interface APIDocument {
   aiAnalyzedAt?: string;
   tags?: string[];
   isHighlighted?: boolean;
-  uploader?: { id: string; fullName: string; avatar?: string };
+  uploader?: { id: string; name: string; avatar?: string };
   createdAt: string;
   updatedAt: string;
 }
