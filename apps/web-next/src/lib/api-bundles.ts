@@ -1,45 +1,20 @@
-// Lazy-load the two compiled Express bundles (apps/api/dist/app-lite.js and
-// app-ai.js) and route incoming /api/* paths to the correct one. The dispatch
-// table mirrors vercel.json's old `rewrites` block one-for-one — heavy
-// AI-bound endpoints (chat, financial extraction, memos, etc.) go to app-ai;
-// everything else to app-lite.
+// Lazy-load the two compiled Express bundles via plain dynamic import().
+// Without /* webpackIgnore */ the tracer still follows the import path at
+// build time, so apps/api/dist/* and every transitive require (express,
+// helmet, supabase, sentry, ...) get packaged into the lambda. Lazy is
+// required because app-lite.js / app-ai.js initialise Supabase + LLM
+// clients at module load and throw if env vars are missing — running that
+// during Next's page-data collection breaks the build. First request on
+// the live lambda triggers the load instead, where env vars are present.
 
-import fs from "node:fs";
-import path from "node:path";
-import { pathToFileURL } from "node:url";
 import type { ExpressHandler } from "./api-adapter";
-
-// Resolve the dist files at runtime. We can't use a relative-to-source path
-// because Next bundles this file into .next/server/chunks/* and the relative
-// path moves underneath us. Fixed anchors instead:
-//   - On Vercel, cwd is the Next project root (/var/task/apps/web-next),
-//     and outputFileTracingIncludes packages apps/api/dist sibling to it,
-//     so ../../apps/api/dist/<name>.js resolves correctly.
-//   - In local dev `npm run dev` from apps/web-next, same shape — cwd is
-//     apps/web-next, repo is two ups.
-//   - In local dev from the repo root, cwd is the repo, dist sits one level
-//     in.
-// We try each and pick the first that exists. If none, throw a diagnostic.
-function bundlePath(name: "app-lite" | "app-ai"): string {
-  const filename = `${name}.js`;
-  const candidates = [
-    path.resolve(process.cwd(), "../../apps/api/dist", filename),
-    path.resolve(process.cwd(), "apps/api/dist", filename),
-    path.resolve(process.cwd(), "../api/dist", filename),
-  ];
-  for (const candidate of candidates) {
-    if (fs.existsSync(candidate)) return candidate;
-  }
-  throw new Error(
-    `[api-bundles] Could not locate ${filename}. cwd=${process.cwd()}. Tried:\n  - ${candidates.join("\n  - ")}`,
-  );
-}
 
 type BundleModule = { default: ExpressHandler } | ExpressHandler;
 
-function resolveDefault(mod: BundleModule): ExpressHandler {
-  const candidate = (mod as { default?: ExpressHandler }).default ?? mod;
-  return candidate as ExpressHandler;
+function resolveDefault(mod: unknown): ExpressHandler {
+  const candidate =
+    (mod as { default?: ExpressHandler }).default ?? (mod as ExpressHandler);
+  return candidate;
 }
 
 let liteAppPromise: Promise<ExpressHandler> | null = null;
@@ -47,9 +22,8 @@ let aiAppPromise: Promise<ExpressHandler> | null = null;
 
 export function getLiteApp(): Promise<ExpressHandler> {
   if (!liteAppPromise) {
-    const url = pathToFileURL(bundlePath("app-lite")).href;
-    liteAppPromise = import(/* webpackIgnore: true */ url).then(
-      (m: BundleModule) => resolveDefault(m),
+    liteAppPromise = import("../../../api/dist/app-lite.js").then(
+      (m) => resolveDefault(m as BundleModule),
     );
   }
   return liteAppPromise;
@@ -57,9 +31,8 @@ export function getLiteApp(): Promise<ExpressHandler> {
 
 export function getAiApp(): Promise<ExpressHandler> {
   if (!aiAppPromise) {
-    const url = pathToFileURL(bundlePath("app-ai")).href;
-    aiAppPromise = import(/* webpackIgnore: true */ url).then(
-      (m: BundleModule) => resolveDefault(m),
+    aiAppPromise = import("../../../api/dist/app-ai.js").then(
+      (m) => resolveDefault(m as BundleModule),
     );
   }
   return aiAppPromise;
