@@ -22,7 +22,7 @@ export interface StatementsValidationResult {
   errorCount: number;
   warningCount: number;
   infoCount: number;
-  overallPassed: boolean;     // true if no errors (warnings are OK)
+  isValid: boolean;     // true if no errors (warnings are OK)
 }
 
 // Format value in millions to human-readable form
@@ -401,6 +401,6 @@ export function validateStatements(statements: ClassifiedStatement[]): Statement
     errorCount,
     warningCount,
     infoCount,
-    overallPassed: errorCount === 0,
+    isValid: errorCount === 0,
   };
 }

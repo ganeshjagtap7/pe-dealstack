@@ -64,7 +64,7 @@ router.post('/extract', upload.single('file'), async (req, res) => {
       sections: classification?.statements.map(s => ({ statementType: s.statementType, periodCount: s.periods.length })),
       statements: classification?.statements ?? [],
       validation,
-      corrections: { corrections: [], finalValidation: validation, needsManualReview: !validation.overallPassed },
+      corrections: { corrections: [], finalValidation: validation, needsManualReview: !validation.isValid },
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
@@ -249,7 +249,7 @@ router.get('/deals/:dealId/financials/validation', async (req, res) => {
         checks: [],
         errorCount: 0,
         warningCount: 0,
-        overallPassed: true,
+        isValid: true,
       });
     }
 
@@ -265,7 +265,7 @@ router.get('/deals/:dealId/financials/validation', async (req, res) => {
       errorCount: result.errorCount,
       warningCount: result.warningCount,
       infoCount: result.infoCount,
-      overallPassed: result.overallPassed,
+      isValid: result.isValid,
     });
   } catch (err) {
     log.error('GET financials validation error', err);

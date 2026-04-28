@@ -25,7 +25,7 @@ import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
-import financialExtractionRouter from './routes/financials-extraction.js';
+import financialExtractionRouter from './routes/financial-extraction.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
