@@ -11,39 +11,46 @@ const nextConfig: NextConfig = {
   // file tracer scopes to apps/web-next/ and misses next/dist/compiled/* on
   // Vercel, breaking the lambda packaging step (ENOENT on @opentelemetry/api).
   outputFileTracingRoot: path.join(__dirname, "../../"),
-  // The /api catch-all dynamically imports apps/api/dist/{app-lite,app-ai}.js
-  // at runtime via pathToFileURL+webpackIgnore so Next's static tracer never
-  // sees the import. Force-include the dist files (and the Express deps that
-  // back them) so they end up physically packaged in the lambda.
+  // Tell Next/webpack not to try to bundle Express + its node-side deps —
+  // they're full of dynamic requires and platform-specifics that don't
+  // bundle cleanly. With these external, the tracer follows the imports
+  // and packages the matching node_modules into the lambda automatically.
+  serverExternalPackages: [
+    "express",
+    "helmet",
+    "cors",
+    "multer",
+    "compression",
+    "dotenv",
+    "express-rate-limit",
+    "@sentry/node",
+    "@supabase/supabase-js",
+    "@anthropic-ai/sdk",
+    "openai",
+    "@google/generative-ai",
+    "@langchain/core",
+    "@langchain/google-genai",
+    "@langchain/langgraph",
+    "@langchain/openai",
+    "@llamaindex/cloud",
+    "@azure/ai-form-recognizer",
+    "apify-client",
+    "csv-parse",
+    "mailparser",
+    "mammoth",
+    "pdf-parse",
+    "pino",
+    "pino-pretty",
+    "resend",
+    "xlsx",
+    "zod",
+  ],
+  // Key is matched picomatch-style against the literal route name Next emits
+  // (`/api/[...slug]`) — brackets are picomatch character-class syntax, so
+  // they MUST be escaped or no nft.json picks up the includes. Value paths
+  // are resolved from the Next project root (apps/web-next).
   outputFileTracingIncludes: {
-    "/api/[[...slug]]": [
-      "../api/dist/**/*",
-      "../../node_modules/express/**",
-      "../../node_modules/helmet/**",
-      "../../node_modules/cors/**",
-      "../../node_modules/multer/**",
-      "../../node_modules/express-rate-limit/**",
-      "../../node_modules/compression/**",
-      "../../node_modules/dotenv/**",
-      "../../node_modules/@sentry/node/**",
-      "../../node_modules/@supabase/supabase-js/**",
-      "../../node_modules/@anthropic-ai/sdk/**",
-      "../../node_modules/openai/**",
-      "../../node_modules/@google/generative-ai/**",
-      "../../node_modules/@langchain/**",
-      "../../node_modules/@llamaindex/cloud/**",
-      "../../node_modules/@azure/ai-form-recognizer/**",
-      "../../node_modules/apify-client/**",
-      "../../node_modules/csv-parse/**",
-      "../../node_modules/mailparser/**",
-      "../../node_modules/mammoth/**",
-      "../../node_modules/pdf-parse/**",
-      "../../node_modules/pino/**",
-      "../../node_modules/pino-pretty/**",
-      "../../node_modules/resend/**",
-      "../../node_modules/xlsx/**",
-      "../../node_modules/zod/**",
-    ],
+    "/api/\\[\\.\\.\\.slug\\]": ["../api/dist/**/*"],
   },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
