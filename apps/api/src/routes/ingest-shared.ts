@@ -54,11 +54,13 @@ export const upload = multer({
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
+      'text/csv',
+      'application/csv',
     ];
 
     const isEml = file.originalname?.toLowerCase().endsWith('.eml') || file.mimetype === 'message/rfc822';
     const isAllowedMime = allowedTypes.includes(file.mimetype);
-    const isAllowedExt = /\.(pdf|xlsx|xls|docx|doc|txt|eml)$/i.test(file.originalname || '');
+    const isAllowedExt = /\.(pdf|xlsx|xls|docx|doc|txt|eml|csv)$/i.test(file.originalname || '');
 
     if (isAllowedMime || isAllowedExt || isEml) {
       cb(null, true);

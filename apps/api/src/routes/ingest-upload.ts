@@ -12,6 +12,7 @@ import { mergeIntoExistingDeal, getIconForIndustry } from '../services/dealMerge
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
 import { resolveUserId } from './notifications.js';
+import { extractText } from '../services/extraction/textExtractor.js';
 
 const router = Router();
 
@@ -61,14 +62,46 @@ router.post('/', upload.single('file'), async (req, res) => {
     let numPages: number | null = null;
 
     if (mimeType === 'application/pdf') {
-      log.debug('Step 1: Extracting text from PDF');
-      const extraction = await extractTextFromPDF(file.buffer);
-      if (extraction) {
-        extractedText = extraction.text.replace(/\u0000/g, '');
-        numPages = extraction.numPages;
-        log.debug('PDF extracted', { numPages, charCount: extractedText.length });
-      } else {
-        return res.status(400).json({ error: 'Failed to extract text from PDF' });
+      log.debug('Step 1: Extracting text from PDF using enhanced extractor');
+      try {
+        // Save buffer to temp file for textExtractor (it expects file path)
+        const fs = await import('fs');
+        const path = await import('path');
+        const os = await import('os');
+        const tempDir = os.tmpdir();
+        const tempFilePath = path.join(tempDir, `ingest_${Date.now()}_${file.originalname}`);
+        fs.writeFileSync(tempFilePath, file.buffer);
+
+        // Use enhanced textExtractor with scanned PDF detection and Vision fallback
+        const textResult = await extractText(tempFilePath, mimeType);
+        
+        // Clean up temp file
+        fs.unlinkSync(tempFilePath);
+
+        if (textResult) {
+          extractedText = textResult.text.replace(/\u0000/g, '');
+          numPages = textResult.metadata.pageCount || 1;
+          log.debug('PDF extracted with enhanced extractor', { 
+            numPages, 
+            charCount: extractedText.length,
+            extractionMethod: textResult.metadata.extractionMethod,
+            isScanned: textResult.metadata.isScanned 
+          });
+        } else {
+          return res.status(400).json({ error: 'Failed to extract text from PDF - file may be corrupted or password-protected' });
+        }
+      } catch (pdfError: any) {
+        log.error('PDF extraction error with enhanced extractor', pdfError);
+        // Fallback to simple extraction
+        log.debug('Falling back to simple PDF extraction');
+        const extraction = await extractTextFromPDF(file.buffer);
+        if (extraction) {
+          extractedText = extraction.text.replace(/\u0000/g, '');
+          numPages = extraction.numPages;
+          log.debug('PDF extracted with fallback', { numPages, charCount: extractedText.length });
+        } else {
+          return res.status(400).json({ error: 'Failed to extract text from PDF - file may be corrupted, password-protected, or scanned without OCR' });
+        }
       }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -93,10 +126,17 @@ router.post('/', upload.single('file'), async (req, res) => {
         return res.status(400).json({ error: 'Excel file appears empty or has no readable data' });
       }
       log.debug('Excel extracted', { charCount: extractedText.length });
+    } else if (mimeType === 'text/csv' || mimeType === 'application/csv' || documentName.toLowerCase().endsWith('.csv')) {
+      log.debug('Step 1: Reading CSV file');
+      extractedText = file.buffer.toString('utf-8');
+      if (!extractedText || extractedText.trim().length < 50) {
+        return res.status(400).json({ error: 'CSV file appears empty or has no readable data' });
+      }
+      log.debug('CSV extracted', { charCount: extractedText.length });
     } else {
       return res.status(400).json({
         error: 'Unsupported file type for auto-deal creation',
-        supported: ['PDF (.pdf)', 'Word (.docx, .doc)', 'Excel (.xlsx, .xls)', 'Text (.txt)'],
+        supported: ['PDF (.pdf)', 'Word (.docx, .doc)', 'Excel (.xlsx, .xls)', 'CSV (.csv)', 'Text (.txt)'],
       });
     }
 
