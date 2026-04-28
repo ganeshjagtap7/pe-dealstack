@@ -20,14 +20,34 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
+    log.info('Deal import file upload attempt', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
+
     const allowed = [
       'text/csv',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
     ];
-    if (allowed.includes(file.mimetype) || file.originalname.endsWith('.csv') || file.originalname.endsWith('.xlsx')) {
+    const isAllowed = allowed.includes(file.mimetype) || file.originalname.endsWith('.csv') || file.originalname.endsWith('.xlsx');
+
+    log.debug('Deal import file filter check', {
+      mimetype: file.mimetype,
+      allowedMimes: allowed,
+      endsWithCsv: file.originalname.endsWith('.csv'),
+      endsWithXlsx: file.originalname.endsWith('.xlsx'),
+      isAllowed,
+    });
+
+    if (isAllowed) {
       cb(null, true);
     } else {
+      log.error('Deal import file rejected', {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+      });
       cb(new Error('Only CSV and Excel files are supported'));
     }
   },

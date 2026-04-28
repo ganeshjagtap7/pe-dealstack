@@ -91,6 +91,17 @@ async function extractTextFromUrl(fileUrl: string): Promise<string | null> {
   }
 }
 
+/** Convert lineItems from record format to array format for validation */
+function lineItemsRecordToArray(lineItems: Record<string, any>): Array<{ name: string; value: number | null; category?: string; isSubtotal?: boolean }> {
+  if (Array.isArray(lineItems)) {
+    return lineItems;
+  }
+  return Object.entries(lineItems || {}).map(([name, value]) => ({
+    name,
+    value: typeof value === 'number' ? value : null,
+  }));
+}
+
 /** Convert DB FinancialStatement rows back into ClassifiedStatement[] for validation */
 function rowsToClassifiedStatements(rows: any[]): ClassifiedStatement[] {
   const byType = new Map<string, ClassifiedStatement>();
@@ -107,7 +118,7 @@ function rowsToClassifiedStatements(rows: any[]): ClassifiedStatement[] {
     byType.get(row.statementType)!.periods.push({
       period: row.period,
       periodType: row.periodType,
-      lineItems: row.lineItems as any[],
+      lineItems: lineItemsRecordToArray(row.lineItems),
       confidence: row.extractionConfidence,
     });
   }
@@ -139,6 +150,8 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
 
     const { documentId } = extractSchema.parse(req.body);
 
+    log.info('Financial extraction requested', { dealId, documentId });
+
     // Find the document to extract from
     let doc: any = null;
 
@@ -150,6 +163,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         .eq('dealId', dealId)
         .single();
       doc = data;
+      log.debug('Document lookup by ID', { documentId, found: !!doc });
     } else {
       // Prefer most recent CIM or FINANCIALS document
       const { data } = await supabase
@@ -161,6 +175,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         .limit(1)
         .single();
       doc = data;
+      log.debug('Document lookup by type CIM/FINANCIALS', { found: !!doc });
 
       if (!doc) {
         const { data: anyDoc } = await supabase
@@ -171,10 +186,12 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
           .limit(1)
           .single();
         doc = anyDoc;
+        log.debug('Document lookup any document', { found: !!doc });
       }
     }
 
     if (!doc?.fileUrl) {
+      log.error('No document found for financial extraction', { dealId, documentId });
       return res.status(404).json({ error: 'No document found to extract from' });
     }
 
