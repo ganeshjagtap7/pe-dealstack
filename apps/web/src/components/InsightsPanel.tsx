@@ -104,7 +104,7 @@ export const InsightsPanel: React.FC<InsightsPanelProps> = ({
           <div className="text-center">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-slate-200 mx-auto mb-4" style={{ borderTopColor: '#003366' }}></div>
             <p className="text-sm font-medium text-slate-700 mb-1">Analyzing folder...</p>
-            <p className="text-xs text-slate-400">GPT-4o is scanning documents and generating insights</p>
+            <p className="text-xs text-slate-400">AI is scanning documents and generating insights</p>
           </div>
         </div>
       </aside>

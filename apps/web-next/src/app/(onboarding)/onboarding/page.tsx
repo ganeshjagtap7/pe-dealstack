@@ -1,0 +1,257 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { WelcomeView } from "./welcome-view";
+import { ChecklistView } from "./checklist-view";
+import { Confetti } from "./confetti";
+import { FirmTaskModal } from "./firm-task";
+import { CimTaskModal } from "./cim-task";
+import { TeamTaskModal } from "./team-task";
+import { SkipConfirmModal } from "./skip-modal";
+import {
+  FirmData,
+  LEGACY_STEP_TO_TASK,
+  OnboardingStatus,
+  TASK_TO_LEGACY_STEP,
+  TASKS,
+  TaskId,
+  TeamInvite,
+} from "./types";
+
+// Main onboarding page — welcome view, then checklist of 3 tasks, then
+// dashboard. Ported from apps/web/js/onboarding/onboarding-flow.js (3a796c8).
+export default function OnboardingPage() {
+  const router = useRouter();
+
+  const [view, setView] = useState<"welcome" | "checklist">("welcome");
+  const [completed, setCompleted] = useState<Set<TaskId>>(new Set());
+  const [activeTask, setActiveTask] = useState<TaskId | null>(null);
+  const [showSkip, setShowSkip] = useState(false);
+
+  const [firmData, setFirmData] = useState<FirmData>({ url: "", linkedin: "", aum: "", sectors: [] });
+  const [sampleDealId, setSampleDealId] = useState<string | null>(null); // "luktara" | "pinecrest" | null
+  const [cimFile, setCimFile] = useState<File | null>(null);
+  // Legacy starts with 2 team invite rows (onboarding-tasks.js team hydrator calls addRow() twice).
+  const [teamInvites, setTeamInvites] = useState<TeamInvite[]>([
+    { email: "", role: "Analyst" },
+    { email: "", role: "Analyst" },
+  ]);
+  const [createdDealId, setCreatedDealId] = useState<string | null>(null);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const confettiFiredRef = useRef(false);
+  // Tracks which task is currently submitting (so modals can show loading state)
+  const [busyTask, setBusyTask] = useState<TaskId | null>(null);
+
+  // ─── Load existing progress from the API ────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<OnboardingStatus>("/onboarding/status");
+        if (cancelled) return;
+        const done = new Set<TaskId>();
+        if (data.steps) {
+          for (const [legacyId, isDone] of Object.entries(data.steps)) {
+            if (!isDone) continue;
+            const taskId = LEGACY_STEP_TO_TASK[legacyId];
+            if (taskId) done.add(taskId);
+          }
+        }
+        setCompleted(done);
+        // If user already finished onboarding, skip straight to dashboard.
+        if (done.size >= TASKS.length) router.push("/dashboard");
+      } catch {
+        // Fresh user or API down — proceed with empty state.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [router]);
+
+  // ─── Task completion ────────────────────────────────────────────
+  const markServerStep = useCallback(async (taskId: TaskId) => {
+    const legacy = TASK_TO_LEGACY_STEP[taskId];
+    if (!legacy) return;
+    try {
+      await api.post("/onboarding/complete-step", { step: legacy });
+    } catch {
+      // Non-blocking — user can still proceed.
+    }
+  }, []);
+
+  const completeTask = useCallback(
+    async (taskId: TaskId) => {
+      // If completing CIM with a sample deal picked, ask the API to spin up the demo.
+      // Mirror legacy behavior: button shows "Creating demo deal..." while waiting
+      // (apps/web/js/onboarding/onboarding-flow.js completeTask, lines 318-335).
+      if (taskId === "cim" && sampleDealId) {
+        setBusyTask(taskId);
+        try {
+          const res = await api.post<{ dealId?: string }>("/onboarding/create-demo-deal", {
+            sampleId: sampleDealId,
+          });
+          if (res?.dealId) setCreatedDealId(res.dealId);
+        } catch {
+          // Best-effort — user still gets marked done
+        } finally {
+          setBusyTask(null);
+        }
+      }
+
+      setCompleted((prev) => {
+        const next = new Set(prev);
+        next.add(taskId);
+        // Fire confetti when all tasks are done (legacy: fireConfetti in onboarding-flow.js)
+        if (next.size >= TASKS.length && !confettiFiredRef.current) {
+          confettiFiredRef.current = true;
+          setShowConfetti(true);
+        }
+        return next;
+      });
+      setActiveTask(null);
+      void markServerStep(taskId);
+
+      // Also mark full onboarding complete when all done (legacy: markOnboardingComplete)
+      const willBeComplete = completed.size + 1 >= TASKS.length || (completed.has(taskId) && completed.size >= TASKS.length);
+      if (willBeComplete) {
+        api.post("/onboarding/complete-step", { step: "createDeal" }).catch(() => {});
+      }
+    },
+    [markServerStep, sampleDealId, completed],
+  );
+
+  const doneCount = completed.size;
+  const allDone = doneCount >= TASKS.length;
+
+  const openWorkspace = () => {
+    if (createdDealId) router.push(`/deals/${createdDealId}`);
+    else router.push("/dashboard");
+  };
+
+  // Same pe_onboarding_seen sessionStorage backup WelcomeModal uses — keeps
+  // /dashboard from bouncing the user back here while the backend catches up.
+  const markSeen = () => {
+    try {
+      sessionStorage.setItem("pe_onboarding_seen", "1");
+    } catch {
+      // storage disabled — fine
+    }
+  };
+
+  const confirmSkip = async () => {
+    // /onboarding/dismiss sets checklistDismissed=true (NOT /onboarding/skip;
+    // that endpoint doesn't exist). Matches legacy markOnboardingSkipped in
+    // apps/web/js/onboarding/onboarding-flow.js:405.
+    markSeen();
+    try {
+      await Promise.all([
+        api.post("/onboarding/welcome-shown", {}).catch(() => undefined),
+        api.post("/onboarding/dismiss", {}).catch(() => undefined),
+      ]);
+    } finally {
+      router.push("/dashboard");
+    }
+  };
+
+  const startChecklist = async (useSample: boolean) => {
+    if (useSample) {
+      setSampleDealId("luktara");
+      setCompleted((prev) => {
+        const next = new Set(prev);
+        next.add("cim");
+        return next;
+      });
+    }
+    setView("checklist");
+    markSeen();
+    try {
+      await api.post("/onboarding/welcome-shown", {});
+    } catch {
+      // non-blocking
+    }
+  };
+
+  return (
+    <>
+      <Confetti active={showConfetti} />
+      <TopNav doneCount={doneCount} onSkip={() => setShowSkip(true)} />
+
+      {view === "welcome" ? (
+        <WelcomeView onStart={() => startChecklist(false)} onSample={() => startChecklist(true)} />
+      ) : (
+        <ChecklistView
+          completed={completed}
+          onOpenTask={setActiveTask}
+          allDone={allDone}
+          onOpenWorkspace={openWorkspace}
+          onDealId={(id) => setCreatedDealId((prev) => prev ?? id)}
+        />
+      )}
+
+      {activeTask === "firm" && (
+        <FirmTaskModal
+          value={firmData}
+          onChange={setFirmData}
+          onClose={() => setActiveTask(null)}
+          onComplete={() => completeTask("firm")}
+        />
+      )}
+      {activeTask === "cim" && (
+        <CimTaskModal
+          file={cimFile}
+          onFile={setCimFile}
+          sampleId={sampleDealId}
+          onSample={setSampleDealId}
+          onClose={() => setActiveTask(null)}
+          onComplete={() => completeTask("cim")}
+          busy={busyTask === "cim"}
+        />
+      )}
+      {activeTask === "team" && (
+        <TeamTaskModal
+          invites={teamInvites}
+          onChange={setTeamInvites}
+          onClose={() => setActiveTask(null)}
+          onComplete={() => completeTask("team")}
+        />
+      )}
+
+      <SkipConfirmModal open={showSkip} onCancel={() => setShowSkip(false)} onConfirm={confirmSkip} />
+    </>
+  );
+}
+
+function TopNav({ doneCount, onSkip }: { doneCount: number; onSkip: () => void }) {
+  return (
+    <header className="bg-white border-b border-border-subtle">
+      <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#003366" />
+          </svg>
+          <span className="font-bold text-[15px] tracking-tight text-primary">PE OS</span>
+          <span className="text-[11px] text-text-muted font-mono uppercase tracking-wider ml-2 hidden sm:inline">
+            Getting started
+          </span>
+        </div>
+        <div className="flex items-center gap-4">
+          {doneCount > 0 && doneCount < TASKS.length && (
+            <span className="text-[12px] text-text-muted hidden md:inline">
+              {doneCount}/{TASKS.length} done
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={onSkip}
+            className="text-[13px] text-text-secondary hover:text-primary transition-colors"
+          >
+            Skip setup
+          </button>
+        </div>
+      </div>
+    </header>
+  );
+}

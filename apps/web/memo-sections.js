@@ -271,7 +271,7 @@ function renderTable(tableData) {
 
     const rows = tableData.rows.map(row => {
         // Handle 3 formats:
-        // 1. Array of strings: ["Revenue", "12.5", "15.0"] (from GPT-4o JSON)
+        // 1. Array of strings: ["Revenue", "12.5", "15.0"] (from AI JSON)
         // 2. Object with values array: {metric: "Revenue", values: ["12.5", "15.0"]}
         // 3. Object with no values: {metric: "Revenue"} (broken)
         let metric = '';

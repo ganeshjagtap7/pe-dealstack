@@ -1,20 +1,42 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import { log } from './utils/logger.js';
+import { OPENROUTER_BASE_URL, OPENROUTER_HEADERS, isOpenRouterEnabled } from './utils/aiModels.js';
 
 dotenv.config();
 
-const apiKey = process.env.OPENAI_API_KEY;
+// Prefer OpenRouter (unified gateway routing Claude + GPT-4.1 family) when configured.
+// OpenRouter is OpenAI-API-compatible, so the existing OpenAI SDK works as a drop-in
+// once we swap the baseURL and key. Falls back to direct OpenAI otherwise.
+const openRouterKey = process.env.OPENROUTER_API_KEY;
+const openAIKey = process.env.OPENAI_API_KEY;
+const useOpenRouter = isOpenRouterEnabled();
+
+const apiKey = useOpenRouter ? openRouterKey : openAIKey;
 
 if (!apiKey) {
-  log.warn('OPENAI_API_KEY not set, AI features disabled');
+  log.warn('No LLM API key set (OPENROUTER_API_KEY / OPENAI_API_KEY), AI features disabled');
 }
 
-export const openai = apiKey ? new OpenAI({ apiKey }) : null;
+export const openai = apiKey
+  ? new OpenAI({
+      apiKey,
+      baseURL: useOpenRouter ? OPENROUTER_BASE_URL : undefined,
+      defaultHeaders: useOpenRouter ? OPENROUTER_HEADERS : undefined,
+    })
+  : null;
+
+// Direct OpenAI client (never routed through OpenRouter). Required for code paths
+// that depend on OpenAI-specific endpoints like the Responses API (PDF file inputs
+// for vision extraction), which OpenRouter does not proxy.
+export const openaiDirect = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
 
 export const isAIEnabled = () => !!openai;
 
-log.info('OpenAI status', { enabled: isAIEnabled() });
+log.info('LLM client status', {
+  enabled: isAIEnabled(),
+  provider: useOpenRouter ? 'openrouter' : 'openai-direct',
+});
 
 // System prompt for deal analysis
 export const DEAL_ANALYSIS_SYSTEM_PROMPT = `You are DealOS AI, an expert private equity analyst assistant. You help analyze deals, financial data, and investment opportunities.

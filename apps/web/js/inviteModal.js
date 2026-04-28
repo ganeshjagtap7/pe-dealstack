@@ -31,9 +31,9 @@ const InviteModal = (function () {
     ).join('');
 
     const dealTags = row.deals.map(deal => `
-      <div class="invite-tag bg-[#1269e2]/10 border border-[#1269e2]/20 text-[#1269e2] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs">
+      <div class="invite-tag bg-[#E6EDF5] border border-[#C8D4E0] text-[#003366] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs">
         <span>${escapeHtml(deal.name)}</span>
-        <button onclick="InviteModal.removeDealFromRow(${row.id}, '${escapeHtml(deal.id)}')" class="hover:text-[#1269e2]/70 text-[#1269e2]/50">
+        <button onclick="InviteModal.removeDealFromRow(${row.id}, '${escapeHtml(deal.id)}')" class="hover:text-[#4A6D8A] text-[#8099B3]">
           <span class="material-symbols-outlined text-[14px]">close</span>
         </button>
       </div>
@@ -47,7 +47,7 @@ const InviteModal = (function () {
           <div class="relative">
             <input
               type="email"
-              class="invite-email-input form-input block w-full rounded-lg border-[#EBEBEB] bg-white text-[#343A40] placeholder-[#868E96]/60 focus:border-[#1269e2] focus:ring-1 focus:ring-[#1269e2] h-12 px-4 text-sm transition-all"
+              class="invite-email-input form-input block w-full rounded-lg border-[#EBEBEB] bg-white text-[#343A40] placeholder-[#868E96]/60 focus:border-[#003366] focus:ring-1 focus:ring-[#003366] h-12 px-4 text-sm transition-all"
               placeholder="colleague@firm.com"
               value="${row.email}"
               data-row-id="${row.id}"
@@ -62,7 +62,7 @@ const InviteModal = (function () {
         <div class="flex-1 min-w-[140px]">
           ${isFirst ? '<label class="block mb-2 text-sm font-medium text-[#868E96]">Role</label>' : ''}
           <select
-            class="invite-modal-select invite-role-select block w-full rounded-lg border-[#EBEBEB] bg-white text-[#343A40] focus:border-[#1269e2] focus:ring-1 focus:ring-[#1269e2] h-12 px-4 text-sm transition-all cursor-pointer"
+            class="invite-modal-select invite-role-select block w-full rounded-lg border-[#EBEBEB] bg-white text-[#343A40] focus:border-[#003366] focus:ring-1 focus:ring-[#003366] h-12 px-4 text-sm transition-all cursor-pointer"
             data-row-id="${row.id}"
           >
             ${roleOptions}
@@ -72,7 +72,7 @@ const InviteModal = (function () {
         <!-- Workspaces/Deals -->
         <div class="flex-[2]">
           ${isFirst ? '<label class="block mb-2 text-sm font-medium text-[#868E96]">Workspaces</label>' : ''}
-          <div class="relative w-full rounded-lg border border-[#EBEBEB] bg-white min-h-[48px] px-2 py-1.5 flex items-center flex-wrap gap-2 focus-within:ring-1 focus-within:ring-[#1269e2] focus-within:border-[#1269e2] transition-all cursor-text group">
+          <div class="relative w-full rounded-lg border border-[#EBEBEB] bg-white min-h-[48px] px-2 py-1.5 flex items-center flex-wrap gap-2 focus-within:ring-1 focus-within:ring-[#003366] focus-within:border-[#003366] transition-all cursor-text group">
             ${dealTags}
             <input
               type="text"
@@ -80,7 +80,7 @@ const InviteModal = (function () {
               placeholder="${row.deals.length > 0 ? 'Add deal...' : 'Search workspaces...'}"
               data-row-id="${row.id}"
             />
-            <span class="material-symbols-outlined absolute right-3 text-[#868E96]/60 pointer-events-none text-lg group-focus-within:text-[#1269e2] transition-colors">search</span>
+            <span class="material-symbols-outlined absolute right-3 text-[#868E96]/60 pointer-events-none text-lg group-focus-within:text-[#003366] transition-colors">search</span>
           </div>
           <!-- Deals Dropdown -->
           <div class="invite-deals-dropdown hidden absolute z-10 mt-1 w-full max-w-[300px] bg-white border border-[#EBEBEB] rounded-lg shadow-lg py-1 max-h-48 overflow-y-auto" data-row-id="${row.id}">
@@ -177,7 +177,7 @@ const InviteModal = (function () {
     } else {
       dropdown.innerHTML = available.map(deal => `
         <button
-          class="w-full text-left px-4 py-2 text-sm hover:bg-[#1269e2]/5 text-[#343A40] transition-colors"
+          class="w-full text-left px-4 py-2 text-sm hover:bg-[#F0F4F8] text-[#343A40] transition-colors"
           onclick="InviteModal.addDealToRow(${rowId}, '${escapeHtml(deal.id)}', '${escapeHtml(deal.name)}')"
         >
           ${escapeHtml(deal.name)}
@@ -206,7 +206,7 @@ const InviteModal = (function () {
     } else {
       dropdown.innerHTML = filtered.map(deal => `
         <button
-          class="w-full text-left px-4 py-2 text-sm hover:bg-[#1269e2]/5 text-[#343A40] transition-colors"
+          class="w-full text-left px-4 py-2 text-sm hover:bg-[#F0F4F8] text-[#343A40] transition-colors"
           onclick="InviteModal.addDealToRow(${rowId}, '${escapeHtml(deal.id)}', '${escapeHtml(deal.name)}')"
         >
           ${escapeHtml(deal.name)}

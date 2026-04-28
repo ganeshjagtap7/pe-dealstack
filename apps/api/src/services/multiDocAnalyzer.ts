@@ -1,4 +1,5 @@
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_REASONING, MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import type { ExtractedDealData } from './aiExtractor.js';
@@ -198,7 +199,7 @@ Respond in JSON format:
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
         messages: [
           { role: 'system', content: synthesisPrompt },
           { role: 'user', content: combinedText.slice(0, 30000) },

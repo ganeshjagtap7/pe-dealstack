@@ -6,6 +6,12 @@ import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { log } from '../utils/logger.js';
+import {
+  AI_MODELS,
+  OPENROUTER_BASE_URL,
+  OPENROUTER_HEADERS,
+  isOpenRouterEnabled,
+} from '../utils/aiModels.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -32,11 +38,16 @@ const config: LLMConfig = {
 
 // ─── Model Registry ────────────────────────────────────────────────
 
+// When OpenRouter is enabled, model strings are OpenRouter IDs
+// (e.g. "anthropic/claude-sonnet-4.5") routed through the OpenAI-compatible
+// ChatOpenAI client below. Otherwise we fall back to bare OpenAI model names.
+const useOpenRouter = isOpenRouterEnabled();
+
 const MODELS = {
   openai: {
-    chat: process.env.LLM_CHAT_MODEL || 'gpt-4o',
-    fast: process.env.LLM_FAST_MODEL || 'gpt-4o-mini',
-    extraction: 'gpt-4o',
+    chat: process.env.LLM_CHAT_MODEL || (useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4o'),
+    fast: process.env.LLM_FAST_MODEL || (useOpenRouter ? AI_MODELS.TIER3 : 'gpt-4o-mini'),
+    extraction: useOpenRouter ? AI_MODELS.TIER1 : 'gpt-4o',
   },
   gemini: {
     chat: 'gemini-1.5-pro',
@@ -48,11 +59,28 @@ const MODELS = {
 // ─── Factory Functions ─────────────────────────────────────────────
 
 function createOpenAIModel(model: string, temperature = 0.7, maxTokens?: number): ChatOpenAI {
+  if (useOpenRouter) {
+    // Route through OpenRouter using ChatOpenAI's OpenAI-compatible client.
+    // @langchain/openai v1 uses `apiKey` (not `openAIApiKey`); we also pass it
+    // inside `configuration` so the underlying OpenAI SDK definitely picks it up
+    // instead of falling back to the OPENAI_API_KEY env var.
+    return new ChatOpenAI({
+      model,
+      temperature,
+      maxTokens,
+      apiKey: process.env.OPENROUTER_API_KEY,
+      configuration: {
+        apiKey: process.env.OPENROUTER_API_KEY,
+        baseURL: OPENROUTER_BASE_URL,
+        defaultHeaders: OPENROUTER_HEADERS,
+      },
+    });
+  }
   return new ChatOpenAI({
-    modelName: model,
+    model,
     temperature,
     maxTokens,
-    openAIApiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY,
   });
 }
 
@@ -83,14 +111,14 @@ function createModel(
 
 // ─── Pre-built Model Instances ─────────────────────────────────────
 
-/** Primary chat model (GPT-4o or Gemini Pro) — for deal analysis, chat, memos */
+/** Primary chat model (Claude Sonnet 4.5 via OpenRouter, or GPT-4.1 direct) — for deal analysis, chat, memos */
 export function getChatModel(temperature = 0.7, maxTokens = 1500): BaseChatModel {
   const provider = config.chatProvider;
   const model = MODELS[provider].chat;
   return createModel(provider, model, temperature, maxTokens);
 }
 
-/** Fast/cheap model (GPT-4o-mini or Gemini Flash) — for sentiment, classification */
+/** Fast/cheap model (GPT-4.1-mini via OpenRouter, or GPT-4.1-mini direct) — for sentiment, classification */
 export function getFastModel(temperature = 0.7, maxTokens = 500): BaseChatModel {
   const provider = config.fastProvider;
   const model = MODELS[provider].fast;
@@ -116,8 +144,8 @@ export function getModel(
 
 // ─── Availability Checks ──────────────────────────────────────────
 
-export function isOpenAIAvailable(): boolean {
-  return !!process.env.OPENAI_API_KEY;
+export function isOpenAICompatibleAvailable(): boolean {
+  return !!process.env.OPENAI_API_KEY || !!process.env.OPENROUTER_API_KEY;
 }
 
 export function isGeminiAvailable(): boolean {
@@ -125,7 +153,7 @@ export function isGeminiAvailable(): boolean {
 }
 
 export function isLLMAvailable(): boolean {
-  return isOpenAIAvailable() || isGeminiAvailable();
+  return isOpenAICompatibleAvailable() || isGeminiAvailable();
 }
 
 /** Get the currently configured chat provider name */
@@ -140,6 +168,7 @@ log.info('LLM abstraction initialized', {
   chatModel: MODELS[config.chatProvider].chat,
   fastProvider: config.fastProvider,
   fastModel: MODELS[config.fastProvider].fast,
-  openaiAvailable: isOpenAIAvailable(),
+  openaiCompatibleAvailable: isOpenAICompatibleAvailable(),
   geminiAvailable: isGeminiAvailable(),
+  routedThroughOpenRouter: useOpenRouter,
 });

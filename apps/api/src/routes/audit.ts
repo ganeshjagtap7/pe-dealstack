@@ -3,8 +3,30 @@ import { z } from 'zod';
 import { getAuditLogs, getAuditSummary, AUDIT_ACTIONS, RESOURCE_TYPES, SEVERITY } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { supabase } from '../supabase.js';
 
 const router = Router();
+
+// ─── Helpers ─────────────────────────────────────────────────
+
+/**
+ * Attach userName to each audit log by looking up the org's User table.
+ * Scoped to organizationId so a log's userId from another org cannot resolve here.
+ */
+async function enrichLogsWithUserNames(logs: any[], orgId: string): Promise<any[]> {
+  const userIds = [...new Set(logs.map((l) => l.userId).filter(Boolean))];
+  if (userIds.length === 0) return logs;
+
+  const { data: users } = await supabase
+    .from('User')
+    .select('id, name')
+    .eq('organizationId', orgId)
+    .in('id', userIds);
+
+  if (!users) return logs;
+  const nameMap = new Map(users.map((u: any) => [u.id, u.name]));
+  return logs.map((l) => ({ ...l, userName: nameMap.get(l.userId) || null }));
+}
 
 // ─── Query Schema ────────────────────────────────────────────
 
@@ -50,12 +72,14 @@ router.get('/', async (req, res) => {
       return res.status(500).json({ error: 'Failed to retrieve audit logs' });
     }
 
+    const enrichedLogs = await enrichLogsWithUserNames(data || [], orgId);
+
     res.json({
       success: true,
       count,
       limit,
       offset,
-      logs: data,
+      logs: enrichedLogs,
     });
   } catch (error) {
     log.error('Audit route error', error);
@@ -84,11 +108,13 @@ router.get('/entity/:entityId', async (req, res) => {
       return res.status(500).json({ error: 'Failed to retrieve audit trail' });
     }
 
+    const enrichedLogs = await enrichLogsWithUserNames(data || [], orgId);
+
     res.json({
       success: true,
       entityId,
       count,
-      logs: data,
+      logs: enrichedLogs,
     });
   } catch (error) {
     log.error('Audit entity route error', error);

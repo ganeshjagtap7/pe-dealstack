@@ -1,15 +1,15 @@
 /**
- * visionExtractor.ts — GPT-4o Vision fallback for scanned / image-only PDFs.
+ * visionExtractor.ts — GPT-4.1 Vision fallback for scanned / image-only PDFs.
  *
  * When pdf-parse returns < 200 meaningful characters (scanned PDFs, image PDFs),
- * this service uploads the raw PDF buffer to OpenAI and sends it to GPT-4o
+ * this service uploads the raw PDF buffer to OpenAI and sends it to GPT-4.1
  * using the Responses API, which natively supports PDF file inputs.
  *
  * Returns the same ClassificationResult format as classifyFinancials()
  * so the rest of the pipeline is unchanged.
  */
 
-import { openai, isAIEnabled } from '../openai.js';
+import { openaiDirect } from '../openai.js';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
 import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, StatementType, PeriodType, UnitScale } from './financialClassifier.js';
@@ -21,7 +21,7 @@ import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, Statem
 
 /**
  * Attempt to extract financial statements from a PDF buffer using
- * GPT-4o's native PDF reading (via Responses API).
+ * GPT-4.1's native PDF reading (via Responses API).
  *
  * Use this when pdf-parse yields fewer than ~200 meaningful characters
  * (scanned PDFs, image-based PDFs).
@@ -31,8 +31,8 @@ export async function classifyFinancialsVision(
   filename: string = 'document.pdf',
   currencyHint?: string,
 ): Promise<ClassificationResult | null> {
-  if (!isAIEnabled() || !openai) {
-    log.warn('Vision extractor: OpenAI not configured, skipping');
+  if (!openaiDirect) {
+    log.warn('Vision extractor: direct OpenAI key not configured (Responses API requires it, OpenRouter does not proxy /v1/responses), skipping');
     return null;
   }
 
@@ -41,7 +41,7 @@ export async function classifyFinancialsVision(
     return null;
   }
 
-  log.info('Vision extractor: starting GPT-4o vision extraction', {
+  log.info('Vision extractor: starting vision extraction', {
     filename,
     bufferSizeKB: Math.round(pdfBuffer.length / 1024),
   });
@@ -51,9 +51,10 @@ export async function classifyFinancialsVision(
     const base64 = pdfBuffer.toString('base64');
     const fileDataUrl = `data:application/pdf;base64,${base64}`;
 
-    // Use the Responses API which natively supports PDF file inputs
-    const response = await (openai as any).responses.create({
-      model: 'gpt-4o',
+    // Use the Responses API which natively supports PDF file inputs.
+    // Must hit OpenAI directly — OpenRouter does not proxy /v1/responses.
+    const response = await (openaiDirect as any).responses.create({
+      model: 'gpt-4.1',
       instructions: buildExtractionPrompt({ includeSourceCitations: false, currencyHint }),
       input: [
         {
@@ -77,7 +78,7 @@ export async function classifyFinancialsVision(
     const content: string | null = response.output_text ?? null;
 
     if (!content) {
-      log.error('Vision extractor: empty response from GPT-4o');
+      log.error('Vision extractor: empty response from vision model');
       return null;
     }
 

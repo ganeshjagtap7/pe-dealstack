@@ -8,6 +8,7 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import { supabase } from '../../../supabase.js';
 import { log } from '../../../utils/logger.js';
+import { TOPIC_GUARDRAILS, CONTEXT_ANCHORING } from '../guardrails.js';
 
 // ─── State Schema ──────────────────────────────────────────────────
 
@@ -85,6 +86,8 @@ async function draftNode(state: typeof EmailState.State) {
 
   const result = await structuredModel.invoke([
     new SystemMessage(`You are an expert email writer for a Private Equity firm. Write professional, concise emails that are appropriate for PE deal communication.
+${TOPIC_GUARDRAILS}
+${CONTEXT_ANCHORING}
 
 Tone: ${state.tone || 'professional'}${templateGuide}
 

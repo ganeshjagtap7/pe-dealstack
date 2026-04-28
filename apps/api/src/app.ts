@@ -34,6 +34,7 @@ import { orgMiddleware } from './middleware/orgScope.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { isAIEnabled } from './openai.js';
+import { MODEL_REASONING } from './utils/aiModels.js';
 import { log } from './utils/logger.js';
 
 dotenv.config();
@@ -95,20 +96,26 @@ app.use(helmet({
   referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
 
+// Trust proxy — required when running behind Vercel/Render/nginx so that
+// express-rate-limit reads the real client IP from X-Forwarded-For.
+app.set('trust proxy', 1);
+
 // CORS - whitelist allowed origins (configurable via ALLOWED_ORIGINS env var)
 const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 const allowedOrigins = [
   'https://pe-os.onrender.com',
   'https://pe-dealstack.vercel.app',
+  'https://pe-dealstack-nextjs.vercel.app',
   'https://lmmos.ai',
   'https://www.lmmos.ai',
   ...extraOrigins,
-  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
+  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:5173'] : []),
 ];
+const previewOriginRegex = /^https:\/\/pe-dealstack(-nextjs)?-[a-z0-9-]+\.vercel\.app$/;
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, Postman, same-origin)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || previewOriginRegex.test(origin)) {
       callback(null, true);
     } else {
       log.warn('CORS request rejected', { origin });
@@ -282,7 +289,7 @@ app.use('/api', authMiddleware, orgMiddleware, aiRouter);
 app.get('/api/ai/status', (_req, res) => {
   res.json({
     enabled: isAIEnabled(),
-    model: 'gpt-4o',
+    model: MODEL_REASONING,
   });
 });
 

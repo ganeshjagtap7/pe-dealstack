@@ -1,0 +1,609 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* PE OS Design System — Banker Blue */
+  --color-primary: #003366;
+  --color-primary-hover: #002855;
+  --color-primary-light: #E6EEF5;
+  --color-secondary: #059669;
+  --color-secondary-light: #D1FAE5;
+  --color-background-body: #F8F9FA;
+  --color-surface-card: #FFFFFF;
+  --color-border-subtle: #E5E7EB;
+  --color-border-focus: #CBD5E1;
+  --color-text-main: #111827;
+  --color-text-secondary: #4B5563;
+  --color-text-muted: #9CA3AF;
+
+  --font-sans: "Inter", sans-serif;
+  --font-display: "Inter", sans-serif;
+
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.05), 0 1px 2px -1px rgba(0, 0, 0, 0.05);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+  --shadow-float: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-glow: 0 0 15px rgba(0, 51, 102, 0.1);
+}
+
+body {
+  background: var(--color-background-body);
+  color: var(--color-text-main);
+  font-feature-settings: "cv11", "ss01";
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #D1D5DB;
+  border-radius: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9CA3AF;
+}
+
+/* Hide scrollbar but keep functionality (memo-builder prompt chips, etc.) */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Gradient mask for horizontal scroll */
+.mask-gradient {
+  mask-image: linear-gradient(to right, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, black 90%, transparent 100%);
+}
+
+/* Kanban card drag styles */
+.kanban-card {
+  cursor: grab;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.kanban-card:active {
+  cursor: grabbing;
+}
+.kanban-card.dragging {
+  opacity: 0.5;
+  transform: rotate(2deg) scale(1.02);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+}
+
+/* Animations */
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideOut {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* User dropdown / notification panel slide-in (matches legacy dropdownSlideIn) */
+@keyframes dropdownSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.dropdown-animate {
+  animation: dropdownSlideIn 0.15s ease-out;
+}
+
+/* User-dropdown item hover states (legacy parity) */
+.user-dropdown-item:hover {
+  background-color: var(--color-primary-light);
+  color: var(--color-primary) !important;
+}
+.user-dropdown-item-logout:hover {
+  background-color: #FEF2F2 !important;
+  color: #DC2626 !important;
+}
+
+@keyframes welcomeFadeInUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes checkmark {
+  0% { transform: scale(0); opacity: 0; }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Onboarding pulse dot — ported from onboarding.html .pulse-dot */
+@keyframes pulseDot {
+  0% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.6); }
+  70% { box-shadow: 0 0 0 10px rgba(5, 150, 105, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(5, 150, 105, 0); }
+}
+.pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #059669;
+  box-shadow: 0 0 0 0 rgba(5, 150, 105, 0.7);
+  animation: pulseDot 2s infinite;
+}
+
+.welcome-fade-in {
+  animation: welcomeFadeInUp 0.3s ease-out;
+}
+
+/* Memo section content typography — ported from caef966 (apps/web/memo-builder.html)
+   so AI-generated section HTML matches the legacy look (h3 with underline,
+   tighter p line-height, positive/negative highlight spans). */
+.memo-section-content h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #0d131b;
+  margin-top: 1.25rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.25rem;
+}
+.memo-section-content h3:first-child { margin-top: 0; }
+.memo-section-content p {
+  color: #334155;
+  line-height: 1.7;
+  margin-bottom: 0.75rem;
+  font-size: 0.9375rem;
+}
+.memo-section-content ul, .memo-section-content ol {
+  margin: 0.5rem 0 0.75rem 1.25rem;
+  color: #334155;
+  font-size: 0.9375rem;
+}
+.memo-section-content li {
+  margin-bottom: 0.35rem;
+  line-height: 1.6;
+}
+.memo-section-content strong { color: #0d131b; }
+.memo-section-content .highlight-positive {
+  color: #166534;
+  font-weight: 600;
+}
+.memo-section-content .highlight-negative {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+/* Document canvas — embedded table typography (AI-generated content) */
+.memo-section-content table {
+  font-size: 12.5px;
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+}
+.memo-section-content th {
+  background-color: #f0f4f8;
+  color: #003366;
+  font-weight: 600;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  text-align: left;
+}
+.memo-section-content td {
+  padding: 7px 12px;
+  border: 1px solid #e2e8f0;
+  vertical-align: top;
+}
+.memo-section-content tr:nth-child(even) td {
+  background-color: #fafafa;
+}
+
+/* ============================================================
+   PE OS — Toast Notification System
+   Ported from apps/web/js/notifications.js. Stacked slide-in
+   toasts at top-right with progress timer bar.
+   ============================================================ */
+
+@keyframes peToastIn {
+  from { opacity: 0; transform: translateX(24px) scale(0.96); }
+  to   { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+@keyframes peToastOut {
+  from { opacity: 1; transform: translateX(0) scale(1); }
+  to   { opacity: 0; transform: translateX(24px) scale(0.96); }
+}
+
+@keyframes peToastProgress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+.pe-toast {
+  min-width: 340px;
+  max-width: 420px;
+  background: #fff;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+  animation: peToastIn 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.pe-toast-removing {
+  animation: peToastOut 0.22s ease-in forwards;
+}
+
+.pe-toast-progress-bar {
+  height: 100%;
+  border-radius: 0 0 10px 10px;
+  animation: peToastProgress linear forwards;
+}
+
+/* ============================================================
+   PE OS — Page Transition Fade-in
+   Subtle fade-in on route load, matching legacy layout.js.
+   ============================================================ */
+
+@keyframes pageContentFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.page-transition-fade-in {
+  animation: pageContentFadeIn 0.18s ease-out;
+}
+
+/* Top-level route change: fade + subtle upward slide.
+   Keyed off the pathname in (app)/layout.tsx so a new animation fires
+   whenever the user navigates between top-level pages. */
+@keyframes fadeSlide {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-fade-in {
+  animation: fadeSlide 200ms ease-out;
+}
+
+/* AI chat bubble gradient — matches legacy deal.html .ai-bubble-gradient */
+.ai-bubble-gradient {
+  background: linear-gradient(135deg, #E6EEF5 0%, #F8F9FA 100%);
+}
+
+/* Chat message fade-in — matches legacy animate-fadeIn */
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Chat markdown inside AI Analyst panel */
+.chat-markdown p { margin-bottom: 0.25rem; }
+.chat-markdown ul, .chat-markdown ol {
+  margin: 0.25rem 0 0.5rem 1.25rem;
+}
+.chat-markdown li { margin-bottom: 0.15rem; }
+
+/* ============================================================
+   PE OS — Skeleton Loading Shimmer
+   Reusable skeleton classes for premium loading states.
+   Uses the existing design system colors.
+   ============================================================ */
+
+/* Base shimmer animation */
+@keyframes shimmer {
+  0% { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+/* Base skeleton element — apply to any div/span */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #F0F0F0 25%,
+    #E0E0E0 37%,
+    #F0F0F0 63%
+  );
+  background-size: 800px 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  border-radius: 0.375rem;
+}
+
+/* Text line — single line of text */
+.skeleton-text {
+  height: 0.875rem;
+  width: 60%;
+  margin-bottom: 0.5rem;
+}
+
+.skeleton-text-sm {
+  height: 0.625rem;
+  width: 40%;
+}
+
+.skeleton-text-lg {
+  height: 1.25rem;
+  width: 50%;
+}
+
+/* Heading */
+.skeleton-heading {
+  height: 1.5rem;
+  width: 35%;
+  margin-bottom: 0.5rem;
+}
+
+/* Circle — avatar placeholder */
+.skeleton-circle {
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+/* Badge — small pill */
+.skeleton-badge {
+  height: 1.25rem;
+  width: 4rem;
+  border-radius: 9999px;
+}
+
+/* Card — full card placeholder */
+.skeleton-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background: #FFFFFF;
+  padding: 1.25rem;
+}
+
+/* Stat card skeleton */
+.skeleton-stat-card {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background: #FFFFFF;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Table row skeleton */
+.skeleton-table-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr 2fr 1fr;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid #F3F4F6;
+  align-items: center;
+}
+
+/* Widget skeleton */
+.skeleton-widget {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background: #FFFFFF;
+  overflow: hidden;
+}
+
+.skeleton-widget-header {
+  padding: 1.25rem;
+  border-bottom: 1px solid #E5E7EB;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.skeleton-widget-body {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* Fade out skeleton when data loads */
+.skeleton-fade-out {
+  animation: skeletonFadeOut 0.3s ease-out forwards;
+}
+
+@keyframes skeletonFadeOut {
+  0% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ============================================================
+   PE OS — Micro-interactions & Hover Effects
+   Premium polish layer. Applied globally.
+   ============================================================ */
+
+/* -- Button press feedback --------------------------------- */
+button:active:not(:disabled),
+a.nav-item:active,
+[role="button"]:active:not(:disabled) {
+  transform: scale(0.97);
+  transition: transform 0.1s ease;
+}
+
+/* -- Card hover lift --------------------------------------- */
+.contact-card article,
+.widget-container,
+[data-deal-id] > a > article,
+[data-deal-id] > article {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s ease,
+              border-color 0.2s ease;
+}
+
+.contact-card article:hover,
+[data-deal-id] > a > article:hover,
+[data-deal-id] > article:hover {
+  transform: translateY(-2px);
+}
+
+/* -- Dropdown menus — slide in ----------------------------- */
+[id$="-dropdown"]:not(.hidden),
+[id$="-menu"]:not(.hidden) {
+  animation: menuSlideIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes menuSlideIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* -- Sidebar nav items — smooth icon color ----------------- */
+.nav-item {
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.nav-item .material-symbols-outlined {
+  transition: color 0.15s ease;
+}
+
+/* -- Badge pulse on new items ------------------------------ */
+@keyframes badgePulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.badge-pulse {
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+/* -- Focus ring — accessible keyboard focus ---------------- */
+button:focus-visible,
+a:focus-visible,
+select:focus-visible {
+  outline: 2px solid #003366;
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Text inputs + textareas: softer premium ring (Linear/Vercel-style) */
+input[type="text"]:focus-visible,
+input[type="email"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="search"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="tel"]:focus-visible,
+input[type="url"]:focus-visible,
+input:not([type]):focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: #003366;
+  box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12);
+}
+
+/* -- Hide scrollbars globally -- scroll still works ------- */
+* {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+}
+*::-webkit-scrollbar {
+  display: none; /* Chrome/Safari */
+}
+
+/* -- Smooth scrollbar for all custom-scrollbar areas ------- */
+.custom-scrollbar {
+  scroll-behavior: smooth;
+}
+
+/* ============================================================
+   AI Assistant — Floating chat drawer animations
+   Ported from apps/web/js/aiAssistant.js
+   ============================================================ */
+
+/* FAB pulse ring */
+.ai-fab-btn { position: relative; }
+.ai-fab-btn::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 19px;
+  border: 2px solid rgba(0, 51, 102, 0.3);
+  animation: aiFabPulse 3s ease-in-out infinite;
+}
+.ai-fab-btn:active { transform: scale(0.95) !important; }
+
+@keyframes aiFabPulse {
+  0%, 100% { opacity: 0; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
+}
+
+/* Overlay fade */
+@keyframes aiFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Drawer slide-up */
+@keyframes aiDrawerIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.95); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Message entrance */
+@keyframes aiMsgIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Typing dots bounce */
+@keyframes aiTypingDot {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+/* Close button hover */
+.ai-close-btn:hover { background: rgba(255, 255, 255, 0.25) !important; }
+
+/* Messages scrollbar — legacy uses 4px, narrower than the generic custom-scrollbar */
+.ai-messages-area::-webkit-scrollbar { width: 4px; }
+.ai-messages-area::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 2px; }
+
+/* Bold text inside assistant messages — Banker Blue like legacy */
+.ai-msg-assistant strong { color: #003366; }
+
+/* Send button hover */
+.ai-send-btn:hover:not(:disabled) { background: #004488 !important; }
+
+/* Input placeholder */
+.ai-input::placeholder { color: #9CA3AF; }

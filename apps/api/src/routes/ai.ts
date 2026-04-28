@@ -11,6 +11,7 @@ import portfolioRouter from './ai-portfolio.js';
 import aiAgentsRouter from './ai-agents.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
+import { MODEL_REASONING, MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { classifyAIError } from '../utils/aiErrors.js';
 
 const router = Router();
@@ -216,7 +217,7 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
     log.info('Generating thesis for deal', { dealId, forceRefresh });
 
     const completion = await openai!.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_REASONING,
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
         { role: 'user', content: prompt },
@@ -314,7 +315,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
     log.info('Analyzing risks for deal', { dealId, forceRefresh });
 
     const completion = await openai!.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
         { role: 'user', content: prompt },
@@ -358,7 +359,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
 router.get('/ai/status', (req, res) => {
   res.json({
     enabled: isAIEnabled(),
-    model: 'gpt-4o',
+    model: MODEL_REASONING,
   });
 });
 

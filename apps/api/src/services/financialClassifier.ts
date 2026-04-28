@@ -1,4 +1,5 @@
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
@@ -43,7 +44,7 @@ export interface ClassificationResult {
  * Returns one ClassifiedStatement per statement type found,
  * each containing all periods (years) as separate FinancialPeriod entries.
  *
- * Designed so the extraction layer (currently GPT-4o) can be swapped
+ * Designed so the extraction layer (currently AI classifier) can be swapped
  * for Azure Document Intelligence later without changing the output interface.
  */
 export async function classifyFinancials(
@@ -59,7 +60,7 @@ export async function classifyFinancials(
     return null;
   }
 
-  // Use up to MAX_TEXT_LENGTH chars — GPT-4o supports 128K context, so we can safely send more
+  // Use up to MAX_TEXT_LENGTH chars — model supports large context, so we can safely send more
   // This catches financial data buried deep in 50+ page CIMs that were previously cut off
   const truncatedText = text.slice(0, MAX_TEXT_LENGTH);
 
@@ -67,7 +68,7 @@ export async function classifyFinancials(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_CLASSIFICATION,
       messages: [
         { role: 'system', content: buildExtractionPrompt({ includeSourceCitations: true }) },
         {

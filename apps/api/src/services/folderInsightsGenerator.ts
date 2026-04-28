@@ -1,4 +1,5 @@
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_INSIGHTS } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
 
 export interface GeneratedInsights {
@@ -96,7 +97,7 @@ Generate insights as JSON.`;
     log.info('Generating folder insights', { folderName, docCount: documents.length });
 
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_INSIGHTS,
       messages: [
         { role: 'system', content: FOLDER_INSIGHTS_SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },

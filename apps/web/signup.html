@@ -26,18 +26,20 @@
   </div>
 </div>
 
-<!-- Top Nav -->
-<header class="bg-white border-b border-border-subtle">
-  <div class="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
-    <div class="flex items-center gap-3">
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
-        <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#003366"/>
-      </svg>
-      <span class="font-display font-bold text-[15px] tracking-tight text-primary">PE OS</span>
-    </div>
+<!-- Top Nav (sticky) -->
+<header class="w-full border-b border-[#e5e7eb] dark:border-gray-800 bg-white dark:bg-[#1a202c] sticky top-0 z-50">
+  <div class="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
+    <a href="index.html" class="flex items-center gap-3 text-[#111418] dark:text-white cursor-pointer select-none">
+      <div class="size-8 text-primary">
+        <img src="/logo-mark.svg" alt="PE OS" class="w-full h-full" onerror="this.style.display='none'" />
+      </div>
+      <h2 class="text-xl font-bold leading-tight tracking-tight">PE OS</h2>
+    </a>
     <div class="flex items-center gap-4">
-      <span class="text-[13px] text-text-secondary hidden sm:inline">Already have an account?</span>
-      <a href="login.html" class="text-[13px] font-semibold text-primary hover:text-primary-hover transition">Log in</a>
+      <span class="text-sm font-medium text-[#617289] dark:text-gray-400 hidden sm:block">Already have an account?</span>
+      <a href="login.html" class="text-primary hover:text-primary/80 font-bold text-sm transition-colors">
+        Log in
+      </a>
     </div>
   </div>
 </header>

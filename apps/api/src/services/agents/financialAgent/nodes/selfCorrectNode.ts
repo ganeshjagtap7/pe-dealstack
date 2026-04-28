@@ -3,8 +3,8 @@
  *
  * THE KILLER FEATURE: When validation fails, this node:
  *   1. Reads the failedChecks (math errors, low confidence periods)
- *   2. Builds a targeted GPT-4o prompt explaining exactly what's wrong
- *   3. Asks GPT-4o to re-extract only the failing statement/periods
+ *   2. Builds a targeted AI prompt explaining exactly what's wrong
+ *   3. Asks the model to re-extract only the failing statement/periods
  *   4. Merges corrected data back into the statements array
  *   5. Increments retryCount so the graph loops back to Validate
  *
@@ -13,6 +13,7 @@
  */
 
 import { openai, isAIEnabled } from '../../../../openai.js';
+import { MODEL_CLASSIFICATION } from '../../../../utils/aiModels.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { log } from '../../../../utils/logger.js';
 import type { ClassifiedStatement, ClassificationResult } from '../../../financialClassifier.js';
@@ -25,7 +26,7 @@ function step(node: string, message: string, detail?: string): AgentStep {
 }
 
 /**
- * Build a targeted correction prompt that tells GPT-4o exactly what went wrong.
+ * Build a targeted correction prompt that tells the model exactly what went wrong.
  */
 function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string): string {
   const issueDescriptions = failedChecks.map((fc, i) => {
@@ -158,14 +159,14 @@ export async function selfCorrectNode(
   try {
     let correctedClassification: ClassificationResult | null = null;
 
-    // ── Text path: targeted GPT-4o re-extraction ──
+    // ── Text path: targeted AI re-extraction ──
     if (rawText && rawText.trim().length >= 200 && isAIEnabled() && openai) {
-      steps.push(step('self_correct', 'Re-extracting with targeted GPT-4o prompt'));
+      steps.push(step('self_correct', 'Re-extracting with targeted AI prompt'));
 
       const prompt = buildCorrectionPrompt(failedChecks, rawText);
 
       const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
+        model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
         messages: [
           { role: 'user', content: prompt },
         ],
@@ -179,14 +180,14 @@ export async function selfCorrectNode(
         correctedClassification = JSON.parse(content) as ClassificationResult;
         steps.push(step(
           'self_correct',
-          `GPT-4o returned ${correctedClassification.statements?.length ?? 0} corrected statement(s)`,
+          `AI returned ${correctedClassification.statements?.length ?? 0} corrected statement(s)`,
         ));
       }
     }
 
     // ── Vision fallback: re-run full Vision extraction ──
     if (!correctedClassification && fileBuffer && fileBuffer.length > 0) {
-      steps.push(step('self_correct', 'Text unavailable — re-extracting with GPT-4o Vision'));
+      steps.push(step('self_correct', 'Text unavailable — re-extracting with AI Vision'));
       correctedClassification = await classifyFinancialsVision(fileBuffer, fileName || 'document.pdf');
 
       if (correctedClassification) {

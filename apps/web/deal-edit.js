@@ -314,7 +314,7 @@ function showContextSettings() {
                         <label class="block text-sm font-semibold text-slate-700 mb-2">AI Model</label>
                         <div class="flex items-center gap-2 px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg">
                             <span class="material-symbols-outlined text-primary text-lg">smart_toy</span>
-                            <span class="text-sm font-medium text-slate-700">GPT-4o (ReAct Agent)</span>
+                            <span class="text-sm font-medium text-slate-700">AI Agent (ReAct)</span>
                             <span class="ml-auto text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-green-50 text-green-600 border border-green-200">Active</span>
                         </div>
                         <p class="text-xs text-slate-400 mt-1.5">Model is configured by your admin. Contact your organization admin to change.</p>

@@ -2,12 +2,13 @@
  * Narrative Insights Service
  *
  * Generates PE-grade AI commentary from computed analysis results.
- * Uses GPT-4o with a senior PE associate persona.
+ * Uses GPT-4.1 (MODEL_INSIGHTS tier) with a senior PE associate persona.
  * Caches results keyed by analysisHash to avoid repeat calls.
  */
 
 import crypto from 'crypto';
 import { openai, isAIEnabled } from '../openai.js';
+import { MODEL_INSIGHTS } from '../utils/aiModels.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import type { IndustryBenchmark, PortfolioSummary } from './agentMemory.js';
@@ -297,7 +298,7 @@ Return JSON:
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4o',
+      model: MODEL_INSIGHTS,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userPrompt },
@@ -308,7 +309,7 @@ Return JSON:
     });
 
     const content = response.choices[0]?.message?.content;
-    if (!content) throw new Error('Empty GPT-4o response');
+    if (!content) throw new Error('Empty AI response');
 
     const parsed = JSON.parse(content) as InsightsResult;
     parsed.generatedAt = new Date().toISOString();
@@ -320,7 +321,7 @@ Return JSON:
 
     return parsed;
   } catch (err) {
-    log.error('narrativeInsights: GPT-4o generation failed', err);
+    log.error('narrativeInsights: AI generation failed', err);
     return fallbackInsights();
   }
 }

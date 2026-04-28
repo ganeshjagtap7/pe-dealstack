@@ -105,7 +105,7 @@ cd apps/web
 npm run dev
 ```
 
-Then navigate to: `http://localhost:3000/vdr.html`
+Then navigate to: `http://localhost:3003/vdr.html`
 
 ### Production Build
 

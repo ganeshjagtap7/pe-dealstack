@@ -2,7 +2,7 @@
  * excelFinancialExtractor.ts
  *
  * Converts an Excel workbook (.xlsx / .xls / .xlsm) into structured text
- * that can be fed directly into classifyFinancials() (GPT-4o classifier).
+ * that can be fed directly into classifyFinancials() (AI classifier).
  *
  * Strategy:
  *   1. Score each sheet by name relevance (financial vs non-financial)
@@ -104,7 +104,7 @@ export function detectUnitScale(sheet: XLSX.WorkSheet): string | null {
 
 /**
  * Convert sheet to CSV but skip mostly-empty rows and formatting-only rows.
- * Returns cleaner text that's more token-efficient for GPT-4o.
+ * Returns cleaner text that's more token-efficient for AI classifier.
  */
 function sheetToCleanCSV(sheet: XLSX.WorkSheet): string {
   const csv = XLSX.utils.sheet_to_csv(sheet, {
@@ -138,7 +138,7 @@ function sheetToCleanCSV(sheet: XLSX.WorkSheet): string {
  * Improvements over v1:
  *   - Scores sheets by financial relevance (not just pattern match)
  *   - Skips junk sheets (Assumptions, Notes, Cover, etc.)
- *   - Detects unit scale from headers and passes to GPT-4o
+ *   - Detects unit scale from headers and passes to AI classifier
  *   - Filters empty/formatting rows for cleaner input
  *   - Processes sheets in relevance order (highest score first)
  */
