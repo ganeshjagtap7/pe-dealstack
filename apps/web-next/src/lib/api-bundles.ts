@@ -2,25 +2,25 @@
 // app-ai.js) and route incoming /api/* paths to the correct one. The dispatch
 // table mirrors vercel.json's old `rewrites` block one-for-one — heavy
 // AI-bound endpoints (chat, financial extraction, memos, etc.) go to app-ai;
-// everything else to app-lite. The dynamic import resolves at runtime
-// against apps/api/dist/, which is built by `npm run build:api` before the
-// web-next build (vercel.json's buildCommand chains them in that order).
+// everything else to app-lite.
 
+import path from "node:path";
+import { pathToFileURL } from "node:url";
 import type { ExpressHandler } from "./api-adapter";
 
-// The path is relative from this file (apps/web-next/src/lib/api-bundles.ts):
-//   ../          → apps/web-next/src/
-//   ../../       → apps/web-next/
-//   ../../../    → apps/
-// Then into api/dist/. Verified to resolve to
-// /<repo>/apps/api/dist/app-{lite,ai}.js.
-const LITE_PATH = "../../../api/dist/app-lite.js";
-const AI_PATH = "../../../api/dist/app-ai.js";
+// Resolve the dist files via an absolute path off the lambda's working
+// directory. With `outputFileTracingRoot` set to the repo root in
+// next.config.ts, Vercel lays the lambda out so process.cwd() === repo root,
+// which means apps/api/dist/* lands at <cwd>/apps/api/dist/*. The
+// `outputFileTracingIncludes` entry in next.config.ts ensures those files
+// are physically packaged into the lambda (the dynamic import itself is
+// invisible to Next's static tracer).
+function bundlePath(name: "app-lite" | "app-ai"): string {
+  return path.join(process.cwd(), "apps", "api", "dist", `${name}.js`);
+}
 
 type BundleModule = { default: ExpressHandler } | ExpressHandler;
 
-// Some bundlers / interop layers expose `default` as the module itself; others
-// nest the export. Normalise so callers always get a plain handler.
 function resolveDefault(mod: BundleModule): ExpressHandler {
   const candidate = (mod as { default?: ExpressHandler }).default ?? mod;
   return candidate as ExpressHandler;
@@ -31,7 +31,8 @@ let aiAppPromise: Promise<ExpressHandler> | null = null;
 
 export function getLiteApp(): Promise<ExpressHandler> {
   if (!liteAppPromise) {
-    liteAppPromise = import(/* webpackIgnore: true */ LITE_PATH).then(
+    const url = pathToFileURL(bundlePath("app-lite")).href;
+    liteAppPromise = import(/* webpackIgnore: true */ url).then(
       (m: BundleModule) => resolveDefault(m),
     );
   }
@@ -40,7 +41,8 @@ export function getLiteApp(): Promise<ExpressHandler> {
 
 export function getAiApp(): Promise<ExpressHandler> {
   if (!aiAppPromise) {
-    aiAppPromise = import(/* webpackIgnore: true */ AI_PATH).then(
+    const url = pathToFileURL(bundlePath("app-ai")).href;
+    aiAppPromise = import(/* webpackIgnore: true */ url).then(
       (m: BundleModule) => resolveDefault(m),
     );
   }

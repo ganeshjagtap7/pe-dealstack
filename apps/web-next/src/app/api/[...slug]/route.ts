@@ -24,10 +24,26 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 async function handle(req: NextRequest): Promise<Response> {
-  const url = new URL(req.url);
-  const bundle = pickBundle(url.pathname);
-  const app = bundle === "ai" ? await getAiApp() : await getLiteApp();
-  return proxyToExpress(req, app);
+  try {
+    const url = new URL(req.url);
+    const bundle = pickBundle(url.pathname);
+    const app = bundle === "ai" ? await getAiApp() : await getLiteApp();
+    return proxyToExpress(req, app);
+  } catch (err) {
+    const e = err as Error;
+    return new Response(
+      JSON.stringify({
+        error: "Route handler exception (likely bundle import failed)",
+        message: e?.message ?? String(err),
+        stack: e?.stack ?? null,
+        cwd: process.cwd(),
+      }),
+      {
+        status: 500,
+        headers: { "content-type": "application/json; charset=utf-8" },
+      },
+    );
+  }
 }
 
 export const GET = handle;
