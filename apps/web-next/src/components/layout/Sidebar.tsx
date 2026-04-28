@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Logo } from "./Logo";
 import { useUser } from "@/providers/UserProvider";
-import { usePresence } from "@/providers/PresenceProvider";
 import { NAV_ITEMS, type NavItem } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
@@ -61,7 +60,6 @@ function NavLink({
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
-  const { teamHasRecentActivity } = usePresence();
   const [collapsed, setCollapsed] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -173,37 +171,6 @@ export function Sidebar() {
             <span className="material-symbols-outlined text-[20px]">settings</span>
             <span className="nav-label font-medium">Settings</span>
           </Link>
-        </div>
-
-        {/* Team activity indicator — green dot when any team member has been
-            active within the last 5 minutes, gray otherwise. Driven by
-            PresenceProvider (60s polling). Ports the sidebar activity dot
-            from apps/web/js/layout.js@1e843b9 — that version keyed off
-            unread notifications, but the spec for web-next is real-time
-            team presence, so this consults usePresence() instead.
-            TODO(presence): becomes meaningful once /presence ships in API. */}
-        <div
-          className={cn(
-            "sidebar-activity flex items-center gap-2 mt-3 px-3 py-2 rounded-lg border border-border-subtle bg-background-body/40",
-            collapsed && "justify-center px-0 border-none bg-transparent",
-          )}
-          title={teamHasRecentActivity ? "Team active now" : "Team is away"}
-        >
-          <span
-            aria-hidden="true"
-            className="block rounded-full shrink-0"
-            style={{
-              width: 8,
-              height: 8,
-              backgroundColor: teamHasRecentActivity ? "#10B981" : "#9CA3AF",
-              boxShadow: teamHasRecentActivity ? "0 0 6px rgba(16,185,129,0.55)" : "none",
-            }}
-          />
-          {!collapsed && (
-            <span className="text-[11px] font-medium text-text-secondary truncate">
-              {teamHasRecentActivity ? "Team active now" : "Team is away"}
-            </span>
-          )}
         </div>
 
         {/* User profile */}
