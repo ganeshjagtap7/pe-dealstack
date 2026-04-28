@@ -87,7 +87,9 @@ export function FileTable({
   return (
     <div className="flex-1 overflow-auto px-6 py-4 custom-scrollbar">
       <div className="min-w-full inline-block align-middle">
-        <div className="border border-slate-200 rounded-lg bg-white shadow-sm overflow-hidden">
+        {/* No overflow-hidden here — it clips the row-action dropdown.
+            Table corners use border-radius via children's first/last styling. */}
+        <div className="border border-slate-200 rounded-lg bg-white shadow-sm">
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50/80">
               <tr>

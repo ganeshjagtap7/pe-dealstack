@@ -348,7 +348,7 @@ export function transformDocument(apiDoc: APIDocument): VDRFile {
       color: analysisColor,
     },
     author: {
-      name: apiDoc.uploader?.fullName || "Unknown",
+      name: apiDoc.uploader?.name || "Unknown",
       avatar: apiDoc.uploader?.avatar || "",
     },
     date: new Date(apiDoc.createdAt).toLocaleDateString("en-US", {

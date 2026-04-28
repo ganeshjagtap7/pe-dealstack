@@ -5,18 +5,15 @@ import { usePathname } from "next/navigation";
 const FEEDBACK_URL =
   "https://docs.google.com/forms/d/e/1FAIpQLSet_GfebuKpdspK7aQ8yAFUF_l5yXeFczBRoKauGEg2GlpS5g/viewform";
 
-// Only show on pages that have feedback in the legacy app
+// Only show on pages that have feedback in the legacy app. Deal detail
+// (/deals/[id]) is intentionally excluded — its docked chat panel sits
+// bottom-right and the feedback button would overlap it.
 const FEEDBACK_PAGES = ["/dashboard", "/deals", "/contacts", "/settings"];
 
 export function FeedbackButton() {
   const pathname = usePathname();
 
-  // Show on exact matches + deal detail pages (/deals/[id])
-  const show =
-    FEEDBACK_PAGES.includes(pathname) ||
-    /^\/deals\/[^/]+$/.test(pathname);
-
-  if (!show) return null;
+  if (!FEEDBACK_PAGES.includes(pathname)) return null;
 
   return (
     <button
