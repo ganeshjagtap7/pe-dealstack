@@ -6,8 +6,6 @@ import type { NextConfig } from "next";
 // Vercel Function (api/index.ts) and reached via vercel.json rewrites — no
 // Next.js rewrite needed. Pointing this at the same Vercel domain triggers
 // DNS_HOSTNAME_RESOLVED_PRIVATE (Vercel blocks self-loops) and 404s /api/*.
-const API_PROXY_URL = process.env.API_PROXY_URL || "http://localhost:3001";
-
 const nextConfig: NextConfig = {
   // npm workspaces hoist node_modules to the repo root. Without this, Next's
   // file tracer scopes to apps/web-next/ and misses next/dist/compiled/* on
@@ -31,11 +29,14 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
-    if (process.env.NODE_ENV !== "development") return [];
+    if (process.env.NODE_ENV !== "development") {
+      return [];
+    }
+    const apiProxy = process.env.API_PROXY_URL ?? "http://localhost:3001";
     return [
       {
         source: "/api/:path*",
-        destination: `${API_PROXY_URL}/api/:path*`,
+        destination: `${apiProxy}/api/:path*`,
       },
     ];
   },

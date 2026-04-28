@@ -1,40 +1,6 @@
 {
   "version": 2,
-  "framework": "nextjs",
   "installCommand": "rm -f package-lock.json && npm install --include=dev",
   "buildCommand": "npm run build:api && npm run build --workspace=@ai-crm/web-next",
-  "outputDirectory": "apps/web-next/.next",
-  "functions": {
-    "api/index.ts": {
-      "includeFiles": "apps/api/dist/**",
-      "maxDuration": 60
-    },
-    "api/ai.ts": {
-      "includeFiles": "apps/api/dist/**",
-      "maxDuration": 301
-    }
-  },
-  "rewrites": [
-    { "source": "/api/ai/(.*)", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/chat", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/chat/(.*)", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/generate-thesis", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/analyze-risks", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/ai-cache", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/conversations/(.*)", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/financials", "destination": "/api/ai" },
-    { "source": "/api/deals/:dealId/financials/(.*)", "destination": "/api/ai" },
-    { "source": "/api/documents/:documentId/extract-financials", "destination": "/api/ai" },
-    { "source": "/api/conversations", "destination": "/api/ai" },
-    { "source": "/api/conversations/(.*)", "destination": "/api/ai" },
-    { "source": "/api/memos/(.*)", "destination": "/api/ai" },
-    { "source": "/api/ingest", "destination": "/api/ai" },
-    { "source": "/api/ingest/(.*)", "destination": "/api/ai" },
-    { "source": "/api/onboarding/(.*)", "destination": "/api/ai" },
-    { "source": "/api/onboarding", "destination": "/api/ai" },
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/health", "destination": "/api" },
-    { "source": "/health/ready", "destination": "/api" }
-  ],
-  "cleanUrls": true
+  "outputDirectory": "apps/web-next/.next"
 }
