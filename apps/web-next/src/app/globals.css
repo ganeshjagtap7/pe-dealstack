@@ -511,11 +511,25 @@ a.nav-item:active,
 /* -- Focus ring — accessible keyboard focus ---------------- */
 button:focus-visible,
 a:focus-visible,
-input:focus-visible,
 select:focus-visible {
   outline: 2px solid #003366;
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Text inputs + textareas: softer premium ring (Linear/Vercel-style) */
+input[type="text"]:focus-visible,
+input[type="email"]:focus-visible,
+input[type="password"]:focus-visible,
+input[type="search"]:focus-visible,
+input[type="number"]:focus-visible,
+input[type="tel"]:focus-visible,
+input[type="url"]:focus-visible,
+input:not([type]):focus-visible,
+textarea:focus-visible {
+  outline: none;
+  border-color: #003366;
+  box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.12);
 }
 
 /* -- Hide scrollbars globally -- scroll still works ------- */
