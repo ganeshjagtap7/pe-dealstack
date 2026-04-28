@@ -1,7 +1,19 @@
 import { supabase } from '../supabase.js';
 import { extractDealDataFromText, ExtractedDealData } from './aiExtractor.js';
-import { classifyFinancials, ClassificationResult, ClassifiedStatement } from './financialClassifier.js';
+import { classifyFinancials, ClassificationResult, ClassifiedStatement, LineItem } from './financialClassifier.js';
 import { log } from '../utils/logger.js';
+
+/**
+ * Convert LineItem[] array format to Record<string, number | null> object format
+ * for database storage (matches FinancialStatement.lineItems JSONB schema)
+ */
+function lineItemsArrayToRecord(items: LineItem[]): Record<string, number | null> {
+  const record: Record<string, number | null> = {};
+  for (const item of items) {
+    record[item.name] = item.value ?? null;
+  }
+  return record;
+}
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -132,7 +144,7 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
               statementType: stmt.statementType,
               period: periodData.period,
               periodType: periodData.periodType,
-              lineItems: periodData.lineItems,
+              lineItems: lineItemsArrayToRecord(periodData.lineItems),
               currency: stmt.currency,
               unitScale: stmt.unitScale,
               extractionConfidence: periodData.confidence,
@@ -165,7 +177,7 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
                 statementType: stmt.statementType,
                 period: periodData.period,
                 periodType: periodData.periodType,
-                lineItems: periodData.lineItems,
+                lineItems: lineItemsArrayToRecord(periodData.lineItems),
                 currency: stmt.currency,
                 unitScale: stmt.unitScale,
                 extractionConfidence: periodData.confidence,

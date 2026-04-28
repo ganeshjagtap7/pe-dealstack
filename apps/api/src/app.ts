@@ -92,18 +92,21 @@ app.use(helmet({
 
 // CORS - whitelist allowed origins (configurable via ALLOWED_ORIGINS env var)
 const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+const allowAnyOrigin = extraOrigins.includes('*');
 const allowedOrigins = [
   'https://pe-os.onrender.com',
   'https://pe-dealstack.vercel.app',
   'https://lmmos.ai',
   'https://www.lmmos.ai',
   ...extraOrigins,
-  ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
+  ...(process.env.NODE_ENV !== 'production'
+    ? ['http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:3003', 'http://127.0.0.1:3003', 'http://localhost:5173', 'http://127.0.0.1:5173']
+    : []),
 ];
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, Postman, same-origin) or if wildcard is set
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowAnyOrigin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       log.warn('CORS request rejected', { origin });

@@ -127,7 +127,7 @@ export function validateFinancials(data: {
 
 // Assignment spec uses 1% tolerance for core financial math cross-checks.
 // Keep this strict to catch unit-scale and row-mapping extraction errors early.
-const TOLERANCE = 0.05; // 5% tolerance for math cross-checks
+const TOLERANCE = 0.01; // 1% tolerance per assignment requirement
 
 function pct(numerator: number, denominator: number): number {
   return (numerator / denominator) * 100;
@@ -196,13 +196,15 @@ function checkIncomeStatement(
     }
     checks.push({
       check: 'is_ebitda_margin_sane',
-      passed: calcMargin >= -50 && calcMargin <= 80,
+      passed: calcMargin >= -100 && calcMargin <= 80,
       severity: calcMargin > 60 ? 'warning' : 'info',
       message: calcMargin > 60
         ? `EBITDA margin of ${calcMargin.toFixed(1)}% is unusually high — verify`
-        : calcMargin < 0
-          ? `EBITDA margin of ${calcMargin.toFixed(1)}% indicates losses`
-          : `EBITDA margin of ${calcMargin.toFixed(1)}% is within normal range`,
+        : calcMargin < -100
+          ? `EBITDA margin of ${calcMargin.toFixed(1)}% indicates extreme losses`
+          : calcMargin < 0
+            ? `EBITDA margin of ${calcMargin.toFixed(1)}% indicates losses`
+            : `EBITDA margin of ${calcMargin.toFixed(1)}% is within normal range`,
       period,
     });
   }
@@ -327,8 +329,8 @@ function checkYoYGrowth(
 
     if (prevRev !== null && currRev !== null && prevRev > 0) {
       const growth = pct(currRev - prevRev, prevRev);
-      // 4e: Flag >100% or < -50% swings
-      if (Math.abs(growth) > 100) {
+      // Assignment: Flag >500% YoY growth as suspicious
+      if (Math.abs(growth) > 500) {
         checks.push({
           check: 'yoy_revenue_growth_sane',
           passed: false,

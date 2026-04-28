@@ -17,6 +17,7 @@
 
 import { openai, isAIEnabled } from '../../../../openai.js';
 import { log } from '../../../../utils/logger.js';
+import { estimateOpenAICostUsd } from '../../../../utils/constants.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep } from '../state.js';
 import type { ClassifiedStatement } from '../../../financialClassifier.js';
@@ -137,8 +138,7 @@ export async function verifyNode(
     const promptTok = response.usage?.prompt_tokens ?? 0;
     const completionTok = response.usage?.completion_tokens ?? 0;
     const verifyTokens = promptTok + completionTok;
-    // gpt-4o-mini pricing: $0.15/1M input, $0.60/1M output
-    const verifyCost = (promptTok * 0.15e-6) + (completionTok * 0.60e-6);
+    const verifyCost = estimateOpenAICostUsd('gpt-4o-mini', promptTok, completionTok);
 
     const content = response.choices[0]?.message?.content;
     if (!content) {

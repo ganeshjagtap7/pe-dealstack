@@ -17,6 +17,7 @@ import { extractTextFromExcel, isExcelFile } from '../../../excelFinancialExtrac
 import { extractTablesFromPdf, isAzureConfigured } from '../../../azureDocIntelligence.js';
 import { classifyExtraction } from '../../../extraction/financialClassifier.js';
 import { log } from '../../../../utils/logger.js';
+import { estimateOpenAICostUsd } from '../../../../utils/constants.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { ExtractionSource, AgentStep } from '../state.js';
 import type { ClassifiedStatement } from '../../../financialClassifier.js';
@@ -76,7 +77,11 @@ export async function extractNode(
         ? { statements: classifyResult.statements, overallConfidence: classifyResult.overallConfidence, warnings: classifyResult.warnings }
         : null;
       const extractTokens = classifyResult.usage.promptTokens + classifyResult.usage.completionTokens;
-      const extractCost = (classifyResult.usage.promptTokens * 5e-6) + (classifyResult.usage.completionTokens * 15e-6);
+      const extractCost = estimateOpenAICostUsd(
+        'gpt-4o',
+        classifyResult.usage.promptTokens,
+        classifyResult.usage.completionTokens,
+      );
 
       if (!classification || classification.statements.length === 0) {
         return {
@@ -165,7 +170,11 @@ export async function extractNode(
         ? { statements: pdfClassifyResult.statements, overallConfidence: pdfClassifyResult.overallConfidence, warnings: pdfClassifyResult.warnings }
         : null;
       const pdfTokens = pdfClassifyResult.usage.promptTokens + pdfClassifyResult.usage.completionTokens;
-      const pdfCost = (pdfClassifyResult.usage.promptTokens * 5e-6) + (pdfClassifyResult.usage.completionTokens * 15e-6);
+      const pdfCost = estimateOpenAICostUsd(
+        'gpt-4o',
+        pdfClassifyResult.usage.promptTokens,
+        pdfClassifyResult.usage.completionTokens,
+      );
 
       if (classification && classification.statements.length > 0) {
         const stmtTypes = classification.statements.map((s: ClassifiedStatement) => s.statementType).join(', ');

@@ -17,18 +17,27 @@
 import { Router } from 'express';
 import multer from 'multer';
 import fs from 'fs/promises';
+import fSync from 'fs';
 import path from 'path';
 import { runExtractionPipeline } from '../services/extraction/pipeline.js';
 import { log } from '../utils/logger.js';
 import { logAuditEvent, AUDIT_ACTIONS, RESOURCE_TYPES } from '../services/auditLog.js';
-import { getOrgId } from '../middleware/orgScope.js';
 
 const router = Router();
+
+// ─── Ensure upload directory exists on startup ──────────────
+
+const uploadDir = path.join(process.cwd(), 'uploads', 'extraction');
+try {
+  fSync.mkdirSync(uploadDir, { recursive: true });
+} catch (err) {
+  log.warn('Could not create upload directory on startup', { uploadDir, error: (err as Error).message });
+}
 
 // ─── Multer — disk storage so pipeline can read by path ───────
 
 const upload = multer({
-  dest: path.join(process.cwd(), 'uploads', 'extraction'),
+  dest: uploadDir,
   limits: {
     fileSize: 20 * 1024 * 1024, // 20 MB
     files: 1,
@@ -140,31 +149,38 @@ router.post('/extract', upload.single('file'), async (req, res) => {
 
     // Audit log — fire and forget, never blocks the HTTP response
     const dealId = req.body?.dealId as string | undefined;
-    logAuditEvent(
-      {
-        action: AUDIT_ACTIONS.DOCUMENT_UPLOADED,
-        userId: (req as any).user?.id,
-        organizationId: getOrgId(req),
-        resourceType: RESOURCE_TYPES.DOCUMENT,
-        resourceId: dealId,
-        resourceName: req.file.originalname,
-        description: `Financial extraction: ${result.status}`,
-        metadata: {
-          event: 'financial_extraction',
-          status: result.status,
-          format: result.metadata.format,
-          statementsExtracted: result.statements.length,
-          tokensUsed: result.metadata.tokensUsed,
-          estimatedCostUsd: result.metadata.estimatedCost,
-          processingTimeMs: result.metadata.processingTime.total,
-          validationPassed: result.validation.isValid,
-          needsManualReview: result.corrections?.needsManualReview ?? false,
+    const user = req.user;
+    const organizationId = user?.organizationId;
+
+    if (user?.id && organizationId) {
+      logAuditEvent(
+        {
+          action: AUDIT_ACTIONS.DOCUMENT_UPLOADED,
+          userId: user.id,
+          organizationId,
+          resourceType: RESOURCE_TYPES.DOCUMENT,
+          resourceId: dealId,
+          resourceName: req.file.originalname,
+          description: `Financial extraction: ${result.status}`,
+          metadata: {
+            event: 'financial_extraction',
+            status: result.status,
+            format: result.metadata.format,
+            statementsExtracted: result.statements.length,
+            tokensUsed: result.metadata.tokensUsed,
+            estimatedCostUsd: result.metadata.estimatedCost,
+            processingTimeMs: result.metadata.processingTime.total,
+            validationPassed: result.validation.isValid,
+            needsManualReview: result.corrections?.needsManualReview ?? false,
+          },
         },
-      },
-      req,
-    ).catch(() => {
-      // Non-fatal — never surface audit errors to the user
-    });
+        req,
+      ).catch(() => {
+        // Non-fatal — never surface audit errors to the user
+      });
+    } else {
+      log.warn('financial-extraction route: audit skipped, missing user or organization');
+    }
 
     return res.status(200).json(result);
   } catch (err: any) {

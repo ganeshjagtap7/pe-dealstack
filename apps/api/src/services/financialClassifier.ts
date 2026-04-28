@@ -310,9 +310,12 @@ function normalizeUnitScale(raw: string): UnitScale {
   return map[String(raw ?? '').toUpperCase().trim()] ?? 'MILLIONS';
 }
 
-function normalizeLineItems(raw: any[]): LineItem[] {
-  if (!Array.isArray(raw)) return [];
-  return raw.map((item: any) => {
+function normalizeLineItems(raw: any[] | Record<string, unknown>): LineItem[] {
+  const items = Array.isArray(raw)
+    ? raw
+    : Object.entries(raw ?? {}).map(([name, value]) => ({ name, value }));
+
+  return items.map((item: any) => {
     const key = String(item.name || '');
     let numVal: number | null = null;
     

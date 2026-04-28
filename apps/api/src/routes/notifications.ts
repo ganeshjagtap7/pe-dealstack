@@ -133,14 +133,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 
     const { data: notification, error } = await supabase
       .from('Notification')
-      .select(`
-        *,
-        Deal (
-          id,
-          name,
-          stage
-        )
-      `)
+      .select('*')
       .eq('id', id)
       .single();
 

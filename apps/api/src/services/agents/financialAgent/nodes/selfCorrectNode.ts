@@ -12,9 +12,11 @@
  * Max retries controlled by state.maxRetries (default 3).
  */
 
-import { openai, isAIEnabled } from '../../../../openai.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
+import { runSelfCorrection } from '../../../extraction/selfCorrector.js';
+import { validateExtraction } from '../../../extraction/validator.js';
 import { log } from '../../../../utils/logger.js';
+import { estimateOpenAICostUsd } from '../../../../utils/constants.js';
 import type { ClassifiedStatement, ClassificationResult } from '../../../financialClassifier.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep, FailedCheck } from '../state.js';
@@ -22,74 +24,6 @@ import type { AgentStep, FailedCheck } from '../state.js';
 /** Create a timestamped agent step */
 function step(node: string, message: string, detail?: string): AgentStep {
   return { timestamp: new Date().toISOString(), node, message, detail };
-}
-
-/**
- * Build a targeted correction prompt that tells GPT-4o exactly what went wrong.
- */
-function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string): string {
-  const issueDescriptions = failedChecks.map((fc, i) => {
-    if (fc.rule === 'low_confidence') {
-      return `${i + 1}. ${fc.statementType} for period ${fc.period ?? 'unknown'}: ${fc.message}. Please re-extract this data more carefully.`;
-    }
-    return `${i + 1}. ${fc.statementType} for period ${fc.period ?? 'all'}: ${fc.message}. Please find the correct values.`;
-  }).join('\n');
-
-  const targetStatements = [...new Set(failedChecks.map(fc => fc.statementType))];
-  const targetPeriods = [...new Set(failedChecks.map(fc => fc.period).filter(Boolean))];
-
-  return `You are a senior financial analyst re-checking extracted financial data. The previous extraction had validation errors that need correction.
-
-ISSUES FOUND:
-${issueDescriptions}
-
-TASK: Re-extract ONLY the following from the document text below:
-- Statement types: ${targetStatements.join(', ')}
-${targetPeriods.length > 0 ? `- Periods: ${targetPeriods.join(', ')}` : '- All periods for the affected statements'}
-
-RULES:
-1. Focus specifically on the issues listed above
-2. Double-check your math: Revenue - COGS must equal Gross Profit, Assets must equal Liabilities + Equity, etc.
-3. If a value truly cannot be determined from the text, use null — do not guess
-4. Normalize all values to MILLIONS USD
-5. confidence: only use 90+ if you are certain the value is correct
-
-INCOME STATEMENT line item keys:
-revenue, cogs, gross_profit, gross_margin_pct, sga, rd, other_opex, total_opex,
-ebitda, ebitda_margin_pct, da, ebit, interest_expense, ebt, tax, net_income, sde
-
-BALANCE SHEET line item keys:
-cash, accounts_receivable, inventory, other_current_assets, total_current_assets,
-ppe_net, goodwill, intangibles, total_assets,
-accounts_payable, short_term_debt, other_current_liabilities, total_current_liabilities,
-long_term_debt, total_liabilities, total_equity
-
-CASH FLOW line item keys:
-operating_cf, capex, fcf, acquisitions, debt_repayment, dividends, net_change_cash
-
-Return ONLY valid JSON:
-{
-  "statements": [
-    {
-      "statementType": "BALANCE_SHEET",
-      "unitScale": "MILLIONS",
-      "currency": "USD",
-      "periods": [
-        {
-          "period": "2023",
-          "periodType": "HISTORICAL",
-          "confidence": 92,
-          "lineItems": { ... }
-        }
-      ]
-    }
-  ],
-  "overallConfidence": 88,
-  "warnings": []
-}
-
-DOCUMENT TEXT:
-${rawText.slice(0, 30000)}`;
 }
 
 /**
@@ -157,37 +91,36 @@ export async function selfCorrectNode(
 
   try {
     let correctedClassification: ClassificationResult | null = null;
+    let usedTargetedCorrection = false;
 
-    // ── Text path: targeted GPT-4o re-extraction ──
+    // ── Text path: shared snippet-based self-correction ──
     let correctionTokens = 0;
     let correctionCost = 0;
-    if (rawText && rawText.trim().length >= 200 && isAIEnabled() && openai) {
-      steps.push(step('self_correct', 'Re-extracting with targeted GPT-4o prompt'));
+    if (rawText && rawText.trim().length >= 200) {
+      steps.push(step('self_correct', 'Running targeted snippet self-correction'));
 
-      const prompt = buildCorrectionPrompt(failedChecks, rawText);
-
-      const response = await openai.chat.completions.create({
-        model: 'gpt-4o',
-        messages: [
-          { role: 'user', content: prompt },
-        ],
-        response_format: { type: 'json_object' },
-        temperature: 0.05,
-        max_tokens: 16000,
-      }, { timeout: 90000 });
-
-      const promptTok = response.usage?.prompt_tokens ?? 0;
-      const completionTok = response.usage?.completion_tokens ?? 0;
+      const initialValidation = validateExtraction(statements);
+      const correctionResult = await runSelfCorrection(rawText, statements, initialValidation);
+      const promptTok = correctionResult.usage.promptTokens;
+      const completionTok = correctionResult.usage.completionTokens;
       correctionTokens = promptTok + completionTok;
-      correctionCost = (promptTok * 5e-6) + (completionTok * 15e-6);
+      correctionCost = estimateOpenAICostUsd('gpt-4o', promptTok, completionTok);
 
-      const content = response.choices[0]?.message?.content;
-      if (content) {
-        correctedClassification = JSON.parse(content) as ClassificationResult;
-        steps.push(step(
-          'self_correct',
-          `GPT-4o returned ${correctedClassification.statements?.length ?? 0} corrected statement(s)`,
-        ));
+      const correctedCount = correctionResult.corrections.reduce(
+        (sum, attempt) => sum + attempt.itemsCorrected.length,
+        0,
+      );
+
+      if (correctedCount > 0) {
+        correctedClassification = {
+          statements: correctionResult.correctedStatements,
+          overallConfidence: correctionResult.finalValidation.overallConfidence,
+          warnings: correctionResult.needsManualReview ? ['Self-correction still needs manual review'] : [],
+        };
+        usedTargetedCorrection = true;
+        steps.push(step('self_correct', `Applied ${correctedCount} targeted correction(s)`));
+      } else {
+        steps.push(step('self_correct', 'No targeted corrections found'));
       }
     }
 
@@ -215,7 +148,9 @@ export async function selfCorrectNode(
     }
 
     // ── Merge corrections into original statements ──
-    const mergedStatements = mergeStatements(statements, correctedClassification.statements);
+    const mergedStatements = usedTargetedCorrection
+      ? correctedClassification.statements
+      : mergeStatements(statements, correctedClassification.statements);
 
     // Recalculate overall confidence from merged data
     const allConfidences: number[] = [];

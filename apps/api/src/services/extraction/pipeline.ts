@@ -22,9 +22,8 @@
  *   - If validation fails but self-correction can't fix it → status:'partial'
  *   - If all passes → status:'success'
  *
- * Cost model (gpt-4o as of 2024):
- *   Input:  $5.00 / 1M tokens
- *   Output: $15.00 / 1M tokens
+ * Token pricing is centralized in utils/constants.ts and can be overridden
+ * with environment variables when provider pricing changes.
  */
 
 import { extractText } from './textExtractor.js';
@@ -32,6 +31,7 @@ import { classifyExtraction } from './financialClassifier.js';
 import { validateExtraction } from './validator.js';
 import { runSelfCorrection } from './selfCorrector.js';
 import { log } from '../../utils/logger.js';
+import { estimateOpenAICostUsd } from '../../utils/constants.js';
 import type { ClassifiedStatement } from '../financialClassifier.js';
 import type { PipelineValidationResult } from './validator.js';
 import type { SelfCorrectionResult } from './selfCorrector.js';
@@ -65,12 +65,6 @@ export interface PipelineResult {
   corrections: SelfCorrectionResult | null;
   metadata: PipelineMetadata;
 }
-
-// ─── Constants ────────────────────────────────────────────────
-
-/** GPT-4o pricing per token (USD) */
-const GPT4O_INPUT_COST_PER_TOKEN = 5.0 / 1_000_000;   // $5 / 1M
-const GPT4O_OUTPUT_COST_PER_TOKEN = 15.0 / 1_000_000;  // $15 / 1M
 
 // ─── Empty validation helper ──────────────────────────────────
 
@@ -190,8 +184,11 @@ export async function runExtractionPipeline(
         extractionMethod: textResult.metadata.extractionMethod,
         processingTime: times,
         tokensUsed: classifyResult.usage.promptTokens + classifyResult.usage.completionTokens,
-        estimatedCost: (classifyResult.usage.promptTokens * GPT4O_INPUT_COST_PER_TOKEN)
-          + (classifyResult.usage.completionTokens * GPT4O_OUTPUT_COST_PER_TOKEN),
+        estimatedCost: estimateOpenAICostUsd(
+          'gpt-4o',
+          classifyResult.usage.promptTokens,
+          classifyResult.usage.completionTokens,
+        ),
         error: 'No financial statements found in document',
       },
     };
@@ -253,8 +250,7 @@ export async function runExtractionPipeline(
   const totalPromptTokens = classifyResult.usage.promptTokens + correctionUsage.promptTokens;
   const totalCompletionTokens = classifyResult.usage.completionTokens + correctionUsage.completionTokens;
   const totalTokens = totalPromptTokens + totalCompletionTokens;
-  const estimatedCost = (totalPromptTokens * GPT4O_INPUT_COST_PER_TOKEN)
-    + (totalCompletionTokens * GPT4O_OUTPUT_COST_PER_TOKEN);
+  const estimatedCost = estimateOpenAICostUsd('gpt-4o', totalPromptTokens, totalCompletionTokens);
 
   // ── Final Status ───────────────────────────────────────────
   let status: PipelineStatus;

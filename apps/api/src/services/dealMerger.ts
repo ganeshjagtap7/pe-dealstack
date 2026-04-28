@@ -63,7 +63,7 @@ export async function mergeIntoExistingDeal(
   // Fetch existing deal
   const { data: existingDeal, error: fetchErr } = await supabase
     .from('Deal')
-    .select('id, name, stage, status, industry, revenue, ebitda, dealSize, aiThesis, icon, extractionConfidence, needsReview, reviewReasons, aiRisks, company:Company(id, name, industry)')
+    .select('id, name, stage, status, industry, revenue, ebitda, dealSize, aiThesis, icon, extractionConfidence, needsReview, reviewReasons, aiRisks, description, company:Company(id, name, industry)')
     .eq('id', dealId)
     .single();
 

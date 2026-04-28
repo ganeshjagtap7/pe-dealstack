@@ -388,6 +388,8 @@
                         message = 'Invalid email or password. Please try again.';
                     } else if (error.message.includes('Email not confirmed')) {
                         message = 'Please verify your email address before signing in.';
+                    } else if (error.message.includes('Failed to fetch')) {
+                        message = 'Authentication service is unreachable. Check the Supabase project URL in apps/web/.env.local and restart the web server.';
                     } else {
                         message = error.message;
                     }
@@ -526,7 +528,7 @@
                 document.getElementById('mainContent').style.opacity = '1';
                 const banner = document.createElement('div');
                 banner.style.cssText = 'background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;padding:12px 16px;border-radius:8px;margin-bottom:16px;text-align:center;font-size:14px;';
-                banner.textContent = 'Unable to connect to authentication service. Please check your internet connection and refresh the page.';
+                banner.textContent = 'Unable to connect to authentication service. Check the Supabase project URL in apps/web/.env.local, then restart the web server.';
                 const form = document.querySelector('form');
                 if (form) form.parentNode.insertBefore(banner, form);
             }
