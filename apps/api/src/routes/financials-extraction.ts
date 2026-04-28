@@ -9,15 +9,66 @@ import { extractTextFromExcel, isExcelFile } from '../services/excelFinancialExt
 import { validateStatements } from '../services/financialValidator.js';
 import { extractTablesFromPdf, isAzureConfigured } from '../services/azureDocIntelligence.js';
 import type { ClassifiedStatement } from '../services/financialClassifier.js';
+import { classifyFinancials } from '../services/financialClassifier.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { runFinancialAgent } from '../services/agents/financialAgent/index.js';
 import type { FileType } from '../services/agents/financialAgent/index.js';
-import { downloadFileBuffer, extractStoragePath } from '../utils/storage.js';
+import multer, { StorageEngine } from 'multer';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
 
 const router = Router();
+
+const upload = multer({
+  storage: multer.memoryStorage() as StorageEngine,
+  limits: { fileSize: 20 * 1024 * 1024 },
+});
+
+router.get('/health', (_req, res) => {
+  res.json({ status: 'ok', feature: 'financial-extraction', timestamp: new Date().toISOString() });
+});
+
+router.post('/extract', upload.single('file'), async (req, res) => {
+  const totalStart = Date.now();
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const { buffer, originalname, mimetype } = req.file;
+    const filename = originalname ?? 'upload';
+
+    let text: string | null = null;
+    let method = 'unknown';
+    const format = isExcelFile(mimetype, filename) ? 'excel' : 'pdf';
+
+    if (format === 'excel') {
+      text = extractTextFromExcel(buffer);
+      method = 'excel-parser';
+    } else {
+      try {
+        const parsed = await pdfParse(buffer);
+        text = parsed.text;
+        method = 'pdf-parse';
+      } catch {
+        const vision = await classifyFinancialsVision(buffer, filename);
+        return res.json({ success: true, statements: vision?.statements ?? [], metadata: { format, extractionMethod: 'gpt4o-vision' } });
+      }
+    }
+
+    const classification = await classifyFinancials(text || '');
+    const validation = validateStatements(classification?.statements ?? []);
+
+    res.json({
+      success: true,
+      metadata: { format, extractionMethod: method, processingTime: { total: Date.now() - totalStart } },
+      sections: classification?.statements.map(s => ({ statementType: s.statementType, periodCount: s.periods.length })),
+      statements: classification?.statements ?? [],
+      validation,
+      corrections: { corrections: [], finalValidation: validation, needsManualReview: !validation.overallPassed },
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
 
 // ─── Helpers ─────────────────────────────────────────────────
 

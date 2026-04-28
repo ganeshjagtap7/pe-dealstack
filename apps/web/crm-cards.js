@@ -128,13 +128,19 @@
         // Render upload card
         function renderUploadCard() {
             return `
-        <article id="upload-card" class="bg-surface-card/50 rounded-lg border-2 border-dashed border-border-subtle p-5 hover:border-primary hover:bg-primary-light/30 transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-4">
-            <div class="size-14 rounded-full bg-surface-card border border-border-subtle flex items-center justify-center group-hover:scale-110 group-hover:border-primary/30 transition-all shadow-sm">
-                <span class="material-symbols-outlined text-text-muted group-hover:text-primary text-2xl">add</span>
+        <article id="upload-card" class="bg-white/40 backdrop-blur-sm rounded-xl border-2 border-dashed border-primary/20 p-6 hover:border-primary/50 hover:bg-white/60 hover:shadow-glow transition-all cursor-pointer group flex flex-col items-center justify-center h-full min-h-[320px] text-center gap-5 relative overflow-hidden">
+            <!-- Decorative background element -->
+            <div class="absolute -top-10 -right-10 size-40 bg-primary/5 rounded-full blur-3xl group-hover:bg-primary/10 transition-colors"></div>
+            
+            <div class="size-16 rounded-2xl bg-white border border-primary/10 flex items-center justify-center group-hover:scale-110 group-hover:border-primary/30 transition-all shadow-md relative z-10">
+                <span class="material-symbols-outlined text-primary/40 group-hover:text-primary text-3xl transition-colors">add_circle</span>
             </div>
-            <div>
-                <h3 class="text-text-main font-bold text-base group-hover:text-primary transition-colors">Upload Documents</h3>
-                <p class="text-text-muted text-sm mt-1 max-w-[180px]">Drop CIMs, Teasers, or Excel models</p>
+            <div class="relative z-10">
+                <h3 class="text-text-main font-bold text-lg group-hover:text-primary transition-colors tracking-tight">Ingest New Deal</h3>
+                <p class="text-text-secondary text-sm mt-1.5 max-w-[200px] leading-relaxed">Drop CIMs, Teasers, or paste text to auto-create deals with AI</p>
+            </div>
+            <div class="mt-2 px-4 py-1.5 bg-primary/5 rounded-full text-[11px] font-bold text-primary uppercase tracking-wider group-hover:bg-primary group-hover:text-white transition-all relative z-10">
+                Start Extraction
             </div>
         </article>
     `;
@@ -186,12 +192,14 @@
             }
 
             return `
-        <div class="col-span-full flex flex-col items-center justify-center py-20">
-            <span class="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
-            <p class="text-text-main font-medium mb-2">No deals found</p>
-            <p class="text-text-muted text-sm">Try adjusting your filters or search query</p>
+        <div class="col-span-full flex flex-col items-center justify-center py-24 px-6 bg-white/30 backdrop-blur-sm rounded-2xl border border-border-subtle border-dashed mb-6">
+            <div class="size-16 rounded-2xl bg-gray-50 flex items-center justify-center mb-5">
+                <span class="material-symbols-outlined text-text-muted text-4xl">query_stats</span>
+            </div>
+            <h3 class="text-text-main font-bold text-xl mb-2 tracking-tight">No deals found</h3>
+            <p class="text-text-secondary text-sm text-center max-w-sm leading-relaxed mb-8">Try adjusting your filters, or start fresh by ingesting a new document or deal data.</p>
+            ${renderUploadCard()}
         </div>
-        ${renderUploadCard()}
     `;
         }
 

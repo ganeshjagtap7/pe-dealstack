@@ -275,17 +275,124 @@
     }
   });
 
-  // Auth check on load
-  document.addEventListener('DOMContentLoaded', async function() {
-    try {
-      await PEAuth.initSupabase();
-      const notAuth = await PEAuth.checkNotAuth();
-      if (notAuth) $('loadingScreen').style.display = 'none';
-    } catch {
-      $('loadingScreen').style.display = 'none';
-    }
-  });
-})();
-</script>
+            // Validate
+            errorMessage.classList.add('hidden');
+            successMessage.classList.add('hidden');
+
+            if (password !== confirmPass) {
+                errorMessage.textContent = 'Passwords do not match.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (password.length < 8) {
+                errorMessage.textContent = 'Password must be at least 8 characters.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (!/[A-Z]/.test(password) || !/[0-9]/.test(password)) {
+                errorMessage.textContent = 'Password must contain at least one uppercase letter and one number.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (!title) {
+                errorMessage.textContent = 'Please select your title.';
+                errorMessage.classList.remove('hidden');
+                return;
+            }
+
+            // Show loading state
+            submitBtn.disabled = true;
+            submitText.textContent = 'Creating workspace...';
+            submitSpinner.classList.remove('hidden');
+
+            try {
+                // Sign up with Supabase (workspace creator = auto ADMIN)
+                const { user, session, error } = await PEAuth.signUp(email, password, {
+                    fullName: fullname,
+                    firmName: firmname,
+                    title: title,  // Display title (Partner, Analyst, etc.) - role is auto-assigned as ADMIN
+                });
+
+                if (error) {
+                    throw error;
+                }
+
+                if (user) {
+                    // Show success message
+                    if (session) {
+                        // Email confirmation disabled - user is logged in
+                        successMessage.textContent = 'Account created successfully! Redirecting...';
+                        successMessage.classList.remove('hidden');
+
+                        // Redirect to CRM after short delay
+                        setTimeout(() => {
+                            window.location.href = 'crm.html';
+                        }, 1500);
+                    } else {
+                        // Email confirmation enabled - show message
+                        successMessage.textContent = 'Account created! Please check your email to verify your account, then log in.';
+                        successMessage.classList.remove('hidden');
+                        submitBtn.disabled = true;
+                        submitText.textContent = 'Check your email';
+                    }
+                } else {
+                    throw new Error('Failed to create account');
+                }
+
+            } catch (error) {
+                // Show error message
+                let message = 'An error occurred. Please try again.';
+                if (error.message) {
+                    if (error.message.includes('User already registered')) {
+                        message = 'An account with this email already exists. Please log in instead.';
+                    } else if (error.message.includes('Password')) {
+                        message = error.message;
+                    } else {
+                        message = error.message;
+                    }
+                }
+                errorMessage.textContent = message + (error.stack ? ' (Network Error)' : '');
+                console.error('Signup detailed error:', error);
+                errorMessage.classList.remove('hidden');
+            } finally {
+                if (!successMessage.classList.contains('hidden') && successMessage.textContent.includes('Check your email')) {
+                    // Keep button disabled if waiting for email confirmation
+                } else {
+                    submitBtn.disabled = false;
+                    submitText.textContent = 'Create Firm Workspace';
+                }
+                submitSpinner.classList.add('hidden');
+            }
+        });
+
+        // Check if already logged in on page load
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Force light mode
+            document.documentElement.classList.remove('dark');
+
+            try {
+                // Initialize auth and check if already logged in
+                await PEAuth.initSupabase();
+                const notAuth = await PEAuth.checkNotAuth();
+
+                // If user is NOT authenticated, show the signup form
+                if (notAuth) {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }
+                // If user is authenticated, checkNotAuth will redirect - don't show anything
+            } catch (err) {
+                console.error('Auth initialization error:', err);
+                document.getElementById('loadingScreen').style.display = 'none';
+                const banner = document.createElement('div');
+                banner.style.cssText = 'background:#FEF2F2;border:1px solid #FECACA;color:#991B1B;padding:12px 16px;border-radius:8px;margin-bottom:16px;text-align:center;font-size:14px;';
+                banner.textContent = 'Unable to connect to authentication service. Please check your internet connection and refresh the page.';
+                const form = document.querySelector('form');
+                if (form) form.parentNode.insertBefore(banner, form);
+            }
+        });
+    </script>
 </body>
 </html>
