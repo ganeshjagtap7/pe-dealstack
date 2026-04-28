@@ -11,6 +11,7 @@ window.PENotifications = (function() {
     let currentUserId = null;
     let activeFilter = 'all'; // 'all' | 'unread' | 'ai' | 'team'
     let pollInterval = null;
+    let consecutiveErrors = 0;
 
     // ── Notification type config ────────────────────────
     const TYPE_CONFIG = {
@@ -231,15 +232,26 @@ window.PENotifications = (function() {
         if (!currentUserId) return;
         try {
             const response = await window.PEAuth.authFetch(`${API_BASE_URL}/notifications?userId=${currentUserId}&limit=50`);
-            if (!response.ok) throw new Error('Failed to load notifications');
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
             const data = await response.json();
             notifications = data.notifications || [];
             unreadCount = data.unreadCount || 0;
+            consecutiveErrors = 0;
             updateBadge();
             // If panel is open, refresh the list
             if (isOpen) refreshList();
         } catch (error) {
-            console.error('Error loading notifications:', error);
+            consecutiveErrors++;
+            // Only log the first error, then go quiet to avoid console spam
+            if (consecutiveErrors === 1) {
+                console.warn('[Notifications] Failed to load:', error.message);
+            }
+            // Back off: stop polling after 5 consecutive failures
+            if (consecutiveErrors >= 5 && pollInterval) {
+                clearInterval(pollInterval);
+                pollInterval = null;
+                console.warn('[Notifications] Stopped polling after repeated failures. Will retry on next page load.');
+            }
         }
     }
 
