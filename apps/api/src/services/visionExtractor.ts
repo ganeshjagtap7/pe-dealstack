@@ -11,7 +11,7 @@
 
 import { openai, isAIEnabled } from '../openai.js';
 import { log } from '../utils/logger.js';
-import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, StatementType, PeriodType, UnitScale } from './financialClassifier.js';
+import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, StatementType, PeriodType, UnitScale, LineItem } from './financialClassifier.js';
 
 // ─── System prompt (same intent as classifyFinancials, optimised for vision) ──
 
@@ -62,7 +62,11 @@ Return ONLY valid JSON:
           "period": "2022",
           "periodType": "HISTORICAL",
           "confidence": 90,
-          "lineItems": { "revenue": 12.5, "ebitda": 3.1, "ebitda_margin_pct": 24.8 }
+          "lineItems": [
+            { "name": "revenue", "value": 12.5, "category": "revenue", "isSubtotal": false },
+            { "name": "ebitda", "value": 3.1, "category": "margin", "isSubtotal": true },
+            { "name": "ebitda_margin_pct", "value": 24.8, "category": "margin_pct", "isSubtotal": false }
+          ]
         }
       ]
     }
@@ -183,7 +187,7 @@ function normalizeVisionResult(raw: any): ClassificationResult {
         periods.push({
           period: String(p.period).trim(),
           periodType: normalizePeriodType(p.periodType),
-          lineItems: normalizeLineItems(p.lineItems ?? {}),
+          lineItems: normalizeLineItems(p.lineItems ?? []),
           confidence: clamp(Number(p.confidence) || 0, 0, 100),
         });
       }
@@ -236,17 +240,14 @@ function normalizeUnitScale(raw: string): UnitScale {
   return map[String(raw ?? '').toUpperCase().trim()] ?? 'MILLIONS';
 }
 
-function normalizeLineItems(raw: Record<string, any>): Record<string, number | null> {
-  const result: Record<string, number | null> = {};
-  for (const [key, val] of Object.entries(raw)) {
-    if (val === null || val === undefined) {
-      result[key] = null;
-    } else {
-      const num = Number(val);
-      result[key] = isNaN(num) ? null : num;
-    }
-  }
-  return result;
+function normalizeLineItems(raw: any[]): LineItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item: any) => ({
+    name: String(item.name || ''),
+    value: item.value !== null && item.value !== undefined ? Number(item.value) : null,
+    category: item.category ? String(item.category) : undefined,
+    isSubtotal: item.isSubtotal ? Boolean(item.isSubtotal) : undefined
+  }));
 }
 
 function clamp(val: number, min: number, max: number): number {

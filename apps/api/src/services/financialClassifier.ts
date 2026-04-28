@@ -7,11 +7,18 @@ export type StatementType = 'INCOME_STATEMENT' | 'BALANCE_SHEET' | 'CASH_FLOW';
 export type PeriodType = 'HISTORICAL' | 'PROJECTED' | 'LTM';
 export type UnitScale = 'MILLIONS' | 'THOUSANDS' | 'ACTUALS';
 
+export interface LineItem {
+  name: string;
+  value: number | null;
+  category?: string;
+  isSubtotal?: boolean;
+}
+
 /** One period's worth of line items — maps directly to a FinancialStatement DB row */
 export interface FinancialPeriod {
   period: string;       // "2021", "2022", "LTM", "2025E"
   periodType: PeriodType;
-  lineItems: Record<string, number | null>; // { revenue: 12.5, ebitda: 3.2, ... }
+  lineItems: LineItem[]; // Array instead of Record
   confidence: number;   // 0-100
 }
 
@@ -94,23 +101,23 @@ Return ONLY valid JSON in this exact structure:
           "period": "2022",
           "periodType": "HISTORICAL",
           "confidence": 90,
-          "lineItems": {
-            "revenue": 12.5,
-            "ebitda": 3.1,
-            "ebitda_margin_pct": 24.8,
-            "net_income": 1.8
-          }
+          "lineItems": [
+            { "name": "revenue", "value": 12.5, "category": "revenue", "isSubtotal": false },
+            { "name": "ebitda", "value": 3.1, "category": "margin", "isSubtotal": true },
+            { "name": "ebitda_margin_pct", "value": 24.8, "category": "margin_pct", "isSubtotal": false },
+            { "name": "net_income", "value": 1.8, "category": "net_income", "isSubtotal": true }
+          ]
         },
         {
           "period": "2023",
           "periodType": "HISTORICAL",
           "confidence": 92,
-          "lineItems": {
-            "revenue": 14.2,
-            "ebitda": 3.7,
-            "ebitda_margin_pct": 26.1,
-            "net_income": 2.1
-          }
+          "lineItems": [
+            { "name": "revenue", "value": 14.2, "category": "revenue", "isSubtotal": false },
+            { "name": "ebitda", "value": 3.7, "category": "margin", "isSubtotal": true },
+            { "name": "ebitda_margin_pct", "value": 26.1, "category": "margin_pct", "isSubtotal": false },
+            { "name": "net_income", "value": 2.1, "category": "net_income", "isSubtotal": true }
+          ]
         }
       ]
     }
@@ -231,7 +238,7 @@ function normalizeClassificationResult(raw: any): ClassificationResult {
     if (Array.isArray(stmt.periods)) {
       for (const p of stmt.periods) {
         const periodType = normalizePeriodType(p.periodType);
-        const lineItems = normalizeLineItems(p.lineItems ?? {});
+        const lineItems = normalizeLineItems(p.lineItems ?? []);
         // Auto-calculate derived fields if missing
         if (statementType === 'INCOME_STATEMENT') {
           computeDerivedFields(lineItems);
@@ -303,25 +310,30 @@ function normalizeUnitScale(raw: string): UnitScale {
   return map[String(raw ?? '').toUpperCase().trim()] ?? 'MILLIONS';
 }
 
-function normalizeLineItems(raw: Record<string, any>): Record<string, number | null> {
-  const result: Record<string, number | null> = {};
-  for (const [key, val] of Object.entries(raw)) {
-    if (val === null || val === undefined) {
-      result[key] = null;
-    } else {
-      const num = Number(val);
-      if (isNaN(num)) {
-        result[key] = null;
-      } else if (key.endsWith('_pct')) {
-        // Percentages: round to 2 decimal places (e.g. 25.55%)
-        result[key] = Math.round(num * 100) / 100;
-      } else {
-        // Financial values in millions: round to 4 decimals ($100 precision)
-        result[key] = Math.round(num * 10000) / 10000;
+function normalizeLineItems(raw: any[]): LineItem[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((item: any) => {
+    const key = String(item.name || '');
+    let numVal: number | null = null;
+    
+    if (item.value !== null && item.value !== undefined) {
+      const num = Number(item.value);
+      if (!isNaN(num)) {
+        if (key.endsWith('_pct')) {
+          numVal = Math.round(num * 100) / 100;
+        } else {
+          numVal = Math.round(num * 10000) / 10000;
+        }
       }
     }
-  }
-  return result;
+    
+    return {
+      name: key,
+      value: numVal,
+      category: item.category ? String(item.category) : undefined,
+      isSubtotal: item.isSubtotal !== undefined ? Boolean(item.isSubtotal) : undefined
+    };
+  });
 }
 
 /**
@@ -329,38 +341,43 @@ function normalizeLineItems(raw: Record<string, any>): Record<string, number | n
  * E.g., EBITDA = revenue - cogs - total_opex (or = ebit + da),
  * gross_profit = revenue - cogs, margins from base values.
  */
-function computeDerivedFields(li: Record<string, number | null>): void {
-  const v = (k: string) => (li[k] !== null && li[k] !== undefined ? li[k]! : null);
+function computeDerivedFields(li: LineItem[]): void {
+  const v = (k: string) => li.find(l => l.name === k)?.value ?? null;
+  const setV = (k: string, val: number) => {
+    const item = li.find(l => l.name === k);
+    if (item) item.value = val;
+    else li.push({ name: k, value: val });
+  };
 
   // gross_profit = revenue - cogs
   if (v('gross_profit') === null && v('revenue') !== null && v('cogs') !== null) {
-    li.gross_profit = Math.round((v('revenue')! - v('cogs')!) * 10000) / 10000;
+    setV('gross_profit', Math.round((v('revenue')! - v('cogs')!) * 10000) / 10000);
   }
 
   // ebitda = ebit + da  OR  revenue - cogs - total_opex
   if (v('ebitda') === null) {
     if (v('ebit') !== null && v('da') !== null) {
-      li.ebitda = Math.round((v('ebit')! + v('da')!) * 10000) / 10000;
+      setV('ebitda', Math.round((v('ebit')! + v('da')!) * 10000) / 10000);
     } else if (v('revenue') !== null && v('cogs') !== null && v('total_opex') !== null) {
-      li.ebitda = Math.round((v('revenue')! - v('cogs')! - v('total_opex')!) * 10000) / 10000;
+      setV('ebitda', Math.round((v('revenue')! - v('cogs')! - v('total_opex')!) * 10000) / 10000);
     } else if (v('gross_profit') !== null && v('total_opex') !== null) {
-      li.ebitda = Math.round((v('gross_profit')! - v('total_opex')!) * 10000) / 10000;
+      setV('ebitda', Math.round((v('gross_profit')! - v('total_opex')!) * 10000) / 10000);
     }
   }
 
   // ebit = ebitda - da
   if (v('ebit') === null && v('ebitda') !== null && v('da') !== null) {
-    li.ebit = Math.round((v('ebitda')! - v('da')!) * 10000) / 10000;
+    setV('ebit', Math.round((v('ebitda')! - v('da')!) * 10000) / 10000);
   }
 
   // gross_margin_pct = gross_profit / revenue * 100
   if (v('gross_margin_pct') === null && v('gross_profit') !== null && v('revenue') !== null && v('revenue')! !== 0) {
-    li.gross_margin_pct = Math.round((v('gross_profit')! / v('revenue')!) * 10000) / 100;
+    setV('gross_margin_pct', Math.round((v('gross_profit')! / v('revenue')!) * 10000) / 100);
   }
 
   // ebitda_margin_pct = ebitda / revenue * 100
   if (v('ebitda_margin_pct') === null && v('ebitda') !== null && v('revenue') !== null && v('revenue')! !== 0) {
-    li.ebitda_margin_pct = Math.round((v('ebitda')! / v('revenue')!) * 10000) / 100;
+    setV('ebitda_margin_pct', Math.round((v('ebitda')! / v('revenue')!) * 10000) / 100);
   }
 }
 

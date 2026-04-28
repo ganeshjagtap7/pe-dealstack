@@ -70,9 +70,9 @@ function buildExtractionSummary(statements: ClassifiedStatement[]): string {
   for (const stmt of statements) {
     parts.push(`\n--- ${stmt.statementType} (${stmt.unitScale}, ${stmt.currency}) ---`);
     for (const p of stmt.periods) {
-      const items = Object.entries(p.lineItems)
-        .filter(([, v]) => v !== null)
-        .map(([k, v]) => `  ${k}: ${v}`)
+      const items = p.lineItems
+        .filter(l => l.value !== null)
+        .map(l => `  ${l.name}: ${l.value}`)
         .join('\n');
       parts.push(`Period: ${p.period} (${p.periodType}, confidence: ${p.confidence}%)\n${items}`);
     }
@@ -186,12 +186,13 @@ export async function verifyNode(
           const periodCorrections = stmtCorrections.filter(c => c.period === p.period);
           if (periodCorrections.length === 0) return p;
 
-          const updatedLineItems = { ...p.lineItems };
+          const updatedLineItems = p.lineItems.map(l => ({ ...l }));
           for (const corr of periodCorrections) {
             const field = corr.field;
-            if (field in updatedLineItems && corr.correctValue !== undefined) {
-              const oldVal = updatedLineItems[field];
-              updatedLineItems[field] = corr.correctValue;
+            const item = updatedLineItems.find(l => l.name === field);
+            if (item && corr.correctValue !== undefined) {
+              const oldVal = item.value;
+              item.value = corr.correctValue;
               correctionCount++;
               steps.push(step('verify',
                 `Corrected ${stmt.statementType} ${p.period} ${field}: ${oldVal} → ${corr.correctValue}`,

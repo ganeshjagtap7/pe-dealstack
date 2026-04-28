@@ -14,6 +14,7 @@ import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { runFinancialAgent } from '../services/agents/financialAgent/index.js';
 import type { FileType } from '../services/agents/financialAgent/index.js';
 import multer, { StorageEngine } from 'multer';
+import { downloadFileBuffer } from '../utils/storage.js';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
@@ -106,7 +107,7 @@ function rowsToClassifiedStatements(rows: any[]): ClassifiedStatement[] {
     byType.get(row.statementType)!.periods.push({
       period: row.period,
       periodType: row.periodType,
-      lineItems: row.lineItems as Record<string, number | null>,
+      lineItems: row.lineItems as any[],
       confidence: row.extractionConfidence,
     });
   }

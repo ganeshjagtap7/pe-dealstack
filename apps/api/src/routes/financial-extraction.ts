@@ -150,7 +150,7 @@ router.post('/extract', upload.single('file'), async (req, res) => {
           tokensUsed: result.metadata.tokensUsed,
           estimatedCostUsd: result.metadata.estimatedCost,
           processingTimeMs: result.metadata.processingTime.total,
-          validationPassed: result.validation.overallPassed,
+          validationPassed: result.validation.isValid,
           needsManualReview: result.corrections?.needsManualReview ?? false,
         },
       },

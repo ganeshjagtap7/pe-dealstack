@@ -29,7 +29,7 @@ function step(node: string, message: string, detail?: string): AgentStep {
  */
 function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string): string {
   const issueDescriptions = failedChecks.map((fc, i) => {
-    if (fc.check === 'low_confidence') {
+    if (fc.rule === 'low_confidence') {
       return `${i + 1}. ${fc.statementType} for period ${fc.period ?? 'unknown'}: ${fc.message}. Please re-extract this data more carefully.`;
     }
     return `${i + 1}. ${fc.statementType} for period ${fc.period ?? 'all'}: ${fc.message}. Please find the correct values.`;

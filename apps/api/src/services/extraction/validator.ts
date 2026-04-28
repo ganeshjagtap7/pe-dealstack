@@ -21,7 +21,7 @@ import type { StatementsValidationResult, StatementCheck } from '../financialVal
 // ─── Types ────────────────────────────────────────────────────
 
 export interface FlaggedItem {
-  lineItemKey: string;
+  lineItem: string;
   statementType: string;
   period: string;
   value: number;
@@ -29,7 +29,12 @@ export interface FlaggedItem {
   suggestedAction: 'review' | 'likely_correct' | 'likely_wrong';
 }
 
-export interface PipelineValidationResult extends StatementsValidationResult {
+export interface PipelineValidationResult {
+  checks: { rule: string; passed: boolean; severity: 'info' | 'warning' | 'error'; message: string; period?: string }[];
+  errorCount: number;
+  warningCount: number;
+  infoCount: number;
+  isValid: boolean;
   /** Items that need human review or self-correction */
   flaggedItems: FlaggedItem[];
   /** 0-100 average confidence across all periods */
@@ -54,7 +59,7 @@ function checkRevenuePositive(statements: ClassifiedStatement[]): StatementCheck
   for (const stmt of statements) {
     if (stmt.statementType !== 'INCOME_STATEMENT') continue;
     for (const period of stmt.periods) {
-      const revenue = period.lineItems['revenue'] ?? null;
+      const revenue = period.lineItems.find(l => l.name === 'revenue')?.value ?? null;
       if (revenue === null) continue; // not extracted — not a violation
 
       const passed = revenue > 0;
@@ -116,11 +121,11 @@ function checkSubtotalConsistency(statements: ClassifiedStatement[]): StatementC
 
   for (const stmt of statements) {
     for (const period of stmt.periods) {
-      const entries = Object.entries(period.lineItems);
       let groupSum = 0;
       let hasItems = false;
-
-      for (const [key, value] of entries) {
+      for (const item of period.lineItems) {
+        const key = item.name;
+        const value = item.value;
         if (value === null || value === undefined) continue;
 
         if (SUBTOTAL_KEYS.has(key)) {
@@ -170,14 +175,14 @@ function checkNetIncomeConsistency(statements: ClassifiedStatement[]): Statement
   if (!isStmt || !cfStmt) return checks;
 
   for (const isPeriod of isStmt.periods) {
-    const isNI = isPeriod.lineItems['net_income'] ?? null;
+    const isNI = isPeriod.lineItems.find(l => l.name === 'net_income')?.value ?? null;
     if (isNI === null) continue;
 
     const cfPeriod = cfStmt.periods.find(p => p.period === isPeriod.period);
     if (!cfPeriod) continue;
 
     // CF statements sometimes store operating_cf instead — skip if net_income absent
-    const cfNI = cfPeriod.lineItems['net_income'] ?? null;
+    const cfNI = cfPeriod.lineItems.find(l => l.name === 'net_income')?.value ?? null;
     if (cfNI === null) continue;
 
     const passed = withinTolerance(isNI, cfNI);
@@ -224,12 +229,12 @@ function checkCashReconciliation(statements: ClassifiedStatement[]): StatementCh
     const prev = bsHist[i - 1];
     const curr = bsHist[i];
 
-    const beginningCash = prev.lineItems['cash'] ?? null;
-    const endingCash = curr.lineItems['cash'] ?? null;
+    const beginningCash = prev.lineItems.find(l => l.name === 'cash')?.value ?? null;
+    const endingCash = curr.lineItems.find(l => l.name === 'cash')?.value ?? null;
     if (beginningCash === null || endingCash === null) continue;
 
     const cfPeriod = cf.periods.find(p => p.period === curr.period);
-    const netChange = cfPeriod?.lineItems['net_change_cash'] ?? null;
+    const netChange = cfPeriod?.lineItems.find(l => l.name === 'net_change_cash')?.value ?? null;
     if (netChange === null) continue;
 
     const expectedEnding = beginningCash + netChange;
@@ -269,15 +274,15 @@ function buildFlaggedItems(
     const stmt = statements.find(s => s.statementType === stmtType);
     const period = stmt?.periods.find(p => p.period === check.period);
 
-    const lineItemKey = check.check === 'bs_balances' ? 'total_assets'
+    const lineItem = check.check === 'bs_balances' ? 'total_assets'
       : check.check === 'net_income_consistency' ? 'net_income'
-        : check.check === 'revenue_positive' ? 'revenue'
-          : 'unknown';
+      : check.check === 'revenue_positive' ? 'revenue'
+      : 'unknown';
 
-    const value = period?.lineItems[lineItemKey] ?? 0;
+    const value = period?.lineItems.find(l => l.name === lineItem)?.value ?? 0;
 
     flagged.push({
-      lineItemKey,
+      lineItem,
       statementType: stmtType,
       period: check.period ?? 'unknown',
       value: value as number,
@@ -305,8 +310,8 @@ function checkYoYGrowthSanity(statements: ClassifiedStatement[]): StatementCheck
       const curr = historical[i];
 
       for (const key of ['revenue', 'ebitda', 'net_income']) {
-        const prevVal = prev.lineItems[key] ?? null;
-        const currVal = curr.lineItems[key] ?? null;
+        const prevVal = prev.lineItems.find(l => l.name === key)?.value ?? null;
+        const currVal = curr.lineItems.find(l => l.name === key)?.value ?? null;
         if (prevVal === null || currVal === null || prevVal === 0) continue;
 
         const growth = ((currVal - prevVal) / Math.abs(prevVal)) * 100;
@@ -351,7 +356,7 @@ export function validateExtraction(
       errorCount: 0,
       warningCount: 0,
       infoCount: 0,
-      overallPassed: true,
+      isValid: true,
       flaggedItems: [],
       overallConfidence: 0,
     };
@@ -394,11 +399,11 @@ export function validateExtraction(
   }
 
   return {
-    checks: allChecks,
+    checks: allChecks.map(c => ({ rule: c.check, passed: c.passed, severity: c.severity, message: c.message, period: c.period })),
     errorCount,
     warningCount,
     infoCount,
-    overallPassed,
+    isValid: overallPassed,
     flaggedItems,
     overallConfidence,
   };

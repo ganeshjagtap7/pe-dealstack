@@ -47,7 +47,7 @@ export async function validateNode(
         errorCount: 0,
         warningCount: 0,
         infoCount: 0,
-        overallPassed: true,
+        isValid: true,
       },
       failedChecks: [],
       status: 'storing',
@@ -66,12 +66,12 @@ export async function validateNode(
     errorCount: pipelineResult.errorCount,
     warningCount: pipelineResult.warningCount,
     infoCount: pipelineResult.infoCount,
-    overallPassed: pipelineResult.overallPassed,
+    isValid: pipelineResult.isValid,
   };
 
   const validationResult: ValidationResult = {
     checks: result.checks.map((c: any) => ({
-      check: c.check,
+      rule: c.rule,
       passed: c.passed,
       severity: c.severity,
       message: c.message,
@@ -80,7 +80,7 @@ export async function validateNode(
     errorCount: result.errorCount,
     warningCount: result.warningCount,
     infoCount: result.infoCount,
-    overallPassed: result.overallPassed,
+    isValid: result.isValid,
   };
 
   // Log summary
@@ -122,9 +122,9 @@ export async function validateNode(
   // Add math errors that need re-extraction
   for (const check of failedErrors) {
     failedChecks.push({
-      statementType: inferStatementType(check.check),
+      statementType: inferStatementType(check.rule),
       period: check.period,
-      check: check.check,
+      rule: check.rule,
       message: check.message,
     });
   }
@@ -134,7 +134,7 @@ export async function validateNode(
     failedChecks.push({
       statementType: lcp.statementType,
       period: lcp.period,
-      check: 'low_confidence',
+      rule: 'low_confidence',
       message: `Confidence ${lcp.confidence}% is below threshold (${CONFIDENCE_THRESHOLD}%)`,
     });
   }
@@ -164,9 +164,9 @@ export async function validateNode(
 }
 
 /** Infer which statement type a check key belongs to */
-function inferStatementType(check: string): string {
-  if (check.startsWith('bs_')) return 'BALANCE_SHEET';
-  if (check.startsWith('cf_')) return 'CASH_FLOW';
-  if (check.startsWith('is_') || check.startsWith('yoy_')) return 'INCOME_STATEMENT';
+function inferStatementType(rule: string): string {
+  if (rule.startsWith('bs_')) return 'BALANCE_SHEET';
+  if (rule.startsWith('cf_')) return 'CASH_FLOW';
+  if (rule.startsWith('is_') || rule.startsWith('yoy_')) return 'INCOME_STATEMENT';
   return 'UNKNOWN';
 }

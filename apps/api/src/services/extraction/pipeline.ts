@@ -80,7 +80,7 @@ function emptyValidation(): PipelineValidationResult {
     errorCount: 0,
     warningCount: 0,
     infoCount: 0,
-    overallPassed: true,
+    isValid: true,
     flaggedItems: [],
     overallConfidence: 0,
   };
@@ -204,7 +204,7 @@ export async function runExtractionPipeline(
     validation = validateExtraction(classifyResult.statements);
     times.validation = performance.now() - t3;
     log.info('pipeline: validation done', {
-      passed: validation.overallPassed,
+      passed: validation.isValid,
       errors: validation.errorCount,
       warnings: validation.warningCount,
       ms: times.validation.toFixed(0),
@@ -222,7 +222,7 @@ export async function runExtractionPipeline(
   let finalValidation = validation;
   let correctionUsage = { promptTokens: 0, completionTokens: 0 };
 
-  if (!validation.overallPassed && validation.flaggedItems.length > 0) {
+  if (!validation.isValid && validation.flaggedItems.length > 0) {
     const t4 = performance.now();
     try {
       correctionResult = await runSelfCorrection(
@@ -260,7 +260,7 @@ export async function runExtractionPipeline(
   let status: PipelineStatus;
   if (finalStatements.length === 0) {
     status = 'failed';
-  } else if (finalValidation.overallPassed) {
+  } else if (finalValidation.isValid) {
     status = 'success';
   } else {
     status = 'partial'; // statements found but validation issues remain

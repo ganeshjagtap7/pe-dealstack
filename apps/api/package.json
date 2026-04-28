@@ -23,6 +23,7 @@
     "@langchain/openai": "^1.2.11",
     "@sentry/node": "^10.39.0",
     "@supabase/supabase-js": "^2.91.1",
+    "@types/helmet": "^0.0.48",
     "@types/multer": "^2.0.0",
     "apify-client": "^2.23.0",
     "cors": "^2.8.5",

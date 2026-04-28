@@ -22,7 +22,7 @@ export type AgentStatus = 'pending' | 'extracting' | 'validating' | 'self_correc
 
 /** Matches the existing StatementCheck from financialValidator.ts */
 export interface ValidationCheck {
-  check: string;
+  rule: string;
   passed: boolean;
   severity: 'error' | 'warning' | 'info';
   message: string;
@@ -34,7 +34,7 @@ export interface ValidationResult {
   errorCount: number;
   warningCount: number;
   infoCount: number;
-  overallPassed: boolean;
+  isValid: boolean;
 }
 
 /** A single step in the agent's execution log — powers the Agent Log tab in UI */
@@ -49,7 +49,7 @@ export interface AgentStep {
 export interface FailedCheck {
   statementType: string;
   period?: string;
-  check: string;
+  rule: string;
   message: string;
 }
 

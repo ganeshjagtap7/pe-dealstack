@@ -103,7 +103,7 @@ const allowedOrigins = [
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, Postman, same-origin) or if wildcard is set
-    if (!origin || allowedOrigins.includes(origin) || allowedOrigins.includes('*')) {
+    if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
       log.warn('CORS request rejected', { origin });
@@ -213,9 +213,6 @@ app.get('/health/ready', async (_req, res) => {
   }
 });
 
-// API routes
-// ── Standalone financial extraction (assignment demo) ──
-app.use('/api/financial-extraction', financialExtractionRouter);
 
 app.get('/api', (_req, res) => {
   res.json({
@@ -247,7 +244,7 @@ app.use('/api/public/invitations', invitationsAcceptRouter);
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
-app.use('/api/deals/import', authMiddleware, orgMiddleware, dealImportRouter);
+app.use('/api/financial-extraction', authMiddleware, orgMiddleware, financialExtractionRouter);
 app.use('/api/deals', authMiddleware, orgMiddleware, dealsRouter);
 app.use('/api/companies', authMiddleware, orgMiddleware, companiesRouter);
 app.use('/api', authMiddleware, orgMiddleware, activitiesRouter);
@@ -265,7 +262,6 @@ app.use('/api/invitations', authMiddleware, orgMiddleware, invitationsRouter);
 app.use('/api/audit', authMiddleware, orgMiddleware, auditRouter);
 app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
-app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, financialsRouter);

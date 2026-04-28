@@ -12,7 +12,10 @@ vi.mock('../src/services/financialClassifier.js', () => ({
       statementType: 'INCOME_STATEMENT',
       unitScale: 'MILLIONS',
       currency: 'USD',
-      periods: [{ period: '2023', periodType: 'HISTORICAL', confidence: 95, lineItems: { revenue: 100, ebitda: 25 } }]
+      periods: [{ period: '2023', periodType: 'HISTORICAL', confidence: 95, lineItems: [
+        { name: 'revenue', value: 100 },
+        { name: 'ebitda', value: 25 }
+      ] }]
     }],
     overallConfidence: 95,
     warnings: [],
@@ -31,14 +34,14 @@ vi.mock('../src/middleware/orgScope.js', () => ({
 
 describe('Subtask 5 — End-to-end pipeline', () => {
   it('POST /api/financial-extraction/extract returns 200', async () => {
-    const buffer = Buffer.from('%PDF-1.4 test');
     const response = await request(app)
       .post('/api/financial-extraction/extract')
       .set('Authorization', 'Bearer mock')
-      .attach('file', buffer, 'test.pdf');
+      .attach('file', Buffer.from('Revenue was $100M and EBITDA was $25M in 2023.'), 'test.txt');
 
+    console.log('DEBUG TEST BODY:', JSON.stringify(response.body, null, 2));
     expect(response.status).toBe(200);
-    expect(response.body.success).toBe(true);
+    expect(response.body.status).toBe('success');
   });
 
   it('GET /api/financial-extraction/health returns ok', async () => {

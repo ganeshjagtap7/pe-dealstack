@@ -24,7 +24,7 @@ import type { TokenUsage } from './financialClassifier.js';
 // ─── Types ────────────────────────────────────────────────────
 
 export interface CorrectionRecord {
-  lineItemKey: string;
+  lineItem: string;
   statementType: string;
   period: string;
   oldValue: number | null;
@@ -61,11 +61,11 @@ const SNIPPET_WINDOW_LINES = 20;
  *  3. Ensure at least SNIPPET_WINDOW_LINES above and below the hit.
  *  4. Fall back to the first 2 000 chars if no match is found.
  */
-function findRelevantSnippet(text: string, lineItemKey: string): string {
+function findRelevantSnippet(text: string, lineItem: string): string {
   if (!text || text.trim().length === 0) return '';
 
   const lines = text.split('\n');
-  const keyword = lineItemKey.replace(/_/g, ' ');
+  const keyword = lineItem.replace(/_/g, ' ');
   const hitIdx = lines.findIndex(l => l.toLowerCase().includes(keyword.toLowerCase()));
 
   if (hitIdx === -1) return text.substring(0, 2000);
@@ -106,13 +106,18 @@ function applyCorrection(
   const period = stmt.periods.find(p => p.period === item.period);
   if (!period) return null;
 
-  const oldValue = period.lineItems[item.lineItemKey] ?? null;
+  const lineItemObj = period.lineItems.find(l => l.name === item.lineItem);
+  const oldValue = lineItemObj?.value ?? null;
   if (oldValue === newValue) return null; // No actual change
 
-  period.lineItems[item.lineItemKey] = newValue;
+  if (lineItemObj) {
+    lineItemObj.value = newValue;
+  } else {
+    period.lineItems.push({ name: item.lineItem, value: newValue });
+  }
 
   return {
-    lineItemKey: item.lineItemKey,
+    lineItem: item.lineItem,
     statementType: item.statementType,
     period: item.period,
     oldValue,
@@ -170,12 +175,12 @@ export async function runSelfCorrection(
       correctedStatements: currentStatements,
       corrections: [],
       finalValidation: currentValidation,
-      needsManualReview: !currentValidation.overallPassed,
+      needsManualReview: !currentValidation.isValid,
       usage: usageTracker,
     };
   }
 
-  while (!currentValidation.overallPassed && attempts < MAX_RETRIES) {
+  while (!currentValidation.isValid && attempts < MAX_RETRIES) {
     attempts++;
     const itemsCorrected: CorrectionRecord[] = [];
     const priorErrorCount = currentValidation.errorCount;
@@ -190,7 +195,7 @@ export async function runSelfCorrection(
       // Skip items where value is 0 and issue is non-numeric — nothing to correct
       if (item.value === 0 && item.suggestedAction !== 'likely_wrong') continue;
 
-      const snippet = findRelevantSnippet(originalText, item.lineItemKey);
+      const snippet = findRelevantSnippet(originalText, item.lineItem);
 
       try {
         const response = await openai.chat.completions.create({
@@ -207,7 +212,7 @@ export async function runSelfCorrection(
             {
               role: 'user',
               content: [
-                `Line item: ${item.lineItemKey}`,
+                `Line item: ${item.lineItem}`,
                 `Statement: ${item.statementType}`,
                 `Period: ${item.period}`,
                 `Extracted value: ${item.value}M`,
@@ -243,7 +248,7 @@ export async function runSelfCorrection(
         }
       } catch (err: any) {
         log.warn('selfCorrector: item correction failed', {
-          lineItemKey: item.lineItemKey,
+          lineItem: item.lineItem,
           period: item.period,
           error: err.message,
         });
@@ -267,7 +272,7 @@ export async function runSelfCorrection(
       attempt: attempts,
       itemsCorrected: itemsCorrected.length,
       errorCountAfter: currentValidation.errorCount,
-      overallPassed: currentValidation.overallPassed,
+      overallPassed: currentValidation.isValid,
     });
 
     // Early exit if LLM found no corrections — further attempts are futile
@@ -281,7 +286,7 @@ export async function runSelfCorrection(
     correctedStatements: currentStatements,
     corrections,
     finalValidation: currentValidation,
-    needsManualReview: !currentValidation.overallPassed,
+    needsManualReview: !currentValidation.isValid,
     usage: usageTracker,
   };
 }
