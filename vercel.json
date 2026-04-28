@@ -1,8 +1,9 @@
 {
   "version": 2,
+  "framework": "nextjs",
   "installCommand": "rm -f package-lock.json && npm install --include=dev",
-  "buildCommand": "npm run build:api && npm run build:web",
-  "outputDirectory": "apps/web/dist",
+  "buildCommand": "npm run build:api && npm run build --workspace=@ai-crm/web-next",
+  "outputDirectory": "apps/web-next/.next",
   "functions": {
     "api/index.ts": {
       "includeFiles": "apps/api/dist/**",
@@ -34,20 +35,6 @@
     { "source": "/api/(.*)", "destination": "/api" },
     { "source": "/health", "destination": "/api" },
     { "source": "/health/ready", "destination": "/api" }
-  ],
-  "headers": [
-    {
-      "source": "/js/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    },
-    {
-      "source": "/assets/(.*)",
-      "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
-      ]
-    }
   ],
   "cleanUrls": true
 }
