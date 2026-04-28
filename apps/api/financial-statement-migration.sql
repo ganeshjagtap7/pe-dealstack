@@ -39,11 +39,17 @@ CREATE TABLE IF NOT EXISTS "FinancialStatement" (
   "reviewedAt" TIMESTAMPTZ,
   "reviewedBy" UUID REFERENCES "User"(id) ON DELETE SET NULL,
 
+  -- Multi-document conflict resolution
+  "isActive" BOOLEAN DEFAULT true,
+  "mergeStatus" TEXT DEFAULT 'auto'
+    CHECK ("mergeStatus" IN ('auto', 'needs_review', 'manual_override')),
+
   "createdAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
   "updatedAt" TIMESTAMPTZ DEFAULT NOW() NOT NULL,
 
   -- One statement per type per period per deal (upsertable)
-  UNIQUE ("dealId", "statementType", period)
+  -- Note: documentId included to allow same-period data from different sources
+  UNIQUE ("dealId", "statementType", period, "documentId")
 );
 
 -- ─── Indexes ─────────────────────────────────────────────────
@@ -55,6 +61,9 @@ CREATE INDEX IF NOT EXISTS idx_financial_statement_deal_type
 
 CREATE INDEX IF NOT EXISTS idx_financial_statement_deal_period
   ON "FinancialStatement"("dealId", period);
+
+CREATE INDEX IF NOT EXISTS idx_financial_statement_is_active
+  ON "FinancialStatement"("dealId", "isActive");
 
 -- ─── Auto-update updatedAt ────────────────────────────────────
 CREATE OR REPLACE FUNCTION update_financial_statement_updated_at()
