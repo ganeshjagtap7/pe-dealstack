@@ -84,13 +84,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     let query = supabase
       .from('Notification')
-      .select(`
-        *,
-        Deal (
-          id,
-          name
-        )
-      `)
+      .select('*')
       .eq('userId', internalUserId)
       .order('createdAt', { ascending: false });
 

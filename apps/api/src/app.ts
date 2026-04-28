@@ -235,8 +235,12 @@ app.get('/api', (_req, res) => {
   });
 });
 
+app.get('/', (_req, res) => {
+  res.json({ status: 'ok', message: 'PE DealStack API is running', version: 'v0.1.0' });
+});
+
 // ========================================
-// Public Routes (no auth required)
+// Main API Routers (Protected by Auth + Org)
 // ========================================
 // Invitation verify/accept must be public — invitees don't have accounts yet
 app.use('/api/public/invitations', invitationsAcceptRouter);

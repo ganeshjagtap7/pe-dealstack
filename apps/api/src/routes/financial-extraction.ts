@@ -36,6 +36,7 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const allowed = [
       'application/pdf',
+      'application/octet-stream', // Fallback for some browsers/systems
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
       'application/vnd.ms-excel.sheet.macroEnabled.12',
@@ -53,7 +54,13 @@ const upload = multer({
     if (mimeOk || extOk) {
       cb(null, true);
     } else {
-      cb(new Error(`Unsupported file type: ${file.mimetype} (${file.originalname})`));
+      console.warn('File upload rejected:', {
+        mimetype: file.mimetype,
+        originalname: file.originalname,
+        mimeOk,
+        extOk
+      });
+      cb(new Error(`Unsupported file type: ${file.mimetype} (${file.originalname}). Please upload a PDF, Excel, or Image file.`));
     }
   },
 });

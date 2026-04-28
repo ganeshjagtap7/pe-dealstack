@@ -60,10 +60,19 @@ subRouter.post('/text', async (req, res) => {
     if (targetDealId) {
       // ─── Update Existing Deal path ───
       log.info('Text ingest into existing deal', { dealId: targetDealId });
-      const result = await mergeIntoExistingDeal(targetDealId, aiData, req.user?.id, docName);
-      deal = result.deal;
-      company = deal.company;
-      isUpdate = true;
+      try {
+        const result = await mergeIntoExistingDeal(targetDealId, aiData, req.user?.id, docName);
+        deal = result.deal;
+        company = deal.company;
+        isUpdate = true;
+      } catch (mergeErr: any) {
+        log.error('Text ingest: merge failed', { targetDealId, error: mergeErr.message });
+        return res.status(404).json({ 
+          error: 'Deal not found', 
+          message: `The deal you are trying to update (ID: ${targetDealId}) could not be found. It may have been deleted or moved.`,
+          details: mergeErr.message
+        });
+      }
     } else {
       // ─── Create New Deal path ───
       const companyName = aiData.companyName.value || 'Unknown Company';
@@ -106,7 +115,6 @@ subRouter.post('/text', async (req, res) => {
           description: aiData.description.value,
           revenue: aiData.revenue.value,
           ebitda: aiData.ebitda.value,
-          currency: aiData.currency || 'USD',
           dealSize: aiData.revenue.value,
           aiThesis: aiData.summary,
           icon: dealIcon,
@@ -115,7 +123,7 @@ subRouter.post('/text', async (req, res) => {
           reviewReasons: aiData.reviewReasons,
           aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
         })
-        .select()
+        .select('id, name, stage, status, industry, revenue, ebitda, dealSize, aiThesis, icon, extractionConfidence, needsReview, reviewReasons, aiRisks')
         .single();
 
       if (dealError) throw dealError;

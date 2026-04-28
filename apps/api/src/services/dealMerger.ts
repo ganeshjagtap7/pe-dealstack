@@ -63,12 +63,22 @@ export async function mergeIntoExistingDeal(
   // Fetch existing deal
   const { data: existingDeal, error: fetchErr } = await supabase
     .from('Deal')
-    .select('*, company:Company(*)')
+    .select('id, name, stage, status, industry, revenue, ebitda, dealSize, aiThesis, icon, extractionConfidence, needsReview, reviewReasons, aiRisks, company:Company(id, name, industry)')
     .eq('id', dealId)
     .single();
 
   if (fetchErr || !existingDeal) {
-    throw new Error('Deal not found');
+    log.error('Merge: failed to fetch existing deal', { 
+      dealId, 
+      error: fetchErr?.message,
+      code: (fetchErr as any)?.code,
+      details: (fetchErr as any)?.details,
+      hint: (fetchErr as any)?.hint
+    });
+    if (fetchErr) {
+      throw new Error(`Database error while fetching deal: ${fetchErr.message} (Code: ${(fetchErr as any).code})`);
+    }
+    throw new Error(`Deal with ID ${dealId} was not found in the database.`);
   }
 
   // Build update object — only override fields where new data is better

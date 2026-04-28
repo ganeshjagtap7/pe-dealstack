@@ -59,7 +59,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     let query = supabase
       .from('User')
-      .select('id, email, name, avatar, role, department, title, phone, isActive, firmName, organizationId')
+      .select('id, email, name, role, isActive, organizationId')
       .eq('organizationId', orgId)
       .order('name', { ascending: true });
 

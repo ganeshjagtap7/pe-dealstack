@@ -122,7 +122,7 @@ function initDealIntakeModal(apiBaseURL) {
                                 <p class="text-sm font-medium text-text-main">Drag & drop a file here, or <span class="text-primary font-semibold">browse</span></p>
                                 <p class="text-xs text-text-muted mt-1">PDF, Word (.docx, .doc), Excel (.xlsx), or Text (.txt) — Max 50MB</p>
                             </div>
-                            <input id="intake-file-input" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.csv" />
+                            <input id="intake-file-input" type="file" class="absolute inset-0 opacity-0 cursor-pointer" accept=".pdf,application/pdf,.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.doc,application/msword,.xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,.xls,application/vnd.ms-excel,.txt,text/plain,.csv,text/csv" />
                         </div>
                         <div id="intake-file-info" class="hidden mt-4 flex items-center gap-3 rounded-lg bg-primary-light/50 border border-primary/20 px-4 py-3">
                             <span class="material-symbols-outlined text-primary">description</span>

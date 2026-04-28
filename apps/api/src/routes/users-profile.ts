@@ -71,7 +71,7 @@ router.get('/me/team', async (req: Request, res: Response, next: NextFunction) =
     // Get all users in the same organization
     let query = supabase
       .from('User')
-      .select('id, email, name, avatar, role, department, title')
+      .select('id, email, name, role')
       .eq('organizationId', currentUser.organizationId)
       .eq('isActive', true)
       .order('name', { ascending: true });
@@ -101,7 +101,6 @@ router.get('/me/team', async (req: Request, res: Response, next: NextFunction) =
 const updateSelfSchema = z.object({
   name: z.string().min(1).max(255).optional(),
   avatar: z.string().url().optional().nullable(),
-  title: z.string().max(255).optional(),
   phone: z.string().max(50).optional(),
   // AI preferences (stored as JSON in preferences column)
   investmentFocus: z.array(z.string()).optional(),
@@ -144,8 +143,6 @@ router.patch('/me', async (req: Request, res: Response, next: NextFunction) => {
     };
 
     if (validation.data.name !== undefined) updateData.name = validation.data.name;
-    if (validation.data.avatar !== undefined) updateData.avatar = validation.data.avatar;
-    if (validation.data.title !== undefined) updateData.title = validation.data.title;
     if (validation.data.phone !== undefined) updateData.phone = validation.data.phone;
 
     // Build preferences update — merge with existing preferences

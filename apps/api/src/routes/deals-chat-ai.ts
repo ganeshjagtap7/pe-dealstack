@@ -104,7 +104,7 @@ router.post('/:dealId/chat', async (req, res) => {
         id, name, stage, status, industry, dealSize, revenue, ebitda,
         irrProjected, mom, aiThesis, description, source, organizationId,
         company:Company(id, name, description),
-        teamMembers:DealTeamMember(role, user:User(id, name, email, title))
+        teamMembers:DealTeamMember(role, user:User(id, name, email))
       `)
       .eq('id', dealId)
       .single();
@@ -153,14 +153,16 @@ router.post('/:dealId/chat', async (req, res) => {
     // Fetch available users for assignment (same org only)
     const { data: availableUsers } = await supabase
       .from('User')
-      .select('id, name, title, role')
+      .select('id, name, role')
       .eq('organizationId', orgId)
       .order('name');
 
     if (availableUsers?.length) {
       contextParts.push('\nAvailable team members for assignment:');
       for (const u of availableUsers) {
-        contextParts.push(`  - ${u.name} (ID: ${u.id}, ${u.title || u.role})`);
+        const name = u.name || 'Unknown User';
+        const role = u.role || 'MEMBER';
+        contextParts.push(`  - ${name} (ID: ${u.id}, Role: ${role})`);
       }
     }
 

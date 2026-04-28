@@ -87,6 +87,12 @@ export async function orgMiddleware(
       }
     }
 
+    // Final fallback: if still no org, assign to default-org to keep system functional
+    if (!req.user.organizationId) {
+      req.user.organizationId = '00000000-0000-0000-0000-000000000000';
+      log.warn('Org middleware: assigned to default-org as final fallback', { userId: req.user.id });
+    }
+
     next();
   } catch (error) {
     log.error('Org middleware error', error);

@@ -15,7 +15,7 @@ export async function findOrCreateUser(authUser: {
   // Try to find by authId first (include Organization join)
   let { data: userData, error } = await supabase
     .from('User')
-    .select('*, organization:Organization(id, name, slug, logo, plan)')
+    .select('id, authId, email, name, role, organizationId, organization:Organization(id, name, slug, logo, plan)')
     .eq('authId', authUser.id)
     .single();
 
@@ -23,7 +23,7 @@ export async function findOrCreateUser(authUser: {
   if (error?.code === 'PGRST116') {
     const result = await supabase
       .from('User')
-      .select('*, organization:Organization(id, name, slug, logo, plan)')
+      .select('id, authId, email, name, role, organizationId, organization:Organization(id, name, slug, logo, plan)')
       .eq('id', authUser.id)
       .single();
     userData = result.data;
@@ -97,8 +97,6 @@ export async function findOrCreateUser(authUser: {
         email: authUser.email,
         name: authUser.name || authUser.email?.split('@')[0] || 'User',
         role: authUser.role || 'MEMBER',
-        title: title || null,
-        firmName: authUser.firmName || null,
         organizationId,
         isActive: true,
       })

@@ -48,18 +48,22 @@ export const upload = multer({
   fileFilter: (req, file, cb) => {
     const allowedTypes = [
       'application/pdf',
+      'application/octet-stream',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       'application/vnd.ms-excel',
       'application/msword',
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       'text/plain',
     ];
-    if (allowedTypes.includes(file.mimetype) ||
-      file.originalname.endsWith('.eml') ||
-      file.mimetype === 'message/rfc822') {
+
+    const isEml = file.originalname?.toLowerCase().endsWith('.eml') || file.mimetype === 'message/rfc822';
+    const isAllowedMime = allowedTypes.includes(file.mimetype);
+    const isAllowedExt = /\.(pdf|xlsx|xls|docx|doc|txt|eml)$/i.test(file.originalname || '');
+
+    if (isAllowedMime || isAllowedExt || isEml) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file type. Allowed: PDF, Excel, Word, Text, Email (.eml)'));
+      cb(new Error(`Invalid file type: ${file.mimetype} (${file.originalname}). Allowed: PDF, Excel, Word, Text, Email (.eml)`));
     }
   },
 });

@@ -29,7 +29,7 @@ router.get('/:id/team', async (req, res) => {
         id,
         role,
         addedAt,
-        user:User(id, name, avatar, email, title, department)
+        user:User(id, name, email)
       `)
       .eq('dealId', id)
       .order('addedAt', { ascending: true });
@@ -78,7 +78,7 @@ router.post('/:id/team', async (req, res) => {
         id,
         role,
         addedAt,
-        user:User(id, name, avatar, email, title)
+        user:User(id, name, email)
       `)
       .single();
 
@@ -137,7 +137,7 @@ router.patch('/:dealId/team/:memberId', async (req, res) => {
         id,
         role,
         addedAt,
-        user:User(id, name, avatar, email, title)
+        user:User(id, name, email)
       `)
       .single();
 

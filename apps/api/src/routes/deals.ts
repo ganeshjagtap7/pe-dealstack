@@ -119,14 +119,7 @@ router.get('/', async (req, res) => {
       .from('Deal')
       .select(`
         *,
-        company:Company(*),
-        assignedUser:User!assignedTo(id, name, avatar, email),
-        teamMembers:DealTeamMember(
-          id,
-          role,
-          addedAt,
-          user:User(id, name, avatar, email)
-        )
+        company:Company(*)
       `)
       .eq('organizationId', orgId);
 
@@ -177,12 +170,12 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       .select(`
         *,
         company:Company(*),
-        assignedUser:User!assignedTo(id, name, avatar, email, title),
+        assignedUser:User!assignedTo(id, name, avatar, email),
         teamMembers:DealTeamMember(
           id,
           role,
           addedAt,
-          user:User(id, name, avatar, email, title, department)
+          user:User(id, name, avatar, email)
         ),
         documents:Document(
           id,

@@ -230,12 +230,10 @@ router.post('/', upload.single('file'), async (req, res) => {
           organizationId: orgId,
           stage: 'INITIAL_REVIEW',
           status: dealStatus,
-          priority: userPriority,
           industry: aiData.industry.value,
           description: aiData.description.value,
           revenue: aiData.revenue.value,
           ebitda: aiData.ebitda.value,
-          currency: aiData.currency || 'USD',
           dealSize: aiData.dealSize?.value || null,
           aiThesis: userThesis || aiData.summary,
           icon: dealIcon,
@@ -249,7 +247,7 @@ router.post('/', upload.single('file'), async (req, res) => {
           ...(userTimeline ? { targetCloseDate: userTimeline } : {}),
           ...(userConcerns ? { customFields: { concerns: userConcerns } } : {}),
         })
-        .select()
+        .select('id, name, stage, status, industry, revenue, ebitda, dealSize, aiThesis, icon, extractionConfidence, needsReview, reviewReasons, aiRisks')
         .single();
 
       if (dealError) {
