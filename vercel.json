@@ -11,7 +11,7 @@
     },
     "api/ai.ts": {
       "includeFiles": "apps/api/dist/**",
-      "maxDuration": 300
+      "maxDuration": 301
     }
   },
   "rewrites": [
