@@ -46,6 +46,12 @@ export const upload = multer({
     fileSize: 50 * 1024 * 1024, // 50MB limit
   },
   fileFilter: (req, file, cb) => {
+    log.info('File upload attempt', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      size: file.size,
+    });
+
     const allowedTypes = [
       'application/pdf',
       'application/octet-stream',
@@ -62,9 +68,20 @@ export const upload = multer({
     const isAllowedMime = allowedTypes.includes(file.mimetype);
     const isAllowedExt = /\.(pdf|xlsx|xls|docx|doc|txt|eml|csv)$/i.test(file.originalname || '');
 
+    log.debug('File filter check', {
+      isAllowedMime,
+      isAllowedExt,
+      isEml,
+      willPass: isAllowedMime || isAllowedExt || isEml,
+    });
+
     if (isAllowedMime || isAllowedExt || isEml) {
       cb(null, true);
     } else {
+      log.error('File rejected by filter', {
+        originalname: file.originalname,
+        mimetype: file.mimetype,
+      });
       cb(new Error(`Invalid file type: ${file.mimetype} (${file.originalname}). Allowed: PDF, Excel, Word, Text, Email (.eml)`));
     }
   },
