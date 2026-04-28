@@ -1,3 +1,4 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 // Single source of truth for the API origin. All client code calls /api/* and
@@ -6,6 +7,10 @@ import type { NextConfig } from "next";
 const API_PROXY_URL = process.env.API_PROXY_URL || "http://localhost:3001";
 
 const nextConfig: NextConfig = {
+  // npm workspaces hoist node_modules to the repo root. Without this, Next's
+  // file tracer scopes to apps/web-next/ and misses next/dist/compiled/* on
+  // Vercel, breaking the lambda packaging step (ENOENT on @opentelemetry/api).
+  outputFileTracingRoot: path.join(__dirname, "../../"),
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
