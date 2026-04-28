@@ -45,13 +45,6 @@ const nextConfig: NextConfig = {
     "xlsx",
     "zod",
   ],
-  // Key is matched picomatch-style against the literal route name Next emits
-  // (`/api/[...slug]`) — brackets are picomatch character-class syntax, so
-  // they MUST be escaped or no nft.json picks up the includes. Value paths
-  // are resolved from the Next project root (apps/web-next).
-  outputFileTracingIncludes: {
-    "/api/\\[\\.\\.\\.slug\\]": ["../api/dist/**/*"],
-  },
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
