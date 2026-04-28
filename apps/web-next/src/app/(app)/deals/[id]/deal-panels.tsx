@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { STAGE_LABELS } from "@/lib/constants";
 import { usePresence, formatPresenceStatus } from "@/providers/PresenceProvider";
+import { MeetingPrepModal } from "@/components/deal-actions/MeetingPrepModal";
+import { DraftEmailModal } from "@/components/deal-actions/DraftEmailModal";
 import type { TeamMember } from "./components";
 
 export { EditDealModal } from "./edit-deal-modal";
@@ -22,6 +24,8 @@ export function DealActionsMenu({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [showMeetingPrep, setShowMeetingPrep] = useState(false);
+  const [showDraftEmail, setShowDraftEmail] = useState(false);
 
   return (
     <div className="relative">
@@ -41,14 +45,14 @@ export function DealActionsMenu({
               AI Tools
             </div>
             <button
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); setShowMeetingPrep(true); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">event_note</span>
               Meeting Prep
             </button>
             <button
-              onClick={() => setOpen(false)}
+              onClick={() => { setOpen(false); setShowDraftEmail(true); }}
               className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
             >
               <span className="material-symbols-outlined text-[18px]">edit_note</span>
@@ -78,6 +82,20 @@ export function DealActionsMenu({
             </button>
           </div>
         </>
+      )}
+      {showMeetingPrep && (
+        <MeetingPrepModal
+          dealId={dealId}
+          dealName={dealName}
+          onClose={() => setShowMeetingPrep(false)}
+        />
+      )}
+      {showDraftEmail && (
+        <DraftEmailModal
+          dealId={dealId}
+          dealName={dealName}
+          onClose={() => setShowDraftEmail(false)}
+        />
       )}
     </div>
   );
