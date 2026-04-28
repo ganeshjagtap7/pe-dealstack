@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { api, NotFoundError } from "@/lib/api";
 import { NAV_ITEMS, STAGE_LABELS } from "@/lib/constants";
 import { useUser } from "@/providers/UserProvider";
+import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
 import type { Deal } from "@/types";
 
 // ---------------------------------------------------------------------------
@@ -32,8 +33,12 @@ interface PaletteAction {
   memberOnly?: boolean;
 }
 
+// Sentinel href used to signal "open the deal-intake modal" instead of routing.
+// Intercepted in selectResult() below — never actually navigated to.
+const ACTION_OPEN_DEAL_INTAKE = "modal:deal-intake";
+
 const PALETTE_ACTIONS: PaletteAction[] = [
-  { label: "Create New Deal",      href: "/deal-intake",  icon: "add_circle",   keywords: "new deal create intake ingest", memberOnly: true },
+  { label: "Create New Deal",      href: ACTION_OPEN_DEAL_INTAKE, icon: "add_circle",   keywords: "new deal create intake ingest", memberOnly: true },
   { label: "Open Data Room",       href: "/data-room",    icon: "folder_open",  keywords: "vdr documents files data room" },
   { label: "Generate AI Report",   href: "/memo-builder", icon: "auto_awesome", keywords: "memo ic report ai generate investment", memberOnly: true },
   { label: "Open Settings",        href: "/settings",     icon: "settings",     keywords: "profile preferences account settings" },
@@ -120,6 +125,7 @@ const GROUP_ORDER: PaletteResult["kind"][] = ["page", "deal", "contact", "action
 export function CommandPalette() {
   const router = useRouter();
   const { user } = useUser();
+  const { openDealIntake } = useIngestDealModal();
   const inputRef = useRef<HTMLInputElement>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
 
@@ -374,9 +380,15 @@ export function CommandPalette() {
   const selectResult = useCallback(
     (result: PaletteResult) => {
       closePalette();
+      // Intercept the deal-intake action so it opens the modal instead of
+      // navigating to the standalone /deal-intake route.
+      if (result.kind === "action" && result.href === ACTION_OPEN_DEAL_INTAKE) {
+        openDealIntake();
+        return;
+      }
       router.push(result.href);
     },
-    [closePalette, router],
+    [closePalette, router, openDealIntake],
   );
 
   // -----------------------------------------------------------------------

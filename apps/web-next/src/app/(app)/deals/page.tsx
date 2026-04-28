@@ -18,7 +18,7 @@ import {
 } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
-import Link from "next/link";
+import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
 import type { Deal, DealFilters } from "@/types";
 import {
   FilterDropdown,
@@ -32,6 +32,7 @@ import {
 import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function DealsPage() {
+  const { openDealIntake } = useIngestDealModal();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -308,13 +309,14 @@ export default function DealsPage() {
             )}
           </p>
         </div>
-        <Link
-          href="/deal-intake"
+        <button
+          type="button"
+          onClick={openDealIntake}
           className="flex items-center gap-2 px-4 py-2 rounded-lg border border-slate-300 text-text-secondary hover:border-[#003366] hover:text-[#003366] bg-surface-card text-sm font-medium transition-colors"
         >
           <span className="material-symbols-outlined text-[18px]">upload_file</span>
           Import Deals
-        </Link>
+        </button>
       </div>
 
       {/* Filter Bar */}
@@ -627,21 +629,23 @@ export default function DealsPage() {
               Start building your deal flow. Create your first deal or import from a spreadsheet to track through sourcing, due diligence, and close.
             </p>
             <div className="flex items-center gap-3">
-              <Link
-                href="/deal-intake"
+              <button
+                type="button"
+                onClick={openDealIntake}
                 className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-semibold"
                 style={{ backgroundColor: "#003366" }}
               >
                 <span className="material-symbols-outlined text-[18px]">add_circle</span>
                 Create Your First Deal
-              </Link>
-              <Link
-                href="/deal-intake"
+              </button>
+              <button
+                type="button"
+                onClick={openDealIntake}
                 className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary transition-all"
               >
                 <span className="material-symbols-outlined text-[18px]">upload_file</span>
                 Import Deals
-              </Link>
+              </button>
             </div>
           </div>
         )
@@ -658,7 +662,7 @@ export default function DealsPage() {
               onRemoveSample={handleRemoveSample}
             />
           ))}
-          <UploadCard />
+          <UploadCard onClick={openDealIntake} />
         </div>
       ) : (
         /* Kanban View */

@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/providers/AuthProvider";
 import { useUser } from "@/providers/UserProvider";
+import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NotificationCenter } from "./NotificationPanel";
@@ -18,6 +19,7 @@ const SUPPORT_CONFIG = {
 export function Header() {
   const { signOut } = useAuth();
   const { user } = useUser();
+  const { openDealIntake } = useIngestDealModal();
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -82,14 +84,15 @@ export function Header() {
             {/* Bulk CSV import modal hasn't been ported from legacy crm.html yet —
                 keep the Import button hidden so we don't 404 users. Port tracked
                 in docs/planning/WEB-NEXT-PORT-PLAN.md. */}
-            <Link
-              href="/deal-intake"
+            <button
+              type="button"
+              onClick={openDealIntake}
               className="flex items-center gap-1.5 px-3 py-1.5 text-white rounded-lg shadow-sm hover:bg-[#002855] transition-colors text-sm font-medium"
               style={{ backgroundColor: "#003366" }}
             >
               <span className="material-symbols-outlined text-[16px]">smart_toy</span>
               Ingest Deal Data
-            </Link>
+            </button>
           </div>
         )}
 
