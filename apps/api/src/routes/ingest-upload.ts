@@ -422,9 +422,14 @@ router.post('/', upload.single('file'), async (req, res) => {
         reviewReasons: aiData.reviewReasons,
       },
     });
-  } catch (error) {
-    log.error('Ingest error', error);
-    res.status(500).json({ error: 'Failed to process document' });
+  } catch (error: any) {
+    log.error('Ingest error - full stack:', {
+      message: error.message,
+      stack: error.stack,
+      code: error.code,
+      details: error.details
+    });
+    res.status(500).json({ error: 'Failed to process document', details: error.message });
   }
 });
 
