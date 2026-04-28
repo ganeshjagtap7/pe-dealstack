@@ -4,19 +4,35 @@
 // AI-bound endpoints (chat, financial extraction, memos, etc.) go to app-ai;
 // everything else to app-lite.
 
+import fs from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import type { ExpressHandler } from "./api-adapter";
 
-// Resolve the dist files via an absolute path off the lambda's working
-// directory. With `outputFileTracingRoot` set to the repo root in
-// next.config.ts, Vercel lays the lambda out so process.cwd() === repo root,
-// which means apps/api/dist/* lands at <cwd>/apps/api/dist/*. The
-// `outputFileTracingIncludes` entry in next.config.ts ensures those files
-// are physically packaged into the lambda (the dynamic import itself is
-// invisible to Next's static tracer).
+// Resolve the dist files at runtime. We can't use a relative-to-source path
+// because Next bundles this file into .next/server/chunks/* and the relative
+// path moves underneath us. Fixed anchors instead:
+//   - On Vercel, cwd is the Next project root (/var/task/apps/web-next),
+//     and outputFileTracingIncludes packages apps/api/dist sibling to it,
+//     so ../../apps/api/dist/<name>.js resolves correctly.
+//   - In local dev `npm run dev` from apps/web-next, same shape — cwd is
+//     apps/web-next, repo is two ups.
+//   - In local dev from the repo root, cwd is the repo, dist sits one level
+//     in.
+// We try each and pick the first that exists. If none, throw a diagnostic.
 function bundlePath(name: "app-lite" | "app-ai"): string {
-  return path.join(process.cwd(), "apps", "api", "dist", `${name}.js`);
+  const filename = `${name}.js`;
+  const candidates = [
+    path.resolve(process.cwd(), "../../apps/api/dist", filename),
+    path.resolve(process.cwd(), "apps/api/dist", filename),
+    path.resolve(process.cwd(), "../api/dist", filename),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate;
+  }
+  throw new Error(
+    `[api-bundles] Could not locate ${filename}. cwd=${process.cwd()}. Tried:\n  - ${candidates.join("\n  - ")}`,
+  );
 }
 
 type BundleModule = { default: ExpressHandler } | ExpressHandler;
