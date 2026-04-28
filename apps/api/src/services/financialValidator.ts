@@ -153,6 +153,7 @@ function checkIncomeStatement(
   const ebitdaMarginPct = li('ebitda_margin_pct');
   const da = li('da');
   const ebit = li('ebit');
+  const netIncome = li('net_income');
 
   // 4a: Revenue - COGS = Gross Profit
   if (revenue !== null && cogs !== null && grossProfit !== null) {
@@ -164,6 +165,20 @@ function checkIncomeStatement(
       message: withinTolerance(calc, grossProfit)
         ? `Gross profit checks out: ${fmtVal(revenue)} - ${fmtVal(cogs)} ≈ ${fmtVal(grossProfit)}`
         : `Gross profit mismatch: Revenue ${fmtVal(revenue)} - COGS ${fmtVal(cogs)} = ${fmtVal(calc)}, but extracted ${fmtVal(grossProfit)}`,
+      period,
+    });
+  }
+
+  // CRITICAL: Gross Profit must be <= Revenue (accounting impossibility otherwise)
+  if (revenue !== null && grossProfit !== null && revenue > 0) {
+    const gpExceedsRevenue = grossProfit > revenue;
+    checks.push({
+      check: 'is_gross_profit_lte_revenue',
+      passed: !gpExceedsRevenue,
+      severity: 'error',
+      message: gpExceedsRevenue
+        ? `Gross Profit ${fmtVal(grossProfit)} exceeds Revenue ${fmtVal(revenue)} — IMPOSSIBLE: Revenue must be >= Gross Profit`
+        : `Gross Profit (${fmtVal(grossProfit)}M) is within Revenue bounds (${fmtVal(revenue)}M)`,
       period,
     });
   }
@@ -180,6 +195,21 @@ function checkIncomeStatement(
         : `EBITDA is within revenue bounds`,
       period,
     });
+  }
+
+  // CRITICAL: Net Income must be <= EBITDA in most cases (rare exceptions for unusual items)
+  if (ebitda !== null && netIncome !== null) {
+    const niExceedsEbitda = netIncome > ebitda;
+    // Only flag as error if significantly exceeds (accounting for non-standard items)
+    if (niExceedsEbitda && (netIncome - ebitda) / Math.abs(ebitda) > 0.1) {
+      checks.push({
+        check: 'is_net_income_lte_ebitda',
+        passed: false,
+        severity: 'warning',
+        message: `Net Income ${fmtVal(netIncome)} exceeds EBITDA ${fmtVal(ebitda)} by >10% — unusual, verify for one-time gains`,
+        period,
+      });
+    }
   }
 
   // 4d: EBITDA margin sanity (5–60% normal for LMM)
