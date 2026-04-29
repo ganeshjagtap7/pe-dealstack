@@ -51,6 +51,27 @@ function withinTolerance(a: number, b: number): boolean {
   return Math.abs(a - b) / Math.abs(b) <= TOLERANCE_PCT;
 }
 
+/** Get currency symbol from ISO code */
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    USD: '$',
+    INR: '₹',
+    EUR: '€',
+    GBP: '£',
+    JPY: '¥',
+    CAD: 'C$',
+    AUD: 'A$',
+    CHF: 'Fr',
+  };
+  return symbols[currency] || currency;
+}
+
+/** Format value with currency symbol and M suffix */
+function formatWithCurrency(value: number, currency: string): string {
+  const symbol = getCurrencySymbol(currency);
+  return `${symbol}${value}M`;
+}
+
 // ─── Rule 1 (added): Revenue > 0 ─────────────────────────────
 
 function checkRevenuePositive(statements: ClassifiedStatement[]): StatementCheck[] {
@@ -68,8 +89,8 @@ function checkRevenuePositive(statements: ClassifiedStatement[]): StatementCheck
         passed,
         severity: passed ? 'info' : 'warning',
         message: passed
-          ? `Revenue ${revenue}M is positive`
-          : `Revenue ${revenue}M is zero or negative — likely an extraction error`,
+          ? `Revenue ${formatWithCurrency(revenue, stmt.currency)} is positive`
+          : `Revenue ${formatWithCurrency(revenue, stmt.currency)} is zero or negative — likely an extraction error`,
         period: period.period,
       });
     }
@@ -138,8 +159,8 @@ function checkSubtotalConsistency(statements: ClassifiedStatement[]): StatementC
               passed,
               severity: 'warning',
               message: passed
-                ? `Subtotal ${key} (${value}M) matches group sum (${groupSum.toFixed(4)}M) for ${period.period}`
-                : `Subtotal ${key} mismatch for ${period.period}: expected ≈${groupSum.toFixed(4)}M, got ${value}M`,
+                ? `Subtotal ${key} (${formatWithCurrency(value, stmt.currency)}) matches group sum (${formatWithCurrency(groupSum, stmt.currency)}) for ${period.period}`
+                : `Subtotal ${key} mismatch for ${period.period}: expected ≈${formatWithCurrency(groupSum, stmt.currency)}, got ${formatWithCurrency(value, stmt.currency)}`,
               period: period.period,
             });
           }
@@ -191,8 +212,8 @@ function checkNetIncomeConsistency(statements: ClassifiedStatement[]): Statement
       passed,
       severity: 'error',
       message: passed
-        ? `Net income consistent across IS and CF for ${isPeriod.period} (${isNI}M)`
-        : `Net income mismatch for ${isPeriod.period}: IS has ${isNI}M, CF has ${cfNI}M`,
+        ? `Net income consistent across IS and CF for ${isPeriod.period} (${formatWithCurrency(isNI, isStmt.currency)})`
+        : `Net income mismatch for ${isPeriod.period}: IS has ${formatWithCurrency(isNI, isStmt.currency)}, CF has ${formatWithCurrency(cfNI, cfStmt.currency)}`,
       period: isPeriod.period,
     });
   }
@@ -245,8 +266,8 @@ function checkCashReconciliation(statements: ClassifiedStatement[]): StatementCh
       passed,
       severity: 'error',
       message: passed
-        ? `Cash reconciles for ${curr.period}: ${beginningCash}M + ${netChange}M ≈ ${endingCash}M`
-        : `Cash reconciliation failed for ${curr.period}: beginning cash ${beginningCash}M + net change ${netChange}M = ${expectedEnding.toFixed(4)}M, but ending cash is ${endingCash}M`,
+        ? `Cash reconciles for ${curr.period}: ${formatWithCurrency(beginningCash, bs.currency)} + ${formatWithCurrency(netChange, cf.currency)} ≈ ${formatWithCurrency(endingCash, bs.currency)}`
+        : `Cash reconciliation failed for ${curr.period}: beginning cash ${formatWithCurrency(beginningCash, bs.currency)} + net change ${formatWithCurrency(netChange, cf.currency)} = ${formatWithCurrency(expectedEnding, bs.currency)}, but ending cash is ${formatWithCurrency(endingCash, bs.currency)}`,
       period: curr.period,
     });
   }
@@ -321,7 +342,7 @@ function checkYoYGrowthSanity(statements: ClassifiedStatement[]): StatementCheck
             check: 'yoy_growth_sanity',
             passed: false,
             severity: 'warning',
-            message: `${key} grew ${growth.toFixed(0)}% from ${prev.period} (${prevVal}M) to ${curr.period} (${currVal}M) — exceeds 500% threshold`,
+            message: `${key} grew ${growth.toFixed(0)}% from ${prev.period} (${formatWithCurrency(prevVal, stmt.currency)}) to ${curr.period} (${formatWithCurrency(currVal, stmt.currency)}) — exceeds 500% threshold`,
             period: curr.period,
           });
         }

@@ -25,14 +25,29 @@ export interface StatementsValidationResult {
   isValid: boolean;     // true if no errors (warnings are OK)
 }
 
-// Format value in millions to human-readable form
-function fmtVal(v: number): string {
+// Format value in millions to human-readable form with currency symbol
+function fmtVal(v: number, currency: string = 'USD'): string {
   const abs = Math.abs(v);
   const sign = v < 0 ? '-' : '';
-  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}B`;
-  if (abs >= 1) return `${sign}$${abs.toFixed(1)}M`;
-  if (abs * 1000 >= 1) return `${sign}$${(abs * 1000).toFixed(1)}K`;
-  return `${sign}$${(abs * 1000000).toFixed(0)}`;
+
+  // Currency symbol mapping
+  const currencySymbols: Record<string, string> = {
+    USD: '$',
+    INR: '₹',
+    EUR: '€',
+    GBP: '£',
+    JPY: '¥',
+    CAD: 'C$',
+    AUD: 'A$',
+    CHF: 'Fr',
+  };
+
+  const symbol = currencySymbols[currency] || currency;
+
+  if (abs >= 1000) return `${sign}${symbol}${(abs / 1000).toFixed(1)}B`;
+  if (abs >= 1) return `${sign}${symbol}${abs.toFixed(1)}M`;
+  if (abs * 1000 >= 1) return `${sign}${symbol}${(abs * 1000).toFixed(1)}K`;
+  return `${sign}${symbol}${(abs * 1000000).toFixed(0)}`;
 }
 
 /**
@@ -142,6 +157,7 @@ function withinTolerance(a: number, b: number): boolean {
 function checkIncomeStatement(
   lineItems: LineItem[],
   period: string,
+  currency: string = 'USD',
 ): StatementCheck[] {
   const checks: StatementCheck[] = [];
   const li = (k: string) => lineItems.find(l => l.name === k)?.value ?? null;
@@ -163,8 +179,8 @@ function checkIncomeStatement(
       passed: withinTolerance(calc, grossProfit),
       severity: 'error',
       message: withinTolerance(calc, grossProfit)
-        ? `Gross profit checks out: ${fmtVal(revenue)} - ${fmtVal(cogs)} ≈ ${fmtVal(grossProfit)}`
-        : `Gross profit mismatch: Revenue ${fmtVal(revenue)} - COGS ${fmtVal(cogs)} = ${fmtVal(calc)}, but extracted ${fmtVal(grossProfit)}`,
+        ? `Gross profit checks out: ${fmtVal(revenue, currency)} - ${fmtVal(cogs, currency)} ≈ ${fmtVal(grossProfit, currency)}`
+        : `Gross profit mismatch: Revenue ${fmtVal(revenue, currency)} - COGS ${fmtVal(cogs, currency)} = ${fmtVal(calc, currency)}, but extracted ${fmtVal(grossProfit, currency)}`,
       period,
     });
   }
@@ -177,8 +193,8 @@ function checkIncomeStatement(
       passed: !gpExceedsRevenue,
       severity: 'error',
       message: gpExceedsRevenue
-        ? `Gross Profit ${fmtVal(grossProfit)} exceeds Revenue ${fmtVal(revenue)} — IMPOSSIBLE: Revenue must be >= Gross Profit`
-        : `Gross Profit (${fmtVal(grossProfit)}M) is within Revenue bounds (${fmtVal(revenue)}M)`,
+        ? `Gross Profit ${fmtVal(grossProfit, currency)} exceeds Revenue ${fmtVal(revenue, currency)} — IMPOSSIBLE: Revenue must be >= Gross Profit`
+        : `Gross Profit (${fmtVal(grossProfit, currency)}) is within Revenue bounds (${fmtVal(revenue, currency)})`,
       period,
     });
   }
@@ -191,7 +207,7 @@ function checkIncomeStatement(
       passed: !exceeds,
       severity: 'error',
       message: exceeds
-        ? `EBITDA ${fmtVal(ebitda)} exceeds revenue ${fmtVal(revenue)} — likely an extraction error`
+        ? `EBITDA ${fmtVal(ebitda, currency)} exceeds revenue ${fmtVal(revenue, currency)} — likely an extraction error`
         : `EBITDA is within revenue bounds`,
       period,
     });
@@ -206,7 +222,7 @@ function checkIncomeStatement(
         check: 'is_net_income_lte_ebitda',
         passed: false,
         severity: 'warning',
-        message: `Net Income ${fmtVal(netIncome)} exceeds EBITDA ${fmtVal(ebitda)} by >10% — unusual, verify for one-time gains`,
+        message: `Net Income ${fmtVal(netIncome, currency)} exceeds EBITDA ${fmtVal(ebitda, currency)} by >10% — unusual, verify for one-time gains`,
         period,
       });
     }
@@ -224,22 +240,36 @@ function checkIncomeStatement(
         period,
       });
     }
-    checks.push({
-      check: 'is_ebitda_margin_sane',
-      passed: calcMargin >= -100 && calcMargin <= 80,
-      severity: calcMargin > 60 ? 'warning' : 'info',
-      message: calcMargin > 60
-        ? `EBITDA margin of ${calcMargin.toFixed(1)}% is unusually high — verify`
-        : calcMargin < -100
+    if (calcMargin > 60) {
+      checks.push({
+        check: 'is_ebitda_margin_sane',
+        passed: false,
+        severity: 'warning',
+        message: `EBITDA margin of ${calcMargin.toFixed(1)}% is unusually high — verify`,
+        period,
+      });
+    } else if (calcMargin < 0) {
+      checks.push({
+        check: 'is_ebitda_margin_sane',
+        passed: false,
+        severity: calcMargin < -10 ? 'error' : 'warning',
+        message: calcMargin < -10
           ? `EBITDA margin of ${calcMargin.toFixed(1)}% indicates extreme losses`
-          : calcMargin < 0
-            ? `EBITDA margin of ${calcMargin.toFixed(1)}% indicates losses`
-            : `EBITDA margin of ${calcMargin.toFixed(1)}% is within normal range`,
-      period,
-    });
+          : `EBITDA margin of ${calcMargin.toFixed(1)}% indicates losses`,
+        period,
+      });
+    } else {
+      checks.push({
+        check: 'is_ebitda_margin_sane',
+        passed: true,
+        severity: 'info',
+        message: `EBITDA margin of ${calcMargin.toFixed(1)}% is within normal range`,
+        period,
+      });
+    }
   }
 
-  // EBITDA - D&A = EBIT
+  // EBIT = EBITDA - D&A
   if (ebitda !== null && da !== null && ebit !== null) {
     const calc = ebitda - da;
     checks.push({
@@ -247,8 +277,8 @@ function checkIncomeStatement(
       passed: withinTolerance(calc, ebit),
       severity: 'warning',
       message: withinTolerance(calc, ebit)
-        ? `EBIT math checks out: EBITDA ${fmtVal(ebitda)} - D&A ${fmtVal(da)} ≈ EBIT ${fmtVal(ebit)}`
-        : `EBIT mismatch: EBITDA ${fmtVal(ebitda)} - D&A ${fmtVal(da)} = ${fmtVal(calc)}, but extracted EBIT ${fmtVal(ebit)}`,
+        ? `EBIT math checks out: EBITDA ${fmtVal(ebitda, currency)} - D&A ${fmtVal(da, currency)} ≈ EBIT ${fmtVal(ebit, currency)}`
+        : `EBIT mismatch: EBITDA ${fmtVal(ebitda, currency)} - D&A ${fmtVal(da, currency)} = ${fmtVal(calc, currency)}, but extracted EBIT ${fmtVal(ebit, currency)}`,
       period,
     });
   }
@@ -260,6 +290,7 @@ function checkIncomeStatement(
 function checkBalanceSheet(
   lineItems: LineItem[],
   period: string,
+  currency: string = 'USD',
 ): StatementCheck[] {
   const checks: StatementCheck[] = [];
   const li = (k: string) => lineItems.find(l => l.name === k)?.value ?? null;
@@ -278,8 +309,8 @@ function checkBalanceSheet(
       passed: withinTolerance(calc, totalAssets),
       severity: 'error',
       message: withinTolerance(calc, totalAssets)
-        ? `Balance sheet balances: Assets ≈ Liabilities + Equity (${fmtVal(totalAssets)})`
-        : `Balance sheet doesn't balance: Assets ${fmtVal(totalAssets)} ≠ Liabilities ${fmtVal(totalLiabilities)} + Equity ${fmtVal(totalEquity)} = ${fmtVal(calc)}`,
+        ? `Balance sheet balances: Assets ≈ Liabilities + Equity (${fmtVal(totalAssets, currency)})`
+        : `Balance sheet doesn't balance: Assets ${fmtVal(totalAssets, currency)} ≠ Liabilities ${fmtVal(totalLiabilities, currency)} + Equity ${fmtVal(totalEquity, currency)} = ${fmtVal(calc, currency)}`,
       period,
     });
   }
@@ -290,7 +321,7 @@ function checkBalanceSheet(
       check: 'bs_current_assets_sane',
       passed: false,
       severity: 'error',
-      message: `Current assets ${fmtVal(totalCurrentAssets)} exceed total assets ${fmtVal(totalAssets)} — extraction error`,
+      message: `Current assets ${fmtVal(totalCurrentAssets, currency)} exceed total assets ${fmtVal(totalAssets, currency)} — extraction error`,
       period,
     });
   }
@@ -301,7 +332,7 @@ function checkBalanceSheet(
       check: 'bs_current_liabilities_sane',
       passed: false,
       severity: 'error',
-      message: `Current liabilities ${fmtVal(totalCurrentLiabilities)} exceed total liabilities ${fmtVal(totalLiabilities)} — extraction error`,
+      message: `Current liabilities ${fmtVal(totalCurrentLiabilities, currency)} exceed total liabilities ${fmtVal(totalLiabilities, currency)} — extraction error`,
       period,
     });
   }
@@ -313,6 +344,7 @@ function checkBalanceSheet(
 function checkCashFlow(
   lineItems: LineItem[],
   period: string,
+  currency: string = 'USD',
 ): StatementCheck[] {
   const checks: StatementCheck[] = [];
   const li = (k: string) => lineItems.find(l => l.name === k)?.value ?? null;
@@ -331,8 +363,8 @@ function checkCashFlow(
       passed: withinTolerance(calc, fcf),
       severity: 'warning',
       message: withinTolerance(calc, fcf)
-        ? `FCF checks out: Operating CF ${fmtVal(operatingCf)} - CapEx ${fmtVal(capexAbs)} ≈ FCF ${fmtVal(fcf)}`
-        : `FCF mismatch: ${fmtVal(operatingCf)} - ${fmtVal(capexAbs)} = ${fmtVal(calc)}, but extracted FCF ${fmtVal(fcf)}`,
+        ? `FCF checks out: Operating CF ${fmtVal(operatingCf, currency)} - CapEx ${fmtVal(capexAbs, currency)} ≈ FCF ${fmtVal(fcf, currency)}`
+        : `FCF mismatch: ${fmtVal(operatingCf, currency)} - ${fmtVal(capexAbs, currency)} = ${fmtVal(calc, currency)}, but extracted FCF ${fmtVal(fcf, currency)}`,
       period,
     });
   }
@@ -343,6 +375,7 @@ function checkCashFlow(
 /** Subtask 4e — YoY growth sanity across sorted periods */
 function checkYoYGrowth(
   periods: Array<{ period: string; periodType: string; lineItems: LineItem[] }>,
+  currency: string = 'USD',
 ): StatementCheck[] {
   const checks: StatementCheck[] = [];
 
@@ -365,7 +398,7 @@ function checkYoYGrowth(
           check: 'yoy_revenue_growth_sane',
           passed: false,
           severity: 'warning',
-          message: `Revenue growth from ${prev.period} to ${curr.period} is ${growth.toFixed(1)}% — verify (${fmtVal(prevRev)} → ${fmtVal(currRev)})`,
+          message: `Revenue growth from ${prev.period} to ${curr.period} is ${growth.toFixed(1)}% — verify (${fmtVal(prevRev, currency)} → ${fmtVal(currRev, currency)})`,
           period: curr.period,
         });
       }
@@ -404,11 +437,11 @@ export function validateStatements(statements: ClassifiedStatement[]): Statement
       let periodChecks: StatementCheck[] = [];
 
       if (stmt.statementType === 'INCOME_STATEMENT') {
-        periodChecks = checkIncomeStatement(period.lineItems, period.period);
+        periodChecks = checkIncomeStatement(period.lineItems, period.period, stmt.currency);
       } else if (stmt.statementType === 'BALANCE_SHEET') {
-        periodChecks = checkBalanceSheet(period.lineItems, period.period);
+        periodChecks = checkBalanceSheet(period.lineItems, period.period, stmt.currency);
       } else if (stmt.statementType === 'CASH_FLOW') {
-        periodChecks = checkCashFlow(period.lineItems, period.period);
+        periodChecks = checkCashFlow(period.lineItems, period.period, stmt.currency);
       }
 
       allChecks.push(...periodChecks);
@@ -416,7 +449,7 @@ export function validateStatements(statements: ClassifiedStatement[]): Statement
 
     // YoY growth checks across all periods for income statements
     if (stmt.statementType === 'INCOME_STATEMENT') {
-      allChecks.push(...checkYoYGrowth(stmt.periods));
+      allChecks.push(...checkYoYGrowth(stmt.periods, stmt.currency));
     }
   }
 

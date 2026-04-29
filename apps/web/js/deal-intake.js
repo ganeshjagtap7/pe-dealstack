@@ -164,10 +164,25 @@ function showExtractionPreview(data) {
     const extraction = data.extraction || {};
     createdDealId = data.deal?.id;
 
+    // Get currency from extraction
+    const currency = extraction.currency || 'USD';
+    const currencySymbol = getCurrencySymbol(currency);
+
+    // Format value with currency-aware suffix (Cr for INR, M for others)
+    const formatValue = (val) => {
+        if (val == null) return '—';
+        if (currency === 'INR') {
+            // Convert millions to crores (1 Cr = 10M)
+            const crores = val / 10;
+            return `${currencySymbol}${crores.toFixed(1)}Cr`;
+        }
+        return `${currencySymbol}${val}M`;
+    };
+
     setField('company', extraction.companyName?.value || data.deal?.name || 'Unknown', extraction.companyName?.confidence);
     setField('industry', extraction.industry?.value || '—', extraction.industry?.confidence);
-    setField('revenue', extraction.revenue?.value != null ? `$${extraction.revenue.value}M` : '—', extraction.revenue?.confidence);
-    setField('ebitda', extraction.ebitda?.value != null ? `$${extraction.ebitda.value}M` : '—', extraction.ebitda?.confidence);
+    setField('revenue', extraction.revenue?.value != null ? formatValue(extraction.revenue.value) : '—', extraction.revenue?.confidence);
+    setField('ebitda', extraction.ebitda?.value != null ? formatValue(extraction.ebitda.value) : '—', extraction.ebitda?.confidence);
     setField('overall', `${extraction.overallConfidence || 0}%`, extraction.overallConfidence);
 
     // Review badge

@@ -3,14 +3,29 @@ import { getExtractionModel, isLLMAvailable } from './llm.js';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 
-// Format a value in millions to human-readable form with smart units
-function formatExtractedValue(valueInMillions: number): string {
+// Format a value in millions to human-readable form with smart units and currency symbol
+function formatExtractedValue(valueInMillions: number, currency: string = 'USD'): string {
   const abs = Math.abs(valueInMillions);
   const sign = valueInMillions < 0 ? '-' : '';
-  if (abs >= 1000) return `${sign}$${(abs / 1000).toFixed(1)}B`;
-  if (abs >= 1) return `${sign}$${abs.toFixed(1)}M`;
-  if (abs * 1000 >= 1) return `${sign}$${(abs * 1000).toFixed(1)}K`;
-  return `${sign}$${(abs * 1000000).toFixed(0)}`;
+
+  // Currency symbol mapping
+  const currencySymbols: Record<string, string> = {
+    USD: '$',
+    INR: '₹',
+    EUR: '€',
+    GBP: '£',
+    JPY: '¥',
+    CAD: 'C$',
+    AUD: 'A$',
+    CHF: 'Fr',
+  };
+
+  const symbol = currencySymbols[currency] || currency;
+
+  if (abs >= 1000) return `${sign}${symbol}${(abs / 1000).toFixed(1)}B`;
+  if (abs >= 1) return `${sign}${symbol}${abs.toFixed(1)}M`;
+  if (abs * 1000 >= 1) return `${sign}${symbol}${(abs * 1000).toFixed(1)}K`;
+  return `${sign}${symbol}${(abs * 1000000).toFixed(0)}`;
 }
 
 // ─── Zod Schema for Structured Output ──────────────────────────────
@@ -30,7 +45,7 @@ const ExtractionOutputSchema = z.object({
     value: z.string(),
     confidence: z.number().min(0).max(100),
   }).describe('2-3 sentence business description'),
-  currency: z.string().describe('ISO 4217 currency code detected from document (e.g. USD, INR, EUR, GBP). Default to USD if not detected.'),
+  currency: z.string().describe('ISO 4217 currency code detected from document. MUST detect from: ₹ symbol = INR, $ symbol = USD, € = EUR, £ = GBP, "Crores/Lakhs" = INR, "Bengaluru/Bangalore/India" = INR. Default USD only if no indicators found.'),
   revenue: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
@@ -130,6 +145,15 @@ CRITICAL INSTRUCTIONS:
 5. Set the "currency" field to the ISO 4217 code (e.g. "USD", "INR", "EUR", "GBP"). Default to "USD" if not detected.
 6. Financial figures MUST be in millions in the ORIGINAL currency — do NOT convert between currencies
 7. If you cannot find data, set value to null with confidence 0
+8. CRITICAL: For Indian currency (₹) with Crores/Lakhs, MULTIPLY to convert to millions - NEVER divide:
+   - 1 Crore = 10 Million (multiply by 10)
+   - 1 Lakh = 0.1 Million (multiply by 0.1)
+   - Example: ₹187.6 Crores = 1876 (187.6 × 10)
+   - Example: ₹32.6 Crores = 326 (32.6 × 10)
+   - Example: ₹50 Crores = 500 (50 × 10)
+   - Example: ₹10 Crores = 100 (10 × 10)
+   - DO NOT divide by 10 - this is a common error
+   - ALWAYS MULTIPLY: Crore value × 10 = Millions
 
 COMMON PATTERNS TO LOOK FOR:
 - Revenue: "revenue of $X", "sales of $X", "top-line of $X", "$X in revenue", "₹X Crores"
@@ -145,8 +169,9 @@ FINANCIAL CONVERSION (always convert to millions in the original currency — do
 - "$6,000" = 0.006
 - "$1,800" = 0.0018
 - "$500" = 0.0005
-- "₹9 Crores" = 90 (1 Crore = 10 Million)
-- "₹50 Lakhs" = 5 (1 Lakh = 0.1 Million)
+- "₹9 Crores" = 90 (multiply by 10: 9 × 10 = 90)
+- "₹187.6 Crores" = 1876 (multiply by 10: 187.6 × 10 = 1876)
+- "₹50 Lakhs" = 5 (multiply by 0.1: 50 × 0.1 = 5)
 - Remove commas and convert to number
 - IMPORTANT: Small values are valid! Do NOT round small amounts to 0 or null.`;
 
@@ -199,6 +224,55 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
       reviewReasons: [],
     };
 
+    // Post-processing: Detect currency from text if AI didn't detect it
+    const textLower = text.toLowerCase();
+    log.info(`Post-processing: AI detected currency = ${result.currency}, checking text patterns...`);
+    
+    if (!result.currency || result.currency === 'USD') {
+      // Check for Indian currency indicators
+      const indianPatterns = /₹|inr|rupee|rupees|crore|crores|lakh|lakhs|bengaluru|bangalore|india|pvt\.?\s+ltd|private limited/i;
+      const hasIndianIndicators = indianPatterns.test(textLower);
+      log.info(`Post-processing: Indian currency indicators found = ${hasIndianIndicators}`);
+      
+      if (hasIndianIndicators) {
+        result.currency = 'INR';
+        log.info('Post-processing: Detected INR currency from text patterns');
+      }
+      // Check for other currencies
+      else if (/€|eur|euro/i.test(textLower)) {
+        result.currency = 'EUR';
+      }
+      else if (/£|gbp|pound/i.test(textLower)) {
+        result.currency = 'GBP';
+      }
+      else if (/¥|jpy|yen/i.test(textLower)) {
+        result.currency = 'JPY';
+      }
+    }
+
+    // Post-processing correction: Fix Crore conversion if AI divided instead of multiplied
+    if (result.currency === 'INR') {
+      const hasCrore = /crore|cr\b/i.test(textLower);
+      
+      if (hasCrore) {
+        // Check if values look like they were divided by 10 instead of multiplied
+        // If text has "32.6 Crore" but extracted value is 3.26, it should be 326
+        const fixCroreConversion = (field: ExtractedField<number | null>, fieldName: string) => {
+          if (field.value !== null && field.value > 0 && field.value < 100) {
+            // If value is small (<100) and text has Crore, likely AI divided instead of multiplied
+            // Multiply by 100 to correct (since AI divided by 10 when it should have multiplied by 10)
+            const corrected = field.value * 100;
+            log.info(`Post-processing: Corrected ${fieldName} from ${field.value} to ${corrected} (Crore conversion fix)`);
+            field.value = corrected;
+          }
+        };
+
+        fixCroreConversion(result.revenue, 'revenue');
+        fixCroreConversion(result.ebitda, 'ebitda');
+        fixCroreConversion(result.dealSize, 'dealSize');
+      }
+    }
+
     // Calculate overall confidence and determine if review is needed
     const confidenceScores: number[] = [];
     const reviewReasons: string[] = [];
@@ -215,14 +289,14 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
 
     if (result.revenue.value !== null) {
       if (result.revenue.confidence < 70) {
-        reviewReasons.push(`Revenue uncertain: ${formatExtractedValue(result.revenue.value)} (${result.revenue.confidence}% confidence)`);
+        reviewReasons.push(`Revenue uncertain: ${formatExtractedValue(result.revenue.value, result.currency)} (${result.revenue.confidence}% confidence)`);
       }
       confidenceScores.push(result.revenue.confidence);
     }
 
     if (result.ebitda.value !== null) {
       if (result.ebitda.confidence < 70) {
-        reviewReasons.push(`EBITDA uncertain: ${formatExtractedValue(result.ebitda.value)} (${result.ebitda.confidence}% confidence)`);
+        reviewReasons.push(`EBITDA uncertain: ${formatExtractedValue(result.ebitda.value, result.currency)} (${result.ebitda.confidence}% confidence)`);
       }
       confidenceScores.push(result.ebitda.confidence);
     }

@@ -29,6 +29,7 @@ export interface ValidatedDeal {
   dealSize?: number | null;
   ebitda?: number | null;
   revenue?: number | null;
+  currency?: string | null;
   irrProjected?: number | null;
   mom?: number | null;
   industry?: string | null;

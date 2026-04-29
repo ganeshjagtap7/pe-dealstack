@@ -203,7 +203,7 @@ async function showAISearchResult(query) {
                                     </div>
                                     <span class="text-xs font-medium text-primary bg-primary-light px-2 py-1 rounded">${formatStage(deal.stage)}</span>
                                 </div>
-                                ${deal.revenue ? `<p class="text-xs text-text-secondary mt-1">Revenue: $${deal.revenue}M</p>` : ''}
+                                ${deal.revenue ? `<p class="text-xs text-text-secondary mt-1">Revenue: ${getCurrencySymbol(deal.currency || 'USD')}${deal.revenue}M</p>` : ''}
                             </a>
                         `).join('')}
                     </div>
