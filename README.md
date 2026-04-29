@@ -44,27 +44,139 @@ A multi-tenant AI-powered CRM purpose-built for PE firms and search funds. Track
 
 ## Diagrams
 
-The full diagram set lives in [`docs/diagrams/`](docs/diagrams/) (Mermaid `.mmd` + rendered `.png`). Highlights:
+All diagrams are in [`docs/diagrams/`](docs/diagrams/) — Mermaid source (`.mmd`) plus rendered PNGs.
 
-| Diagram | What it shows |
-| --- | --- |
-| [System Architecture](docs/diagrams/08-system-architecture.mmd) | Top-down: web-next + legacy web + 48-route API + 8 agents + external services |
-| [AI Agents Architecture](docs/diagrams/12-ai-agents-architecture.mmd) | All 8 agents, the unified LLM layer, and their endpoints |
-| [Financial Extraction Pipeline](docs/diagrams/11-financial-extraction-pipeline.mmd) | 6-node LangGraph + 3-layer extraction |
-| [ER Diagram](docs/diagrams/07-er-diagram.mmd) | Full Postgres schema |
-| [Multi-Tenancy / Org Isolation](docs/diagrams/13-multi-tenancy-org-isolation.mmd) | Direct + indirect scoping patterns |
-| [Onboarding Flow](docs/diagrams/14-onboarding-flow.mmd) | Signup → 3-step onboarding → persistent checklist |
-| [Firm Research Agent](docs/diagrams/15-firm-research-agent.mmd) | Phase 1 sync + Phase 2 deep research |
-| [Deal Import Flow](docs/diagrams/16-deal-import-flow.mmd) | 4-step modal + 5-phase batch insert |
-| [Document Ingest Pipeline](docs/diagrams/17-document-ingest-pipeline.mmd) | All 5 ingest sources → validation → storage → routing |
-| [Web-Next Architecture](docs/diagrams/18-webnext-architecture.mmd) | Next.js 16 App Router layout |
-| [Deal Chat ReAct Agent](docs/diagrams/19-deal-chat-react-agent.mmd) | Sequence diagram for chat + tool calls |
-| [Auth Flow](docs/diagrams/sample-auth-flow.mmd) | Signup, login, invitation, reset, RBAC |
+### System Architecture
 
-Render any diagram with:
+> Two frontends, one Express API with 48 routes / 37 services / 8 agents, Supabase + OpenAI + Azure DI + Resend + Sentry + Vercel.
+
+<p align="center">
+  <a href="docs/diagrams/08-system-architecture.mmd"><img src="docs/diagrams/08-system-architecture.png" alt="System Architecture" width="100%"/></a>
+</p>
+
+### AI Agents Architecture
+
+> Eight agents — Financial, Deal Chat (ReAct + 14 tools), Memo, Firm Research, Contact Enrichment, Meeting Prep, Signal Monitor, Email Drafter — all routed through the unified LLM layer.
+
+<p align="center">
+  <a href="docs/diagrams/12-ai-agents-architecture.mmd"><img src="docs/diagrams/12-ai-agents-architecture.png" alt="AI Agents Architecture" width="100%"/></a>
+</p>
+
+### Financial Extraction Pipeline
+
+> 6-node LangGraph: extract → verify → cross-verify → validate → self-correct → store. Three-layer extraction (Azure DI → pdf-parse + GPT-4o → Vision) with self-correction loop.
+
+<p align="center">
+  <a href="docs/diagrams/11-financial-extraction-pipeline.mmd"><img src="docs/diagrams/11-financial-extraction-pipeline.png" alt="Financial Extraction Pipeline" width="100%"/></a>
+</p>
+
+### ER Diagram
+
+> ~25 tables. Multi-tenant via `Organization`. All financial values in millions USD.
+
+<p align="center">
+  <a href="docs/diagrams/07-er-diagram.mmd"><img src="docs/diagrams/07-er-diagram.png" alt="ER Diagram" width="100%"/></a>
+</p>
+
+### Multi-Tenancy / Org Isolation
+
+> Every row owned by an `Organization`. Two scoping patterns (direct FK + indirect via Deal). All 48 route files hardened. Cross-org access returns 404.
+
+<p align="center">
+  <a href="docs/diagrams/13-multi-tenancy-org-isolation.mmd"><img src="docs/diagrams/13-multi-tenancy-org-isolation.png" alt="Multi-Tenancy / Org Isolation" width="100%"/></a>
+</p>
+
+### Deal Lifecycle
+
+> 7 pipeline stages, 3 terminal states, deals enter via manual create, CIM upload, URL ingest, or email forward.
+
+<p align="center">
+  <a href="docs/diagrams/02-deal-lifecycle.mmd"><img src="docs/diagrams/02-deal-lifecycle.png" alt="Deal Lifecycle" width="100%"/></a>
+</p>
+
+### Onboarding Flow
+
+> Signup → auto-provision Organization → welcome modal → 3-step onboarding (firm focus → upload deal → invite team) → persistent checklist with auto-backfill from real activity.
+
+<p align="center">
+  <a href="docs/diagrams/14-onboarding-flow.mmd"><img src="docs/diagrams/14-onboarding-flow.png" alt="Onboarding Flow" width="100%"/></a>
+</p>
+
+### Firm Research Agent
+
+> Phase 1 sync (≤ 60s): scrape → search firm → search person → synthesize → verify → save. Phase 2 async (60–120s): GPT-4o derives 8–12 follow-up queries and recurses.
+
+<p align="center">
+  <a href="docs/diagrams/15-firm-research-agent.mmd"><img src="docs/diagrams/15-firm-research-agent.png" alt="Firm Research Agent" width="100%"/></a>
+</p>
+
+### Deal Import Flow
+
+> CSV / Excel / paste → GPT-4o column mapping with deterministic overrides → preview → 5-phase batch insert (up to 500 deals at ~$0.01–0.02 per import).
+
+<p align="center">
+  <a href="docs/diagrams/16-deal-import-flow.mmd"><img src="docs/diagrams/16-deal-import-flow.png" alt="Deal Import Flow" width="100%"/></a>
+</p>
+
+### Document Ingest Pipeline
+
+> Five entry points (upload, URL, email, paste, VDR) → magic-bytes validation → Supabase Storage → parse → financial branch (Financial Agent) or chunking (DocumentChunk for VDR search).
+
+<p align="center">
+  <a href="docs/diagrams/17-document-ingest-pipeline.mmd"><img src="docs/diagrams/17-document-ingest-pipeline.png" alt="Document Ingest Pipeline" width="100%"/></a>
+</p>
+
+### Memo Builder Flow
+
+> Template-based memo creation with section-by-section AI generation grounded in deal data.
+
+<p align="center">
+  <a href="docs/diagrams/04-memo-builder-flow.mmd"><img src="docs/diagrams/04-memo-builder-flow.png" alt="Memo Builder Flow" width="100%"/></a>
+</p>
+
+### Document & VDR Flow
+
+> Folder-based document workspace with smart filters, cross-folder search, document requests via Resend, and folder-level AI insights.
+
+<p align="center">
+  <a href="docs/diagrams/03-document-vdr-flow.mmd"><img src="docs/diagrams/03-document-vdr-flow.png" alt="Document & VDR Flow" width="100%"/></a>
+</p>
+
+### Web-Next Architecture
+
+> Next.js 16 App Router with route groups: `(auth)`, `(onboarding)`, `(app)`. The `/api/[...slug]` route proxies to the Express API and forwards the JWT.
+
+<p align="center">
+  <a href="docs/diagrams/18-webnext-architecture.mmd"><img src="docs/diagrams/18-webnext-architecture.png" alt="Web-Next Architecture" width="100%"/></a>
+</p>
+
+### Deal Chat — ReAct Agent (Sequence)
+
+> POST `/api/deals/:id/chat` → `runDealChatAgent` with 14 closure-bound tools → returns response + updates + sideEffects for optimistic UI.
+
+<p align="center">
+  <a href="docs/diagrams/19-deal-chat-react-agent.mmd"><img src="docs/diagrams/19-deal-chat-react-agent.png" alt="Deal Chat ReAct Agent" width="100%"/></a>
+</p>
+
+### Auth Flow (Sequence)
+
+> Signup, first-login auto-provision, subsequent login, invitation, accept-invitation, password reset, RBAC.
+
+<p align="center">
+  <a href="docs/diagrams/sample-auth-flow.mmd"><img src="docs/diagrams/sample-auth-flow.png" alt="Auth Flow" width="100%"/></a>
+</p>
+
+### Other diagrams
+
+- [Role Access Matrix](docs/diagrams/09-role-access-matrix.mmd) — what each role can do
+- [Navigation / Page Flow](docs/diagrams/10-navigation-page-flow.mmd) — frontend page graph
+- [User Journey — Admin](docs/diagrams/05-user-journey-admin.mmd)
+- [User Journey — Analyst](docs/diagrams/06-user-journey-analyst.mmd)
+
+To re-render a diagram from its `.mmd` source:
 
 ```bash
-npx -p @mermaid-js/mermaid-cli mmdc -i docs/diagrams/08-system-architecture.mmd -o docs/diagrams/08-system-architecture.png
+npx -p @mermaid-js/mermaid-cli mmdc -i docs/diagrams/08-system-architecture.mmd -o docs/diagrams/08-system-architecture.png -b transparent -w 2400
 ```
 
 ## Documentation
