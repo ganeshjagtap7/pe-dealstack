@@ -16,6 +16,7 @@ import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { extractTextFromExcel, isExcelFile } from '../../../excelFinancialExtractor.js';
 import { extractTablesFromPdf, isAzureConfigured } from '../../../azureDocIntelligence.js';
 import { classifyExtraction } from '../../../extraction/financialClassifier.js';
+import { extractText } from '../../../extraction/textExtractor.js';
 import { log } from '../../../../utils/logger.js';
 import { estimateOpenAICostUsd } from '../../../../utils/constants.js';
 import type { FinancialAgentStateType } from '../state.js';
@@ -58,6 +59,84 @@ export async function extractNode(
   steps.push(step('extract', `Received ${fileName} (${fileType}, ${(fileBuffer.length / 1024).toFixed(0)}KB)`));
 
   try {
+    // ── DOCX Path ─────────────────────────────────────────────
+    if (
+      fileName.toLowerCase().endsWith('.docx') ||
+      fileName.toLowerCase().endsWith('.doc') ||
+      fileType === 'docx'
+    ) {
+      steps.push(step('extract', 'Detected DOCX file — extracting text with mammoth'));
+
+      // Save buffer to temp file for extractText
+      const fs = await import('fs/promises');
+      const os = await import('os');
+      const path = await import('path');
+      const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'docx-'));
+      const tempPath = path.join(tempDir, fileName);
+      await fs.writeFile(tempPath, fileBuffer);
+
+      try {
+        const docxResult = await extractText(tempPath, 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+        const docxText = docxResult.text;
+
+        if (!docxText || docxText.trim().length < 50) {
+          return {
+            status: 'failed',
+            error: 'DOCX file appears empty or has no readable financial data',
+            steps: [...steps, step('extract', 'Failed: DOCX file has no readable data')],
+          };
+        }
+
+        steps.push(step('extract', `Extracted ${docxText.length} chars from DOCX, classifying with GPT-4o`));
+        const classifyResult = await classifyExtraction(docxText);
+        const classification = classifyResult.statements.length > 0
+          ? { statements: classifyResult.statements, overallConfidence: classifyResult.overallConfidence, warnings: classifyResult.warnings }
+          : null;
+        const extractTokens = classifyResult.usage.promptTokens + classifyResult.usage.completionTokens;
+        const extractCost = estimateOpenAICostUsd(
+          'gpt-4o',
+          classifyResult.usage.promptTokens,
+          classifyResult.usage.completionTokens,
+        );
+
+        if (!classification || classification.statements.length === 0) {
+          return {
+            rawText: docxText,
+            extractionSource: 'gpt4o',
+            classification,
+            statements: [],
+            overallConfidence: 0,
+            warnings: classification?.warnings ?? ['No financial data found in DOCX file'],
+            status: 'validating',
+            tokensUsed: extractTokens,
+            estimatedCostUsd: extractCost,
+            steps: [...steps, step('extract', 'No financial statements found in DOCX')],
+          };
+        }
+
+        const stmtTypes = classification.statements.map((s: ClassifiedStatement) => s.statementType).join(', ');
+        const totalPeriods = classification.statements.reduce((sum: number, s: ClassifiedStatement) => sum + s.periods.length, 0);
+        steps.push(step('extract', `Found: ${stmtTypes} (${totalPeriods} periods, confidence ${classification.overallConfidence}%)`));
+
+        return {
+          rawText: docxText,
+          extractionSource: 'gpt4o',
+          classification,
+          statements: classification.statements,
+          overallConfidence: classification.overallConfidence,
+          warnings: classification.warnings,
+          status: 'validating',
+          tokensUsed: extractTokens,
+          estimatedCostUsd: extractCost,
+          steps,
+        };
+      } finally {
+        // Cleanup temp file
+        await fs.unlink(tempPath).catch(() => {});
+        await fs.rmdir(tempDir).catch(() => {});
+      }
+    }
+
     // ── Excel Path ─────────────────────────────────────────────
     if (fileType === 'excel' || isExcelFile(null, fileName)) {
       steps.push(step('extract', 'Detected Excel file — parsing with xlsx'));

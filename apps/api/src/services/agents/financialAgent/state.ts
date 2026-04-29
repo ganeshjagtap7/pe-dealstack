@@ -16,7 +16,7 @@ import type { ClassificationResult, ClassifiedStatement } from '../../financialC
 
 // ─── Supporting Types ────────────────────────────────────────────────
 
-export type FileType = 'pdf' | 'excel' | 'image';
+export type FileType = 'pdf' | 'excel' | 'image' | 'docx';
 export type ExtractionSource = 'gpt4o' | 'azure' | 'vision' | 'manual';
 export type AgentStatus = 'pending' | 'extracting' | 'validating' | 'self_correcting' | 'storing' | 'completed' | 'failed';
 

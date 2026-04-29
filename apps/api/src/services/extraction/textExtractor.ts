@@ -16,6 +16,7 @@ import { createRequire } from 'module';
 import { extractTextFromExcel, isExcelFile } from '../excelFinancialExtractor.js';
 import { openai, isAIEnabled } from '../../openai.js';
 import { log } from '../../utils/logger.js';
+import mammoth from 'mammoth';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
@@ -29,10 +30,10 @@ export interface TextSection {
 }
 
 export interface TextExtractionMeta {
-  format: 'pdf' | 'excel' | 'image';
+  format: 'pdf' | 'excel' | 'image' | 'docx';
   pageCount: number;
   fileSize: number;
-  extractionMethod: 'pdf-parse' | 'excel-xlsx' | 'gpt-4o-vision' | 'gpt-4o-vision-ocr';
+  extractionMethod: 'pdf-parse' | 'excel-xlsx' | 'gpt-4o-vision' | 'gpt-4o-vision-ocr' | 'mammoth-docx';
   isScanned: boolean;
 }
 
@@ -228,6 +229,43 @@ async function extractPdfViaVisionText(
   };
 }
 
+async function extractDocx(
+  filePath: string,
+  fileSize: number,
+): Promise<TextExtractionResult> {
+  const buffer = await fs.readFile(filePath);
+  const fileName = filePath.split(/[/\\]/).pop() ?? 'document.docx';
+
+  log.info('textExtractor: extracting DOCX using mammoth', { fileName, fileSize });
+
+  const result = await mammoth.extractRawText({ buffer });
+  const text = result.value;
+
+  if (!text || text.trim().length < 50) {
+    throw new Error('DOCX file appears empty or has no readable text');
+  }
+
+  // Split by paragraphs for sections
+  const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 0);
+  const sections: TextSection[] = paragraphs.map((para, idx) => ({
+    name: `Section ${idx + 1}`,
+    text: para,
+    hasTabularData: detectTabularData(para),
+  }));
+
+  return {
+    text,
+    sections,
+    metadata: {
+      format: 'docx',
+      pageCount: sections.length,
+      fileSize,
+      extractionMethod: 'mammoth-docx',
+      isScanned: false,
+    },
+  };
+}
+
 // ─── Main Export ─────────────────────────────────────────────
 
 /**
@@ -243,6 +281,16 @@ export async function extractText(
   const fileBuffer = await fs.readFile(filePath);
   const fileSize = fileBuffer.length;
   const fileName = filePath.split(/[/\\]/).pop() ?? '';
+
+  // ── DOCX ────────────────────────────────────────────────────
+  if (
+    mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    mimeType === 'application/msword' ||
+    fileName.toLowerCase().endsWith('.docx') ||
+    fileName.toLowerCase().endsWith('.doc')
+  ) {
+    return extractDocx(filePath, fileSize);
+  }
 
   // ── Excel ───────────────────────────────────────────────────
   if (isExcelFile(mimeType, fileName)) {
