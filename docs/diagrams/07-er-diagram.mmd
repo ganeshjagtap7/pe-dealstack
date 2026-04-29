@@ -2,31 +2,42 @@ erDiagram
     ORGANIZATION {
         uuid id PK
         string name
-        string slug
+        string slug UK
         string logo
         string industry
+        string website
+        jsonb settings "incl. firmProfile"
         string plan
         int maxUsers
         boolean isActive
+        uuid createdBy
         timestamp createdAt
     }
 
     USER {
         uuid id PK
-        string authId UK
+        uuid authId UK "Supabase Auth UUID"
         string email UK
         string name
+        string avatar
         string role "ADMIN MEMBER VIEWER OPS"
-        uuid organizationId FK
+        string department
+        string title
+        string phone
+        boolean isActive
+        timestamp lastLoginAt
+        string firmName
         jsonb preferences
+        jsonb onboardingStatus
+        uuid organizationId FK
         timestamp createdAt
     }
 
     DEAL {
         uuid id PK
+        string name
         uuid companyId FK
         uuid organizationId FK
-        string name
         string stage "7 pipeline stages"
         string status "ACTIVE CLOSED_WON CLOSED_LOST PASSED"
         string priority "LOW MEDIUM HIGH URGENT"
@@ -34,6 +45,25 @@ erDiagram
         float revenue
         float ebitda
         float irrProjected
+        float mom
+        string industry
+        string description
+        text aiThesis
+        string icon
+        string lastDocument
+        timestamp lastDocumentUpdated
+        uuid assignedTo FK
+        date targetCloseDate
+        date actualCloseDate
+        string source
+        string_arr tags
+        int extractionConfidence
+        boolean needsReview
+        jsonb reviewReasons
+        jsonb aiRisks
+        timestamp aiCacheUpdatedAt
+        jsonb customFields
+        string currency "default USD"
         timestamp createdAt
     }
 
@@ -42,8 +72,14 @@ erDiagram
         uuid organizationId FK
         string name
         string industry
+        text description
         string website
-        string description
+        string logo
+        string headquarters
+        int foundedYear
+        int employeeCount
+        float annualRevenue
+        string linkedinUrl
         timestamp createdAt
     }
 
@@ -53,24 +89,45 @@ erDiagram
         string firstName
         string lastName
         string email
+        string phone
         string title
         string company
-        string type "BANKER ADVISOR EXECUTIVE LP LEGAL"
+        string type "BANKER ADVISOR EXECUTIVE LP LEGAL OTHER"
+        string linkedinUrl
+        text notes
+        string_arr tags
+        timestamp lastContactedAt
+        uuid createdBy FK
         timestamp createdAt
     }
 
     CONTACT_INTERACTION {
         uuid id PK
         uuid contactId FK
-        string type "NOTE MEETING CALL EMAIL"
-        date date
-        string description
+        string type "NOTE MEETING CALL EMAIL OTHER"
+        string title
+        text description
+        timestamp date
+        uuid createdBy FK
+        timestamp createdAt
     }
 
     CONTACT_DEAL {
+        uuid id PK
         uuid contactId FK
         uuid dealId FK
-        string role "BANKER ADVISOR BOARD MGMT"
+        string role "BANKER ADVISOR BOARD_MEMBER MANAGEMENT OTHER"
+        timestamp createdAt
+    }
+
+    CONTACT_RELATIONSHIP {
+        uuid id PK
+        uuid contactId FK
+        uuid relatedContactId FK
+        string type "KNOWS REFERRED_BY REPORTS_TO COLLEAGUE INTRODUCED_BY"
+        text notes
+        uuid createdBy FK
+        timestamp createdAt
     }
 
     DOCUMENT {
@@ -81,10 +138,19 @@ erDiagram
         string type "CIM TEASER FINANCIAL LEGAL TAX OTHER"
         string fileUrl
         int fileSize
-        jsonb aiAnalysis
-        text extractedText
-        string_arr tags
+        string mimeType
+        jsonb extractedData
+        float confidence
         uuid uploadedBy FK
+        jsonb aiAnalysis
+        timestamp aiAnalyzedAt
+        string_arr tags
+        boolean isHighlighted
+        text extractedText
+        string status
+        string embeddingStatus "pending processing completed failed"
+        int chunkCount
+        timestamp embeddedAt
         timestamp createdAt
     }
 
@@ -93,8 +159,11 @@ erDiagram
         uuid dealId FK
         uuid parentId FK
         string name
+        text description
+        int fileCount
         boolean isRestricted
         int sortOrder
+        uuid createdBy FK
         timestamp createdAt
     }
 
@@ -103,21 +172,27 @@ erDiagram
         uuid folderId FK
         text summary
         int completionPercent
-        string_arr redFlags
-        string_arr missingDocuments
-        timestamp createdAt
+        jsonb redFlags
+        jsonb missingDocuments
+        timestamp generatedAt
     }
 
     FINANCIAL_STATEMENT {
         uuid id PK
         uuid dealId FK
         uuid documentId FK
-        string statementType "INCOME BALANCE CASH_FLOW"
+        string statementType "INCOME_STATEMENT BALANCE_SHEET CASH_FLOW"
         string period
+        string periodType "HISTORICAL PROJECTED LTM"
         jsonb lineItems
+        string currency
+        string unitScale "MILLIONS THOUSANDS ACTUALS"
+        int extractionConfidence "0-100"
         string extractionSource "gpt4o azure vision manual"
-        float extractionConfidence
-        boolean isActive
+        timestamp extractedAt
+        timestamp reviewedAt
+        uuid reviewedBy FK
+        boolean isActive "partial unique idx"
         string mergeStatus "auto needs_review user_resolved"
         timestamp createdAt
     }
@@ -126,9 +201,30 @@ erDiagram
         uuid id PK
         uuid documentId FK
         uuid dealId FK
-        text content
-        jsonb embedding
         int chunkIndex
+        text content
+        vector embedding "pgvector"
+        int tokenCount
+        jsonb metadata
+        timestamp createdAt
+    }
+
+    CONVERSATION {
+        uuid id PK
+        uuid dealId FK
+        uuid userId FK
+        string title
+        timestamp createdAt
+    }
+
+    CHAT_MESSAGE {
+        uuid id PK
+        uuid dealId FK
+        string userId
+        string role "user assistant system"
+        text content
+        jsonb metadata
+        timestamp createdAt
     }
 
     MEMO {
@@ -136,27 +232,80 @@ erDiagram
         uuid dealId FK
         uuid organizationId FK
         string title
-        string type "IC_MEMO TEASER SUMMARY"
+        string projectName
+        string type "IC_MEMO TEASER SUMMARY CUSTOM"
         string status "DRAFT REVIEW FINAL ARCHIVED"
+        string sponsor
+        date memoDate
+        int version
         uuid createdBy FK
+        uuid lastEditedBy FK
+        uuid_arr collaborators
+        boolean complianceChecked
+        text complianceNotes
+        jsonb metadata
         timestamp createdAt
     }
 
     MEMO_SECTION {
         uuid id PK
         uuid memoId FK
-        string type "12 section types"
+        string type "17 section types"
+        string title
         text content
         boolean aiGenerated
+        string aiModel
+        text aiPrompt
         int sortOrder
+        jsonb citations
+        jsonb tableData
+        jsonb chartConfig
+        string status "DRAFT APPROVED NEEDS_REVIEW"
+        timestamp createdAt
+    }
+
+    MEMO_CONVERSATION {
+        uuid id PK
+        uuid memoId FK
+        uuid userId FK
+        string title
+        timestamp createdAt
+    }
+
+    MEMO_CHAT_MESSAGE {
+        uuid id PK
+        uuid conversationId FK
+        string role "user assistant system"
+        text content
+        jsonb metadata
+        timestamp createdAt
     }
 
     MEMO_TEMPLATE {
         uuid id PK
         uuid organizationId FK
         string name
-        string type
-        jsonb sections
+        text description
+        string category
+        boolean isGoldStandard
+        boolean isLegacy
+        boolean isActive
+        int usageCount
+        string permissions "FIRM_WIDE etc"
+        uuid createdBy FK
+        timestamp createdAt
+    }
+
+    MEMO_TEMPLATE_SECTION {
+        uuid id PK
+        uuid templateId FK
+        string title
+        text description
+        boolean aiEnabled
+        text aiPrompt
+        boolean mandatory
+        boolean requiresApproval
+        int sortOrder
         timestamp createdAt
     }
 
@@ -164,19 +313,13 @@ erDiagram
         uuid id PK
         uuid dealId FK
         uuid userId FK
-        string type "DOCUMENT_UPLOADED STAGE_CHANGED etc"
+        string type "NOTE_ADDED CALL_LOGGED MEETING_LOGGED EMAIL_LOGGED STAGE_CHANGED DOCUMENT_UPLOADED DEAL_IMPORTED etc"
         string title
         text description
-        timestamp createdAt
-    }
-
-    CHAT_MESSAGE {
-        uuid id PK
-        uuid dealId FK
-        uuid userId FK
-        string role "user assistant system"
-        text content
         jsonb metadata
+        timestamp scheduledAt
+        timestamp completedAt
+        string_arr participants
         timestamp createdAt
     }
 
@@ -187,6 +330,8 @@ erDiagram
         string type
         string title
         text message
+        uuid dealId FK
+        uuid documentId FK
         boolean isRead
         timestamp createdAt
     }
@@ -195,19 +340,23 @@ erDiagram
         uuid id PK
         uuid organizationId FK
         string email
-        string role
-        string token UK
-        string status "PENDING ACCEPTED EXPIRED REVOKED"
+        string firmName
+        string role "ADMIN MEMBER VIEWER"
         uuid invitedBy FK
+        string status "PENDING ACCEPTED EXPIRED REVOKED"
+        string token UK
+        timestamp expiresAt
+        timestamp acceptedAt
         timestamp createdAt
     }
 
     DEAL_TEAM_MEMBER {
+        uuid id PK
         uuid dealId FK
         uuid userId FK
+        string role "MEMBER default"
         string accessLevel "view edit admin"
-        uuid addedBy FK
-        timestamp createdAt
+        timestamp addedAt
     }
 
     TASK {
@@ -215,10 +364,13 @@ erDiagram
         uuid dealId FK
         uuid organizationId FK
         uuid assignedTo FK
+        uuid createdBy FK
         string title
         text description
-        string status
-        date dueDate
+        string status "PENDING IN_PROGRESS COMPLETED STUCK"
+        string priority "LOW MEDIUM HIGH URGENT"
+        timestamp dueDate
+        string firmName
         timestamp createdAt
     }
 
@@ -227,40 +379,28 @@ erDiagram
         uuid userId FK
         uuid organizationId FK
         string action
-        string resourceType
-        uuid resourceId
+        string entityType
+        uuid entityId
+        string entityName
+        text description
+        jsonb changes
+        jsonb metadata
         string severity "INFO WARNING ERROR CRITICAL"
         string ipAddress
-        jsonb metadata
+        string userAgent
+        string userEmail
+        string userRole
+        string requestId
         timestamp createdAt
     }
 
-    AGENT_MEMORY_INDUSTRY {
+    WATCHLIST {
         uuid id PK
         uuid organizationId FK
+        string companyName
         string industry
-        string metric
-        float typicalLow
-        float typicalMid
-        float typicalHigh
-        int sampleSize
-    }
-
-    AGENT_MEMORY_EXTRACTION {
-        uuid id PK
-        uuid organizationId FK
-        string documentPattern
-        string fileType
-        string bestExtractionSource
-        float avgConfidence
-    }
-
-    NARRATIVE_INSIGHT_CACHE {
-        uuid id PK
-        uuid dealId FK
-        uuid organizationId FK
-        string analysisHash
-        jsonb insights
+        text notes
+        uuid addedBy FK
         timestamp createdAt
     }
 
@@ -268,39 +408,49 @@ erDiagram
     ORGANIZATION ||--o{ DEAL : "owns"
     ORGANIZATION ||--o{ COMPANY : "tracks"
     ORGANIZATION ||--o{ CONTACT : "manages"
+    ORGANIZATION ||--o{ MEMO : "owns"
     ORGANIZATION ||--o{ MEMO_TEMPLATE : "shares"
     ORGANIZATION ||--o{ INVITATION : "sends"
     ORGANIZATION ||--o{ AUDIT_LOG : "logs"
     ORGANIZATION ||--o{ NOTIFICATION : "notifies"
     ORGANIZATION ||--o{ TASK : "assigns"
-    ORGANIZATION ||--o{ AGENT_MEMORY_INDUSTRY : "learns"
-    ORGANIZATION ||--o{ AGENT_MEMORY_EXTRACTION : "learns"
+    ORGANIZATION ||--o{ WATCHLIST : "watches"
 
-    COMPANY ||--o{ DEAL : "has"
+    COMPANY ||--o{ DEAL : "is target of"
     DEAL ||--o{ DOCUMENT : "contains"
     DEAL ||--o{ FOLDER : "has"
     DEAL ||--o{ ACTIVITY : "logs"
     DEAL ||--o{ FINANCIAL_STATEMENT : "extracted"
     DEAL ||--o{ CHAT_MESSAGE : "discussed"
+    DEAL ||--o{ CONVERSATION : "scoped to"
     DEAL ||--o{ DEAL_TEAM_MEMBER : "assigned"
     DEAL ||--o{ DOCUMENT_CHUNK : "indexed"
     DEAL ||--o{ MEMO : "reports"
-    DEAL ||--o{ NARRATIVE_INSIGHT_CACHE : "caches"
+    DEAL ||--o{ NOTIFICATION : "alerts on"
+    DEAL ||--o{ TASK : "tracks"
 
     USER ||--o{ ACTIVITY : "performs"
-    USER ||--o{ CHAT_MESSAGE : "sends"
     USER ||--o{ NOTIFICATION : "receives"
     USER ||--o{ DEAL_TEAM_MEMBER : "member of"
     USER ||--o{ MEMO : "creates"
+    USER ||--o{ CONVERSATION : "owns"
+    USER ||--o{ MEMO_CONVERSATION : "owns"
+    USER ||--o{ INVITATION : "sends"
+    USER ||--o{ TASK : "assigned to"
 
     DOCUMENT ||--o{ DOCUMENT_CHUNK : "chunked into"
     DOCUMENT ||--o{ FINANCIAL_STATEMENT : "extracted from"
+    DOCUMENT ||--o{ NOTIFICATION : "alerts on"
     FOLDER ||--o{ DOCUMENT : "contains"
     FOLDER ||--o{ FOLDER : "has subfolders"
-    FOLDER ||--o{ FOLDER_INSIGHT : "analyzed"
+    FOLDER ||--o{ FOLDER_INSIGHT : "analyzed by"
 
     MEMO ||--o{ MEMO_SECTION : "has"
+    MEMO ||--o{ MEMO_CONVERSATION : "discussed in"
+    MEMO_CONVERSATION ||--o{ MEMO_CHAT_MESSAGE : "contains"
+    MEMO_TEMPLATE ||--o{ MEMO_TEMPLATE_SECTION : "defines"
 
     CONTACT ||--o{ CONTACT_INTERACTION : "has"
     CONTACT ||--o{ CONTACT_DEAL : "linked to"
     DEAL ||--o{ CONTACT_DEAL : "linked to"
+    CONTACT ||--o{ CONTACT_RELATIONSHIP : "knows"

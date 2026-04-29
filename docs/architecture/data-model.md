@@ -1,8 +1,8 @@
 # Data Model
 
-> Reference for the Supabase Postgres schema. The canonical ER diagram is [`docs/diagrams/07-er-diagram.mmd`](../diagrams/07-er-diagram.mmd).
+> Reference for the Supabase Postgres schema. The canonical ER diagram is [`docs/diagrams/07-er-diagram.mmd`](../diagrams/07-er-diagram.mmd). Last cross-checked against the live database schema on 2026-04-29.
 
-All tables use UUID primary keys and `createdAt`/`updatedAt` timestamps. Money values are stored in **millions USD** unless noted.
+All tables use UUID primary keys. Money values are stored according to `unitScale` (defaults to **MILLIONS** for financial statements).
 
 ## Tenancy
 
@@ -13,8 +13,8 @@ Every row is owned by an [`Organization`](#organization). Two scoping patterns:
 
 | Pattern | Tables |
 | --- | --- |
-| Direct (10) | `User`, `Deal`, `Company`, `Contact`, `Task`, `Memo`, `MemoTemplate`, `Invitation`, `AuditLog`, `Notification` |
-| Indirect via Deal (10) | `Document`, `Folder`, `FolderInsight`, `Activity`, `FinancialStatement`, `DocumentChunk`, `DealTeamMember`, `ChatMessage`, `NarrativeInsightCache`, `AgentMemory*` |
+| Direct (12) | `User`, `Deal`, `Company`, `Contact`, `Task`, `Memo`, `MemoTemplate`, `Invitation`, `AuditLog`, `Notification`, `Watchlist` |
+| Indirect via Deal | `Document`, `Folder`, `FolderInsight`, `Activity`, `FinancialStatement`, `DocumentChunk`, `DealTeamMember`, `ChatMessage`, `Conversation`, `MemoSection`, `MemoConversation`, `MemoChatMessage`, `MemoTemplateSection`, `ContactDeal`, `ContactInteraction`, `ContactRelationship` |
 
 ## Core entities
 
@@ -25,144 +25,242 @@ The tenant root.
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | uuid PK | |
-| `name` | string | Firm name |
-| `slug` | string unique | URL-safe |
-| `logo`, `industry` | string | |
-| `plan`, `maxUsers` | string, int | Billing tier |
-| `isActive` | boolean | Disable to lock out org |
+| `name` | text | Firm name |
+| `slug` | text unique | URL-safe |
+| `logo`, `industry`, `website` | text | |
 | `settings` | jsonb | Includes `firmProfile` (Firm Research Agent output) |
+| `plan`, `maxUsers` | text, int | Billing tier — default `FREE` / 10 |
+| `isActive` | boolean | Disable to lock out org |
+| `createdBy` | uuid | |
 
 ### User
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | uuid PK | Internal user id |
-| `authId` | string unique | **Supabase Auth UUID** — different from `id`. Always resolve via `authId` when matching session. |
-| `email` | string unique | |
-| `name`, `title` | string | |
-| `role` | enum | `ADMIN`, `MEMBER`, `VIEWER`, `OPS` |
+| `authId` | uuid unique | **Supabase Auth UUID** — different from `id`. Always resolve via `authId` when matching session. |
+| `email` | text unique | |
+| `name`, `avatar`, `title`, `phone`, `department`, `firmName` | text | |
+| `role` | text | Default `MEMBER`. Common values: `ADMIN`, `MEMBER`, `VIEWER`, `OPS`. (No DB CHECK — set by app.) |
 | `organizationId` | uuid FK | |
+| `isActive` | boolean | |
+| `lastLoginAt` | timestamptz | |
 | `preferences` | jsonb | UI prefs |
-| `onboardingStatus` | jsonb | 5-step onboarding progress + `personProfile` from firm research |
+| `onboardingStatus` | jsonb | Default `{ steps: { createDeal: false, tryDealChat: false, uploadDocument: false, inviteTeamMember: false, reviewExtraction: false }, welcomeShown: false, checklistDismissed: false }` |
 
 > **Gotcha**: the frontend sees `session.user.id` (Supabase Auth UUID), but the API's `User` table has its own `id`. Match via `authId` to bridge them.
 
 ### Deal
 
-The unit of work in PE OS. Owns documents, financials, activities, chats, memos.
+The unit of work. Owns documents, financials, activities, chats, memos.
 
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | uuid PK | |
-| `companyId` | uuid FK | The target company |
+| `name`, `description` | text | |
+| `companyId` | uuid FK | Target company (required) |
 | `organizationId` | uuid FK | Tenant |
-| `name` | string | |
-| `stage` | enum | `INITIAL_REVIEW` → `DUE_DILIGENCE` → `IOI_SUBMITTED` → `LOI_NEGOTIATION` → `CLOSING` → `CLOSED_WON`. Terminals: `CLOSED_LOST`, `PASSED` |
-| `status` | enum | `ACTIVE`, `CLOSED_WON`, `CLOSED_LOST`, `PASSED` |
-| `priority` | enum | `LOW`, `MEDIUM`, `HIGH`, `URGENT` |
-| `dealSize`, `revenue`, `ebitda`, `grossMargin`, `irrProjected`, `mom` | float | All in millions USD |
-| `currency`, `industry`, `description`, `source`, `leadPartner`, `analyst`, `targetCloseDate` | string | |
+| `stage` | text | Default `INITIAL_REVIEW`. Values: `INITIAL_REVIEW` → `DUE_DILIGENCE` → `IOI_SUBMITTED` → `LOI_NEGOTIATION` → `CLOSING` → `CLOSED_WON`. Terminals: `CLOSED_LOST`, `PASSED`. (No DB CHECK — app-enforced.) |
+| `status` | text | Default `ACTIVE`. Values: `ACTIVE`, `CLOSED_WON`, `CLOSED_LOST`, `PASSED` |
+| `priority` | text | Default `MEDIUM`. Values: `LOW`, `MEDIUM`, `HIGH`, `URGENT` |
+| `dealSize`, `revenue`, `ebitda`, `irrProjected`, `mom` | float | Numeric values (in millions per app convention) |
+| `currency` | text | Default `USD` |
+| `industry`, `source`, `icon` | text | |
+| `assignedTo` | uuid FK → User | Lead |
+| `targetCloseDate`, `actualCloseDate` | date | |
+| `tags` | text[] | |
+| `aiThesis` | text | LLM-generated thesis |
+| `aiRisks` | jsonb | Risk extraction |
+| `extractionConfidence`, `needsReview`, `reviewReasons` | int, boolean, jsonb | Set by ingest agent |
+| `aiCacheUpdatedAt` | timestamptz | |
+| `lastDocument`, `lastDocumentUpdated` | text, timestamptz | Cached for list views |
 | `customFields` | jsonb | Bag for unmapped Deal-Import columns |
 
 ### Company
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `organizationId` | uuid FK | |
-| `name`, `industry`, `website`, `description` | string | |
+| Column | Notes |
+| --- | --- |
+| `name`, `industry`, `description`, `website`, `logo` | core fields |
+| `headquarters`, `foundedYear`, `employeeCount`, `annualRevenue`, `linkedinUrl` | enrichment |
+| `organizationId` | uuid FK |
 
-Companies are auto-created when Deal Import sees a new `companyName` (case-insensitive lookup, deduped per-batch).
+Auto-created when Deal Import sees a new `companyName` (case-insensitive lookup, deduped per-batch).
 
-### Contact / ContactInteraction / ContactDeal
+### Contact / ContactInteraction / ContactDeal / ContactRelationship
 
-`Contact` is the CRM record (banker, advisor, exec, LP, legal). Interactions and Deal links are stored separately so a contact can map to many deals and accumulate history.
+`Contact` (org-scoped) — `firstName`, `lastName`, `email`, `phone`, `title`, `company`, `linkedinUrl`, `notes`, `tags`, `lastContactedAt`.
 
-Type enum: `BANKER`, `ADVISOR`, `EXECUTIVE`, `LP`, `LEGAL`.
+`Contact.type` CHECK ∈ `{BANKER, ADVISOR, EXECUTIVE, LP, LEGAL, OTHER}`.
 
-Relationship score (0–100) is computed on the fly from recency (40), frequency (40), deals (20). Cached in the frontend `contactScores` object.
+`ContactInteraction.type` CHECK ∈ `{NOTE, MEETING, CALL, EMAIL, OTHER}` — title, description, date.
+
+`ContactDeal.role` CHECK ∈ `{BANKER, ADVISOR, BOARD_MEMBER, MANAGEMENT, OTHER}` — pivots a contact onto a deal.
+
+`ContactRelationship.type` CHECK ∈ `{KNOWS, REFERRED_BY, REPORTS_TO, COLLEAGUE, INTRODUCED_BY}` — contact↔contact graph (powers the network view).
+
+Relationship score (0–100) is computed in `routes/contacts-insights.ts` from recency (40), frequency (40), deals (20). Cached client-side.
 
 ### Document
 
-| Column | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid PK | |
-| `dealId` | uuid FK | Required — orphan documents vanish from VDR |
-| `folderId` | uuid FK | Auto-assigned in `documents-upload.ts` if missing |
-| `name`, `fileUrl`, `fileSize` | string, int | |
-| `type` | enum | `CIM`, `TEASER`, `FINANCIAL`, `LEGAL`, `TAX`, `OTHER` |
-| `tags` | string[] | |
-| `aiAnalysis` | jsonb | Cached AI insights |
-| `extractedText` | text | Full-text search source |
-| `uploadedBy` | uuid FK → User | |
+| Column | Notes |
+| --- | --- |
+| `dealId` | uuid FK — required (orphan documents vanish from VDR) |
+| `folderId` | uuid FK — auto-assigned in `documents-upload.ts` if missing |
+| `name`, `fileUrl`, `fileSize`, `mimeType` | core |
+| `type` | text — default `OTHER` (no DB CHECK; app values: `CIM`, `TEASER`, `FINANCIAL`, `LEGAL`, `TAX`, `OTHER`) |
+| `extractedData`, `extractedText`, `confidence` | jsonb, text, float |
+| `aiAnalysis`, `aiAnalyzedAt` | jsonb, timestamptz |
+| `tags`, `isHighlighted`, `status` | text[], boolean, text (default `pending`) |
+| `embeddingStatus` | CHECK ∈ `{pending, processing, completed, failed}` — vector indexing state |
+| `chunkCount`, `embeddedAt` | int, timestamptz |
+| `uploadedBy` | uuid FK → User |
 
 ### Folder / FolderInsight
 
-`Folder` is a self-referential tree (`parentId`). `isRestricted` toggles RBAC gating. `sortOrder` controls UI position.
+`Folder` is a self-referential tree (`parentId`). `isRestricted` toggles RBAC gating. `sortOrder` controls UI position. `fileCount` is denormalised for list views.
 
-`FolderInsight` is generated by `services/folderInsightsGenerator.ts` and includes:
+`FolderInsight` is generated by `services/folderInsightsGenerator.ts`:
 
 - `summary` — text overview
 - `completionPercent`
-- `redFlags` — string[]
-- `missingDocuments` — string[]
+- `redFlags` — jsonb array
+- `missingDocuments` — jsonb array
 
 ### FinancialStatement
 
-The output of the Financial Agent. **Constraints worth memorising:**
-
-- `extractionSource` ∈ `{'gpt4o', 'azure', 'vision', 'manual'}` (DB CHECK).
-- `statementType` ∈ `{'INCOME_STATEMENT', 'BALANCE_SHEET', 'CASH_FLOW'}` (DB CHECK).
-- `UNIQUE (dealId, statementType, period, documentId)` — multi-doc allowed.
-- **Partial unique index** `WHERE isActive = true` enforces one active row per `(dealId, statementType, period)` — duplicates are physically impossible at the DB level.
-- `mergeStatus` ∈ `{'auto', 'needs_review', 'user_resolved'}` for multi-document merge logic.
+The output of the Financial Agent.
 
 | Column | Notes |
 | --- | --- |
-| `lineItems` | jsonb — every revenue / cost / EBITDA / cash-flow line, in millions USD |
-| `extractionConfidence` | 0–1 confidence from the agent |
-| `isActive` | one true per period |
+| `dealId`, `documentId` | FKs |
+| `statementType` | CHECK ∈ `{INCOME_STATEMENT, BALANCE_SHEET, CASH_FLOW}` |
+| `period` | text — e.g. `2023`, `Q1 2024`, `LTM Mar 2024` |
+| `periodType` | CHECK ∈ `{HISTORICAL, PROJECTED, LTM}` |
+| `lineItems` | jsonb — every revenue/cost/EBITDA/cash-flow line |
+| `currency` | text — default `USD` |
+| `unitScale` | CHECK ∈ `{MILLIONS, THOUSANDS, ACTUALS}` — default `MILLIONS` |
+| `extractionConfidence` | int 0–100 (CHECK enforced) |
+| `extractionSource` | CHECK ∈ `{gpt4o, azure, vision, manual}` |
+| `extractedAt`, `reviewedAt`, `reviewedBy` | audit trail |
+| `isActive` | boolean — partial unique index `WHERE isActive = true` enforces one active row per `(dealId, statementType, period)` |
+| `mergeStatus` | CHECK ∈ `{auto, needs_review, user_resolved}` |
+
+Every CHECK above is at the DB level — application bugs can't bypass them.
 
 ### DocumentChunk
 
-Vector chunks of `extractedText` (jsonb embeddings). Powers full-text search inside the deal chat agent's `search_documents` tool.
+Vector chunks of `extractedText`. Powers full-text search inside the deal chat agent's `search_documents` tool.
 
-### Memo / MemoSection / MemoTemplate
+| Column | Notes |
+| --- | --- |
+| `documentId`, `dealId` | FKs |
+| `chunkIndex`, `tokenCount` | int |
+| `content` | text |
+| `embedding` | **pgvector** column (USER-DEFINED type) |
+| `metadata` | jsonb |
 
-`Memo` is the IC (investment committee) memo. `type` ∈ `{IC_MEMO, TEASER, SUMMARY}`. `status` ∈ `{DRAFT, REVIEW, FINAL, ARCHIVED}`.
+### Conversation / ChatMessage
 
-`MemoSection.type` covers 12 section types (Executive Summary, Investment Thesis, Market Analysis, Financial Performance, Risks, etc.). `aiGenerated` flags AI-authored content. `sortOrder` controls position.
+Per-deal chat history.
 
-`MemoTemplate` is org-shared and stores `sections` JSONB so each org can customise their memo skeleton.
+`Conversation` — title and ownership for a chat thread on a deal (`dealId`, `userId`, `title`).
+
+`ChatMessage` — `dealId`, `userId` (text), `role` CHECK ∈ `{user, assistant, system}`, `content`, `metadata` jsonb. Used by Deal Chat agent.
+
+### Memo / MemoSection / MemoConversation / MemoChatMessage / MemoTemplate / MemoTemplateSection
+
+`Memo` — `dealId`, `organizationId`, `title`, `projectName`, `sponsor`, `memoDate`, `version`, `createdBy`, `lastEditedBy`, `collaborators uuid[]`, `complianceChecked`, `complianceNotes`, `metadata`.
+
+- `type` CHECK ∈ `{IC_MEMO, TEASER, SUMMARY, CUSTOM}`.
+- `status` CHECK ∈ `{DRAFT, REVIEW, FINAL, ARCHIVED}`.
+
+`MemoSection.type` CHECK ∈ **17** values: `EXECUTIVE_SUMMARY`, `COMPANY_OVERVIEW`, `FINANCIAL_PERFORMANCE`, `QUALITY_OF_EARNINGS`, `MARKET_DYNAMICS`, `COMPETITIVE_LANDSCAPE`, `MANAGEMENT_ASSESSMENT`, `OPERATIONAL_DEEP_DIVE`, `RISK_ASSESSMENT`, `DEAL_STRUCTURE`, `VALUE_CREATION`, `VALUE_CREATION_PLAN`, `EXIT_STRATEGY`, `EXIT_ANALYSIS`, `RECOMMENDATION`, `APPENDIX`, `CUSTOM`. Section status CHECK ∈ `{DRAFT, APPROVED, NEEDS_REVIEW}`. Carries `aiGenerated`, `aiModel`, `aiPrompt`, `citations` jsonb, `tableData` jsonb, `chartConfig` jsonb.
+
+`MemoConversation` — chat thread scoped to a memo (`memoId`, `userId`, `title`).
+
+`MemoChatMessage` — messages inside a `MemoConversation`. Role CHECK ∈ `{user, assistant, system}`.
+
+`MemoTemplate` — `name`, `description`, `category` (default `INVESTMENT_MEMO`), `isGoldStandard`, `isLegacy`, `isActive`, `usageCount`, `permissions` (default `FIRM_WIDE`), `createdBy`, `organizationId`.
+
+`MemoTemplateSection` — `templateId`, `title`, `description`, `aiEnabled`, `aiPrompt`, `mandatory`, `requiresApproval`, `sortOrder`.
 
 ### Activity
 
-Timeline events on a deal. `type` covers `DOCUMENT_UPLOADED`, `STAGE_CHANGED`, `NOTE_ADDED`, `MEETING_LOGGED`, `CALL_LOGGED`, `EMAIL_LOGGED`, `DEAL_IMPORTED`, etc. Powers the deal-detail timeline and fed into the deal chat agent's `get_deal_activity` tool.
+Timeline events on a deal.
 
-### ChatMessage
-
-Per-deal conversation log for the Deal Chat agent. Roles: `user`, `assistant`, `system`. `metadata` stores tool calls, agent telemetry, and side-effect results.
-
-### Notification / Invitation / Task / AuditLog
-
-| Table | Purpose |
+| Column | Notes |
 | --- | --- |
-| `Notification` | Per-user notifications (mark-all-read endpoint) |
-| `Invitation` | Pending invites with `token`, `status` ∈ `{PENDING, ACCEPTED, EXPIRED, REVOKED}` |
-| `Task` | Assignable to-dos, may attach to a deal |
-| `AuditLog` | Append-only security/operations log; severity `INFO`/`WARNING`/`ERROR`/`CRITICAL` |
+| `dealId`, `userId` | FKs |
+| `type` | text — values include `NOTE_ADDED`, `CALL_LOGGED`, `MEETING_LOGGED`, `EMAIL_LOGGED`, `STAGE_CHANGED`, `DOCUMENT_UPLOADED`, `DOCUMENT_REQUESTED`, `DEAL_IMPORTED`, `DEAL_CREATED`, `MEMO_CREATED`, `EXTRACTION_TRIGGERED` (no DB CHECK) |
+| `title`, `description`, `metadata` | text, text, jsonb |
+| `scheduledAt`, `completedAt` | timestamptz — for upcoming/logged calls/meetings |
+| `participants` | text[] |
+
+### Notification
+
+Per-user in-app alerts.
+
+| Column | Notes |
+| --- | --- |
+| `userId`, `organizationId` | FKs |
+| `type`, `title`, `message` | core |
+| `dealId`, `documentId` | optional FKs for context |
+| `isRead` | boolean |
+
+### Invitation
+
+| Column | Notes |
+| --- | --- |
+| `email`, `firmName` | text |
+| `role` | CHECK ∈ `{ADMIN, MEMBER, VIEWER}` (no `OPS` here) |
+| `invitedBy`, `organizationId` | FKs |
+| `status` | CHECK ∈ `{PENDING, ACCEPTED, EXPIRED, REVOKED}` |
+| `token` | unique |
+| `expiresAt`, `acceptedAt` | timestamptz |
 
 ### DealTeamMember
 
-Many-to-many `Deal ↔ User` with `accessLevel` ∈ `{view, edit, admin}` for per-deal permissions on top of org role.
+Many-to-many `Deal ↔ User`.
 
-### Agent memory
-
-| Table | Purpose |
+| Column | Notes |
 | --- | --- |
-| `AgentMemoryIndustry` | Per-org per-industry typical metric ranges (low/mid/high). Learned over time. |
-| `AgentMemoryExtraction` | Per-org pattern of which extraction source works best for which document signature |
-| `NarrativeInsightCache` | Memoised narrative insights keyed by `dealId` + `analysisHash` |
+| `dealId`, `userId` | FKs |
+| `role` | text — default `MEMBER` (free-text) |
+| `accessLevel` | CHECK ∈ `{view, edit, admin}` — overlays the org role for sensitive deals |
+| `addedAt` | timestamptz |
+
+### Task
+
+| Column | Notes |
+| --- | --- |
+| `title`, `description` | text |
+| `status` | CHECK ∈ `{PENDING, IN_PROGRESS, COMPLETED, STUCK}` |
+| `priority` | CHECK ∈ `{LOW, MEDIUM, HIGH, URGENT}` |
+| `assignedTo`, `dealId`, `createdBy`, `organizationId` | FKs |
+| `dueDate`, `firmName` | timestamptz, text |
+
+### AuditLog
+
+Append-only security/operations log.
+
+| Column | Notes |
+| --- | --- |
+| `userId`, `organizationId` | FKs |
+| `action`, `entityType`, `entityId`, `entityName`, `description` | core |
+| `changes`, `metadata` | jsonb |
+| `severity` | text — default `INFO` (values used by app: `INFO`, `WARNING`, `ERROR`, `CRITICAL`) |
+| `ipAddress`, `userAgent`, `userEmail`, `userRole`, `requestId` | text |
+
+> Schema uses `entityType` / `entityId` (not `resourceType` / `resourceId`).
+
+### Watchlist
+
+Saved companies a firm wants to track without yet creating a deal.
+
+| Column | Notes |
+| --- | --- |
+| `companyName`, `industry`, `notes` | text |
+| `addedBy`, `organizationId` | FKs |
 
 ## Migrations
 
@@ -172,6 +270,8 @@ Migration files live in [`apps/api/`](../../apps/api/) (e.g. `organization-migra
 
 - **Auth UUID vs internal id.** Frontend session id ≠ `User.id`. Always join via `User.authId`.
 - **Mixed period scales.** Charts must call `filterConsistentPeriods()` to avoid mixing annual totals with quarterly data.
-- **Compound extractionSource.** The CHECK constraint will reject `gpt4o-excel`. Pick one of the four allowed values.
+- **`extractionSource` CHECK.** Will reject `'gpt4o-excel'` etc. Pick one of the four allowed values.
+- **`unitScale` matters.** Don't assume millions — if a row has `unitScale = THOUSANDS`, charts must rescale.
 - **`overflow-x-auto` clips dropdowns.** Not a data issue, but it bites every new engineer. Use `flex-wrap` instead.
 - **`organizationId` on every query.** Forgetting `.eq('organizationId', orgId)` (or `verifyDealAccess`) is a tenancy bug. The integration tests in `tests/org-isolation.test.ts` exist to catch it — run them before merging.
+- **Memo conversations are separate** from deal conversations. `MemoConversation`/`MemoChatMessage` are memo-scoped; `Conversation`/`ChatMessage` are deal-scoped. Don't conflate.
