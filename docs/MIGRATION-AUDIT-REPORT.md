@@ -254,7 +254,7 @@ There is no `.env.example` file in `apps/web-next/`. New developers (or you, six
 
 ## Section E — Action Plan
 
-### Phase 1 — Cleanup (Due: 2026-05-06, 5 business days)
+### Phase 1 — Cleanup 
 
 **Owner: Aditya Negi**
 
@@ -271,7 +271,7 @@ There is no `.env.example` file in `apps/web-next/`. New developers (or you, six
 
 **Phase 1 acceptance:** A single PR titled `chore(migration): complete Phase 1 cleanup` that addresses every checkbox above, with each commit linked to its checkbox.
 
-### Phase 2 — Code Quality (Due: 2026-05-13)
+### Phase 2 — Code Quality 
 
 **Owner: Aditya Negi**
 
