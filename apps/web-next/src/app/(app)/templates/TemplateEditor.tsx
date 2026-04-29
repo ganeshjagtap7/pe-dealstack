@@ -77,7 +77,8 @@ export function TemplateEditor({
     try {
       await api.patch(`/templates/${template.id}`, { isActive: newVal });
       onUpdate({ ...template, isActive: newVal });
-    } catch {
+    } catch (err) {
+      console.warn("[templates] failed to toggle active state:", err);
       setIsActive(!newVal);
       onToast("Failed to toggle active state", "error");
     }
@@ -95,7 +96,8 @@ export function TemplateEditor({
       const updated = await api.patch<Template>(`/templates/${template.id}`, updateData);
       onUpdate({ ...template, ...updated, sections });
       onToast("Template saved successfully", "success");
-    } catch {
+    } catch (err) {
+      console.warn("[templates] failed to save template:", err);
       onToast("Failed to save template", "error");
     } finally {
       setSaving(false);
@@ -114,7 +116,8 @@ export function TemplateEditor({
         onUpdate({ ...template, sections: newSections });
         onToast("Section added", "success");
         setShowAddSection(false);
-      } catch {
+      } catch (err) {
+        console.warn("[templates] failed to add section:", err);
         onToast("Failed to add section", "error");
       }
     },
@@ -129,7 +132,8 @@ export function TemplateEditor({
         setSections(newSections);
         onUpdate({ ...template, sections: newSections });
         onToast("Section updated", "success");
-      } catch {
+      } catch (err) {
+        console.warn("[templates] failed to update section:", err);
         onToast("Failed to update section", "error");
       }
     },
@@ -144,7 +148,8 @@ export function TemplateEditor({
         setSections(newSections);
         onUpdate({ ...template, sections: newSections });
         onToast("Section deleted", "success");
-      } catch {
+      } catch (err) {
+        console.warn("[templates] failed to delete section:", err);
         onToast("Failed to delete section", "error");
       }
     },
@@ -161,7 +166,8 @@ export function TemplateEditor({
           sections: updated.map((s, i) => ({ id: s.id, sortOrder: i })),
         });
         onToast("Sections reordered", "success");
-      } catch {
+      } catch (err) {
+        console.warn("[templates] failed to reorder sections:", err);
         onToast("Failed to reorder sections", "error");
       }
     },

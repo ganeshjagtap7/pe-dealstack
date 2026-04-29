@@ -9,6 +9,7 @@ import { cn } from "@/lib/cn";
 import { useAuth } from "@/providers/AuthProvider";
 import { useUser } from "@/providers/UserProvider";
 import { useToast } from "@/providers/ToastProvider";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import Link from "next/link";
 import { NotificationCenter } from "@/components/layout/NotificationPanel";
 import { HelpSupportModal } from "@/components/layout/Header";
@@ -88,6 +89,9 @@ export default function DealDetailPage() {
   // Manage team modal (header "+" / avatar stack)
   const [showTeamModal, setShowTeamModal] = useState(false);
 
+  // Delete-deal confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
   // Documents
   const [documents, setDocuments] = useState<DocItem[]>([]);
   const [uploading, setUploading] = useState(false);
@@ -144,8 +148,8 @@ export default function DealDetailPage() {
       } else {
         setActivities(data.data || data.activities || []);
       }
-    } catch {
-      // non-critical
+    } catch (err) {
+      console.warn("[deal] loadActivities failed:", err);
     } finally {
       setActivitiesLoading(false);
     }
@@ -157,8 +161,8 @@ export default function DealDetailPage() {
         `/deals/${dealId}/chat/history`
       );
       setMessages(Array.isArray(data) ? data : data.messages || []);
-    } catch {
-      // non-critical
+    } catch (err) {
+      console.warn("[deal] loadChatHistory failed:", err);
     }
   }, [dealId]);
 
@@ -259,8 +263,8 @@ export default function DealDetailPage() {
       });
       setDeal(updated);
       loadActivities();
-    } catch {
-      // non-critical
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update deal stage", "error");
     }
   };
 
@@ -268,18 +272,18 @@ export default function DealDetailPage() {
   // Delete deal
   // -----------------------------------------------------------------------
 
-  const handleDeleteDeal = async () => {
+  const handleDeleteDeal = () => {
     if (!deal) return;
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${deal.name}"?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`
-    );
-    if (!confirmed) return;
+    setShowDeleteConfirm(true);
+  };
 
+  const confirmDeleteDeal = async () => {
+    setShowDeleteConfirm(false);
     try {
       await api.delete(`/deals/${dealId}`);
       router.push("/deals");
-    } catch {
-      // non-critical
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to delete deal", "error");
     }
   };
 
@@ -308,8 +312,8 @@ export default function DealDetailPage() {
       const result = await res.json();
       const newDocs: DocItem[] = result.documents || result || [];
       setDocuments((prev) => [...prev, ...newDocs]);
-    } catch {
-      // ignore
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Document upload failed", "error");
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -379,7 +383,7 @@ export default function DealDetailPage() {
       // If there were deal-field updates, refresh the deal data
       if (data.updates && data.updates.length > 0) {
         showToast("Changes have been applied", "success", { title: "Deal Updated" });
-        try { await loadDeal(); } catch { /* ignore */ }
+        try { await loadDeal(); } catch (err) { console.warn("[deal] loadDeal after side-effect failed:", err); }
       }
 
       // Handle side effects (notes, extraction, scroll)
@@ -387,7 +391,7 @@ export default function DealDetailPage() {
         for (const effect of data.sideEffects) {
           if (effect.type === "note_added") {
             showToast("Activity feed updated", "success", { title: "Note Added" });
-            try { await loadDeal(); } catch { /* ignore */ }
+            try { await loadDeal(); } catch (err) { console.warn("[deal] loadDeal after side-effect failed:", err); }
           }
           if (effect.type === "extraction_triggered") {
             showToast(effect.message || "Financial extraction queued", "info", { title: "Extraction" });
@@ -439,10 +443,10 @@ export default function DealDetailPage() {
     try {
       await api.delete(`/deals/${dealId}/chat/history`);
       setMessages([]);
-    } catch {
-      // non-critical
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to clear chat history", "error");
     }
-  }, [dealId]);
+  }, [dealId, showToast]);
 
   // -----------------------------------------------------------------------
   // Render helpers
@@ -606,8 +610,10 @@ export default function DealDetailPage() {
                 await navigator.clipboard.writeText(window.location.origin + pathname);
                 setLinkCopied(true);
                 setTimeout(() => setLinkCopied(false), 2000);
-              } catch {
-                // Fallback for non-secure contexts
+              } catch (err) {
+                // clipboard API requires secure context — fall back to a toast hint
+                console.warn("[deal] clipboard write failed:", err);
+                showToast("Could not copy link — check your browser permissions", "warning");
               }
             }}
             className="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors"
@@ -911,6 +917,17 @@ export default function DealDetailPage() {
 
       {/* Help & Support Modal (opened from user dropdown) */}
       <HelpSupportModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+
+      {/* Delete Deal confirmation */}
+      <ConfirmDialog
+        open={showDeleteConfirm}
+        title={`Delete "${deal?.name ?? "this deal"}"?`}
+        message={`This will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`}
+        confirmLabel="Delete Deal"
+        variant="danger"
+        onConfirm={confirmDeleteDeal}
+        onCancel={() => setShowDeleteConfirm(false)}
+      />
     </>
   );
 }

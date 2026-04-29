@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback } from "react";
 import { api } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/providers/ToastProvider";
 
 // ─── CSV parsing (matches legacy contacts-csv.js) ─────────
 
@@ -94,21 +95,25 @@ export function CSVImportModal({ onClose, onDone }: { onClose: () => void; onDon
   const [result, setResult] = useState<{ imported: number; failed: number; errors?: string[] } | null>(null);
   const [dragActive, setDragActive] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { showToast } = useToast();
 
   const handleFile = useCallback((file: File) => {
-    if (!file.name.endsWith(".csv")) { alert("Please select a CSV file."); return; }
+    if (!file.name.endsWith(".csv")) {
+      showToast("Please select a CSV file.", "error");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (e) => {
       const contacts = parseCSV(e.target?.result as string);
       if (contacts.length === 0) {
-        alert("No valid contacts found in CSV. Make sure it has First Name and Last Name columns.");
+        showToast("No valid contacts found in CSV. Make sure it has First Name and Last Name columns.", "error");
         return;
       }
       setParsedContacts(contacts);
       setStep("preview");
     };
     reader.readAsText(file);
-  }, []);
+  }, [showToast]);
 
   function resetModal() {
     setParsedContacts([]);
@@ -133,7 +138,8 @@ export function CSVImportModal({ onClose, onDone }: { onClose: () => void; onDon
       const data = await res.json();
       setResult({ imported: data.imported || 0, failed: data.failed || 0, errors: data.errors });
       setStep("result");
-    } catch {
+    } catch (err) {
+      console.warn("[contacts] CSV import failed:", err);
       setImportError("Import failed. Please try again.");
     } finally { setImporting(false); }
   }

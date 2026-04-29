@@ -355,7 +355,8 @@ export default function DataRoomDealPage({ params }: PageProps) {
       } else {
         showToast(`Unable to load document: ${file.name}`, "error");
       }
-    } catch {
+    } catch (err) {
+      console.warn("[vdr] handleFileClick failed:", err);
       showToast(`Error loading file: ${file.name}`, "error");
     }
   }, [showToast]);

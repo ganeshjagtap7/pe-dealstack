@@ -81,7 +81,8 @@ export function RecentActivityWidget() {
         if (cancelled) return;
         const logs = data?.logs || [];
         setGroups(logs.length === 0 ? [] : groupByDay(logs));
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/recent-activity] failed to load audit logs:", err);
         if (!cancelled) setError(true);
       }
     })();

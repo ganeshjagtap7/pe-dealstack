@@ -40,7 +40,8 @@ function parsePrefs(raw: UserProfile["preferences"]): {
   if (typeof raw === "string") {
     try {
       obj = JSON.parse(raw);
-    } catch {
+    } catch (err) {
+      console.warn("[settings] failed to parse preferences JSON:", err);
       obj = {};
     }
   } else if (raw && typeof raw === "object") {

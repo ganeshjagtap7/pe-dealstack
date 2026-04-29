@@ -89,7 +89,10 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
     try {
       const res = await api.get<DealOption[] | { deals: DealOption[] }>(`/deals?search=${encodeURIComponent(query)}&limit=10`);
       setDealOptions(Array.isArray(res) ? res.slice(0, 10) : (res?.deals ?? []));
-    } catch { setDealOptions([]); }
+    } catch (err) {
+      console.warn("[deal-intake] searchDeals failed:", err);
+      setDealOptions([]);
+    }
     finally { setLoadingDeals(false); }
   }, []);
 
@@ -168,7 +171,9 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
         },
       });
       setFollowUpQuestions(res.questions || []);
-    } catch { /* Non-blocking */ }
+    } catch (err) {
+      console.warn("[deal-intake] fetchFollowUpQuestions failed:", err);
+    }
     finally { setFollowUpLoading(false); }
   }, []);
 
@@ -282,7 +287,9 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       await api.patch(`/deals/${result.deal.id}`, {
         customFields: { aiFollowUp: { generatedAt: new Date().toISOString(), questions: followUpQuestions, answers: followUpAnswers } },
       });
-    } catch { /* Non-blocking */ }
+    } catch (err) {
+      console.warn("[deal-intake] save follow-up answers failed:", err);
+    }
     // Close modal (if any) before navigating so the overlay doesn't flash
     // briefly over the destination page.
     onClose?.();

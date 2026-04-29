@@ -395,7 +395,8 @@ export function FinancialStatusBadge({ dealId }: { dealId: string }) {
         if (confidences.length > 0) {
           setAvgConfidence(Math.round(confidences.reduce((a, b) => a + b, 0) / confidences.length));
         }
-      } catch {
+      } catch (err) {
+        console.warn("[deal-layout] financials status fetch failed:", err);
         if (!cancelled) setStatus("none");
       }
     })();

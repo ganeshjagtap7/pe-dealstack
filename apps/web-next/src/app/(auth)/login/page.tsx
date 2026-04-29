@@ -134,8 +134,8 @@ export default function LoginPage() {
   };
 
   const handleSso = () => {
-    // Placeholder — matches legacy behavior until real IdP wiring lands.
-    window.alert("SSO integration would be configured here.\n\nThis would typically redirect to your identity provider (Okta, Azure AD, etc.)");
+    // Placeholder — real IdP wiring (Okta, Azure AD, etc.) lands later.
+    // No user-facing message yet; the button click is a no-op until then.
   };
 
   return (

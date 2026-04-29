@@ -18,7 +18,8 @@ export async function createClient() {
               cookieStore.set(name, value, options)
             );
           } catch {
-            // setAll called from Server Component — ignore
+            // setAll called from a Server Component — read-only context, expected.
+            // Don't log: this fires on every server render and would spam the console.
           }
         },
       },

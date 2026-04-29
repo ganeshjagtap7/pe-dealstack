@@ -67,7 +67,8 @@ export function CalendarWidget() {
           events: evs,
         }));
         setGroups(grouped);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/calendar] failed to load tasks/deals:", err);
         if (!cancelled) setError(true);
       }
     })();

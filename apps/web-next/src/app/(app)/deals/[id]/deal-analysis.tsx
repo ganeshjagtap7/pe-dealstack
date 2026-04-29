@@ -82,7 +82,8 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
       if (benchmarkRes.status === "fulfilled") setBenchmark(benchmarkRes.value);
       if (insightsRes.status === "fulfilled") setInsights(insightsRes.value.insights);
       // Supplementary endpoint failures are non-fatal (graceful degradation)
-    } catch {
+    } catch (err) {
+      console.warn("[deal-analysis] loadData failed:", err);
       setError(true);
     } finally {
       setLoading(false);

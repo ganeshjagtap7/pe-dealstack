@@ -59,7 +59,8 @@ export function TeamPerformanceWidget() {
           return { id: m.id, name: m.name, email: m.email, dealCount, taskCount, capacity };
         });
         setRows(computed);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/team-performance] failed to load team data:", err);
         if (!cancelled) setError(true);
       }
     })();

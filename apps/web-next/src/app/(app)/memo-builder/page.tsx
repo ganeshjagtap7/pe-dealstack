@@ -178,8 +178,8 @@ function MemoBuilderPageInner() {
       ]);
       setDeals(dealRes.deals || []);
       setTemplates(Array.isArray(templateRes) ? templateRes : []);
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.warn("[memo-builder] failed to load deals/templates for create modal:", err);
     }
   }, []);
 
@@ -214,8 +214,9 @@ function MemoBuilderPageInner() {
           // No existing memo — open Create modal with the deal pre-selected.
           openCreateModal(urlDealId);
         }
-      } catch {
+      } catch (err) {
         // Best-effort: fall through to the default empty state.
+        console.warn("[memo-builder] dealId-prefill memo lookup failed:", err);
       }
     })();
     return () => { cancelled = true; };

@@ -203,7 +203,12 @@ export default function DashboardPage() {
         onDragStart={(e) => {
           if (!isEditing) return;
           e.dataTransfer.effectAllowed = "move";
-          try { e.dataTransfer.setData("text/plain", coreId); } catch { /* Firefox */ }
+          try {
+            e.dataTransfer.setData("text/plain", coreId);
+          } catch (err) {
+            // Firefox quirk — drag-and-drop still works without setData.
+            console.warn("[dashboard] dataTransfer.setData failed for core widget:", err);
+          }
           onCoreDragStart(coreId);
         }}
         onDragOver={(e) => {

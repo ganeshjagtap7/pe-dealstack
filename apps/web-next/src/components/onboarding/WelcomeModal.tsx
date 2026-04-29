@@ -46,9 +46,10 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
       // shuttling the user to /onboarding on every render.
       try {
         if (sessionStorage.getItem("pe_onboarding_seen") === "1") return;
-      } catch {
+      } catch (err) {
         // sessionStorage disabled (private mode, strict blockers) — fall
         // through to the API check below.
+        console.warn("[onboarding/WelcomeModal] sessionStorage read failed:", err);
       }
 
       try {
@@ -74,12 +75,14 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
         if (status.welcomeShown || status.checklistDismissed || hasAnyProgress) {
           try {
             sessionStorage.setItem("pe_onboarding_seen", "1");
-          } catch {
-            // ignore write failures
+          } catch (err) {
+            // sessionStorage disabled — non-critical.
+            console.warn("[onboarding/WelcomeModal] sessionStorage write failed:", err);
           }
         }
-      } catch {
-        // silently skip
+      } catch (err) {
+        // Best-effort onboarding status fetch.
+        console.warn("[onboarding/WelcomeModal] failed to load status:", err);
       }
     })();
     return () => {
@@ -93,8 +96,9 @@ export function WelcomeModal({ ctaHref = "/deals" }: { ctaHref?: string }) {
     // hit a race with the DB update and redirect to /onboarding.
     try {
       sessionStorage.setItem("pe_onboarding_seen", "1");
-    } catch {
-      // ignore
+    } catch (err) {
+      // sessionStorage disabled — non-critical.
+      console.warn("[onboarding/WelcomeModal] sessionStorage write failed:", err);
     }
   };
 

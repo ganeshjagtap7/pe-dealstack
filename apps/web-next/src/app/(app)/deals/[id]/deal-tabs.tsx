@@ -192,8 +192,8 @@ function AIMessageActions({ content }: { content: string }) {
             await navigator.clipboard.writeText(tmp.innerText);
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
-          } catch {
-            // ignore
+          } catch (err) {
+            console.warn("[deal-tabs] copy to clipboard failed:", err);
           }
         }}
         className={cn(
@@ -272,7 +272,8 @@ export function ChatTab({
       setAttachedFiles((prev) =>
         prev.map((f) => (f.name === file.name && f.status === "uploading" ? { ...f, status: "done" } : f))
       );
-    } catch {
+    } catch (err) {
+      console.warn("[deal-tabs] chat file attach failed:", err);
       setAttachedFiles((prev) =>
         prev.map((f) => (f.name === file.name && f.status === "uploading" ? { ...f, status: "error" } : f))
       );

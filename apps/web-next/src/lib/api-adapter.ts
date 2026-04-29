@@ -190,7 +190,7 @@ export async function proxyToExpress(
       try {
         streamController!.close();
       } catch {
-        // Already closed (e.g. from an upstream error path).
+        // Already closed (e.g. from an upstream error path) — expected, don't log.
       }
       (fakeRes as { finished?: boolean }).finished = true;
       (fakeRes as { writableEnded?: boolean }).writableEnded = true;
@@ -274,7 +274,7 @@ export async function proxyToExpress(
         try {
           streamController!.close();
         } catch {
-          // already closed
+          // Already closed — expected after an Express error path, don't log.
         }
       }
     });
@@ -294,7 +294,7 @@ export async function proxyToExpress(
       try {
         streamController!.close();
       } catch {
-        // already closed
+        // Already closed — expected, don't log.
       }
     }
   }

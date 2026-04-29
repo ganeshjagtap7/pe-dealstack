@@ -16,8 +16,9 @@ export function QuickNotesWidget() {
   useEffect(() => {
     try {
       setNote(localStorage.getItem(storageKey) ?? "");
-    } catch {
-      // localStorage disabled / quota error — silently ignore
+    } catch (err) {
+      // localStorage disabled / quota error — fallback to empty note.
+      console.warn("[dashboard/quick-notes] failed to read note from localStorage:", err);
     }
   }, [storageKey]);
 
@@ -25,7 +26,8 @@ export function QuickNotesWidget() {
     try {
       localStorage.setItem(storageKey, note);
       setStatus(`Saved · ${new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`);
-    } catch {
+    } catch (err) {
+      console.warn("[dashboard/quick-notes] failed to save note to localStorage:", err);
       setStatus("Could not save (storage unavailable)");
     }
   };

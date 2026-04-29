@@ -19,6 +19,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { api } from "@/lib/api";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import type { TeamMember } from "./components";
 
 type Role = "LEAD" | "MEMBER" | "VIEWER";
@@ -82,6 +83,7 @@ export function ManageTeamModal({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
+  const [pendingRemove, setPendingRemove] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch authoritative team + users once on open. We seed with `initialTeam`
   // shape just so the avatar list isn't empty during fetch, but the canonical
@@ -197,13 +199,19 @@ export function ManageTeamModal({
     }
   };
 
-  const handleRemove = async (memberId: string) => {
-    if (!window.confirm("Remove this team member?")) return;
+  const requestRemove = (memberId: string, memberName: string) => {
+    setPendingRemove({ id: memberId, name: memberName });
+  };
+
+  const confirmRemove = async () => {
+    const target = pendingRemove;
+    if (!target) return;
+    setPendingRemove(null);
     setError("");
     setInfo("");
     try {
-      await api.delete(`/deals/${dealId}/team/${memberId}`);
-      setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
+      await api.delete(`/deals/${dealId}/team/${target.id}`);
+      setTeamMembers((prev) => prev.filter((m) => m.id !== target.id));
       setInfo("Team member removed");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to remove team member");
@@ -289,7 +297,7 @@ export function ManageTeamModal({
                             <option value="VIEWER">Viewer</option>
                           </select>
                           <button
-                            onClick={() => handleRemove(member.id)}
+                            onClick={() => requestRemove(member.id, member.user?.name || "this team member")}
                             className="p-1 text-text-muted hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all"
                             title="Remove from team"
                           >
@@ -427,6 +435,16 @@ export function ManageTeamModal({
           </button>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={pendingRemove !== null}
+        title="Remove team member"
+        message={`Remove ${pendingRemove?.name ?? "this team member"} from the deal team?`}
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={confirmRemove}
+        onCancel={() => setPendingRemove(null)}
+      />
     </div>
   );
 }

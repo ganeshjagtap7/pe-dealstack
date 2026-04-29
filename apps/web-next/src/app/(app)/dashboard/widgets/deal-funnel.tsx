@@ -40,7 +40,8 @@ export function DealFunnelWidget() {
           return { label: stage.label, color: stage.color, count, pct };
         });
         setRows(computed);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/deal-funnel] failed to load deals:", err);
         if (!cancelled) setError(true);
       }
     })();

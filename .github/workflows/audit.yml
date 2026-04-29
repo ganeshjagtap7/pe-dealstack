@@ -1,0 +1,24 @@
+name: Dependency Audit
+
+on:
+  pull_request:
+    branches:
+      - main
+  schedule:
+    # Mondays at 09:00 UTC
+    - cron: '0 9 * * 1'
+
+jobs:
+  npm-audit:
+    name: npm audit (high+)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install --include=dev
+      - name: npm audit (fail only on high/critical)
+        run: npm audit --audit-level=high --workspaces --include-workspace-root

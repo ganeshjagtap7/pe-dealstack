@@ -42,8 +42,9 @@ export function NotificationCountProvider({ children }: { children: ReactNode })
         `/notifications?userId=${encodeURIComponent(userId)}&limit=1`,
       );
       setUnreadCount(data.unreadCount || 0);
-    } catch {
-      // swallow -- polling failures are not critical
+    } catch (err) {
+      // Polling failures are not critical — keep last known count.
+      console.warn("[NotificationCountProvider] poll failed:", err);
     }
   }, [userId]);
 

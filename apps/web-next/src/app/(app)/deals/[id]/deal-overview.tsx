@@ -140,9 +140,10 @@ async function fetchMentionUsers(): Promise<MentionUser[]> {
       });
       _mentionUsersCache = mapped;
       return mapped;
-    } catch {
+    } catch (err) {
       // Failed fetch — return empty list. Don't poison the cache so the
       // next attempt can retry.
+      console.warn("[deal-overview] fetchMentionUsers failed:", err);
       return [];
     } finally {
       _mentionUsersInflight = null;
@@ -256,7 +257,9 @@ function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: 
       });
       setNote("");
       onNoteAdded();
-    } catch { /* non-critical */ } finally {
+    } catch (err) {
+      console.warn("[deal-overview] submitNote failed:", err);
+    } finally {
       setSaving(false);
     }
   }, [dealId, note, onNoteAdded]);

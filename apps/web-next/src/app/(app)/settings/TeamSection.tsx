@@ -33,7 +33,8 @@ export function TeamSection() {
     try {
       const data = await api.get<Invitation[]>("/invitations");
       setInvites(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (err) {
+      console.warn("[settings/team] failed to load invitations:", err);
       setInvites([]);
     } finally {
       setLoading(false);
@@ -54,7 +55,8 @@ export function TeamSection() {
   const copyLink = async (inviteUrl: string, inviteId: string) => {
     try {
       await navigator.clipboard.writeText(inviteUrl);
-    } catch {
+    } catch (err) {
+      console.warn("[settings/team] clipboard.writeText failed, falling back to execCommand:", err);
       // Fallback
       const ta = document.createElement("textarea");
       ta.value = inviteUrl;
@@ -64,7 +66,9 @@ export function TeamSection() {
       ta.select();
       try {
         document.execCommand("copy");
-      } catch { /* ignore */ }
+      } catch (copyErr) {
+        console.warn("[settings/team] execCommand('copy') fallback failed:", copyErr);
+      }
       document.body.removeChild(ta);
     }
     setCopiedId(inviteId);

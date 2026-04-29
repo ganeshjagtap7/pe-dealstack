@@ -76,7 +76,8 @@ export function FirmProfileSection() {
       setOrgWebsite(orgSettings.firmWebsite || data?.organization?.website || "");
       setOrgLinkedin(orgSettings.firmLinkedin || "");
       setLoadError(false);
-    } catch {
+    } catch (err) {
+      console.warn("[settings/firm-profile] failed to load:", err);
       setFirmProfile(null);
       setLoadError(true);
     } finally {
@@ -120,7 +121,8 @@ export function FirmProfileSection() {
           text: result.error || "Refresh failed. Try again.",
         });
       }
-    } catch {
+    } catch (err) {
+      console.warn("[settings/firm-profile] enrich-firm failed:", err);
       setRefreshStatus({
         type: "error",
         text: "Refresh failed. Try again.",

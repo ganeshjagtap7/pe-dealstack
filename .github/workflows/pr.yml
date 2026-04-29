@@ -1,0 +1,81 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install --include=dev
+      - name: Typecheck api and web-next in parallel
+        run: |
+          (cd apps/api && npx tsc --noEmit) &
+          API_PID=$!
+          (cd apps/web-next && npx tsc --noEmit) &
+          WEB_PID=$!
+          wait $API_PID
+          API_STATUS=$?
+          wait $WEB_PID
+          WEB_STATUS=$?
+          if [ $API_STATUS -ne 0 ] || [ $WEB_STATUS -ne 0 ]; then
+            echo "typecheck failed: api=$API_STATUS web-next=$WEB_STATUS"
+            exit 1
+          fi
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install --include=dev
+      - name: Lint web-next
+        run: cd apps/web-next && npm run lint
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install --include=dev
+      - name: Build api then web-next (Vercel parity)
+        run: |
+          npm run build:api
+          cd apps/web-next && npm run build
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install --include=dev
+      - name: Run web-next tests (vitest tolerates zero tests)
+        run: cd apps/web-next && npm run test -- --passWithNoTests

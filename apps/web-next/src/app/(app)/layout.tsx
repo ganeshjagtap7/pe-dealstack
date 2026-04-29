@@ -4,7 +4,6 @@ import { usePathname } from "next/navigation";
 import { AuthProvider } from "@/providers/AuthProvider";
 import { UserProvider } from "@/providers/UserProvider";
 import { NotificationCountProvider } from "@/providers/NotificationCountProvider";
-import { PresenceProvider } from "@/providers/PresenceProvider";
 import { ToastProvider } from "@/providers/ToastProvider";
 import { IngestDealModalProvider } from "@/providers/IngestDealModalProvider";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -32,39 +31,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     <AuthProvider>
       <UserProvider>
         <NotificationCountProvider>
-          <PresenceProvider>
-            <ToastProvider>
-              <IngestDealModalProvider>
-                <div className="flex h-screen w-full overflow-hidden">
-                  <Sidebar />
-                  <main className="flex h-full flex-1 flex-col overflow-hidden bg-background-body min-w-0">
-                    <Header />
+          <ToastProvider>
+            <IngestDealModalProvider>
+              <div className="flex h-screen w-full overflow-hidden">
+                <Sidebar />
+                <main className="flex h-full flex-1 flex-col overflow-hidden bg-background-body min-w-0">
+                  <Header />
+                  <div
+                    className={
+                      fullBleed
+                        ? "flex-1 min-h-0 flex flex-col overflow-hidden"
+                        : "flex-1 overflow-y-auto custom-scrollbar"
+                    }
+                  >
                     <div
+                      key={pathname}
                       className={
                         fullBleed
-                          ? "flex-1 min-h-0 flex flex-col overflow-hidden"
-                          : "flex-1 overflow-y-auto custom-scrollbar"
+                          ? "page-fade-in flex-1 min-h-0 flex flex-col overflow-hidden"
+                          : "page-fade-in"
                       }
                     >
-                      <div
-                        key={pathname}
-                        className={
-                          fullBleed
-                            ? "page-fade-in flex-1 min-h-0 flex flex-col overflow-hidden"
-                            : "page-fade-in"
-                        }
-                      >
-                        {children}
-                      </div>
+                      {children}
                     </div>
-                  </main>
-                  <FeedbackButton />
-                  <AIAssistant />
-                  <CommandPalette />
-                </div>
-              </IngestDealModalProvider>
-            </ToastProvider>
-          </PresenceProvider>
+                  </div>
+                </main>
+                <FeedbackButton />
+                <AIAssistant />
+                <CommandPalette />
+              </div>
+            </IngestDealModalProvider>
+          </ToastProvider>
         </NotificationCountProvider>
       </UserProvider>
     </AuthProvider>

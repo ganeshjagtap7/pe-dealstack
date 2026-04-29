@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
 import { getInitials } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { useToast } from "@/providers/ToastProvider";
 import { LinkedDeal, TYPE_CONFIG } from "./components";
 
 // ─── Config ───────────────────────────────────────────────
@@ -29,6 +30,7 @@ export function LinkDealModal({ contactId, linkedDeals, onClose, onLinked }: { c
   const [selectedDealId, setSelectedDealId] = useState<string | null>(null);
   const [selectedDealName, setSelectedDealName] = useState("");
   const [role, setRole] = useState("");
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (query.length < 2) { setResults([]); return; }
@@ -40,7 +42,10 @@ export function LinkDealModal({ contactId, linkedDeals, onClose, onLinked }: { c
         const all = Array.isArray(data) ? data : ((data as { deals: typeof results }).deals || []);
         const linkedIds = new Set(linkedDeals.map((d) => (d.deal || d).id || d.dealId));
         setResults(all.filter((d) => !linkedIds.has(d.id)));
-      } catch { setResults([]); }
+      } catch (err) {
+        console.warn("[contacts] LinkDealModal search failed:", err);
+        setResults([]);
+      }
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
@@ -53,7 +58,9 @@ export function LinkDealModal({ contactId, linkedDeals, onClose, onLinked }: { c
       if (role) body.role = role;
       await api.post(`/contacts/${contactId}/deals`, body);
       onLinked();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to link deal"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to link deal", "error");
+    }
   }
 
   const inputCls = "w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors";
@@ -124,6 +131,7 @@ export function ConnectionModal({ contactId, onClose, onCreated }: { contactId: 
   const [selectedName, setSelectedName] = useState("");
   const [connType, setConnType] = useState("KNOWS");
   const [notes, setNotes] = useState("");
+  const { showToast } = useToast();
 
   useEffect(() => {
     if (query.length < 2) { setResults([]); return; }
@@ -134,7 +142,10 @@ export function ConnectionModal({ contactId, onClose, onCreated }: { contactId: 
         const data = await api.get<{ contacts: typeof results } | typeof results>(`/contacts?${params}`);
         const all = Array.isArray(data) ? data : ((data as { contacts: typeof results }).contacts || []);
         setResults(all.filter((c) => c.id !== contactId));
-      } catch { setResults([]); }
+      } catch (err) {
+        console.warn("[contacts] ConnectionModal search failed:", err);
+        setResults([]);
+      }
       setSearching(false);
     }, 300);
     return () => clearTimeout(timer);
@@ -145,7 +156,9 @@ export function ConnectionModal({ contactId, onClose, onCreated }: { contactId: 
     try {
       await api.post(`/contacts/${contactId}/connections`, { relatedContactId: selectedId, type: connType, notes: notes.trim() || undefined });
       onCreated();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to create connection"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to create connection", "error");
+    }
   }
 
   const inputCls = "w-full rounded-lg border border-border-subtle bg-white px-3 py-2 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors";

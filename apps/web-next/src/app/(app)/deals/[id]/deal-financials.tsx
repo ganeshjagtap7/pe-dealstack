@@ -799,8 +799,9 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
       await api.post(`/deals/${dealId}/financials/resolve-all`, { strategy: "highest_confidence" });
       // Reload everything after resolution
       await loadFinancials();
-    } catch {
-      // Silently ignore — conflicts panel will still show
+    } catch (err) {
+      // Silently swallow — conflicts panel will still show. Log so it's not invisible.
+      console.warn("[deal-financials] auto-resolve failed:", err);
     }
   }, [dealId, loadFinancials]);
 
