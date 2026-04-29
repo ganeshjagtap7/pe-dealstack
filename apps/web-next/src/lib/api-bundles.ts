@@ -61,7 +61,7 @@ export function pickBundle(pathname: string): "ai" | "lite" {
   if (AI_DOC_EXTRACT_RE.test(pathname)) return "ai";
   if (pathname === "/api/conversations" || pathname.startsWith("/api/conversations/"))
     return "ai";
-  if (pathname.startsWith("/api/memos/")) return "ai";
+  if (pathname === "/api/memos" || pathname.startsWith("/api/memos/")) return "ai";
   if (pathname === "/api/ingest" || pathname.startsWith("/api/ingest/"))
     return "ai";
   if (pathname === "/api/onboarding" || pathname.startsWith("/api/onboarding/"))
