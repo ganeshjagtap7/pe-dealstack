@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { api, NotFoundError } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { getCurrencySymbol, formatCurrency } from "@/lib/formatters";
 import { useToast } from "@/providers/ToastProvider";
 import {
   type FinancialStatement,
@@ -11,724 +10,30 @@ import {
   GrowthChart,
   BalanceSheetChart,
 } from "./deal-financials-charts";
-
-// --- Validation & Conflict Types ---
-
-interface ValidationCheck {
-  check: string;
-  passed: boolean;
-  severity: "error" | "warning" | "info";
-  message: string;
-  period?: string;
-}
-
-interface ValidationResult {
-  checks: ValidationCheck[];
-  errorCount: number;
-  warningCount: number;
-  infoCount: number;
-  overallPassed: boolean;
-}
-
-interface ConflictVersion {
-  id: string;
-  documentId: string;
-  documentName: string;
-  isActive: boolean;
-  lineItems: Record<string, number | null>;
-  extractionConfidence: number;
-  extractionSource: string;
-  extractedAt: string;
-  reviewedAt: string | null;
-}
-
-interface ConflictGroup {
-  statementType: string;
-  period: string;
-  versions: ConflictVersion[];
-}
-
-// --- Constants (ported from legacy financials-helpers.js) ---
-
-const LINE_ITEM_LABELS: Record<string, string> = {
-  revenue: "Revenue", cogs: "Cost of Goods Sold", gross_profit: "Gross Profit",
-  gross_margin_pct: "Gross Margin %", sga: "SG&A", rd: "R&D",
-  other_opex: "Other OpEx", total_opex: "Total OpEx", ebitda: "EBITDA",
-  ebitda_margin_pct: "EBITDA Margin %", da: "D&A", ebit: "EBIT",
-  interest_expense: "Interest Expense", ebt: "EBT", tax: "Tax",
-  net_income: "Net Income", sde: "SDE", depreciation: "D&A", tax_expense: "Tax Expense",
-  cash: "Cash & Equivalents", accounts_receivable: "Accounts Receivable",
-  inventory: "Inventory", other_current_assets: "Other Current Assets",
-  total_current_assets: "Total Current Assets", ppe_net: "PP&E (Net)",
-  goodwill: "Goodwill", intangibles: "Intangibles", total_assets: "Total Assets",
-  accounts_payable: "Accounts Payable", short_term_debt: "Short-term Debt",
-  other_current_liabilities: "Other Current Liabilities",
-  total_current_liabilities: "Total Current Liabilities",
-  long_term_debt: "Long-term Debt", total_liabilities: "Total Liabilities",
-  total_equity: "Total Equity", total_debt: "Total Debt",
-  operating_cf: "Operating Cash Flow", operating_cash_flow: "Operating Cash Flow",
-  capex: "CapEx", fcf: "Free Cash Flow", free_cash_flow: "Free Cash Flow",
-  acquisitions: "Acquisitions", debt_repayment: "Debt Repayment",
-  dividends: "Dividends", net_change_cash: "Net Change in Cash",
-  investing_activities: "Investing Activities", financing_activities: "Financing Activities",
-};
-
-const SUBTOTAL_KEYS = new Set([
-  "revenue", "gross_profit", "ebitda", "ebit", "net_income", "sde",
-  "total_current_assets", "total_assets", "total_current_liabilities",
-  "total_liabilities", "total_equity", "fcf", "free_cash_flow",
-  "operating_cf", "operating_cash_flow", "net_change_cash",
-]);
-
-const ORDERED_LINE_ITEMS = [
-  "revenue", "cogs", "gross_profit", "gross_margin_pct",
-  "sga", "rd", "other_opex", "total_opex",
-  "ebitda", "ebitda_margin_pct", "da", "ebit",
-  "interest_expense", "ebt", "tax", "net_income", "sde",
-  "cash", "accounts_receivable", "inventory", "other_current_assets", "total_current_assets",
-  "ppe_net", "goodwill", "intangibles", "total_assets",
-  "accounts_payable", "short_term_debt", "other_current_liabilities", "total_current_liabilities",
-  "long_term_debt", "total_liabilities", "total_equity",
-  "operating_cf", "operating_cash_flow", "capex", "fcf", "free_cash_flow",
-  "acquisitions", "debt_repayment", "dividends", "net_change_cash",
-  "investing_activities", "financing_activities",
-];
-
-type StatementType = "INCOME_STATEMENT" | "BALANCE_SHEET" | "CASH_FLOW";
-type ChartType = "revenue" | "growth" | "composition";
-
-const TAB_CONFIG: { key: StatementType; label: string; icon: string }[] = [
-  { key: "INCOME_STATEMENT", label: "Income Statement", icon: "receipt_long" },
-  { key: "BALANCE_SHEET", label: "Balance Sheet", icon: "account_balance" },
-  { key: "CASH_FLOW", label: "Cash Flow", icon: "payments" },
-];
-
-// --- Helpers ---
-
-function isPctKey(key: string): boolean {
-  return key.endsWith("_pct") || key.endsWith("_margin");
-}
-
-function fmtMoney(val: number | null | undefined, unitScale?: string, currency?: string): string {
-  if (val === null || val === undefined) return "\u2014";
-  const n = Number(val);
-  if (isNaN(n)) return "\u2014";
-  const sym = getCurrencySymbol(currency);
-  const code = (currency || "USD").toUpperCase();
-  if (code === "INR" && unitScale === "MILLIONS") {
-    return sym + (n / 10).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "Cr";
-  }
-  if (code === "INR" && unitScale === "THOUSANDS") {
-    return sym + (n / 100).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "L";
-  }
-  const suffix = unitScale === "MILLIONS" ? "M" : unitScale === "THOUSANDS" ? "K" : "";
-  return sym + n.toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + suffix;
-}
-
-function fmtPct(val: number | null | undefined): string {
-  if (val === null || val === undefined) return "\u2014";
-  const n = Number(val);
-  if (isNaN(n)) return "\u2014";
-  return n.toFixed(1) + "%";
-}
-
-function ConfidenceBadge({ confidence }: { confidence?: number | null }) {
-  const pct = Math.round(confidence ?? 0);
-  const [cls, dotColor] =
-    pct >= 80 ? ["bg-emerald-50 text-emerald-700 border-emerald-200", "#059669"]
-    : pct >= 50 ? ["bg-amber-50 text-amber-700 border-amber-200", "#d97706"]
-    : ["bg-red-50 text-red-600 border-red-200", "#dc2626"];
-  return (
-    <span className={cn("inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded-full border", cls)}>
-      <span className="inline-block rounded-full" style={{ width: 5, height: 5, background: dotColor }} />
-      {pct}%
-    </span>
-  );
-}
-
-// --- Client-side validation flag derivation ---
-// Mirrors the legacy financials.js checks run against the loaded statements.
-// We derive flags purely from the statements array so no extra API round-trip
-// is needed when the server /validation endpoint is unavailable.
-
-function deriveClientValidationFlags(statements: FinancialStatement[]): ValidationCheck[] {
-  const flags: ValidationCheck[] = [];
-
-  // 1. Low confidence warning (< 70%) on any period
-  for (const s of statements) {
-    const conf = s.extractionConfidence ?? null;
-    if (conf !== null && conf < 70) {
-      flags.push({
-        check: "low_confidence",
-        passed: false,
-        severity: conf < 50 ? "error" : "warning",
-        message: `${s.statementType.replace(/_/g, " ")} ${s.period}: extraction confidence is ${Math.round(conf)}% — review extracted values`,
-        period: s.period,
-      });
-    }
-  }
-
-  // 2. Cross-source value divergence for the same (statementType, period)
-  //    Group statements by type+period, check if multiple docs report wildly different values.
-  const KEY_FIELDS = ["revenue", "ebitda", "net_income", "total_assets", "total_equity", "operating_cf"];
-  const groups = new Map<string, FinancialStatement[]>();
-  for (const s of statements) {
-    const key = `${s.statementType}|${s.period}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key)!.push(s);
-  }
-
-  for (const [key, group] of groups) {
-    if (group.length < 2) continue;
-    const [stmtType, period] = key.split("|");
-    for (const field of KEY_FIELDS) {
-      const vals = group
-        .map((s) => (s.lineItems ?? {})[field])
-        .filter((v): v is number => v != null);
-      if (vals.length < 2) continue;
-      const maxAbs = Math.max(...vals.map(Math.abs));
-      const spread = Math.max(...vals) - Math.min(...vals);
-      const discPct = maxAbs > 0 ? (spread / maxAbs) * 100 : 0;
-      if (discPct > 10) {
-        const fieldLabel = field.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-        flags.push({
-          check: `cross_source_${field}`,
-          passed: false,
-          severity: discPct > 30 ? "error" : "warning",
-          message: `${stmtType.replace(/_/g, " ")} ${period}: ${fieldLabel} differs by ${discPct.toFixed(1)}% across source documents — verify`,
-          period,
-        });
-      }
-    }
-  }
-
-  return flags;
-}
-
-// --- Validation Flags Panel ---
-
-function ValidationFlagsPanel({ flags }: { flags: ValidationCheck[] }) {
-  const [open, setOpen] = useState(true);
-
-  if (flags.length === 0) return null;
-
-  const errorFlags = flags.filter((f) => f.severity === "error");
-  const hasErrors = errorFlags.length > 0;
-
-  return (
-    <div className="mb-4 rounded-lg border overflow-hidden border-amber-200 bg-amber-50">
-      <button
-        onClick={() => setOpen((p) => !p)}
-        className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-amber-100/50"
-        aria-expanded={open}
-      >
-        <span className="material-symbols-outlined text-base text-amber-500">
-          warning
-        </span>
-        <span className="text-xs font-semibold text-amber-800">
-          {flags.length} Validation Flag{flags.length > 1 ? "s" : ""}
-          {hasErrors && ` (${errorFlags.length} error${errorFlags.length > 1 ? "s" : ""})`}
-        </span>
-        <span
-          className="material-symbols-outlined text-sm ml-auto transition-transform duration-200 text-amber-400"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-          aria-hidden
-        >
-          expand_more
-        </span>
-      </button>
-
-      {open && (
-        <div className="px-4 pb-3 border-t border-amber-200/60">
-          <ul className="text-xs space-y-1 mt-2 text-amber-700">
-            {flags.map((f, i) => (
-              <li key={`${f.check}-${i}`} className="flex items-start gap-1.5">
-                <span
-                  className={cn(
-                    "mt-0.5 shrink-0 material-symbols-outlined",
-                    f.severity === "error" || f.severity === "warning"
-                      ? "text-amber-400 text-xs"
-                      : "text-gray-400 text-xs",
-                  )}
-                  style={{ fontSize: 12 }}
-                >
-                  {f.severity === "error" ? "error" : f.severity === "warning" ? "warning" : "info"}
-                </span>
-                <span>{f.message}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// --- Conflict / Overlapping Period Banner ---
-
-interface ConflictBannerProps {
-  conflicts: ConflictGroup[];
-  onAutoResolve: () => void;
-}
-
-function ConflictBanner({ conflicts, onAutoResolve }: ConflictBannerProps) {
-  if (conflicts.length === 0) return null;
-
-  return (
-    <div className="mb-4 rounded-lg border-2 border-blue-300 bg-blue-50 overflow-hidden">
-      <div className="flex items-center gap-3 px-4 py-3 flex-wrap">
-        <span className="material-symbols-outlined text-blue-600 text-lg">merge_type</span>
-        <div className="flex-1 min-w-[200px]">
-          <span className="text-xs font-bold text-blue-900">
-            {conflicts.length} Overlapping Period{conflicts.length > 1 ? "s" : ""} Found
-          </span>
-          <span className="text-[10px] text-blue-600 ml-2">
-            Multiple documents extracted data for the same period — highest-confidence version is shown
-          </span>
-        </div>
-        <button
-          onClick={onAutoResolve}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-blue-700 border border-blue-300 rounded-md hover:bg-blue-100 transition-colors"
-        >
-          <span className="material-symbols-outlined text-sm">auto_fix_high</span>
-          Auto-resolve
-        </button>
-      </div>
-
-      {/* Conflict detail rows */}
-      <div className="border-t border-blue-200/60 px-4 py-2 space-y-1">
-        {conflicts.map((c) => (
-          <div key={`${c.statementType}|${c.period}`} className="flex items-center gap-2 text-[10px] text-blue-700">
-            <span className="material-symbols-outlined text-[11px] text-blue-400">chevron_right</span>
-            <span className="font-semibold">{c.statementType.replace(/_/g, " ")}</span>
-            <span>{c.period}</span>
-            <span className="text-blue-400">·</span>
-            <span>{c.versions.length} versions</span>
-            <span className="text-blue-400 ml-auto">
-              Showing: {c.versions.reduce((best, v) =>
-                v.extractionConfidence > best.extractionConfidence ? v : best
-              ).documentName}
-            </span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// --- Extraction Result Types & Modal ---
-
-interface ExtractionResult {
-  result?: {
-    periodsStored?: number;
-    warnings?: string[];
-    overallConfidence?: number;
-    hasConflicts?: boolean;
-  };
-  agent?: {
-    retryCount?: number;
-  };
-  documentUsed?: {
-    name?: string;
-  };
-  extractionMethod?: string;
-}
-
-function ExtractionResultModal({
-  extractionResult,
-  statements,
-  currency,
-  onClose,
-}: {
-  extractionResult: ExtractionResult;
-  statements: FinancialStatement[];
-  currency: string;
-  onClose: () => void;
-}) {
-  const result = extractionResult.result ?? {};
-  const docName = extractionResult.documentUsed?.name ?? "Unknown document";
-  const method = (extractionResult.extractionMethod ?? "gpt4o").toUpperCase();
-  const overallConf = result.overallConfidence ?? 0;
-  const warnings = result.warnings ?? [];
-  const hasConflicts = result.hasConflicts ?? false;
-  const retryCount = extractionResult.agent?.retryCount ?? 0;
-
-  const sym = getCurrencySymbol(currency);
-
-  // Count by type
-  const incomeCount = statements.filter((s) => s.statementType === "INCOME_STATEMENT").length;
-  const balanceCount = statements.filter((s) => s.statementType === "BALANCE_SHEET").length;
-  const cashFlowCount = statements.filter((s) => s.statementType === "CASH_FLOW").length;
-
-  // Latest revenue & EBITDA
-  const incomeStmts = statements
-    .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => b.period.localeCompare(a.period));
-  const latestIncome = incomeStmts[0]?.lineItems ?? {};
-  const revenue = latestIncome.revenue ?? null;
-  const ebitda = latestIncome.ebitda ?? null;
-  const grossMargin = latestIncome.gross_margin_pct ?? null;
-  const ebitdaMargin = latestIncome.ebitda_margin_pct ?? null;
-  const latestPeriod = incomeStmts[0]?.period ?? "";
-
-  // Confidence color
-  const confColor = overallConf >= 80 ? "#059669" : overallConf >= 50 ? "#d97706" : "#dc2626";
-
-  const fmtVal = (val: number | null | undefined) => {
-    if (val == null) return "\u2014";
-    return formatCurrency(val, currency);
-  };
-  const fmtPctVal = (val: number | null | undefined) => {
-    if (val == null) return "\u2014";
-    return Number(val).toFixed(1) + "%";
-  };
-
-  // Close on Escape
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    document.addEventListener("keydown", handler);
-    return () => document.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  const handleViewFinancials = () => {
-    onClose();
-    const el = document.getElementById("financials-section");
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-        onClick={onClose}
-        aria-hidden
-      />
-
-      {/* Modal */}
-      <div
-        className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden animate-[slideUp_0.3s_ease-out]"
-      >
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <span className="material-symbols-outlined text-xl" style={{ color: "#003366" }}>
-                auto_awesome
-              </span>
-              <h3 className="text-base font-bold text-gray-900">Extraction Results</h3>
-            </div>
-            {hasConflicts ? (
-              <span
-                className="px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1"
-                style={{ background: "#fffbeb", color: "#92400e", border: "1px solid #fde68a" }}
-              >
-                <span className="material-symbols-outlined text-xs">warning</span>
-                Conflicts Found
-              </span>
-            ) : (
-              <span
-                className="px-2.5 py-1 rounded-full text-xs font-medium inline-flex items-center gap-1"
-                style={{ background: "#ecfdf5", color: "#065f46", border: "1px solid #a7f3d0" }}
-              >
-                <span className="material-symbols-outlined text-xs">check_circle</span>
-                Extraction Complete
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 mt-2 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-xs">description</span>
-            {docName}
-            <span className="mx-1">&middot;</span>
-            {method}
-            {retryCount > 0 && (
-              <>
-                <span className="mx-1">&middot;</span>
-                {retryCount} retries
-              </>
-            )}
-          </p>
-        </div>
-
-        {/* Confidence */}
-        <div className="px-6 py-4">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-gray-600">Overall Confidence</span>
-            <span className="text-sm font-bold" style={{ color: confColor }}>
-              {overallConf}%
-            </span>
-          </div>
-          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#f3f4f6" }}>
-            <div
-              className="h-2 rounded-full transition-all"
-              style={{ width: `${overallConf}%`, background: confColor }}
-            />
-          </div>
-        </div>
-
-        {/* Extracted Metrics 2x2 Grid */}
-        <div className="px-6 pb-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
-                Revenue {latestPeriod ? `(${latestPeriod})` : ""}
-              </p>
-              <p className="text-sm font-bold text-gray-900 mt-1">{fmtVal(revenue)}</p>
-            </div>
-            <div className="p-3 rounded-lg" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">EBITDA</p>
-              <p className="text-sm font-bold text-gray-900 mt-1">{fmtVal(ebitda)}</p>
-            </div>
-            <div className="p-3 rounded-lg" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">Gross Margin</p>
-              <p className="text-sm font-bold text-gray-900 mt-1">{fmtPctVal(grossMargin)}</p>
-            </div>
-            <div className="p-3 rounded-lg" style={{ background: "#f8fafc", border: "1px solid #e2e8f0" }}>
-              <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">EBITDA Margin</p>
-              <p className="text-sm font-bold text-gray-900 mt-1">{fmtPctVal(ebitdaMargin)}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Statement counts + Currency */}
-        <div className="px-6 pb-4">
-          <div className="flex gap-2 flex-wrap">
-            {incomeCount > 0 && (
-              <span
-                className="px-2.5 py-1 rounded-full text-[10px] font-semibold"
-                style={{ background: "#eff6ff", color: "#1e40af", border: "1px solid #bfdbfe" }}
-              >
-                Income: {incomeCount} period{incomeCount > 1 ? "s" : ""}
-              </span>
-            )}
-            {balanceCount > 0 && (
-              <span
-                className="px-2.5 py-1 rounded-full text-[10px] font-semibold"
-                style={{ background: "#f0fdf4", color: "#166534", border: "1px solid #bbf7d0" }}
-              >
-                Balance: {balanceCount} period{balanceCount > 1 ? "s" : ""}
-              </span>
-            )}
-            {cashFlowCount > 0 && (
-              <span
-                className="px-2.5 py-1 rounded-full text-[10px] font-semibold"
-                style={{ background: "#fefce8", color: "#854d0e", border: "1px solid #fef08a" }}
-              >
-                Cash Flow: {cashFlowCount} period{cashFlowCount > 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-          <p className="text-xs text-gray-500 mt-2">
-            Currency: <span className="font-semibold text-gray-700">{sym.trim()} ({currency})</span>
-          </p>
-        </div>
-
-        {/* Warnings */}
-        {warnings.length > 0 && (
-          <div className="px-6 pb-4">
-            <div className="p-3 rounded-lg" style={{ background: "#fffbeb", border: "1px solid #fde68a" }}>
-              <p className="text-xs font-medium" style={{ color: "#92400e" }}>Warnings:</p>
-              <ul className="text-xs mt-1 space-y-0.5" style={{ color: "#a16207" }}>
-                {warnings.map((w, i) => (
-                  <li key={i} className="flex items-start gap-1.5">
-                    <span className="mt-0.5 shrink-0">&bull;</span>
-                    {w}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        )}
-
-        {/* Actions */}
-        <div className="px-6 py-4 border-t border-gray-100 flex gap-3">
-          <button
-            onClick={handleViewFinancials}
-            className="flex-1 py-2.5 px-4 rounded-lg text-white text-sm font-medium transition-all flex items-center justify-center gap-2"
-            style={{ background: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[18px]">table_chart</span>
-            View Financials
-          </button>
-        </div>
-      </div>
-
-      {/* slideUp animation */}
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(20px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-      `}</style>
-    </div>
-  );
-}
-
-// --- Shell wrapper (header + border) ---
-
-function FinancialShell({ children, avgConfidence, currency, collapsed, onToggle }: {
-  children: React.ReactNode; avgConfidence?: number | null; currency?: string;
-  collapsed?: boolean; onToggle?: () => void;
-}) {
-  return (
-    <div id="financials-section" className="overflow-hidden"
-      style={{ borderRadius: 12, border: "2px solid #003366", boxShadow: "0 2px 8px rgba(0,51,102,0.15)", flexShrink: 0 }}>
-      <button
-        onClick={onToggle}
-        className="w-full flex items-center gap-2.5 cursor-pointer"
-        style={{ backgroundColor: "#003366", padding: "14px 20px", borderRadius: collapsed ? "10px" : "10px 10px 0 0", border: "none" }}>
-        <span className="material-symbols-outlined text-white text-[20px]">table_chart</span>
-        <span className="text-white text-[13px] font-bold uppercase tracking-wider" style={{ letterSpacing: "0.05em" }}>
-          Financial Statements
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          {currency && currency !== "USD" && (
-            <span className="text-[10px] font-semibold text-white/70 bg-white/10 px-2 py-0.5 rounded-full">{currency}</span>
-          )}
-          {avgConfidence != null && (
-            <span className={cn("text-[10px] font-semibold px-2 py-0.5 rounded-full",
-              avgConfidence >= 80 ? "bg-emerald-400/20 text-emerald-200"
-              : avgConfidence >= 50 ? "bg-amber-400/20 text-amber-200"
-              : "bg-red-400/20 text-red-200")}>
-              {avgConfidence}% confidence
-            </span>
-          )}
-          <span
-            className="material-symbols-outlined text-[16px] transition-colors"
-            style={{ color: "rgba(255,255,255,0.5)" }}
-            title="Fullscreen"
-            onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "rgba(255,255,255,0.9)"; }}
-            onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "rgba(255,255,255,0.5)"; }}
-            onClick={(e) => { e.stopPropagation(); }}
-          >
-            open_in_full
-          </span>
-          <span
-            className="material-symbols-outlined text-[18px] transition-transform duration-200"
-            style={{ color: "rgba(255,255,255,0.75)", transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }}
-          >
-            expand_more
-          </span>
-        </div>
-      </button>
-      {!collapsed && (
-        <div className="bg-white" style={{ padding: 20, borderRadius: "0 0 10px 10px" }}>{children}</div>
-      )}
-    </div>
-  );
-}
-
-// --- Financial Data Table ---
-
-function FinancialTable({
-  statements,
-  statementType,
-  conflicts,
-}: {
-  statements: FinancialStatement[];
-  statementType: StatementType;
-  conflicts: ConflictGroup[];
-}) {
-  const rows = statements.filter((s) => s.statementType === statementType).sort((a, b) => a.period.localeCompare(b.period));
-  if (rows.length === 0) {
-    return <p className="text-xs text-gray-400 py-4 text-center">No {statementType.replace(/_/g, " ").toLowerCase()} data available.</p>;
-  }
-
-  const unitScale = rows[0]?.unitScale ?? "ACTUALS";
-  const currency = rows[0]?.currency ?? "USD";
-  const allKeys = new Set<string>();
-  rows.forEach((r) => Object.keys(r.lineItems ?? {}).forEach((k) => allKeys.add(k)));
-  const orderedKeys = ORDERED_LINE_ITEMS.filter((k) => allKeys.has(k));
-  allKeys.forEach((k) => { if (!orderedKeys.includes(k)) orderedKeys.push(k); });
-
-  const sym = getCurrencySymbol(currency);
-  const code = (currency || "USD").toUpperCase();
-  const unitSuffix = code === "INR"
-    ? (unitScale === "MILLIONS" ? "Cr" : unitScale === "THOUSANDS" ? "L" : "")
-    : (unitScale === "MILLIONS" ? "M" : unitScale === "THOUSANDS" ? "K" : "");
-
-  const docMap = new Map<string, string>();
-  rows.forEach((r) => { if (r.Document?.id) docMap.set(r.Document.id, r.Document.name ?? "Unknown document"); });
-
-  // Build a Set of conflict period keys for quick lookup
-  const conflictPeriodSet = new Set(
-    conflicts
-      .filter((c) => c.statementType === statementType)
-      .map((c) => c.period),
-  );
-
-  return (
-    <>
-      <div className="overflow-x-auto rounded-lg border border-gray-200" style={{ boxShadow: "0 1px 3px rgba(0,0,0,0.04)" }}>
-        <table className="w-full text-xs" style={{ borderCollapse: "separate", borderSpacing: 0 }}>
-          <thead>
-            <tr style={{ background: "#fafbfc" }}>
-              <th className="px-3 py-3 text-left text-[11px] font-semibold text-gray-500 sticky left-0 min-w-[160px]"
-                style={{ background: "#fafbfc", zIndex: 3, boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
-                Line Item <span className="text-[10px] font-normal text-gray-400">({sym}{unitSuffix})</span>
-              </th>
-              {rows.map((r) => {
-                const hasConflict = conflictPeriodSet.has(r.period);
-                return (
-                  <th key={r.id} className="px-3 py-3 text-right whitespace-nowrap min-w-[95px]" style={{ background: "#fafbfc" }}>
-                    <div className="flex items-center justify-end gap-1">
-                      {hasConflict && (
-                        <span
-                          className="material-symbols-outlined text-amber-500 cursor-default"
-                          style={{ fontSize: 14 }}
-                          title="Multiple versions exist for this period — overlapping extraction detected"
-                        >
-                          merge_type
-                        </span>
-                      )}
-                      <span className={cn("text-[11px] font-semibold", r.periodType === "PROJECTED" ? "italic text-gray-400" : "text-gray-700")}>{r.period}</span>
-                    </div>
-                    <div className="mt-1"><ConfidenceBadge confidence={r.extractionConfidence} /></div>
-                    {r.Document?.name && <div className="text-[9px] text-gray-400 truncate max-w-[88px] mt-0.5" title={r.Document.name}>{r.Document.name}</div>}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {orderedKeys.map((key, idx) => {
-              const label = LINE_ITEM_LABELS[key] ?? key.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
-              const isSubtotal = SUBTOTAL_KEYS.has(key);
-              const isPct = isPctKey(key);
-              const rowBg = isSubtotal ? "#f7f8f9" : idx % 2 === 0 ? "#ffffff" : "#fbfbfc";
-              const labelCls = isSubtotal ? "font-semibold text-gray-800" : isPct ? "text-gray-400 pl-6" : "text-gray-500";
-              return (
-                <tr key={key} className="border-b border-gray-100 hover:bg-blue-50/30 transition-colors group">
-                  <td className={cn("px-3 py-2 text-xs whitespace-nowrap sticky left-0", labelCls)}
-                    style={{ zIndex: 2, background: rowBg, boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>{label}</td>
-                  {rows.map((r) => {
-                    const val = (r.lineItems ?? {})[key];
-                    const display = isPct ? fmtPct(val) : fmtMoney(val, unitScale, currency);
-                    const valCls = r.periodType === "PROJECTED" ? "text-gray-400 italic"
-                      : isSubtotal ? "text-gray-900 font-semibold" : "text-gray-700";
-                    return <td key={r.id} className={cn("px-3 py-2 text-right text-xs", valCls)}>{display}</td>;
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {docMap.size > 0 && (
-        <p className="text-[10px] text-gray-400 mt-2.5 px-1 flex items-center gap-1">
-          <span className="material-symbols-outlined text-xs">description</span>
-          Source{docMap.size > 1 ? "s" : ""}: {[...docMap.values()].join(" \u00B7 ")}
-        </p>
-      )}
-    </>
-  );
-}
+import {
+  TAB_CONFIG,
+  type ChartType,
+  type StatementType,
+} from "./deal-financials-constants";
+import {
+  ValidationFlagsPanel,
+  deriveClientValidationFlags,
+  type ValidationCheck,
+  type ValidationResult,
+} from "./deal-financials-validation";
+import {
+  ConflictBanner,
+  type ConflictGroup,
+} from "./deal-financials-conflicts";
+import { FinancialShell, FinancialTable } from "./deal-financials-table";
+import {
+  ExtractionResultModal,
+  type ExtractionResult,
+} from "./deal-financials-modal";
 
 // --- Main Panel ---
 
-export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
+export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: string; onFullscreen?: () => void }) {
   const { showToast } = useToast();
   const [statements, setStatements] = useState<FinancialStatement[]>([]);
   const [serverValidation, setServerValidation] = useState<ValidationResult | null>(null);
@@ -811,12 +116,12 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   const handleExtract = useCallback(async () => {
     if (extracting) return;
     setExtracting(true);
-    setExtractLabel("Extracting\u2026 (30\u201360s)");
+    setExtractLabel("Extracting… (30–60s)");
 
     const progressMsgs = [
-      "Extracting\u2026 (reading file)",
-      "Extracting\u2026 (analyzing data)",
-      "Extracting\u2026 (almost done)",
+      "Extracting… (reading file)",
+      "Extracting… (analyzing data)",
+      "Extracting… (almost done)",
     ];
     let idx = 0;
     const progressTimer = setInterval(() => {
@@ -851,8 +156,8 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
     } catch (err) {
       const msg =
         err instanceof Error && err.name === "AbortError"
-          ? "Extraction timed out (>2 min). The file may be too large \u2014 try again or upload a simpler P&L."
-          : "Could not extract financial data \u2014 document may be encrypted or unsupported";
+          ? "Extraction timed out (>2 min). The file may be too large — try again or upload a simpler P&L."
+          : "Could not extract financial data — document may be encrypted or unsupported";
       showToast(msg, "warning", { title: "No Data Extracted" });
     } finally {
       clearInterval(progressTimer);
@@ -920,7 +225,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
     return (
       <>
         {extractionModal}
-        <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
+        <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed} onFullscreen={onFullscreen}>
           <div className="text-center py-10">
             <span className="material-symbols-outlined text-gray-300 text-3xl animate-spin block mb-2">progress_activity</span>
             <p className="text-xs text-gray-400">Loading financial data...</p>
@@ -935,7 +240,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
     return (
       <>
         {extractionModal}
-        <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
+        <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed} onFullscreen={onFullscreen}>
           <div className="text-center py-10">
             <span className="material-symbols-outlined text-red-300 text-3xl block mb-2">error</span>
             <p className="text-xs text-gray-500">{error}</p>
@@ -951,7 +256,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
     return (
       <>
         {extractionModal}
-        <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed}>
+        <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed} onFullscreen={onFullscreen}>
           <div className="text-center" style={{ padding: "40px 16px" }}>
             <span className="material-symbols-outlined text-gray-300 block mb-2" style={{ fontSize: 40 }}>table_chart</span>
             <p className="text-sm font-semibold text-gray-800" style={{ marginBottom: 4 }}>No Financial Data Yet</p>
@@ -966,7 +271,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
               {extracting ? (
                 <>
                   <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-                  {extractLabel || "Extracting\u2026 (30\u201360s)"}
+                  {extractLabel || "Extracting… (30–60s)"}
                 </>
               ) : (
                 <>
@@ -999,7 +304,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
   return (
     <>
       {extractionModal}
-      <FinancialShell avgConfidence={avgConfidence} currency={detectedCurrency} collapsed={collapsed} onToggle={toggleCollapsed}>
+      <FinancialShell avgConfidence={avgConfidence} currency={detectedCurrency} collapsed={collapsed} onToggle={toggleCollapsed} onFullscreen={onFullscreen}>
         {/* Validation flags — collapsible amber/red warning card (mirrors legacy flagHtml) */}
         <ValidationFlagsPanel flags={validationFlags} />
 
@@ -1042,7 +347,7 @@ export function FinancialStatementsPanel({ dealId }: { dealId: string }) {
             {extracting ? (
               <>
                 <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                {extractLabel || "Extracting\u2026"}
+                {extractLabel || "Extracting…"}
               </>
             ) : (
               <>

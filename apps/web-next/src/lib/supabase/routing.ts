@@ -11,8 +11,19 @@ const AUTH_PAGE_PREFIXES = [
 ];
 
 // Public marketing/legal pages that anonymous users must be able to reach
-// (e.g. linked from the signup flow for GDPR consent).
-const PUBLIC_PAGE_PREFIXES = ["/privacy-policy", "/terms-of-service"];
+// (e.g. linked from the signup flow for GDPR consent, and the public-facing
+// marketing pages — pricing, docs, etc.).
+const PUBLIC_PAGE_PREFIXES = [
+  "/privacy-policy",
+  "/terms-of-service",
+  "/pricing",
+  "/documentation",
+  "/api-reference",
+  "/help-center",
+  "/solutions",
+  "/resources",
+  "/company",
+];
 
 const SYSTEM_PREFIXES = ["/api", "/_next"];
 

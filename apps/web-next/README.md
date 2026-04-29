@@ -60,6 +60,16 @@ Copy `.env.example` to `.env.local` and fill in. At minimum:
 
 In production (Vercel) the API runs as a Node Function colocated with the Next app, so no proxy URL is needed — `/api/*` resolves through the Route Handler.
 
+### Running tests
+
+```bash
+cd apps/web-next
+npm run test             # run all tests once (Vitest, jsdom)
+npm run test:watch       # watch mode
+```
+
+Vitest is configured via [`vitest.config.ts`](vitest.config.ts) with `jsdom`, the `@/*` → `src/*` alias, and `src/test/setup.ts` which registers `@testing-library/jest-dom` matchers and stubs `next/navigation` + `next/link`. Use the `renderWithProviders` helper from [`src/test/render.tsx`](src/test/render.tsx) to mount components inside the providers (`ToastProvider` by default; opt out with `withToast: false`).
+
 ---
 
 ## Project structure

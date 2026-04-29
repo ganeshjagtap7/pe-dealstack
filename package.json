@@ -17,6 +17,8 @@
     "dev:next": "npm run dev --workspace=@ai-crm/web-next"
   },
   "devDependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "turbo": "^2.0.0"
   },
   "engines": {

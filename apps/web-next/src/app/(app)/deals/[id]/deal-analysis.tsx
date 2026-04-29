@@ -28,7 +28,7 @@ import {
 // Main component
 // ---------------------------------------------------------------------------
 
-export function DealAnalysisSection({ dealId }: { dealId: string }) {
+export function DealAnalysisSection({ dealId, onFullscreen }: { dealId: string; onFullscreen?: () => void }) {
   const [collapsed, setCollapsed] = useState(false);
   const [activeTab, setActiveTab] = useState<AnalysisTab>("overview");
   const [loading, setLoading] = useState(true);
@@ -129,12 +129,35 @@ export function DealAnalysisSection({ dealId }: { dealId: string }) {
           </span>
           {analysis?.qoe && <QoEBadge score={analysis.qoe.score} />}
         </div>
-        <span
-          className="material-symbols-outlined text-white/80 text-[20px] transition-transform duration-200"
-          style={{ transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }}
-        >
-          expand_more
-        </span>
+        <div className="flex items-center gap-2">
+          {onFullscreen && (
+            <span
+              role="button"
+              tabIndex={0}
+              className="material-symbols-outlined text-[16px] transition-colors cursor-pointer"
+              style={{ color: "rgba(255,255,255,0.5)" }}
+              title="Fullscreen"
+              onMouseEnter={(e) => { (e.target as HTMLElement).style.color = "rgba(255,255,255,0.9)"; }}
+              onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "rgba(255,255,255,0.5)"; }}
+              onClick={(e) => { e.stopPropagation(); onFullscreen(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onFullscreen();
+                }
+              }}
+            >
+              open_in_full
+            </span>
+          )}
+          <span
+            className="material-symbols-outlined text-white/80 text-[20px] transition-transform duration-200"
+            style={{ transform: collapsed ? "rotate(0deg)" : "rotate(180deg)" }}
+          >
+            expand_more
+          </span>
+        </div>
       </button>
 
       {/* Collapsible body */}

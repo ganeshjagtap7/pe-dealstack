@@ -315,8 +315,8 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
 
 import { FinancialStatementsPanel } from "./deal-financials";
 
-export function FinancialStatementsSection({ dealId }: { dealId: string }) {
-  return <FinancialStatementsPanel dealId={dealId} />;
+export function FinancialStatementsSection({ dealId, onFullscreen }: { dealId: string; onFullscreen?: () => void }) {
+  return <FinancialStatementsPanel dealId={dealId} onFullscreen={onFullscreen} />;
 }
 
 // ---------------------------------------------------------------------------
