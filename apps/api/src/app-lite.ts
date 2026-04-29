@@ -94,10 +94,15 @@ const allowedOrigins = [
   ...extraOrigins,
   ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
 ];
+// Vercel auto-aliases per branch and per deploy:
+//   pe-dealstack-git-<branch>-<team>-<hash>.vercel.app
+//   pe-dealstack-<hash>-<team>-<hash>.vercel.app
+// Hardcoding each is impossible — match the project subdomain pattern.
+const VERCEL_ALIAS_RE = /^https:\/\/pe-dealstack(-[a-z0-9-]+)?\.vercel\.app$/;
 app.use(cors({
   origin: (origin, callback) => {
     // Allow requests with no origin (mobile apps, Postman, same-origin)
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.includes(origin) || VERCEL_ALIAS_RE.test(origin)) {
       callback(null, true);
     } else {
       log.warn('CORS request rejected', { origin });
