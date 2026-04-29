@@ -16,9 +16,13 @@ import { CommandPalette } from "@/components/layout/CommandPalette";
 // Pages that manage their own internal scrolling (full-bleed flex layouts with
 // docked side panels). For these we drop the layout's overflow-y-auto wrapper
 // so `h-full` chains resolve to the viewport height; otherwise the docked
-// chat panel collapses below the deal content instead of side-by-side.
+// chat panel collapses below the deal content instead of side-by-side, and
+// the data room's loading spinner / file table can't centre vertically.
 function isFullBleedPage(pathname: string): boolean {
-  return /^\/deals\/[^/]+$/.test(pathname);
+  return (
+    /^\/deals\/[^/]+$/.test(pathname) ||
+    /^\/data-room\/[^/]+$/.test(pathname)
+  );
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {

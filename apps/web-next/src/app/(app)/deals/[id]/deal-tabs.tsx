@@ -439,7 +439,7 @@ export function ChatTab({
             </div>
           )}
 
-          <div className="relative bg-background-body rounded-xl border border-border-subtle shadow-inner focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary transition-all">
+          <div className="relative bg-background-body rounded-xl border border-border-subtle shadow-inner">
             <textarea
               value={chatInput}
               onChange={(e) => setChatInput(e.target.value)}
