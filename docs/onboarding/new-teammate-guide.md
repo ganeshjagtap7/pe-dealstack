@@ -99,7 +99,7 @@ After those you can dip into any feature doc as needed: [`docs/features/`](../fe
 
 ### Code style
 
-Concise, direct, no over-engineering. Specific rules in `CLAUDE.md`:
+Concise, direct, no over-engineering. Specific rules in [`AGENTS.md`](../../AGENTS.md):
 
 - Files under 500 lines. Split if growing.
 - No magic strings — use constants from `utils/constants.ts` (API) or `js/config.js` (web).
@@ -177,7 +177,6 @@ Look at:
 
 - Linear / GitHub Issues for tasks
 - `progress.md` (root of repo) for the running session log
-- `MEMORY.md` is a Claude-specific memory file; ignore unless you're collaborating with Claude
 
 Ask in Slack / DM if you're stuck more than 30 minutes — the team prefers chat over silent investigation.
 
@@ -207,7 +206,7 @@ To save you from going down dead ends:
 
 Inside the app: top-right user dropdown → "Help & Support".
 
-For engineering questions, the codebase comments and `CLAUDE.md` are the source of truth, then this docs tree.
+For engineering questions, the codebase comments and [`AGENTS.md`](../../AGENTS.md) are the source of truth, then this docs tree.
 
 For domain (PE) questions, ask the partners.
 

@@ -20,7 +20,7 @@ The Next.js migration was merged to `main` on 2026-04-28 (PR #1 + follow-up clea
 - Documentation files in the new app are **placeholder text** (`README.md` is the `create-next-app` default; `CLAUDE.md` literally says "test").
 - 13 files violate our 500-line file-size standard, with two new files at >1000 lines.
 
-This document inventories every outstanding item with file references, prioritizes them by severity, and assigns ownership. **Phase 1 (cleanup of legacy code) is non-negotiable and must be completed within 5 business days.**
+This document inventories every outstanding item with file references, prioritizes them by severity, and assigns ownership. **Phase 1 (cleanup of legacy code) is non-negotiable.**
 
 ---
 
@@ -254,7 +254,7 @@ There is no `.env.example` file in `apps/web-next/`. New developers (or you, six
 
 ## Section E — Action Plan
 
-### Phase 1 — Cleanup (Due: 2026-05-06, 5 business days)
+### Phase 1 — Cleanup
 
 **Owner: Aditya Negi**
 
@@ -271,7 +271,7 @@ There is no `.env.example` file in `apps/web-next/`. New developers (or you, six
 
 **Phase 1 acceptance:** A single PR titled `chore(migration): complete Phase 1 cleanup` that addresses every checkbox above, with each commit linked to its checkbox.
 
-### Phase 2 — Code Quality (Due: 2026-05-13)
+### Phase 2 — Code Quality
 
 **Owner: Aditya Negi**
 
@@ -279,7 +279,7 @@ There is no `.env.example` file in `apps/web-next/`. New developers (or you, six
 - [ ] **C3** — Audit and fix all 82 empty catch blocks.
 - [ ] **C4** — Replace all 14 native `alert()` / `window.confirm()` calls with project UI components.
 
-### Phase 3 — Architecture & Process (Due: 2026-05-27)
+### Phase 3 — Architecture & Process
 
 **Owner: Aditya Negi (with Tech Lead review)**
 
