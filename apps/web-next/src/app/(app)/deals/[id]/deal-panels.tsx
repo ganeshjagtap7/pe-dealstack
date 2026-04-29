@@ -8,6 +8,7 @@ import { DraftEmailModal } from "@/components/deal-actions/DraftEmailModal";
 import type { TeamMember } from "./components";
 
 export { EditDealModal } from "./edit-deal-modal";
+export { ManageTeamModal } from "./manage-team-modal";
 
 // ---------------------------------------------------------------------------
 // Deal Actions Menu (more_vert dropdown: Meeting Prep, Draft Email, Data Room, Delete)
@@ -105,7 +106,13 @@ export function DealActionsMenu({
 // Team Avatar Stack (header, matches legacy renderTeamAvatars)
 // ---------------------------------------------------------------------------
 
-export function TeamAvatarStack({ team }: { team: TeamMember[] }) {
+export function TeamAvatarStack({
+  team,
+  onManage,
+}: {
+  team: TeamMember[];
+  onManage?: () => void;
+}) {
   // TODO(presence): once a backend /presence endpoint is live, the deal page
   // can hydrate `member.lastActiveAt` directly from /deals/:id (joining users
   // with their last activity). Until then `usePresence()` is the source of
@@ -115,18 +122,27 @@ export function TeamAvatarStack({ team }: { team: TeamMember[] }) {
   const visible = team.slice(0, maxVisible);
   const remaining = Math.max(0, team.length - maxVisible);
 
+  // The "+" affordance is ALWAYS rendered — clicking it opens the Manage Team
+  // modal. Previously it only rendered when the team was empty (and was a dead
+  // div with no onClick).
+  const ManageButton = (
+    <button
+      type="button"
+      onClick={onManage}
+      title="Manage team members"
+      aria-label="Manage team members"
+      className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-500 hover:bg-primary-light hover:text-primary transition-colors shrink-0"
+    >
+      <span className="material-symbols-outlined text-[16px]">group_add</span>
+    </button>
+  );
+
   if (team.length === 0) {
-    return (
-      <div className="flex items-center">
-        <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-400 hover:bg-gray-200 transition-colors">
-          <span className="material-symbols-outlined text-[16px]">group_add</span>
-        </div>
-      </div>
-    );
+    return <div className="flex items-center">{ManageButton}</div>;
   }
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-2">
       <div className="flex -space-x-2">
         {visible.map((member, i) => {
           const initials = member.name
@@ -167,10 +183,11 @@ export function TeamAvatarStack({ team }: { team: TeamMember[] }) {
         })}
       </div>
       {remaining > 0 && (
-        <span className="ml-1 text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full">
+        <span className="text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full">
           +{remaining}
         </span>
       )}
+      {ManageButton}
     </div>
   );
 }

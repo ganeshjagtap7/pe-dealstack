@@ -35,7 +35,7 @@ import {
   DealViewers,
   FinancialStatusBadge,
 } from "./components";
-import { EditDealModal, TerminalStageModal } from "./deal-panels";
+import { EditDealModal, ManageTeamModal, TerminalStageModal } from "./deal-panels";
 import { useResizablePanel } from "./use-resizable-panel";
 import { Skeleton } from "@/components/ui/Skeleton";
 
@@ -84,6 +84,9 @@ export default function DealDetailPage() {
 
   // Edit deal modal
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Manage team modal (header "+" / avatar stack)
+  const [showTeamModal, setShowTeamModal] = useState(false);
 
   // Documents
   const [documents, setDocuments] = useState<DocItem[]>([]);
@@ -574,9 +577,20 @@ export default function DealDetailPage() {
           </nav>
         </div>
         <div className="flex items-center gap-4">
-          {/* Team Avatar Stack */}
-          <div className="hidden md:flex items-center cursor-pointer hover:opacity-80 transition-opacity">
-            <TeamAvatarStack team={deal.team || []} />
+          {/* Team Avatar Stack — click "+" or any avatar to open Manage Team */}
+          <div
+            className="hidden md:flex items-center hover:opacity-90 transition-opacity"
+            onClick={(e) => {
+              // Only open from clicks on avatars; the explicit "+" button has
+              // its own onClick passed via onManage.
+              if ((e.target as HTMLElement).closest("button")) return;
+              setShowTeamModal(true);
+            }}
+          >
+            <TeamAvatarStack
+              team={deal.team || []}
+              onManage={() => setShowTeamModal(true)}
+            />
           </div>
 
           <Link
@@ -875,6 +889,22 @@ export default function DealDetailPage() {
             setDeal((prev) => (prev ? { ...prev, ...updated } : updated));
             showToast("Deal details have been saved", "success", { title: "Deal Updated" });
             loadActivities();
+          }}
+        />
+      )}
+
+      {/* Manage Team Modal (header avatar stack "+") */}
+      {showTeamModal && deal && (
+        <ManageTeamModal
+          dealId={dealId}
+          initialTeam={deal.team || []}
+          onClose={() => {
+            setShowTeamModal(false);
+            // Reload activities — adds/removes/role-changes log activity rows.
+            loadActivities();
+          }}
+          onTeamChanged={(team) => {
+            setDeal((prev) => (prev ? { ...prev, team } : prev));
           }}
         />
       )}
