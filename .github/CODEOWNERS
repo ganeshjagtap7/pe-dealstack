@@ -1,0 +1,7 @@
+# Code owners — every change to this repo requires approval from @ganeshjagtap7.
+# Branch protection on main is configured to require code owner review, so
+# this file is the only authoritative gate for merges to main.
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner — applies to everything not matched below
+*       @ganeshjagtap7
