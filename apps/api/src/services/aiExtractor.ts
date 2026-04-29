@@ -250,28 +250,9 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
       }
     }
 
-    // Post-processing correction: Fix Crore conversion if AI divided instead of multiplied
-    if (result.currency === 'INR') {
-      const hasCrore = /crore|cr\b/i.test(textLower);
-      
-      if (hasCrore) {
-        // Check if values look like they were divided by 10 instead of multiplied
-        // If text has "32.6 Crore" but extracted value is 3.26, it should be 326
-        const fixCroreConversion = (field: ExtractedField<number | null>, fieldName: string) => {
-          if (field.value !== null && field.value > 0 && field.value < 100) {
-            // If value is small (<100) and text has Crore, likely AI divided instead of multiplied
-            // Multiply by 100 to correct (since AI divided by 10 when it should have multiplied by 10)
-            const corrected = field.value * 100;
-            log.info(`Post-processing: Corrected ${fieldName} from ${field.value} to ${corrected} (Crore conversion fix)`);
-            field.value = corrected;
-          }
-        };
-
-        fixCroreConversion(result.revenue, 'revenue');
-        fixCroreConversion(result.ebitda, 'ebitda');
-        fixCroreConversion(result.dealSize, 'dealSize');
-      }
-    }
+    // Note: Crore conversion is handled by the AI based on explicit prompt instructions
+    // 32.6 Crores = 326 million (multiply by 10)
+    // No post-processing needed - AI instructions are explicit
 
     // Calculate overall confidence and determine if review is needed
     const confidenceScores: number[] = [];
