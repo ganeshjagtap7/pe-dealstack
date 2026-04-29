@@ -45,7 +45,7 @@ flowchart TD
 
     FallbackVision --> ImageExtract
 
-    subgraph LangGraphAgent["LangGraph Financial Agent — 5-Node StateGraph"]
+    subgraph LangGraphAgent["LangGraph Financial Agent — 6-Node StateGraph"]
         direction TB
 
         ExtractNode["EXTRACT NODE
@@ -61,6 +61,12 @@ flowchart TD
         Cross-check vs source text
         Catches unit errors, transposed digits
         Best-effort — continues on failure"]
+
+        CrossVerifyNode["CROSS-VERIFY NODE
+        crossVerifyNode.ts
+        Cross-statement consistency
+        e.g. Net Income flows into Cash Flow
+        Best-effort"]
 
         ValidateNode["VALIDATE NODE
         validateNode.ts
@@ -80,7 +86,8 @@ flowchart TD
         Handle merge conflicts"]
 
         ExtractNode --> VerifyNode
-        VerifyNode --> ValidateNode
+        VerifyNode --> CrossVerifyNode
+        CrossVerifyNode --> ValidateNode
         ValidateNode -->|Pass| StoreNode
         ValidateNode -->|Fail| SelfCorrectNode
         SelfCorrectNode -->|"Retry (max 3)"| ValidateNode
@@ -136,6 +143,7 @@ flowchart TD
     style Input fill:#8b5cf6,color:#fff,stroke:#7c3aed
     style ExtractNode fill:#003366,color:#fff,stroke:#002855
     style VerifyNode fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style CrossVerifyNode fill:#06b6d4,color:#fff,stroke:#0891b2
     style ValidateNode fill:#f59e0b,color:#fff,stroke:#d97706
     style SelfCorrectNode fill:#ef4444,color:#fff,stroke:#dc2626
     style StoreNode fill:#10b981,color:#fff,stroke:#059669

@@ -1,0 +1,110 @@
+flowchart TB
+    subgraph Inputs["Input Sources"]
+        direction LR
+        I_Upload["File upload
+        POST /api/ingest/upload
+        ingest-upload.ts"]
+        I_URL["URL ingest
+        POST /api/ingest/url
+        ingest-url.ts"]
+        I_Email["Forwarded email
+        POST /api/ingest/email
+        ingest-email.ts"]
+        I_Text["Pasted text
+        POST /api/ingest/text
+        ingest-text.ts"]
+        I_VDR["VDR upload
+        POST /api/deals/:id/documents/upload
+        documents-upload.ts"]
+    end
+
+    subgraph Validation["File Validation"]
+        direction TB
+        MagicBytes["fileValidator.ts
+        magic-bytes check
+        rejects spoofed MIME"]
+        SizeLimit["Size limit
+        50 MB JSON limit
+        per-file caps"]
+        Encrypt["encryption.ts
+        sensitive fields encrypted at rest"]
+        MagicBytes --> SizeLimit --> Encrypt
+    end
+
+    subgraph Storage["Storage"]
+        direction LR
+        SupaStore["Supabase Storage
+        files bucket"]
+        DocRow["Document row
+        fileUrl, name, type, size,
+        dealId, folderId, uploadedBy"]
+        SupaStore --> DocRow
+    end
+
+    subgraph Parse["Document Parse"]
+        direction TB
+        Router{File type}
+        PDFParse["PDF
+        services/pdfExtractor.ts
+        pdf-parse → raw text"]
+        ExcelParse["Excel
+        services/excelParser.ts
+        xlsx → sheets + scoring"]
+        WordParse["Word
+        services/documentParser.ts
+        mammoth → text"]
+        EmailParse["Email
+        services/emailParser.ts
+        mailparser → headers + body"]
+        Router --> PDFParse & ExcelParse & WordParse & EmailParse
+    end
+
+    subgraph Branch["Routing by content"]
+        direction TB
+        Q{Is financial doc?}
+    end
+
+    subgraph FinPath["Financial path"]
+        direction TB
+        FinAgent["runFinancialAgent()
+        services/agents/financialAgent
+        6-node LangGraph"]
+        FinTable["FinancialStatement table
+        merge logic + isActive"]
+        FinAgent --> FinTable
+    end
+
+    subgraph DocPath["Generic doc path"]
+        direction TB
+        ChunkSvc["documentChunker.ts
+        chunk text with overlap"]
+        Chunks["DocumentChunk table
+        with embeddings (jsonb)"]
+        ChunkSvc --> Chunks
+    end
+
+    subgraph Insights["AI insights"]
+        direction LR
+        FolderInsight["Folder Insights
+        services/folderInsightsGenerator.ts
+        completion %, red flags"]
+        DocAlerts["Document alerts
+        documents-alerts.ts"]
+        AIAnalysis["aiExtractor.ts
+        deal context extraction"]
+    end
+
+    Inputs --> Validation --> Storage
+    Storage --> Parse --> Branch
+    Branch -->|Yes| FinPath
+    Branch -->|No| DocPath
+    DocPath --> Insights
+    FinPath --> Insights
+
+    style Inputs fill:#003366,color:#fff,stroke:#002855
+    style Validation fill:#ef4444,color:#fff,stroke:#dc2626
+    style Storage fill:#10b981,color:#fff,stroke:#059669
+    style Parse fill:#3b82f6,color:#fff,stroke:#2563eb
+    style FinPath fill:#6366f1,color:#fff,stroke:#4f46e5
+    style DocPath fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style Insights fill:#f59e0b,color:#fff,stroke:#d97706

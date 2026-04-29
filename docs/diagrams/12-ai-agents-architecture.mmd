@@ -1,176 +1,199 @@
 flowchart TB
-    subgraph LLMLayer["Unified LLM Layer — llm.ts"]
+    subgraph LLMLayer["Unified LLM Layer — services/llm.ts"]
         direction LR
         ChatModel["getChatModel()
         GPT-4o — main reasoning"]
         FastModel["getFastModel()
-        GPT-4o-mini — verification"]
+        GPT-4o-mini — verify, classify"]
         ExtractModel["getExtractionModel()
-        GPT-4o — structured output"]
-        GeminiAlt["Gemini — alternative
-        LLM_CHAT_PROVIDER env var"]
+        GPT-4o — structured JSON"]
+        GeminiAlt["Gemini fallback
+        LLM_CHAT_PROVIDER env"]
     end
 
-    subgraph FinancialAgent["Financial Agent — LangGraph StateGraph"]
+    subgraph FinancialAgent["Financial Agent — LangGraph (6 nodes)"]
         direction TB
         FA_Entry["runFinancialAgent()
-        agents/financialAgent/index.ts"]
-        FA_Extract["Extract Node
-        3-layer fallback"]
-        FA_Verify["Verify Node
-        Two-pass GPT-4o-mini"]
-        FA_Validate["Validate Node
-        Range and scale checks"]
-        FA_SelfCorrect["Self-Correct Node
-        Targeted re-extraction"]
-        FA_Store["Store Node
-        DB + merge conflicts"]
-        FA_Entry --> FA_Extract --> FA_Verify --> FA_Validate
-        FA_Validate -->|Fail| FA_SelfCorrect -->|Retry| FA_Validate
-        FA_Validate -->|Pass| FA_Store
+        services/agents/financialAgent/index.ts"]
+        FA_Extract["extract
+        3-layer fallback:
+        Azure DI → pdf-parse+GPT-4o → Vision"]
+        FA_Verify["verify
+        Two-pass GPT-4o-mini
+        catches scale + transposition errors"]
+        FA_CrossVerify["cross_verify
+        Cross-statement consistency
+        e.g. Net Income → Cash Flow"]
+        FA_Validate["validate
+        Range and accounting checks"]
+        FA_SelfCorrect["self_correct
+        Targeted re-extraction
+        max 3 retries"]
+        FA_Store["store
+        DB persistence + merge conflicts"]
+        FA_Entry --> FA_Extract --> FA_Verify --> FA_CrossVerify --> FA_Validate
+        FA_Validate -->|fail| FA_SelfCorrect -->|retry| FA_Validate
+        FA_Validate -->|pass| FA_Store
     end
 
-    subgraph DealChatAgent["Deal Chat Agent — ReAct"]
+    subgraph DealChatAgent["Deal Chat Agent — ReAct (14 tools)"]
         direction TB
         DC_Entry["runDealChatAgent()
-        agents/dealChatAgent/index.ts"]
-        DC_Tools["6 Closure-Bound Tools
-        getDealChatTools(dealId, orgId)"]
-        DC_T1["search_documents
-        Full-text VDR search"]
-        DC_T2["get_deal_financials
-        ALL statements (active+inactive)"]
-        DC_T3["compare_deals
-        Cross-deal comparison"]
-        DC_T4["get_deal_activity
-        Timeline feed"]
-        DC_T5["update_deal_field
-        Modify deal properties"]
-        DC_T6["suggest_action
-        Structured recommendations"]
-        DC_Entry --> DC_Tools
-        DC_Tools --> DC_T1 & DC_T2 & DC_T3 & DC_T4 & DC_T5 & DC_T6
+        services/agents/dealChatAgent/index.ts"]
+        DC_Tools["getDealChatTools(dealId, orgId)
+        closure-bound LangChain tools"]
+        DC_Read["READ tools
+        search_documents
+        get_deal_financials
+        compare_deals
+        get_deal_activity
+        get_analysis_summary
+        list_documents"]
+        DC_Write["WRITE tools
+        update_deal_field
+        change_deal_stage
+        add_note"]
+        DC_Trigger["TRIGGER tools
+        trigger_financial_extraction
+        generate_meeting_prep
+        draft_email"]
+        DC_Nav["UI tools
+        scroll_to_section
+        suggest_action"]
+        DC_Entry --> DC_Tools --> DC_Read & DC_Write & DC_Trigger & DC_Nav
     end
 
-    subgraph PortfolioChat["Portfolio Chat — ReAct"]
+    subgraph FirmResearch["Firm Research Agent — LangGraph (6 nodes)"]
         direction TB
-        PC_Entry["ai-portfolio.ts
-        Inline ReAct agent"]
-        PC_T1["get_portfolio_summary
-        All deals overview"]
-        PC_T2["get_deal_details
-        Single deal + financials"]
-        PC_T3["get_pipeline_analysis
-        Stage distribution"]
-        PC_Entry --> PC_T1 & PC_T2 & PC_T3
+        FR_Entry["runFirmResearch()
+        services/agents/firmResearchAgent/index.ts"]
+        FR_Scrape["scrape
+        Firm website + LinkedIn"]
+        FR_SearchFirm["search_firm
+        Apify Google Search"]
+        FR_SearchPerson["search_person
+        Founder/partner background"]
+        FR_Synth["synthesize
+        Strategy + sectors + check size"]
+        FR_Verify["verify
+        Confidence scoring"]
+        FR_Save["save
+        Org.settings.firmProfile"]
+        FR_Deep["deep_research (Phase 2)
+        background, 60-120s
+        GPT-4o query gen + threads"]
+        FR_Entry --> FR_Scrape --> FR_SearchFirm --> FR_SearchPerson --> FR_Synth --> FR_Verify --> FR_Save
+        FR_Save -.->|"async background"| FR_Deep
     end
 
-    subgraph ContactEnrich["Contact Enrichment — 4-Node StateGraph"]
+    subgraph MemoAgent["Memo Agent — Pipeline + Tools"]
         direction TB
-        CE_Entry["agents/contactEnrichment/index.ts"]
-        CE_Research["Research Node
-        LLM inference only"]
-        CE_Validate["Validate Node
-        Input-sparsity confidence caps
-        name only=max 30%
-        name+email=max 50%"]
-        CE_Save["Save Node
-        Store enriched data"]
-        CE_Review["Review Node
-        Low confidence flagged"]
+        MA_Entry["services/agents/memoAgent/index.ts"]
+        MA_Pipeline["pipeline.ts
+        section-by-section generation"]
+        MA_Context["context.ts
+        deal data + financials + docs"]
+        MA_Tools["tools.ts
+        section-specific helpers"]
+        MA_Prompts["prompts.ts
+        12 section types"]
+        MA_Entry --> MA_Pipeline --> MA_Context & MA_Tools & MA_Prompts
+    end
+
+    subgraph ContactEnrich["Contact Enrichment — 4-node graph"]
+        direction TB
+        CE_Entry["services/agents/contactEnrichment/index.ts"]
+        CE_Research["research
+        LLM inference"]
+        CE_Validate["validate
+        input-sparsity caps:
+        name only → max 30%
+        name+email → max 50%"]
+        CE_Save["save
+        store enrichment"]
+        CE_Review["review
+        flag low-confidence"]
         CE_Entry --> CE_Research --> CE_Validate
-        CE_Validate -->|High conf| CE_Save
-        CE_Validate -->|Low conf| CE_Review
+        CE_Validate -->|high| CE_Save
+        CE_Validate -->|low| CE_Review
     end
 
     subgraph MeetingPrep["Meeting Prep — Parallel Fetcher"]
         direction TB
-        MP_Entry["agents/meetingPrep/index.ts"]
-        MP_Fetch["Parallel Fetch — 5 Sources"]
+        MP_Entry["services/agents/meetingPrep/index.ts"]
+        MP_Fetch["Parallel fetch — 5 sources"]
         MP_S1["Deal info"]
         MP_S2["Financial statements"]
         MP_S3["Activity timeline"]
         MP_S4["Contacts"]
         MP_S5["Company research"]
-        MP_Brief["Generate Brief
+        MP_Brief["Generate brief
         Talking points, questions,
         risks, agenda"]
-        MP_Entry --> MP_Fetch
-        MP_Fetch --> MP_S1 & MP_S2 & MP_S3 & MP_S4 & MP_S5
+        MP_Entry --> MP_Fetch --> MP_S1 & MP_S2 & MP_S3 & MP_S4 & MP_S5
         MP_S1 & MP_S2 & MP_S3 & MP_S4 & MP_S5 --> MP_Brief
     end
 
-    subgraph SignalMonitor["Signal Monitor — 3-Node StateGraph"]
+    subgraph SignalMonitor["Signal Monitor — 3-node graph"]
         direction TB
-        SM_Entry["agents/signalMonitor/index.ts"]
+        SM_Entry["services/agents/signalMonitor/index.ts"]
         SM_Fetch["fetchPortfolio
-        All active deals"]
+        all active deals"]
         SM_Analyze["analyzeSignals
         8 signal types"]
         SM_Route["routeSignals
-        Severity-based routing
         critical / warning / info"]
         SM_Entry --> SM_Fetch --> SM_Analyze --> SM_Route
     end
 
-    subgraph EmailDrafter["Email Drafter — 4-Node StateGraph"]
+    subgraph EmailDrafter["Email Drafter — 4-node graph"]
         direction TB
-        ED_Entry["agents/emailDrafter/index.ts"]
-        ED_Write["writeDraft Node
+        ED_Entry["services/agents/emailDrafter/index.ts"]
+        ED_Write["writeDraft
         7 templates"]
-        ED_Tone["toneCheck Node
-        5 tone options"]
-        ED_Compliance["complianceCheck Node
+        ED_Tone["toneCheck
+        5 tones"]
+        ED_Compliance["complianceCheck
         PE compliance rules"]
-        ED_Final["finalize Node
+        ED_Final["finalize
         ready_for_review or
         compliance_issues"]
         ED_Entry --> ED_Write --> ED_Tone --> ED_Compliance --> ED_Final
     end
 
-    subgraph Frontend["Frontend — ai-tools.js"]
-        direction LR
-        FE_Enrich["AI Enrich button
-        contacts.html"]
-        FE_Meeting["Meeting Prep
-        deal.html menu"]
-        FE_Email["Draft Email
-        deal.html menu"]
-        FE_Signal["Scan Signals
-        dashboard widget"]
-        FE_Chat["Deal Chat
-        deal.html tab"]
-        FE_Portfolio["Portfolio Chat
-        coming-soon"]
-        FE_Attach["Chat Attachment
-        deal-chat-attachments.js"]
-    end
-
-    subgraph APIEndpoints["API Endpoints — ai-agents.ts"]
+    subgraph APIEndpoints["API Endpoints"]
         direction LR
         EP1["POST /api/ai/enrich-contact"]
         EP2["POST /api/ai/meeting-prep"]
         EP3["POST /api/ai/draft-email"]
         EP4["POST /api/ai/scan-signals"]
-        EP5["POST /api/deals/:id/chat"]
+        EP5["POST /api/deals/:id/chat
+        (deals-chat-ai.ts)"]
         EP6["POST /api/ai/portfolio/chat"]
+        EP7["POST /api/onboarding/enrich-firm"]
+        EP8["POST /api/financials/extract
+        (financials-extraction.ts)"]
+        EP9["POST /api/memos/:id/sections/:id/generate"]
     end
 
-    LLMLayer --> FinancialAgent & DealChatAgent & PortfolioChat & ContactEnrich & MeetingPrep & SignalMonitor & EmailDrafter
+    LLMLayer --> FinancialAgent & DealChatAgent & FirmResearch & MemoAgent
+    LLMLayer --> ContactEnrich & MeetingPrep & SignalMonitor & EmailDrafter
 
-    FE_Enrich --> EP1 --> ContactEnrich
-    FE_Meeting --> EP2 --> MeetingPrep
-    FE_Email --> EP3 --> EmailDrafter
-    FE_Signal --> EP4 --> SignalMonitor
-    FE_Chat --> EP5 --> DealChatAgent
-    FE_Portfolio --> EP6 --> PortfolioChat
+    EP1 --> ContactEnrich
+    EP2 --> MeetingPrep
+    EP3 --> EmailDrafter
+    EP4 --> SignalMonitor
+    EP5 --> DealChatAgent
+    EP7 --> FirmResearch
+    EP8 --> FinancialAgent
+    EP9 --> MemoAgent
 
     style LLMLayer fill:#003366,color:#fff,stroke:#002855
     style FinancialAgent fill:#6366f1,color:#fff,stroke:#4f46e5
     style DealChatAgent fill:#3b82f6,color:#fff,stroke:#2563eb
-    style PortfolioChat fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style FirmResearch fill:#06b6d4,color:#fff,stroke:#0891b2
+    style MemoAgent fill:#a855f7,color:#fff,stroke:#9333ea
     style ContactEnrich fill:#8b5cf6,color:#fff,stroke:#7c3aed
     style MeetingPrep fill:#14b8a6,color:#fff,stroke:#0d9488
     style SignalMonitor fill:#f59e0b,color:#fff,stroke:#d97706
     style EmailDrafter fill:#10b981,color:#fff,stroke:#059669
-    style Frontend fill:#003366,color:#fff,stroke:#002855

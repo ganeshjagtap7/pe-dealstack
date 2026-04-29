@@ -1,0 +1,104 @@
+flowchart TB
+    subgraph Signup["1 — Signup"]
+        direction TB
+        Form["signup.html
+        name, email, firm, password"]
+        SupaSignup["supabase.auth.signUp()"]
+        Verify["verify-email.html
+        click email link"]
+        FirstLogin["First login"]
+        Form --> SupaSignup --> Verify --> FirstLogin
+    end
+
+    subgraph AutoProvision["2 — Auto-provision (server)"]
+        direction TB
+        FindOrCreate["findOrCreateUser()
+        services/userService.ts"]
+        CreateOrg["INSERT Organization
+        name = firmName"]
+        CreateUser["INSERT User
+        role = ADMIN
+        organizationId set"]
+        InitOnboard["onboardingStatus JSONB
+        welcomeShown = false"]
+        FindOrCreate --> CreateOrg --> CreateUser --> InitOnboard
+    end
+
+    subgraph Welcome["3 — Welcome Modal"]
+        direction TB
+        WelcomeModal["onboarding-welcome.js
+        modal on first dashboard load"]
+        SetWelcome["PATCH /api/onboarding/welcome-shown
+        flag flipped to true"]
+        WelcomeModal --> SetWelcome
+    end
+
+    subgraph Onboard["4 — Standalone Onboarding (apps/web/onboarding.html)"]
+        direction TB
+        Step1["Step 1 — Investment Focus
+        firm website, LinkedIn,
+        sectors, check size"]
+        EnrichTrigger["onBlur(website)
+        POST /api/onboarding/enrich-firm"]
+        FirmAgent["Firm Research Agent
+        scrape + search + synthesize"]
+        Preview["Preview card
+        Use this profile? Y/N"]
+        Step2["Step 2 — Upload First Deal
+        CIM dropzone or sample"]
+        Ingest["POST /api/ingest/upload
+        creates Deal + extracts financials"]
+        Step3["Step 3 — Invite Team
+        optional"]
+        InviteAPI["POST /api/invitations"]
+        Done["Completion screen
+        AI findings + Phase 2 notice"]
+        Step1 --> EnrichTrigger --> FirmAgent --> Preview --> Step2
+        Step2 --> Ingest --> Step3
+        Step3 --> InviteAPI --> Done
+        Step3 -.->|skip| Done
+    end
+
+    subgraph Checklist["5 — Persistent Checklist Widget"]
+        direction TB
+        Status["GET /api/onboarding/status
+        auto-backfills 5 steps from
+        real activity each load"]
+        Steps["5 steps:
+        1. Investment focus
+        2. Create first deal
+        3. Upload document
+        4. Review extraction
+        5. Try AI chat"]
+        ManualToggle["Empty circle = button
+        click marks complete (forward only)"]
+        Status --> Steps --> ManualToggle
+    end
+
+    subgraph CompleteHooks["6 — Auto-completion Hooks"]
+        direction LR
+        H1["createDeal()
+        crm.js"]
+        H2["uploadDocument()
+        documents-upload.ts"]
+        H3["reviewExtraction()
+        financials.js"]
+        H4["tryDealChat()
+        deal-chat.js"]
+        H5["inviteTeamMember()
+        invitations.ts"]
+    end
+
+    FirstLogin --> AutoProvision
+    AutoProvision --> Welcome
+    Welcome --> Onboard
+    Onboard --> Checklist
+    Checklist <--> CompleteHooks
+
+    style Signup fill:#003366,color:#fff,stroke:#002855
+    style AutoProvision fill:#6366f1,color:#fff,stroke:#4f46e5
+    style Welcome fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Onboard fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style Checklist fill:#10b981,color:#fff,stroke:#059669
+    style CompleteHooks fill:#f59e0b,color:#fff,stroke:#d97706
+    style FirmAgent fill:#06b6d4,color:#fff,stroke:#0891b2

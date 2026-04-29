@@ -1,187 +1,263 @@
-# PE OS — AI-Native Deal CRM
+# PE OS — AI-Native Deal CRM for Private Equity
 
-A modern, AI-powered CRM for Private Equity firms to manage deal flow, track opportunities, and analyze investments with artificial intelligence.
+A multi-tenant AI-powered CRM purpose-built for PE firms and search funds. Track deal flow, ingest CIMs, extract financials with a self-correcting agent, draft IC memos, and run portfolio-wide AI analysis.
 
-**Production:** https://pe-os.onrender.com
+> **Status:** active development. `main` is production. **Last updated:** 2026-04-29.
+
+---
+
+## Contents
+
+- [What's in here](#whats-in-here)
+- [Diagrams](#diagrams)
+- [Documentation](#documentation)
+- [Tech stack](#tech-stack)
+- [Project structure](#project-structure)
+- [Quick start](#quick-start)
+- [API overview](#api-overview)
+- [Scripts](#scripts)
+- [Deployment](#deployment)
 
 ---
 
-### System Architecture
-<p align="center">
-  <img src="docs/diagrams/08-system-architecture.png" alt="System Architecture" width="100%"/>
-</p>
+## What's in here
 
-### AI Memo Builder Flow
-<p align="center">
-  <img src="docs/diagrams/04-memo-builder-flow.png" alt="Memo Builder Flow" width="100%"/>
-</p>
+- **Two frontends.** `apps/web-next` (Next.js 16 + React 19 + Tailwind v4) is the primary product surface. `apps/web` (Vite + vanilla JS) is the legacy MPA we are migrating away from.
+- **One Express + TypeScript API.** 48 route files, 37 service modules, **8 LangGraph / ReAct agents**.
+- **Supabase Postgres** for data, auth, and storage. ~25 tables; multi-tenant via `Organization`.
+- **Eight AI agents:** Financial (6-node LangGraph), Deal Chat (ReAct + 14 tools), Memo (pipeline), Firm Research (6-node + Phase-2 deep research), Contact Enrichment, Meeting Prep, Signal Monitor, Email Drafter.
 
-### Document & Virtual Data Room Flow
-<p align="center">
-  <img src="docs/diagrams/03-document-vdr-flow.png" alt="Document & VDR Flow" width="100%"/>
-</p>
+## Features at a glance
 
-> See all 10 diagrams in [`docs/diagrams/`](docs/diagrams/) — includes Auth Flow, Deal Lifecycle, ER Diagram, Role Matrix, User Journeys, and Navigation Flow.
+- **Deal Pipeline** — 7-stage Kanban (`INITIAL_REVIEW → DUE_DILIGENCE → IOI_SUBMITTED → LOI_NEGOTIATION → CLOSING → CLOSED_WON`; terminals `CLOSED_LOST`, `PASSED`).
+- **Deal Import** — CSV / Excel / paste up to 500 deals (~$0.01–0.02 per import via GPT-4o column mapping with deterministic overrides).
+- **VDR (Virtual Data Room)** — folder tree + smart filters (4 built-in + 7 custom presets) + cross-folder search + folder insights.
+- **Financial Extraction** — 6-node LangGraph: extract → verify → cross-verify → validate → self-correct → store. Three-layer extraction (Azure DI → pdf-parse + GPT-4o → GPT-4o Vision). Multi-document merge with DB-enforced active-row uniqueness.
+- **PE Analysis Suite** — QoE, financial ratios, operational analysis, debt & LBO screen, red flags, EBITDA bridges.
+- **Memo Builder** — section-by-section IC memos with AI grounding in the deal's financials.
+- **Deal Chat** — ReAct agent with 14 tools (search docs, get financials, compare deals, update fields, change stage, add note, trigger extraction, draft email, prep meeting, scroll, suggest action).
+- **Firm Research Agent** — onboarding firm enrichment (Phase 1 ≤ 60s) + background deep research (Phase 2 60–120s). Stores to `Organization.settings.firmProfile`.
+- **Multi-tenancy** — every row org-scoped; 48 route files hardened; 34 integration tests; cross-org returns 404 (anti-enumeration).
+- **RBAC** — `ADMIN`, `MEMBER`, `VIEWER`, `OPS` + per-deal access via `DealTeamMember`.
+- **Onboarding** — 3-step standalone flow + persistent checklist that auto-backfills from real activity.
+- **Admin Command Center** — ops/COO cockpit with task management, audit log, team roster, pending invitations.
 
----
+## Diagrams
+
+The full diagram set lives in [`docs/diagrams/`](docs/diagrams/) (Mermaid `.mmd` + rendered `.png`). Highlights:
+
+| Diagram | What it shows |
+| --- | --- |
+| [System Architecture](docs/diagrams/08-system-architecture.mmd) | Top-down: web-next + legacy web + 48-route API + 8 agents + external services |
+| [AI Agents Architecture](docs/diagrams/12-ai-agents-architecture.mmd) | All 8 agents, the unified LLM layer, and their endpoints |
+| [Financial Extraction Pipeline](docs/diagrams/11-financial-extraction-pipeline.mmd) | 6-node LangGraph + 3-layer extraction |
+| [ER Diagram](docs/diagrams/07-er-diagram.mmd) | Full Postgres schema |
+| [Multi-Tenancy / Org Isolation](docs/diagrams/13-multi-tenancy-org-isolation.mmd) | Direct + indirect scoping patterns |
+| [Onboarding Flow](docs/diagrams/14-onboarding-flow.mmd) | Signup → 3-step onboarding → persistent checklist |
+| [Firm Research Agent](docs/diagrams/15-firm-research-agent.mmd) | Phase 1 sync + Phase 2 deep research |
+| [Deal Import Flow](docs/diagrams/16-deal-import-flow.mmd) | 4-step modal + 5-phase batch insert |
+| [Document Ingest Pipeline](docs/diagrams/17-document-ingest-pipeline.mmd) | All 5 ingest sources → validation → storage → routing |
+| [Web-Next Architecture](docs/diagrams/18-webnext-architecture.mmd) | Next.js 16 App Router layout |
+| [Deal Chat ReAct Agent](docs/diagrams/19-deal-chat-react-agent.mmd) | Sequence diagram for chat + tool calls |
+| [Auth Flow](docs/diagrams/sample-auth-flow.mmd) | Signup, login, invitation, reset, RBAC |
+
+Render any diagram with:
+
+```bash
+npx -p @mermaid-js/mermaid-cli mmdc -i docs/diagrams/08-system-architecture.mmd -o docs/diagrams/08-system-architecture.png
+```
 
 ## Documentation
 
-| Guide | Description |
-|-------|-------------|
-| [Environment Setup](docs/ENVIRONMENT_SETUP.md) | All environment variables explained |
-| [Deployment](docs/DEPLOYMENT.md) | Render deployment runbook |
-| [Troubleshooting](docs/TROUBLESHOOTING.md) | Common issues and fixes |
-| [Architecture](docs/ARCHITECTURE.md) | System architecture |
-| [API Reference](docs/API.md) | API endpoints |
-| [Security](docs/SECURITY.md) | Security considerations |
+Full docs tree: [`docs/README.md`](docs/README.md). Start here:
 
-## Features
+| Read this if you... | Doc |
+| --- | --- |
+| just joined the team | [New Teammate Guide](docs/onboarding/new-teammate-guide.md) |
+| need a system mental model | [Architecture Overview](docs/architecture/overview.md) |
+| are touching the schema | [Data Model](docs/architecture/data-model.md) |
+| are touching the API | [API Routes](docs/architecture/api-routes.md) |
+| are touching agents/AI | [AI Agents](docs/architecture/ai-agents.md) |
+| need to verify multi-tenancy | [Security](docs/architecture/security.md) |
+| want a flow walk-through | [User Flows](docs/user-flows/) |
+| want product-level feature docs | [Features](docs/features/) |
+| are deploying or operating | [Deployment](docs/DEPLOYMENT.md), [Environment Setup](docs/ENVIRONMENT_SETUP.md), [Troubleshooting](docs/TROUBLESHOOTING.md) |
 
-- **Deal Pipeline Management** — Track deals across stages (Initial Review → Due Diligence → IOI → LOI → Negotiation → Closing)
-- **AI-Powered Insights** — GPT-4 analysis, thesis generation, and deal chat
-- **Document Intelligence** — Upload and process CIMs, teasers, financials with magic-bytes validation
-- **Investment Memo Builder** — Template-based memos with AI-generated sections
-- **Virtual Data Room** — Folder-based document management with access controls
-- **Role-Based Access** — ADMIN / MEMBER / VIEWER roles with permission-gated features
-- **Team Collaboration** — Invite team members, assign deals, share documents
-- **Real-time Dashboard** — Live metrics and KPIs for your portfolio
-- **Error Tracking** — Sentry integration for both frontend and backend
-- **Rate Limiting** — Tiered rate limits (general, AI, write operations)
+## Tech stack
 
-## Tech Stack
+| Layer | Tools |
+| --- | --- |
+| Primary frontend | Next.js 16 + React 19 + Tailwind v4 (`apps/web-next`, port 3002) |
+| Legacy frontend | Vite + vanilla JS + Tailwind (`apps/web`, port 3003). 30 HTML pages + 39 JS modules. VDR is React/Vite. |
+| Backend | Express + TypeScript (`apps/api`, port 3001). Zod validation. Pino logging. |
+| Database | Supabase (Postgres + Auth + Storage) |
+| AI | OpenAI GPT-4o + GPT-4o-mini via unified `services/llm.ts`; Gemini and Anthropic supported as alternates |
+| Agent framework | LangGraph + LangChain (`@langchain/langgraph`, `@langchain/openai`, `@langchain/core`) |
+| Document parsing | pdf-parse, xlsx, mammoth, mailparser; Azure Document Intelligence + LlamaParse as deep-parse fallbacks |
+| Web scraping | Apify Google Search + DuckDuckGo Lite fallback |
+| Email | Resend |
+| Error tracking | Sentry |
+| Hosting | Vercel (single deployment: Next.js + serverless API) |
+| Build | Turborepo |
+| Testing | Vitest + Supertest (API), Playwright (web), Vitest (web-next) |
 
-**Frontend:** HTML5, Vanilla JavaScript, Tailwind CSS, Vite
-**Backend:** Node.js, Express, TypeScript, Zod validation
-**Database:** Supabase (PostgreSQL + Auth + Storage)
-**AI:** OpenAI GPT-4, Google Gemini (RAG)
-**Infrastructure:** Turborepo, Render.com, Sentry
-**Testing:** Vitest, Supertest
-
-## Project Structure
+## Project structure
 
 ```
 AI CRM/
 ├── apps/
-│   ├── web/                     # Frontend (Vite + vanilla JS)
-│   │   ├── index.html           # Landing page
-│   │   ├── dashboard.html       # Main dashboard
-│   │   ├── crm.html             # Deal pipeline
-│   │   ├── deal.html            # Deal detail / AI chat
-│   │   ├── memo-builder.html    # Investment memo builder
-│   │   ├── admin-dashboard.html # Admin panel
-│   │   ├── js/                  # JavaScript modules
-│   │   └── vite.config.ts       # Vite config (env injection, Sentry)
-│   └── api/                     # Backend (Express + TypeScript)
-│       ├── src/
-│       │   ├── index.ts         # Server entry point
-│       │   ├── middleware/       # Auth, RBAC
-│       │   ├── routes/          # API routes
-│       │   ├── services/        # Business logic (audit, file validation, AI)
-│       │   └── utils/           # Logger, helpers
-│       ├── tests/               # Vitest test suite
-│       └── package.json
+│   ├── api/                       # Express + TypeScript (port 3001)
+│   │   └── src/
+│   │       ├── app.ts             # Middleware stack + route mounting
+│   │       ├── index.ts           # Bootstraps Express
+│   │       ├── middleware/        # auth, orgScope, rbac, errorHandler, requestId
+│   │       ├── routes/            # 48 route files
+│   │       └── services/          # 37 service files + agents/ + analysis/ + parsers/
+│   ├── web-next/                  # Next.js 16 — primary (port 3002)
+│   │   └── src/
+│   │       ├── app/
+│   │       │   ├── (auth)/        # login, signup, verify, forgot, reset, accept-invite
+│   │       │   ├── (onboarding)/  # standalone onboarding
+│   │       │   ├── (app)/         # authenticated routes
+│   │       │   └── api/[...slug]/ # proxy to Express API
+│   │       ├── components/        # ui, layout, vdr, deal-actions, onboarding
+│   │       ├── lib/               # supabase, vdr, utils
+│   │       └── providers/         # auth, theme, toast
+│   ├── web/                       # Legacy vanilla JS (port 3003)
+│   └── extractor/                 # Standalone extractor utility
 ├── packages/
-│   ├── shared/                  # Shared TypeScript types
-│   └── ui/                      # Shared UI components
-├── render.yaml                  # Render deployment blueprint
-├── turbo.json                   # Turborepo config
-└── package.json                 # Root workspace config
+│   ├── ui/                        # Shared React components / styles
+│   └── shared/                    # Shared TypeScript types (legacy)
+├── docs/                          # All documentation
+│   ├── architecture/              # Overview, data model, API routes, AI agents, security
+│   ├── user-flows/                # End-to-end flows
+│   ├── features/                  # Per-feature docs
+│   ├── onboarding/                # New teammate guide
+│   └── diagrams/                  # Mermaid + PNG
+├── scripts/                       # Repo helpers
+├── render.yaml                    # Render blueprint (legacy)
+├── vercel.json                    # Vercel config
+├── turbo.json                     # Turborepo pipeline
+└── package.json
 ```
 
-## Quick Start
+## Quick start
 
 ### Prerequisites
 
-- Node.js >= 18
-- npm >= 10
+- Node.js ≥ 18
+- npm ≥ 10
 - A [Supabase](https://supabase.com) project
+- (Optional) OpenAI / Anthropic / Gemini / Azure DI / Apify / Resend / Sentry credentials
 
-### 1. Install dependencies
+### Install
 
 ```bash
-git clone <repository-url>
+git clone <repo>
 cd "AI CRM"
 npm install
 ```
 
-### 2. Configure environment
+### Configure env
 
 ```bash
-# Backend
 cp apps/api/.env.example apps/api/.env
-# Edit apps/api/.env with your Supabase URL, anon key, and API keys
-
-# Frontend
 cp apps/web/.env.example apps/web/.env
-# Edit apps/web/.env with your Supabase URL and anon key
+# Web-next inherits via next.config.ts
 ```
 
-See [Environment Setup](docs/ENVIRONMENT_SETUP.md) for all variables.
+Required: `SUPABASE_URL`, `SUPABASE_ANON_KEY`. Optional but useful: `OPENAI_API_KEY`, `AZURE_DI_KEY`, `APIFY_API_TOKEN`, `RESEND_API_KEY`, `SENTRY_DSN`. Full list in [`docs/ENVIRONMENT_SETUP.md`](docs/ENVIRONMENT_SETUP.md).
 
-### 3. Run locally
+### Run
 
 ```bash
 npm run dev
 ```
 
-- **Frontend:** http://localhost:3000
-- **API:** http://localhost:3001
-- **Health check:** http://localhost:3001/health
-- **Readiness check:** http://localhost:3001/health/ready
+That spins up everything via Turborepo:
 
-### 4. Run tests
+| Service | URL |
+| --- | --- |
+| API | http://localhost:3001 |
+| Web-next (primary) | http://localhost:3002 |
+| Legacy web | http://localhost:3003 |
+| API health | http://localhost:3001/health |
+| API readiness | http://localhost:3001/health/ready |
+
+> **Port note:** 3000 is reserved for the main-branch worktree's legacy `apps/web` (Vite default). If `web-next` can't bind 3002 it'll pick another free port and may collide with API — kill stale processes first.
+
+### Single-app dev
+
+```bash
+npm run dev:api
+npm run dev:web-next
+npm run dev:web
+```
+
+### Tests & type-check
 
 ```bash
 cd apps/api
-npm test              # Run all tests
-npm run test:coverage # Run with coverage report
+npm test                         # Vitest
+npm run test:org-isolation       # Multi-tenancy integration tests (run before merging)
+npm run test:coverage
+
+cd apps/api && npx tsc --noEmit
+cd apps/web-next && npx tsc --noEmit
 ```
 
-## API Overview
+## API overview
 
-All API routes are under `/api/` and require authentication (Bearer token) unless noted.
+All routes under `/api/*`. Auth via Bearer JWT (Supabase). See [`docs/architecture/api-routes.md`](docs/architecture/api-routes.md) for the complete map.
 
-| Resource | Endpoints |
-|----------|-----------|
-| Deals | `GET/POST /api/deals`, `GET/PATCH/DELETE /api/deals/:id`, `GET /api/deals/stats/summary` |
-| Companies | `GET/POST /api/companies`, `GET/PATCH/DELETE /api/companies/:id` |
+| Resource | Endpoints (selection) |
+| --- | --- |
+| Deals | `GET/POST /api/deals`, `GET/PATCH/DELETE /api/deals/:id`, `GET /api/deals/stats/summary`, `POST /api/deals/import`, `POST /api/deals/import/analyze` |
+| Companies | `GET/POST/PATCH/DELETE /api/companies` |
 | Documents | `GET /api/deals/:id/documents`, `POST /api/deals/:id/documents/upload` |
-| Memos | `GET/POST /api/memos`, `GET/PATCH /api/memos/:id` |
-| Templates | `GET/POST /api/templates`, `PATCH/DELETE /api/templates/:id` |
-| Users | `GET /api/users`, `GET/PATCH /api/users/me` |
-| AI Chat | `POST /api/deals/:id/chat`, `GET /api/deals/:id/chat/history` |
+| Folders | `GET/POST/PATCH/DELETE /api/folders`, `GET /api/folders/:id/insights` |
+| Financials | `GET /api/financials`, `POST /api/financials/extract`, `GET /api/financials/conflicts`, `POST /api/financials/resolve` |
+| Memos | `GET/POST /api/memos`, `POST /api/memos/:id/sections/:id/generate`, `POST /api/memos/:id/chat` |
+| Templates | `GET/POST/PATCH/DELETE /api/templates` |
+| Users | `GET /api/users/me`, `GET/PATCH /api/users/profile`, `GET /api/users` |
+| Contacts | `GET/POST/PATCH/DELETE /api/contacts`, `GET /api/contacts/insights` |
+| AI | `POST /api/deals/:id/chat`, `POST /api/ai/portfolio/chat`, `POST /api/ai/enrich-contact`, `POST /api/ai/meeting-prep`, `POST /api/ai/draft-email`, `POST /api/ai/scan-signals` |
+| Onboarding | `GET /api/onboarding/status`, `PATCH /api/onboarding/step`, `POST /api/onboarding/enrich-firm`, `GET /api/onboarding/research-status` |
+| Ingest | `POST /api/ingest/upload`, `POST /api/ingest/url`, `POST /api/ingest/email`, `POST /api/ingest/text` |
+| Tasks | `GET/POST/PATCH/DELETE /api/tasks` |
 | Notifications | `GET /api/notifications`, `POST /api/notifications/mark-all-read` |
-| Invitations | `POST /api/invitations`, `GET /api/invitations/verify/:token` |
+| Invitations | `GET/POST /api/invitations`, `DELETE /api/invitations/:id`, `POST /api/invitations/:id/resend`, `GET /api/public/invitations/verify/:token`, `POST /api/public/invitations/accept` |
+| Audit | `GET /api/audit` (admin) |
+| Watchlist | `GET/POST /api/watchlist` |
+| Export | `GET /api/export/...` |
+| Health | `GET /health`, `GET /health/ready` |
 
-See [API Reference](docs/API.md) for full documentation.
+Rate limits (per-user, keyed by token suffix): general 600/15min, AI 10/min, write 30/min.
 
 ## Scripts
 
 | Command | Description |
-|---------|-------------|
-| `npm run dev` | Start all services (Turborepo) |
-| `npm run dev:web` | Start frontend only |
-| `npm run dev:api` | Start API only |
-| `npm run build` | Build all packages |
-| `npm run build:prod` | Build web + API for production |
+| --- | --- |
+| `npm run dev` | All services via Turborepo |
+| `npm run dev:api` | API only |
+| `npm run dev:web-next` | Next.js only |
+| `npm run dev:web` | Legacy web only |
+| `npm run build` | Build everything |
+| `npm run build:prod` | Production bundle |
 | `npm run start:prod` | Start production server |
-| `cd apps/api && npm test` | Run API tests |
-| `cd apps/api && npm run test:coverage` | Run tests with coverage |
+| `cd apps/api && npm test` | API tests |
+| `cd apps/api && npm run test:org-isolation` | Multi-tenancy tests |
+| `cd apps/api && npx tsc --noEmit` | API type-check |
+| `cd apps/web-next && npx tsc --noEmit` | Web-next type-check |
 
 ## Deployment
 
-Deployed on **Render.com** with automatic deploys from the `main` branch.
+Production runs on **Vercel** as a single deployment with the Express API as serverless functions. Render is legacy (no longer used). See [Deployment Guide](docs/DEPLOYMENT.md).
 
 ```bash
-# Build
-npm ci --include=dev && npm run build:prod
-
-# Start
+npm run build:prod
 NODE_ENV=production node apps/api/dist/index.js
 ```
-
-See [Deployment Guide](docs/DEPLOYMENT.md) for full runbook.
 
 ## License
 
@@ -189,4 +265,4 @@ Private and confidential.
 
 ---
 
-**Last Updated:** February 13, 2026
+**Maintained by Ganesh Jagtap.** Only `@ganeshjagtap7` can approve merges to `main` (CODEOWNERS).

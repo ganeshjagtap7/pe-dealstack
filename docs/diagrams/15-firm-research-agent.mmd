@@ -1,0 +1,111 @@
+flowchart TB
+    subgraph Trigger["Trigger Points"]
+        direction LR
+        T1["Onboarding Step 1
+        URL blur on firm website"]
+        T2["Settings → Firm Profile
+        Refresh profile button"]
+        Endpoint["POST /api/onboarding/enrich-firm"]
+        T1 --> Endpoint
+        T2 --> Endpoint
+    end
+
+    subgraph Guards["Guardrails — Pre-flight"]
+        direction TB
+        Rate["Rate limit
+        3 / hour / org"]
+        Lock["Concurrent lock
+        one run per org"]
+        SSRF["URL validation
+        services/utils/urlHelpers.ts
+        SSRF prevention"]
+        Endpoint --> Rate --> Lock --> SSRF
+    end
+
+    subgraph Phase1["Phase 1 — Synchronous (≤ 60s)"]
+        direction TB
+
+        Scrape["scrape node
+        services/webScraper.ts
+        firm website + LinkedIn"]
+
+        SearchFirm["searchFirm node
+        services/webSearch.ts
+        Apify Google Search → DDG fallback
+        firm name, fund, AUM, portfolio"]
+
+        SearchPerson["searchPerson node
+        scrapeLinkedInProfile()
+        partner / founder background"]
+
+        Synth["synthesize node
+        GPT-4o reasoning
+        produces FirmProfile struct:
+        strategy, sectors, check size,
+        portfolio, geography, stage"]
+
+        VerifyNode["verify node
+        confidence scoring
+        per-field 0–1 confidence"]
+
+        Save["save node
+        Organization.settings.firmProfile (JSONB)
+        User.onboardingStatus.personProfile"]
+
+        Scrape --> SearchFirm --> SearchPerson --> Synth --> VerifyNode --> Save
+    end
+
+    subgraph Phase2["Phase 2 — Background Deep Research (60–120s)"]
+        direction TB
+        DeepStart["deepResearch.ts
+        spawned async after Save"]
+        QueryGen["GPT-4o query generator
+        derives 8–12 follow-up queries"]
+        Threads["Thread following
+        recurses on top results"]
+        DeepSynth["synthesize deep findings
+        merges into FirmProfile.deepResearch"]
+        DeepStart --> QueryGen --> Threads --> DeepSynth
+    end
+
+    subgraph Polling["Frontend polling"]
+        direction TB
+        StatusEP["GET /api/onboarding/research-status"]
+        SlideIn["Phase 2 slide-in notification
+        when deepResearch.complete"]
+        StatusEP --> SlideIn
+    end
+
+    subgraph Storage["Storage"]
+        direction LR
+        OrgSettings["Organization.settings
+        firmProfile JSONB"]
+        UserStatus["User.onboardingStatus
+        personProfile JSONB"]
+    end
+
+    subgraph Consumers["Consumers"]
+        direction LR
+        DealChat["Deal Chat Agent
+        deals-chat-ai.ts injects
+        firm strategy into prompt"]
+        Memo["Memo Agent
+        firm thesis into IC memo"]
+        Onboard["Onboarding completion
+        AI findings card"]
+    end
+
+    SSRF --> Phase1
+    Save -.->|async background| Phase2
+    Phase1 --> Storage
+    Phase2 --> Storage
+    Storage --> Consumers
+    Phase2 -.-> Polling
+
+    style Trigger fill:#003366,color:#fff,stroke:#002855
+    style Guards fill:#ef4444,color:#fff,stroke:#dc2626
+    style Phase1 fill:#06b6d4,color:#fff,stroke:#0891b2
+    style Phase2 fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style Polling fill:#f59e0b,color:#fff,stroke:#d97706
+    style Storage fill:#10b981,color:#fff,stroke:#059669
+    style Consumers fill:#6366f1,color:#fff,stroke:#4f46e5

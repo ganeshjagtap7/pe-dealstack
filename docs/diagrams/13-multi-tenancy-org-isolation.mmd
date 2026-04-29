@@ -77,8 +77,10 @@ flowchart TB
         IndirectQuery["verifyDealAccess(dealId, orgId)
         Used for deal-child tables
         Confirms deal belongs to org"]
-        AllRoutes["All 17 route files scoped
-        Zero cross-org data leakage"]
+        AllRoutes["All 48 route files scoped
+        Zero cross-org data leakage
+        Returns 404 (not 403) to
+        prevent enumeration"]
     end
 
     subgraph OrgTable["Organization Table"]

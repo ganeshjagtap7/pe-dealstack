@@ -1,0 +1,49 @@
+sequenceDiagram
+    autonumber
+    participant U as User
+    participant FE as deal.html<br/>deal-chat.js
+    participant API as Express API<br/>routes/deals-chat-ai.ts
+    participant Agent as runDealChatAgent<br/>(ReAct)
+    participant LLM as GPT-4o
+    participant Tool as Closure-bound tool
+    participant DB as Supabase
+
+    U->>FE: Type question<br/>("what's revenue CAGR 2021-2023?")
+    FE->>API: POST /api/deals/:id/chat<br/>{ message, history }
+    API->>API: orgMiddleware<br/>verifyDealAccess(dealId, orgId)
+    API->>DB: Hydrate deal context<br/>(name, stage, financial table)
+    DB-->>API: Deal + active financial statements
+
+    API->>Agent: runDealChatAgent({<br/>dealId, orgId, message,<br/>dealContext, history })
+
+    Note over Agent: createReactAgent({ llm, tools })<br/>14 tools bound to (dealId, orgId)
+
+    Agent->>LLM: SystemMessage(prompt)<br/>+ context + history + user message
+    LLM-->>Agent: Reasoning step:<br/>"need to compute CAGR"
+
+    alt Data already in context tables
+        LLM-->>Agent: Direct answer with citations
+    else Need fresh data
+        LLM->>Tool: get_deal_financials(period?)
+        Tool->>DB: SELECT FinancialStatement<br/>WHERE dealId = ?
+        DB-->>Tool: All statements (active + inactive)
+        Tool-->>LLM: ToolMessage(JSON)
+        LLM-->>Agent: Composes answer from data
+    end
+
+    Note over Agent: Tool messages scanned for<br/>updates / actions / sideEffects
+
+    alt Tool returned write-result
+        Agent->>FE: { response, updates: [...] }<br/>(field changed)
+    else Tool returned URL action
+        Agent->>FE: { response, action: { url } }<br/>(navigate / open)
+    else Tool returned side effect
+        Agent->>FE: { response, sideEffects: [...] }<br/>(extraction_triggered, scroll_to)
+    else No side effect
+        Agent->>FE: { response, model }
+    end
+
+    FE->>FE: Render response<br/>+ apply optimistic UI updates
+
+    Note over FE,DB: Common tool calls
+    Note right of Tool: search_documents<br/>get_deal_financials<br/>compare_deals<br/>get_deal_activity<br/>get_analysis_summary<br/>list_documents<br/>update_deal_field<br/>change_deal_stage<br/>add_note<br/>trigger_financial_extraction<br/>generate_meeting_prep<br/>draft_email<br/>scroll_to_section<br/>suggest_action

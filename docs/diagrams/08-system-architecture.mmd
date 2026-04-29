@@ -1,109 +1,161 @@
 flowchart TB
-    subgraph Frontend["Frontend — Vite + Vanilla JS :3000"]
+    subgraph WebNext["Next.js App — apps/web-next :3002 (PRIMARY)"]
         direction TB
-        subgraph Pages["29 Pages"]
+        subgraph NextRoutes["10 App Router Routes"]
             direction LR
-            Dashboard["Dashboard"]
-            CRM["Deal Pipeline"]
-            DealDetail["Deal Detail"]
-            VDR["VDR — React"]
-            Contacts["Contacts CRM"]
-            MemoBuilder["Memo Builder"]
-            Templates["Templates"]
-            AdminDash["Admin Panel"]
-            Settings["Settings"]
-            DealIntake["Deal Intake"]
+            WN_Dashboard["dashboard"]
+            WN_Deals["deals — pipeline + detail"]
+            WN_DataRoom["data-room — VDR React"]
+            WN_Memo["memo-builder"]
+            WN_Contacts["contacts"]
+            WN_Templates["templates"]
+            WN_Admin["admin"]
+            WN_Settings["settings"]
+            WN_DealIntake["deal-intake"]
+            WN_Onboarding["onboarding"]
         end
-        subgraph SharedModules["34 JS Modules"]
+        subgraph NextStack["React 19 + Next 16 + Tailwind v4"]
             direction LR
-            Auth["auth.js — PEAuth"]
-            Config["config.js"]
-            Layout["layout.js — Sidebar"]
-            Formatters["formatters.js"]
-            Notifs["notifications.js"]
-            AITools["ai-tools.js"]
-            FinJS["financials.js"]
-            AnalysisJS["analysis.js + 4 modules"]
+            ApiProxy["/api/[...slug]
+            proxies → Express API"]
+            SupaSSR["@supabase/ssr
+            Server-side auth"]
+            Providers["providers/
+            theme, auth, toast"]
         end
     end
 
-    subgraph API["API — Express + TypeScript :3001"]
+    subgraph WebLegacy["Legacy Vanilla JS — apps/web :3003"]
         direction TB
-        subgraph Middleware["Middleware Layer"]
+        subgraph LegacyPages["30 HTML Pages"]
             direction LR
-            AuthMW["authMiddleware
-            Supabase JWT verify"]
-            OrgMW["orgMiddleware
-            Org resolution + isolation"]
-            RBAC["rbacMiddleware
-            Role-based access"]
-            RateLimit["Rate Limiting
-            200/15min general
-            10/min AI, 30/min write"]
-            ErrHandler["errorHandler
-            ValidationError, NotFoundError"]
-            ReqId["requestId
-            Correlation tracking"]
+            L_Dashboard["dashboard.html"]
+            L_CRM["crm.html"]
+            L_Deal["deal.html — chat tab"]
+            L_VDR["vdr.html — React"]
+            L_Memo["memo-builder.html"]
+            L_Contacts["contacts.html"]
+            L_Admin["admin-dashboard.html"]
+            L_Settings["settings.html"]
+            L_Onboard["onboarding.html"]
+            L_Templates["templates.html"]
         end
-        subgraph Routes["44 Route Files"]
+        subgraph LegacyJS["39 JS Modules"]
             direction LR
-            DealRoutes["Deals — 5 files
-            deals, analysis,
-            chat, chat-ai"]
-            DocRoutes["Documents — 4 files
+            JS_Auth["auth.js — PEAuth"]
+            JS_Config["config.js"]
+            JS_Layout["layout.js — sidebar"]
+            JS_Format["formatters.js"]
+            JS_Notif["notifications.js"]
+            JS_AI["ai-tools.js"]
+            JS_Fin["financials.js + helpers"]
+            JS_Analysis["analysis.js + 4 modules"]
+            JS_DealImport["deal-import.js"]
+            JS_Onboard["onboarding/ — 6 modules"]
+        end
+    end
+
+    subgraph API["Express + TypeScript API — apps/api :3001"]
+        direction TB
+        subgraph Middleware["Middleware Stack (in order)"]
+            direction LR
+            MW_Compress["compression
+            gzip"]
+            MW_Helmet["helmet
+            CSP, HSTS"]
+            MW_CORS["cors
+            origin allowlist"]
+            MW_RateLimit["rate-limit
+            600/15min general
+            10/min AI, 30/min write"]
+            MW_ReqId["requestId
+            correlation header"]
+            MW_Auth["authMiddleware
+            Supabase JWT verify"]
+            MW_Org["orgMiddleware
+            org resolution + isolation"]
+            MW_RBAC["rbacMiddleware
+            ADMIN | MEMBER | VIEWER"]
+            MW_Err["errorHandler
+            ValidationError, NotFoundError"]
+        end
+
+        subgraph Routes["48 Route Files — /api/*"]
+            direction LR
+            R_Deals["Deals — 6 files
+            deals, analysis, chat,
+            chat-ai, team, import"]
+            R_Docs["Documents — 4 files
             docs, upload,
-            sharing, folders"]
-            FinRoutes["Financials — 4 files
+            sharing, alerts"]
+            R_Folders["Folders — 2 files
+            folders, insights"]
+            R_Fin["Financials — 5 files
             list, extraction,
-            merge, analysis"]
-            MemoRoutes["Memos — 4 files
-            memos, chat,
-            sections, templates"]
-            AIRoutes["AI — 3 files
+            merge, analysis, memo"]
+            R_Memos["Memos — 3 files
+            memos, sections, chat"]
+            R_Tmpl["Templates — 2 files
+            templates, sections"]
+            R_AI["AI — 3 files
             agents, portfolio,
             ingest"]
-            IngestRoutes["Ingest — 5 files
-            upload, url,
-            email, text, shared"]
-            UserRoutes["Users — 5 files
+            R_Ingest["Ingest — 5 files
+            upload, url, email,
+            text, shared"]
+            R_Users["Users — 3 files
             users, profile,
-            invitations, contacts"]
-            SysRoutes["System — 4 files
-            audit, tasks,
-            export, notifications"]
+            invitations(+accept)"]
+            R_Contacts["Contacts — 3 files
+            contacts, insights,
+            connections"]
+            R_Sys["System — 7 files
+            audit, tasks, export,
+            notifications, watchlist,
+            onboarding, activities"]
         end
-        subgraph Services["33 Service Files"]
+
+        subgraph Services["37 Service Files + sub-dirs"]
             direction LR
-            LLM["llm.ts — Unified LLM
+            S_LLM["llm.ts — Unified LLM
             getChatModel, getFastModel,
             getExtractionModel"]
-            FinServices["Financial Services
+            S_Fin["Financial extraction
             classifier, orchestrator,
             validator, vision, azure,
-            excel extractor"]
-            AnalysisEngine["PE Analysis Engine
+            excel, pdf, llamaParse"]
+            S_Analysis["analysis/ — PE engine
             QoE, ratios, operational,
             debt-LBO, red flags"]
-            DocServices["Doc Services
+            S_Parsers["parsers/ — accounting
+            bank, paypal, square,
+            stripe, router"]
+            S_Doc["Doc services
             parser, validator,
-            scraper, email parser"]
+            chunker, scraper, email"]
+            S_Other["Misc services
+            audit, encryption, cache,
+            agent memory, sample deal"]
         end
-        subgraph Agents["6 AI Agents"]
+
+        subgraph Agents["8 AI Agents — services/agents/"]
             direction LR
-            FinAgent["Financial Agent
-            LangGraph 5-node"]
-            DealChat["Deal Chat
-            ReAct + 6 tools"]
-            PortChat["Portfolio Chat
-            ReAct + 3 tools"]
-            Enrich["Contact Enrichment
-            4-node StateGraph"]
-            MeetPrep["Meeting Prep
+            A_Fin["Financial Agent
+            LangGraph 6-node"]
+            A_DealChat["Deal Chat Agent
+            ReAct + 14 tools"]
+            A_Memo["Memo Agent
+            pipeline + tools"]
+            A_Firm["Firm Research Agent
+            LangGraph 6-node"]
+            A_Enrich["Contact Enrichment
+            4-node graph"]
+            A_Meet["Meeting Prep
             5-source parallel"]
-            SignalMon["Signal Monitor
-            3-node StateGraph"]
-            EmailDraft["Email Drafter
-            4-node StateGraph"]
+            A_Signal["Signal Monitor
+            3-node graph"]
+            A_Email["Email Drafter
+            4-node graph"]
         end
     end
 
@@ -114,39 +166,57 @@ flowchart TB
         OpenAI["OpenAI
         GPT-4o + GPT-4o-mini"]
         Gemini["Google Gemini
-        Alt LLM — configurable"]
+        Alt LLM (configurable)"]
+        Anthropic["Anthropic
+        Claude (optional)"]
         AzureDI["Azure Doc Intelligence
-        Complex PDF layouts"]
+        complex PDF layouts"]
+        LlamaParse["LlamaParse
+        deep PDF parsing"]
+        Apify["Apify
+        Google Search scrape"]
         Resend["Resend
         Transactional email"]
         Sentry["Sentry
         Error tracking"]
-        Render["Render
-        Production hosting"]
         Vercel["Vercel
-        Backup hosting"]
+        Production hosting"]
     end
 
-    Frontend -->|"PEAuth.authFetch()
+    WebNext -->|"fetch → /api/* proxy
     JWT Bearer token"| API
-    API -->|"Supabase client
+    WebLegacy -->|"PEAuth.authFetch()
+    JWT Bearer token"| API
+    API -->|"Supabase JS client
     org-scoped queries"| Supabase
-    API -->|"getChatModel()
-    getExtractionModel()"| OpenAI
-    API -->|"getFastModel()
-    if configured"| Gemini
-    API -->|"Azure DI SDK"| AzureDI
+    API -->|"OpenAI SDK"| OpenAI
+    API -->|"Gemini SDK
+    if LLM_CHAT_PROVIDER=gemini"| Gemini
+    API -->|"Anthropic SDK
+    optional"| Anthropic
+    API -->|"Azure DI SDK
+    if AZURE_DI_KEY set"| AzureDI
+    API -->|"LlamaParse
+    if LLAMA_CLOUD_API_KEY set"| LlamaParse
+    API -->|"apify-client
+    firm research agent"| Apify
     API -->|"Resend SDK
-    invites, doc requests"| Resend
-    API -->|"Sentry SDK"| Sentry
+    invites + doc requests"| Resend
+    API -->|"Sentry SDK
+    NODE_ENV=production"| Sentry
+    WebNext -.->|"deploy"| Vercel
+    API -.->|"deploy serverless"| Vercel
 
-    style Frontend fill:#003366,color:#fff,stroke:#002855
+    style WebNext fill:#003366,color:#fff,stroke:#002855
+    style WebLegacy fill:#1e3a8a,color:#fff,stroke:#1e40af
     style API fill:#6366f1,color:#fff,stroke:#4f46e5
     style Supabase fill:#10b981,color:#fff,stroke:#059669
     style OpenAI fill:#f59e0b,color:#fff,stroke:#d97706
     style Gemini fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Anthropic fill:#d97706,color:#fff,stroke:#b45309
     style AzureDI fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style LlamaParse fill:#ec4899,color:#fff,stroke:#db2777
+    style Apify fill:#84cc16,color:#fff,stroke:#65a30d
     style Resend fill:#8b5cf6,color:#fff,stroke:#7c3aed
     style Sentry fill:#ef4444,color:#fff,stroke:#dc2626
-    style Render fill:#14b8a6,color:#fff,stroke:#0d9488
     style Vercel fill:#111827,color:#fff,stroke:#374151

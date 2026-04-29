@@ -1,0 +1,101 @@
+flowchart TB
+    subgraph Step1["1 — Upload (frontend)"]
+        direction TB
+        Modal["Import Deals modal
+        apps/web/js/deal-import.js"]
+        Source{Input source}
+        CSV["CSV file"]
+        Excel["Excel file (xlsx)"]
+        Paste["Paste text / table"]
+        Modal --> Source
+        Source --> CSV & Excel & Paste
+    end
+
+    subgraph Step2["2 — Analyze (server, GPT-4o)"]
+        direction TB
+        AnalyzeEP["POST /api/deals/import/analyze
+        routes/deal-import.ts"]
+        Parse["Parse rows
+        services/dealImportMapper.ts"]
+        AIMap["GPT-4o column mapping
+        single call ≈ $0.01–0.02"]
+        Override["Deterministic overrides
+        regex-forced mapping:
+        ARR/MRR/Sales → revenue
+        EV → dealSize
+        MOIC → mom"]
+        AnalyzeEP --> Parse --> AIMap --> Override
+    end
+
+    subgraph Step3["3 — Map columns (frontend)"]
+        direction TB
+        MapUI["Map Columns step
+        each source column ↔ Deal field
+        unmapped → customFields JSONB"]
+        Validate["Type / format validation
+        flag invalid rows"]
+        MapUI --> Validate
+    end
+
+    subgraph Step4["4 — Preview"]
+        direction TB
+        PreviewTable["Preview table
+        first 10 rows"]
+        DupeCheck["Duplicate detection
+        case-insensitive name match
+        within batch + against existing"]
+        PreviewTable --> DupeCheck
+    end
+
+    subgraph Step5["5 — Batch import (server, 5-phase)"]
+        direction TB
+        ImportEP["POST /api/deals/import
+        max 500 deals / 5 MB"]
+        P1["Phase 1
+        Pre-fetch all deal names
+        (paginated for >1000)"]
+        P2["Phase 2
+        Pre-fetch companies
+        lowercase Map dedupe"]
+        P3["Phase 3
+        Validate in-memory"]
+        P4["Phase 4
+        Batch-create missing companies
+        groups of 50"]
+        P5["Phase 5
+        Batch-insert deals
+        groups of 50
+        fallback to per-row on error"]
+        ImportEP --> P1 --> P2 --> P3 --> P4 --> P5
+    end
+
+    subgraph Step6["6 — Result UI"]
+        direction LR
+        Success["Full success
+        green banner"]
+        Partial["Partial success
+        amber + per-row errors"]
+        Failure["Failure
+        red + Some deals may have imported"]
+    end
+
+    subgraph DB["Database side"]
+        direction LR
+        DealRow["Deal row
+        + customFields JSONB"]
+        CompanyRow["Company row
+        auto-created if missing"]
+        ActivityLog["Activity row
+        type = DEAL_IMPORTED"]
+    end
+
+    Step1 --> Step2 --> Step3 --> Step4 --> Step5 --> Step6
+    Step5 --> DB
+
+    style Step1 fill:#003366,color:#fff,stroke:#002855
+    style Step2 fill:#6366f1,color:#fff,stroke:#4f46e5
+    style Step3 fill:#3b82f6,color:#fff,stroke:#2563eb
+    style Step4 fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style Step5 fill:#10b981,color:#fff,stroke:#059669
+    style Step6 fill:#14b8a6,color:#fff,stroke:#0d9488
+    style DB fill:#f59e0b,color:#fff,stroke:#d97706

@@ -1,0 +1,107 @@
+flowchart TB
+    subgraph WebNext["apps/web-next — Next.js 16 + React 19 + Tailwind v4 (port 3002)"]
+        direction TB
+
+        subgraph AuthGroup["(auth) — Public routes"]
+            direction LR
+            Login["login"]
+            Signup["signup"]
+            Verify["verify-email"]
+            Forgot["forgot-password"]
+            Reset["reset-password"]
+            Accept["accept-invite"]
+        end
+
+        subgraph OnboardGroup["(onboarding) — Post-signup"]
+            direction LR
+            Onboard["onboarding
+            standalone, no chrome"]
+        end
+
+        subgraph AppGroup["(app) — Authenticated, with sidebar/header"]
+            direction LR
+            Dash["dashboard"]
+            Deals["deals
+            list + [dealId] detail"]
+            DataRoom["data-room
+            VDR React"]
+            MemoBuilder["memo-builder"]
+            Contacts["contacts"]
+            Templates["templates"]
+            Admin["admin"]
+            Settings["settings"]
+            DealIntake["deal-intake"]
+            ComingSoon["coming-soon"]
+        end
+
+        subgraph Components["src/components/"]
+            direction LR
+            UI["ui/
+            buttons, cards, modals, etc."]
+            Layout["layout/
+            sidebar, header, shells"]
+            VDRComp["vdr/
+            data-room components"]
+            DealActions["deal-actions/"]
+            DealIntakeComp["deal-intake/"]
+            OnboardComp["onboarding/"]
+        end
+
+        subgraph LibLayer["src/lib/"]
+            direction LR
+            SupaSSR["supabase/
+            createServerClient (SSR)
+            createBrowserClient"]
+            VDRLib["vdr/
+            VDR API client"]
+            Utils["utils
+            cn(), formatters"]
+        end
+
+        subgraph Providers["src/providers/"]
+            direction LR
+            AuthProv["AuthProvider"]
+            ThemeProv["ThemeProvider"]
+            ToastProv["ToastProvider"]
+        end
+
+        subgraph ApiProxy["API Proxy — src/app/api/[...slug]"]
+            direction TB
+            Catchall["route.ts
+            catches /api/* on Next host"]
+            Forward["forwards to Express :3001
+            preserves Authorization header
+            (or external API_BASE_URL)"]
+            Catchall --> Forward
+        end
+
+        AuthGroup --> Providers
+        OnboardGroup --> Providers
+        AppGroup --> Providers
+        AppGroup --> Components --> LibLayer
+    end
+
+    subgraph Express["apps/api — Express on :3001"]
+        direction LR
+        Routes["48 route files"]
+        Middleware["auth + org + RBAC"]
+    end
+
+    Browser["Browser
+    React 19 client components +
+    server components"] --> WebNext
+
+    AppGroup -->|"fetch('/api/...')"| ApiProxy
+    ApiProxy -->|"http forward"| Express
+
+    SupaSSR -.->|"reads cookie session"| Browser
+
+    style WebNext fill:#003366,color:#fff,stroke:#002855
+    style AuthGroup fill:#6366f1,color:#fff,stroke:#4f46e5
+    style OnboardGroup fill:#0ea5e9,color:#fff,stroke:#0284c7
+    style AppGroup fill:#10b981,color:#fff,stroke:#059669
+    style Components fill:#3b82f6,color:#fff,stroke:#2563eb
+    style LibLayer fill:#8b5cf6,color:#fff,stroke:#7c3aed
+    style Providers fill:#14b8a6,color:#fff,stroke:#0d9488
+    style ApiProxy fill:#f59e0b,color:#fff,stroke:#d97706
+    style Express fill:#ef4444,color:#fff,stroke:#dc2626
