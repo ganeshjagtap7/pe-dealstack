@@ -58,9 +58,10 @@ export async function markEventProcessed(
     processedAt: new Date().toISOString(),
   };
   if (error !== undefined) update.error = error;
-  await supabase
+  const { error: dbError } = await supabase
     .from('IntegrationEvent')
     .update(update)
     .eq('integrationId', integrationId)
     .eq('externalId', externalId);
+  if (dbError) throw new Error(`webhookRouter.markEventProcessed failed: ${dbError.message}`);
 }

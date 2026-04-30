@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 beforeEach(() => {
-  process.env.OAUTH_STATE_SECRET = 'test-secret-do-not-use-in-prod';
+  process.env.OAUTH_STATE_SECRET = 'test-secret-do-not-use-in-prod-padding-to-32-chars';
   vi.resetModules();
 });
 

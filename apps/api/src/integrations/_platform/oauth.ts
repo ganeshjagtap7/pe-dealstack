@@ -14,6 +14,9 @@ interface StateClaims {
 function getSecret(): Buffer {
   const secret = process.env.OAUTH_STATE_SECRET;
   if (!secret) throw new Error('OAUTH_STATE_SECRET is not configured');
+  if (secret.length < 32) {
+    throw new Error('OAUTH_STATE_SECRET must be at least 32 characters');
+  }
   return Buffer.from(secret, 'utf8');
 }
 
