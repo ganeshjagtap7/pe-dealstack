@@ -30,6 +30,7 @@ import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
 import organizationsRouter from './routes/organizations.js';
+import authSessionsRouter from './routes/auth-sessions.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -280,6 +281,8 @@ app.use('/api/organizations', authMiddleware, orgMiddleware, enforceOrgMfaMiddle
 app.use('/api/tasks', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, exportRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, onboardingRouter);
+// Auth-scoped self-service routes (MFA bypass active for /api/auth/* in middleware)
+app.use('/api/auth', authMiddleware, authSessionsRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, financialsRouter);

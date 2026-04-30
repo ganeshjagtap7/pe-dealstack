@@ -138,9 +138,83 @@
     return `
       <div class="border-t border-border-subtle pt-4" id="active-sessions-block">
         <p class="text-sm font-semibold text-text-main mb-2">Active sessions</p>
+        <p class="text-xs text-text-muted mb-3">Devices currently signed into this account. Revoke any you don't recognize.</p>
         <div id="active-sessions-list" class="text-xs text-text-muted">Loading…</div>
       </div>
     `;
+  }
+
+  // Fetch and render the user's active sessions into #active-sessions-list.
+  async function loadSessions() {
+    const list = document.getElementById('active-sessions-list');
+    if (!list) return;
+    try {
+      if (typeof PEAuth === 'undefined' || !PEAuth.authFetch) {
+        list.innerHTML = '<p class="text-xs text-text-muted">Session management unavailable.</p>';
+        return;
+      }
+      const res = await PEAuth.authFetch(`${API_BASE_URL}/auth/sessions`);
+      if (!res.ok) {
+        list.innerHTML = '<p class="text-xs text-text-muted">Session management unavailable.</p>';
+        return;
+      }
+      const payload = await res.json();
+      const sessions = Array.isArray(payload && payload.sessions) ? payload.sessions : [];
+      if (sessions.length === 0) {
+        list.innerHTML = '<p class="text-xs text-text-muted">No active sessions found.</p>';
+        return;
+      }
+      list.innerHTML = sessions.map((s) => {
+        const ua = s && s.userAgent ? s.userAgent : 'Unknown device';
+        const ip = s && s.ipAddress ? s.ipAddress : '—';
+        const last = s && s.lastActiveAt ? new Date(s.lastActiveAt).toLocaleString() : '—';
+        const currentBadge = s && s.current
+          ? '<span class="ml-2 text-[10px] uppercase font-bold text-green-700 bg-green-100 px-1.5 py-0.5 rounded">Current</span>'
+          : '';
+        const revokeBtn = s && s.current
+          ? ''
+          : `<button data-revoke-session="${escapeHtml(s.id)}" class="text-xs text-red-600 hover:underline ml-3 shrink-0">Sign out</button>`;
+        return `
+          <div class="flex items-start justify-between p-3 mb-2 bg-gray-50 rounded-lg border border-border-subtle">
+            <div class="flex-1 min-w-0">
+              <p class="text-xs font-semibold text-text-main truncate">
+                ${escapeHtml(ua)}${currentBadge}
+              </p>
+              <p class="text-xs text-text-muted mt-1">
+                IP ${escapeHtml(ip)} · last active ${escapeHtml(last)}
+              </p>
+            </div>
+            ${revokeBtn}
+          </div>
+        `;
+      }).join('');
+
+      list.querySelectorAll('[data-revoke-session]').forEach((btn) => {
+        btn.addEventListener('click', async (e) => {
+          const id = e.currentTarget.getAttribute('data-revoke-session');
+          if (!id) return;
+          if (!confirm('Sign out of this session?')) return;
+          try {
+            const r = await PEAuth.authFetch(`${API_BASE_URL}/auth/sessions/${encodeURIComponent(id)}`, {
+              method: 'DELETE'
+            });
+            if (r.ok) {
+              loadSessions();
+            } else if (r.status === 501) {
+              alert('Session revocation is not available in this environment.');
+            } else {
+              alert('Failed to revoke session.');
+            }
+          } catch (err) {
+            console.error('settingsSecurity: revoke error', err);
+            alert('Failed to revoke session.');
+          }
+        });
+      });
+    } catch (err) {
+      console.error('settingsSecurity: loadSessions error', err);
+      list.innerHTML = '<p class="text-xs text-red-600">Failed to load sessions.</p>';
+    }
   }
 
   function renderIsolationTestPlaceholder(isAdmin) {
@@ -207,6 +281,9 @@
       renderActionsBlock() +
       renderSessionsPlaceholder() +
       renderIsolationTestPlaceholder(isAdmin);
+
+    // Populate sessions list once placeholder is in the DOM
+    loadSessions();
   }
 
   if (document.readyState === 'loading') {
