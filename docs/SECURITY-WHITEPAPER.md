@@ -31,7 +31,7 @@ No PE OS data is stored on unmanaged servers or developer machines. All producti
 - Encryption key management via environment variables (never stored in code)
 
 ### Data in Transit
-- All traffic encrypted in transit using **TLS 1.2 or higher** (TLS 1.3 negotiated when supported by client). HTTPS enforced via HSTS — see `apps/api/src/app.ts:82` (`helmet()` configuration).
+- All traffic encrypted in transit using **TLS 1.2 or higher** (TLS 1.3 negotiated when supported by client). HTTPS enforced via HSTS.
 - **HSTS** headers with 1-year max-age, includeSubDomains, and preload
 - API ↔ Database connections encrypted via Supabase internal networking
 
@@ -64,12 +64,10 @@ No PE OS data is stored on unmanaged servers or developer machines. All producti
 PE OS enforces hard organizational data isolation at the application layer:
 
 - Every database row in scoped tables is tagged with `organizationId`
-- All API route handlers call `getOrgId(req)` and verify access via `verifyDealAccess()` / `verifyContactAccess()` / `verifyDocumentAccess()` / `verifyFolderAccess()` / `verifyConversationAccess()` helpers (`apps/api/src/middleware/orgScope.ts`)
+- All API route handlers verify access via centralized access-verification helpers (`verifyDealAccess()` / `verifyContactAccess()` / `verifyDocumentAccess()` / `verifyFolderAccess()` / `verifyConversationAccess()`)
 - 268 org-scope verification calls across 45 route files (verified 2026-04-30)
-- 34 automated cross-organization integration tests run on every deploy (`apps/api/tests/org-isolation.test.ts`) — these tests actively attempt cross-org reads/writes and verify all are rejected
+- 34 automated cross-organization integration tests run on every deploy — these tests actively attempt cross-org reads/writes and verify all are rejected
 - Backend uses a separate service role key (never exposed to clients)
-
-Cross-organization access attempts return HTTP 404 (not 403) to prevent resource enumeration.
 
 ---
 
@@ -79,7 +77,7 @@ Cross-organization access attempts return HTTP 404 (not 403) to prevent resource
 
 PE OS enforces three tiers of rate limiting at the API gateway:
 
-| Tier | Endpoint scope | Limit | Window |
+| Tier | Endpoint Scope | Limit | Window |
 |------|---------------|-------|--------|
 | General | All `/api/*` requests | 600 | 15 min |
 | AI | `/api/ai/*`, memo chat | 10 | 1 min |
@@ -184,4 +182,4 @@ For security questions or to request a detailed security assessment, contact: **
 
 ---
 
-*Last updated: March 2026*
+*Last updated: April 2026*
