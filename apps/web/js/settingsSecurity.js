@@ -217,6 +217,63 @@
     }
   }
 
+  function attachIsolationTestHandler() {
+    const btn = document.getElementById('run-isolation-test-btn');
+    const out = document.getElementById('isolation-test-output');
+    if (!btn || !out) return;
+
+    // Avoid double-binding if init runs twice
+    if (btn.dataset.bound === '1') return;
+    btn.dataset.bound = '1';
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      const originalText = btn.textContent;
+      btn.textContent = 'Running…';
+      out.classList.remove('hidden');
+      out.classList.remove('text-red-400');
+      out.classList.add('text-green-400');
+      out.textContent = '→ Starting isolation test…';
+
+      try {
+        const res = await PEAuth.authFetch(`${API_BASE_URL}/admin/security/run-isolation-test`, {
+          method: 'POST',
+        });
+        if (!res.ok) {
+          let msg = 'Test failed (' + res.status + ')';
+          try { const body = await res.json(); if (body && body.error) msg = body.error; } catch (_) {}
+          throw new Error(msg);
+        }
+        const data = await res.json();
+        const lines = [];
+        for (const c of (data.checks || [])) {
+          const status = c.passed ? 'BLOCKED ✓' : 'FAILED ✗';
+          lines.push(`→ ${c.name}    ${status}`);
+          if (!c.passed && c.actual) {
+            lines.push(`    actual: ${c.actual}`);
+          }
+        }
+        lines.push('');
+        const allPassed = data.passed === data.total;
+        lines.push(
+          `→ ${data.passed}/${data.total} isolation checks ${allPassed ? 'passed' : 'PASSED — see failures above'} (${data.durationMs || '?'}ms)`
+        );
+        out.textContent = lines.join('\n');
+        if (!allPassed) {
+          out.classList.remove('text-green-400');
+          out.classList.add('text-red-400');
+        }
+      } catch (err) {
+        out.textContent = '→ Test execution failed: ' + (err && err.message ? err.message : 'unknown error');
+        out.classList.remove('text-green-400');
+        out.classList.add('text-red-400');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = originalText || 'Run isolation test';
+      }
+    });
+  }
+
   function renderIsolationTestPlaceholder(isAdmin) {
     if (!isAdmin) return '';
     return `
@@ -284,6 +341,9 @@
 
     // Populate sessions list once placeholder is in the DOM
     loadSessions();
+
+    // Wire up the live isolation test button (admin-only — no-op if not rendered)
+    attachIsolationTestHandler();
   }
 
   if (document.readyState === 'loading') {
