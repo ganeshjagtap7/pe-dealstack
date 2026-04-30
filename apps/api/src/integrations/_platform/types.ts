@@ -59,6 +59,10 @@ export interface IntegrationProvider {
   initiateAuth(userId: string, organizationId: string): Promise<InitiateAuthResult>;
   handleCallback(params: { code: string; state: string }): Promise<Integration>;
   sync(integration: Integration, options: SyncOptions): Promise<SyncResult>;
-  handleWebhook(headers: Record<string, string>, body: unknown): Promise<void>;
+  handleWebhook(
+    headers: Record<string, string>,
+    body: unknown,
+    rawBody?: Buffer
+  ): Promise<void>;
   disconnect(integration: Integration): Promise<void>;
 }

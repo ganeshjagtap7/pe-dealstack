@@ -10,7 +10,8 @@ export type WebhookResult =
 export async function routeWebhook(
   providerId: ProviderId,
   headers: Record<string, string>,
-  body: unknown
+  body: unknown,
+  rawBody?: Buffer
 ): Promise<WebhookResult> {
   if (!isProviderRegistered(providerId)) {
     log.warn('webhookRouter: unknown provider', { providerId });
@@ -18,7 +19,7 @@ export async function routeWebhook(
   }
   try {
     const provider = getProvider(providerId);
-    await provider.handleWebhook(headers, body);
+    await provider.handleWebhook(headers, body, rawBody);
     return { ok: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : 'unknown error';

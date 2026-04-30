@@ -43,6 +43,6 @@ describe('webhookRouter', () => {
     );
     const result = await routeWebhook('_mock', { sig: 'x' }, { type: 'ping' });
     expect(result.ok).toBe(true);
-    expect(handleWebhook).toHaveBeenCalledWith({ sig: 'x' }, { type: 'ping' });
+    expect(handleWebhook).toHaveBeenCalledWith({ sig: 'x' }, { type: 'ping' }, undefined);
   });
 });

@@ -12,7 +12,8 @@ router.post('/webhooks/:provider', async (req: Request, res: Response) => {
   const headers = Object.fromEntries(
     Object.entries(req.headers).map(([k, v]) => [k, Array.isArray(v) ? v.join(',') : (v ?? '')])
   ) as Record<string, string>;
-  const result = await routeWebhook(provider, headers, req.body);
+  const rawBody = (req as Request & { rawBody?: Buffer }).rawBody;
+  const result = await routeWebhook(provider, headers, req.body, rawBody);
   if (!result.ok) {
     if (result.code === 'INVALID_SIGNATURE') return res.status(401).end();
     if (result.code === 'PROVIDER_UNKNOWN') return res.status(404).end();
