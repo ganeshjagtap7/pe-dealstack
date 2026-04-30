@@ -177,8 +177,84 @@
                         <p class="text-[#475569] dark:text-gray-300 leading-relaxed mb-4">
                             The third parties that process customer data on our behalf, listed below. We notify customers 30 days before adding any new sub-processor.
                         </p>
-                        <!-- Table inserted in Task 3 -->
-                        <div id="sub-processor-table-placeholder"></div>
+                        <div class="overflow-x-auto rounded-lg border border-[#e5e7eb] dark:border-[#1e293b]">
+                            <table class="w-full text-sm text-left">
+                                <thead class="bg-[#f8fafc] dark:bg-[#1e293b] text-[#111418] dark:text-white">
+                                    <tr>
+                                        <th class="px-4 py-3 font-semibold border-b border-[#e5e7eb] dark:border-[#1e293b]">Provider</th>
+                                        <th class="px-4 py-3 font-semibold border-b border-[#e5e7eb] dark:border-[#1e293b]">Service</th>
+                                        <th class="px-4 py-3 font-semibold border-b border-[#e5e7eb] dark:border-[#1e293b]">Region</th>
+                                        <th class="px-4 py-3 font-semibold border-b border-[#e5e7eb] dark:border-[#1e293b]">Certifications</th>
+                                        <th class="px-4 py-3 font-semibold border-b border-[#e5e7eb] dark:border-[#1e293b]">DPA</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="text-[#475569] dark:text-gray-300">
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Supabase</td>
+                                        <td class="px-4 py-3">Database, authentication, file storage</td>
+                                        <td class="px-4 py-3">US (AWS)</td>
+                                        <td class="px-4 py-3">SOC 2 Type II</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://supabase.com/dpa" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Vercel</td>
+                                        <td class="px-4 py-3">Application hosting (serverless)</td>
+                                        <td class="px-4 py-3">Global (edge)</td>
+                                        <td class="px-4 py-3">SOC 2 Type II</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://vercel.com/legal/dpa" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">OpenAI</td>
+                                        <td class="px-4 py-3">GPT-4o (extraction, classification, chat)</td>
+                                        <td class="px-4 py-3">US</td>
+                                        <td class="px-4 py-3">SOC 2 Type II</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://openai.com/policies/data-processing-addendum" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Anthropic</td>
+                                        <td class="px-4 py-3">Claude (financial cross-verification)</td>
+                                        <td class="px-4 py-3">US</td>
+                                        <td class="px-4 py-3">SOC 2 Type II</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://www.anthropic.com/legal/dpa" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Google</td>
+                                        <td class="px-4 py-3">Gemini (LLM router fallback)</td>
+                                        <td class="px-4 py-3">US</td>
+                                        <td class="px-4 py-3">SOC 2</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://cloud.google.com/terms/data-processing-addendum" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Microsoft Azure</td>
+                                        <td class="px-4 py-3">Document Intelligence (PDF extraction)</td>
+                                        <td class="px-4 py-3">US</td>
+                                        <td class="px-4 py-3">SOC 2 Type II, ISO 27001</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://www.microsoft.com/licensing/docs/view/Microsoft-Products-and-Services-Data-Protection-Addendum-DPA" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Apify</td>
+                                        <td class="px-4 py-3">Web search (firm research agent)</td>
+                                        <td class="px-4 py-3">US/EU</td>
+                                        <td class="px-4 py-3">SOC 2</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://apify.com/data-processing-agreement" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr class="border-b border-[#e5e7eb] dark:border-[#1e293b]">
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Resend</td>
+                                        <td class="px-4 py-3">Transactional email (invitations, alerts)</td>
+                                        <td class="px-4 py-3">US</td>
+                                        <td class="px-4 py-3">SOC 2 Type II</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://resend.com/legal/dpa" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                    <tr>
+                                        <td class="px-4 py-3 font-medium text-[#111418] dark:text-white">Sentry</td>
+                                        <td class="px-4 py-3">Error monitoring (sanitized stack traces only — no customer data in payloads)</td>
+                                        <td class="px-4 py-3">US</td>
+                                        <td class="px-4 py-3">SOC 2 Type II</td>
+                                        <td class="px-4 py-3"><a class="text-primary hover:underline" href="https://sentry.io/legal/dpa/" target="_blank" rel="noopener noreferrer">DPA</a></td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </section>
 
                     <!-- Compliance roadmap -->
