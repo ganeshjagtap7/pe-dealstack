@@ -32,6 +32,7 @@ import integrationsRouter from './routes/integrations.js';
 import integrationsPublicRouter from './routes/integrations-public.js';
 import { registerProvider } from './integrations/_platform/registry.js';
 import { granolaProvider } from './integrations/granola/index.js';
+import { gmailProvider } from './integrations/gmail/index.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -314,6 +315,7 @@ app.get('/api/ai/status', (_req, res) => {
 
 // Register integration providers (must execute before any request)
 registerProvider(granolaProvider);
+registerProvider(gmailProvider);
 
 // Sentry error handler (must be before custom error handler)
 if (process.env.SENTRY_DSN) {
