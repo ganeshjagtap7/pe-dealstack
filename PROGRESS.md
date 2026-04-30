@@ -5,6 +5,24 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 67 — April 30, 2026
+
+#### Goal
+Add Google Calendar as the third provider — same OAuth credentials as Gmail, separate Integration row.
+
+#### What shipped
+- Calendar HTTP client (`apps/api/src/integrations/googleCalendar/client.ts`): OAuth helpers reusing `GOOGLE_CLIENT_ID/SECRET`, paginated `listEventsBetween` with `singleEvents=true&orderBy=startTime` (recurring events expanded), `getUserInfo`. AbortSignal.timeout on every HTTP call.
+- Calendar event → `IntegrationActivity` mapper: handles both `dateTime` and all-day `date` formats, computes durationSeconds, captures attendees + organizer + location + status + htmlLink in metadata. type='CALENDAR_EVENT'.
+- `googleCalendarProvider`: full IntegrationProvider in OAuth mode. Each user can connect Gmail and Calendar independently — separate Integration rows under separate provider IDs.
+- sync window: -30d to +30d each tick (re-upserts handle reschedules / attendee additions correctly via UNIQUE on integrationId,source,externalId).
+- 9 new tests across `tests/integrations/googleCalendar/` (client 4, mapper 4, sync 1). All green.
+
+#### Decisions
+- **No pre-meeting brief generation in V1.** Calendar events are stored as IntegrationActivity rows; the brief feature (LLM-generated context summary 1h before meeting) is a separate follow-up that builds on the data we now have.
+- **No Calendar push notifications (channels.watch).** V1 polls every 6h via the existing cron; push is a future phase.
+
+---
+
 ### Session 66 — April 30, 2026
 
 #### Goal
