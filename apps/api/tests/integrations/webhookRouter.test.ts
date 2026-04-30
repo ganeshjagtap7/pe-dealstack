@@ -1,16 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { _resetRegistryForTests, registerProvider } from '../../src/integrations/_platform/registry.js';
 
 beforeEach(() => {
   process.env.SUPABASE_URL = 'https://test.supabase.co';
   process.env.SUPABASE_ANON_KEY = 'test-anon-key';
   vi.resetModules();
-  _resetRegistryForTests();
 });
 
 describe('webhookRouter', () => {
   it('rejects unknown provider with PROVIDER_UNKNOWN', async () => {
     vi.doMock('../../src/supabase.js', () => ({ supabase: { from: vi.fn() } }));
+    const { _resetRegistryForTests } = await import(
+      '../../src/integrations/_platform/registry.js'
+    );
+    _resetRegistryForTests();
     const { routeWebhook } = await import(
       '../../src/integrations/_platform/webhookRouter.js'
     );
@@ -21,6 +23,10 @@ describe('webhookRouter', () => {
 
   it('dispatches to registered provider.handleWebhook', async () => {
     vi.doMock('../../src/supabase.js', () => ({ supabase: { from: vi.fn() } }));
+    const { registerProvider, _resetRegistryForTests } = await import(
+      '../../src/integrations/_platform/registry.js'
+    );
+    _resetRegistryForTests();
     const handleWebhook = vi.fn().mockResolvedValue(undefined);
     registerProvider({
       id: '_mock',
