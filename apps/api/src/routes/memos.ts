@@ -26,7 +26,12 @@ router.use('/', memoChatRouter);
 const createMemoSchema = z.object({
   title: z.string().min(1),
   projectName: z.string().optional(),
-  dealId: z.string().uuid().nullable().optional(),
+  // dealId is REQUIRED on create — the AI generation pipeline (generate-all,
+  // chat agent) needs a bound deal to source context, and a memo with no
+  // deal strands the user on the MEMO_MISSING_DEAL 400 path. The frontend
+  // CreateMemoModal also enforces this client-side; this guard catches
+  // bypass attempts via curl, the API explorer, or stale/older clients.
+  dealId: z.string().uuid({ message: 'A valid dealId is required to create a memo' }),
   templateId: z.string().uuid().optional(),
   type: z.enum(['IC_MEMO', 'TEASER', 'SUMMARY', 'CUSTOM']).default('IC_MEMO'),
   status: z.enum(['DRAFT', 'REVIEW', 'FINAL', 'ARCHIVED']).default('DRAFT'),

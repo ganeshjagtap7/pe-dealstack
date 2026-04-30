@@ -25,6 +25,7 @@ import {
 } from "./components";
 import { exportMemoPDF, exportMemoMarkdown, exportMemoClipboard, shareMemoLink } from "./export";
 import { DocumentHeaderBar } from "./header-bar";
+import { DeleteMemoConfirm, applyMemoDeleted, type PendingDeleteMemo } from "./delete-memo";
 
 export default function MemoBuilderPage() {
   return (
@@ -71,6 +72,7 @@ function MemoBuilderPageInner() {
   const [addSectionAI, setAddSectionAI] = useState(true);
   const [addingSectionLoading, setAddingSectionLoading] = useState(false);
   const [pendingDeleteSection, setPendingDeleteSection] = useState<{ id: string; title: string } | null>(null);
+  const [pendingDeleteMemo, setPendingDeleteMemo] = useState<PendingDeleteMemo | null>(null);
   const [generatingAll, setGeneratingAll] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
@@ -172,12 +174,17 @@ function MemoBuilderPageInner() {
       setCreateForm((f) => ({ ...f, dealId: prefillDealId }));
     }
     try {
+      // /api/deals can return either a bare DealOption[] (current handler in
+      // routes/deals.ts) OR { deals: DealOption[] } (other handlers in the
+      // codebase). Normalise both shapes — same dual-shape pattern as
+      // IngestDealForm.searchDeals — so the dropdown isn't empty when the
+      // bare-array shape is returned.
       const [dealRes, templateRes] = await Promise.all([
-        api.get<{ deals: DealOption[] }>("/deals?limit=50").catch(() => ({ deals: [] })),
-        api.get<TemplateOption[]>("/templates").catch(() => []),
+        api.get<DealOption[] | { deals: DealOption[] }>("/deals?limit=50").catch(() => [] as DealOption[]),
+        api.get<TemplateOption[] | { templates: TemplateOption[] }>("/templates").catch(() => [] as TemplateOption[]),
       ]);
-      setDeals(dealRes.deals || []);
-      setTemplates(Array.isArray(templateRes) ? templateRes : []);
+      setDeals(Array.isArray(dealRes) ? dealRes : (dealRes?.deals ?? []));
+      setTemplates(Array.isArray(templateRes) ? templateRes : (templateRes?.templates ?? []));
     } catch (err) {
       console.warn("[memo-builder] failed to load deals/templates for create modal:", err);
     }
@@ -497,6 +504,12 @@ function MemoBuilderPageInner() {
         setStatusFilter={setStatusFilter}
         onSelectMemo={loadMemo}
         onCreateNew={() => openCreateModal()}
+        onDelete={(id) => {
+          setPendingDeleteMemo({
+            id,
+            title: memos.find((m) => m.id === id)?.title ?? "this memo",
+          });
+        }}
         filteredMemos={filteredMemos}
       />
 
@@ -673,6 +686,25 @@ function MemoBuilderPageInner() {
         variant="danger"
         onConfirm={() => pendingDeleteSection && handleDeleteSection(pendingDeleteSection.id)}
         onCancel={() => setPendingDeleteSection(null)}
+      />
+
+      {/* ---- Delete Memo Confirm ---- */}
+      <DeleteMemoConfirm
+        pending={pendingDeleteMemo}
+        setPending={setPendingDeleteMemo}
+        onDeleted={(deletedId) => {
+          const { nextMemos, clearSelection } = applyMemoDeleted(memos, selectedMemo, deletedId);
+          setMemos(nextMemos);
+          if (clearSelection) {
+            setSelectedMemo(null);
+            setSections([]);
+            setEditingContent({});
+            setActiveSection(null);
+            setMessages([]);
+          }
+          setSuccessToast("Memo deleted.");
+        }}
+        onError={(msg) => setError(msg)}
       />
     </div>
   );
