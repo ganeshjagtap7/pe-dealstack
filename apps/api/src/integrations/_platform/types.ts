@@ -47,9 +47,18 @@ export interface SyncResult {
   newCursor?: string;
 }
 
+export type AuthMode = 'oauth' | 'api_key';
+
 export interface InitiateAuthResult {
-  authUrl: string;
-  state: string;
+  mode: AuthMode;
+  authUrl?: string;                         // present when mode === 'oauth'
+  state?: string;                           // OAuth-state token (oauth mode)
+  instructions?: {                          // present when mode === 'api_key'
+    title: string;
+    body: string;
+    helpUrl?: string;
+    placeholder?: string;
+  };
 }
 
 export interface IntegrationProvider {
@@ -58,6 +67,12 @@ export interface IntegrationProvider {
   scopes: string[];
   initiateAuth(userId: string, organizationId: string): Promise<InitiateAuthResult>;
   handleCallback(params: { code: string; state: string }): Promise<Integration>;
+  /** API-key-paste mode: user submitted a long-lived bearer token directly. */
+  connectWithApiKey?(params: {
+    userId: string;
+    organizationId: string;
+    apiKey: string;
+  }): Promise<Integration>;
   sync(integration: Integration, options: SyncOptions): Promise<SyncResult>;
   handleWebhook(
     headers: Record<string, string>,

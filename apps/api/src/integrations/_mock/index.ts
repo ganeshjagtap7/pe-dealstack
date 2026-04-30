@@ -14,7 +14,7 @@ export const mockProvider: IntegrationProvider = {
   scopes: ['mock.read'],
 
   async initiateAuth(): Promise<InitiateAuthResult> {
-    return { authUrl: 'https://mock.example.com/auth', state: 'mock-state' };
+    return { mode: 'oauth', authUrl: 'https://mock.example.com/auth', state: 'mock-state' };
   },
 
   async handleCallback(): Promise<Integration> {
