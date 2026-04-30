@@ -10,7 +10,7 @@ export async function syncIntegration(
   const provider = getProvider(integration.provider);
   try {
     const result = await provider.sync(integration, {
-      since: options.since ?? integration.lastSyncAt ?? undefined,
+      since: options.since ?? (integration.lastSyncAt ? new Date(integration.lastSyncAt) : undefined),
       backfill: options.backfill ?? false,
     });
     await supabase

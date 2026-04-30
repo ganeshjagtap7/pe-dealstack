@@ -25,14 +25,14 @@ export interface Integration {
   externalAccountEmail: string | null;
   accessTokenEncrypted: string | null;
   refreshTokenEncrypted: string | null;
-  tokenExpiresAt: Date | null;
+  tokenExpiresAt: string | null;
   scopes: string[];
   settings: Record<string, unknown>;
-  lastSyncAt: Date | null;
+  lastSyncAt: string | null;
   lastSyncError: string | null;
   consecutiveFailures: number;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface SyncOptions {

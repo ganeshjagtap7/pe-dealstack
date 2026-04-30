@@ -64,7 +64,7 @@ router.delete('/:id', async (req: Request, res: Response, next: NextFunction) =>
     if (!row) return res.status(404).json({ error: 'Integration not found' });
     if (isProviderRegistered(row.provider as ProviderId)) {
       try {
-        await getProvider(row.provider as ProviderId).disconnect(row as unknown as Integration);
+        await getProvider(row.provider as ProviderId).disconnect(row as Integration);
       } catch (e) {
         log.warn('Provider disconnect failed (continuing with local revoke)', { e });
       }
@@ -83,7 +83,7 @@ router.post('/:id/sync', async (req: Request, res: Response, next: NextFunction)
       .select('*')
       .eq('id', id).eq('organizationId', orgId).single();
     if (error || !row) return res.status(404).json({ error: 'Integration not found' });
-    const result = await syncIntegration(row as unknown as Integration);
+    const result = await syncIntegration(row as Integration);
     res.json({ ok: true, result });
   } catch (err) { next(err); }
 });

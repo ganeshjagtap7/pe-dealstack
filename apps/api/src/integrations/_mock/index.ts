@@ -26,7 +26,7 @@ export const mockProvider: IntegrationProvider = {
       integrationId: integration.id,
       accessToken: 'mock-access-token-refreshed',
       refreshToken: integration.refreshTokenEncrypted ? 'mock-refresh' : null,
-      tokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+      tokenExpiresAt: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
     });
     return { itemsSynced: 1, itemsMatched: 0, errors: [] };
   },

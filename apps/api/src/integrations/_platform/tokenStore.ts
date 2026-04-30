@@ -16,7 +16,7 @@ export async function saveTokens(params: {
   integrationId: string;
   accessToken: string;
   refreshToken: string | null;
-  tokenExpiresAt: Date | null;
+  tokenExpiresAt: string | null;
 }): Promise<void> {
   const { integrationId, accessToken, refreshToken, tokenExpiresAt } = params;
   const { error } = await supabase
@@ -24,7 +24,7 @@ export async function saveTokens(params: {
     .update({
       accessTokenEncrypted: encryptForStorage(accessToken),
       refreshTokenEncrypted: encryptForStorage(refreshToken),
-      tokenExpiresAt: tokenExpiresAt?.toISOString() ?? null,
+      tokenExpiresAt: tokenExpiresAt,
       status: 'connected' as IntegrationStatus,
       consecutiveFailures: 0,
       lastSyncError: null,

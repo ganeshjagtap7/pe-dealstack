@@ -32,7 +32,7 @@ describe('Phase 0 smoke', () => {
       tokenExpiresAt: null, scopes: [], settings: {}, lastSyncAt: null,
       lastSyncError: null, consecutiveFailures: 0,
       externalAccountId: null, externalAccountEmail: null,
-      createdAt: new Date(), updatedAt: new Date(),
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     } as any;
 
     const result = await provider.sync(integration, {});
