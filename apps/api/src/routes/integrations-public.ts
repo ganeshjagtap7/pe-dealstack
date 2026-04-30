@@ -40,8 +40,11 @@ router.get('/oauth/:provider/callback', async (req: Request, res: Response, _nex
 router.post('/_cron/sync-all', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const expected = process.env.CRON_SECRET;
-    const actual = req.header('x-cron-secret');
-    if (!expected || actual !== expected) {
+    if (!expected) return res.status(401).json({ error: 'Unauthorized' });
+    const auth = req.header('authorization') ?? '';
+    const bearer = auth.toLowerCase().startsWith('bearer ') ? auth.slice(7) : '';
+    const xHeader = req.header('x-cron-secret') ?? '';
+    if (bearer !== expected && xHeader !== expected) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
     const result = await syncAll();
