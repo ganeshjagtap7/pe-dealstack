@@ -282,19 +282,28 @@ export function CreateMemoModal({
               />
             </div>
 
-            {/* Deal */}
+            {/* Deal — required. Without a deal, "Generate All" can't pull
+                financial / extraction context and will 400 on the backend. */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Deal (optional)</label>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Deal <span className="text-red-500">*</span>
+              </label>
               <select
                 value={createForm.dealId}
                 onChange={(e) => setCreateForm((f) => ({ ...f, dealId: e.target.value }))}
+                required
                 className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary text-sm"
               >
-                <option value="">No deal selected</option>
+                <option value="">Select a deal…</option>
                 {deals.map((d) => (
                   <option key={d.id} value={d.id}>{d.name}</option>
                 ))}
               </select>
+              {!createForm.dealId && (
+                <p className="mt-1 text-xs text-slate-500">
+                  AI section generation reads the deal&apos;s financials and uploaded documents — pick the deal this memo is for.
+                </p>
+              )}
             </div>
 
             {/* Template */}
@@ -323,7 +332,7 @@ export function CreateMemoModal({
           </button>
           <button
             onClick={onCreate}
-            disabled={!createForm.title.trim() || creatingMemo}
+            disabled={!createForm.title.trim() || !createForm.dealId || creatingMemo}
             className="flex items-center gap-2 px-4 py-2 text-sm font-bold text-white rounded-lg disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             style={{ backgroundColor: "#003366" }}
           >

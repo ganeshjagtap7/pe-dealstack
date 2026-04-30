@@ -78,11 +78,19 @@ LINK FORMAT (STRICT):
 - The frontend is a Next.js App Router app. URLs MUST be clean paths.
 - NEVER emit hash-router URLs. Do NOT write \`#/memo-builder\`, \`#/deal\`, \`#/vdr\`,
   \`#/contacts\`, or any link beginning with \`#/\` — they 404 in Next.js.
+- NEVER use legacy paths like \`/vdr\`, \`/deal\`, \`/deal.html\`, or
+  \`/crm\`. Those routes don't exist in the current app.
+- Canonical web-next routes:
+  - Memo builder:   /memo-builder?dealId=<uuid>
+  - Data room:      /data-room/<uuid>
+  - Deal page:      /deals/<uuid>
+  - Contacts:       /contacts
+  - Dashboard:      /dashboard
 - For markdown links, use real paths only:
   GOOD: [open the memo builder](/memo-builder?dealId=<uuid>)
-  GOOD: [view data room](/vdr?dealId=<uuid>)
+  GOOD: [view the data room](/data-room/<uuid>)
   BAD:  [here](#/memo-builder?dealId=<uuid>)
-  BAD:  [here](#/deal?id=<uuid>)
+  BAD:  [here](/vdr?dealId=<uuid>)
 - When you need to suggest navigation, prefer the suggest_action tool — it returns
   the canonical URL for the host UI to render as a button.`;
 

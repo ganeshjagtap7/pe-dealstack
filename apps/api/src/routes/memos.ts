@@ -466,7 +466,12 @@ router.post('/:id/generate-all', async (req, res) => {
       .single();
 
     if (!memo) return res.status(404).json({ error: 'Memo not found' });
-    if (!memo.dealId) return res.status(400).json({ error: 'Memo has no associated deal' });
+    if (!memo.dealId) {
+      return res.status(400).json({
+        error: "This memo isn't attached to a deal — attach one before generating AI sections. Open the memo and pick a deal from the title bar, or recreate the memo via the Create Memo modal with a deal selected.",
+        code: 'MEMO_MISSING_DEAL',
+      });
+    }
     if (!isLLMAvailable()) return res.status(503).json({ error: 'AI service unavailable' });
 
     const { sections: generated } = await generateAllSections(memo.dealId, orgId);
