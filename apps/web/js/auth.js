@@ -287,10 +287,39 @@ async function authFetch(url, options = {}) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
   });
+
+  // MFA enforcement interceptor — when org requires 2FA and user has none,
+  // API returns 403 with code MFA_REQUIRED. Redirect to settings for enrollment.
+  if (response.status === 403) {
+    try {
+      const clone = response.clone();
+      const body = await clone.json();
+      if (body && body.code === 'MFA_REQUIRED') {
+        // Avoid loop on the settings page itself
+        if (!location.pathname.includes('settings.html')) {
+          // Use existing toast if available, else alert
+          if (typeof window.showToast === 'function') {
+            window.showToast({
+              type: 'warning',
+              message: 'Your organization requires 2FA. Redirecting to enrollment.',
+            });
+            await new Promise((r) => setTimeout(r, 800));
+          } else {
+            alert('Your organization requires 2FA. Redirecting to enrollment.');
+          }
+          location.href = '/settings.html#section-security';
+          // Return a never-resolving promise so the caller doesn't try to use the response
+          return new Promise(() => {});
+        }
+      }
+    } catch (_) { /* not JSON or parse failed — let caller handle 403 normally */ }
+  }
+
+  return response;
 }
 
 // ─── MFA / Two-Factor Authentication ───────────────────────
