@@ -5,6 +5,36 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 65 — April 30, 2026
+
+#### Goal
+Wire Granola as the first real provider in the Integrations Platform, with a separate AI agent for meeting transcripts.
+
+#### What shipped
+- 3 Phase 0 review follow-ups: raw webhook body capture (req.rawBody), per-integration sync timeout + bounded concurrency in syncAll, Integration timestamp fields as ISO strings (matching Supabase wire format).
+- New IntegrationActivity table — separate from the existing Activity table so the human-action audit log stays clean. UNIQUE on (source, externalId) for idempotent re-sync; dealIds/contactIds are UUID[] columns with GIN indexes for fast WHERE col @> ARRAY[id] containment lookups.
+- New meeting transcript agent (apps/api/src/services/agents/meetingTranscriptAgent/) — distinct from the financial agent. Single GPT-4.1-mini call with json_object response format and Zod schema validation. Returns: summary, keyTopics, actionItems, decisions, openQuestions, mentionedNumbers, nextSteps, sentiment. ~$0.001-0.005 per transcript.
+- IntegrationProvider extended with optional connectWithApiKey() and InitiateAuthResult.mode discriminator ('oauth' | 'api_key') so the platform supports both auth styles.
+- New Granola provider module (apps/api/src/integrations/granola/): types, HTTP client (validateKey, listNotesSince with cursor pagination + 429 retry, getNoteWithTranscript), note→IntegrationActivity mapper (calls the transcript agent inline), provider implementation registered at app boot.
+- New API endpoints: POST /api/integrations/:provider/api-key (validates + encrypts the key), GET /api/integrations/activities?dealId=…|?contactId=… (org-scoped, ordered by occurredAt DESC, uses GIN indexes).
+- Settings UI: paste-key modal that opens when /connect returns mode: 'api_key'. Shows the provider's instructions + helpUrl, surfaces validation errors inline (plan-required, invalid key), Esc/Enter/click-outside wired.
+- Tests: 33 in tests/integrations/ (was 18 after Phase 0 hardening), 4 in tests/agents/, all green.
+
+#### Reality vs. spec
+The original integrations spec assumed Granola exposed third-party OAuth + meeting.transcript.ready webhooks. Research against docs.granola.ai confirmed neither exists. Granola issues only Personal API keys (Business/Enterprise plans), no webhooks. Phase 1 ships paste-key + 6h polling architecture; the webhook code path stays intact for Phase 2+ providers (Gmail, Calendar).
+
+#### Caveats
+- Connecting Granola requires a Business or Enterprise plan; Free/Pro users see a clear "plan not supported" error from validation.
+- Sync runs every 6 hours via Vercel cron + on-demand via POST /api/integrations/:id/sync. No real-time push.
+- Transcript agent runs on every transcript with matched attendees. Cost: ~$0.001-0.005 per transcript on MODEL_FAST (gpt-4.1-mini). For a firm doing 100 deal-relevant meetings/month, ~$0.10-$0.50/month.
+- Frontend rendering of IntegrationActivity rows on deal/contact pages is NOT in this phase — the API endpoints exist (GET /api/integrations/activities), but the deal.html/contact pages haven't been wired up yet. Next phase.
+- IntegrationActivity table needs to be applied via apps/api/integration-activity-migration.sql before any sync runs against staging/prod.
+
+#### Branch
+feature/integrations-platform — Phase 0 + 3 hardening fixes + Phase 1 Granola, all on the same branch. Suggested merge order: Phase 0 commits + hardening fixes can be cherry-picked or merged first; Phase 1 can follow as a second PR.
+
+---
+
 ### Session 64 — April 30, 2026
 
 #### Goal: Integrations Platform Phase 0 (foundations)
