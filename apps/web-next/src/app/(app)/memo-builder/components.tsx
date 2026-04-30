@@ -108,6 +108,9 @@ interface MemoListSidebarProps {
   setStatusFilter: (v: string) => void;
   onSelectMemo: (id: string) => void;
   onCreateNew: () => void;
+  // Click opens the parent's delete-confirm dialog. The parent owns the
+  // pending-delete state and the actual API call.
+  onDelete: (memoId: string) => void;
   filteredMemos: Memo[];
 }
 
@@ -120,6 +123,7 @@ export function MemoListSidebar({
   setStatusFilter,
   onSelectMemo,
   onCreateNew,
+  onDelete,
   filteredMemos,
 }: MemoListSidebarProps) {
   return (
@@ -195,16 +199,28 @@ export function MemoListSidebar({
           filteredMemos.map((memo) => {
             const isSelected = selectedMemoId === memo.id;
             const style = STATUS_STYLES[memo.status] || STATUS_STYLES.DRAFT;
+            // The row is a `div` (not `button`) so we can nest a real <button>
+            // for the delete icon without producing invalid button-in-button
+            // HTML. We mirror the row's button affordance with role/tabIndex
+            // and onKeyDown handling so keyboard users get the same flow.
             return (
-              <button
+              <div
                 key={memo.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelectMemo(memo.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectMemo(memo.id);
+                  }
+                }}
                 className={cn(
-                  "w-full text-left p-3 border-b border-border-subtle transition-colors",
+                  "group relative w-full text-left p-3 border-b border-border-subtle transition-colors cursor-pointer focus:outline-none focus:bg-background-body",
                   isSelected ? "bg-blue-50 border-l-2 border-l-primary" : "hover:bg-background-body"
                 )}
               >
-                <div className="flex items-start justify-between mb-1">
+                <div className="flex items-start justify-between mb-1 pr-7">
                   <p className="text-sm font-medium text-text-main truncate pr-2">
                     {memo.projectName || memo.title}
                   </p>
@@ -212,9 +228,26 @@ export function MemoListSidebar({
                     {memo.status}
                   </span>
                 </div>
-                <p className="text-[11px] text-text-muted truncate">{memo.title}</p>
+                <p className="text-[11px] text-text-muted truncate pr-7">{memo.title}</p>
                 <p className="text-[10px] text-text-muted mt-1">{formatRelativeTime(memo.updatedAt)}</p>
-              </button>
+
+                {/* Delete affordance — bottom-right, only visible on row
+                    hover/focus. stopPropagation so clicking it doesn't also
+                    select the memo. */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(memo.id);
+                  }}
+                  onKeyDown={(e) => e.stopPropagation()}
+                  aria-label={`Delete memo ${memo.projectName || memo.title}`}
+                  title="Delete memo"
+                  className="absolute bottom-2 right-2 size-6 rounded-md flex items-center justify-center text-text-muted opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-red-50 hover:text-red-600 transition-opacity"
+                >
+                  <span className="material-symbols-outlined text-[16px]">delete</span>
+                </button>
+              </div>
             );
           })
         )}

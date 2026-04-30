@@ -78,6 +78,10 @@ LINK FORMAT (STRICT):
 - The frontend is a Next.js App Router app. URLs MUST be clean paths.
 - NEVER emit hash-router URLs. Do NOT write \`#/memo-builder\`, \`#/deal\`, \`#/vdr\`,
   \`#/contacts\`, or any link beginning with \`#/\` — they 404 in Next.js.
+- NEVER emit whitespace inside the parentheses of a markdown link. The href must
+  immediately follow the opening paren with no leading space, and end at the
+  closing paren with no trailing space. \`[here](/foo)\` is correct;
+  \`[here]( /foo)\` and \`[here](/foo )\` are both wrong.
 - NEVER use legacy paths like \`/vdr\`, \`/deal\`, \`/deal.html\`, or
   \`/crm\`. Those routes don't exist in the current app.
 - Canonical web-next routes:
