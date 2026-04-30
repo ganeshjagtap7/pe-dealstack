@@ -48,11 +48,53 @@ export async function syncIntegration(
   }
 }
 
-export async function syncAll(): Promise<{
+const SYNC_TIMEOUT_MS = 60_000;
+const SYNC_CONCURRENCY = 5;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${ms}ms`)),
+      ms
+    );
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); }
+    );
+  });
+}
+
+async function runWithConcurrency<T>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<void>
+): Promise<void> {
+  const queue = items.slice();
+  const workers: Promise<void>[] = [];
+  const worker = async (): Promise<void> => {
+    while (queue.length > 0) {
+      const next = queue.shift();
+      if (next === undefined) return;
+      await fn(next);
+    }
+  };
+  for (let i = 0; i < Math.min(limit, items.length); i++) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+}
+
+export async function syncAll(options: {
+  timeoutMs?: number;
+  concurrency?: number;
+} = {}): Promise<{
   ranFor: number;
   succeeded: number;
   failed: number;
 }> {
+  const timeoutMs = options.timeoutMs ?? SYNC_TIMEOUT_MS;
+  const concurrency = options.concurrency ?? SYNC_CONCURRENCY;
+
   const { data: integrations, error } = await supabase
     .from('Integration')
     .select('*')
@@ -62,14 +104,20 @@ export async function syncAll(): Promise<{
 
   let succeeded = 0;
   let failed = 0;
-  for (const row of integrations as Integration[]) {
+
+  await runWithConcurrency(integrations as Integration[], concurrency, async (row) => {
     try {
-      await syncIntegration(row);
+      await withTimeout(
+        syncIntegration(row),
+        timeoutMs,
+        `syncIntegration(${row.provider}/${row.id})`
+      );
       succeeded++;
     } catch {
       failed++;
     }
-  }
+  });
+
   return { ranFor: integrations.length, succeeded, failed };
 }
 
