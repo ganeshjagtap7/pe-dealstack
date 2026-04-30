@@ -2,6 +2,7 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { log } from '../utils/logger.js';
 import { routeWebhook } from '../integrations/_platform/webhookRouter.js';
 import { getProvider, isProviderRegistered } from '../integrations/_platform/registry.js';
+import { syncAll } from '../integrations/_platform/syncEngine.js';
 import type { ProviderId } from '../integrations/_platform/types.js';
 
 const router = Router();
@@ -34,6 +35,18 @@ router.get('/oauth/:provider/callback', async (req: Request, res: Response, _nex
     log.error('OAuth callback failed', err);
     res.redirect(`/settings.html?integrations=error&provider=${provider}`);
   }
+});
+
+router.post('/_cron/sync-all', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const expected = process.env.CRON_SECRET;
+    const actual = req.header('x-cron-secret');
+    if (!expected || actual !== expected) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const result = await syncAll();
+    res.json({ ok: true, ...result });
+  } catch (err) { next(err); }
 });
 
 export default router;
