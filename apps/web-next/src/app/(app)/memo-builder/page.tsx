@@ -200,23 +200,33 @@ function MemoBuilderPageInner() {
 
     let cancelled = false;
     (async () => {
+      // Always end up in either the existing memo OR the Create modal. If any
+      // step throws, fall through to opening the modal — never strand the
+      // user on an empty state when they navigated here with a dealId.
+      let matches: Memo[] = [];
       try {
         const params = new URLSearchParams({ dealId: urlDealId });
-        const matches = await api.get<Memo[]>(`/memos?${params}`).catch(() => [] as Memo[]);
-        if (cancelled) return;
-        if (Array.isArray(matches) && matches.length > 0) {
-          // Pick the most recently updated memo for this deal.
-          const best = [...matches].sort((a, b) =>
-            (b.updatedAt || "").localeCompare(a.updatedAt || "")
-          )[0];
-          loadMemo(best.id);
-        } else {
-          // No existing memo — open Create modal with the deal pre-selected.
-          openCreateModal(urlDealId);
-        }
+        const result = await api.get<Memo[]>(`/memos?${params}`);
+        if (Array.isArray(result)) matches = result;
       } catch (err) {
-        // Best-effort: fall through to the default empty state.
         console.warn("[memo-builder] dealId-prefill memo lookup failed:", err);
+      }
+      if (cancelled) return;
+
+      if (matches.length > 0) {
+        const best = [...matches].sort((a, b) =>
+          (b.updatedAt || "").localeCompare(a.updatedAt || "")
+        )[0];
+        try {
+          await loadMemo(best.id);
+        } catch (err) {
+          // If the memo can't load (deleted? permissions?), fall through to
+          // the create flow rather than leave the user on the empty state.
+          console.warn("[memo-builder] loadMemo failed, falling back to create:", err);
+          if (!cancelled) openCreateModal(urlDealId);
+        }
+      } else {
+        openCreateModal(urlDealId);
       }
     })();
     return () => { cancelled = true; };

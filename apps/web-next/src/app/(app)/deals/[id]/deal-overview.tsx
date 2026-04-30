@@ -294,7 +294,13 @@ function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: 
   }, [mentionOpen, mentionFiltered, mentionSelectedIdx, insertMention, closeMention, submitNote]);
 
   return (
-    <div ref={containerRef} className="rounded-xl p-4" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
+    // `backdrop-filter` on this wrapper creates a stacking context — the
+    // mention dropdown's z-30 is therefore scoped *inside* this card. The
+    // sibling InlineActivityFeed has no z-index, so without an explicit
+    // value here it would render on top in document order and clip the
+    // dropdown. relative + z-20 lifts the whole AddNote card above the
+    // feed so the dropdown is visible.
+    <div ref={containerRef} className="rounded-xl p-4 relative z-20" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
       <h3 className="text-sm font-bold text-text-main uppercase tracking-wider mb-3 flex items-center gap-2">
         <span className="material-symbols-outlined text-amber-500 text-lg">sticky_note_2</span>
         Add Note
