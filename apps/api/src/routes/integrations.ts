@@ -53,21 +53,6 @@ router.post('/:provider/connect', async (req: Request, res: Response, next: Next
   } catch (err) { next(err); }
 });
 
-router.get('/:provider/callback', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const provider = req.params.provider as ProviderId;
-    const code = String(req.query.code ?? '');
-    const state = String(req.query.state ?? '');
-    if (!code || !state) return res.status(400).send('Missing code or state');
-    if (!isProviderRegistered(provider)) return res.status(404).send('Provider not registered');
-    await getProvider(provider).handleCallback({ code, state });
-    res.redirect(`/settings.html?integrations=connected&provider=${provider}`);
-  } catch (err) {
-    log.error('OAuth callback failed', err);
-    res.redirect(`/settings.html?integrations=error&provider=${req.params.provider}`);
-  }
-});
-
 router.delete('/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);

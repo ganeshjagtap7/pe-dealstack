@@ -56,3 +56,52 @@ describe('GET /api/integrations', () => {
     expect(res.body.integrations[0].accessTokenEncrypted).toBeUndefined();
   });
 });
+
+describe('POST /api/integrations/webhooks/:provider', () => {
+  it('returns 404 for an unregistered provider', async () => {
+    vi.doMock('../../src/supabase.js', () => ({ supabase: { from: vi.fn() } }));
+
+    const { _resetRegistryForTests } = await import(
+      '../../src/integrations/_platform/registry.js'
+    );
+    _resetRegistryForTests();
+
+    const express = (await import('express')).default;
+    const router = (await import('../../src/routes/integrations-public.js')).default;
+    const app = express();
+    app.use(express.json());
+    app.use('/api/integrations', router);
+
+    const res = await request(app)
+      .post('/api/integrations/webhooks/granola')
+      .send({ event: 'test' });
+    expect(res.status).toBe(404);
+  });
+
+  it('returns 204 when registered provider handles webhook successfully', async () => {
+    vi.doMock('../../src/supabase.js', () => ({ supabase: { from: vi.fn() } }));
+
+    const { _resetRegistryForTests, registerProvider } = await import(
+      '../../src/integrations/_platform/registry.js'
+    );
+    _resetRegistryForTests();
+    const handleWebhook = vi.fn().mockResolvedValue(undefined);
+    registerProvider({
+      id: '_mock', displayName: 'M', scopes: [],
+      initiateAuth: vi.fn(), handleCallback: vi.fn(), sync: vi.fn(),
+      handleWebhook, disconnect: vi.fn(),
+    } as any);
+
+    const express = (await import('express')).default;
+    const router = (await import('../../src/routes/integrations-public.js')).default;
+    const app = express();
+    app.use(express.json());
+    app.use('/api/integrations', router);
+
+    const res = await request(app)
+      .post('/api/integrations/webhooks/_mock')
+      .send({ event: 'test' });
+    expect(res.status).toBe(204);
+    expect(handleWebhook).toHaveBeenCalled();
+  });
+});

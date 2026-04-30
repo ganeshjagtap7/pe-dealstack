@@ -29,6 +29,7 @@ import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
 import integrationsRouter from './routes/integrations.js';
+import integrationsPublicRouter from './routes/integrations-public.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -253,6 +254,13 @@ app.get('/api', (_req, res) => {
 // ========================================
 // Invitation verify/accept must be public — invitees don't have accounts yet
 app.use('/api/public/invitations', invitationsAcceptRouter);
+
+// Integration webhooks + OAuth callbacks must be public — providers POST/GET
+// here without an auth header. Auth is enforced via signed state tokens
+// (callbacks) or per-provider signature verification (webhooks).
+// MUST be mounted BEFORE the authenticated /api/integrations router below,
+// since Express matches routes in registration order.
+app.use('/api/integrations', integrationsPublicRouter);
 
 // ========================================
 // Protected Routes (require authentication + org resolution)
