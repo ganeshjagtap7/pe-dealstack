@@ -39,6 +39,18 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 const connectSchema = z.object({ provider: z.enum(PROVIDER_IDS as [ProviderId, ...ProviderId[]]) });
 
+const apiKeySchema = z.object({
+  apiKey: z.string().min(8).max(512),
+});
+
+const activitiesQuerySchema = z.object({
+  dealId: z.string().uuid().optional(),
+  contactId: z.string().uuid().optional(),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+}).refine(v => v.dealId || v.contactId, {
+  message: 'dealId or contactId is required',
+});
+
 router.post('/:provider/connect', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { provider } = connectSchema.parse({ provider: req.params.provider });
@@ -50,6 +62,57 @@ router.post('/:provider/connect', async (req: Request, res: Response, next: Next
     if (!userId) return res.status(404).json({ error: 'User not found' });
     const { authUrl, state } = await getProvider(provider).initiateAuth(userId, orgId);
     res.json({ authUrl, state });
+  } catch (err) { next(err); }
+});
+
+router.post('/:provider/api-key', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const provider = (connectSchema.parse({ provider: req.params.provider })).provider;
+    if (!isProviderRegistered(provider)) {
+      return res.status(404).json({ error: `Provider ${provider} not available yet` });
+    }
+    const impl = getProvider(provider);
+    if (!impl.connectWithApiKey) {
+      return res.status(400).json({ error: `Provider ${provider} does not accept API keys` });
+    }
+    const { apiKey } = apiKeySchema.parse(req.body);
+    const orgId = getOrgId(req);
+    const userId = await resolveInternalUserId(req.user!.id);
+    if (!userId) return res.status(404).json({ error: 'User not found' });
+    const integration = await impl.connectWithApiKey({ userId, organizationId: orgId, apiKey });
+    res.json({
+      id: integration.id,
+      provider: integration.provider,
+      status: integration.status,
+      externalAccountEmail: integration.externalAccountEmail,
+    });
+  } catch (err) {
+    if (err instanceof Error && /invalid api key|plan/i.test(err.message)) {
+      return res.status(400).json({ error: err.message });
+    }
+    next(err);
+  }
+});
+
+router.get('/activities', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const orgId = getOrgId(req);
+    const params = activitiesQuerySchema.parse(req.query);
+    const limit = params.limit ?? 50;
+
+    let q = supabase
+      .from('IntegrationActivity')
+      .select('id, integrationId, source, externalId, type, dealIds, contactIds, title, summary, occurredAt, durationSeconds, metadata, aiExtraction, createdAt')
+      .eq('organizationId', orgId)
+      .order('occurredAt', { ascending: false })
+      .limit(limit);
+
+    if (params.dealId) q = q.contains('dealIds', [params.dealId]);
+    if (params.contactId) q = q.contains('contactIds', [params.contactId]);
+
+    const { data, error } = await q;
+    if (error) throw error;
+    res.json({ activities: data ?? [] });
   } catch (err) { next(err); }
 });
 
