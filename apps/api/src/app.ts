@@ -28,6 +28,7 @@ import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
+import organizationsRouter from './routes/organizations.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -272,6 +273,7 @@ app.use('/api/templates', authMiddleware, orgMiddleware, templatesRouter);
 // Authenticated invitation routes (list, create, revoke, resend)
 app.use('/api/invitations', authMiddleware, orgMiddleware, invitationsRouter);
 app.use('/api/audit', authMiddleware, orgMiddleware, auditRouter);
+app.use('/api/organizations', authMiddleware, orgMiddleware, organizationsRouter);
 app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
