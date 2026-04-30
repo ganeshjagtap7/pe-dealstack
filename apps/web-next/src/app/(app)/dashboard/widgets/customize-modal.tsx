@@ -140,9 +140,12 @@ export function CustomizeDashboardModal({
   const dragIdRef = useRef<string | null>(null);
   const [dragOver, setDragOver] = useState<string | null>(null);
 
-  // Sync draft when modal opens
+  // Reset draft from props each time the modal opens — local edits are
+  // discarded when the user closes/reopens. This is intentionally a sync
+  // (not a remount), since the modal stays mounted to keep its DOM.
   useEffect(() => {
     if (open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDraft({
         core: new Set(coreVisible) as Set<CoreOrComingSoonId>,
         optional: new Set(visible),

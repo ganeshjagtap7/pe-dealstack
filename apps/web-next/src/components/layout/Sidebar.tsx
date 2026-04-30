@@ -64,6 +64,9 @@ export function Sidebar() {
   const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
+    // Hydrate after mount so SSR + client first-paint match (a lazy
+    // useState initialiser would diverge between server and client).
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setCollapsed(localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === "true");
   }, []);
 

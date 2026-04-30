@@ -33,6 +33,10 @@ export function LinkDealModal({ contactId, linkedDeals, onClose, onLinked }: { c
   const { showToast } = useToast();
 
   useEffect(() => {
+    // Reset results synchronously when query is too short — this is a
+    // legitimate "clear stale state on input change" pattern; remounting
+    // would lose the controlled <input>'s focus state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (query.length < 2) { setResults([]); return; }
     const timer = setTimeout(async () => {
       setSearching(true);
@@ -134,6 +138,10 @@ export function ConnectionModal({ contactId, onClose, onCreated }: { contactId: 
   const { showToast } = useToast();
 
   useEffect(() => {
+    // Reset results synchronously when query is too short — this is a
+    // legitimate "clear stale state on input change" pattern; remounting
+    // would lose the controlled <input>'s focus state.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (query.length < 2) { setResults([]); return; }
     const timer = setTimeout(async () => {
       setSearching(true);

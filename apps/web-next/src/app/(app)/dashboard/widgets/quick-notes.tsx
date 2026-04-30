@@ -1,26 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useUser } from "@/providers/UserProvider";
 import { WidgetShell } from "./shell";
 
 // Ported from apps/web/js/widgets/quick-notes.js. Per-user localStorage
 // namespace so a shared browser doesn't leak notes.
-export function QuickNotesWidget() {
-  const { user } = useUser();
-  const storageKey = `pe-quick-notes:${user?.id ?? "anon"}`;
-
-  const [note, setNote] = useState("");
-  const [status, setStatus] = useState("Auto-saves on blur");
-
-  useEffect(() => {
+function QuickNotesInner({ storageKey }: { storageKey: string }) {
+  // Lazy-init from localStorage so we don't sync state in an effect.
+  // The parent re-mounts this component (via key={storageKey}) when the
+  // user changes, so a stale note doesn't leak across user switches.
+  const [note, setNote] = useState<string>(() => {
     try {
-      setNote(localStorage.getItem(storageKey) ?? "");
+      return localStorage.getItem(storageKey) ?? "";
     } catch (err) {
       // localStorage disabled / quota error — fallback to empty note.
       console.warn("[dashboard/quick-notes] failed to read note from localStorage:", err);
+      return "";
     }
-  }, [storageKey]);
+  });
+  const [status, setStatus] = useState("Auto-saves on blur");
 
   const save = () => {
     try {
@@ -46,4 +45,12 @@ export function QuickNotesWidget() {
       </div>
     </WidgetShell>
   );
+}
+
+export function QuickNotesWidget() {
+  const { user } = useUser();
+  const storageKey = `pe-quick-notes:${user?.id ?? "anon"}`;
+  // key=storageKey forces remount when the user changes, so the lazy
+  // useState in QuickNotesInner re-reads localStorage for the new user.
+  return <QuickNotesInner key={storageKey} storageKey={storageKey} />;
 }

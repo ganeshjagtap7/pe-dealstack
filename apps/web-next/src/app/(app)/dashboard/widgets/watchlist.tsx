@@ -31,6 +31,9 @@ export function WatchlistWidget() {
   }, []);
 
   useEffect(() => {
+    // load() awaits an async fetch — its setStates happen in deferred
+    // callbacks, not synchronously during the effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 

@@ -32,6 +32,10 @@ export function useVisibleWidgets() {
   const [coreOrder, setCoreOrder] = useState<CoreWidgetId[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Hydrate from localStorage after mount. Lazy useState initialisers
+  // would diverge between SSR (no localStorage) and client first paint —
+  // the eslint-disables document that this is intentional.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -87,6 +91,7 @@ export function useVisibleWidgets() {
     }
     setLoaded(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const persistVisible = useCallback((set: Set<WidgetId>) => {
     try {

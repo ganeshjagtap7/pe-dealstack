@@ -12,6 +12,11 @@ import { FeedbackButton } from "@/components/onboarding/FeedbackButton";
 import { AIAssistant } from "@/components/layout/AIAssistant";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
+// Auth-required pages are inherently dynamic (cookies/auth lookup per request).
+// Force-dynamic prevents Next from attempting build-time prerender, which would
+// invoke the Supabase factory chain before env vars are bound (CI build crash).
+export const dynamic = "force-dynamic";
+
 // Pages that manage their own internal scrolling (full-bleed flex layouts with
 // docked side panels). For these we drop the layout's overflow-y-auto wrapper
 // so `h-full` chains resolve to the viewport height; otherwise the docked

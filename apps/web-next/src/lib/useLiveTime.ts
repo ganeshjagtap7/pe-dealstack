@@ -15,6 +15,12 @@ export function useLiveTime(date: string | Date | null | undefined): string {
   const [label, setLabel] = useState(() => formatRelativeTime(iso));
 
   useEffect(() => {
+    // Re-format immediately when iso changes, then poll every 30s. Both
+    // setLabel calls produce render-cycle work (the immediate one is the
+    // sync one — but it only fires when iso changes, not on every render,
+    // and matches the legacy 30s tick cadence). The interval callback is
+    // deferred, not a sync setState during effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLabel(formatRelativeTime(iso));
     if (!iso) return;
     const id = setInterval(() => {

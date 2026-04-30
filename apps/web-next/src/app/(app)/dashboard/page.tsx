@@ -140,6 +140,7 @@ export default function DashboardPage() {
   }, [isEditing, exitEditMode]);
 
   const [taskError, setTaskError] = useState<string | null>(null);
+  const [signalError, setSignalError] = useState<string | null>(null);
 
   const toggleTask = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === "COMPLETED" ? "PENDING" : "COMPLETED";
@@ -482,13 +483,14 @@ export default function DashboardPage() {
                         onClick={async () => {
                           setScanning(true);
                           setSignalResult(null);
+                          setSignalError(null);
                           try {
                             const result = await api.get<{ signals?: Array<{ title: string; description: string; severity: string; signalType: string; dealName: string; suggestedAction: string }>; processedCount?: number }>("/ai/scan-signals");
                             setSignalResult(result);
                           } catch (err) {
                             console.warn("[dashboard] scan-signals failed:", err);
-                            setTaskError("Couldn't scan signals — please try again.");
-                            setTimeout(() => setTaskError(null), 3500);
+                            setSignalError("Couldn't scan signals — please try again.");
+                            setTimeout(() => setSignalError(null), 5000);
                           } finally {
                             setScanning(false);
                           }
@@ -501,6 +503,12 @@ export default function DashboardPage() {
                         {scanning ? "Scanning..." : "Scan Signals"}
                       </button>
                     </div>
+                    {signalError && (
+                      <div className="px-5 py-2 text-xs text-red-600 bg-red-50 border-b border-red-100 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-[14px]">error</span>
+                        {signalError}
+                      </div>
+                    )}
                     {scanning ? (
                       <div className="flex flex-col items-center justify-center py-8">
                         <span className="material-symbols-outlined text-primary text-2xl animate-spin mb-2">radar</span>

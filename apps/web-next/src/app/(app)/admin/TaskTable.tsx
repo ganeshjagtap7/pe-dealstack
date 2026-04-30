@@ -110,8 +110,11 @@ export function TaskTable({ tasks, externalFilter, onTasksChanged, onToast }: Pr
   const [openStatusFor, setOpenStatusFor] = useState<string | null>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Sync external filter (e.g., user clicked Overdue stats card)
+  // Sync external filter (e.g., user clicked Overdue stats card).
+  // We deliberately only sync when externalFilter changes — local filter
+  // edits are preserved until the parent re-asserts a value.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (externalFilter && externalFilter !== filter) setFilter(externalFilter);
   }, [externalFilter, filter]);
 

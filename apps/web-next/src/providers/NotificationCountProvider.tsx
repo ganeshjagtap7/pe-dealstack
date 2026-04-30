@@ -23,7 +23,9 @@ const NotificationCountContext = createContext<NotificationCountContextType>({
   refresh: async () => {},
 });
 
-const POLL_INTERVAL_MS = 30_000;
+// 15s feels real-time enough for new task assignments without spamming the
+// notifications endpoint. Was 30s — felt sluggish.
+const POLL_INTERVAL_MS = 15_000;
 
 /**
  * Provides the unread notification count to the entire app tree.
@@ -50,6 +52,10 @@ export function NotificationCountProvider({ children }: { children: ReactNode })
 
   useEffect(() => {
     if (!userId) return;
+    // refresh() awaits an async fetch; setInterval invokes it later.
+    // Both produce deferred setStates — no sync state writes during this
+    // effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
     const id = setInterval(refresh, POLL_INTERVAL_MS);
     return () => clearInterval(id);

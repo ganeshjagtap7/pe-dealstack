@@ -28,6 +28,9 @@ export function useResizablePanel() {
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && window.innerWidth >= 1024) {
+      // Hydrate after mount: localStorage + window.innerWidth need a real
+      // browser; lazy useState would mismatch SSR's null default.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLeftWidth(parseInt(saved, 10));
     }
   }, []);
