@@ -5,6 +5,28 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 66 — April 30, 2026
+
+#### Goal
+Add Gmail as the second provider in the Integrations Platform — first real OAuth flow on top of the platform.
+
+#### What shipped
+- Gmail HTTP client (`apps/api/src/integrations/gmail/client.ts`): OAuth helpers (`buildAuthorizeUrl` / `exchangeCode` / `refreshAccessToken`), `getUserInfo`, paginated `listMessagesSince` with `q=after:<unix> (from:OR to:OR cc: …)` pre-filter to known org contacts, `getMessage` with metadata-only headers (Subject/From/To/Cc/Date/Message-ID/In-Reply-To). All HTTP bounded by AbortSignal.timeout.
+- Gmail message → `IntegrationActivity` mapper (`mapper.ts`): parses `"Name" <email>` headers, normalizes addresses, extracts threading metadata (threadId, Message-ID, In-Reply-To). type='EMAIL'. summary = Gmail's snippet (no LLM in V1 — pre-filter at the API level is the relevance signal).
+- `gmailProvider`: full IntegrationProvider in OAuth mode. initiateAuth returns `mode: 'oauth'` + Google authorize URL with signed state. handleCallback verifies state, exchanges code, fetches userinfo, encrypts tokens, upserts Integration row. sync refreshes access token if within 60s of expiry, fetches the org's Contact emails, calls listMessagesSince with that filter, runs the matcher per message, upserts IntegrationActivity. handleWebhook is a no-op (Gmail Pub/Sub push deferred).
+- 11 new tests across `tests/integrations/gmail/` (client 6, mapper 4, sync 1). All green.
+
+#### Decisions
+- **No LLM relevance classifier in V1.** The Gmail API q-filter constraining to known org-contact emails is the relevance signal. Saves cost and latency. Deeper classification can land later if needed.
+- Gmail Pub/Sub push notifications deferred to a later phase. V1 polls every 6h via the existing cron.
+- Token refresh re-stores the *original* refresh token because Google omits `refresh_token` on subsequent refresh responses.
+
+#### New env vars
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` — created at console.cloud.google.com.
+- Authorized redirect URI to register: `${APP_URL}/api/integrations/oauth/gmail/callback`.
+
+---
+
 ### Session 65 — April 30, 2026
 
 #### Goal
