@@ -5,6 +5,45 @@ This file tracks all progress, changes, new features, updates, and bug fixes mad
 
 ---
 
+### Session 64 — April 30, 2026
+
+#### Goal: Integrations Platform Phase 0 (foundations)
+
+Built the shared platform that future provider integrations (Granola → Gmail → Calendar → Outbound) plug into. No user-visible feature ships yet; the Settings → Integrations page renders 5 cards but every "Connect" returns 404 because no real provider is registered. Phase 1 (Granola) wires the first one.
+
+---
+
+#### What shipped
+
+- **DB:** `Integration` + `IntegrationEvent` tables; extended `Notification.type` CHECK constraint
+- **`apps/api/src/integrations/_platform/`:** types, encrypted tokenStore, OAuth helpers (state signing + code exchange), provider registry, webhook router (with dedupe), sync engine (with 3-strikes failure notification), Contact/Deal email matcher
+- **`apps/api/src/integrations/_mock/`:** mock provider used by integration tests
+- **`apps/api/src/routes/integrations.ts`:** list / connect / disconnect / sync / events (all auth + org-scoped)
+- **`apps/api/src/routes/integrations-public.ts`:** webhook receivers + OAuth callbacks + cron (no auth, signature-verified per provider)
+- **Vercel cron:** `/api/integrations/_cron/sync-all` every 6h (accepts `Authorization: Bearer` or `x-cron-secret`)
+- **Settings → Integrations UI:** card grid for 5 providers, [Connect]/[Disconnect] CTAs, sync activity placeholder
+- **Tests:** 15 vitest tests across tokenStore, oauth, webhookRouter, syncEngine, matcher, routes, smoke
+
+---
+
+#### Bugs caught during execution (and fixed)
+
+1. **Migration unquoted camelCase columns** — Postgres folds those to lowercase, would have broken every Supabase JS query downstream. Fixed by quoting all camelCase identifiers + adding `public.` schema prefix.
+2. **OAuth callback behind authMiddleware** — providers redirect unauthenticated browsers, so it had to move to a public router (split out as `integrations-public.ts`).
+3. **Cron handler only checked `x-cron-secret`** — Vercel cron actually sends `Authorization: Bearer <CRON_SECRET>`. Now accepts either.
+4. **Settings panel used a `settings-section hidden` class** that doesn't match the page's stacked-section layout — would have rendered invisible. Fixed to match neighbor markup.
+5. **Provider registry `globalThis` Symbol pin** to survive `vi.resetModules()` — that's a test workaround leaking into production code. Reverted; tests now use dynamic imports for registry helpers.
+
+---
+
+#### New env vars
+
+`OAUTH_STATE_SECRET`, `CRON_SECRET`. Run `apps/api/integrations-migration.sql` against staging then prod before merging Phase 1.
+
+**Branch:** `feature/integrations-platform` — to be merged after final review + manual smoke on staging.
+
+---
+
 ### Session 63 — April 24, 2026
 
 #### Timestamp: April 24, 2026 — 20:00-21:30 IST
