@@ -323,6 +323,17 @@
                                     </button>
                                 </div>
                                 <div class="p-6">
+                                    <div id="org-mfa-toggle-block" class="hidden mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200 flex items-start gap-3">
+                                        <span class="material-symbols-outlined text-[#003366]">verified_user</span>
+                                        <div class="flex-1">
+                                            <p class="text-sm font-semibold text-text-main">Require Two-Factor Authentication</p>
+                                            <p class="text-xs text-text-muted mt-1">When enabled, all members must enroll 2FA on next login. Members without 2FA cannot access the API.</p>
+                                        </div>
+                                        <label class="relative inline-flex items-center cursor-pointer">
+                                            <input type="checkbox" id="org-mfa-toggle" class="sr-only peer">
+                                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-[#003366]"></div>
+                                        </label>
+                                    </div>
                                     <div id="invitations-list" class="space-y-2">
                                         <p class="text-sm text-text-muted text-center py-4">Loading invitations...</p>
                                     </div>
@@ -493,5 +504,70 @@
     <script defer src="js/onboarding/onboarding-api.js"></script>
     <script defer src="js/onboarding/onboarding-celebrate.js"></script>
     <script defer src="js/onboarding/onboarding-feedback.js"></script>
+
+    <script>
+      // Org-level 2FA enforcement toggle (admin only).
+      (async function () {
+        const toggleBlock = document.getElementById('org-mfa-toggle-block');
+        const toggle = document.getElementById('org-mfa-toggle');
+        if (!toggleBlock || !toggle) return;
+
+        // Wait briefly for window.USER (populated by layout.js)
+        let attempts = 0;
+        while (typeof window.USER === 'undefined' && attempts < 50) {
+          await new Promise(r => setTimeout(r, 50));
+          attempts++;
+        }
+
+        const role = ((window.USER && window.USER.systemRole) || window.PE_USER_ROLE || '').toLowerCase();
+        const isAdmin = role === 'admin';
+        if (!isAdmin) return;
+        toggleBlock.classList.remove('hidden');
+
+        // Load current state from /api/organizations/me
+        try {
+          if (typeof PEAuth !== 'undefined') {
+            const res = await PEAuth.authFetch((window.API_BASE_URL || '/api') + '/organizations/me');
+            if (res.ok) {
+              const org = await res.json();
+              toggle.checked = !!org.requireMFA;
+            }
+          }
+        } catch (e) { /* ignore */ }
+
+        toggle.addEventListener('change', async () => {
+          const desired = toggle.checked;
+          const confirmed = confirm(
+            desired
+              ? 'Require Two-Factor Authentication for all members? Members without 2FA will be required to enroll on their next API request.'
+              : 'Disable the requirement? Members can choose whether to use 2FA individually.'
+          );
+          if (!confirmed) {
+            toggle.checked = !desired;
+            return;
+          }
+          try {
+            const res = await PEAuth.authFetch((window.API_BASE_URL || '/api') + '/organizations/me', {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ requireMFA: desired }),
+            });
+            if (!res.ok) throw new Error(await res.text());
+            if (window.showToast) {
+              window.showToast({
+                type: 'success',
+                message: desired ? '2FA now required for all members.' : '2FA requirement disabled.',
+              });
+            }
+          } catch (err) {
+            console.error('requireMFA toggle failed', err);
+            toggle.checked = !desired;
+            if (window.showToast) {
+              window.showToast({ type: 'error', message: 'Failed to update setting.' });
+            }
+          }
+        });
+      })();
+    </script>
 </body>
 </html>
