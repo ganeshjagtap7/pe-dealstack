@@ -112,8 +112,17 @@ async function onCardClick(e) {
     try {
       const res = await authFetch(`/api/integrations/${provider}/connect`, { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const { authUrl } = await res.json();
-      window.location.href = authUrl;
+      const result = await res.json();
+      if (result.mode === 'oauth' && result.authUrl) {
+        window.location.href = result.authUrl;
+        return;
+      }
+      if (result.mode === 'api_key' && result.instructions) {
+        openApiKeyModal(provider, result.instructions);
+        btn.disabled = false;
+        return;
+      }
+      throw new Error('Unsupported auth mode in response');
     } catch (err) {
       btn.disabled = false;
       alert(`Could not start connection: ${err.message}`);
@@ -131,6 +140,90 @@ async function onCardClick(e) {
       alert(`Disconnect failed: ${err.message}`);
     }
   }
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
+function openApiKeyModal(provider, instructions) {
+  const overlay = document.createElement('div');
+  overlay.className = 'fixed inset-0 z-50 flex items-center justify-center';
+  overlay.style.background = 'rgba(0,0,0,0.45)';
+  overlay.innerHTML = `
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-md p-6 mx-4" role="dialog" aria-modal="true">
+      <h3 class="text-base font-bold text-text-main mb-1">${escapeHtml(instructions.title)}</h3>
+      <p class="text-sm text-text-secondary mb-3 whitespace-pre-line">${escapeHtml(instructions.body)}</p>
+      ${instructions.helpUrl
+        ? `<a href="${escapeHtml(instructions.helpUrl)}" target="_blank" rel="noopener" class="text-xs font-semibold inline-block mb-3" style="color:${NAVY}">How to find your key →</a>`
+        : ''}
+      <input type="password" id="api-key-input"
+        class="mt-1 w-full border border-border-subtle rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2"
+        style="--tw-ring-color:${NAVY}66"
+        placeholder="${escapeHtml(instructions.placeholder ?? '')}" autocomplete="off" />
+      <div id="api-key-error" class="mt-2 text-xs" style="color:#991B1B; display:none;"></div>
+      <div class="mt-5 flex items-center justify-end gap-2">
+        <button id="api-key-cancel" class="px-3 py-1.5 text-sm font-semibold rounded-md border border-border-subtle bg-white">Cancel</button>
+        <button id="api-key-submit" class="px-3 py-1.5 text-sm font-semibold rounded-md text-white" style="background:${NAVY}">Connect</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const input = overlay.querySelector('#api-key-input');
+  const errEl = overlay.querySelector('#api-key-error');
+  const submitBtn = overlay.querySelector('#api-key-submit');
+  const closeModal = () => overlay.remove();
+
+  overlay.querySelector('#api-key-cancel').addEventListener('click', closeModal);
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeModal(); });
+  document.addEventListener('keydown', function escHandler(e) {
+    if (e.key === 'Escape') {
+      document.removeEventListener('keydown', escHandler);
+      closeModal();
+    }
+  });
+
+  setTimeout(() => input.focus(), 0);
+
+  async function submit() {
+    const apiKey = input.value.trim();
+    errEl.style.display = 'none';
+    if (apiKey.length < 8) {
+      errEl.textContent = 'That key looks too short.';
+      errEl.style.display = 'block';
+      return;
+    }
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Connecting…';
+    try {
+      const res = await authFetch(`/api/integrations/${provider}/api-key`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        errEl.textContent = j.error ?? `HTTP ${res.status}`;
+        errEl.style.display = 'block';
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Connect';
+        return;
+      }
+      closeModal();
+      await render();
+    } catch (e) {
+      errEl.textContent = e.message;
+      errEl.style.display = 'block';
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Connect';
+    }
+  }
+
+  submitBtn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 }
 
 if (document.readyState === 'loading') {
