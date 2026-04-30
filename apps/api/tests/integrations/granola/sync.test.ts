@@ -97,7 +97,7 @@ describe('granolaProvider.sync', () => {
         title: 'Founder call',
         durationSeconds: 30 * 60,
       }),
-      { onConflict: 'source,externalId' }
+      { onConflict: 'integrationId,source,externalId' }
     );
   });
 

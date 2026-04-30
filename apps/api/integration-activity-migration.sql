@@ -25,10 +25,12 @@ CREATE TABLE IF NOT EXISTS public."IntegrationActivity" (
   "updatedAt"     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- One row per (provider, externalId). Re-syncing the same event becomes an
--- upsert and never creates duplicates.
+-- One row per (integration, source, externalId). Re-syncing the same event from
+-- the same connected integration becomes an upsert and never creates duplicates.
+-- Two users in the same firm who both attended the same Granola meeting will
+-- each get their own row, scoped to their own connection — no overwrites.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_activity_dedupe
-  ON public."IntegrationActivity"(source, "externalId");
+  ON public."IntegrationActivity"("integrationId", source, "externalId");
 
 -- Org-scoped lists.
 CREATE INDEX IF NOT EXISTS idx_integration_activity_org_occurred

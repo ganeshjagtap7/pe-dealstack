@@ -51,7 +51,8 @@ describe('runTranscriptAnalysis', () => {
       expect.objectContaining({
         response_format: { type: 'json_object' },
         temperature: 0.1,
-      })
+      }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 

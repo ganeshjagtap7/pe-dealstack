@@ -97,7 +97,13 @@ router.post('/:provider/api-key', async (req: Request, res: Response, next: Next
 router.get('/activities', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
-    const params = activitiesQuerySchema.parse(req.query);
+    const parsed = activitiesQuerySchema.safeParse(req.query);
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: parsed.error.issues[0]?.message ?? 'Invalid query parameters',
+      });
+    }
+    const params = parsed.data;
     const limit = params.limit ?? 50;
 
     let q = supabase

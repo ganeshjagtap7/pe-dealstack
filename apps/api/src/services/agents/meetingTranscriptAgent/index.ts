@@ -32,15 +32,18 @@ export async function runTranscriptAnalysis(
   };
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: MODEL_FAST,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: buildUserPrompt(truncatedInput) },
-      ],
-      temperature: 0.1,
-    });
+    const completion = await openai.chat.completions.create(
+      {
+        model: MODEL_FAST,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: buildUserPrompt(truncatedInput) },
+        ],
+        temperature: 0.1,
+      },
+      { signal: AbortSignal.timeout(15_000) }
+    );
     const raw = completion.choices[0]?.message?.content;
     if (!raw) return null;
     const parsed = JSON.parse(raw);

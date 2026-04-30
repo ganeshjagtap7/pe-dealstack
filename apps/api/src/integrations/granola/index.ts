@@ -131,7 +131,7 @@ export const granolaProvider: IntegrationProvider = {
 
         const { error } = await supabase
           .from('IntegrationActivity')
-          .upsert(row, { onConflict: 'source,externalId' });
+          .upsert(row, { onConflict: 'integrationId,source,externalId' });
         if (error) {
           errors.push(`note ${note.id}: ${error.message}`);
         } else {

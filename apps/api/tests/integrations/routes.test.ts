@@ -270,7 +270,7 @@ describe('GET /api/integrations/activities', () => {
     app.use('/api/integrations', router);
 
     const res = await request(app).get('/api/integrations/activities');
-    expect(res.status).toBe(500);  // Zod parse error becomes a thrown error → 500 via error handler
-    // (a more specific 400 could be implemented; for V1 the 500 is acceptable signal)
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/dealId or contactId/i);
   });
 });
