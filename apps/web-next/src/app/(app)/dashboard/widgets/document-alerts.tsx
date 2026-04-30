@@ -30,7 +30,8 @@ export function DocumentAlertsWidget() {
       try {
         const data = await api.get<{ items?: Alert[] }>("/documents/alerts");
         if (!cancelled) setItems(data?.items || []);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/document-alerts] failed to load alerts:", err);
         if (!cancelled) setError(true);
       }
     })();

@@ -72,7 +72,19 @@ RESPONSE FORMAT:
 - Be concise but thorough. Use professional financial terminology.
 - Structure with bullet points, sections, and tables where helpful.
 - Always cite source data: quote the exact numbers you used from the tables.
-- If no results from a tool, say so clearly — never fabricate data.`;
+- If no results from a tool, say so clearly — never fabricate data.
+
+LINK FORMAT (STRICT):
+- The frontend is a Next.js App Router app. URLs MUST be clean paths.
+- NEVER emit hash-router URLs. Do NOT write \`#/memo-builder\`, \`#/deal\`, \`#/vdr\`,
+  \`#/contacts\`, or any link beginning with \`#/\` — they 404 in Next.js.
+- For markdown links, use real paths only:
+  GOOD: [open the memo builder](/memo-builder?dealId=<uuid>)
+  GOOD: [view data room](/vdr?dealId=<uuid>)
+  BAD:  [here](#/memo-builder?dealId=<uuid>)
+  BAD:  [here](#/deal?id=<uuid>)
+- When you need to suggest navigation, prefer the suggest_action tool — it returns
+  the canonical URL for the host UI to render as a button.`;
 
 export interface DealChatInput {
   dealId: string;

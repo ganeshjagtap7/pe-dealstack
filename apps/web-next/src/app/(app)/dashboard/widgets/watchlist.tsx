@@ -24,12 +24,16 @@ export function WatchlistWidget() {
     try {
       const data = await api.get<{ items?: WatchItem[] }>("/watchlist");
       setItems(data?.items || []);
-    } catch {
+    } catch (err) {
+      console.warn("[dashboard/watchlist] failed to load watchlist:", err);
       setError(true);
     }
   }, []);
 
   useEffect(() => {
+    // load() awaits an async fetch — its setStates happen in deferred
+    // callbacks, not synchronously during the effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -37,7 +41,8 @@ export function WatchlistWidget() {
     try {
       await api.delete(`/watchlist/${id}`);
       load();
-    } catch {
+    } catch (err) {
+      console.warn("[dashboard/watchlist] failed to delete watchlist item:", err);
       setError(true);
     }
   };

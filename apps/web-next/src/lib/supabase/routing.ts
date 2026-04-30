@@ -10,6 +10,21 @@ const AUTH_PAGE_PREFIXES = [
   "/accept-invite",
 ];
 
+// Public marketing/legal pages that anonymous users must be able to reach
+// (e.g. linked from the signup flow for GDPR consent, and the public-facing
+// marketing pages — pricing, docs, etc.).
+const PUBLIC_PAGE_PREFIXES = [
+  "/privacy-policy",
+  "/terms-of-service",
+  "/pricing",
+  "/documentation",
+  "/api-reference",
+  "/help-center",
+  "/solutions",
+  "/resources",
+  "/company",
+];
+
 const SYSTEM_PREFIXES = ["/api", "/_next"];
 
 const AUTH_ONLY_PAGES = ["/login", "/signup"];
@@ -29,6 +44,7 @@ function matchesPrefix(pathname: string, prefix: string): boolean {
 export function isAppRouteRequiringAuth(pathname: string): boolean {
   if (pathname === "/") return false;
   if (AUTH_PAGE_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) return false;
+  if (PUBLIC_PAGE_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) return false;
   if (SYSTEM_PREFIXES.some((prefix) => matchesPrefix(pathname, prefix))) return false;
   if (pathname.includes(".")) return false;
   return true;

@@ -347,6 +347,29 @@ export default function DataRoomDealPage({ params }: PageProps) {
     setAllFiles((prev) => prev.map((f) => (f.id === fileId ? { ...f, name: newName } : f)));
   };
 
+  // -------------------------------------------------------------------------
+  // In-app document preview — intentional MVP decision (audit A3)
+  //
+  // The legacy apps/web/js/docPreview.js rendered PDF, Excel, Word, and CSV
+  // files entirely in-browser using PDF.js (PDF), SheetJS (XLSX), and
+  // Mammoth.js (DOCX). That 543-line subsystem was intentionally NOT ported
+  // during the migration to web-next.
+  //
+  // The current approach — window.open(signedUrl, "_blank") — covers the 80%
+  // case: modern browsers render PDFs inline in a new tab, XLSX/DOCX files
+  // get downloaded by the browser (there is no in-app renderer), and CSV
+  // opens as plaintext. This is sufficient for MVP.
+  //
+  // NOTE: The API currently returns a raw Supabase signed URL without setting
+  // Content-Disposition: inline. Browsers still render PDFs inline by default
+  // when opened in a new tab, but explicit inline disposition would make the
+  // behaviour more reliable across browsers. That is a separate concern in
+  // the API layer — do not change it here.
+  //
+  // If product wants in-app Excel/Word rendering back: port
+  // apps/web/js/docPreview.js and add `xlsx` + `mammoth` to
+  // apps/web-next/package.json. Reference: docs/MIGRATION-AUDIT-REPORT.md A3.
+  // -------------------------------------------------------------------------
   const handleFileClick = useCallback(async (file: VDRFile) => {
     try {
       const url = await getDocumentDownloadUrl(file.id);
@@ -355,7 +378,8 @@ export default function DataRoomDealPage({ params }: PageProps) {
       } else {
         showToast(`Unable to load document: ${file.name}`, "error");
       }
-    } catch {
+    } catch (err) {
+      console.warn("[vdr] handleFileClick failed:", err);
       showToast(`Error loading file: ${file.name}`, "error");
     }
   }, [showToast]);

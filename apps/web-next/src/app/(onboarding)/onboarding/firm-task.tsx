@@ -288,8 +288,9 @@ function EnrichmentPanel({
           setPhase2("complete");
           if (data.newInsightsCount) setPhase2Count(data.newInsightsCount);
         }
-      } catch {
-        // Silent polling
+      } catch (err) {
+        // Silent polling — keep retrying.
+        console.warn("[onboarding/firm-task] research-status poll failed:", err);
       }
     }, 5000);
     return () => stopPhase2();

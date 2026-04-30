@@ -102,7 +102,7 @@ function Circle({ size = 32, className, ...rest }: CircleProps) {
   );
 }
 
-interface BadgeProps extends Omit<SkeletonBaseProps, "rounded"> {}
+type BadgeProps = Omit<SkeletonBaseProps, "rounded">;
 
 function Badge({ width = 64, height = 20, className, ...rest }: BadgeProps) {
   return (

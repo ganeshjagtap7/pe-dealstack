@@ -26,7 +26,8 @@ function getCachedUser(): AppUser | null {
     // Minimum viable record: we need an id and a non-empty name/email to render.
     if (!parsed?.id || !parsed?.name) return null;
     return parsed as AppUser;
-  } catch {
+  } catch (err) {
+    console.warn("[UserProvider] failed to read cached user from sessionStorage:", err);
     return null;
   }
 }
@@ -69,8 +70,9 @@ export function UserProvider({ children }: { children: ReactNode }) {
       setUser(appUser);
       try {
         sessionStorage.setItem(STORAGE_KEYS.userCache, JSON.stringify(appUser));
-      } catch {
-        // sessionStorage full or blocked — safe to skip
+      } catch (err) {
+        // sessionStorage full or blocked — safe to skip.
+        console.warn("[UserProvider] failed to cache user to sessionStorage:", err);
       }
     } catch (err) {
       console.warn("[UserProvider] /users/me failed:", err);

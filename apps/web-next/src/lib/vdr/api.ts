@@ -147,8 +147,10 @@ export async function fetchFolderInsights(
 ): Promise<APIFolderInsight | null> {
   try {
     return await api.get<APIFolderInsight>(`/folders/${folderId}/insights`);
-  } catch {
-    return null; // 404 just means no insights yet — not an error
+  } catch (err) {
+    // 404 just means no insights yet — not an error.
+    console.warn("[vdr] folder insights fetch failed:", err);
+    return null;
   }
 }
 

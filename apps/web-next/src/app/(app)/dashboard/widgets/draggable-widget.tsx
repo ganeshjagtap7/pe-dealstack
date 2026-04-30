@@ -39,8 +39,9 @@ export function DraggableWidget({
         e.dataTransfer.effectAllowed = "move";
         try {
           e.dataTransfer.setData("text/plain", id);
-        } catch {
-          // Firefox quirk ignored
+        } catch (err) {
+          // Firefox quirk: dataTransfer.setData can throw — drag still works.
+          console.warn("[dashboard/draggable-widget] dataTransfer.setData failed:", err);
         }
         onDragStart(id);
       }}

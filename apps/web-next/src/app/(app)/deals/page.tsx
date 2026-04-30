@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef, type DragEvent } from "react";
 import { api } from "@/lib/api";
 import { formatCurrency } from "@/lib/formatters";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   STAGES,
   KANBAN_STAGES,
@@ -40,6 +41,7 @@ export default function DealsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [stageModal, setStageModal] = useState(false);
+  const [bulkPassConfirm, setBulkPassConfirm] = useState(false);
   const [industries, setIndustries] = useState<string[]>([]);
   const [filters, setFilters] = useState<DealFilters>({
     stage: "",
@@ -68,7 +70,9 @@ export default function DealsPage() {
           if (valid.length > 0) setActiveMetrics(valid as MetricKey[]);
         }
       }
-    } catch { /* ignore */ }
+    } catch (err) {
+      console.warn("[deals] failed to read cached metrics:", err);
+    }
   }, []);
 
   const loadDeals = useCallback(async () => {
@@ -181,8 +185,12 @@ export default function DealsPage() {
     loadDeals();
   };
 
-  const handleBulkPass = async () => {
-    if (!confirm(`Mark ${selected.size} deal${selected.size > 1 ? "s" : ""} as Passed?`)) return;
+  const handleBulkPass = () => {
+    setBulkPassConfirm(true);
+  };
+
+  const confirmBulkPass = async () => {
+    setBulkPassConfirm(false);
     await handleBulkStage("PASSED");
   };
 
@@ -246,8 +254,8 @@ export default function DealsPage() {
     try {
       await api.delete(`/deals/${id}`);
       setDeals((prev) => prev.filter((d) => d.id !== id));
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[deals] removeSample failed:", err);
     }
   };
 
@@ -264,7 +272,8 @@ export default function DealsPage() {
     setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
     try {
       await api.patch(`/deals/${dealId}`, { stage: newStage });
-    } catch {
+    } catch (err) {
+      console.warn("[deals] kanban drop failed, reverting:", err);
       // Revert on error
       setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: oldStage } : d)));
     }
@@ -733,6 +742,17 @@ export default function DealsPage() {
           onClose={() => setStageModal(false)}
         />
       )}
+
+      {/* Bulk Pass Confirmation */}
+      <ConfirmDialog
+        open={bulkPassConfirm}
+        title="Mark deals as Passed"
+        message={`Mark ${selected.size} deal${selected.size > 1 ? "s" : ""} as Passed?`}
+        confirmLabel="Mark as Passed"
+        variant="danger"
+        onConfirm={confirmBulkPass}
+        onCancel={() => setBulkPassConfirm(false)}
+      />
     </div>
   );
 }

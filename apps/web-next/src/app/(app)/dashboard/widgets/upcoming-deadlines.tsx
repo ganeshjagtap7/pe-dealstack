@@ -42,7 +42,8 @@ export function UpcomingDeadlinesWidget() {
           .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
           .slice(0, 8);
         setUpcoming(filtered);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/upcoming-deadlines] failed to load tasks:", err);
         if (!cancelled) setError(true);
       }
     })();

@@ -1,14 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/cn";
-import { formatRelativeTime, formatFileSize, getDocIcon } from "@/lib/formatters";
+import { formatRelativeTime } from "@/lib/formatters";
 import { api } from "@/lib/api";
-import type { DealDetail, Activity, DocItem } from "./components";
+import type { DealDetail, Activity } from "./components";
 
 // ---------------------------------------------------------------------------
 // Overview Tab — always-visible left-panel content (Key Risks,
-// Add Note, Activity Feed, Recent Documents).
+// Add Note, Activity Feed).
 // Ported from deal.html left-panel + deal-activity.js + deal-stages.js
 // ---------------------------------------------------------------------------
 
@@ -37,10 +37,6 @@ export function OverviewTab({
         loading={activitiesLoading}
         onRefresh={onRefreshActivities}
       />
-
-      {(deal.documents?.length ?? 0) > 0 && (
-        <RecentDocuments documents={deal.documents || []} />
-      )}
     </div>
   );
 }
@@ -103,14 +99,153 @@ function KeyRisksSection({ risks, highlights }: { risks: string[]; highlights: s
 }
 
 // ---------------------------------------------------------------------------
-// Add Note (ported from deal-activity.js addNote + initActivityFeed)
+// Add Note (ported from deal-activity.js addNote + initActivityFeed +
+// initMentionAutocomplete). Supports @ mentions sourced from /api/users.
 // ---------------------------------------------------------------------------
+
+interface MentionUser {
+  id: string;
+  name: string;
+  email: string;
+  initials: string;
+}
+
+// Session-scoped cache of org users for @-mentions. The legacy app fetches
+// once and caches in a module-level variable (deal-activity.js:117) — same
+// pattern here. Cleared on hard reload.
+let _mentionUsersCache: MentionUser[] | null = null;
+let _mentionUsersInflight: Promise<MentionUser[]> | null = null;
+
+async function fetchMentionUsers(): Promise<MentionUser[]> {
+  if (_mentionUsersCache) return _mentionUsersCache;
+  if (_mentionUsersInflight) return _mentionUsersInflight;
+  _mentionUsersInflight = (async () => {
+    try {
+      const data = await api.get<unknown>("/users");
+      // The API returns either an array directly or { users: [...] }. Handle both.
+      const list = Array.isArray(data)
+        ? (data as Array<Record<string, unknown>>)
+        : (((data as { users?: Array<Record<string, unknown>> })?.users) ?? []);
+      const mapped: MentionUser[] = list.map((u) => {
+        const name = (u.name as string) || ((u.email as string)?.split("@")[0]) || "Unknown";
+        const email = (u.email as string) || "";
+        const initials = name
+          .split(" ")
+          .map((w) => w[0])
+          .filter(Boolean)
+          .join("")
+          .toUpperCase()
+          .slice(0, 2) || "??";
+        return { id: u.id as string, name, email, initials };
+      });
+      _mentionUsersCache = mapped;
+      return mapped;
+    } catch (err) {
+      // Failed fetch — return empty list. Don't poison the cache so the
+      // next attempt can retry.
+      console.warn("[deal-overview] fetchMentionUsers failed:", err);
+      return [];
+    } finally {
+      _mentionUsersInflight = null;
+    }
+  })();
+  return _mentionUsersInflight;
+}
 
 function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: () => void }) {
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const addNote = useCallback(async () => {
+  // Mention dropdown state. _mentionStart is the index of the `@` in the note
+  // string; null when the picker is closed.
+  const [users, setUsers] = useState<MentionUser[]>([]);
+  const [mentionStart, setMentionStart] = useState<number | null>(null);
+  const [mentionFiltered, setMentionFiltered] = useState<MentionUser[]>([]);
+  const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
+
+  const mentionOpen = mentionStart !== null && mentionFiltered.length > 0;
+
+  // Pre-warm the user cache once so the first @ keystroke doesn't lag.
+  useEffect(() => {
+    fetchMentionUsers().then(setUsers);
+  }, []);
+
+  const closeMention = useCallback(() => {
+    setMentionStart(null);
+    setMentionFiltered([]);
+    setMentionSelectedIdx(0);
+  }, []);
+
+  // Click-outside dismissal — matches the legacy `blur` + setTimeout behavior
+  // (deal-activity.js:212) but more deterministic.
+  useEffect(() => {
+    if (!mentionOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        closeMention();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [mentionOpen, closeMention]);
+
+  const recomputeMention = useCallback((value: string, cursor: number) => {
+    const before = value.slice(0, cursor);
+    const atIdx = before.lastIndexOf("@");
+    // Match legacy rule (deal-activity.js:150): the `@` must be at the start
+    // of the input or preceded by a space.
+    if (atIdx === -1 || (atIdx > 0 && before[atIdx - 1] !== " ")) {
+      closeMention();
+      return;
+    }
+    const query = before.slice(atIdx + 1).toLowerCase();
+    // Substring match against name OR email — same as legacy filter.
+    const filtered = (users.length ? users : _mentionUsersCache || [])
+      .filter((u) => u.name.toLowerCase().includes(query) || u.email.toLowerCase().includes(query))
+      .slice(0, 6);
+    if (filtered.length === 0) {
+      closeMention();
+      return;
+    }
+    setMentionStart(atIdx);
+    setMentionFiltered(filtered);
+    setMentionSelectedIdx(0);
+  }, [users, closeMention]);
+
+  const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setNote(value);
+    const cursor = e.target.selectionStart ?? value.length;
+    // If the cache hasn't loaded yet, kick it off; recompute uses whatever's
+    // available right now (state OR raw cache) so we don't drop the first @.
+    if (!users.length && !_mentionUsersCache) {
+      void fetchMentionUsers().then(setUsers);
+    }
+    recomputeMention(value, cursor);
+  }, [recomputeMention, users.length]);
+
+  const insertMention = useCallback((user: MentionUser) => {
+    const input = inputRef.current;
+    if (input === null || mentionStart === null) return;
+    const cursor = input.selectionStart ?? note.length;
+    const before = note.slice(0, mentionStart);
+    const after = note.slice(cursor);
+    const next = `${before}@${user.name} ${after}`;
+    setNote(next);
+    closeMention();
+    // Restore focus + cursor after the React update lands.
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      const newCursor = before.length + user.name.length + 2;
+      el.focus();
+      el.setSelectionRange(newCursor, newCursor);
+    });
+  }, [note, mentionStart, closeMention]);
+
+  const submitNote = useCallback(async () => {
     const text = note.trim();
     if (!text) return;
     setSaving(true);
@@ -122,28 +257,88 @@ function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: 
       });
       setNote("");
       onNoteAdded();
-    } catch { /* non-critical */ } finally {
+    } catch (err) {
+      console.warn("[deal-overview] submitNote failed:", err);
+    } finally {
       setSaving(false);
     }
   }, [dealId, note, onNoteAdded]);
 
+  const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (mentionOpen) {
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        setMentionSelectedIdx((i) => Math.min(i + 1, mentionFiltered.length - 1));
+        return;
+      }
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setMentionSelectedIdx((i) => Math.max(i - 1, 0));
+        return;
+      }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const sel = mentionFiltered[mentionSelectedIdx];
+        if (sel) insertMention(sel);
+        return;
+      }
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeMention();
+        return;
+      }
+    } else if (e.key === "Enter") {
+      // Plain Enter with no picker open submits the note (legacy behavior).
+      submitNote();
+    }
+  }, [mentionOpen, mentionFiltered, mentionSelectedIdx, insertMention, closeMention, submitNote]);
+
   return (
-    <div className="rounded-xl p-4" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
+    <div ref={containerRef} className="rounded-xl p-4" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
       <h3 className="text-sm font-bold text-text-main uppercase tracking-wider mb-3 flex items-center gap-2">
         <span className="material-symbols-outlined text-amber-500 text-lg">sticky_note_2</span>
         Add Note
       </h3>
-      <div className="flex gap-2">
-        <input
-          type="text"
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Enter") addNote(); }}
-          placeholder="Add a note about this deal..."
-          className="flex-1 px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
-        />
+      <div className="flex gap-2 relative">
+        <div className="flex-1 relative">
+          <input
+            ref={inputRef}
+            type="text"
+            value={note}
+            onChange={onChange}
+            onKeyDown={onKeyDown}
+            placeholder="Add a note about this deal... use @ to mention"
+            className="w-full px-3 py-2 border border-border-subtle rounded-lg text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary"
+          />
+          {mentionOpen && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-white border border-border-subtle rounded-lg shadow-lg overflow-hidden max-h-64 overflow-y-auto custom-scrollbar">
+              {mentionFiltered.map((u, i) => (
+                <button
+                  key={u.id}
+                  type="button"
+                  // Use mousedown so we beat the input's onBlur — matches the
+                  // legacy `mousedown` + preventDefault handler.
+                  onMouseDown={(e) => { e.preventDefault(); insertMention(u); }}
+                  onMouseEnter={() => setMentionSelectedIdx(i)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 flex items-center gap-2.5 transition-colors",
+                    i === mentionSelectedIdx ? "bg-primary/5" : "hover:bg-primary/5"
+                  )}
+                >
+                  <span className="size-7 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0" style={{ background: "#003366" }}>
+                    {u.initials}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 truncate">{u.name}</p>
+                    {u.email && <p className="text-[10px] text-gray-400 truncate">{u.email}</p>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button
-          onClick={addNote}
+          onClick={submitNote}
           disabled={!note.trim() || saving}
           className="px-4 py-2 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-1 disabled:opacity-60"
           style={{ backgroundColor: "#003366" }}
@@ -226,27 +421,3 @@ function InlineActivityFeed({ activities, loading, onRefresh }: { activities: Ac
   );
 }
 
-// ---------------------------------------------------------------------------
-// Recent Documents (bottom of left panel)
-// ---------------------------------------------------------------------------
-
-function RecentDocuments({ documents }: { documents: DocItem[] }) {
-  return (
-    <div className="mt-auto pt-6 border-t border-border-subtle">
-      <h3 className="text-sm font-bold text-text-main mb-3">Recent Documents</h3>
-      <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-        {documents.slice(0, 5).map((doc) => (
-          <div key={doc.id} className="flex items-center gap-3 p-2 pr-4 bg-white rounded-lg border border-border-subtle shrink-0 hover:border-primary/50 hover:bg-blue-50/30 cursor-pointer transition-colors group shadow-sm">
-            <div className="size-10 bg-gray-50 rounded flex items-center justify-center text-text-muted group-hover:bg-blue-50 transition-colors">
-              <span className="material-symbols-outlined">{getDocIcon(doc.name)}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-text-main">{doc.name}</span>
-              <span className="text-xs text-text-muted">{formatFileSize(doc.fileSize)} - Added {formatRelativeTime(doc.createdAt)}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}

@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/providers/ToastProvider";
 import {
   Contact, ContactFormData, CONTACT_TYPES, TYPE_CONFIG, SCORE_CONFIG,
   getInitials, getRelationshipLabel,
@@ -50,6 +51,7 @@ export default function ContactsPage() {
   const [typeOpen, setTypeOpen] = useState(false);
   const [groupByCompany, setGroupByCompany] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const { showToast } = useToast();
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -179,7 +181,9 @@ export default function ContactsPage() {
       if (editingContact) await api.patch(`/contacts/${editingContact.id}`, body);
       else await api.post("/contacts", body);
       setModalOpen(false); setEditingContact(null); loadContacts();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to save contact"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to save contact", "error");
+    }
     finally { setSaving(false); }
   }
 
@@ -202,7 +206,10 @@ export default function ContactsPage() {
       a.download = `contacts-export-${new Date().toISOString().split("T")[0]}.csv`;
       document.body.appendChild(a); a.click(); document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch { alert("Failed to export contacts"); }
+    } catch (err) {
+      console.warn("[contacts] CSV export failed:", err);
+      showToast("Failed to export contacts", "error");
+    }
   }
 
   const currentSortLabel = SORT_OPTIONS.find((o) => o.sortBy === filters.sortBy && o.sortOrder === filters.sortOrder)?.label || "Newest First";

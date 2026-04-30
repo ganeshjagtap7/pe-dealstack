@@ -294,10 +294,23 @@ export function getDealChatTools(dealId: string, orgId: string) {
               .insert({ dealId, userId: value, role });
           }
 
+          // The deal page UI reads Lead Partner from Deal.assignedTo (relation
+          // exposed as `assignedUser`), and Analyst from team members where
+          // role=MEMBER. So:
+          //   - leadPartner → also UPDATE Deal.assignedTo = userId
+          //   - analyst    → no extra Deal update (DealTeamMember row is the
+          //     source of truth, already inserted above)
+          // (There are no Deal.leadPartnerId / Deal.analystId columns —
+          // confirmed via routes/deals.ts and the deal-layout.tsx renderer.)
+          const dealUpdate: Record<string, string> =
+            field === 'leadPartner'
+              ? { assignedTo: value, updatedAt: new Date().toISOString() }
+              : { updatedAt: new Date().toISOString() };
           await supabase
             .from('Deal')
-            .update({ updatedAt: new Date().toISOString() })
-            .eq('id', dealId);
+            .update(dealUpdate)
+            .eq('id', dealId)
+            .eq('organizationId', orgId);
 
           await supabase.from('Activity').insert({
             dealId,

@@ -62,8 +62,9 @@ export default function OnboardingPage() {
         setCompleted(done);
         // If user already finished onboarding, skip straight to dashboard.
         if (done.size >= TASKS.length) router.push("/dashboard");
-      } catch {
+      } catch (err) {
         // Fresh user or API down — proceed with empty state.
+        console.warn("[onboarding] failed to load status:", err);
       }
     })();
     return () => {
@@ -77,8 +78,9 @@ export default function OnboardingPage() {
     if (!legacy) return;
     try {
       await api.post("/onboarding/complete-step", { step: legacy });
-    } catch {
+    } catch (err) {
       // Non-blocking — user can still proceed.
+      console.warn("[onboarding] failed to mark step complete:", err);
     }
   }, []);
 
@@ -94,8 +96,9 @@ export default function OnboardingPage() {
             sampleId: sampleDealId,
           });
           if (res?.dealId) setCreatedDealId(res.dealId);
-        } catch {
-          // Best-effort — user still gets marked done
+        } catch (err) {
+          // Best-effort — user still gets marked done.
+          console.warn("[onboarding] failed to create demo deal:", err);
         } finally {
           setBusyTask(null);
         }
@@ -136,8 +139,9 @@ export default function OnboardingPage() {
   const markSeen = () => {
     try {
       sessionStorage.setItem("pe_onboarding_seen", "1");
-    } catch {
-      // storage disabled — fine
+    } catch (err) {
+      // storage disabled — fine.
+      console.warn("[onboarding] failed to set sessionStorage flag:", err);
     }
   };
 
@@ -169,8 +173,9 @@ export default function OnboardingPage() {
     markSeen();
     try {
       await api.post("/onboarding/welcome-shown", {});
-    } catch {
+    } catch (err) {
       // non-blocking
+      console.warn("[onboarding] failed to mark welcome-shown:", err);
     }
   };
 

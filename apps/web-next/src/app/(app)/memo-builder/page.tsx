@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, NotFoundError } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
 
@@ -26,6 +27,22 @@ import { exportMemoPDF, exportMemoMarkdown, exportMemoClipboard, shareMemoLink }
 import { DocumentHeaderBar } from "./header-bar";
 
 export default function MemoBuilderPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-[calc(100vh-4rem)] items-center justify-center">
+          <div className="size-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+        </div>
+      }
+    >
+      <MemoBuilderPageInner />
+    </Suspense>
+  );
+}
+
+function MemoBuilderPageInner() {
+  const searchParams = useSearchParams();
+  const urlDealId = searchParams.get("dealId");
   /* ---- State ---- */
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -149,8 +166,11 @@ export default function MemoBuilderPage() {
   });
 
   /* ---- Create memo ---- */
-  const openCreateModal = async () => {
+  const openCreateModal = useCallback(async (prefillDealId?: string) => {
     setShowCreate(true);
+    if (prefillDealId) {
+      setCreateForm((f) => ({ ...f, dealId: prefillDealId }));
+    }
     try {
       const [dealRes, templateRes] = await Promise.all([
         api.get<{ deals: DealOption[] }>("/deals?limit=50").catch(() => ({ deals: [] })),
@@ -158,10 +178,49 @@ export default function MemoBuilderPage() {
       ]);
       setDeals(dealRes.deals || []);
       setTemplates(Array.isArray(templateRes) ? templateRes : []);
-    } catch {
-      // Ignore
+    } catch (err) {
+      console.warn("[memo-builder] failed to load deals/templates for create modal:", err);
     }
-  };
+  }, []);
+
+  /* ---- ?dealId=X consumption ----
+   * When the page is opened from a deal (e.g. Memo Builder button on the
+   * deal analysis panel), we receive ?dealId=X and want to either jump
+   * straight into the deal's existing memo, or open the Create modal
+   * pre-bound to that deal. Mirrors the legacy apps/web/memo-builder.js
+   * dealId-branch behavior, but skips the multi-memo picker overlay since
+   * web-next already shows the full memo list in the left sidebar.
+   * Consume once per distinct dealId so we don't re-trigger on every render.
+   */
+  const consumedDealIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!urlDealId) return;
+    if (consumedDealIdRef.current === urlDealId) return;
+    consumedDealIdRef.current = urlDealId;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        const params = new URLSearchParams({ dealId: urlDealId });
+        const matches = await api.get<Memo[]>(`/memos?${params}`).catch(() => [] as Memo[]);
+        if (cancelled) return;
+        if (Array.isArray(matches) && matches.length > 0) {
+          // Pick the most recently updated memo for this deal.
+          const best = [...matches].sort((a, b) =>
+            (b.updatedAt || "").localeCompare(a.updatedAt || "")
+          )[0];
+          loadMemo(best.id);
+        } else {
+          // No existing memo — open Create modal with the deal pre-selected.
+          openCreateModal(urlDealId);
+        }
+      } catch (err) {
+        // Best-effort: fall through to the default empty state.
+        console.warn("[memo-builder] dealId-prefill memo lookup failed:", err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [urlDealId, loadMemo, openCreateModal]);
 
   const handleCreate = async () => {
     setCreatingMemo(true);
@@ -427,7 +486,7 @@ export default function MemoBuilderPage() {
         statusFilter={statusFilter}
         setStatusFilter={setStatusFilter}
         onSelectMemo={loadMemo}
-        onCreateNew={openCreateModal}
+        onCreateNew={() => openCreateModal()}
         filteredMemos={filteredMemos}
       />
 
@@ -471,7 +530,7 @@ export default function MemoBuilderPage() {
                 Choose a memo from the sidebar, or create a new one to get started with the AI-powered memo builder.
               </p>
               <button
-                onClick={openCreateModal}
+                onClick={() => openCreateModal()}
                 className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity"
                 style={{ backgroundColor: "#003366" }}
               >

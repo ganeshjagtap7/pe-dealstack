@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { STAGE_LABELS } from "@/lib/constants";
-import { usePresence, formatPresenceStatus } from "@/providers/PresenceProvider";
 import { MeetingPrepModal } from "@/components/deal-actions/MeetingPrepModal";
 import { DraftEmailModal } from "@/components/deal-actions/DraftEmailModal";
 import type { TeamMember } from "./components";
 
 export { EditDealModal } from "./edit-deal-modal";
+export { ManageTeamModal } from "./manage-team-modal";
 
 // ---------------------------------------------------------------------------
 // Deal Actions Menu (more_vert dropdown: Meeting Prep, Draft Email, Data Room, Delete)
@@ -105,40 +105,43 @@ export function DealActionsMenu({
 // Team Avatar Stack (header, matches legacy renderTeamAvatars)
 // ---------------------------------------------------------------------------
 
-export function TeamAvatarStack({ team }: { team: TeamMember[] }) {
-  // TODO(presence): once a backend /presence endpoint is live, the deal page
-  // can hydrate `member.lastActiveAt` directly from /deals/:id (joining users
-  // with their last activity). Until then `usePresence()` is the source of
-  // truth — see apps/web-next/src/providers/PresenceProvider.tsx.
-  const { isOnline, getLastActiveAt } = usePresence();
+export function TeamAvatarStack({
+  team,
+  onManage,
+}: {
+  team: TeamMember[];
+  onManage?: () => void;
+}) {
   const maxVisible = 3;
   const visible = team.slice(0, maxVisible);
   const remaining = Math.max(0, team.length - maxVisible);
 
+  // The "+" affordance is ALWAYS rendered — clicking it opens the Manage Team
+  // modal. Previously it only rendered when the team was empty (and was a dead
+  // div with no onClick).
+  const ManageButton = (
+    <button
+      type="button"
+      onClick={onManage}
+      title="Manage team members"
+      aria-label="Manage team members"
+      className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-500 hover:bg-primary-light hover:text-primary transition-colors shrink-0"
+    >
+      <span className="material-symbols-outlined text-[16px]">group_add</span>
+    </button>
+  );
+
   if (team.length === 0) {
-    return (
-      <div className="flex items-center">
-        <div className="w-8 h-8 rounded-full bg-gray-100 border-2 border-white flex items-center justify-center text-gray-400 hover:bg-gray-200 transition-colors">
-          <span className="material-symbols-outlined text-[16px]">group_add</span>
-        </div>
-      </div>
-    );
+    return <div className="flex items-center">{ManageButton}</div>;
   }
 
   return (
-    <div className="flex items-center">
+    <div className="flex items-center gap-2">
       <div className="flex -space-x-2">
         {visible.map((member, i) => {
           const initials = member.name
             ? member.name.split(" ").map((n) => n[0]).join("").substring(0, 2).toUpperCase()
             : "?";
-          // Prefer the member's own lastActiveAt (if the API ever populates
-          // it on the deal payload), then fall back to the presence map.
-          const lastActiveAt = member.lastActiveAt ?? getLastActiveAt(member.id);
-          const online = member.lastActiveAt
-            ? Date.now() - new Date(member.lastActiveAt).getTime() < 5 * 60 * 1000
-            : isOnline(member.id);
-          const presenceLabel = online ? "Online" : formatPresenceStatus(lastActiveAt);
           return (
             <div
               key={member.id || i}
@@ -147,30 +150,20 @@ export function TeamAvatarStack({ team }: { team: TeamMember[] }) {
             >
               <div
                 className="w-8 h-8 rounded-full bg-primary/10 border-2 border-white flex items-center justify-center text-primary font-semibold text-xs shadow-sm"
-                title={`${member.name || "Unknown"} (${member.role || "Member"}) — ${presenceLabel}`}
+                title={`${member.name || "Unknown"} (${member.role || "Member"})`}
               >
                 {initials}
               </div>
-              <span
-                aria-label={presenceLabel}
-                title={presenceLabel}
-                className="absolute bottom-0 right-0 block rounded-full border-2 border-white"
-                style={{
-                  width: 10,
-                  height: 10,
-                  backgroundColor: online ? "#10B981" : "#9CA3AF",
-                  boxShadow: online ? "0 0 4px rgba(16,185,129,0.6)" : "none",
-                }}
-              />
             </div>
           );
         })}
       </div>
       {remaining > 0 && (
-        <span className="ml-1 text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full">
+        <span className="text-xs font-medium text-text-secondary bg-gray-100 px-2 py-0.5 rounded-full">
           +{remaining}
         </span>
       )}
+      {ManageButton}
     </div>
   );
 }

@@ -143,8 +143,9 @@ function cleanNameIfUrl(value: string): string {
       .split(/[.\-_]/)
       .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
       .join(" ");
-  } catch {
-    // Not a valid URL despite looking like one — return as-is
+  } catch (err) {
+    // Not a valid URL despite looking like one — return as-is.
+    console.warn("[formatters] derivedNameFromUrl failed:", err);
     return value;
   }
 }

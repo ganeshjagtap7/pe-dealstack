@@ -575,10 +575,14 @@ export function MetricsDropdown({
   const [checked, setChecked] = useState<Set<MetricKey>>(new Set(activeMetrics));
   const ref = useRef<HTMLDivElement>(null);
 
-  // Sync local checked state when activeMetrics prop changes
-  useEffect(() => {
+  // Sync local checked state when activeMetrics prop changes. Using the
+  // "track previous prop" idiom (a state update during render) instead of
+  // an effect so we don't double-render on prop change.
+  const [prevActiveMetrics, setPrevActiveMetrics] = useState(activeMetrics);
+  if (activeMetrics !== prevActiveMetrics) {
+    setPrevActiveMetrics(activeMetrics);
     setChecked(new Set(activeMetrics));
-  }, [activeMetrics]);
+  }
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {

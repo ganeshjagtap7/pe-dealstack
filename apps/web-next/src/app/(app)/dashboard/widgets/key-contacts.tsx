@@ -46,7 +46,8 @@ export function KeyContactsWidget() {
           .sort((a, b) => b.score - a.score)
           .slice(0, 5);
         setRows(enriched);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/key-contacts] failed to load contacts:", err);
         if (!cancelled) setError(true);
       }
     })();

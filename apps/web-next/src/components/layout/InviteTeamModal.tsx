@@ -135,7 +135,8 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
         );
         const list = Array.isArray(data) ? data : data.deals || [];
         setAvailableDeals(list.map((d) => ({ id: d.id, name: d.name })));
-      } catch {
+      } catch (err) {
+        console.warn("[layout/InviteTeamModal] failed to load deals:", err);
         setAvailableDeals([]);
       }
     })();

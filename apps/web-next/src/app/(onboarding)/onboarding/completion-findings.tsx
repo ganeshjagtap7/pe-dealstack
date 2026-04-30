@@ -74,8 +74,9 @@ export function CompletionFindings({
             setDeepNotification(data.newInsightsCount);
           }
         }
-      } catch {
-        // Silent polling
+      } catch (err) {
+        // Silent polling — keep retrying.
+        console.warn("[onboarding/completion] research-status poll failed:", err);
       }
     }, 5000);
   }, [stopPolling]);
@@ -124,8 +125,9 @@ export function CompletionFindings({
             setLoading(false);
             return;
           }
-        } catch {
-          // fall through
+        } catch (err) {
+          // fall through to financials check.
+          console.warn("[onboarding/completion] failed to load deal analysis:", err);
         }
 
         // Fallback: check financial statements
@@ -145,13 +147,15 @@ export function CompletionFindings({
             setLoading(false);
             return;
           }
-        } catch {
-          // fall through
+        } catch (err) {
+          // fall through to no-findings state.
+          console.warn("[onboarding/completion] failed to load financials:", err);
         }
 
         renderNoFindings();
         startPolling();
-      } catch {
+      } catch (err) {
+        console.warn("[onboarding/completion] failed to fetch deals:", err);
         renderNoFindings();
       }
     })();
