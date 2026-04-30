@@ -140,6 +140,99 @@ export async function optionalAuthMiddleware(
   }
 }
 
+// Paths that bypass org-level MFA enforcement so users can still enroll
+// their factor, manage sessions, and read their own org/user state.
+// These are checked by `req.path.startsWith(prefix)`.
+const MFA_BYPASS_PATH_PREFIXES: string[] = [
+  '/auth/',           // login/logout/MFA enrollment
+  '/api/auth/',
+  '/organizations/me',
+  '/api/organizations/me',
+  '/users/me',
+  '/api/users/me',
+];
+
+async function userHasVerifiedMfa(userId: string): Promise<boolean> {
+  try {
+    // Use Supabase admin client to list factors for this user.
+    // The exact API may vary by SDK version — adjust if needed.
+    const adminAuth: any = (supabase as any).auth?.admin;
+    if (!adminAuth?.mfa?.listFactors) return false;
+    const { data, error } = await adminAuth.mfa.listFactors({ userId });
+    if (error) return false;
+    const factors = (data?.factors || []) as Array<{ status?: string }>;
+    return factors.some((f) => f.status === 'verified');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Org-level MFA enforcement middleware.
+ * If the user's organization has `requireMFA = true`, blocks API access for
+ * users without a verified MFA factor. Bypasses paths needed for enrollment
+ * and self-service so users can still get into compliance.
+ * Must run after authMiddleware (and ideally orgMiddleware).
+ */
+export const enforceOrgMfaMiddleware = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> => {
+  try {
+    const user = req.user;
+    if (!user) {
+      next();
+      return;
+    }
+
+    // Use originalUrl so the bypass list works regardless of where this
+    // middleware is mounted in the Express tree (req.path strips the mount
+    // prefix; originalUrl preserves the full request path). Strip query string.
+    const fullPath = (req.originalUrl || req.url || '').split('?')[0] || '';
+    if (MFA_BYPASS_PATH_PREFIXES.some((p) => fullPath.startsWith(p))) {
+      next();
+      return;
+    }
+
+    const orgId = user.organizationId;
+    if (!orgId) {
+      next();
+      return;
+    }
+
+    const { data: org, error: orgErr } = await supabase
+      .from('Organization')
+      .select('requireMFA')
+      .eq('id', orgId)
+      .single();
+
+    if (orgErr || !org) {
+      next(); // fail-open on transient lookup error
+      return;
+    }
+    if (!org.requireMFA) {
+      next();
+      return;
+    }
+
+    const hasMfa = await userHasVerifiedMfa(user.id);
+    if (hasMfa) {
+      next();
+      return;
+    }
+
+    res.status(403).json({
+      error: 'Two-factor authentication is required by your organization',
+      code: 'MFA_REQUIRED',
+    });
+    return;
+  } catch (err) {
+    log.error('enforceOrgMfaMiddleware error', err as any);
+    next(); // fail-open on errors — don't lock users out on transient bugs
+  }
+};
+
 /**
  * Role-based access control middleware
  * Must be used after authMiddleware
