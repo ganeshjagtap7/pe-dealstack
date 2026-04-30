@@ -1,12 +1,6 @@
 import { encrypt, decrypt } from '../../services/encryption.js';
+import { supabase } from '../../supabase.js';
 import type { Integration, IntegrationStatus } from './types.js';
-
-// Lazy supabase import — keeps pure helpers (encryptForStorage / decryptFromStorage)
-// importable in unit tests without requiring SUPABASE_URL / SUPABASE_ANON_KEY.
-async function getSupabase() {
-  const mod = await import('../../supabase.js');
-  return mod.supabase;
-}
 
 export function encryptForStorage(value: string | null): string | null {
   if (value === null || value === undefined) return null;
@@ -25,7 +19,6 @@ export async function saveTokens(params: {
   tokenExpiresAt: Date | null;
 }): Promise<void> {
   const { integrationId, accessToken, refreshToken, tokenExpiresAt } = params;
-  const supabase = await getSupabase();
   const { error } = await supabase
     .from('Integration')
     .update({
@@ -60,7 +53,6 @@ export async function markStatus(
     updatedAt: new Date().toISOString(),
   };
   if (error !== undefined) update.lastSyncError = error;
-  const supabase = await getSupabase();
   const { error: dbError } = await supabase
     .from('Integration')
     .update(update)
