@@ -22,6 +22,7 @@ import invitationsRouter from './routes/invitations.js';
 import invitationsAcceptRouter from './routes/invitations-accept.js';
 import templatesRouter from './routes/templates.js';
 import auditRouter from './routes/audit.js';
+import auditExportRouter from './routes/audit-export.js';
 import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
@@ -272,6 +273,8 @@ app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, me
 app.use('/api/templates', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, templatesRouter);
 // Authenticated invitation routes (list, create, revoke, resend)
 app.use('/api/invitations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, invitationsRouter);
+// Audit export must be mounted BEFORE the generic /api/audit router so /export.csv matches first
+app.use('/api/audit', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, auditExportRouter);
 app.use('/api/audit', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, auditRouter);
 app.use('/api/organizations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, organizationsRouter);
 app.use('/api/tasks', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, tasksRouter);

@@ -49,6 +49,7 @@ async function initAdminDashboard() {
     initCardScrollLinks();
     initResourceToggle();
     initLoadMoreActivity();
+    initAuditFilters();
     updateLastUpdated();
     setInterval(updateLastUpdated, 60000);
 
@@ -307,6 +308,20 @@ function initResourceToggle() {
 let activityOffset = 0;
 const ACTIVITY_PAGE_SIZE = 10;
 let allActivityLogs = [];
+let currentAuditFilters = {};
+
+function buildAuditQueryParams(includePagination = true) {
+    const params = new URLSearchParams();
+    if (includePagination) {
+        params.set('limit', String(ACTIVITY_PAGE_SIZE));
+        params.set('offset', String(activityOffset));
+    }
+    if (currentAuditFilters.startDate) params.set('startDate', currentAuditFilters.startDate);
+    if (currentAuditFilters.endDate) params.set('endDate', currentAuditFilters.endDate);
+    if (currentAuditFilters.action) params.set('action', currentAuditFilters.action);
+    if (currentAuditFilters.resourceType) params.set('resourceType', currentAuditFilters.resourceType);
+    return params;
+}
 
 async function loadActivityFeed(append = false) {
     const container = document.querySelector('.activity-timeline .space-y-5');
@@ -318,7 +333,8 @@ async function loadActivityFeed(append = false) {
     }
 
     try {
-        const response = await PEAuth.authFetch(`${API_BASE_URL}/audit?limit=${ACTIVITY_PAGE_SIZE}&offset=${activityOffset}`);
+        const params = buildAuditQueryParams(true);
+        const response = await PEAuth.authFetch(`${API_BASE_URL}/audit?${params.toString()}`);
         if (!response.ok) throw new Error('Failed to fetch audit logs');
 
         const data = await response.json();
@@ -389,6 +405,96 @@ function initLoadMoreActivity() {
             btn.textContent = 'LOADING...';
             btn.disabled = true;
             await loadActivityFeed(true);
+        });
+    }
+}
+
+// ─── Audit filter row + CSV export ──────────────────────────
+
+function initAuditFilters() {
+    const startEl = document.getElementById('audit-filter-start');
+    const endEl = document.getElementById('audit-filter-end');
+    const actionEl = document.getElementById('audit-filter-action');
+    const resourceEl = document.getElementById('audit-filter-resource');
+    const applyBtn = document.getElementById('audit-filter-apply');
+    const resetBtn = document.getElementById('audit-filter-reset');
+    const exportBtn = document.getElementById('audit-export-csv');
+
+    if (applyBtn) {
+        applyBtn.addEventListener('click', () => {
+            currentAuditFilters = {
+                startDate: startEl && startEl.value
+                    ? new Date(startEl.value).toISOString()
+                    : '',
+                endDate: endEl && endEl.value
+                    ? new Date(endEl.value + 'T23:59:59').toISOString()
+                    : '',
+                action: (actionEl && actionEl.value) || '',
+                resourceType: (resourceEl && resourceEl.value) || '',
+            };
+            loadActivityFeed(false);
+        });
+    }
+
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
+            currentAuditFilters = {};
+            if (startEl) startEl.value = '';
+            if (endEl) endEl.value = '';
+            if (actionEl) actionEl.value = '';
+            if (resourceEl) resourceEl.value = '';
+            loadActivityFeed(false);
+        });
+    }
+
+    if (exportBtn) {
+        exportBtn.addEventListener('click', async () => {
+            const originalLabel = exportBtn.innerHTML;
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = '<span class="material-symbols-outlined text-[14px] animate-spin">progress_activity</span> Exporting...';
+            try {
+                const params = buildAuditQueryParams(false);
+                const url = `${API_BASE_URL}/audit/export.csv?${params.toString()}`;
+                const res = await PEAuth.authFetch(url);
+                if (!res.ok) {
+                    if (res.status === 403) {
+                        if (typeof showNotification === 'function') {
+                            showNotification('error', 'Admin role required to export audit log');
+                        } else {
+                            alert('Admin role required to export audit log.');
+                        }
+                    } else {
+                        if (typeof showNotification === 'function') {
+                            showNotification('error', 'Export failed. Please try again.');
+                        } else {
+                            alert('Export failed.');
+                        }
+                    }
+                    return;
+                }
+                const blob = await res.blob();
+                const a = document.createElement('a');
+                const objectUrl = URL.createObjectURL(blob);
+                a.href = objectUrl;
+                a.download = `pocket-fund-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(objectUrl);
+                if (typeof showNotification === 'function') {
+                    showNotification('success', 'Audit log exported');
+                }
+            } catch (err) {
+                console.error('audit export failed', err);
+                if (typeof showNotification === 'function') {
+                    showNotification('error', 'Export failed. Please try again.');
+                } else {
+                    alert('Export failed.');
+                }
+            } finally {
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = originalLabel;
+            }
         });
     }
 }

@@ -203,12 +203,75 @@
     <div class="xl:col-span-1 space-y-6">
 
         <!-- Team Activity Feed -->
-        <div class="bg-surface-card rounded-xl border border-border-subtle shadow-card flex flex-col" style="height: 420px;">
+        <div class="bg-surface-card rounded-xl border border-border-subtle shadow-card flex flex-col" style="height: 540px;">
             <div class="p-5 border-b border-border-subtle">
                 <h2 class="text-base font-semibold text-text-main flex items-center gap-2">
                     <span class="material-symbols-outlined text-text-muted text-[20px]">rss_feed</span>
                     Team Activity
                 </h2>
+            </div>
+            <!-- Filter row -->
+            <div id="audit-filter-row" class="px-4 py-3 border-b border-border-subtle bg-surface-subtle/40 flex flex-wrap gap-2 items-end text-xs">
+                <div class="flex flex-col">
+                    <label for="audit-filter-start" class="text-[10px] font-semibold uppercase tracking-wide text-text-muted mb-1">From</label>
+                    <input type="date" id="audit-filter-start" class="border border-border-subtle rounded px-2 py-1 text-xs bg-white">
+                </div>
+                <div class="flex flex-col">
+                    <label for="audit-filter-end" class="text-[10px] font-semibold uppercase tracking-wide text-text-muted mb-1">To</label>
+                    <input type="date" id="audit-filter-end" class="border border-border-subtle rounded px-2 py-1 text-xs bg-white">
+                </div>
+                <div class="flex flex-col">
+                    <label for="audit-filter-action" class="text-[10px] font-semibold uppercase tracking-wide text-text-muted mb-1">Action</label>
+                    <select id="audit-filter-action" class="border border-border-subtle rounded px-2 py-1 text-xs bg-white">
+                        <option value="">All actions</option>
+                        <optgroup label="Authentication">
+                            <option value="LOGIN">LOGIN</option>
+                            <option value="LOGOUT">LOGOUT</option>
+                            <option value="LOGIN_FAILED">LOGIN_FAILED</option>
+                        </optgroup>
+                        <optgroup label="Deals">
+                            <option value="DEAL_CREATED">DEAL_CREATED</option>
+                            <option value="DEAL_UPDATED">DEAL_UPDATED</option>
+                            <option value="DEAL_DELETED">DEAL_DELETED</option>
+                            <option value="DEAL_VIEWED">DEAL_VIEWED</option>
+                        </optgroup>
+                        <optgroup label="Documents">
+                            <option value="DOCUMENT_UPLOADED">DOCUMENT_UPLOADED</option>
+                            <option value="DOCUMENT_DELETED">DOCUMENT_DELETED</option>
+                            <option value="DOCUMENT_DOWNLOADED">DOCUMENT_DOWNLOADED</option>
+                        </optgroup>
+                        <optgroup label="Memos">
+                            <option value="MEMO_CREATED">MEMO_CREATED</option>
+                            <option value="MEMO_APPROVED">MEMO_APPROVED</option>
+                            <option value="MEMO_EXPORTED">MEMO_EXPORTED</option>
+                        </optgroup>
+                        <optgroup label="System">
+                            <option value="ORG_MFA_REQUIRED">ORG_MFA_REQUIRED</option>
+                            <option value="SETTINGS_CHANGED">SETTINGS_CHANGED</option>
+                            <option value="SECURITY_TEST_RUN">SECURITY_TEST_RUN</option>
+                        </optgroup>
+                    </select>
+                </div>
+                <div class="flex flex-col">
+                    <label for="audit-filter-resource" class="text-[10px] font-semibold uppercase tracking-wide text-text-muted mb-1">Resource</label>
+                    <select id="audit-filter-resource" class="border border-border-subtle rounded px-2 py-1 text-xs bg-white">
+                        <option value="">All resources</option>
+                        <option value="DEAL">DEAL</option>
+                        <option value="DOCUMENT">DOCUMENT</option>
+                        <option value="MEMO">MEMO</option>
+                        <option value="USER">USER</option>
+                        <option value="SETTINGS">SETTINGS</option>
+                        <option value="INVITATION">INVITATION</option>
+                    </select>
+                </div>
+                <div class="flex items-center gap-1 ml-auto">
+                    <button id="audit-filter-apply" class="px-3 py-1.5 text-xs font-semibold text-white rounded transition-colors" style="background-color: #003366;" onmouseover="this.style.backgroundColor='#004488'" onmouseout="this.style.backgroundColor='#003366'">Apply</button>
+                    <button id="audit-filter-reset" class="px-3 py-1.5 text-xs font-medium border border-border-subtle rounded text-text-secondary hover:bg-surface-subtle transition-colors">Reset</button>
+                    <button id="audit-export-csv" class="px-3 py-1.5 text-xs font-medium border border-border-subtle rounded text-text-secondary hover:bg-surface-subtle transition-colors flex items-center gap-1" title="Download filtered audit log as CSV">
+                        <span class="material-symbols-outlined text-[14px]">download</span>
+                        Export CSV
+                    </button>
+                </div>
             </div>
             <div class="flex-1 overflow-y-auto p-5 relative activity-timeline custom-scrollbar">
                 <div class="space-y-5 relative">
