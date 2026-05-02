@@ -67,7 +67,10 @@ export function FirmTaskModal({
     const url = value.url.trim();
     const linkedin = value.linkedin.trim();
     if (!url && !linkedin) return;
-    if (enrichState === "loading" || enrichState === "applied") return;
+    // Only block if a request is already in flight. Previously also
+    // short-circuited on "applied", which silently swallowed a LinkedIn
+    // blur after the user had applied a website-only enrichment.
+    if (enrichState === "loading") return;
 
     setEnrichState("loading");
     setEnrichError(null);
@@ -154,7 +157,9 @@ export function FirmTaskModal({
           value={value.linkedin}
           onChange={(e) => onChange({ ...value, linkedin: e.target.value })}
           onBlur={() => {
-            if (value.linkedin.includes("linkedin.com")) triggerEnrichment();
+            // Lowercase check so pasted "LinkedIn.com" / "Linkedin.com"
+            // still fire the enrichment.
+            if (value.linkedin.toLowerCase().includes("linkedin.com")) triggerEnrichment();
           }}
           placeholder="https://linkedin.com/in/yourprofile"
           className="w-full pl-10 pr-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
