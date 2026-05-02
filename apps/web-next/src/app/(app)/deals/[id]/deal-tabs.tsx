@@ -8,6 +8,7 @@ import type { ChatMessage, DealDetail } from "./components";
 import { ClearChatModal } from "./components";
 import { AISettingsModal } from "./deal-panels";
 import { api } from "@/lib/api";
+import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { SuggestionChips } from "./deal-tabs-suggestions";
 import { ContextDocIndicators } from "./deal-tabs-context-indicators";
 import { AIMessageActions } from "./deal-tabs-ai-message-actions";
@@ -64,7 +65,9 @@ export function ChatTab({
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`/api/deals/${deal.id}/documents`, {
+      // authFetchRaw forwards the Supabase Bearer token; bare fetch returned
+      // 401 because the API auth middleware never saw the JWT.
+      const res = await authFetchRaw(`/deals/${deal.id}/documents`, {
         method: "POST",
         body: formData,
       });
