@@ -3,7 +3,7 @@
 // Supports template library integration + human-in-the-loop review.
 
 import { StateGraph, Annotation, END, START } from '@langchain/langgraph';
-import { getChatModel, isLLMAvailable } from '../../llm.js';
+import { isLLMAvailable, invokeStructured } from '../../llm.js';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import { supabase } from '../../../supabase.js';
@@ -72,19 +72,15 @@ const EMAIL_TEMPLATES: Record<string, { name: string; structure: string }> = {
 // ─── Node: Draft Email ─────────────────────────────────────────────
 
 async function draftNode(state: typeof EmailState.State) {
-  const model = getChatModel(0.7, 1500);
-
   const template = state.templateId ? EMAIL_TEMPLATES[state.templateId] : null;
   const templateGuide = template
     ? `\nUse this structure: ${template.structure}`
     : '';
 
-  const structuredModel = model.withStructuredOutput(z.object({
+  const result = await invokeStructured(z.object({
     subject: z.string().describe('Email subject line'),
     body: z.string().describe('Full email body with proper formatting'),
-  }));
-
-  const result = await structuredModel.invoke([
+  }), [
     new SystemMessage(`You are an expert email writer for a Private Equity firm. Write professional, concise emails that are appropriate for PE deal communication.
 ${TOPIC_GUARDRAILS}
 ${CONTEXT_ANCHORING}
@@ -99,7 +95,7 @@ Guidelines:
 - No jargon unless writing to another PE professional
 - Sign off appropriately for the relationship stage`),
     new HumanMessage(`Write an email for this purpose: ${state.purpose}\n\nContext:\n${state.context}`),
-  ]);
+  ], { maxTokens: 1500, temperature: 0.7, label: 'emailDrafter.draft' });
 
   return { draft: result.body, subject: result.subject };
 }
@@ -107,15 +103,11 @@ Guidelines:
 // ─── Node: Tone Check ──────────────────────────────────────────────
 
 async function toneCheckNode(state: typeof EmailState.State) {
-  const model = getChatModel(0.2, 800);
-
-  const structuredModel = model.withStructuredOutput(z.object({
+  const result = await invokeStructured(z.object({
     score: z.number().min(0).max(100).describe('Tone appropriateness score'),
     notes: z.array(z.string()).describe('Specific tone feedback items'),
     adjustedDraft: z.string().describe('Adjusted email if score < 80, otherwise original'),
-  }));
-
-  const result = await structuredModel.invoke([
+  }), [
     new SystemMessage(`You are an email tone analyzer for PE communications. Score the email's tone and provide feedback.
 
 Evaluate:
@@ -127,7 +119,7 @@ Evaluate:
 
 Target tone: ${state.tone || 'professional'}`),
     new HumanMessage(`Analyze this email's tone:\n\nSubject: ${state.subject}\n\n${state.draft}`),
-  ]);
+  ], { maxTokens: 800, temperature: 0.2, label: 'emailDrafter.tone' });
 
   return {
     toneScore: result.score,
@@ -139,15 +131,11 @@ Target tone: ${state.tone || 'professional'}`),
 // ─── Node: Compliance Check ────────────────────────────────────────
 
 async function complianceCheckNode(state: typeof EmailState.State) {
-  const model = getChatModel(0.1, 800);
-
-  const structuredModel = model.withStructuredOutput(z.object({
+  const result = await invokeStructured(z.object({
     isCompliant: z.boolean(),
     issues: z.array(z.string()).describe('Compliance issues found'),
     suggestions: z.array(z.string()).describe('Suggestions to improve the email'),
-  }));
-
-  const result = await structuredModel.invoke([
+  }), [
     new SystemMessage(`You are a compliance checker for PE deal communications. Flag any potential issues.
 
 Check for:
@@ -159,7 +147,7 @@ Check for:
 - Missing confidentiality notice when needed
 - Inappropriate commitments or promises`),
     new HumanMessage(`Check this email for compliance:\n\nPurpose: ${state.purpose}\nSubject: ${state.subject}\n\n${state.draft}`),
-  ]);
+  ], { maxTokens: 800, temperature: 0.1, label: 'emailDrafter.compliance' });
 
   return {
     isCompliant: result.isCompliant,
