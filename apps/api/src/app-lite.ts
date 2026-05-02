@@ -60,6 +60,13 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0.1,
+    // The Express adapter (proxyToExpress in apps/web-next) uses synthetic
+    // req/res objects, so Sentry's HTTP auto-instrumentation has no real
+    // http.Server to wrap. In @sentry/node v10 the broken wrapper recursively
+    // re-emits errors on Server.emit, causing 5-minute timeouts on simple
+    // requests like /api/notifications. setupExpressErrorHandler below still
+    // captures thrown errors via the middleware chain.
+    defaultIntegrations: false,
   });
   log.info('Sentry error tracking initialized');
 }
