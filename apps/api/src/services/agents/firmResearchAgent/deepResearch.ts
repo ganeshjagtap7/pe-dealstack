@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { FirmProfile, PersonProfile } from './state.js';
-import { getChatModel } from '../../llm.js';
+import { invokeStructured } from '../../llm.js';
 import { searchWeb } from '../../webSearch.js';
 import { scrapePageText } from '../../companyResearcher.js';
 import { supabase } from '../../../supabase.js';
@@ -57,9 +57,6 @@ async function generateQueries(
   firmProfile: FirmProfile | null,
   personProfile: PersonProfile | null,
 ): Promise<GeneratedQuery[]> {
-  const model = getChatModel(0.3, 1500);
-  const structuredModel = model.withStructuredOutput(QuerySchema);
-
   const systemPrompt = `You are a PE research analyst. Based on an initial scan of a firm, generate 8-12 targeted DuckDuckGo search queries to find DEEPER information.
 
 Focus on:
@@ -88,10 +85,10 @@ ${JSON.stringify(personProfile, null, 2)}
 Generate 8-12 targeted follow-up search queries.`;
 
   try {
-    const result = await structuredModel.invoke([
+    const result = await invokeStructured(QuerySchema, [
       new SystemMessage(systemPrompt),
       new HumanMessage(userPrompt),
-    ]);
+    ], { maxTokens: 1500, temperature: 0.3, label: 'deepResearch.queries' });
     return (result as GeneratedQuery[]).slice(0, MAX_PRIMARY_QUERIES);
   } catch (error) {
     log.error('Deep research: query generation failed', { error: (error as Error).message });
@@ -187,8 +184,6 @@ async function synthesizePhase2(
   firmProfile: FirmProfile | null,
   personProfile: PersonProfile | null,
 ): Promise<{ firm: z.infer<typeof EnrichedFirmSchema>; person: z.infer<typeof EnrichedPersonSchema> }> {
-  const model = getChatModel(0.1, 2000);
-
   const systemPrompt = `You are a PE research analyst. Extract NEW information found in deep research results that was NOT in the initial profile. Only include facts that are clearly stated in the source text. Do not guess.`;
 
   const context = [
@@ -201,11 +196,10 @@ async function synthesizePhase2(
   // Extract firm additions
   let firm: z.infer<typeof EnrichedFirmSchema>;
   try {
-    const firmModel = model.withStructuredOutput(EnrichedFirmSchema);
-    firm = await firmModel.invoke([
+    firm = await invokeStructured(EnrichedFirmSchema, [
       new SystemMessage(systemPrompt),
       new HumanMessage(`Extract NEW firm-level information (social presence, press articles, community mentions, co-investors, competitors, new portfolio companies, new deals, additional sectors):\n\n${context}`),
-    ]) as z.infer<typeof EnrichedFirmSchema>;
+    ], { maxTokens: 2000, label: 'deepResearch.firm' });
   } catch {
     firm = EnrichedFirmSchema.parse({});
   }
@@ -213,11 +207,10 @@ async function synthesizePhase2(
   // Extract person additions
   let person: z.infer<typeof EnrichedPersonSchema>;
   try {
-    const personModel = model.withStructuredOutput(EnrichedPersonSchema);
-    person = await personModel.invoke([
+    person = await invokeStructured(EnrichedPersonSchema, [
       new SystemMessage(systemPrompt),
       new HumanMessage(`Extract NEW person-level information (social handles, interviews/podcasts, public content, network connections):\n\n${context}`),
-    ]) as z.infer<typeof EnrichedPersonSchema>;
+    ], { maxTokens: 2000, label: 'deepResearch.person' });
   } catch {
     person = EnrichedPersonSchema.parse({});
   }
