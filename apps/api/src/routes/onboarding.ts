@@ -4,8 +4,12 @@ import { getOrgId } from '../middleware/orgScope.js';
 import { runFirmResearch, runDeepResearch } from '../services/agents/firmResearchAgent/index.js';
 import { log } from '../utils/logger.js';
 import { extractNameFromDomain } from '../utils/urlHelpers.js';
+import firmProfileRouter from './onboarding-firm.js';
 
 const router = Router();
+
+// Sub-routers
+router.use('/', firmProfileRouter);
 
 const VALID_STEPS = ['createDeal', 'uploadDocument', 'reviewExtraction', 'tryDealChat', 'inviteTeamMember'];
 
