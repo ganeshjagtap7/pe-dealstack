@@ -184,10 +184,18 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     log.info('Creating invitation', { email, role, userId: user.id });
 
+    // Self-invite check — compare against the authenticated user's email
+    if (user.email && email.toLowerCase() === user.email.toLowerCase()) {
+      return res.status(400).json({
+        error: "You can't invite yourself.",
+        code: 'INVITE_SELF',
+      });
+    }
+
     // Get current user's info + org name
     const { data: currentUser, error: userError } = await supabase
       .from('User')
-      .select('id, name, firmName, organizationId, role')
+      .select('id, name, email, firmName, organizationId, role')
       .eq('authId', user.id)
       .maybeSingle();
 
@@ -199,6 +207,14 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (!currentUser?.organizationId) {
       return res.status(400).json({ error: 'You must belong to an organization to invite members' });
+    }
+
+    // Secondary self-invite check against the User row's email
+    if (currentUser.email && email.toLowerCase() === currentUser.email.toLowerCase()) {
+      return res.status(400).json({
+        error: "You can't invite yourself.",
+        code: 'INVITE_SELF',
+      });
     }
 
     // Get org name for email
@@ -226,7 +242,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     log.info('Existing user check', { existingUser, error: existingUserErr?.message });
 
     if (existingUser) {
-      return res.status(400).json({ error: 'User is already a member of your organization' });
+      return res.status(400).json({
+        error: `${email} is already on the team.`,
+        code: 'INVITE_ALREADY_MEMBER',
+      });
     }
 
     // Check for existing pending invitation
@@ -241,7 +260,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     log.info('Existing invite check', { existingInvite, error: existingInviteErr?.message });
 
     if (existingInvite) {
-      return res.status(400).json({ error: 'An invitation is already pending for this email' });
+      return res.status(400).json({
+        error: `${email} already has a pending invitation.`,
+        code: 'INVITE_ALREADY_PENDING',
+      });
     }
 
     // Create invitation

@@ -295,18 +295,19 @@ export default function DashboardPage() {
           />,
         )}
 
-        {/* Main widget grid — matches legacy dashboard.html:
-             Active Priorities spans col-span-full (full-width hero row),
-             other widgets are 1 column each in a 3-col grid.
+        {/* Active Priorities — rendered as a full-width hero row above the
+             masonry. CSS multi-column layout below can't honour col-span-full,
+             so this widget lives outside the column flow. Drag-and-drop
+             reordering still works because it swaps array indices in
+             orderedCoreIds; the visual layout is independent.
              Order is driven by orderedCoreIds from useVisibleWidgets. */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-min items-start">
-          {orderedCoreIds
-            .filter((id) => id !== "stats-cards" && coreVisible.has(id))
-            .map((coreId) => {
-              if (coreId === "active-priorities") {
-                return wrapCoreWidget(
-                  "active-priorities",
-                  <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
+        {orderedCoreIds
+          .filter((id) => id === "active-priorities" && coreVisible.has(id))
+          .map((coreId) => {
+            if (coreId === "active-priorities") {
+              return wrapCoreWidget(
+                "active-priorities",
+                <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
                     <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
                       <h3 className="font-bold text-text-main text-base">Active Priorities</h3>
                       <div className="flex gap-2">
@@ -389,10 +390,22 @@ export default function DashboardPage() {
                       </table>
                     </div>
                   </div>,
-                  "col-span-full",
                 );
               }
+              return null;
+            })}
 
+        {/* Remaining core widgets — CSS multi-column masonry. Each widget
+             flows into the next available column slot, so a tall widget in
+             column 1 doesn't force columns 2 & 3 to leave empty whitespace
+             below their content. `break-inside-avoid` keeps each card in a
+             single column. Drag-and-drop reorder still works: drop targets
+             swap array positions in orderedCoreIds via onCoreDragEnter, the
+             columns then re-flow to match. */}
+        <div className="columns-1 md:columns-2 lg:columns-3 gap-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
+          {orderedCoreIds
+            .filter((id) => id !== "stats-cards" && id !== "active-priorities" && coreVisible.has(id))
+            .map((coreId) => {
               if (coreId === "my-tasks") {
                 return wrapCoreWidget(
                   "my-tasks",
@@ -531,9 +544,11 @@ export default function DashboardPage() {
             })}
         </div>{/* /dashboard-widget-grid */}
 
-        {/* Optional widgets (user-customizable via Customize button below) */}
+        {/* Optional widgets (user-customizable via Customize button below).
+             Same CSS multi-column masonry approach as the core widgets above
+             so short widgets don't leave dead vertical space below them. */}
         {orderedVisible.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="columns-1 md:columns-2 lg:columns-3 gap-6 [&>*]:mb-6 [&>*]:break-inside-avoid">
             {orderedVisible.map((w) => (
               <DraggableWidget
                 key={w.id}

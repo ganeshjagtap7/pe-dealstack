@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { BulkCsvImportPanel } from "./InviteTeamModal.csv";
+import { RowDealPicker, type DealOption } from "./RowDealPicker";
 
 type Role = "VIEWER" | "MEMBER" | "ADMIN";
 
@@ -11,11 +13,6 @@ const ROLES: { value: Role; label: string; description: string }[] = [
   { value: "MEMBER", label: "Associate", description: "Can edit deals" },
   { value: "ADMIN", label: "Admin", description: "Full access" },
 ];
-
-interface DealOption {
-  id: string;
-  name: string;
-}
 
 interface InviteRow {
   id: number;
@@ -26,97 +23,6 @@ interface InviteRow {
 
 const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
-function RowDealPicker({
-  row,
-  available,
-  onAdd,
-  onRemove,
-}: {
-  row: InviteRow;
-  available: DealOption[];
-  onAdd: (deal: DealOption) => void;
-  onRemove: (id: string) => void;
-}) {
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    function handleClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const selectedIds = new Set(row.deals.map((d) => d.id));
-  const filtered = available.filter(
-    (d) => !selectedIds.has(d.id) && d.name.toLowerCase().includes(query.toLowerCase()),
-  );
-
-  return (
-    <div className="relative" ref={ref}>
-      <div
-        onClick={() => setOpen(true)}
-        className="relative w-full rounded-lg border border-[#EBEBEB] bg-white min-h-[48px] px-2 py-1.5 flex items-center flex-wrap gap-2 focus-within:ring-1 focus-within:ring-[#003366] focus-within:border-[#003366] transition-all cursor-text group"
-      >
-        {row.deals.map((deal) => (
-          <div
-            key={deal.id}
-            className="bg-[#E6EDF5] border border-[#CCDBE8] text-[#003366] font-medium px-2 py-1 rounded-md flex items-center gap-1 text-xs"
-          >
-            <span>{deal.name}</span>
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onRemove(deal.id);
-              }}
-              className="hover:text-[#4A6D8A] text-[#8099B3]"
-            >
-              <span className="material-symbols-outlined text-[14px]">close</span>
-            </button>
-          </div>
-        ))}
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onFocus={() => setOpen(true)}
-          placeholder={row.deals.length > 0 ? "Add deal..." : "Search workspaces..."}
-          className="bg-transparent border-none focus:ring-0 text-[#343A40] text-sm placeholder-[#868E96]/40 p-0 h-6 min-w-[60px] flex-1 outline-none"
-        />
-        <span className="material-symbols-outlined absolute right-3 text-[#868E96]/60 pointer-events-none text-lg group-focus-within:text-[#003366] transition-colors">
-          search
-        </span>
-      </div>
-      {open && (
-        <div className="absolute z-10 mt-1 w-full bg-white border border-[#EBEBEB] rounded-lg shadow-lg py-1 max-h-48 overflow-y-auto">
-          {filtered.length === 0 ? (
-            <div className="px-4 py-2 text-sm text-[#868E96]">
-              {available.length === 0 ? "No deals available" : "No matching deals"}
-            </div>
-          ) : (
-            filtered.map((deal) => (
-              <button
-                key={deal.id}
-                type="button"
-                onClick={() => {
-                  onAdd(deal);
-                  setQuery("");
-                }}
-                className="w-full text-left px-4 py-2 text-sm hover:bg-[#F0F4F8] text-[#343A40] transition-colors"
-              >
-                {deal.name}
-              </button>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function InviteTeamModal({ onClose }: { onClose: () => void }) {
   const [rows, setRows] = useState<InviteRow[]>([
     { id: 1, email: "", role: "MEMBER", deals: [] },
@@ -126,6 +32,13 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error" | "warning"; text: string } | null>(null);
   const [inviteUrl, setInviteUrl] = useState<string | null>(null);
+  // Per-row inline errors keyed by row id. Used for known cases the API
+  // returns with a `code` (INVITE_SELF, INVITE_ALREADY_MEMBER,
+  // INVITE_ALREADY_PENDING). Generic failures fall back to the top `message`.
+  const [rowErrors, setRowErrors] = useState<Record<number, string>>({});
+  // "rows" = the per-row entry UI; "csv" = the bulk CSV import sub-flow.
+  // The bulk panel handles its own sub-stages (upload/preview/result).
+  const [viewMode, setViewMode] = useState<"rows" | "csv">("rows");
 
   useEffect(() => {
     (async () => {
@@ -156,14 +69,44 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
 
   const validCount = useMemo(() => rows.filter((r) => isValidEmail(r.email)).length, [rows]);
 
-  const updateRow = (id: number, patch: Partial<InviteRow>) =>
+  const updateRow = (id: number, patch: Partial<InviteRow>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+    // Clear any inline error for this row when the user edits it.
+    setRowErrors((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
 
   const addRow = () =>
     setRows((prev) => [...prev, { id: nextId.current++, email: "", role: "MEMBER", deals: [] }]);
 
-  const removeRow = (id: number) =>
+  const removeRow = (id: number) => {
     setRows((prev) => (prev.length <= 1 ? prev : prev.filter((r) => r.id !== id)));
+    setRowErrors((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  // Map known API error codes to user-facing copy. Returns null for unknown
+  // codes — the caller should fall back to the top-of-modal `message` banner.
+  const inlineCopyForCode = (code: string | undefined, email: string): string | null => {
+    switch (code) {
+      case "INVITE_SELF":
+        return "This is your account — you can't invite yourself. Try a teammate's email.";
+      case "INVITE_ALREADY_MEMBER":
+        return `${email} is already on the team.`;
+      case "INVITE_ALREADY_PENDING":
+        return `${email} already has a pending invitation.`;
+      default:
+        return null;
+    }
+  };
 
   const handleSubmit = async () => {
     const valid = rows.filter((r) => isValidEmail(r.email));
@@ -175,11 +118,13 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
     setSubmitting(true);
     setMessage(null);
     setInviteUrl(null);
+    setRowErrors({});
 
     let successCount = 0;
     let emailFailCount = 0;
     let lastInviteUrl: string | null = null;
-    const errors: string[] = [];
+    const genericErrors: string[] = [];
+    const nextRowErrors: Record<number, string> = {};
 
     for (const row of valid) {
       try {
@@ -193,11 +138,18 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
           if (data.inviteUrl) lastInviteUrl = data.inviteUrl;
         }
       } catch (err) {
-        errors.push(`${row.email}: ${err instanceof Error ? err.message : "Failed"}`);
+        const code = err instanceof ApiError ? err.code : undefined;
+        const inlineCopy = inlineCopyForCode(code, row.email);
+        if (inlineCopy) {
+          nextRowErrors[row.id] = inlineCopy;
+        } else {
+          genericErrors.push(`${row.email}: ${err instanceof Error ? err.message : "Failed"}`);
+        }
       }
     }
 
     setSubmitting(false);
+    setRowErrors(nextRowErrors);
 
     if (successCount > 0) {
       if (emailFailCount === successCount && lastInviteUrl) {
@@ -211,6 +163,15 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
           type: "warning",
           text: `${successCount - emailFailCount} sent. ${emailFailCount} email${emailFailCount > 1 ? "s" : ""} failed to deliver.`,
         });
+      } else if (Object.keys(nextRowErrors).length > 0) {
+        // Some succeeded, some had per-row inline errors — keep the modal
+        // open and let the inline notes do the talking.
+        setMessage({
+          type: "warning",
+          text: `${successCount} invitation${successCount > 1 ? "s" : ""} sent. Fix the highlighted row${
+            Object.keys(nextRowErrors).length > 1 ? "s" : ""
+          } below.`,
+        });
       } else {
         setMessage({
           type: "success",
@@ -218,9 +179,11 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
         });
         setTimeout(() => onClose(), 1200);
       }
-    } else if (errors.length > 0) {
-      setMessage({ type: "error", text: errors[0] });
+    } else if (genericErrors.length > 0) {
+      setMessage({ type: "error", text: genericErrors[0] });
     }
+    // If only per-row inline errors and zero success, the inline notes carry
+    // the message — no top banner needed.
   };
 
   return createPortal(
@@ -256,6 +219,15 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
 
           {/* Content */}
           <div className="flex-1 overflow-y-auto px-8 py-2">
+            {viewMode === "csv" ? (
+              <div className="py-2">
+                <BulkCsvImportPanel
+                  onBack={() => setViewMode("rows")}
+                  onClose={onClose}
+                />
+              </div>
+            ) : (
+            <>
             <div className="space-y-4">
               {rows.map((row, index) => {
                 const isFirst = index === 0;
@@ -278,14 +250,24 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
                           value={row.email}
                           onChange={(e) => updateRow(row.id, { email: e.target.value })}
                           placeholder="colleague@firm.com"
-                          className="block w-full rounded-lg border border-[#EBEBEB] bg-white text-[#343A40] placeholder-[#868E96]/60 focus:border-[#003366] focus:ring-2 focus:ring-[#003366]/20 h-12 px-4 text-sm transition-all outline-none"
+                          aria-invalid={Boolean(rowErrors[row.id])}
+                          className={`block w-full rounded-lg border bg-white text-[#343A40] placeholder-[#868E96]/60 focus:ring-2 h-12 px-4 text-sm transition-all outline-none ${
+                            rowErrors[row.id]
+                              ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                              : "border-[#EBEBEB] focus:border-[#003366] focus:ring-[#003366]/20"
+                          }`}
                         />
-                        {emailValid && (
+                        {emailValid && !rowErrors[row.id] && (
                           <span className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600 material-symbols-outlined text-lg">
                             check_circle
                           </span>
                         )}
                       </div>
+                      {rowErrors[row.id] && (
+                        <span className="mt-1.5 block text-xs text-red-600">
+                          {rowErrors[row.id]}
+                        </span>
+                      )}
                     </div>
 
                     {/* Role */}
@@ -369,8 +351,15 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
               </button>
               <button
                 type="button"
+                onClick={() => {
+                  // Clear any inline state from the row flow before swapping —
+                  // the bulk panel keeps its own state.
+                  setMessage(null);
+                  setInviteUrl(null);
+                  setRowErrors({});
+                  setViewMode("csv");
+                }}
                 className="flex items-center gap-2 text-[#868E96] hover:text-[#343A40] font-medium text-sm transition-colors px-2 py-1 rounded-md hover:bg-black/5"
-                title="Coming soon"
               >
                 <span className="material-symbols-outlined text-xl">upload_file</span>
                 Bulk import via CSV
@@ -417,9 +406,12 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
                 )}
               </div>
             )}
+            </>
+            )}
           </div>
 
-          {/* Footer */}
+          {/* Footer — hidden in CSV mode; the bulk panel renders its own actions. */}
+          {viewMode === "rows" && (
           <div className="px-8 py-6 bg-white border-t border-[#EBEBEB] flex flex-col sm:flex-row justify-between items-center gap-4">
             <div className="text-sm text-[#868E96] hidden sm:block">
               Inviting{" "}
@@ -457,6 +449,7 @@ export function InviteTeamModal({ onClose }: { onClose: () => void }) {
               </button>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>,
