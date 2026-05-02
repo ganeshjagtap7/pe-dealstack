@@ -62,6 +62,21 @@ function MemoBuilderPageInner() {
   const [sendingChat, setSendingChat] = useState(false);
   const [chatOpen, setChatOpen] = useState(true);
   const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // Free up horizontal space for the AI Analyst panel by asking the sidebar
+  // to collapse while chat is open. The sidebar restores the user's saved
+  // preference when we un-force on close / unmount, so this never overwrites
+  // their manual choice in localStorage.
+  useEffect(() => {
+    window.dispatchEvent(
+      new CustomEvent("sidebar:auto-collapse", { detail: { collapsed: chatOpen } }),
+    );
+    return () => {
+      window.dispatchEvent(
+        new CustomEvent("sidebar:auto-collapse", { detail: { collapsed: false } }),
+      );
+    };
+  }, [chatOpen]);
   const [showCreate, setShowCreate] = useState(false);
   const [deals, setDeals] = useState<DealOption[]>([]);
   const [templates, setTemplates] = useState<TemplateOption[]>([]);

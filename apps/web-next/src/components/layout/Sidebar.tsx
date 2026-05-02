@@ -60,19 +60,34 @@ function NavLink({
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
-  const [collapsed, setCollapsed] = useState(false);
+  const [userCollapsed, setUserCollapsed] = useState(false);
+  const [forceCollapsed, setForceCollapsed] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Visible collapsed state is the OR of the user's saved preference and any
+  // page-driven force-collapse (e.g. memo-builder dims the nav while the AI
+  // Analyst chat is open). When the page un-forces, we fall back to the
+  // user's preference rather than overwriting it.
+  const collapsed = userCollapsed || forceCollapsed;
 
   useEffect(() => {
     // Hydrate after mount so SSR + client first-paint match (a lazy
     // useState initialiser would diverge between server and client).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCollapsed(localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === "true");
+    setUserCollapsed(localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === "true");
+  }, []);
+
+  useEffect(() => {
+    const onForce = (e: Event) => {
+      const detail = (e as CustomEvent<{ collapsed: boolean }>).detail;
+      setForceCollapsed(!!detail?.collapsed);
+    };
+    window.addEventListener("sidebar:auto-collapse", onForce);
+    return () => window.removeEventListener("sidebar:auto-collapse", onForce);
   }, []);
 
   const toggleCollapse = () => {
-    const next = !collapsed;
-    setCollapsed(next);
+    const next = !userCollapsed;
+    setUserCollapsed(next);
     localStorage.setItem(STORAGE_KEYS.sidebarCollapsed, String(next));
   };
 
