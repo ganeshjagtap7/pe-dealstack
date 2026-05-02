@@ -64,7 +64,8 @@ export async function isExtractorHealthy(): Promise<boolean> {
 
     clearTimeout(timeout);
     return response.ok;
-  } catch {
+  } catch (err) {
+    log.warn('langExtract: health check failed', { error: err instanceof Error ? err.message : String(err) });
     return false;
   }
 }

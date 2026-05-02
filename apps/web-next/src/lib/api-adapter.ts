@@ -189,8 +189,9 @@ export async function proxyToExpress(
       }
       try {
         streamController!.close();
-      } catch {
-        // Already closed (e.g. from an upstream error path) — expected, don't log.
+      } catch (err) {
+        // Defensive: already closed (e.g. from an upstream error path) — expected, log to confirm it doesn't fire elsewhere.
+        console.warn("[api-adapter/end] stream already closed:", err);
       }
       (fakeRes as { finished?: boolean }).finished = true;
       (fakeRes as { writableEnded?: boolean }).writableEnded = true;
@@ -273,8 +274,9 @@ export async function proxyToExpress(
         }
         try {
           streamController!.close();
-        } catch {
-          // Already closed — expected after an Express error path, don't log.
+        } catch (err) {
+          // Defensive: already closed — expected after an Express error path. Log to confirm.
+          console.warn("[api-adapter/express-error] stream already closed:", err);
         }
       }
     });
@@ -293,8 +295,9 @@ export async function proxyToExpress(
       );
       try {
         streamController!.close();
-      } catch {
-        // Already closed — expected, don't log.
+      } catch (err) {
+        // Defensive: already closed — expected. Log to confirm.
+        console.warn("[api-adapter/adapter-exception] stream already closed:", err);
       }
     }
   }

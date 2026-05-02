@@ -118,8 +118,9 @@ async function backfillStepsFromActivity(userId: string, status: any): Promise<{
         status.steps[step] = true;
         changed = true;
       }
-    } catch {
+    } catch (err) {
       // Best-effort — never block status fetch
+      log.warn('onboarding: audit-log backfill check failed', { step, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -320,9 +321,9 @@ router.post('/enrich-firm', async (req: Request, res: Response) => {
           return res.status(429).json({ error: 'Max 3 enrichment runs per hour. Try again later.' });
         }
       }
-    } catch {
+    } catch (err) {
       // Org not available yet — agent will still scrape and search, just won't save to org
-      log.warn('Enrichment: org not available, running without save', { userId });
+      log.warn('Enrichment: org not available, running without save', { userId, error: err instanceof Error ? err.message : String(err) });
     }
 
     // Extract firm name from website URL as fallback

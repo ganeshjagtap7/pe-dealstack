@@ -1,121 +1,12 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { api } from "@/lib/api";
-
-// Roles accepted by POST /api/invitations/bulk (must match
-// apps/api/src/routes/invitations.ts > bulkInviteSchema).
-type BulkRole = "VIEWER" | "MEMBER" | "ADMIN";
-const VALID_ROLES: BulkRole[] = ["VIEWER", "MEMBER", "ADMIN"];
-
-const DEFAULT_ROLE: BulkRole = "VIEWER"; // task spec: defaults to ANALYST → VIEWER
-const MAX_BULK_ROWS = 20; // matches API: bulkInviteSchema.emails max(20)
-
-const isValidEmail = (s: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s);
-
-// Map a friendly label from the CSV (case-insensitive) to the API enum.
-// Accepts both the new labels (Analyst/Associate/Admin) and the raw enum values.
-function normalizeRole(raw: string | undefined): {
-  role: BulkRole;
-  warning?: string;
-} {
-  const v = (raw ?? "").trim().toUpperCase();
-  if (!v) return { role: DEFAULT_ROLE };
-  // Friendly aliases
-  const aliasMap: Record<string, BulkRole> = {
-    ANALYST: "VIEWER",
-    VIEWER: "VIEWER",
-    ASSOCIATE: "MEMBER",
-    MEMBER: "MEMBER",
-    PARTNER: "MEMBER",
-    PRINCIPAL: "MEMBER",
-    ADMIN: "ADMIN",
-  };
-  const mapped = aliasMap[v];
-  if (mapped) return { role: mapped };
-  return {
-    role: DEFAULT_ROLE,
-    warning: `Unknown role "${raw}", defaulted to Analyst`,
-  };
-}
-
-interface ParsedRow {
-  rowNumber: number; // 1-indexed CSV row (excluding header)
-  email: string;
-  role: BulkRole;
-  deal: string;
-  // Validation status — when set, the row will not be submitted.
-  invalid?: string;
-  // Non-fatal note (e.g. unknown role coerced to default).
-  note?: string;
-  // Result after submission.
-  result?:
-    | { kind: "sent" }
-    | { kind: "exists" }
-    | { kind: "pending" }
-    | { kind: "error"; error?: string }
-    | { kind: "skipped"; reason: string };
-}
-
-// Strip BOM, trim CR, treat blank lines as skipped.
-function parseCsv(text: string): { rows: ParsedRow[]; topError?: string } {
-  const cleaned = text.replace(/^﻿/, "");
-  const lines = cleaned.split(/\r?\n/);
-  // Find first non-empty line as header.
-  let headerIdx = -1;
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i].trim().length > 0) {
-      headerIdx = i;
-      break;
-    }
-  }
-  if (headerIdx === -1) {
-    return { rows: [], topError: "CSV is empty" };
-  }
-  const header = lines[headerIdx]
-    .split(",")
-    .map((h) => h.trim().toLowerCase().replace(/^"|"$/g, ""));
-  const emailCol = header.indexOf("email");
-  if (emailCol === -1) {
-    return {
-      rows: [],
-      topError: 'CSV must contain an "email" column in the header row.',
-    };
-  }
-  const roleCol = header.indexOf("role");
-  const dealCol = header.indexOf("deal");
-
-  const rows: ParsedRow[] = [];
-  let csvRowNum = 0;
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const raw = lines[i];
-    if (!raw || raw.trim().length === 0) continue;
-    csvRowNum++;
-    const cells = raw
-      .split(",")
-      .map((c) => c.trim().replace(/^"|"$/g, ""));
-    const email = (cells[emailCol] ?? "").trim();
-    const roleRaw = roleCol === -1 ? "" : cells[roleCol] ?? "";
-    const deal = dealCol === -1 ? "" : (cells[dealCol] ?? "").trim();
-    const { role, warning } = normalizeRole(roleRaw);
-
-    let invalid: string | undefined;
-    if (!email) invalid = "Missing email";
-    else if (!isValidEmail(email)) invalid = "Invalid email";
-
-    rows.push({
-      rowNumber: csvRowNum,
-      email,
-      role,
-      deal,
-      invalid,
-      note: warning,
-    });
-  }
-  return { rows };
-}
-
-type Stage = "upload" | "preview" | "submitting" | "done";
+import {
+  BulkRole, MAX_BULK_ROWS, ParsedRow, Stage, parseCsv,
+} from "./InviteTeamModal.csv.parse";
+import { RowStatus } from "./InviteTeamModal.csv.row";
+import { CsvUploadStep } from "./InviteTeamModal.csv.upload";
 
 export function BulkCsvImportPanel({
   onBack,
@@ -129,8 +20,6 @@ export function BulkCsvImportPanel({
   const [topError, setTopError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isDragging, setIsDragging] = useState(false);
 
   const validRows = useMemo(() => rows.filter((r) => !r.invalid), [rows]);
   const tooMany = validRows.length > MAX_BULK_ROWS;
@@ -267,7 +156,6 @@ export function BulkCsvImportPanel({
     setFileName(null);
     setTopError(null);
     setSubmitError(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const sentCount = rows.filter((r) => r.result?.kind === "sent").length;
@@ -295,76 +183,7 @@ export function BulkCsvImportPanel({
       </div>
 
       {stage === "upload" && (
-        <div className="space-y-4">
-          {/* Format reference */}
-          <div className="bg-[#F0F4F8] border border-[#E0E8F0] rounded-lg p-4">
-            <div className="flex gap-3 items-start">
-              <span className="material-symbols-outlined text-[#003366] text-xl mt-0.5">
-                description
-              </span>
-              <div className="flex-1 text-sm text-[#343A40]">
-                <div className="font-medium mb-1">Expected CSV format</div>
-                <div className="text-[#868E96] text-xs mb-2">
-                  Headers required: <code>email</code> (required),{" "}
-                  <code>role</code> (optional, defaults to Analyst),{" "}
-                  <code>deal</code> (optional). Roles: Analyst, Associate, Admin.
-                </div>
-                <pre className="bg-white border border-[#EBEBEB] rounded-md p-2 text-xs text-[#343A40] overflow-x-auto whitespace-pre">{`email,role,deal
-analyst1@firm.com,ANALYST,
-partner@firm.com,ASSOCIATE,Project Atlas`}</pre>
-                <div className="text-[#868E96] text-xs mt-2">
-                  Up to {MAX_BULK_ROWS} valid rows per import. Deal names in CSV
-                  are shown for reference but cannot be auto-attached during
-                  bulk import.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Drop zone */}
-          <label
-            onDragOver={(e) => {
-              e.preventDefault();
-              setIsDragging(true);
-            }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setIsDragging(false);
-              const f = e.dataTransfer.files?.[0];
-              if (f) handleFile(f);
-            }}
-            className={`block border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-              isDragging
-                ? "border-[#003366] bg-[#E6EDF5]"
-                : "border-[#EBEBEB] bg-white hover:border-[#003366]/40 hover:bg-[#F0F4F8]"
-            }`}
-          >
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,text/csv"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) handleFile(f);
-              }}
-            />
-            <span className="material-symbols-outlined text-4xl text-[#003366]">
-              upload_file
-            </span>
-            <div className="mt-2 text-sm font-medium text-[#343A40]">
-              Drop your CSV here, or click to browse
-            </div>
-            <div className="text-xs text-[#868E96] mt-1">.csv files only</div>
-          </label>
-
-          {topError && (
-            <div className="rounded-lg p-3 text-sm border bg-red-50 border-red-200 text-red-700">
-              {topError}
-            </div>
-          )}
-        </div>
+        <CsvUploadStep topError={topError} onFile={handleFile} />
       )}
 
       {(stage === "preview" || stage === "submitting" || stage === "done") && (
@@ -504,67 +323,5 @@ partner@firm.com,ASSOCIATE,Project Atlas`}</pre>
         )}
       </div>
     </div>
-  );
-}
-
-function RowStatus({ row, stage }: { row: ParsedRow; stage: Stage }) {
-  if (row.invalid) {
-    return (
-      <span className="inline-flex items-center gap-1 text-red-600 text-xs">
-        <span className="material-symbols-outlined text-sm">error</span>
-        {row.invalid}
-      </span>
-    );
-  }
-  if (stage === "preview") {
-    if (row.note) {
-      return (
-        <span className="inline-flex items-center gap-1 text-amber-600 text-xs">
-          <span className="material-symbols-outlined text-sm">info</span>
-          {row.note}
-        </span>
-      );
-    }
-    return <span className="text-[#868E96] text-xs">Ready</span>;
-  }
-  if (stage === "submitting") {
-    return <span className="text-[#868E96] text-xs">Sending…</span>;
-  }
-  // done
-  const r = row.result;
-  if (!r) return <span className="text-[#868E96] text-xs">No result</span>;
-  if (r.kind === "sent")
-    return (
-      <span className="inline-flex items-center gap-1 text-green-700 text-xs">
-        <span className="material-symbols-outlined text-sm">check_circle</span>
-        Invitation sent
-      </span>
-    );
-  if (r.kind === "exists")
-    return (
-      <span className="inline-flex items-center gap-1 text-[#868E96] text-xs">
-        <span className="material-symbols-outlined text-sm">person</span>
-        Already on the team
-      </span>
-    );
-  if (r.kind === "pending")
-    return (
-      <span className="inline-flex items-center gap-1 text-amber-600 text-xs">
-        <span className="material-symbols-outlined text-sm">schedule</span>
-        Invite already pending
-      </span>
-    );
-  if (r.kind === "skipped")
-    return (
-      <span className="inline-flex items-center gap-1 text-[#868E96] text-xs">
-        <span className="material-symbols-outlined text-sm">block</span>
-        Skipped: {r.reason}
-      </span>
-    );
-  return (
-    <span className="inline-flex items-center gap-1 text-red-600 text-xs">
-      <span className="material-symbols-outlined text-sm">error</span>
-      {r.error || "Failed"}
-    </span>
   );
 }

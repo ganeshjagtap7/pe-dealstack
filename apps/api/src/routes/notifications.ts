@@ -15,7 +15,8 @@ export async function resolveUserId(authId: string): Promise<string | null> {
       .eq('authId', authId)
       .single();
     return data?.id || null;
-  } catch {
+  } catch (err) {
+    log.warn('notifications: resolveUserId failed', { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
@@ -390,7 +391,8 @@ async function isNotificationEnabled(userId: string, type: string): Promise<bool
 
     // Only skip if explicitly set to false
     return prefs?.notifications?.[type] !== false;
-  } catch {
+  } catch (err) {
+    log.warn('notifications: isNotificationEnabled failed, defaulting to enabled', { error: err instanceof Error ? err.message : String(err), userId, type });
     return true; // On error, default to enabled
   }
 }

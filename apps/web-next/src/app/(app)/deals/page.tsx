@@ -2,35 +2,29 @@
 
 import { useEffect, useState, useCallback, useRef, type DragEvent } from "react";
 import { api } from "@/lib/api";
-import { formatCurrency } from "@/lib/formatters";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
-  STAGES,
-  KANBAN_STAGES,
-  STAGE_STYLES,
-  STAGE_LABELS,
   SORT_OPTIONS,
   DEAL_SIZE_OPTIONS,
-  PRIORITY_OPTIONS,
-  PRIORITY_LABELS,
   DEFAULT_CARD_METRICS,
   ALL_METRIC_KEYS,
   type MetricKey,
 } from "@/lib/constants";
-import { cn } from "@/lib/cn";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
 import type { Deal, DealFilters } from "@/types";
 import {
-  FilterDropdown,
   DeleteModal,
   StageChangeModal,
   DealCard,
-  KanbanCard,
-  MetricsDropdown,
   UploadCard,
 } from "./components";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { DealsFilterBar } from "./deals-page-filter-bar";
+import { BulkActionsBar } from "./deals-page-bulk-actions";
+import { KanbanView } from "./deals-page-kanban-view";
+import { KanbanSkeleton, ListSkeleton } from "./deals-page-skeletons";
+import { ErrorState, NoMatchingDealsState, WelcomeEmptyState } from "./deals-page-empty-states";
+import { exportDealsToCSV } from "./deals-csv-export";
 
 export default function DealsPage() {
   const { openDealIntake } = useIngestDealModal();
@@ -195,58 +189,16 @@ export default function DealsPage() {
   };
 
   // CSV Export
-  const exportSelectedToCSV = () => {
-    const dealsToExport = deals.filter((d) => selected.has(d.id));
-    if (dealsToExport.length === 0) return;
-
-    const escapeCSV = (val: string | null | undefined) => {
-      if (val == null) return "";
-      const str = String(val);
-      if (str.includes(",") || str.includes('"') || str.includes("\n")) {
-        return `"${str.replace(/"/g, '""')}"`;
-      }
-      return str;
-    };
-
-    const headers = [
-      "Name", "Industry", "Stage", "Status",
-      "Revenue (displayed)", "EBITDA (displayed)", "Deal Size (displayed)",
-      "IRR Projected (%)", "MoM Multiple", "AI Thesis",
-      "Created At", "Updated At",
-    ];
-
-    const rows = dealsToExport.map((deal) => [
-      escapeCSV(deal.name),
-      escapeCSV(deal.industry),
-      escapeCSV(STAGE_LABELS[deal.stage] || deal.stage),
-      escapeCSV(deal.status),
-      deal.revenue != null ? formatCurrency(deal.revenue) : "",
-      deal.ebitda != null ? formatCurrency(deal.ebitda) : "",
-      deal.dealSize != null ? formatCurrency(deal.dealSize) : "",
-      deal.irrProjected?.toString() ?? "",
-      deal.mom?.toString() ?? "",
-      escapeCSV(deal.aiThesis),
-      deal.createdAt ? new Date(deal.createdAt).toISOString() : "",
-      deal.updatedAt ? new Date(deal.updatedAt).toISOString() : "",
-    ]);
-
-    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = `deals-export-${new Date().toISOString().split("T")[0]}.csv`;
-    link.style.visibility = "hidden";
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const exportSelectedToCSV = () => exportDealsToCSV(deals, selected);
 
   // Save metrics preference to localStorage (and server if available)
   const handleMetricsApply = (metrics: MetricKey[]) => {
     setActiveMetrics(metrics);
     localStorage.setItem(STORAGE_KEYS.dealCardMetrics, JSON.stringify(metrics));
     // Fire-and-forget save to server
-    api.patch("/users/me", { dealCardMetrics: metrics }).catch(() => {});
+    api.patch("/users/me", { dealCardMetrics: metrics }).catch((err) => {
+      console.warn("[deals] failed to save metrics preference to server:", err);
+    });
   };
 
   // Remove sample deal
@@ -329,334 +281,42 @@ export default function DealsPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center justify-between gap-3">
-        {/* Left: filter dropdowns — allowed to wrap */}
-        <div className="flex flex-wrap items-center gap-3">
-          {/* Stage Filter */}
-          <FilterDropdown label={filters.stage ? `Stage: ${STAGE_LABELS[filters.stage]}` : "Stage: All"} active={!!filters.stage}>
-            {(close) => (
-              <>
-                <button
-                  onClick={() => { setFilters((f) => ({ ...f, stage: "" })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
-                >
-                  All Stages
-                </button>
-                {STAGES.map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => { setFilters((f) => ({ ...f, stage: s })); close(); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
-                  >
-                    {STAGE_LABELS[s]}
-                  </button>
-                ))}
-              </>
-            )}
-          </FilterDropdown>
-
-          {/* Industry Filter */}
-          <FilterDropdown label={filters.industry ? `Industry: ${filters.industry}` : "Industry: All"} active={!!filters.industry}>
-            {(close) => (
-              <>
-                <button
-                  onClick={() => { setFilters((f) => ({ ...f, industry: "" })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
-                >
-                  All Industries
-                </button>
-                {industries.map((ind) => (
-                  <button
-                    key={ind}
-                    onClick={() => { setFilters((f) => ({ ...f, industry: ind })); close(); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
-                  >
-                    {ind}
-                  </button>
-                ))}
-              </>
-            )}
-          </FilterDropdown>
-
-          {/* Deal Size Filter */}
-          <FilterDropdown label={dealSizeLabel} active={!!filters.minDealSize || !!filters.maxDealSize}>
-            {(close) =>
-              DEAL_SIZE_OPTIONS.map((opt) => (
-                <button
-                  key={opt.label}
-                  onClick={() => {
-                    setFilters((f) => ({ ...f, minDealSize: opt.min, maxDealSize: opt.max }));
-                    close();
-                  }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
-                >
-                  {opt.label}
-                </button>
-              ))
-            }
-          </FilterDropdown>
-
-          {/* Priority Filter */}
-          <FilterDropdown
-            label={filters.priority ? `Priority: ${PRIORITY_LABELS[filters.priority]}` : "Priority: All"}
-            active={!!filters.priority}
-          >
-            {(close) => (
-              <>
-                <button
-                  onClick={() => { setFilters((f) => ({ ...f, priority: "" })); close(); }}
-                  className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light font-medium"
-                >
-                  All Priorities
-                </button>
-                {PRIORITY_OPTIONS.map((p) => (
-                  <button
-                    key={p}
-                    onClick={() => { setFilters((f) => ({ ...f, priority: p })); close(); }}
-                    className="w-full text-left px-4 py-2 text-sm hover:bg-primary-light"
-                  >
-                    {PRIORITY_LABELS[p]}
-                  </button>
-                ))}
-              </>
-            )}
-          </FilterDropdown>
-
-          <div className="h-6 w-px bg-border-subtle mx-1 hidden sm:block" />
-
-          {/* Clear Filters */}
-          {hasActiveFilters && (
-            <button
-              onClick={clearFilters}
-              className="flex items-center gap-1 h-9 px-3 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg font-medium transition-colors"
-            >
-              <span className="material-symbols-outlined text-[16px]">filter_alt_off</span>
-              Clear
-            </button>
-          )}
-        </div>
-
-        {/* Right: view toggle + metrics + sort — shrink-0 keeps them always on the same row */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* View Toggle */}
-          <div className="flex items-center gap-0.5">
-            <button
-              onClick={() => toggleView("list")}
-              title="List View"
-              className={cn(
-                "p-1.5 rounded-md transition-all",
-                view === "list"
-                  ? "text-primary bg-primary/10"
-                  : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">view_list</span>
-            </button>
-            <button
-              onClick={() => toggleView("kanban")}
-              title="Kanban View"
-              className={cn(
-                "p-1.5 rounded-md transition-all",
-                view === "kanban"
-                  ? "text-primary bg-primary/10"
-                  : "text-text-muted hover:text-text-secondary hover:bg-gray-100"
-              )}
-            >
-              <span className="material-symbols-outlined text-[18px]">view_kanban</span>
-            </button>
-          </div>
-
-          {/* Customize Metrics */}
-          <MetricsDropdown activeMetrics={activeMetrics} onApply={handleMetricsApply} />
-
-          <div className="h-6 w-px bg-border-subtle hidden sm:block" />
-
-          {/* Sort */}
-          {view === "list" && (
-            <FilterDropdown
-              label={`Sort by: ${sortLabel}`}
-              active={false}
-              icon="sort"
-              borderless
-              compact
-              align="right"
-            >
-              {(close) =>
-                SORT_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.label}
-                    onClick={() => {
-                      setFilters((f) => ({ ...f, sortBy: opt.sortBy, sortOrder: opt.sortOrder }));
-                      close();
-                    }}
-                    className={cn(
-                      "w-full text-left px-4 py-2 text-sm hover:bg-primary-light whitespace-nowrap",
-                      filters.sortBy === opt.sortBy && filters.sortOrder === opt.sortOrder && "font-medium text-[#003366]"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))
-              }
-            </FilterDropdown>
-          )}
-        </div>
-      </div>
+      <DealsFilterBar
+        filters={filters}
+        setFilters={setFilters}
+        industries={industries}
+        hasActiveFilters={hasActiveFilters}
+        clearFilters={clearFilters}
+        view={view}
+        toggleView={toggleView}
+        activeMetrics={activeMetrics}
+        onMetricsApply={handleMetricsApply}
+        sortLabel={sortLabel}
+        dealSizeLabel={dealSizeLabel}
+      />
 
       {/* Bulk Actions Bar */}
       {selected.size > 0 && (
-        <div className="flex items-center justify-between bg-[#003366] text-white rounded-xl p-4 shadow-lg">
-          <div className="flex items-center gap-3">
-            <button onClick={clearSelection} className="p-1.5 hover:bg-white/20 rounded-lg transition-colors">
-              <span className="material-symbols-outlined text-[20px]">close</span>
-            </button>
-            <span className="font-bold text-sm">
-              {selected.size} deal{selected.size > 1 ? "s" : ""} selected
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setStageModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">swap_horiz</span>
-              Change Stage
-            </button>
-            <button
-              onClick={exportSelectedToCSV}
-              className="flex items-center gap-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-sm font-medium transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">download</span>
-              Export CSV
-            </button>
-            <button
-              onClick={handleBulkPass}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500/80 hover:bg-red-500 rounded-lg text-sm font-medium transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">block</span>
-              Mark as Passed
-            </button>
-            <button
-              onClick={() => setDeleteTarget({ id: "__bulk__", name: `${selected.size} deals` })}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600/90 hover:bg-red-600 rounded-lg text-sm font-medium transition-colors"
-            >
-              <span className="material-symbols-outlined text-[18px]">delete</span>
-              Delete
-            </button>
-          </div>
-        </div>
+        <BulkActionsBar
+          count={selected.size}
+          onClear={clearSelection}
+          onChangeStage={() => setStageModal(true)}
+          onExport={exportSelectedToCSV}
+          onMarkPassed={handleBulkPass}
+          onDelete={() => setDeleteTarget({ id: "__bulk__", name: `${selected.size} deals` })}
+        />
       )}
 
       {/* Content */}
       {loading ? (
-        view === "kanban" ? (
-          <div className="flex gap-4 overflow-x-auto pb-4">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="min-w-[300px] w-[300px] shrink-0">
-                <div className="bg-surface-card rounded-xl border border-border-subtle overflow-hidden h-full flex flex-col">
-                  <div className="px-4 py-3 border-b border-border-subtle flex items-center justify-between">
-                    <Skeleton.Badge width={80} />
-                    <Skeleton width={24} height={18} rounded="full" />
-                  </div>
-                  <div className="flex-1 p-3 space-y-3">
-                    {Array.from({ length: 3 }).map((_, j) => (
-                      <div key={j} className="bg-white rounded-lg border border-border-subtle p-3 flex flex-col gap-2">
-                        <Skeleton.Line width="80%" height={14} />
-                        <Skeleton.Line width="55%" height={12} />
-                        <div className="flex items-center gap-2 pt-1">
-                          <Skeleton.Badge width={56} height={16} />
-                          <Skeleton.Line width={40} height={12} />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="bg-surface-card rounded-lg border border-border-subtle p-5 flex flex-col gap-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 flex flex-col gap-2">
-                    <Skeleton.Line width="70%" height={16} />
-                    <Skeleton.Line width="45%" height={12} />
-                  </div>
-                  <Skeleton.Badge width={70} height={20} />
-                </div>
-                <div className="grid grid-cols-2 gap-3 pt-2">
-                  <div className="flex flex-col gap-1.5">
-                    <Skeleton.Line width="50%" height={10} />
-                    <Skeleton.Line width="80%" height={14} />
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Skeleton.Line width="50%" height={10} />
-                    <Skeleton.Line width="80%" height={14} />
-                  </div>
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
-                  <Skeleton.Line width="40%" height={11} />
-                  <div className="flex items-center -space-x-1.5">
-                    <Skeleton.Circle size={24} />
-                    <Skeleton.Circle size={24} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )
+        view === "kanban" ? <KanbanSkeleton /> : <ListSkeleton />
       ) : error ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <span className="material-symbols-outlined text-red-500 text-4xl mb-4">error</span>
-          <p className="text-text-main font-medium mb-2">Failed to load deals</p>
-          <p className="text-text-muted text-sm mb-4">{error}</p>
-          <button
-            onClick={loadDeals}
-            className="px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors"
-            style={{ backgroundColor: "#003366" }}
-          >
-            Try Again
-          </button>
-        </div>
+        <ErrorState error={error} onRetry={loadDeals} />
       ) : deals.length === 0 ? (
         hasActiveFilters ? (
-          <div className="flex flex-col items-center justify-center py-20">
-            <span className="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
-            <p className="text-text-main font-medium mb-2">No deals found</p>
-            <p className="text-text-muted text-sm">Try adjusting your filters</p>
-          </div>
+          <NoMatchingDealsState />
         ) : (
-          <div className="flex flex-col items-center justify-center py-24">
-            <div className="w-20 h-20 rounded-2xl bg-primary-light border border-primary/10 flex items-center justify-center mb-6 shadow-sm">
-              <span className="material-symbols-outlined text-primary" style={{ fontSize: "36px" }}>
-                rocket_launch
-              </span>
-            </div>
-            <p className="text-text-main font-bold text-xl mb-2 tracking-tight">Welcome to Your Deal Pipeline</p>
-            <p className="text-text-muted text-sm text-center max-w-md mb-8 leading-relaxed">
-              Start building your deal flow. Create your first deal or import from a spreadsheet to track through sourcing, due diligence, and close.
-            </p>
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={openDealIntake}
-                className="inline-flex items-center gap-2 px-5 py-2.5 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-semibold"
-                style={{ backgroundColor: "#003366" }}
-              >
-                <span className="material-symbols-outlined text-[18px]">add_circle</span>
-                Create Your First Deal
-              </button>
-              <button
-                type="button"
-                onClick={openDealIntake}
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary transition-all"
-              >
-                <span className="material-symbols-outlined text-[18px]">upload_file</span>
-                Import Deals
-              </button>
-            </div>
-          </div>
+          <WelcomeEmptyState onCreate={openDealIntake} />
         )
       ) : view === "list" ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4 gap-5 pb-6">
@@ -675,51 +335,13 @@ export default function DealsPage() {
         </div>
       ) : (
         /* Kanban View */
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {KANBAN_STAGES.map((stage) => {
-            const s = STAGE_STYLES[stage] || STAGE_STYLES.INITIAL_REVIEW;
-            const stageDeals = deals.filter((d) => d.stage === stage);
-            return (
-              <div key={stage} className="min-w-[300px] w-[300px] shrink-0" data-stage={stage}>
-                <div className="bg-surface-card rounded-xl border border-border-subtle overflow-hidden h-full flex flex-col">
-                  <div className={cn("px-4 py-3 border-b border-border-subtle", s.bg)}>
-                    <div className="flex items-center justify-between">
-                      <span className={cn("px-2 py-0.5 rounded border text-[10px] font-bold uppercase tracking-wider", s.bg, s.border, s.text)}>
-                        {STAGE_LABELS[stage]}
-                      </span>
-                      <span className={cn("text-xs font-bold bg-white/60 px-2 py-0.5 rounded-full", s.text)}>
-                        {stageDeals.length}
-                      </span>
-                    </div>
-                  </div>
-                  <div
-                    className={cn(
-                      "flex-1 p-3 space-y-3 overflow-y-auto max-h-[calc(100vh-320px)] border-2 border-dashed border-transparent rounded-lg transition-all custom-scrollbar",
-                      dragOverStage === stage && "bg-[rgba(0,51,102,0.05)] border-[rgba(0,51,102,0.3)]",
-                    )}
-                    style={{ minHeight: 100 }}
-                    onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; setDragOverStage(stage); }}
-                    onDragLeave={(e) => {
-                      const col = (e.currentTarget as HTMLElement);
-                      if (!col.contains(e.relatedTarget as Node)) setDragOverStage(null);
-                    }}
-                    onDrop={(e) => handleKanbanDrop(e, stage)}
-                  >
-                    {stageDeals.map((deal) => (
-                      <KanbanCard key={deal.id} deal={deal} activeMetrics={activeMetrics} />
-                    ))}
-                    {stageDeals.length === 0 && (
-                      <div className="text-center py-8 text-text-muted text-sm">
-                        <span className="material-symbols-outlined text-2xl mb-2 block opacity-40">inbox</span>
-                        Drop deals here
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <KanbanView
+          deals={deals}
+          activeMetrics={activeMetrics}
+          dragOverStage={dragOverStage}
+          setDragOverStage={setDragOverStage}
+          onDrop={handleKanbanDrop}
+        />
       )}
 
       {/* Delete Confirmation Modal */}

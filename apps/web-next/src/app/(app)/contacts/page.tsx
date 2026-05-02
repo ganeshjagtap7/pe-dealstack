@@ -2,31 +2,21 @@
 
 import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
-import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/providers/ToastProvider";
 import {
-  Contact, ContactFormData, CONTACT_TYPES, TYPE_CONFIG, SCORE_CONFIG,
-  getInitials, getRelationshipLabel,
+  Contact, ContactFormData, CONTACT_TYPES, TYPE_CONFIG,
   ContactModal, InsightCards,
 } from "./components";
 import { DetailPanel } from "./detail-panel";
 import { CSVImportModal } from "./csv-import-modal";
-import { Skeleton } from "@/components/ui/Skeleton";
-
-// ─── Constants ─────────────────────────────────────────────
-
-const PAGE_SIZE = 30;
-
-const SORT_OPTIONS = [
-  { sortBy: "createdAt", sortOrder: "desc", label: "Newest First" },
-  { sortBy: "createdAt", sortOrder: "asc",  label: "Oldest First" },
-  { sortBy: "name",      sortOrder: "asc",  label: "Name A-Z" },
-  { sortBy: "name",      sortOrder: "desc", label: "Name Z-A" },
-  { sortBy: "company",   sortOrder: "asc",  label: "Company A-Z" },
-  { sortBy: "lastContactedAt", sortOrder: "desc", label: "Last Contacted" },
-];
+import { ContactCard, ContactRow, TABLE_HEADERS, TABLE_TH_CLS } from "./list-items";
+import { CONTACTS_PAGE_SIZE, SORT_OPTIONS, groupContacts, sortGroupKeys } from "./list-utils";
+import {
+  ContactsGridSkeleton, ContactsTableSkeleton,
+  ContactsErrorState, ContactsEmptyState,
+} from "./loading-states";
 
 // ─── Page Component ────────────────────────────────────────
 
@@ -74,7 +64,7 @@ export default function ContactsPage() {
       if (filters.type) params.set("type", filters.type);
       params.set("sortBy", filters.sortBy);
       params.set("sortOrder", filters.sortOrder);
-      params.set("limit", String(PAGE_SIZE));
+      params.set("limit", String(CONTACTS_PAGE_SIZE));
       params.set("offset", "0");
 
       const [data, scores] = await Promise.all([
@@ -147,7 +137,7 @@ export default function ContactsPage() {
       if (filters.type) params.set("type", filters.type);
       params.set("sortBy", filters.sortBy);
       params.set("sortOrder", filters.sortOrder);
-      params.set("limit", String(PAGE_SIZE));
+      params.set("limit", String(CONTACTS_PAGE_SIZE));
       params.set("offset", String(currentOffset));
 
       const data = await api.get<{ contacts: Contact[]; total: number }>(`/contacts?${params}`);
@@ -214,127 +204,30 @@ export default function ContactsPage() {
 
   const currentSortLabel = SORT_OPTIONS.find((o) => o.sortBy === filters.sortBy && o.sortOrder === filters.sortOrder)?.label || "Newest First";
 
-  // ─── Group by Company helper ──────────────────────────────
-
-  function groupContacts(list: Contact[]): Record<string, Contact[]> {
-    const groups: Record<string, Contact[]> = {};
-    for (const c of list) {
-      const key = (c.company || "").trim() || "No Company";
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(c);
-    }
-    return groups;
-  }
-
-  const sortedGroupKeys = groupByCompany
-    ? Object.keys(groupContacts(contacts)).sort((a, b) => {
-        if (a === "No Company") return 1;
-        if (b === "No Company") return -1;
-        return groupContacts(contacts)[b].length - groupContacts(contacts)[a].length;
-      })
-    : [];
+  // ─── Group by Company derived state ───────────────────────
 
   const grouped = groupByCompany ? groupContacts(contacts) : {};
+  const sortedGroupKeys = groupByCompany ? sortGroupKeys(grouped) : [];
   const hasMore = contacts.length < totalContacts;
   const remaining = totalContacts - contacts.length;
 
-  // ─── Render ───────────────────────────────────────────────
+  // ─── Render helpers ───────────────────────────────────────
 
-  function renderContactCard(contact: Contact) {
-    const ts = TYPE_CONFIG[contact.type] || TYPE_CONFIG.OTHER;
-    const sd = contactScores[contact.id];
-    const scoreLabel = sd ? sd.label : getRelationshipLabel(undefined);
-    const sc = SCORE_CONFIG[scoreLabel] || SCORE_CONFIG.Cold;
-    // Filter out enriched: tags (matches legacy)
-    const visibleTags = (contact.tags || []).filter((t) => !t.startsWith("enriched:"));
-    const tags = visibleTags.slice(0, 4);
-    const overflow = visibleTags.length - 4;
-    const lastContacted = contact.lastInteractionAt ? `Contacted ${formatRelativeTime(contact.lastInteractionAt)}` : "Never contacted";
-    const linkedDealsCount = contact.linkedDeals ? contact.linkedDeals.length : 0;
-
-    return (
-      <div key={contact.id} onClick={() => setDetailContactId(contact.id)} className="cursor-pointer">
-        <article className="bg-surface-card rounded-lg border border-border-subtle p-5 hover:border-primary/30 transition-all flex flex-col h-full shadow-card hover:shadow-card-hover relative group">
-          <div className="flex items-start gap-3.5 mb-4">
-            <div className="size-11 rounded-full flex items-center justify-center shrink-0 text-sm font-bold shadow-sm" style={{ backgroundColor: ts.avatarBg, color: ts.avatarText }}>
-              {getInitials(contact.firstName, contact.lastName)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-text-main font-bold text-[15px] leading-tight group-hover:text-primary transition-colors truncate">{contact.firstName} {contact.lastName}</h3>
-              {contact.title && <p className="text-text-secondary text-xs mt-0.5 truncate">{contact.title}</p>}
-            </div>
-            <span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider shrink-0", ts.bg, ts.text)}>{ts.label}</span>
-          </div>
-          {contact.company && (
-            <div className="flex items-center gap-1.5 mb-3">
-              <span className="material-symbols-outlined text-text-muted text-[16px]">business</span>
-              <span className="text-sm text-text-secondary truncate">{contact.company}</span>
-            </div>
-          )}
-          <div className="flex flex-col gap-1.5 mb-3">
-            {contact.email && (
-              <a href={`mailto:${contact.email}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary transition-colors truncate">
-                <span className="material-symbols-outlined text-[14px]">mail</span><span className="truncate">{contact.email}</span>
-              </a>
-            )}
-            {contact.phone && (
-              <a href={`tel:${contact.phone}`} onClick={(e) => e.stopPropagation()} className="flex items-center gap-1.5 text-xs text-text-muted hover:text-primary transition-colors">
-                <span className="material-symbols-outlined text-[14px]">call</span>{contact.phone}
-              </a>
-            )}
-          </div>
-          {tags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {tags.map((t, i) => <span key={i} className="px-2 py-0.5 rounded-full bg-gray-50 text-text-muted text-[10px] font-medium border border-border-subtle">{t}</span>)}
-              {overflow > 0 && <span className="text-[10px] text-text-muted">+{overflow}</span>}
-            </div>
-          )}
-          <div className="flex items-center justify-between mt-auto pt-3 border-t border-border-subtle">
-            <span className="text-[11px] text-primary font-medium">{lastContacted}</span>
-            <div className="flex items-center gap-2">
-              {sd && <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold", sc.bg, sc.text)}><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", sc.dot)} />{sd.score}</span>}
-              {linkedDealsCount > 0 && (
-                <span className="flex items-center gap-1 text-[11px] text-text-muted font-medium">
-                  <span className="material-symbols-outlined text-[14px]">work</span>{linkedDealsCount}
-                </span>
-              )}
-            </div>
-          </div>
-        </article>
-      </div>
-    );
-  }
-
-  function renderContactRow(contact: Contact) {
-    const ts = TYPE_CONFIG[contact.type] || TYPE_CONFIG.OTHER;
-    const sd = contactScores[contact.id];
-    const scoreLabel = sd ? sd.label : "Cold";
-    const sc = SCORE_CONFIG[scoreLabel] || SCORE_CONFIG.Cold;
-    const lastContacted = contact.lastInteractionAt ? formatRelativeTime(contact.lastInteractionAt) : "--";
-
-    return (
-      <tr key={contact.id} onClick={() => setDetailContactId(contact.id)} className="hover:bg-slate-50/80 cursor-pointer transition-colors border-b border-border-subtle">
-        <td className="px-4 py-3">
-          <div className="flex items-center gap-3">
-            <div className="size-8 rounded-full flex items-center justify-center shrink-0 text-xs font-bold" style={{ backgroundColor: ts.avatarBg, color: ts.avatarText }}>{getInitials(contact.firstName, contact.lastName)}</div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-text-main truncate">{contact.firstName} {contact.lastName}</p>
-              {contact.title && <p className="text-xs text-text-muted truncate">{contact.title}</p>}
-            </div>
-          </div>
-        </td>
-        <td className="px-4 py-3 text-sm text-text-secondary truncate max-w-[180px]">{contact.company || "--"}</td>
-        <td className="px-4 py-3"><span className={cn("px-2 py-0.5 rounded-md text-[10px] font-bold uppercase", ts.bg, ts.text)}>{ts.label}</span></td>
-        <td className="px-4 py-3 text-sm text-text-muted truncate max-w-[200px]">{contact.email || "--"}</td>
-        <td className="px-4 py-3 text-sm text-primary">{lastContacted}</td>
-        <td className="px-4 py-3">{sd ? <span className={cn("flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold", sc.bg, sc.text)}><span className={cn("w-1.5 h-1.5 rounded-full shrink-0", sc.dot)} />{sd.score}</span> : <span className="text-text-muted text-xs">--</span>}</td>
+  const tableHead = (
+    <thead>
+      <tr className="border-b border-border-subtle bg-slate-50/50">
+        {TABLE_HEADERS.map((h) => <th key={h} className={TABLE_TH_CLS}>{h}</th>)}
       </tr>
-    );
-  }
+    </thead>
+  );
 
-  const thCls = "px-4 py-3 text-left text-[11px] font-bold text-text-muted uppercase tracking-wider";
-  const tableHeaders = ["Name", "Company", "Type", "Email", "Last Contact", "Score"];
-  const tableHead = <thead><tr className="border-b border-border-subtle bg-slate-50/50">{tableHeaders.map((h) => <th key={h} className={thCls}>{h}</th>)}</tr></thead>;
+  const renderCard = (contact: Contact) => (
+    <ContactCard key={contact.id} contact={contact} contactScores={contactScores} onClick={() => setDetailContactId(contact.id)} />
+  );
+
+  const renderRow = (contact: Contact) => (
+    <ContactRow key={contact.id} contact={contact} contactScores={contactScores} onClick={() => setDetailContactId(contact.id)} />
+  );
 
   return (
     <div className="p-4 md:p-6 mx-auto max-w-[1600px] w-full flex flex-col gap-6">
@@ -444,91 +337,11 @@ export default function ContactsPage() {
 
       {/* Content */}
       {loading ? (
-        viewMode === "grid" ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <article key={i} className="bg-surface-card rounded-lg border border-border-subtle p-5 flex flex-col gap-3">
-                <div className="flex items-start gap-3.5">
-                  <Skeleton.Circle size={44} />
-                  <div className="flex-1 flex flex-col gap-2">
-                    <Skeleton.Line width="70%" height={15} />
-                    <Skeleton.Line width="50%" height={12} />
-                  </div>
-                  <Skeleton.Badge width={64} height={20} />
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Skeleton.Line width="60%" height={13} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <Skeleton.Line width="80%" height={12} />
-                  <Skeleton.Line width="55%" height={12} />
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  <Skeleton.Badge width={48} height={18} />
-                  <Skeleton.Badge width={56} height={18} />
-                </div>
-                <div className="flex items-center justify-between pt-3 border-t border-border-subtle">
-                  <Skeleton.Line width="40%" height={11} />
-                  <Skeleton.Badge width={36} height={16} />
-                </div>
-              </article>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden">
-            <table className="w-full min-w-[600px]">
-              {tableHead}
-              <tbody>
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <tr key={i} className="border-b border-border-subtle">
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Skeleton.Circle size={32} />
-                        <div className="flex-1 flex flex-col gap-1.5">
-                          <Skeleton.Line width="70%" height={13} />
-                          <Skeleton.Line width="50%" height={11} />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3"><Skeleton.Line width="60%" height={13} /></td>
-                    <td className="px-4 py-3"><Skeleton.Badge width={56} /></td>
-                    <td className="px-4 py-3"><Skeleton.Line width="75%" height={13} /></td>
-                    <td className="px-4 py-3"><Skeleton.Line width="40%" height={13} /></td>
-                    <td className="px-4 py-3"><Skeleton.Badge width={36} height={16} /></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )
+        viewMode === "grid" ? <ContactsGridSkeleton /> : <ContactsTableSkeleton />
       ) : error ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <span className="material-symbols-outlined text-red-500 text-4xl mb-4">error</span>
-          <p className="text-text-main font-medium mb-2">Failed to load contacts</p>
-          <p className="text-text-muted text-sm mb-4">{error}</p>
-          <button onClick={loadContacts} className="px-4 py-2 text-white rounded-lg text-sm font-medium hover:opacity-90 transition-colors" style={{ backgroundColor: "#003366" }}>Try Again</button>
-        </div>
+        <ContactsErrorState error={error} onRetry={loadContacts} />
       ) : contacts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          {filters.search || filters.type ? (
-            <>
-              <span className="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
-              <p className="text-text-main font-medium mb-2">No contacts found</p>
-              <p className="text-text-muted text-sm">Try adjusting your search or filters</p>
-            </>
-          ) : (
-            <>
-              <div className="size-16 rounded-full bg-blue-50/60 flex items-center justify-center mb-4">
-                <span className="material-symbols-outlined text-[#003366] text-3xl">groups</span>
-              </div>
-              <h3 className="text-base font-bold text-text-main mb-2">Start building your network</h3>
-              <p className="text-text-muted text-sm mb-5 text-center max-w-xs">Add contacts to track relationships with bankers, advisors, executives, and LPs.</p>
-              <button onClick={openAddModal} className="flex items-center gap-2 px-5 py-2 text-white rounded-lg shadow-sm hover:opacity-90 transition-colors text-sm font-medium" style={{ backgroundColor: "#003366" }}>
-                <span className="material-symbols-outlined text-[18px]">person_add</span>Add Your First Contact
-              </button>
-            </>
-          )}
-        </div>
+        <ContactsEmptyState filtered={!!(filters.search || filters.type)} onAdd={openAddModal} />
       ) : groupByCompany ? (
         <div className="flex flex-col gap-5">
           {sortedGroupKeys.map((company) => (
@@ -542,20 +355,20 @@ export default function ContactsPage() {
                 <div className="flex-1 border-t border-border-subtle" />
               </div>
               {viewMode === "grid" ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{grouped[company].map(renderContactCard)}</div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{grouped[company].map(renderCard)}</div>
               ) : (
                 <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden overflow-x-auto">
-                  <table className="w-full min-w-[600px]">{tableHead}<tbody>{grouped[company].map(renderContactRow)}</tbody></table>
+                  <table className="w-full min-w-[600px]">{tableHead}<tbody>{grouped[company].map(renderRow)}</tbody></table>
                 </div>
               )}
             </div>
           ))}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{contacts.map(renderContactCard)}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{contacts.map(renderCard)}</div>
       ) : (
         <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden overflow-x-auto">
-          <table className="w-full min-w-[600px]">{tableHead}<tbody>{contacts.map(renderContactRow)}</tbody></table>
+          <table className="w-full min-w-[600px]">{tableHead}<tbody>{contacts.map(renderRow)}</tbody></table>
         </div>
       )}
 

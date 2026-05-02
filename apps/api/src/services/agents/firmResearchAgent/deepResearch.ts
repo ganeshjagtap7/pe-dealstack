@@ -1,28 +1,32 @@
 // apps/api/src/services/agents/firmResearchAgent/deepResearch.ts
-import { z } from 'zod';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+// ─── Deep research — Phase 2 orchestrator ────────────────────────
+// Public API: runDeepResearch(input) — fire-and-forget background task
+// that follows up Phase 1 with targeted web search, snippet aggregation,
+// follow-the-thread name expansion, optional URL scraping, LLM synthesis,
+// and persistence of new insights to Organization + User settings.
+//
+// Helpers split out to keep this file under 500 lines:
+//   - deepResearchQueries.ts   — generateQueries / extractNewNames
+//   - deepResearchSynthesis.ts — synthesizePhase2 / countInsights / schemas
+//   - deepResearchProgress.ts  — updateProgress + DeepResearchProgress type
+
 import { FirmProfile, PersonProfile } from './state.js';
-import { invokeStructured } from '../../llm.js';
 import { searchWeb } from '../../webSearch.js';
 import { scrapePageText } from '../../companyResearcher.js';
 import { supabase } from '../../../supabase.js';
 import { log } from '../../../utils/logger.js';
 import { isHighValueUrl } from '../../../utils/urlHelpers.js';
+import { generateQueries, extractNewNames } from './deepResearchQueries.js';
+import { synthesizePhase2, countInsights } from './deepResearchSynthesis.js';
+import { updateProgress } from './deepResearchProgress.js';
 
 const PHASE2_TIMEOUT_MS = 120000;
-const MAX_PRIMARY_QUERIES = 12;
 const MAX_FOLLOWUP_QUERIES = 6;
 const MAX_URL_SCRAPES = 3;
 
 // ==========================================
 // Types
 // ==========================================
-
-interface GeneratedQuery {
-  query: string;
-  category: string;
-  reason: string;
-}
 
 export interface DeepResearchInput {
   phase1Profile: FirmProfile | null;
@@ -32,243 +36,6 @@ export interface DeepResearchInput {
   firmName: string;
   userId: string;
   organizationId: string;
-}
-
-interface DeepResearchProgress {
-  status: 'running' | 'complete' | 'failed';
-  startedAt: string;
-  completedAt?: string;
-  queriesRun: number;
-  insightsFound: number;
-  error?: string;
-}
-
-// ==========================================
-// Query Generation (GPT-4o)
-// ==========================================
-
-const QuerySchema = z.array(z.object({
-  query: z.string(),
-  category: z.enum(['person', 'deals', 'portfolio', 'reputation', 'social', 'network']),
-  reason: z.string(),
-}));
-
-async function generateQueries(
-  firmProfile: FirmProfile | null,
-  personProfile: PersonProfile | null,
-): Promise<GeneratedQuery[]> {
-  const systemPrompt = `You are a PE research analyst. Based on an initial scan of a firm, generate 8-12 targeted DuckDuckGo search queries to find DEEPER information.
-
-Focus on:
-1. The person's public presence (interviews, podcasts, talks, social media)
-2. Specific deal history (acquisitions, exits, deal sizes)
-3. Each portfolio company (what they do, when acquired)
-4. Firm reputation (press articles, reviews, rankings)
-5. Social presence (Twitter, YouTube, newsletters, blogs)
-6. Network (co-investors, community involvement, LPs)
-
-Rules:
-- Use exact names and handles found in the initial scan (don't guess)
-- Combine terms for specificity: "name" + "firm" + "topic"
-- Use site: operator for specific platforms (site:twitter.com, site:crunchbase.com)
-- Generate diverse queries across all 6 categories
-- Don't repeat generic queries like "firm name private equity"`;
-
-  const userPrompt = `Initial scan results:
-
-FIRM PROFILE:
-${JSON.stringify(firmProfile, null, 2)}
-
-PERSON PROFILE:
-${JSON.stringify(personProfile, null, 2)}
-
-Generate 8-12 targeted follow-up search queries.`;
-
-  try {
-    const result = await invokeStructured(QuerySchema, [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(userPrompt),
-    ], { maxTokens: 1500, temperature: 0.3, label: 'deepResearch.queries' });
-    return (result as GeneratedQuery[]).slice(0, MAX_PRIMARY_QUERIES);
-  } catch (error) {
-    log.error('Deep research: query generation failed', { error: (error as Error).message });
-    return [];
-  }
-}
-
-// ==========================================
-// Follow-the-Thread: Extract New Names
-// ==========================================
-
-function extractNewNames(
-  snippets: string,
-  knownNames: Set<string>,
-): string[] {
-  // Find capitalized multi-word phrases (likely company/person names)
-  const matches = snippets.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/g) || [];
-
-  // Count occurrences
-  const counts = new Map<string, number>();
-  for (const name of matches) {
-    const lower = name.toLowerCase();
-    if (knownNames.has(lower)) continue;
-    if (name.length < 5 || name.length > 50) continue;
-    // Skip common phrases
-    if (['United States', 'New York', 'San Francisco', 'Private Equity', 'Managing Director',
-         'Vice President', 'Chief Executive', 'Read More', 'Learn More', 'Terms Service',
-         'Privacy Policy', 'All Rights'].some(skip => name.includes(skip))) continue;
-    counts.set(name, (counts.get(name) || 0) + 1);
-  }
-
-  // Return names that appear 2+ times (likely significant)
-  return [...counts.entries()]
-    .filter(([, count]) => count >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([name]) => name);
-}
-
-// ==========================================
-// Final Synthesis (Merge Phase 1 + Phase 2)
-// ==========================================
-
-const EnrichedFirmSchema = z.object({
-  socialPresence: z.object({
-    twitter: z.string().default(''),
-    youtube: z.string().default(''),
-    newsletter: z.string().default(''),
-    podcast: z.string().default(''),
-    blog: z.string().default(''),
-  }).default({}),
-  pressArticles: z.array(z.object({
-    title: z.string(),
-    url: z.string().default(''),
-    date: z.string().default(''),
-    summary: z.string().default(''),
-  })).default([]),
-  communityMentions: z.array(z.string()).default([]),
-  coInvestors: z.array(z.string()).default([]),
-  competitorFirms: z.array(z.string()).default([]),
-  newPortfolioCompanies: z.array(z.object({
-    name: z.string(),
-    sector: z.string().default(''),
-    status: z.string().default('active'),
-  })).default([]),
-  newRecentDeals: z.array(z.object({
-    title: z.string(),
-    date: z.string().default(''),
-    source: z.string().default(''),
-  })).default([]),
-  additionalSectors: z.array(z.string()).default([]),
-});
-
-const EnrichedPersonSchema = z.object({
-  socialHandles: z.object({
-    twitter: z.string().default(''),
-    youtube: z.string().default(''),
-    github: z.string().default(''),
-    blog: z.string().default(''),
-  }).default({}),
-  interviews: z.array(z.object({
-    title: z.string(),
-    url: z.string().default(''),
-    platform: z.string().default(''),
-  })).default([]),
-  publicContent: z.array(z.string()).default([]),
-  networkConnections: z.array(z.string()).default([]),
-});
-
-async function synthesizePhase2(
-  allSnippets: string,
-  scrapedContent: string,
-  firmProfile: FirmProfile | null,
-  personProfile: PersonProfile | null,
-): Promise<{ firm: z.infer<typeof EnrichedFirmSchema>; person: z.infer<typeof EnrichedPersonSchema> }> {
-  const systemPrompt = `You are a PE research analyst. Extract NEW information found in deep research results that was NOT in the initial profile. Only include facts that are clearly stated in the source text. Do not guess.`;
-
-  const context = [
-    `=== INITIAL FIRM PROFILE (already known — do NOT repeat) ===\n${JSON.stringify(firmProfile, null, 2)}`,
-    `=== INITIAL PERSON PROFILE (already known — do NOT repeat) ===\n${JSON.stringify(personProfile, null, 2)}`,
-    `=== DEEP RESEARCH RESULTS ===\n${allSnippets.slice(0, 10000)}`,
-    scrapedContent ? `=== SCRAPED ARTICLES ===\n${scrapedContent.slice(0, 5000)}` : '',
-  ].filter(Boolean).join('\n\n');
-
-  // Extract firm additions
-  let firm: z.infer<typeof EnrichedFirmSchema>;
-  try {
-    firm = await invokeStructured(EnrichedFirmSchema, [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(`Extract NEW firm-level information (social presence, press articles, community mentions, co-investors, competitors, new portfolio companies, new deals, additional sectors):\n\n${context}`),
-    ], { maxTokens: 2000, label: 'deepResearch.firm' });
-  } catch {
-    firm = EnrichedFirmSchema.parse({});
-  }
-
-  // Extract person additions
-  let person: z.infer<typeof EnrichedPersonSchema>;
-  try {
-    person = await invokeStructured(EnrichedPersonSchema, [
-      new SystemMessage(systemPrompt),
-      new HumanMessage(`Extract NEW person-level information (social handles, interviews/podcasts, public content, network connections):\n\n${context}`),
-    ], { maxTokens: 2000, label: 'deepResearch.person' });
-  } catch {
-    person = EnrichedPersonSchema.parse({});
-  }
-
-  return { firm, person };
-}
-
-// ==========================================
-// Count New Insights
-// ==========================================
-
-function countInsights(
-  firm: z.infer<typeof EnrichedFirmSchema>,
-  person: z.infer<typeof EnrichedPersonSchema>,
-): number {
-  let count = 0;
-  const sp = firm.socialPresence;
-  if (sp.twitter) count++;
-  if (sp.youtube) count++;
-  if (sp.newsletter) count++;
-  if (sp.podcast) count++;
-  if (sp.blog) count++;
-  count += firm.pressArticles.length;
-  count += firm.communityMentions.length;
-  count += firm.coInvestors.length;
-  count += firm.competitorFirms.length;
-  count += firm.newPortfolioCompanies.length;
-  count += firm.newRecentDeals.length;
-  count += firm.additionalSectors.length;
-  const sh = person.socialHandles;
-  if (sh.twitter) count++;
-  if (sh.youtube) count++;
-  if (sh.github) count++;
-  if (sh.blog) count++;
-  count += person.interviews.length;
-  count += person.publicContent.length;
-  count += person.networkConnections.length;
-  return count;
-}
-
-// ==========================================
-// Save Phase 2 Progress
-// ==========================================
-
-async function updateProgress(orgId: string, progress: DeepResearchProgress): Promise<void> {
-  if (!orgId) return;
-  try {
-    const { data: org } = await supabase
-      .from('Organization')
-      .select('settings')
-      .eq('id', orgId)
-      .single();
-    const settings = (org?.settings || {}) as Record<string, any>;
-    settings.deepResearch = progress;
-    await supabase.from('Organization').update({ settings }).eq('id', orgId);
-  } catch (error) {
-    log.warn('Deep research: failed to update progress', { error: (error as Error).message });
-  }
 }
 
 // ==========================================
@@ -395,8 +162,11 @@ export async function runDeepResearch(input: DeepResearchInput): Promise<void> {
         if (text && text.length > 200) {
           scrapedContent += `\n=== ARTICLE: ${url} ===\n${text.slice(0, 3000)}\n`;
         }
-      } catch {
-        // Skip failed scrapes
+      } catch (err) {
+        log.warn('Deep research: scrape failed', {
+          url,
+          error: err instanceof Error ? err.message : String(err),
+        });
       }
     }
 

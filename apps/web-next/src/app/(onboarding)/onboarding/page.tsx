@@ -74,9 +74,10 @@ export default function OnboardingPage() {
         setCompleted(done);
         // If user already finished onboarding, skip straight to dashboard.
         if (done.size >= TASKS.length) router.push("/dashboard");
-      } catch {
+      } catch (err) {
         // Fresh user or API down — proceed with empty state. Don't toast;
         // an empty checklist is the expected first-load state.
+        console.warn("[onboarding/status] fetch failed:", err);
       }
     })();
     return () => {
@@ -145,7 +146,8 @@ export default function OnboardingPage() {
         if (id) setCreatedDealId((prev) => prev ?? id);
         showToast("CIM uploaded — your deal is ready", "success");
         return true;
-      } catch {
+      } catch (err) {
+        console.warn("[onboarding/cim-upload] failed:", err);
         showToast("CIM upload failed — try again or skip this step", "error");
         return false;
       }
@@ -219,9 +221,10 @@ export default function OnboardingPage() {
   const markSeen = () => {
     try {
       sessionStorage.setItem("pe_onboarding_seen", "1");
-    } catch {
+    } catch (err) {
       // storage disabled (Safari private mode / cookie denial) — best-effort,
       // the API-side flag is the source of truth so silent degradation is fine.
+      console.warn("[onboarding/markSeen] sessionStorage write failed:", err);
     }
   };
 
@@ -253,9 +256,10 @@ export default function OnboardingPage() {
     markSeen();
     try {
       await api.post("/onboarding/welcome-shown", {});
-    } catch {
+    } catch (err) {
       // Non-blocking — the user is already on the checklist. Backend will
       // re-flag this on the next status fetch if needed.
+      console.warn("[onboarding/welcome-shown] post failed:", err);
     }
   };
 

@@ -110,7 +110,8 @@ export function DraftEmailModal({
       await navigator.clipboard.writeText(`Subject: ${result.subject}\n\n${result.draft}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
+      console.warn("[DraftEmailModal/copy] clipboard write failed:", err);
       setError("Failed to copy to clipboard");
     }
   };

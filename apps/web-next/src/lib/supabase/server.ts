@@ -25,9 +25,11 @@ export async function createClient() {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, options)
             );
-          } catch {
-            // setAll called from a Server Component — read-only context, expected.
-            // Don't log: this fires on every server render and would spam the console.
+          } catch (_err) {
+            // Defensive: setAll called from a Server Component — read-only context, expected.
+            // Intentionally not logging: this fires on every server render and would spam the console.
+            // Middleware / route handlers refresh cookies in their own writable contexts; that's
+            // the source of truth, so silent degradation here is correct.
           }
         },
       },

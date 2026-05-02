@@ -34,7 +34,9 @@ router.post('/firm-profile', async (req: Request, res: Response) => {
   let orgId: string;
   try {
     orgId = getOrgId(req);
-  } catch {
+  } catch (err) {
+    // Org not yet provisioned for this user — surfaced to client as 400 below.
+    log.warn('onboarding-firm: getOrgId failed', { error: err instanceof Error ? err.message : String(err) });
     return res.status(400).json({ error: 'Organization not set up yet' });
   }
 

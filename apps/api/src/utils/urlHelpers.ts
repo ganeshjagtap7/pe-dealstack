@@ -18,7 +18,9 @@ export function normalizeUrl(url: string): string {
   // Validate it's a real URL
   try {
     new URL(normalized);
-  } catch {
+  } catch (_err) {
+    // Defensive: invalid URL string — caller treats '' as "not a URL", which is the correct
+    // semantic for normalizeUrl. No log: this is a routine validator, not an error path.
     return '';
   }
   return normalized;
@@ -39,7 +41,9 @@ export function isLinkedInUrl(url: string): boolean {
     if (!hostname.endsWith('linkedin.com')) return false;
     // Must have /in/ or /company/ path
     return /^\/(in|company)\/[^/?#]+/i.test(parsed.pathname);
-  } catch {
+  } catch (_err) {
+    // Defensive: normalizeUrl already validated above, so reaching here is unexpected.
+    // Return false (not a LinkedIn URL) — same semantic as a malformed input.
     return false;
   }
 }
@@ -84,7 +88,9 @@ export function isPrivateUrl(url: string): boolean {
     }
 
     return false;
-  } catch {
+  } catch (_err) {
+    // Defensive: normalizeUrl already validated above, so reaching here is unexpected.
+    // Treat unparseable URLs as private (fail-closed for SSRF prevention).
     return true;
   }
 }
@@ -105,7 +111,9 @@ export function extractBaseDomain(url: string): string {
       return parts.slice(-3).join('.');
     }
     return parts.slice(-2).join('.');
-  } catch {
+  } catch (_err) {
+    // Defensive: normalizeUrl already validated above. Return '' so callers get the same
+    // "no domain" semantic they'd see for an empty input.
     return '';
   }
 }
@@ -135,7 +143,9 @@ export function isSocialMediaUrl(url: string): boolean {
       'tiktok.com', 'threads.net', 'reddit.com',
     ];
     return socialDomains.includes(domain);
-  } catch {
+  } catch (_err) {
+    // Defensive: extractBaseDomain already handles parse errors. Return false (not a known
+    // social URL) — same semantic as a non-matching domain.
     return false;
   }
 }
