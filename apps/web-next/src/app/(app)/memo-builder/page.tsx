@@ -44,6 +44,7 @@ export default function MemoBuilderPage() {
 function MemoBuilderPageInner() {
   const searchParams = useSearchParams();
   const urlDealId = searchParams.get("dealId");
+  const urlMemoId = searchParams.get("memoId");
   /* ---- State ---- */
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -239,6 +240,16 @@ function MemoBuilderPageInner() {
     return () => { cancelled = true; };
   }, [urlDealId, loadMemo, openCreateModal]);
 
+  // ?memoId=X — deep-link straight to a specific memo (used by Share button).
+  // Consume once per distinct memoId to avoid re-loading on every render.
+  const consumedMemoIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!urlMemoId) return;
+    if (consumedMemoIdRef.current === urlMemoId) return;
+    consumedMemoIdRef.current = urlMemoId;
+    loadMemo(urlMemoId);
+  }, [urlMemoId, loadMemo]);
+
   const handleCreate = async () => {
     setCreatingMemo(true);
     try {
@@ -418,7 +429,7 @@ function MemoBuilderPageInner() {
   const handleShare = async () => {
     if (!selectedMemo) return;
     try {
-      await shareMemoLink();
+      await shareMemoLink(selectedMemo.id);
       setSuccessToast(`Share link for "${selectedMemo.projectName || selectedMemo.title}" copied.`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Share failed");
