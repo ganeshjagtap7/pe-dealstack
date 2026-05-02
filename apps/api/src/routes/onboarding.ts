@@ -418,18 +418,27 @@ router.post('/create-demo-deal', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid sample deal ID' });
     }
 
-    // Resolve org
+    // Resolve org and the User table's internal id. Deal.assignedTo /
+    // Folder.createdBy foreign-key to User.id, NOT the Supabase authId
+    // — passing req.user.id (the auth UUID) directly would 23503.
     let orgId: string = req.user?.organizationId || '';
-    if (!orgId) {
+    let userInternalId: string | null = null;
+    {
       const { data: userData } = await supabase
         .from('User')
-        .select('organizationId')
+        .select('id, organizationId')
         .eq('authId', userId)
         .single();
-      orgId = userData?.organizationId || '';
+      if (userData) {
+        userInternalId = userData.id;
+        if (!orgId) orgId = userData.organizationId || '';
+      }
     }
     if (!orgId) {
       return res.status(400).json({ error: 'Organization not set up yet' });
+    }
+    if (!userInternalId) {
+      return res.status(400).json({ error: 'User profile not set up yet' });
     }
 
     // Check if sample deal already exists (prevent duplicates)
@@ -447,7 +456,7 @@ router.post('/create-demo-deal', async (req: Request, res: Response) => {
 
     // Create the sample deal
     const { createSampleDeal } = await import('../services/sampleDealService.js');
-    const dealId = await createSampleDeal(orgId, userId);
+    const dealId = await createSampleDeal(orgId, userInternalId);
 
     if (!dealId) {
       return res.status(500).json({ error: 'Failed to create demo deal' });
