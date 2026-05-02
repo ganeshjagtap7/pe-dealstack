@@ -586,7 +586,7 @@ function MemoBuilderPageInner() {
             />
 
             {/* Workspace: outline + document canvas + chat */}
-            <div className="flex flex-1 overflow-hidden">
+            <div className="flex flex-1 overflow-hidden min-w-0">
               <MemoOutlineSidebar
                 sections={sections}
                 activeSection={activeSection}
