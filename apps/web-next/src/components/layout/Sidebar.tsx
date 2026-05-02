@@ -86,8 +86,13 @@ export function Sidebar() {
   }, []);
 
   const toggleCollapse = () => {
-    const next = !userCollapsed;
+    // Toggle from what the user SEES, not just userCollapsed — otherwise an
+    // active force-collapse would swallow the click. Clear the force flag so
+    // the user's intent wins until the next force event (e.g. closing/reopening
+    // the AI chat).
+    const next = !collapsed;
     setUserCollapsed(next);
+    setForceCollapsed(false);
     localStorage.setItem(STORAGE_KEYS.sidebarCollapsed, String(next));
   };
 
