@@ -1,7 +1,7 @@
 // VDR API — ported from apps/web/src/services/vdrApi.ts. Re-uses the web-next
 // `api` helper for JSON calls; upload uses raw fetch since api is JSON-only.
 
-import { api } from "@/lib/api";
+import { api, NotFoundError } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import type {
   APIDocument,
@@ -148,7 +148,12 @@ export async function fetchFolderInsights(
   try {
     return await api.get<APIFolderInsight>(`/folders/${folderId}/insights`);
   } catch (err) {
-    // 404 just means no insights yet — not an error.
+    // 404 just means no insights yet — that's the normal state for folders
+    // that haven't had insights generated. Stay silent for those.
+    if (err instanceof NotFoundError) {
+      return null;
+    }
+    // Real errors (5xx, network, auth) still get logged.
     console.warn("[vdr] folder insights fetch failed:", err);
     return null;
   }
