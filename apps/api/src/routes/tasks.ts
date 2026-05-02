@@ -123,13 +123,25 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_ASSIGN), async (req: Request
       metadata: { taskTitle: task.title, assignedTo: task.assignedTo },
     });
 
-    // Notify assignee (fire-and-forget)
-    if (task.assignedTo) {
+    // Notify assignee (fire-and-forget). If no assignee, notify the creator
+    // instead so self-created tasks (e.g. "Review Call" scheduled with no
+    // reviewer picked) still surface in the bell. When the creator is also the
+    // assignee, only one notification is sent. When they differ, both get one.
+    const dueLine = task.dueDate
+      ? `Due: ${new Date(task.dueDate).toLocaleDateString()}`
+      : undefined;
+    const recipients = new Set<string>();
+    if (task.assignedTo) recipients.add(task.assignedTo);
+    if (recipients.size === 0 && createdBy) recipients.add(createdBy);
+    for (const recipientId of recipients) {
+      const isSelfCreate = recipientId === createdBy && !task.assignedTo;
       createNotification({
-        userId: task.assignedTo,
+        userId: recipientId,
         type: 'TASK_ASSIGNED',
-        title: `New task assigned: ${task.title}`,
-        message: task.dueDate ? `Due: ${new Date(task.dueDate).toLocaleDateString()}` : undefined,
+        title: isSelfCreate
+          ? `New task created: ${task.title}`
+          : `New task assigned: ${task.title}`,
+        message: dueLine,
         dealId: task.dealId || undefined,
       }).catch(err => log.error('Notification error (task create)', err));
     }

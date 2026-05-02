@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useNotificationCount } from "@/providers/NotificationCountProvider";
 import { Modal } from "./Modal";
 import { DealOptions, UserOptions, INPUT_CLS, LABEL_CLS, type SharedProps } from "./form-primitives";
 
@@ -13,6 +14,7 @@ export function CreateTaskModal({
   onToast,
   onCreated,
 }: SharedProps & { onCreated: () => void }) {
+  const { refresh: refreshNotifications } = useNotificationCount();
   const [title, setTitle] = useState("");
   const [userId, setUserId] = useState("");
   const [dealId, setDealId] = useState("");
@@ -47,6 +49,11 @@ export function CreateTaskModal({
         dueDate: dueDate || undefined,
         priority,
         description: description.trim() || undefined,
+      });
+      // Refresh the bell immediately so the self-created TASK_ASSIGNED
+      // notification is visible without waiting for the 15s poll.
+      refreshNotifications().catch(() => {
+        // Polling will catch up on the next tick.
       });
       onToast("Task created successfully", "success");
       onClose();

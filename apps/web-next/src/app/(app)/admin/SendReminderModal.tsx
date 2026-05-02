@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useNotificationCount } from "@/providers/NotificationCountProvider";
 import { Modal } from "./Modal";
 import { UserOptions, INPUT_CLS, LABEL_CLS, type SharedProps } from "./form-primitives";
 
@@ -12,6 +13,7 @@ export function SendReminderModal({
   users,
   onToast,
 }: SharedProps) {
+  const { refresh: refreshNotifications } = useNotificationCount();
   const [userId, setUserId] = useState("");
   const [message, setMessage] = useState("");
   const [dealId, setDealId] = useState("");
@@ -43,6 +45,12 @@ export function SendReminderModal({
         title: "Reminder from Admin",
         message: msg,
         dealId: dealId || undefined,
+      });
+      // Force-refresh the bell so a self-addressed reminder shows up
+      // immediately instead of waiting for the 15s poll. No-op when the
+      // recipient is someone else (their bell will catch it on next poll).
+      refreshNotifications().catch(() => {
+        // Polling will pick it up on the next 15s tick.
       });
       onToast("Reminder sent successfully", "success");
       onClose();

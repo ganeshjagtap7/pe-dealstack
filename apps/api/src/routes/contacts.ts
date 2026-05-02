@@ -82,7 +82,8 @@ router.get('/', async (req: any, res) => {
     } else if (sortBy === 'lastContactedAt') {
       q = q.order('lastContactedAt', { ascending: sortOrder === 'asc', nullsFirst: false });
     } else {
-      q = q.order('createdAt', { ascending: false });
+      // Default: sort by createdAt. Honor sortOrder so "Oldest First" works.
+      q = q.order('createdAt', { ascending: sortOrder === 'asc' });
     }
 
     q = q.range(offset, offset + limit - 1);
@@ -129,7 +130,8 @@ router.get('/export', async (req: any, res) => {
     } else if (sortBy === 'lastContactedAt') {
       q = q.order('lastContactedAt', { ascending: sortOrder === 'asc', nullsFirst: false });
     } else {
-      q = q.order('createdAt', { ascending: false });
+      // Default: sort by createdAt. Honor sortOrder so "Oldest First" works.
+      q = q.order('createdAt', { ascending: sortOrder === 'asc' });
     }
 
     const { data: contacts, error } = await q;
