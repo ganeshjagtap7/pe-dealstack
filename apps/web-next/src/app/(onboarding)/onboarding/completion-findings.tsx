@@ -17,6 +17,11 @@ interface RedFlag {
   source?: string;
   severity?: string;
   type?: string;
+  // POST /deals/:id/analyze-risks (apps/api/src/routes/ai.ts:263) returns
+  // risks shaped { title, description, severity, mitigation }. We map
+  // `mitigation` into the legacy `detail`/`explanation` slot at the call
+  // site so renderFindings stays unchanged.
+  mitigation?: string;
 }
 
 const SEVERITY_CONFIG: Record<
@@ -104,16 +109,28 @@ export function CompletionFindings({
         const dealId = deals[0].id;
         onDealId?.(dealId);
 
-        // Try fetching red flags / analysis
+        // Try fetching AI risk analysis. The legacy onboarding-flow.js called
+        // GET /deals/:id/analysis (apps/web/js/onboarding/onboarding-flow.js:459),
+        // which never existed on the backend — it was always a 404 fall-through.
+        // The actual endpoint is POST /deals/:id/analyze-risks
+        // (apps/api/src/routes/ai.ts:263) which returns
+        // { risks: Array<{ title, description, severity, mitigation }>, dealId, cached }.
+        // POST is fine here — the backend caches the result via AICache, so a
+        // repeat call from the completion screen is cheap.
         try {
-          const analysis = await api.get<{
+          const analysis = await api.post<{
+            risks?: RedFlag[] | { flags?: RedFlag[] };
             redFlags?: { flags?: RedFlag[] } | RedFlag[];
-          }>(`/deals/${dealId}/analysis`);
+          }>(`/deals/${dealId}/analyze-risks`, {});
           if (cancelled) return;
 
-          const flags = Array.isArray(analysis?.redFlags)
-            ? analysis.redFlags
-            : (analysis?.redFlags as { flags?: RedFlag[] })?.flags ?? [];
+          // Backend returns `risks`, but accept `redFlags` shapes too in case
+          // the response shape changes — the renderer handles both keys via
+          // the same RedFlag interface above.
+          const risksValue = analysis?.risks ?? analysis?.redFlags;
+          const flags = Array.isArray(risksValue)
+            ? risksValue
+            : (risksValue as { flags?: RedFlag[] } | undefined)?.flags ?? [];
 
           if (flags.length > 0) {
             const top5 = flags.slice(0, 5);
@@ -227,8 +244,18 @@ export function CompletionFindings({
           {findings.map((flag, i) => {
             const severity = (flag.severity || flag.type || "medium").toLowerCase();
             const config = SEVERITY_CONFIG[severity] || SEVERITY_CONFIG.medium;
-            const flagTitle = flag.title || flag.flag || flag.description || "Finding";
-            const detail = flag.detail || flag.explanation || flag.source || "";
+            const flagTitle = flag.title || flag.flag || "Finding";
+            // analyze-risks returns { title, description, mitigation } —
+            // legacy red-flag analyses use { detail, explanation, source }.
+            // Prefer the long-form fields in the order most useful for the
+            // single-line row beneath the title.
+            const detail =
+              flag.detail ||
+              flag.explanation ||
+              flag.description ||
+              flag.mitigation ||
+              flag.source ||
+              "";
             return (
               <div
                 key={i}

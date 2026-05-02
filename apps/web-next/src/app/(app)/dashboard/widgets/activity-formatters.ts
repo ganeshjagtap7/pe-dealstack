@@ -57,6 +57,8 @@ const ACTION_MAP: Record<string, ActionDef> = {
   USER_CREATED:        { before: "added team member ", icon: "person_add" },
   USER_UPDATED:        { before: "updated user ",     icon: "manage_accounts" },
   USER_INVITED:        { before: "invited ",          icon: "mail" },
+  INVITATION_SENT:     { before: "sent invitation to ", icon: "send" },
+  INVITATION_ACCEPTED: { before: "",                  after: " accepted invitation", icon: "how_to_reg" },
   AI_INGEST:           { before: "ingested document ", icon: "auto_awesome" },
   AI_GENERATE:         { before: "generated analysis for ", icon: "auto_awesome" },
   AI_CHAT:             { before: "chatted with ",     icon: "auto_awesome" },
@@ -76,10 +78,10 @@ export function formatAuditAction(log: AuditLog): FormattedAction {
       icon: def.icon,
     };
   }
-  // Fallback: matches legacy "performed FOO" rendering
-  const fallback = (log.action || "an action").toLowerCase().replace(/_/g, " ");
+  // Fallback matches legacy renderActivityItem: it preserves the raw action
+  // string (e.g. "performed LOGIN_FAILED") rather than lower-casing.
   return {
-    prefix: `performed ${fallback}`,
+    prefix: `performed ${log.action || "an action"}`,
     entity: "",
     suffix: "",
     icon: "info",

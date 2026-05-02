@@ -2,7 +2,8 @@
 
 import { KeyboardEvent, useCallback, useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
+import { useToast } from "@/providers/ToastProvider";
 import { TaskModalShell } from "./task-modal-shell";
 import { AUM_OPTIONS, DEFAULT_SECTORS, FirmData } from "./types";
 import { EnrichmentResponse, matchAumBucket, matchSectors } from "./enrichment-types";
@@ -17,12 +18,15 @@ export function FirmTaskModal({
   onChange,
   onClose,
   onComplete,
+  busy = false,
 }: {
   value: FirmData;
   onChange: (v: FirmData) => void;
   onClose: () => void;
   onComplete: () => void;
+  busy?: boolean;
 }) {
+  const { showToast } = useToast();
   const [customSectorOpen, setCustomSectorOpen] = useState(false);
   const [customSector, setCustomSector] = useState("");
 
@@ -63,7 +67,10 @@ export function FirmTaskModal({
     const url = value.url.trim();
     const linkedin = value.linkedin.trim();
     if (!url && !linkedin) return;
-    if (enrichState === "loading" || enrichState === "applied") return;
+    // Only block if a request is already in flight. Previously also
+    // short-circuited on "applied", which silently swallowed a LinkedIn
+    // blur after the user had applied a website-only enrichment.
+    if (enrichState === "loading") return;
 
     setEnrichState("loading");
     setEnrichError(null);
@@ -76,12 +83,23 @@ export function FirmTaskModal({
         setEnrichResult(res);
         setEnrichState("done");
       } else {
-        setEnrichError(res.error || "Could not auto-fill from website. Fill in manually.");
+        const msg = res.error || "Could not auto-fill from website. Fill in manually.";
+        setEnrichError(msg);
         setEnrichState("error");
       }
     } catch (err) {
-      setEnrichError(err instanceof Error ? err.message : "Enrichment failed — fill in manually below.");
-      setEnrichState("error");
+      // 429 = backend's 3-per-hour AI enrichment cap. Surface clearly so user
+      // knows to fill in manually.
+      if (err instanceof ApiError && err.status === 429) {
+        const msg = "AI enrichment rate limit reached — fill out the form manually below.";
+        setEnrichError(msg);
+        setEnrichState("error");
+        showToast(msg, "warning");
+      } else {
+        const msg = err instanceof Error ? err.message : "Enrichment failed — fill in manually below.";
+        setEnrichError(msg);
+        setEnrichState("error");
+      }
     }
   };
 
@@ -105,6 +123,8 @@ export function FirmTaskModal({
       onClose={onClose}
       onComplete={onComplete}
       canComplete={canComplete}
+      busy={busy}
+      busyLabel="Saving..."
     >
       <p className="text-[13.5px] text-text-secondary mb-4">
         Help us tailor AI findings to your strategy. This takes 30 seconds.
@@ -137,7 +157,9 @@ export function FirmTaskModal({
           value={value.linkedin}
           onChange={(e) => onChange({ ...value, linkedin: e.target.value })}
           onBlur={() => {
-            if (value.linkedin.includes("linkedin.com")) triggerEnrichment();
+            // Lowercase check so pasted "LinkedIn.com" / "Linkedin.com"
+            // still fire the enrichment.
+            if (value.linkedin.toLowerCase().includes("linkedin.com")) triggerEnrichment();
           }}
           placeholder="https://linkedin.com/in/yourprofile"
           className="w-full pl-10 pr-3 py-2.5 text-[14px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"

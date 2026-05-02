@@ -194,8 +194,9 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
         if (parsed.type && ['note_added', 'extraction_triggered', 'scroll_to'].includes(parsed.type)) {
           sideEffects.push(parsed);
         }
-      } catch {
-        // Not JSON tool output — skip
+      } catch (err) {
+        // Not JSON tool output — skip. Log at debug to avoid noise on every non-JSON tool.
+        log.debug('dealChatAgent: tool message JSON parse skipped', { error: err instanceof Error ? err.message : String(err) });
       }
     }
 

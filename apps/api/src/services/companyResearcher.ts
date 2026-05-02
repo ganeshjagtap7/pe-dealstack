@@ -57,7 +57,9 @@ export async function scrapePageText(url: string): Promise<string | null> {
       .replace(/\s+/g, ' ')
       .trim()
       .slice(0, 8000);
-  } catch {
+  } catch (err) {
+    // Best-effort scrape — caller treats null as "no content for this URL".
+    log.warn('companyResearcher: scrapePageText failed', { url, error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }

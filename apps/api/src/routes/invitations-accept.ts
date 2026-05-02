@@ -283,7 +283,8 @@ router.post('/:id/resend', async (req: Request, res: Response, next: NextFunctio
       currentUser?.name || 'A team member',
       orgName,
       invitation.token,
-      invitation.role
+      invitation.role,
+      req
     );
 
     res.json({

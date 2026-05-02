@@ -15,108 +15,23 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { api, NotFoundError } from "@/lib/api";
-import { NAV_ITEMS, STAGE_LABELS } from "@/lib/constants";
 import { useUser } from "@/providers/UserProvider";
 import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
 import type { Deal } from "@/types";
-
-// ---------------------------------------------------------------------------
-// Static action shortcuts — broader than NAV_ITEMS (verbs, not destinations).
-// ---------------------------------------------------------------------------
-
-interface PaletteAction {
-  label: string;
-  href: string;
-  icon: string;
-  keywords: string;
-  /** Visibility rule: hide for users without member-level access. */
-  memberOnly?: boolean;
-}
-
-// Sentinel href used to signal "open the deal-intake modal" instead of routing.
-// Intercepted in selectResult() below — never actually navigated to.
-const ACTION_OPEN_DEAL_INTAKE = "modal:deal-intake";
-
-const PALETTE_ACTIONS: PaletteAction[] = [
-  { label: "Create New Deal",      href: ACTION_OPEN_DEAL_INTAKE, icon: "add_circle",   keywords: "new deal create intake ingest", memberOnly: true },
-  { label: "Open Data Room",       href: "/data-room",    icon: "folder_open",  keywords: "vdr documents files data room" },
-  { label: "Generate AI Report",   href: "/memo-builder", icon: "auto_awesome", keywords: "memo ic report ai generate investment", memberOnly: true },
-  { label: "Open Settings",        href: "/settings",     icon: "settings",     keywords: "profile preferences account settings" },
-];
-
-// Per-page keyword expansion (mirrors apps/web/js/commandPalette.js PAGES).
-// Lets queries like "pipeline" or "vdr" match Deals / Data Room.
-const PAGE_KEYWORDS: Record<string, string> = {
-  dashboard: "home overview",
-  deals: "pipeline crm",
-  "data-room": "vdr documents files",
-  crm: "crm people network contacts",
-  admin: "tasks team users",
-  "ai-reports": "memo ic report ai investment",
-};
-
-// ---------------------------------------------------------------------------
-// Contact API row (matches /api/contacts response shape).
-// ---------------------------------------------------------------------------
-interface ContactRow {
-  id: string;
-  firstName?: string;
-  lastName?: string;
-  title?: string;
-  company?: string;
-  email?: string;
-}
-
-// ---------------------------------------------------------------------------
-// Result discriminated union — used so renderer can switch on .kind.
-// ---------------------------------------------------------------------------
-
-type PaletteResult =
-  | { kind: "page"; id: string; label: string; href: string; icon: string; keywords: string }
-  | { kind: "deal"; id: string; label: string; href: string; icon: string; sub: string; keywords: string }
-  | { kind: "contact"; id: string; label: string; href: string; icon: string; sub: string; keywords: string }
-  | { kind: "action"; label: string; href: string; icon: string; keywords: string };
-
-// ---------------------------------------------------------------------------
-// Shared substring matcher — AND-of-words across haystack (mirrors legacy).
-// ---------------------------------------------------------------------------
-
-function matchesQuery(haystack: string, query: string): boolean {
-  const lower = haystack.toLowerCase();
-  return query
-    .toLowerCase()
-    .split(" ")
-    .filter(Boolean)
-    .every((word) => lower.includes(word));
-}
-
-function formatStage(stage: string | undefined): string {
-  if (!stage) return "";
-  return STAGE_LABELS[stage] || stage;
-}
-
-// ---------------------------------------------------------------------------
-// Group rendering helpers
-// ---------------------------------------------------------------------------
-
-const GROUP_ICON_STYLES: Record<PaletteResult["kind"], { bg: string; color: string }> = {
-  page:    { bg: "#E6EEF5", color: "#003366" },
-  deal:    { bg: "#DBEAFE", color: "#1D4ED8" },
-  contact: { bg: "#FCE7F3", color: "#BE185D" },
-  action:  { bg: "#FEF3C7", color: "#D97706" },
-};
-
-// Group label varies for deals: "Recent Deals" when showing the lazy
-// 5-deal preview on empty query, plain "Deals" once the user types.
-const GROUP_LABELS: Record<PaletteResult["kind"], string> = {
-  page:    "Pages",
-  deal:    "Deals",
-  contact: "Contacts",
-  action:  "Actions",
-};
-
-// Render order — Pages first, then Deals, then Contacts, then Actions.
-const GROUP_ORDER: PaletteResult["kind"][] = ["page", "deal", "contact", "action"];
+import {
+  ACTION_OPEN_DEAL_INTAKE,
+  ContactRow,
+  GROUP_LABELS,
+  GROUP_ORDER,
+  PALETTE_ACTIONS,
+  PaletteResult,
+} from "./CommandPalette.types";
+import {
+  buildActions,
+  buildPages,
+  buildResults,
+} from "./CommandPalette.results";
+import { PaletteItem } from "./CommandPalette.item";
 
 // ---------------------------------------------------------------------------
 // Component
@@ -146,38 +61,16 @@ export function CommandPalette() {
   const isMember = user?.systemRole === "ADMIN" || user?.systemRole === "MEMBER";
 
   // -----------------------------------------------------------------------
-  // Pages — filter NAV_ITEMS by role + drop dividers/empty hrefs.
+  // Pages + Actions, derived from role.
   // -----------------------------------------------------------------------
-  const pages = useMemo<PaletteResult[]>(() => {
-    return NAV_ITEMS.filter((item) => {
-      if (item.divider || !item.href) return false;
-      if (item.adminOnly && !isAdmin) return false;
-      if (item.memberOnly && !isMember) return false;
-      return true;
-    }).map((item) => ({
-      kind: "page" as const,
-      id: item.id,
-      label: item.label,
-      href: item.href,
-      icon: item.icon,
-      // Per-page keyword synonyms (PAGE_KEYWORDS) ported from legacy so
-      // searches like "pipeline", "vdr", "memo" still match relevant pages.
-      keywords: `${item.label} ${item.id} ${PAGE_KEYWORDS[item.id] ?? ""}`.toLowerCase(),
-    }));
-  }, [isAdmin, isMember]);
-
-  // -----------------------------------------------------------------------
-  // Actions — filter by role.
-  // -----------------------------------------------------------------------
-  const actions = useMemo<PaletteResult[]>(() => {
-    return PALETTE_ACTIONS.filter((a) => !a.memberOnly || isMember).map((a) => ({
-      kind: "action" as const,
-      label: a.label,
-      href: a.href,
-      icon: a.icon,
-      keywords: a.keywords,
-    }));
-  }, [isMember]);
+  const pages = useMemo<PaletteResult[]>(
+    () => buildPages({ isAdmin, isMember }),
+    [isAdmin, isMember],
+  );
+  const actions = useMemo<PaletteResult[]>(
+    () => buildActions(PALETTE_ACTIONS, isMember),
+    [isMember],
+  );
 
   // -----------------------------------------------------------------------
   // Recent deals — 5-item preview shown on empty query (fetched once on
@@ -243,67 +136,17 @@ export function CommandPalette() {
   }, [query, fetchAllDeals, fetchAllContacts]);
 
   // -----------------------------------------------------------------------
-  // Result builders.
+  // Combined results — cap, filter, build the visible list.
   // -----------------------------------------------------------------------
-  function dealToResult(d: Deal): PaletteResult {
-    return {
-      kind: "deal",
-      id: d.id,
-      label: d.name,
-      href: `/deals/${d.id}`,
-      icon: "work",
-      sub: [d.industry, formatStage(d.stage)].filter(Boolean).join(" · "),
-      keywords: `${d.name} ${d.industry ?? ""} ${formatStage(d.stage)}`.toLowerCase(),
-    };
-  }
-
-  function contactToResult(c: ContactRow): PaletteResult {
-    const name = `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim() || c.email || "Unnamed";
-    return {
-      kind: "contact",
-      id: c.id,
-      label: name,
-      href: `/contacts#detail-${c.id}`,
-      icon: "person",
-      sub: [c.title, c.company].filter(Boolean).join(" · "),
-      keywords: `${name} ${c.company ?? ""} ${c.email ?? ""}`.toLowerCase(),
-    };
-  }
-
-  // -----------------------------------------------------------------------
-  // Combined results.
-  // - Empty query: pages + 5 recent deals + actions (preview).
-  // - With query: pages + ALL deals + ALL contacts + actions, filtered.
-  // Capped at 12 to keep the list readable (matches legacy).
-  // -----------------------------------------------------------------------
-  const results = useMemo<PaletteResult[]>(() => {
-    const trimmed = query.trim();
-
-    if (!trimmed) {
-      const recent = recentDeals.map(dealToResult);
-      return [...pages, ...recent, ...actions];
-    }
-
-    const dealResults = allDeals.map(dealToResult);
-    const contactResults = allContacts.map(contactToResult);
-    const haystack = (r: PaletteResult) => `${r.label} ${r.kind === "page" || r.kind === "action" ? r.keywords : `${r.sub} ${r.keywords}`}`;
-
-    return [...pages, ...dealResults, ...contactResults, ...actions]
-      .filter((r) => matchesQuery(haystack(r), trimmed))
-      .slice(0, 12);
-  }, [pages, actions, query, recentDeals, allDeals, allContacts]);
+  const results = useMemo<PaletteResult[]>(
+    () => buildResults({ query, pages, actions, recentDeals, allDeals, allContacts }),
+    [pages, actions, query, recentDeals, allDeals, allContacts],
+  );
 
   // -----------------------------------------------------------------------
   // Open / close helpers — the modal's open state is tracked here so the
   // global keydown listener can toggle without re-attaching.
   // -----------------------------------------------------------------------
-  const openPalette = useCallback(() => {
-    setQuery("");
-    setActiveIndex(0);
-    setOpen(true);
-    fetchRecentDeals();
-  }, [fetchRecentDeals]);
-
   const closePalette = useCallback(() => {
     setOpen(false);
   }, []);
@@ -492,53 +335,18 @@ export function CommandPalette() {
                   {items.map((item) => {
                     const idx = globalIdx++;
                     const isActive = idx === activeIndex;
-                    const sub = item.kind === "deal" || item.kind === "contact" ? item.sub : "";
                     const itemKey =
                       item.kind === "deal" || item.kind === "page" || item.kind === "contact"
                         ? `${item.kind}:${item.id}`
                         : `action:${item.href}`;
                     return (
-                      <div
+                      <PaletteItem
                         key={itemKey}
-                        data-palette-item
-                        className={`flex items-center gap-2.5 px-2.5 py-2.5 rounded-lg cursor-pointer transition-colors ${
-                          isActive ? "text-white" : "hover:bg-[#E6EEF5]"
-                        }`}
-                        style={isActive ? { backgroundColor: "#003366" } : undefined}
+                        item={item}
+                        isActive={isActive}
                         onClick={() => selectResult(item)}
                         onMouseEnter={() => setActiveIndex(idx)}
-                      >
-                        <div
-                          className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
-                          style={
-                            isActive
-                              ? { backgroundColor: "rgba(255,255,255,0.15)", color: "#fff" }
-                              : {
-                                  backgroundColor: GROUP_ICON_STYLES[item.kind].bg,
-                                  color: GROUP_ICON_STYLES[item.kind].color,
-                                }
-                          }
-                        >
-                          <span className="material-symbols-outlined" style={{ fontSize: 18 }}>
-                            {item.icon}
-                          </span>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">{item.label}</p>
-                          {sub && (
-                            <p
-                              className="text-[11px] truncate"
-                              style={
-                                isActive
-                                  ? { color: "rgba(255,255,255,0.7)" }
-                                  : { color: "#9CA3AF" }
-                              }
-                            >
-                              {sub}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                      />
                     );
                   })}
                 </div>

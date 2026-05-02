@@ -110,7 +110,8 @@ export function MeetingPrepModal({
       await navigator.clipboard.writeText(briefAsText(brief));
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
+      console.warn("[MeetingPrepModal/copy] clipboard write failed:", err);
       setError("Failed to copy to clipboard");
     }
   };

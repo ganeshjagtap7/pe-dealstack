@@ -82,10 +82,14 @@ export async function exportMemoClipboard(
 }
 
 /**
- * Copy the current memo URL to the clipboard for sharing.
+ * Copy a deep link to a specific memo onto the clipboard.
+ * The link uses NEXT_PUBLIC_APP_URL (defaulting to the canonical lmmos.ai
+ * production domain) instead of window.location so the link is portable
+ * across preview deployments and pinned to the memo, not the bare page.
  */
-export async function shareMemoLink(): Promise<void> {
-  const url = window.location.href;
+export async function shareMemoLink(memoId: string): Promise<void> {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://lmmos.ai";
+  const url = `${appUrl}/memo-builder?memoId=${encodeURIComponent(memoId)}`;
   if (navigator.clipboard?.writeText) {
     await navigator.clipboard.writeText(url);
     return;

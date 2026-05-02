@@ -267,9 +267,9 @@ export async function crossVerifyNode(
     let claudeResults: ClaudeVerification[];
     try {
       claudeResults = JSON.parse(content.text) as ClaudeVerification[];
-    } catch {
+    } catch (err) {
       steps.push(step('crossVerify', 'Cross-verification skipped — could not parse Claude response as JSON'));
-      log.warn('crossVerifyNode: JSON parse failure', { raw: content.text.slice(0, 200) });
+      log.warn('crossVerifyNode: JSON parse failure', { raw: content.text.slice(0, 200), error: err instanceof Error ? err.message : String(err) });
       return { steps };
     }
 

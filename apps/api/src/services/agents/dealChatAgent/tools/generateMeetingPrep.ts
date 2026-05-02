@@ -1,0 +1,44 @@
+// ─── generate_meeting_prep tool ──────────────────────────────────
+// Calls the meetingPrep agent and renders the brief as Markdown.
+
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
+import { log } from '../../../../utils/logger.js';
+import { generateMeetingPrep } from '../../meetingPrep/index.js';
+
+export function makeGenerateMeetingPrepTool(dealId: string, orgId: string) {
+  return tool(
+    async ({ attendees, topics }) => {
+      try {
+        const brief = await generateMeetingPrep({
+          dealId,
+          organizationId: orgId,
+          meetingTopic: [attendees, topics].filter(Boolean).join('. '),
+        });
+
+        const parts = [
+          `## ${brief.headline}\n`,
+          `**Deal Summary:** ${brief.dealSummary}\n`,
+        ];
+        if (brief.contactProfile) parts.push(`**Contact:** ${brief.contactProfile}\n`);
+        if (brief.keyTalkingPoints.length) parts.push(`**Talking Points:**\n${brief.keyTalkingPoints.map(p => `- ${p}`).join('\n')}\n`);
+        if (brief.questionsToAsk.length) parts.push(`**Questions to Ask:**\n${brief.questionsToAsk.map(q => `- ${q}`).join('\n')}\n`);
+        if (brief.risksToAddress.length) parts.push(`**Risks to Address:**\n${brief.risksToAddress.map(r => `- ${r}`).join('\n')}\n`);
+        if (brief.suggestedAgenda.length) parts.push(`**Suggested Agenda:**\n${brief.suggestedAgenda.map((a, i) => `${i + 1}. ${a}`).join('\n')}`);
+
+        return parts.join('\n');
+      } catch (error) {
+        log.error('generateMeetingPrep tool error', error);
+        return 'Failed to generate meeting prep. Please try again.';
+      }
+    },
+    {
+      name: 'generate_meeting_prep',
+      description: 'Generate a meeting preparation brief for this deal. Includes talking points, questions, risks, and suggested agenda.',
+      schema: z.object({
+        attendees: z.string().optional().describe('Who the meeting is with (e.g., "CEO of target company")'),
+        topics: z.string().optional().describe('Key topics to cover'),
+      }),
+    }
+  );
+}

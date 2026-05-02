@@ -11,7 +11,7 @@ docs/           Architecture docs, planning, diagrams
 packages/       ui/ (shared React components/styles), etc.
 ```
 
-## Coding Standards
+### Coding Standards
 
 ### General
 - Keep files under 500 lines. Split when they grow beyond this.

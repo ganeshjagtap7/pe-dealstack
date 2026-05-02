@@ -30,10 +30,15 @@ export function TaskModalShell({
       if (e.key === "Escape") onClose();
     };
     document.addEventListener("keydown", onKey);
+    // Capture the prior inline overflow so we restore it (not "") on unmount.
+    // The root body has the `overflow-hidden` Tailwind class set in
+    // apps/web-next/src/app/layout.tsx — clearing the inline style to "" would
+    // leak the wizard's lock state into the rest of the app.
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.body.style.overflow = "";
+      document.body.style.overflow = prevOverflow;
     };
   }, [onClose]);
 

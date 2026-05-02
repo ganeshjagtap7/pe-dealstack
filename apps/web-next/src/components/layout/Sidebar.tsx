@@ -60,19 +60,39 @@ function NavLink({
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useUser();
-  const [collapsed, setCollapsed] = useState(false);
+  const [userCollapsed, setUserCollapsed] = useState(false);
+  const [forceCollapsed, setForceCollapsed] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  // Visible collapsed state is the OR of the user's saved preference and any
+  // page-driven force-collapse (e.g. memo-builder dims the nav while the AI
+  // Analyst chat is open). When the page un-forces, we fall back to the
+  // user's preference rather than overwriting it.
+  const collapsed = userCollapsed || forceCollapsed;
 
   useEffect(() => {
     // Hydrate after mount so SSR + client first-paint match (a lazy
     // useState initialiser would diverge between server and client).
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    setCollapsed(localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === "true");
+    setUserCollapsed(localStorage.getItem(STORAGE_KEYS.sidebarCollapsed) === "true");
+  }, []);
+
+  useEffect(() => {
+    const onForce = (e: Event) => {
+      const detail = (e as CustomEvent<{ collapsed: boolean }>).detail;
+      setForceCollapsed(!!detail?.collapsed);
+    };
+    window.addEventListener("sidebar:auto-collapse", onForce);
+    return () => window.removeEventListener("sidebar:auto-collapse", onForce);
   }, []);
 
   const toggleCollapse = () => {
+    // Toggle from what the user SEES, not just userCollapsed — otherwise an
+    // active force-collapse would swallow the click. Clear the force flag so
+    // the user's intent wins until the next force event (e.g. closing/reopening
+    // the AI chat).
     const next = !collapsed;
-    setCollapsed(next);
+    setUserCollapsed(next);
+    setForceCollapsed(false);
     localStorage.setItem(STORAGE_KEYS.sidebarCollapsed, String(next));
   };
 
@@ -174,6 +194,21 @@ export function Sidebar() {
             <span className="material-symbols-outlined text-[20px]">settings</span>
             <span className="nav-label font-medium">Settings</span>
           </Link>
+          <button
+            type="button"
+            onClick={() =>
+              window.open(
+                "https://docs.google.com/forms/d/e/1FAIpQLSet_GfebuKpdspK7aQ8yAFUF_l5yXeFczBRoKauGEg2GlpS5g/viewform",
+                "_blank",
+                "noopener,noreferrer",
+              )
+            }
+            title="Send feedback"
+            className="nav-item flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm text-text-secondary hover:bg-primary-light hover:text-primary text-left"
+          >
+            <span className="material-symbols-outlined text-[20px]">rate_review</span>
+            <span className="nav-label font-medium">Feedback</span>
+          </button>
         </div>
 
         {/* User profile */}

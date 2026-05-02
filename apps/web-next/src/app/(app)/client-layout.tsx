@@ -8,7 +8,6 @@ import { ToastProvider } from "@/providers/ToastProvider";
 import { IngestDealModalProvider } from "@/providers/IngestDealModalProvider";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Header } from "@/components/layout/Header";
-import { FeedbackButton } from "@/components/onboarding/FeedbackButton";
 import { AIAssistant } from "@/components/layout/AIAssistant";
 import { CommandPalette } from "@/components/layout/CommandPalette";
 
@@ -56,7 +55,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                 </main>
-                <FeedbackButton />
                 <AIAssistant />
                 <CommandPalette />
               </div>
