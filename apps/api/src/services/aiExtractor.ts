@@ -154,17 +154,39 @@ COMMON PATTERNS TO LOOK FOR:
 - Industry: Look for sector descriptions, market focus, business type
 
 FINANCIAL CONVERSION (always convert to millions in the original currency — do NOT convert between currencies):
-- "50 million" or "$50M" or "$50,000,000" = 50
-- "1.5 billion" or "$1.5B" = 1500
-- "$500,000" or "500K" = 0.5
-- "$38,200" or "$38.2K" = 0.0382
-- "$6,000" = 0.006
-- "$1,800" = 0.0018
-- "$500" = 0.0005
-- "₹9 Crores" = 90 (1 Crore = 10 Million)
-- "₹50 Lakhs" = 5 (1 Lakh = 0.1 Million)
-- Remove commas and convert to number
-- IMPORTANT: Small values are valid! Do NOT round small amounts to 0 or null.`;
+
+STEP 1 — DETECT THE REPORTING SCALE BEFORE READING ANY NUMBER:
+   PE documents almost always declare units once at the top of a financial table or in a note. Common headers:
+   - "$ in millions" / "(USD millions)" / "in $M" → numbers are already in millions, e.g. "Revenue 45" means $45M (output 45)
+   - "$ in thousands" / "(USD 000s)" / "in $K" / "$ '000" → numbers are in thousands, e.g. "Revenue 45" means $45K (output 0.045)
+   - No header → numbers are raw dollars unless explicitly suffixed with M, K, B, Cr, L
+   You MUST scan the section header, table header, and any footnote ABOVE OR ON the financial figure before deciding the scale.
+   If you cannot determine the scale, set the value to null with confidence 0 — do NOT guess.
+
+STEP 2 — CONVERT TO MILLIONS:
+- "50 million" / "$50M" / "$50,000,000" → 50
+- "1.5 billion" / "$1.5B" → 1500
+- "$500,000" / "500K" → 0.5
+- "$38,200" / "$38.2K" → 0.0382
+- "$6,000" → 0.006
+- "$1,800" → 0.0018
+- "$500" → 0.0005
+- "₹9 Crores" → 90 (1 Crore = 10 Million)
+- "₹50 Lakhs" → 5 (1 Lakh = 0.1 Million)
+- Bare "45" in a "$ in thousands" table → 0.045 (NOT 45)
+- Bare "45" in a "$ in millions" table → 45
+- Remove commas before parsing.
+
+STEP 3 — MANDATORY SOURCE QUOTE FOR REVENUE / EBITDA / DEALSIZE:
+   The "source" field for revenue, ebitda, and dealSize MUST contain the exact phrase from the document, including the unit indicator AND the surrounding scale context (e.g. the table header that establishes scale). For example:
+     source: "(USD in thousands) — Revenue: 45,300" → revenue.value = 45.3
+     source: "Revenue $45.3M" → revenue.value = 45.3
+   If you cannot quote both the figure and its scale context, lower confidence to ≤50.
+
+COMMON ERROR TO AVOID:
+   A small-business CIM with revenue of "$45,300" or "$300,000" is real — many lower-middle-market deals trade at $1M–$50M revenue. Do NOT inflate small values to millions because the deal "looks small". If the source reads "$45,300", the answer is 0.0453, not 45.3.
+
+IMPORTANT: Small values are valid. Do NOT round small amounts to 0 or null.`;
 
 /**
  * Extract structured deal data from document text using AI
