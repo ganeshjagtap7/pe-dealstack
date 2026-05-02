@@ -12,14 +12,15 @@ import { formatRelativeTime } from "./formatters";
  */
 export function useLiveTime(date: string | Date | null | undefined): string {
   const iso = date instanceof Date ? date.toISOString() : (date ?? null);
-  const [label, setLabel] = useState(() => formatRelativeTime(iso));
+  // Empty initial value so SSR and first client render match. formatRelativeTime
+  // calls `new Date()`, which gives different strings on server vs client and
+  // would otherwise trip React's hydration check (#418). The real label snaps
+  // in on the first effect tick after hydration.
+  const [label, setLabel] = useState<string>("");
 
   useEffect(() => {
-    // Re-format immediately when iso changes, then poll every 30s. Both
-    // setLabel calls produce render-cycle work (the immediate one is the
-    // sync one — but it only fires when iso changes, not on every render,
-    // and matches the legacy 30s tick cadence). The interval callback is
-    // deferred, not a sync setState during effect.
+    // Re-format immediately when iso changes, then poll every 30s. Matches the
+    // legacy 30s tick cadence in apps/web/crm.js (commit 42511e5).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLabel(formatRelativeTime(iso));
     if (!iso) return;
