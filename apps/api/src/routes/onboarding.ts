@@ -25,12 +25,16 @@ const DEFAULT_STATUS = {
   },
 };
 
-// Check if user is genuinely new (no existing deals/activity)
-async function isNewUser(userId: string, orgId: string): Promise<boolean> {
+// Check if THIS user is genuinely new (has no audit-log activity of their own).
+// Org-scoped checks were wrong: a fresh invitee joining a populated org, or
+// any signup into an org that already had demo deals, would be classified as
+// "existing" and silently bypass onboarding. AuditLog.userId is the
+// per-actor signal — pre-existing users have entries, fresh users don't.
+async function isNewUser(userId: string, _orgId: string): Promise<boolean> {
   const { count } = await supabase
-    .from('Deal')
+    .from('AuditLog')
     .select('id', { count: 'exact', head: true })
-    .eq('organizationId', orgId);
+    .eq('userId', userId);
   return (count ?? 0) === 0;
 }
 
@@ -84,90 +88,33 @@ export async function tryCompleteOnboardingStep(userId: string, step: string): P
 }
 
 /**
- * Backfill onboarding steps from actual user data.
- * Catches cases where the backend auto-complete hooks were missed
- * (e.g. user existed before hooks were added, or used a path that bypassed them).
+ * Backfill onboarding steps from THIS user's audit-log activity.
+ * Org-scoped queries were silently auto-completing onboarding for fresh
+ * invitees (any deal in the org → step ticked). Audit-log filtered by
+ * userId is the only signal that distinguishes the actor from the org.
  */
-async function backfillStepsFromActivity(orgId: string, status: any): Promise<{ status: any; changed: boolean }> {
+async function backfillStepsFromActivity(userId: string, status: any): Promise<{ status: any; changed: boolean }> {
   if (!status.steps) status.steps = { ...DEFAULT_STATUS.steps };
   let changed = false;
 
-  const checks: Array<{ step: string; query: () => Promise<boolean> }> = [
-    {
-      step: 'createDeal',
-      query: async () => {
-        const { count } = await supabase
-          .from('Deal')
-          .select('id', { count: 'exact', head: true })
-          .eq('organizationId', orgId);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'uploadDocument',
-      query: async () => {
-        // Document table has no organizationId — scope via Deal
-        const { data: deals } = await supabase
-          .from('Deal')
-          .select('id')
-          .eq('organizationId', orgId);
-        const dealIds = (deals || []).map(d => d.id);
-        if (dealIds.length === 0) return false;
-        const { count } = await supabase
-          .from('Document')
-          .select('id', { count: 'exact', head: true })
-          .in('dealId', dealIds);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'reviewExtraction',
-      query: async () => {
-        const { data: deals } = await supabase
-          .from('Deal')
-          .select('id')
-          .eq('organizationId', orgId);
-        const dealIds = (deals || []).map(d => d.id);
-        if (dealIds.length === 0) return false;
-        const { count } = await supabase
-          .from('FinancialStatement')
-          .select('id', { count: 'exact', head: true })
-          .in('dealId', dealIds);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'tryDealChat',
-      query: async () => {
-        const { data: deals } = await supabase
-          .from('Deal')
-          .select('id')
-          .eq('organizationId', orgId);
-        const dealIds = (deals || []).map(d => d.id);
-        if (dealIds.length === 0) return false;
-        const { count } = await supabase
-          .from('ChatMessage')
-          .select('id', { count: 'exact', head: true })
-          .in('dealId', dealIds);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'inviteTeamMember',
-      query: async () => {
-        const { count } = await supabase
-          .from('Invitation')
-          .select('id', { count: 'exact', head: true })
-          .eq('organizationId', orgId);
-        return (count ?? 0) > 0;
-      },
-    },
+  const checks: Array<{ step: string; actions: string[] }> = [
+    { step: 'createDeal',       actions: ['DEAL_CREATED'] },
+    { step: 'uploadDocument',   actions: ['DOCUMENT_UPLOADED'] },
+    { step: 'tryDealChat',      actions: ['AI_CHAT'] },
+    { step: 'inviteTeamMember', actions: ['INVITATION_SENT'] },
+    // reviewExtraction has no clean audit-log signal; left to explicit
+    // complete-step calls or stays false.
   ];
 
-  for (const { step, query } of checks) {
+  for (const { step, actions } of checks) {
     if (status.steps[step]) continue;
     try {
-      if (await query()) {
+      const { count } = await supabase
+        .from('AuditLog')
+        .select('id', { count: 'exact', head: true })
+        .eq('userId', userId)
+        .in('action', actions);
+      if ((count ?? 0) > 0) {
         status.steps[step] = true;
         changed = true;
       }
@@ -219,7 +166,7 @@ router.get('/status', async (req: Request, res: Response) => {
     // Backfill any steps the user has actually completed via activity
     // (handles missed hook fires + manual check-off persistence)
     if (!status.checklistDismissed) {
-      const { status: updated, changed } = await backfillStepsFromActivity(orgId, status);
+      const { status: updated, changed } = await backfillStepsFromActivity(userId, status);
       if (changed) {
         status = updated;
         await supabase

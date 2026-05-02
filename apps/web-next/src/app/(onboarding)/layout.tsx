@@ -13,6 +13,14 @@ import { AuthProvider } from "@/providers/AuthProvider";
 import { UserProvider } from "@/providers/UserProvider";
 import { ToastProvider } from "@/providers/ToastProvider";
 
+// Opt out of static prerendering. AuthProvider lazily constructs a Supabase
+// browser client which reads NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY at first
+// render — those vars aren't available in the CI build job (only at runtime
+// on Vercel), so prerendering this route group throws at build time. The
+// page is auth-gated and fetches /api/onboarding/status on every load
+// anyway; there's nothing meaningful to statically generate.
+export const dynamic = "force-dynamic";
+
 export default function OnboardingLayout({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
