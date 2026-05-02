@@ -49,7 +49,7 @@ export async function sendInvitationEmail(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-    const inviteUrl = `${baseUrl}/accept-invite.html?token=${token}`;
+    const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
 
     log.info('Sending invitation email', { email, inviterName, firmName, role, inviteUrl });
 
@@ -150,7 +150,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     const baseUrl = process.env.APP_URL || 'http://localhost:3000';
     const decorated = (invitations || []).map((inv: any) => {
       const isPending = inv.status === 'PENDING';
-      const url = isPending && inv.token ? `${baseUrl}/accept-invite.html?token=${inv.token}` : null;
+      const url = isPending && inv.token ? `${baseUrl}/accept-invite?token=${inv.token}` : null;
       // Don't leak the raw token for non-pending invites
       const { token, ...rest } = inv;
       return { ...rest, inviteUrl: url };
@@ -307,7 +307,7 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     // Build invite URL for fallback sharing
     const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-    const inviteUrl = `${baseUrl}/accept-invite.html?token=${token}`;
+    const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
 
     // Audit log
     await AuditLog.log(req, {
