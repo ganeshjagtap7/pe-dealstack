@@ -1,7 +1,23 @@
 import { z } from 'zod';
-import { getExtractionModel, isLLMAvailable } from './llm.js';
+import { getExtractionModel, getModel, isLLMAvailable } from './llm.js';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
+import { AI_MODELS, isOpenRouterEnabled } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
+
+// Extract the actual provider error from an OpenAI-SDK APIError. OpenRouter
+// wraps upstream provider errors as `400 Provider returned error` and tucks
+// the real message under `error.error.metadata.raw`. Pino's default Error
+// serializer strips everything but message+stack, so we surface it manually.
+function describeAIError(err: any): Record<string, unknown> {
+  return {
+    message: err?.message,
+    status: err?.status,
+    code: err?.code,
+    providerRaw: err?.error?.metadata?.raw,
+    providerMsg: err?.error?.message,
+    type: err?.error?.type,
+  };
+}
 
 // Format a value in millions to human-readable form with smart units
 function formatExtractedValue(valueInMillions: number): string {
@@ -169,13 +185,27 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     const truncatedText = text.slice(0, 20000);
     log.debug('AI extraction starting (structured output)', { textLength: truncatedText.length });
 
-    const model = getExtractionModel(3000);
-    const structuredModel = model.withStructuredOutput(ExtractionOutputSchema);
-
-    const extracted = await structuredModel.invoke([
+    const messages = [
       new SystemMessage(EXTRACTION_SYSTEM_PROMPT),
       new HumanMessage(`Analyze this document and extract business/financial data with confidence scores:\n\n${truncatedText}`),
-    ]);
+    ];
+
+    let extracted: any;
+    try {
+      const model = getExtractionModel(3000);
+      const structuredModel = model.withStructuredOutput(ExtractionOutputSchema);
+      extracted = await structuredModel.invoke(messages);
+    } catch (primaryErr: any) {
+      // Claude Sonnet 4.5 via OpenRouter sometimes rejects the tool schema
+      // LangChain emits for withStructuredOutput. Fall back to an OpenAI-native
+      // model (gpt-4.1 via OpenRouter, or gpt-4o direct) — both have first-class
+      // function-calling support that handles this schema reliably.
+      log.warn('AI extraction primary model failed; retrying with fallback', describeAIError(primaryErr));
+      const fallbackModelName = isOpenRouterEnabled() ? AI_MODELS.TIER2 : 'gpt-4o';
+      const fallbackModel = getModel('openai', fallbackModelName, 0.1, 3000);
+      const structuredFallback = fallbackModel.withStructuredOutput(ExtractionOutputSchema);
+      extracted = await structuredFallback.invoke(messages);
+    }
 
     // Build result with proper defaults
     const result: ExtractedDealData = {
@@ -242,7 +272,7 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
 
     return result;
   } catch (error) {
-    log.error('AI extraction error', error);
+    log.error('AI extraction error', undefined, describeAIError(error));
     return null;
   }
 }
