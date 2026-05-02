@@ -190,13 +190,17 @@ export default function DataRoomDealPage({ params }: PageProps) {
   };
 
   // Stage 2: User confirms upload
-  const handleConfirmUpload = useCallback(
-    createConfirmUpload({
+  const handleConfirmUpload = useCallback(() => {
+    return createConfirmUpload({
       dealId, activeFolderId, pendingUploadFiles, autoUpdateDeal,
-      setUploading, setPendingUploadFiles, setUploadError, setAllFiles, setFolders, showToast,
-    }),
-    [pendingUploadFiles, dealId, activeFolderId, autoUpdateDeal, showToast],
-  );
+      setUploading, setPendingUploadFiles, setUploadError,
+      setAllFiles, setFolders, showToast,
+    })();
+  }, [
+    dealId, activeFolderId, pendingUploadFiles, autoUpdateDeal,
+    setUploading, setPendingUploadFiles, setUploadError,
+    setAllFiles, setFolders, showToast,
+  ]);
 
   const [pendingDelete, setPendingDelete] = useState<{ type: "folder" | "file"; id: string; name: string; extra?: string } | null>(null);
 
@@ -258,9 +262,15 @@ export default function DataRoomDealPage({ params }: PageProps) {
   // apps/web/js/docPreview.js and add `xlsx` + `mammoth` to
   // apps/web-next/package.json. Reference: docs/MIGRATION-AUDIT-REPORT.md A3.
   // -------------------------------------------------------------------------
-  const handleFileClick = useCallback(createFileClick({ showToast }), [showToast]);
-  const handleReanalyze = useCallback(createReanalyze({ dealId, showToast, setAllFiles }), [dealId, showToast]);
-  const handleExtractFinancials = useCallback(createExtractFinancials({ dealId, showToast }), [dealId, showToast]);
+  const handleFileClick = useCallback((file: VDRFile) => {
+    return createFileClick({ showToast })(file);
+  }, [showToast]);
+  const handleReanalyze = useCallback((file: VDRFile) => {
+    return createReanalyze({ dealId, showToast, setAllFiles })(file);
+  }, [dealId, showToast, setAllFiles]);
+  const handleExtractFinancials = useCallback((file: VDRFile) => {
+    return createExtractFinancials({ dealId, showToast })(file);
+  }, [dealId, showToast]);
 
   const linkDeps = {
     dealId,
@@ -272,8 +282,12 @@ export default function DataRoomDealPage({ params }: PageProps) {
     setLinkSearchQuery,
     setLinking,
   };
-  const handleLinkToDeal = useCallback(createLinkToDeal(linkDeps), [dealId]);
-  const confirmLinkToDeal = useCallback(createConfirmLinkToDeal(linkDeps), [linkModalFile, linkDeals, showToast]);
+  const handleLinkToDeal = useCallback((file: VDRFile) => {
+    return createLinkToDeal(linkDeps)(file);
+  }, [linkDeps]);
+  const confirmLinkToDeal = useCallback((dealIdToLink: string) => {
+    return createConfirmLinkToDeal(linkDeps)(dealIdToLink);
+  }, [linkDeps]);
 
   const insightsDeps = {
     dealId,
@@ -289,7 +303,9 @@ export default function DataRoomDealPage({ params }: PageProps) {
   // them before constructing the handlers so the factories have current refs.
   insightsDeps.activeFolder = activeFolder;
   insightsDeps.activeFolderInsights = activeFolderInsights;
-  const handleGenerateInsights = useCallback(createGenerateInsights(insightsDeps), [activeFolderId, generating]);
+  const handleGenerateInsights = useCallback(() => {
+    return createGenerateInsights(insightsDeps)();
+  }, [insightsDeps]);
 
   // Generate Full Report — downloads a markdown file (matching legacy behavior)
   const handleGenerateReport = useCallback(() => {
