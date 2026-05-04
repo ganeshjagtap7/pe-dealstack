@@ -7,57 +7,6 @@ import { createNotification } from './notifications.js';
 
 const router = Router();
 
-// Escape user-provided strings before embedding them in a RegExp.
-function escapeRegex(s: string): string {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-// Compute the display string the mention picker would insert for a user.
-// Mirrors fetchMentionUsers in deal-overview.tsx: prefer User.name, fall
-// back to the email-prefix, then "Unknown". Without this fallback, users
-// whose name is NULL never match server-side even though the picker
-// happily inserts `@<email-prefix> ` for them.
-function mentionDisplayName(u: { name: string | null; email: string | null }): string | null {
-  const name = u.name?.trim();
-  if (name) return name;
-  const prefix = u.email?.split('@')[0]?.trim();
-  if (prefix) return prefix;
-  return null;
-}
-
-// Parse @<display name> mentions from free-form note text. Mirrors the
-// client insertion rule (deal-overview.tsx insertMention): the @ must sit
-// at start-of-string or after whitespace, followed by the user's display
-// name and a word-boundary delimiter. We resolve display names against
-// the org's User table — the client doesn't send mentioned-id metadata.
-function parseMentions(
-  text: string,
-  orgUsers: Array<{ id: string; name: string | null; email: string | null }>,
-): Set<string> {
-  const matched = new Set<string>();
-  if (!text) return matched;
-  // Sort by display-name length DESC so "@Aditya Negi" wins over "@Aditya"
-  // when the user typed the longer form (avoids false positives on the
-  // shorter name).
-  const sorted = orgUsers
-    .map((u) => ({ id: u.id, displayName: mentionDisplayName(u) }))
-    .filter((u): u is { id: string; displayName: string } => u.displayName !== null)
-    .sort((a, b) => b.displayName.length - a.displayName.length);
-  let remaining = text;
-  for (const u of sorted) {
-    // Case-insensitive — the picker preserves DB case but users sometimes
-    // hand-type a mention with different casing.
-    const re = new RegExp(`(?:^|\\s)@${escapeRegex(u.displayName)}(?=\\s|$|[^\\w])`, 'i');
-    if (re.test(remaining)) {
-      matched.add(u.id);
-      // Strip the matched span so a longer-name match doesn't double-count
-      // a shorter-name suffix (e.g. matching "@Aditya" inside "@Aditya Negi").
-      remaining = remaining.replace(re, ' ');
-    }
-  }
-  return matched;
-}
-
 // Query parameter schemas
 const activitiesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).default(50),
@@ -82,6 +31,12 @@ const createActivitySchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   metadata: z.record(z.any()).optional(),
+  // Emails the client picked from the @-mention dropdown. Server resolves
+  // them to User rows scoped to this org — avoids the multi-user-same-name
+  // ambiguity that text-based regex parsing can't resolve. Email is unique
+  // per User and shown in the picker, so the client can always send a
+  // canonical identifier without surfacing UUIDs in the UI.
+  mentionedEmails: z.array(z.string().email()).optional(),
 });
 
 // GET /api/deals/:dealId/activities - List activities for a deal
@@ -154,43 +109,36 @@ router.post('/deals/:dealId/activities', async (req, res) => {
 
     if (error) throw error;
 
-    // @-mention notifications. Activity insert is the source of truth for
-    // notes; the client doesn't send mentioned-id metadata so we resolve
-    // names against the org User table here. Awaited (not fire-and-forget)
-    // because Vercel's serverless runtime can freeze the function once the
-    // response is sent, dropping pending promises — that's why the previous
-    // post-response IIFE never reached the Notification insert. Failures
-    // are logged but never fail the request: the activity itself succeeded.
-    if (data.description) {
+    // @-mention notifications. Client sends emails picked from the
+    // @-dropdown (deal-overview.tsx tracks them in state). We resolve each
+    // to a User row scoped to this org — defense-in-depth so a crafted
+    // request can't notify users in another tenant. Awaited so the
+    // notifications actually land: Vercel's serverless runtime can freeze
+    // the function once the response is sent, dropping any pending
+    // post-response promises.
+    if (data.mentionedEmails && data.mentionedEmails.length > 0) {
       try {
-        const { data: orgUsers } = await supabase
+        const { data: validUsers } = await supabase
           .from('User')
-          .select('id, name, email')
+          .select('id, email')
+          .in('email', data.mentionedEmails)
           .eq('organizationId', orgId);
-        const candidates = (orgUsers || []).map((u) => ({
+        const recipients = (validUsers || []).map((u) => ({
           id: u.id as string,
-          name: (u.name as string | null) ?? null,
-          email: (u.email as string | null) ?? null,
+          email: u.email as string,
         }));
-        log.info('Mention scan: orgUsers fetched', {
+        log.info('Mention scan: explicit emails', {
           dealId,
-          orgId,
-          count: candidates.length,
-          displayNames: candidates.map((u) => mentionDisplayName(u)).filter(Boolean),
+          sent: data.mentionedEmails.length,
+          valid: recipients.length,
+          emails: recipients.map((r) => r.email),
         });
-        const mentioned = parseMentions(data.description as string, candidates);
-        log.info('Mention scan: parseMentions done', {
-          dealId,
-          descriptionPreview: (data.description as string).slice(0, 120),
-          matched: mentioned.size,
-          userIds: Array.from(mentioned),
-        });
-        if (mentioned.size > 0) {
-          const snippet = (data.description as string).slice(0, 200);
+        if (recipients.length > 0) {
+          const snippet = (data.description || '').slice(0, 200);
           const results = await Promise.all(
-            Array.from(mentioned).map((userId) =>
+            recipients.map((r) =>
               createNotification({
-                userId,
+                userId: r.id,
                 type: 'MENTION',
                 title: `You were mentioned in "${deal.name}"`,
                 message: snippet,
@@ -202,10 +150,10 @@ router.post('/deals/:dealId/activities', async (req, res) => {
             ),
           );
           const created = results.filter((r) => r !== null).length;
-          log.info('Mention scan: notifications created', { dealId, attempted: mentioned.size, created });
+          log.info('Mention scan: notifications created', { dealId, attempted: recipients.length, created });
         }
       } catch (err) {
-        log.error('Mention parsing failed', err);
+        log.error('Mention notification path failed', err);
       }
     }
 

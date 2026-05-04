@@ -164,6 +164,12 @@ function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: 
   const [mentionStart, setMentionStart] = useState<number | null>(null);
   const [mentionFiltered, setMentionFiltered] = useState<MentionUser[]>([]);
   const [mentionSelectedIdx, setMentionSelectedIdx] = useState(0);
+  // Tracks emails the picker actually inserted into the note. Sent to the
+  // server alongside the description so notification fan-out doesn't have to
+  // fuzzy-match @<Name> back to a User row — which is ambiguous when two
+  // users share a display name. Email is unique per User and is the field
+  // the dropdown already shows next to each name. Cleared after submit.
+  const [mentionedEmails, setMentionedEmails] = useState<Set<string>>(new Set());
 
   const mentionOpen = mentionStart !== null && mentionFiltered.length > 0;
 
@@ -234,6 +240,11 @@ function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: 
     const after = note.slice(cursor);
     const next = `${before}@${user.name} ${after}`;
     setNote(next);
+    setMentionedEmails((prev) => {
+      const nextSet = new Set(prev);
+      if (user.email) nextSet.add(user.email);
+      return nextSet;
+    });
     closeMention();
     // Restore focus + cursor after the React update lands.
     requestAnimationFrame(() => {
@@ -250,19 +261,31 @@ function AddNoteSection({ dealId, onNoteAdded }: { dealId: string; onNoteAdded: 
     if (!text) return;
     setSaving(true);
     try {
+      // Only send emails whose @<Name> token still appears in the final
+      // text — covers the case where a user picked a name then deleted it
+      // before submit. Cheap substring check; the server treats this list
+      // as the source of truth, so a stray include would notify the wrong
+      // person.
+      const nameByEmail = new Map(users.map((u) => [u.email, u.name] as const));
+      const stillPresent = Array.from(mentionedEmails).filter((email) => {
+        const name = nameByEmail.get(email);
+        return name ? text.includes(`@${name}`) : false;
+      });
       await api.post(`/deals/${dealId}/activities`, {
         type: "NOTE_ADDED",
         title: "Note added",
         description: text,
+        ...(stillPresent.length > 0 && { mentionedEmails: stillPresent }),
       });
       setNote("");
+      setMentionedEmails(new Set());
       onNoteAdded();
     } catch (err) {
       console.warn("[deal-overview] submitNote failed:", err);
     } finally {
       setSaving(false);
     }
-  }, [dealId, note, onNoteAdded]);
+  }, [dealId, note, onNoteAdded, mentionedEmails, users]);
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
     if (mentionOpen) {
