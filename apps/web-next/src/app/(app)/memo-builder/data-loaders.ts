@@ -159,9 +159,11 @@ export function useOpenCreateModal({ setShowCreate, setCreateForm, setDeals, set
 //
 // When ?fromChat=1 is present (deal-chat suggested-action redirect), skip
 // the Create modal entirely: ask the API for an AI-suggested title +
-// description, POST a new memo with autoGenerate=true, then load it. The
-// caller surfaces a fullscreen overlay during this flow via the
-// onAutoCreateStart / onAutoCreateEnd callbacks.
+// description, POST a new memo with autoGenerate=false (fast), then trigger
+// /generate-all separately via onTriggerGenerateAll so the slow LLM work
+// runs under its own function budget and overlay slot. Without the split,
+// generation runs inside the create response and routinely blows Vercel's
+// 300s function budget, stranding the client on a never-resolving fetch.
 export function useDealIdEffect(
   urlDealId: string | null,
   urlFromChat: string | null,
@@ -170,6 +172,7 @@ export function useDealIdEffect(
   onAutoCreateStart?: () => void,
   onAutoCreateEnd?: () => void,
   onError?: (msg: string) => void,
+  onTriggerGenerateAll?: (memoId: string) => void,
 ) {
   const consumedDealIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -206,7 +209,11 @@ export function useDealIdEffect(
         }
       } else if (urlFromChat === "1") {
         // Deal-chat redirect: skip the modal, auto-create with AI metadata.
+        // Create runs with autoGenerate: false (fast); /generate-all runs
+        // afterwards via onTriggerGenerateAll so its 60-150s wall time
+        // doesn't sit inside the create response.
         onAutoCreateStart?.();
+        let createdId: string | null = null;
         try {
           let title = "Investment Committee Memo";
           let description = "";
@@ -225,13 +232,14 @@ export function useDealIdEffect(
           const created = await api.post<Memo>("/memos", {
             title,
             dealId: urlDealId,
-            autoGenerate: true,
+            autoGenerate: false,
             type: "IC_MEMO",
             status: "DRAFT",
             metadata: description ? { description } : undefined,
           });
           if (cancelled) return;
           await loadMemo(created.id);
+          createdId = created.id;
         } catch (err) {
           console.warn("[memo-builder] auto-create from chat failed:", err);
           onError?.(err instanceof Error ? err.message : "Failed to create memo from chat");
@@ -240,12 +248,15 @@ export function useDealIdEffect(
         } finally {
           if (!cancelled) onAutoCreateEnd?.();
         }
+        if (createdId && !cancelled) {
+          onTriggerGenerateAll?.(createdId);
+        }
       } else {
         openCreateModal(urlDealId);
       }
     })();
     return () => { cancelled = true; };
-  }, [urlDealId, urlFromChat, loadMemo, openCreateModal, onAutoCreateStart, onAutoCreateEnd, onError]);
+  }, [urlDealId, urlFromChat, loadMemo, openCreateModal, onAutoCreateStart, onAutoCreateEnd, onError, onTriggerGenerateAll]);
 }
 
 // ?memoId=X — deep-link straight to a specific memo (used by Share button).

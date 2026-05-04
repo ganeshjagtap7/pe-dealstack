@@ -3,8 +3,43 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
+
+// Escape user-provided strings before embedding them in a RegExp.
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Parse @<full name> mentions from free-form note text. Mirrors the client
+// insertion rule (deal-overview.tsx insertMention): the @ must sit at
+// start-of-string or after whitespace, followed by the user's exact display
+// name and a word-boundary delimiter. We resolve names against the org's
+// User table — the client doesn't send mentioned-id metadata.
+function parseMentions(
+  text: string,
+  orgUsers: Array<{ id: string; name: string | null }>,
+): Set<string> {
+  const matched = new Set<string>();
+  if (!text) return matched;
+  // Sort by name length DESC so "@Aditya Negi" wins over "@Aditya" when the
+  // user typed the longer form (avoids false positives on the shorter name).
+  const sorted = [...orgUsers]
+    .filter((u): u is { id: string; name: string } => Boolean(u.name && u.name.trim()))
+    .sort((a, b) => b.name.length - a.name.length);
+  let remaining = text;
+  for (const u of sorted) {
+    const re = new RegExp(`(?:^|\\s)@${escapeRegex(u.name)}(?=\\s|$|[^\\w])`);
+    if (re.test(remaining)) {
+      matched.add(u.id);
+      // Strip the matched span so a longer-name match doesn't double-count
+      // a shorter-name suffix (e.g. matching "@Aditya" inside "@Aditya Negi").
+      remaining = remaining.replace(re, ' ');
+    }
+  }
+  return matched;
+}
 
 // Query parameter schemas
 const activitiesQuerySchema = z.object({
@@ -101,6 +136,37 @@ router.post('/deals/:dealId/activities', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // @-mention notifications. Activity insert is the source of truth for
+    // notes; the client doesn't send mentioned-id metadata so we resolve
+    // names against the org User table here. Fire-and-forget — the activity
+    // POST shouldn't block on notification fan-out.
+    if (data.description) {
+      (async () => {
+        try {
+          const { data: orgUsers } = await supabase
+            .from('User')
+            .select('id, name')
+            .eq('organizationId', orgId);
+          const mentioned = parseMentions(data.description as string, orgUsers || []);
+          if (mentioned.size === 0) return;
+          const snippet = (data.description as string).slice(0, 200);
+          await Promise.all(
+            Array.from(mentioned).map((userId) =>
+              createNotification({
+                userId,
+                type: 'MENTION',
+                title: `You were mentioned in "${deal.name}"`,
+                message: snippet,
+                dealId,
+              }).catch((err) => log.error('Mention notification failed', err)),
+            ),
+          );
+        } catch (err) {
+          log.error('Mention parsing failed', err);
+        }
+      })();
+    }
 
     res.status(201).json(activity);
   } catch (error) {
