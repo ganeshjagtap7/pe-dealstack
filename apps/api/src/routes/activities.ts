@@ -148,10 +148,12 @@ router.post('/deals/:dealId/activities', async (req, res) => {
             .from('User')
             .select('id, name')
             .eq('organizationId', orgId);
+          log.info('Mention scan: orgUsers fetched', { dealId, orgId, count: orgUsers?.length ?? 0 });
           const mentioned = parseMentions(data.description as string, orgUsers || []);
+          log.info('Mention scan: parseMentions done', { dealId, matched: mentioned.size, userIds: Array.from(mentioned) });
           if (mentioned.size === 0) return;
           const snippet = (data.description as string).slice(0, 200);
-          await Promise.all(
+          const results = await Promise.all(
             Array.from(mentioned).map((userId) =>
               createNotification({
                 userId,
@@ -159,9 +161,14 @@ router.post('/deals/:dealId/activities', async (req, res) => {
                 title: `You were mentioned in "${deal.name}"`,
                 message: snippet,
                 dealId,
-              }).catch((err) => log.error('Mention notification failed', err)),
+              }).catch((err) => {
+                log.error('Mention notification failed', err);
+                return null;
+              }),
             ),
           );
+          const created = results.filter((r) => r !== null).length;
+          log.info('Mention scan: notifications created', { dealId, attempted: mentioned.size, created });
         } catch (err) {
           log.error('Mention parsing failed', err);
         }

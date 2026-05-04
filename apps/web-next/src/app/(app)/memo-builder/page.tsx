@@ -215,10 +215,15 @@ function MemoBuilderPageInner() {
   // Ref avoids re-firing on handleGenerateAll identity churn (it's recreated
   // every render). Effect depends only on the trigger flag + memo identity.
   const handleGenerateAllRef = useRef(handleGenerateAll);
-  handleGenerateAllRef.current = handleGenerateAll;
+  useEffect(() => {
+    handleGenerateAllRef.current = handleGenerateAll;
+  }, [handleGenerateAll]);
   useEffect(() => {
     if (!pendingGenerateMemoId) return;
     if (!selectedMemo || selectedMemo.id !== pendingGenerateMemoId) return;
+    // Clear the trigger flag so the effect only fires once per pending id.
+    // Without this clear we'd re-enter every render until the memo changes.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPendingGenerateMemoId(null);
     handleGenerateAllRef.current();
   }, [pendingGenerateMemoId, selectedMemo]);
