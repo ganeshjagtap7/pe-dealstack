@@ -2,7 +2,7 @@
 // Node implementations: gather → research → validate → save | review
 
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
-import { getChatModel } from '../../llm.js';
+import { invokeStructured } from '../../llm.js';
 import { supabase } from '../../../supabase.js';
 import { log } from '../../../utils/logger.js';
 import { EnrichmentState } from './state.js';
@@ -218,8 +218,6 @@ export async function researchNode(state: typeof EnrichmentState.State) {
   const steps = [...(state.steps || [])];
   steps.push({ timestamp: new Date().toISOString(), node: 'research', message: 'Synthesizing profile from CRM data' });
 
-  const model = getChatModel(0.3, 2000);
-
   const prompt = buildResearchPrompt({
     firstName: state.firstName,
     lastName: state.lastName,
@@ -232,12 +230,10 @@ export async function researchNode(state: typeof EnrichmentState.State) {
   });
 
   try {
-    const structuredModel = model.withStructuredOutput(enrichmentSchema);
-
-    const result = await structuredModel.invoke([
+    const result = await invokeStructured(enrichmentSchema, [
       new SystemMessage('You are a CRM enrichment system. Only state facts supported by the provided data. Return valid JSON.'),
       new HumanMessage(prompt),
-    ]);
+    ], { maxTokens: 2000, temperature: 0.3, label: 'contactEnrichment.research' });
 
     // Merge LLM results with gathered intelligence
     const enrichedData: Record<string, any> = {

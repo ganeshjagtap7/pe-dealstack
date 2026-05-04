@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/cn";
 
-// Ported from apps/web/js/widgets/layout-editor.js.
+// Ported from layout-editor.js.
 //
 // In legacy apps/web, LayoutEditor was a complex DOM-mutating module that
 // added drag handles, a banner, and HTML5 drag-and-drop reorder to widgets

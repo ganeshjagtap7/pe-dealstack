@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 // FullscreenSectionModal
 //
-// React port of apps/web/js/dealFullscreen.js. Provides a fullscreen overlay
+// React port of dealFullscreen.js. Provides a fullscreen overlay
 // for the Financials and Analysis sections of the deal detail page:
 //   - ESC + backdrop close
 //   - body scroll lock

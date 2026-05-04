@@ -75,7 +75,13 @@ router.post('/:id/generate-all', async (req, res) => {
       completed++;
     }
 
-    res.json({ success: true, completed, total: generated.length });
+    const { data: refreshedSections } = await supabase
+      .from('MemoSection')
+      .select('*')
+      .eq('memoId', id)
+      .order('sortOrder', { ascending: true });
+
+    res.json({ success: true, completed, total: generated.length, sections: refreshedSections || [] });
   } catch (error: any) {
     log.error('Generate-all failed', error);
     res.status(500).json({ error: classifyAIError(error.message || 'Failed to regenerate memo') });

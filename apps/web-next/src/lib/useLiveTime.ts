@@ -7,7 +7,7 @@ import { formatRelativeTime } from "./formatters";
  * Live-updating relative timestamp.
  *
  * Returns a human-readable "5 mins ago" string that re-formats every 30s,
- * matching the legacy `setInterval(..., 30000)` mechanic in apps/web/crm.js
+ * matching the legacy `setInterval(..., 30000)` mechanic in crm.js
  * (commit 42511e5). Cleans up its interval on unmount.
  */
 export function useLiveTime(date: string | Date | null | undefined): string {
@@ -20,7 +20,7 @@ export function useLiveTime(date: string | Date | null | undefined): string {
 
   useEffect(() => {
     // Re-format immediately when iso changes, then poll every 30s. Matches the
-    // legacy 30s tick cadence in apps/web/crm.js (commit 42511e5).
+    // legacy 30s tick cadence in crm.js (commit 42511e5).
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLabel(formatRelativeTime(iso));
     if (!iso) return;

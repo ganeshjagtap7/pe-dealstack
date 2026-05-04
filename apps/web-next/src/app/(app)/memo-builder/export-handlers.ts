@@ -87,7 +87,12 @@ export function createMemoHandler(deps: CreateMemoDeps) {
   return async () => {
     setCreatingMemo(true);
     try {
-      const body: Record<string, string> = { title: createForm.title, status: "DRAFT", type: "IC_MEMO" };
+      const body: Record<string, unknown> = {
+        title: createForm.title,
+        status: "DRAFT",
+        type: "IC_MEMO",
+        autoGenerate: true,
+      };
       if (createForm.dealId) body.dealId = createForm.dealId;
       if (createForm.templateId) body.templateId = createForm.templateId;
       const created = await api.post<Memo>("/memos", body);

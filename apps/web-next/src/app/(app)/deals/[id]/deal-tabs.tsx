@@ -8,9 +8,11 @@ import type { ChatMessage, DealDetail } from "./components";
 import { ClearChatModal } from "./components";
 import { AISettingsModal } from "./deal-panels";
 import { api } from "@/lib/api";
+import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { SuggestionChips } from "./deal-tabs-suggestions";
 import { ContextDocIndicators } from "./deal-tabs-context-indicators";
 import { AIMessageActions } from "./deal-tabs-ai-message-actions";
+import { ArtifactActionButton } from "./deal-tabs-artifact-button";
 
 // ---------------------------------------------------------------------------
 // Chat Tab
@@ -64,7 +66,9 @@ export function ChatTab({
       const formData = new FormData();
       formData.append("file", file);
 
-      const res = await fetch(`/api/deals/${deal.id}/documents`, {
+      // authFetchRaw forwards the Supabase Bearer token; bare fetch returned
+      // 401 because the API auth middleware never saw the JWT.
+      const res = await authFetchRaw(`/deals/${deal.id}/documents`, {
         method: "POST",
         body: formData,
       });
@@ -172,6 +176,9 @@ export function ChatTab({
                       className="chat-markdown space-y-1 break-words [&_p]:mb-1.5 [&_ul]:pl-4 [&_ul]:list-disc [&_li]:mb-0.5 [&_strong]:font-semibold"
                       dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
                     />
+                    {msg.action && msg.action.url && msg.action.label && (
+                      <ArtifactActionButton action={msg.action} />
+                    )}
                   </div>
                   {/* Helpful / Copy buttons */}
                   <AIMessageActions content={msg.content} />

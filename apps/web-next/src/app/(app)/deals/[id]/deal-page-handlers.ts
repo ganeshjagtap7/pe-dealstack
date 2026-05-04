@@ -190,6 +190,7 @@ export async function uploadDocuments(
 interface ChatResponseShape {
   response: string;
   model?: string;
+  action?: { type: string; label: string; description?: string; url: string };
   updates?: Array<{ field: string; value: unknown }>;
   sideEffects?: Array<{
     type: "note_added" | "extraction_triggered" | "scroll_to";
@@ -250,6 +251,7 @@ export async function sendPrompt(
           role: "assistant",
           content: responseText,
           createdAt: new Date().toISOString(),
+          ...(data.action && { action: data.action }),
         },
       ]);
     }

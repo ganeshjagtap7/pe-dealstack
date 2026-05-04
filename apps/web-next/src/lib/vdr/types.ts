@@ -1,4 +1,4 @@
-// VDR type definitions — ported 1:1 from apps/web/src/types/vdr.types.ts so the
+// VDR type definitions — ported 1:1 from vdr.types.ts so the
 // two implementations share the same shape and transformers are drop-in compatible.
 
 export type FolderStatus = "ready" | "attention" | "reviewing" | "restricted";

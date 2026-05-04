@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useUser } from "@/providers/UserProvider";
 import { WidgetShell } from "./shell";
 
-// Ported from apps/web/js/widgets/quick-notes.js. Per-user localStorage
+// Ported from quick-notes.js. Per-user localStorage
 // namespace so a shared browser doesn't leak notes.
 function QuickNotesInner({ storageKey }: { storageKey: string }) {
   // Lazy-init from localStorage so we don't sync state in an effect.

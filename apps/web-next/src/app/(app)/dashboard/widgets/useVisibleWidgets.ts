@@ -5,7 +5,7 @@ import { DEFAULT_VISIBLE, WIDGETS, WidgetId, CoreWidgetId, CORE_WIDGETS } from "
 
 const STORAGE_KEY = "pe-dashboard-widget-visibility";
 // Separate key for user-chosen order (matches WIDGET_ORDER_KEY in
-// apps/web/dashboard-widgets.js). Order is independent of visibility.
+// dashboard-widgets.js). Order is independent of visibility.
 const ORDER_KEY = "pe-dashboard-widget-order";
 // Key for core widget visibility (stats-cards, active-priorities, etc.)
 const CORE_VISIBILITY_KEY = "pe-dashboard-core-widget-visibility";
@@ -21,7 +21,7 @@ const DEFAULT_CORE_VISIBLE: CoreWidgetId[] = CORE_WIDGETS
 const DEFAULT_CORE_ORDER: CoreWidgetId[] = DEFAULT_CORE_VISIBLE;
 
 // Persist the set of visible optional-widget IDs in localStorage, per-browser.
-// Matches the legacy key in apps/web/dashboard.js but stores a pure array of
+// Matches the legacy key in dashboard.js but stores a pure array of
 // widget IDs rather than the HTML-specific "order + visibility" map.
 export function useVisibleWidgets() {
   const [visible, setVisible] = useState<Set<WidgetId>>(() => new Set(DEFAULT_VISIBLE));

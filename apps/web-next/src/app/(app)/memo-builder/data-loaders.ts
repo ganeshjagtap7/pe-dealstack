@@ -152,14 +152,24 @@ export function useOpenCreateModal({ setShowCreate, setCreateForm, setDeals, set
 // ?dealId=X consumption hook. When the page is opened from a deal (e.g. the
 // Memo Builder button on the deal analysis panel), receives ?dealId=X and
 // either jumps straight into the deal's existing memo, or opens the Create
-// modal pre-bound to that deal. Mirrors the legacy apps/web/memo-builder.js
+// modal pre-bound to that deal. Mirrors the legacy memo-builder.js
 // dealId-branch behavior, but skips the multi-memo picker overlay since
 // web-next already shows the full memo list in the left sidebar. Consumes
 // once per distinct dealId so it doesn't re-trigger on every render.
+//
+// When ?fromChat=1 is present (deal-chat suggested-action redirect), skip
+// the Create modal entirely: ask the API for an AI-suggested title +
+// description, POST a new memo with autoGenerate=true, then load it. The
+// caller surfaces a fullscreen overlay during this flow via the
+// onAutoCreateStart / onAutoCreateEnd callbacks.
 export function useDealIdEffect(
   urlDealId: string | null,
+  urlFromChat: string | null,
   loadMemo: (id: string) => Promise<void>,
   openCreateModal: (prefillDealId?: string) => Promise<void>,
+  onAutoCreateStart?: () => void,
+  onAutoCreateEnd?: () => void,
+  onError?: (msg: string) => void,
 ) {
   const consumedDealIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -194,12 +204,48 @@ export function useDealIdEffect(
           console.warn("[memo-builder] loadMemo failed, falling back to create:", err);
           if (!cancelled) openCreateModal(urlDealId);
         }
+      } else if (urlFromChat === "1") {
+        // Deal-chat redirect: skip the modal, auto-create with AI metadata.
+        onAutoCreateStart?.();
+        try {
+          let title = "Investment Committee Memo";
+          let description = "";
+          try {
+            const meta = await api.post<{ title?: string; description?: string }>(
+              `/memos/suggest-meta`,
+              { dealId: urlDealId },
+            );
+            if (meta?.title) title = meta.title;
+            if (meta?.description) description = meta.description;
+          } catch (metaErr) {
+            console.warn("[memo-builder] suggest-meta failed; using default title:", metaErr);
+          }
+          if (cancelled) return;
+
+          const created = await api.post<Memo>("/memos", {
+            title,
+            dealId: urlDealId,
+            autoGenerate: true,
+            type: "IC_MEMO",
+            status: "DRAFT",
+            metadata: description ? { description } : undefined,
+          });
+          if (cancelled) return;
+          await loadMemo(created.id);
+        } catch (err) {
+          console.warn("[memo-builder] auto-create from chat failed:", err);
+          onError?.(err instanceof Error ? err.message : "Failed to create memo from chat");
+          // Fall back to the modal so the user can retry manually.
+          if (!cancelled) openCreateModal(urlDealId);
+        } finally {
+          if (!cancelled) onAutoCreateEnd?.();
+        }
       } else {
         openCreateModal(urlDealId);
       }
     })();
     return () => { cancelled = true; };
-  }, [urlDealId, loadMemo, openCreateModal]);
+  }, [urlDealId, urlFromChat, loadMemo, openCreateModal, onAutoCreateStart, onAutoCreateEnd, onError]);
 }
 
 // ?memoId=X — deep-link straight to a specific memo (used by Share button).

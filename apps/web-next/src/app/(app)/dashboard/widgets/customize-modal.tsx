@@ -13,7 +13,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // Customize Dashboard modal — shows ALL widgets including core sections.
-// Matches apps/web/dashboard-widgets.js openWidgetModal() full widget list.
+// Matches dashboard-widgets.js openWidgetModal() full widget list.
 // ---------------------------------------------------------------------------
 export function CustomizeDashboardModal({
   open,

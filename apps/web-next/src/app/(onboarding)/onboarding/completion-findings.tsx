@@ -110,7 +110,7 @@ export function CompletionFindings({
         onDealId?.(dealId);
 
         // Try fetching AI risk analysis. The legacy onboarding-flow.js called
-        // GET /deals/:id/analysis (apps/web/js/onboarding/onboarding-flow.js:459),
+        // GET /deals/:id/analysis (onboarding-flow.js),
         // which never existed on the backend — it was always a 404 fall-through.
         // The actual endpoint is POST /deals/:id/analyze-risks
         // (apps/api/src/routes/ai.ts:263) which returns

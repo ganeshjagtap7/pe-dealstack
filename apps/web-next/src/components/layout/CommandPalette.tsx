@@ -2,7 +2,7 @@
 
 // ---------------------------------------------------------------------------
 // CommandPalette — Cmd+K spotlight overlay for quick navigation.
-// Ported from apps/web/js/commandPalette.js. The legacy palette listed Pages,
+// Ported from commandPalette.js. The legacy palette listed Pages,
 // Deals, and Contacts — the web-next port restructures into Pages, Recent
 // Deals, and Actions (broader navigation). Per-result search continues to use
 // case-insensitive AND-of-words substring match across label + keywords.

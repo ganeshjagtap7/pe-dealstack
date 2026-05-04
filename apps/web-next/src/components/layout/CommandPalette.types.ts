@@ -29,7 +29,7 @@ export const PALETTE_ACTIONS: PaletteAction[] = [
   { label: "Open Settings",        href: "/settings",     icon: "settings",     keywords: "profile preferences account settings" },
 ];
 
-// Per-page keyword expansion (mirrors apps/web/js/commandPalette.js PAGES).
+// Per-page keyword expansion (mirrors commandPalette.js PAGES).
 // Lets queries like "pipeline" or "vdr" match Deals / Data Room.
 export const PAGE_KEYWORDS: Record<string, string> = {
   dashboard: "home overview",

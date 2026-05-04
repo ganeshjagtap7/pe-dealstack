@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 import { WatchlistAddModal } from "./watchlist-add-modal";
 
-// Ported from apps/web/js/widgets/watchlist.js. Needs the /api/watchlist
+// Ported from watchlist.js. Needs the /api/watchlist
 // endpoint added on main in c9dcc6d.
 type WatchItem = {
   id: string;

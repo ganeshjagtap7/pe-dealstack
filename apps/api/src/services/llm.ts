@@ -171,8 +171,12 @@ export async function invokeStructured<T extends z.ZodTypeAny>(
   const maxTokens = opts?.maxTokens ?? 2000;
   const temperature = opts?.temperature ?? 0.1;
   const label = opts?.label ?? 'invokeStructured';
+  // Construct primary directly so caller's temperature is honoured. Using
+  // getExtractionModel would hardcode 0.1, which is wrong for emails / meeting
+  // briefs / signal analysis where higher variance is desirable.
+  const primaryName = MODELS[config.chatProvider].extraction;
   try {
-    const primary = getExtractionModel(maxTokens);
+    const primary = createModel(config.chatProvider, primaryName, temperature, maxTokens);
     return await primary.withStructuredOutput(schema).invoke(messages);
   } catch (primaryErr: any) {
     log.warn(`${label}: primary model failed, retrying with fallback`, describeAIError(primaryErr));

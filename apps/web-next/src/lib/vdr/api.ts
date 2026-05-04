@@ -1,4 +1,4 @@
-// VDR API — ported from apps/web/src/services/vdrApi.ts. Re-uses the web-next
+// VDR API — ported from vdrApi.ts. Re-uses the web-next
 // `api` helper for JSON calls; upload uses raw fetch since api is JSON-only.
 
 import { api, NotFoundError } from "@/lib/api";
@@ -297,7 +297,7 @@ export function transformDocument(apiDoc: APIDocument): VDRFile {
   }
 
   // Analysis — three-state: Pending → Ready for AI → Analyzed
-  // (ported from apps/web/src/services/vdrApi.ts transformDocument, 68ff3f8)
+  // (ported from vdrApi.ts transformDocument, 68ff3f8)
   let analysisType: VDRFile["analysis"]["type"] = "standard";
   let analysisLabel = "Pending Analysis";
   let analysisDescription = "Document awaiting text extraction.";

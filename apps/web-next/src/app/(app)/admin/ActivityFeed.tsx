@@ -15,7 +15,7 @@ import type { AdminAuditLog } from "./types";
 
 const PAGE_SIZE = 10;
 
-// Mirrors legacy getInitials in apps/web/js/widgets/activity-formatters.js —
+// Mirrors legacy getInitials in activity-formatters.js —
 // splits on whitespace AND `@` so an email-derived display name still produces
 // two-letter initials (e.g. "alice.bobson@firm.com" → "AF"). The shared
 // getInitials in lib/formatters.ts only splits on space, so it's not a direct
@@ -152,7 +152,7 @@ export function ActivityFeed() {
 }
 
 // Single activity row. Matches the legacy renderActivityItem layout in
-// apps/web/js/widgets/activity-formatters.js, with the corrected action-icon
+// activity-formatters.js, with the corrected action-icon
 // badge sizing from commit 3d87c52 (badge 18×18, icon 12px font-size, opsz 20).
 function ActivityItem({ log }: { log: AuditLog }) {
   const ai = isAIAction(log);

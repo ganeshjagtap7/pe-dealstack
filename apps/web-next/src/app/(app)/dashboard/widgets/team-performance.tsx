@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { getInitials } from "@/lib/formatters";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/team-performance.js.
+// Ported from team-performance.js.
 type User = { id: string; name?: string; email?: string };
 type DealRow = { teamMembers?: Array<{ userId?: string; user?: { id?: string } }> };
 type TaskRow = { assignedTo?: string; status?: string };

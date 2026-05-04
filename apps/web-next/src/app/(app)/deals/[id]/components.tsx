@@ -66,11 +66,19 @@ export interface TeamMember {
   role?: string;
 }
 
+export interface ChatAction {
+  type: string;
+  label: string;
+  description?: string;
+  url: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   content: string;
   createdAt?: string;
+  action?: ChatAction;
 }
 
 export interface Activity {

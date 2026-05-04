@@ -1,5 +1,5 @@
 // Chat send handler extracted from page.tsx. Mirrors the legacy
-// apps/web/memo-chat.js refresh-on-applied behavior: when the agent
+// memo-chat.js refresh-on-applied behavior: when the agent
 // surfaces an "applied" action (e788eb3 + b609ebd on main), reload the
 // memo so the new section state is visible in the editor. Behavior is
 // unchanged from the inline implementation in page.tsx.

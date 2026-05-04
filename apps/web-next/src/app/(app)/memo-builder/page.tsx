@@ -21,6 +21,7 @@ import {
 } from "./components";
 import { DocumentHeaderBar } from "./header-bar";
 import { DeleteMemoConfirm, applyMemoDeleted, type PendingDeleteMemo } from "./delete-memo";
+import { GeneratingOverlay } from "./generating-overlay";
 import {
   MemoBreadcrumb,
   MemoEmptyState,
@@ -69,6 +70,7 @@ function MemoBuilderPageInner() {
   const searchParams = useSearchParams();
   const urlDealId = searchParams.get("dealId");
   const urlMemoId = searchParams.get("memoId");
+  const urlFromChat = searchParams.get("fromChat");
   /* ---- State ---- */
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -114,6 +116,7 @@ function MemoBuilderPageInner() {
   const [pendingDeleteSection, setPendingDeleteSection] = useState<{ id: string; title: string } | null>(null);
   const [pendingDeleteMemo, setPendingDeleteMemo] = useState<PendingDeleteMemo | null>(null);
   const [generatingAll, setGeneratingAll] = useState(false);
+  const [autoCreating, setAutoCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
@@ -148,7 +151,15 @@ function MemoBuilderPageInner() {
   const openCreateModal = useOpenCreateModal({ setShowCreate, setCreateForm, setDeals, setTemplates });
 
   // URL ?dealId=X / ?memoId=X consumption — see data-loaders.ts for details.
-  useDealIdEffect(urlDealId, loadMemo, openCreateModal);
+  useDealIdEffect(
+    urlDealId,
+    urlFromChat,
+    loadMemo,
+    openCreateModal,
+    () => setAutoCreating(true),
+    () => setAutoCreating(false),
+    setError,
+  );
   useMemoIdEffect(urlMemoId, loadMemo);
 
   const handleCreate = createMemoHandler({
@@ -236,8 +247,18 @@ function MemoBuilderPageInner() {
 
   /* ---- Render ---- */
 
+  // Pick the highest-priority overlay status (one overlay at a time).
+  const overlayStatus = autoCreating
+    ? "Creating memo from deal context..."
+    : creatingMemo
+    ? "Creating memo and generating sections..."
+    : generatingAll
+    ? "Generating all memo sections..."
+    : null;
+
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden min-w-0">
+      {overlayStatus && <GeneratingOverlay status={overlayStatus} />}
       {/* ---- Left sidebar: memo list ---- */}
       <MemoListSidebar
         memos={memos}

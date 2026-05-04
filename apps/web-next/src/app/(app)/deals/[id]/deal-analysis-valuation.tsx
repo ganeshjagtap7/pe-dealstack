@@ -142,7 +142,7 @@ function LBOScreenCard({ lbo }: { lbo: LBOScreen }) {
 
 // ---------------------------------------------------------------------------
 // Benchmark Card (used inside Valuation tab — matches legacy renderBenchmark
-// in apps/web/js/analysis-valuation.js. Title "Portfolio Benchmarking"
+// in analysis-valuation.js. Title "Portfolio Benchmarking"
 // is canonical and must not change without a corresponding legacy update.)
 // ---------------------------------------------------------------------------
 
