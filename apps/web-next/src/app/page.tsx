@@ -45,7 +45,7 @@ export default function LandingPage() {
                 </div>
                 <div className="flex items-center justify-center lg:justify-start gap-2 text-sm text-slate-500 pt-2">
                   <span className="material-symbols-outlined text-[18px] text-green-500">check_circle</span>
-                  <span>SOC 2 Type II compliant</span>
+                  <span>SOC 2 Type II Compliant</span>
                 </div>
               </div>
               {/* Hero Image / Dashboard Preview */}
