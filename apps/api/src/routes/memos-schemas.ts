@@ -19,6 +19,7 @@ export const createMemoSchema = z.object({
   memoDate: z.string().optional(),
   autoGenerate: z.boolean().optional().default(false),
   templatePreset: z.enum(['comprehensive', 'standard', 'search_fund', 'screening']).optional(),
+  metadata: z.record(z.any()).optional(),
 });
 
 export const updateMemoSchema = createMemoSchema.partial();

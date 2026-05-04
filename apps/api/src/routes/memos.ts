@@ -15,9 +15,11 @@ import memoChatRouter from './memos-chat.js';
 import memosListRouter from './memos-list.js';
 import memosMutateRouter from './memos-mutate.js';
 import memosGenerateRouter from './memos-generate.js';
+import memosSuggestRouter from './memos-suggest.js';
 
 const router = Router();
 
+router.use('/', memosSuggestRouter);
 router.use('/', memoSectionsRouter);
 router.use('/', memoChatRouter);
 router.use('/', memosListRouter);

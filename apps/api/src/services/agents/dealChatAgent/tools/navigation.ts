@@ -13,7 +13,7 @@ export function makeSuggestActionTool(dealId: string, _orgId: string) {
       // just send users to the deal page and rely on the user to click the
       // right tab. (A future improvement: real route segments per tab.)
       const urlMap: Record<string, string> = {
-        create_memo: `/memo-builder?dealId=${dealId}`,
+        create_memo: `/memo-builder?dealId=${dealId}&fromChat=1`,
         open_data_room: `/data-room/${dealId}`,
         upload_document: `/data-room/${dealId}`,
         view_financials: `/deals/${dealId}`,

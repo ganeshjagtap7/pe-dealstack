@@ -12,6 +12,7 @@ import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { SuggestionChips } from "./deal-tabs-suggestions";
 import { ContextDocIndicators } from "./deal-tabs-context-indicators";
 import { AIMessageActions } from "./deal-tabs-ai-message-actions";
+import { ArtifactActionButton } from "./deal-tabs-artifact-button";
 
 // ---------------------------------------------------------------------------
 // Chat Tab
@@ -175,6 +176,9 @@ export function ChatTab({
                       className="chat-markdown space-y-1 break-words [&_p]:mb-1.5 [&_ul]:pl-4 [&_ul]:list-disc [&_li]:mb-0.5 [&_strong]:font-semibold"
                       dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(renderMarkdown(msg.content)) }}
                     />
+                    {msg.action && msg.action.url && msg.action.label && (
+                      <ArtifactActionButton action={msg.action} />
+                    )}
                   </div>
                   {/* Helpful / Copy buttons */}
                   <AIMessageActions content={msg.content} />
