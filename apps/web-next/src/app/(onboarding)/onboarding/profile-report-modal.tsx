@@ -4,7 +4,7 @@ import { useEffect } from "react";
 import { EnrichmentResponse, FirmProfile, PersonProfile } from "./enrichment-types";
 
 // Full profile report modal — detailed firm + person data.
-// Ported from showProfileReport() in apps/web/js/onboarding/onboarding-tasks.js
+// Ported from showProfileReport() in onboarding-tasks.js
 // (9948dcf). Closes on X, backdrop click, and Escape.
 export function ProfileReportModal({
   result,

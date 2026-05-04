@@ -6,7 +6,7 @@ import type { ChatAction } from "./components";
 // ---------------------------------------------------------------------------
 // Artifact action button — rendered below an AI message when the backend
 // returns an `action` object on POST /deals/:id/chat. Mirrors the legacy
-// implementation in apps/web/deal-chat.js:511-541.
+// implementation in deal-chat.js.
 // ---------------------------------------------------------------------------
 
 const ICON_MAP: Record<string, string> = {

@@ -5,7 +5,7 @@ import type { DealDetail } from "./components";
 
 // ---------------------------------------------------------------------------
 // Suggestion Chips — personalized prompts based on deal data.
-// Ported from apps/web/deal-chat.js (63dd4a0 + cf67cea): always visible,
+// Ported from deal-chat.js (63dd4a0 + cf67cea): always visible,
 // contextual copy when deal data is loaded, fall back to defaults otherwise.
 // ---------------------------------------------------------------------------
 

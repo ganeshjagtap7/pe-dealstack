@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { formatRelativeTime, getInitials } from "@/lib/formatters";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/recent-activity.js +
+// Ported from recent-activity.js +
 // activity-formatters.js. Top 10 audit logs grouped by day with rich formatting.
 type AuditLog = {
   id: string;

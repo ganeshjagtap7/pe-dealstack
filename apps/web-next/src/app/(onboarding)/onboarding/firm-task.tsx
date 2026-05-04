@@ -11,7 +11,7 @@ import { ProfileReportModal } from "./profile-report-modal";
 
 // Firm task modal — form for website/linkedin + fund size + sectors.
 // Ported from OnboardingTasks._renderers.firm + _hydrators.firm in
-// apps/web/js/onboarding/onboarding-tasks.js. AI enrichment button is
+// onboarding-tasks.js. AI enrichment button is
 // deferred — user fills the form manually for now.
 export function FirmTaskModal({
   value,

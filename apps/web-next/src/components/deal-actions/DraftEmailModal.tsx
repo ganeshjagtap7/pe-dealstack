@@ -1,6 +1,6 @@
 "use client";
 
-// Ported from apps/web/js/ai-email-drafter.js (openEmailDraftModal +
+// Ported from ai-email-drafter.js (openEmailDraftModal +
 // generateEmailDraft + renderEmailDraft + copyEmailDraft).
 // Calls GET /api/ai/email-templates and POST /api/ai/draft-email.
 // Response shape: see EmailDraftResult in

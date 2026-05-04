@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/deal-funnel.js.
+// Ported from deal-funnel.js.
 const STAGES: Array<{ key: string; label: string; color: string; also?: string[] }> = [
   { key: "INITIAL_REVIEW", label: "Sourcing", color: "#60A5FA" },
   { key: "DUE_DILIGENCE", label: "Due Diligence", color: "#003366" },

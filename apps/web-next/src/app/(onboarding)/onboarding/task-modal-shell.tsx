@@ -3,7 +3,7 @@
 import { ReactNode, useEffect } from "react";
 
 // Shared modal shell for the 3 task modals. Mirrors the #modal-card
-// markup in apps/web/onboarding.html.
+// markup in onboarding.html.
 export function TaskModalShell({
   icon,
   title,

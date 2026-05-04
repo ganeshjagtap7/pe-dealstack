@@ -7,7 +7,7 @@ import { formatRelativeTime, formatFileSize, getDocIcon } from "@/lib/formatters
 import type { DocItem } from "./components";
 
 // ---------------------------------------------------------------------------
-// Document row — ported from apps/web/deal-documents.js (updateDocumentsList +
+// Document row — ported from deal-documents.js (updateDocumentsList +
 // fetchAndPreviewDocument + fetchAndShowAnalysis). Whole row is keyboard- and
 // click-activatable; an explicit Download button on the right edge triggers
 // the same signed URL but forces a download instead of a preview.
@@ -55,7 +55,7 @@ export function DocumentRow({ doc, onShowAnalysis }: DocumentRowProps) {
   // -------------------------------------------------------------------------
   // In-app document preview — intentional MVP decision (audit A3)
   //
-  // The legacy apps/web/js/docPreview.js rendered PDF, Excel, Word, and CSV
+  // The legacy docPreview.js rendered PDF, Excel, Word, and CSV
   // files entirely in-browser using PDF.js (PDF), SheetJS (XLSX), and
   // Mammoth.js (DOCX). That 543-line subsystem was intentionally NOT ported
   // during the migration to web-next.
@@ -72,7 +72,7 @@ export function DocumentRow({ doc, onShowAnalysis }: DocumentRowProps) {
   // the API layer — do not change it here.
   //
   // If product wants in-app Excel/Word rendering back: port
-  // apps/web/js/docPreview.js and add `xlsx` + `mammoth` to
+  // docPreview.js and add `xlsx` + `mammoth` to
   // apps/web-next/package.json. Reference: docs/MIGRATION-AUDIT-REPORT.md A3.
   // -------------------------------------------------------------------------
   async function handleActivate() {

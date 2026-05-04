@@ -190,7 +190,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
 
 export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
   // Dynamic financial metrics — only show cards with data, prioritized by
-  // relevance. Ported from apps/web/deal.js renderDynamicMetrics.
+  // relevance. Ported from deal.js renderDynamicMetrics.
   const hasMarginData = deal.ebitda != null && deal.revenue != null && deal.revenue !== 0;
 
   type MetricDef = { key: string; label: string; value: unknown; formatted: string; badge?: string; extra?: string };

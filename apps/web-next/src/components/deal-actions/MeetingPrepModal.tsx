@@ -1,6 +1,6 @@
 "use client";
 
-// Ported from apps/web/js/ai-tools.js (openMeetingPrepModal + generateMeetingPrep
+// Ported from ai-tools.js (openMeetingPrepModal + generateMeetingPrep
 // + renderMeetingBrief + exportMeetingBrief). Calls POST /api/ai/meeting-prep
 // which returns a MeetingBrief — see
 // apps/api/src/services/agents/meetingPrep/index.ts for the response shape.

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api } from "@/lib/api";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/document-alerts.js. Depends on the
+// Ported from document-alerts.js. Depends on the
 // /api/documents/alerts endpoint added on main in c9dcc6d.
 type Alert = {
   id: string;

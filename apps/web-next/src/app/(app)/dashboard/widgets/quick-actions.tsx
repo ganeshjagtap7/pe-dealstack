@@ -5,7 +5,7 @@ import { useUser } from "@/providers/UserProvider";
 import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
 import { WidgetShell } from "./shell";
 
-// Ported from apps/web/js/widgets/quick-actions.js.
+// Ported from quick-actions.js.
 // Hides "Create Task" for non-admins.
 //
 // "New Deal" used to deep-link to /deal-intake. The full-page intake flow has

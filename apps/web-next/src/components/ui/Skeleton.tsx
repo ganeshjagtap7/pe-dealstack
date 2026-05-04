@@ -3,7 +3,7 @@
 /**
  * Reusable skeleton shimmer primitives.
  *
- * Mirrors apps/web/css/skeleton.css. The base `.skeleton` class (defined in
+ * Mirrors skeleton.css. The base `.skeleton` class (defined in
  * globals.css) provides the gradient + shimmer animation; this component just
  * adds ergonomic React props for sizing and shape.
  *

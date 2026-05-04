@@ -183,7 +183,7 @@ export default function DealDetailPage() {
   // Hash-scroll: the onboarding checklist links to /deals/:id#financials-section
   // etc. Sections render async after the deal loads, so the browser's native
   // hash scroll fires before targets exist. Poll up to 8s for the element then
-  // smooth-scroll. Ported from apps/web/deal.js scrollToHashWhenReady (ee35074).
+  // smooth-scroll. Ported from deal.js scrollToHashWhenReady (ee35074).
   useEffect(() => {
     if (!deal) return;
     const hash = window.location.hash?.slice(1);

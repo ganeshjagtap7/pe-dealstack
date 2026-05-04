@@ -152,7 +152,7 @@ export function useOpenCreateModal({ setShowCreate, setCreateForm, setDeals, set
 // ?dealId=X consumption hook. When the page is opened from a deal (e.g. the
 // Memo Builder button on the deal analysis panel), receives ?dealId=X and
 // either jumps straight into the deal's existing memo, or opens the Create
-// modal pre-bound to that deal. Mirrors the legacy apps/web/memo-builder.js
+// modal pre-bound to that deal. Mirrors the legacy memo-builder.js
 // dealId-branch behavior, but skips the multi-memo picker overlay since
 // web-next already shows the full memo list in the left sidebar. Consumes
 // once per distinct dealId so it doesn't re-trigger on every render.

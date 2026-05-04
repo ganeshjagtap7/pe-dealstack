@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/upcoming-deadlines.js.
+// Ported from upcoming-deadlines.js.
 type TaskRow = {
   id: string;
   title: string;

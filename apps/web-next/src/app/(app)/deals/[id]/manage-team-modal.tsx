@@ -1,6 +1,6 @@
 "use client";
 
-// Manage Team modal — port of apps/web/deal-team.js showShareModal (legacy
+// Manage Team modal — port of deal-team.js showShareModal (legacy
 // vanilla-JS implementation), folded into a single React component.
 //
 // Capabilities (parity with legacy + the chat-agent assign flow):

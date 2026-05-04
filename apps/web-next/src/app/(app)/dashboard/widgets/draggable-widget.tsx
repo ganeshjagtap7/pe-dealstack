@@ -8,7 +8,7 @@ import { WidgetId } from "./registry";
 // `editing` is true, the wrapper becomes draggable, shows a dashed outline
 // and a grab handle in the top-right, and fires `onReorder` with the new
 // sibling order on drop. Mirrors the native HTML5 drag-and-drop flow from
-// apps/web/js/widgets/layout-editor.js.
+// layout-editor.js.
 export function DraggableWidget({
   id,
   editing,

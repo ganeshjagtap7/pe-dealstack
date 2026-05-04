@@ -253,7 +253,7 @@ export default function DashboardPage() {
         <OnboardingChecklist />
 
         {/* Edit-mode banner — matches #layout-edit-banner in
-            apps/web/js/widgets/layout-editor.js. Shown at top of widgets. */}
+            layout-editor.js. Shown at top of widgets. */}
         {isEditing && (
           <div
             className="flex items-center gap-2.5 px-5 py-2.5 rounded-lg text-white text-[13px] font-semibold shadow-md"

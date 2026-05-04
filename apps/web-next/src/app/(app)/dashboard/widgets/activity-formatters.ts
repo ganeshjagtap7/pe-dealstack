@@ -1,5 +1,5 @@
 // Shared activity-log formatters. Ported from
-// apps/web/js/widgets/activity-formatters.js — used by RecentActivityWidget
+// activity-formatters.js — used by RecentActivityWidget
 // today, and ready for future Team Activity admin views.
 //
 // The legacy module exposed string-HTML helpers; this version returns
@@ -35,7 +35,7 @@ type ActionDef = {
   icon: string;
 };
 
-// Mirrors actionMap in apps/web/js/widgets/activity-formatters.js. The before
+// Mirrors actionMap in activity-formatters.js. The before
 // segment is rendered before the entity name; if `after` is present, it's
 // rendered after the entity. When both are blank, the action is treated as
 // entity-less (LOGIN, LOGOUT, SETTINGS_CHANGED).

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/calendar.js. Next-7-days union of
+// Ported from calendar.js. Next-7-days union of
 // Task.dueDate (pending) + Deal.targetCloseDate.
 type DealRow = { name: string; targetCloseDate?: string };
 type TaskRow = { title: string; dueDate?: string; status?: string };

@@ -32,7 +32,7 @@ function normalizeUrl(raw: string): string | undefined {
 }
 
 // Main onboarding page — welcome view, then checklist of 3 tasks, then
-// dashboard. Ported from apps/web/js/onboarding/onboarding-flow.js (3a796c8).
+// dashboard. Ported from onboarding-flow.js (3a796c8).
 export default function OnboardingPage() {
   const router = useRouter();
   const { showToast } = useToast();
@@ -231,7 +231,7 @@ export default function OnboardingPage() {
   const confirmSkip = async () => {
     // /onboarding/dismiss sets checklistDismissed=true (NOT /onboarding/skip;
     // that endpoint doesn't exist). Matches legacy markOnboardingSkipped in
-    // apps/web/js/onboarding/onboarding-flow.js:405.
+    // onboarding-flow.js.
     markSeen();
     try {
       await Promise.all([

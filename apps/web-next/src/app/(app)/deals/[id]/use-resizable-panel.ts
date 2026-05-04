@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // ─── Resizable Panel Hook ─────────────────────────────────────
 // Drag the border between deal details and chat to resize.
 // Persists width preference in localStorage.
-// Ported from apps/web/deal-chat-resize.js.
+// Ported from deal-chat-resize.js.
 
 const STORAGE_KEY = "pe-deal-chat-width";
 const MIN_LEFT = 400;
