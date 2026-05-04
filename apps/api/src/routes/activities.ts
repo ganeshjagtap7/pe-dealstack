@@ -12,25 +12,42 @@ function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-// Parse @<full name> mentions from free-form note text. Mirrors the client
-// insertion rule (deal-overview.tsx insertMention): the @ must sit at
-// start-of-string or after whitespace, followed by the user's exact display
-// name and a word-boundary delimiter. We resolve names against the org's
-// User table — the client doesn't send mentioned-id metadata.
+// Compute the display string the mention picker would insert for a user.
+// Mirrors fetchMentionUsers in deal-overview.tsx: prefer User.name, fall
+// back to the email-prefix, then "Unknown". Without this fallback, users
+// whose name is NULL never match server-side even though the picker
+// happily inserts `@<email-prefix> ` for them.
+function mentionDisplayName(u: { name: string | null; email: string | null }): string | null {
+  const name = u.name?.trim();
+  if (name) return name;
+  const prefix = u.email?.split('@')[0]?.trim();
+  if (prefix) return prefix;
+  return null;
+}
+
+// Parse @<display name> mentions from free-form note text. Mirrors the
+// client insertion rule (deal-overview.tsx insertMention): the @ must sit
+// at start-of-string or after whitespace, followed by the user's display
+// name and a word-boundary delimiter. We resolve display names against
+// the org's User table — the client doesn't send mentioned-id metadata.
 function parseMentions(
   text: string,
-  orgUsers: Array<{ id: string; name: string | null }>,
+  orgUsers: Array<{ id: string; name: string | null; email: string | null }>,
 ): Set<string> {
   const matched = new Set<string>();
   if (!text) return matched;
-  // Sort by name length DESC so "@Aditya Negi" wins over "@Aditya" when the
-  // user typed the longer form (avoids false positives on the shorter name).
-  const sorted = [...orgUsers]
-    .filter((u): u is { id: string; name: string } => Boolean(u.name && u.name.trim()))
-    .sort((a, b) => b.name.length - a.name.length);
+  // Sort by display-name length DESC so "@Aditya Negi" wins over "@Aditya"
+  // when the user typed the longer form (avoids false positives on the
+  // shorter name).
+  const sorted = orgUsers
+    .map((u) => ({ id: u.id, displayName: mentionDisplayName(u) }))
+    .filter((u): u is { id: string; displayName: string } => u.displayName !== null)
+    .sort((a, b) => b.displayName.length - a.displayName.length);
   let remaining = text;
   for (const u of sorted) {
-    const re = new RegExp(`(?:^|\\s)@${escapeRegex(u.name)}(?=\\s|$|[^\\w])`);
+    // Case-insensitive — the picker preserves DB case but users sometimes
+    // hand-type a mention with different casing.
+    const re = new RegExp(`(?:^|\\s)@${escapeRegex(u.displayName)}(?=\\s|$|[^\\w])`, 'i');
     if (re.test(remaining)) {
       matched.add(u.id);
       // Strip the matched span so a longer-name match doesn't double-count
@@ -146,11 +163,26 @@ router.post('/deals/:dealId/activities', async (req, res) => {
         try {
           const { data: orgUsers } = await supabase
             .from('User')
-            .select('id, name')
+            .select('id, name, email')
             .eq('organizationId', orgId);
-          log.info('Mention scan: orgUsers fetched', { dealId, orgId, count: orgUsers?.length ?? 0 });
-          const mentioned = parseMentions(data.description as string, orgUsers || []);
-          log.info('Mention scan: parseMentions done', { dealId, matched: mentioned.size, userIds: Array.from(mentioned) });
+          const candidates = (orgUsers || []).map((u) => ({
+            id: u.id as string,
+            name: (u.name as string | null) ?? null,
+            email: (u.email as string | null) ?? null,
+          }));
+          log.info('Mention scan: orgUsers fetched', {
+            dealId,
+            orgId,
+            count: candidates.length,
+            displayNames: candidates.map((u) => mentionDisplayName(u)).filter(Boolean),
+          });
+          const mentioned = parseMentions(data.description as string, candidates);
+          log.info('Mention scan: parseMentions done', {
+            dealId,
+            descriptionPreview: (data.description as string).slice(0, 120),
+            matched: mentioned.size,
+            userIds: Array.from(mentioned),
+          });
           if (mentioned.size === 0) return;
           const snippet = (data.description as string).slice(0, 200);
           const results = await Promise.all(
