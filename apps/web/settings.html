@@ -116,6 +116,10 @@
                                     <span class="material-symbols-outlined text-[20px]">notifications</span>
                                     <span class="text-sm font-medium">Notifications</span>
                                 </a>
+                                <a href="#section-integrations" data-section="integrations" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
+                                  <span class="material-symbols-outlined text-[20px]">extension</span>
+                                  <span class="text-sm font-medium">Integrations</span>
+                                </a>
                                 <a href="#section-team" data-section="team" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
                                     <span class="material-symbols-outlined text-[20px]">group</span>
                                     <span class="text-sm font-medium">Team</span>
@@ -302,6 +306,30 @@
                                 </div>
                                 <div class="p-6 space-y-1" id="notification-toggles">
                                     <!-- Toggles rendered by JS -->
+                                </div>
+                            </section>
+
+                            <!-- Integrations -->
+                            <section id="section-integrations" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
+                                <div class="px-6 py-5 border-b border-border-subtle flex items-center gap-3">
+                                    <div class="p-2 bg-primary-light rounded-lg text-primary border border-primary/20">
+                                        <span class="material-symbols-outlined text-[20px] block">extension</span>
+                                    </div>
+                                    <div>
+                                        <h2 class="text-base font-bold text-text-main">Integrations</h2>
+                                        <p class="text-xs text-text-muted">Connect your tools so deal context appears here automatically.</p>
+                                    </div>
+                                </div>
+                                <div class="p-6">
+                                    <div id="integrations-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <!-- Cards rendered by integrations.js -->
+                                    </div>
+                                    <div class="mt-8">
+                                        <h3 class="text-sm font-semibold text-text-main mb-3">Sync activity</h3>
+                                        <div id="integrations-activity" class="border border-border-subtle rounded-lg overflow-hidden">
+                                            <div class="p-4 text-sm text-text-muted">Connect an integration to see sync activity.</div>
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
 
@@ -492,5 +520,7 @@
     <script defer src="js/onboarding/onboarding-api.js"></script>
     <script defer src="js/onboarding/onboarding-celebrate.js"></script>
     <script defer src="js/onboarding/onboarding-feedback.js"></script>
+
+    <script type="module" src="/js/integrations.js"></script>
 </body>
 </html>
