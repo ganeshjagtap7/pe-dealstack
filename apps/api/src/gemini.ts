@@ -13,8 +13,8 @@ if (!apiKey) {
 // Initialize Gemini client
 export const genAI = apiKey ? new GoogleGenerativeAI(apiKey) : null;
 
-// Embedding model - text-embedding-004 outputs 768 dimensions
-export const embeddingModel = genAI?.getGenerativeModel({ model: 'text-embedding-004' });
+// Embedding model - gemini-embedding-001 (GA replacement for text-embedding-004)
+export const embeddingModel = genAI?.getGenerativeModel({ model: process.env.EMBEDDING_MODEL || 'gemini-embedding-001' });
 
 // Chat model - Gemini 1.5 Flash for fast responses
 export const chatModel = genAI?.getGenerativeModel({ model: 'gemini-1.5-flash' });

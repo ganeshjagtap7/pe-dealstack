@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { useToast } from "@/providers/ToastProvider";
+import { Logo } from "@/components/layout/Logo";
 import { WelcomeView } from "./welcome-view";
 import { ChecklistView } from "./checklist-view";
 import { Confetti } from "./confetti";
@@ -319,9 +320,7 @@ function TopNav({ doneCount, onSkip }: { doneCount: number; onSkip: () => void }
     <header className="bg-white border-b border-border-subtle">
       <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <svg width={22} height={22} viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L2 12L12 22L22 12L12 2Z" fill="#003366" />
-          </svg>
+          <Logo className="size-[22px] shrink-0 text-primary" />
           <span className="font-bold text-[15px] tracking-tight text-primary">PE OS</span>
           <span className="text-[11px] text-text-muted font-mono uppercase tracking-wider ml-2 hidden sm:inline">
             Getting started

@@ -159,9 +159,11 @@ export function useOpenCreateModal({ setShowCreate, setCreateForm, setDeals, set
 //
 // When ?fromChat=1 is present (deal-chat suggested-action redirect), skip
 // the Create modal entirely: ask the API for an AI-suggested title +
-// description, POST a new memo with autoGenerate=true, then load it. The
-// caller surfaces a fullscreen overlay during this flow via the
-// onAutoCreateStart / onAutoCreateEnd callbacks.
+// description, POST a new memo with autoGenerate=false (fast), then trigger
+// /generate-all separately via onTriggerGenerateAll so the slow LLM work
+// runs under its own function budget and overlay slot. Without the split,
+// generation runs inside the create response and routinely blows Vercel's
+// 300s function budget, stranding the client on a never-resolving fetch.
 export function useDealIdEffect(
   urlDealId: string | null,
   urlFromChat: string | null,
@@ -170,6 +172,7 @@ export function useDealIdEffect(
   onAutoCreateStart?: () => void,
   onAutoCreateEnd?: () => void,
   onError?: (msg: string) => void,
+  onTriggerGenerateAll?: (memoId: string) => void,
 ) {
   const consumedDealIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -179,34 +182,14 @@ export function useDealIdEffect(
 
     let cancelled = false;
     (async () => {
-      // Always end up in either the existing memo OR the Create modal. If any
-      // step throws, fall through to opening the modal — never strand the
-      // user on an empty state when they navigated here with a dealId.
-      let matches: Memo[] = [];
-      try {
-        const params = new URLSearchParams({ dealId: urlDealId });
-        const result = await api.get<Memo[]>(`/memos?${params}`);
-        if (Array.isArray(result)) matches = result;
-      } catch (err) {
-        console.warn("[memo-builder] dealId-prefill memo lookup failed:", err);
-      }
-      if (cancelled) return;
-
-      if (matches.length > 0) {
-        const best = [...matches].sort((a, b) =>
-          (b.updatedAt || "").localeCompare(a.updatedAt || "")
-        )[0];
-        try {
-          await loadMemo(best.id);
-        } catch (err) {
-          // If the memo can't load (deleted? permissions?), fall through to
-          // the create flow rather than leave the user on the empty state.
-          console.warn("[memo-builder] loadMemo failed, falling back to create:", err);
-          if (!cancelled) openCreateModal(urlDealId);
-        }
-      } else if (urlFromChat === "1") {
-        // Deal-chat redirect: skip the modal, auto-create with AI metadata.
+      // Chat-redirect path takes precedence over the existing-memo lookup:
+      // every deal-chat "Create memo" click produces a fresh draft, even if
+      // the deal already has memos. The chat agent (not the URL hook) is the
+      // arbiter of when to start a new memo. Skipping the /memos lookup also
+      // saves a DB round-trip on this hot path.
+      if (urlFromChat === "1") {
         onAutoCreateStart?.();
+        let createdId: string | null = null;
         try {
           let title = "Investment Committee Memo";
           let description = "";
@@ -225,13 +208,14 @@ export function useDealIdEffect(
           const created = await api.post<Memo>("/memos", {
             title,
             dealId: urlDealId,
-            autoGenerate: true,
+            autoGenerate: false,
             type: "IC_MEMO",
             status: "DRAFT",
             metadata: description ? { description } : undefined,
           });
           if (cancelled) return;
           await loadMemo(created.id);
+          createdId = created.id;
         } catch (err) {
           console.warn("[memo-builder] auto-create from chat failed:", err);
           onError?.(err instanceof Error ? err.message : "Failed to create memo from chat");
@@ -240,12 +224,41 @@ export function useDealIdEffect(
         } finally {
           if (!cancelled) onAutoCreateEnd?.();
         }
+        if (createdId && !cancelled) {
+          onTriggerGenerateAll?.(createdId);
+        }
+        return;
+      }
+
+      // Non-chat path: prefer an existing memo for this deal; if none, open
+      // the Create modal. Any throw falls through to the modal rather than
+      // stranding the user on an empty state.
+      let matches: Memo[] = [];
+      try {
+        const params = new URLSearchParams({ dealId: urlDealId });
+        const result = await api.get<Memo[]>(`/memos?${params}`);
+        if (Array.isArray(result)) matches = result;
+      } catch (err) {
+        console.warn("[memo-builder] dealId-prefill memo lookup failed:", err);
+      }
+      if (cancelled) return;
+
+      if (matches.length > 0) {
+        const best = [...matches].sort((a, b) =>
+          (b.updatedAt || "").localeCompare(a.updatedAt || "")
+        )[0];
+        try {
+          await loadMemo(best.id);
+        } catch (err) {
+          console.warn("[memo-builder] loadMemo failed, falling back to create:", err);
+          if (!cancelled) openCreateModal(urlDealId);
+        }
       } else {
         openCreateModal(urlDealId);
       }
     })();
     return () => { cancelled = true; };
-  }, [urlDealId, urlFromChat, loadMemo, openCreateModal, onAutoCreateStart, onAutoCreateEnd, onError]);
+  }, [urlDealId, urlFromChat, loadMemo, openCreateModal, onAutoCreateStart, onAutoCreateEnd, onError, onTriggerGenerateAll]);
 }
 
 // ?memoId=X — deep-link straight to a specific memo (used by Share button).

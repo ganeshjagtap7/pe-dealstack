@@ -27,7 +27,7 @@ interface LLMConfig {
   chatProvider: LLMProvider;
   /** Provider for fast/cheap tasks (sentiment, classification) */
   fastProvider: LLMProvider;
-  /** Provider for embeddings — always Gemini (768-dim text-embedding-004) */
+  /** Provider for embeddings — always Gemini (gemini-embedding-001) */
   embeddingProvider: 'gemini';
 }
 

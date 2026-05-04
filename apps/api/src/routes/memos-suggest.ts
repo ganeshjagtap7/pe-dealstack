@@ -7,12 +7,29 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId } from '../middleware/orgScope.js';
-import { getChatModel, isLLMAvailable } from '../services/llm.js';
+import { getFastModel, isLLMAvailable } from '../services/llm.js';
 import { z } from 'zod';
 
 const router = Router();
 
 const suggestSchema = z.object({ dealId: z.string().uuid() });
+
+// Hard ceiling on the LLM wait. The fast model usually replies in 1-3s,
+// but OpenRouter latency can spike. The chat-redirect flow blocks the
+// "Setting up memo from deal context" overlay on this call, so we'd
+// rather use the deterministic title than have the user staring at a
+// spinner. 8s is generous enough to absorb a normal slow response and
+// short enough that a hung model doesn't strand the UI.
+const SUGGEST_META_TIMEOUT_MS = 8000;
+
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
 
 router.post('/suggest-meta', async (req, res) => {
   try {
@@ -40,7 +57,7 @@ router.post('/suggest-meta', async (req, res) => {
     }
 
     try {
-      const model = getChatModel(0.3, 300);
+      const model = getFastModel(0.3, 300);
       const dealCtx = JSON.stringify({
         name: deal.name,
         company: (deal as any).company?.name,
@@ -60,7 +77,13 @@ router.post('/suggest-meta', async (req, res) => {
         { role: 'user', content: `Deal context:\n${dealCtx}\n\nReturn JSON.` },
       ];
 
-      const result: any = await model.invoke(prompt as any);
+      const startedAt = Date.now();
+      const result: any = await withTimeout(
+        model.invoke(prompt as any),
+        SUGGEST_META_TIMEOUT_MS,
+        'suggest-meta LLM',
+      );
+      log.info('suggest-meta LLM ok', { dealId, ms: Date.now() - startedAt });
       const raw = typeof result?.content === 'string' ? result.content : Array.isArray(result?.content) ? result.content.map((c: any) => (typeof c === 'string' ? c : c?.text || '')).join('') : '';
       const cleaned = raw.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
       let parsed: { title?: string; description?: string } = {};
