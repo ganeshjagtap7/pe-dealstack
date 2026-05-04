@@ -182,36 +182,12 @@ export function useDealIdEffect(
 
     let cancelled = false;
     (async () => {
-      // Always end up in either the existing memo OR the Create modal. If any
-      // step throws, fall through to opening the modal — never strand the
-      // user on an empty state when they navigated here with a dealId.
-      let matches: Memo[] = [];
-      try {
-        const params = new URLSearchParams({ dealId: urlDealId });
-        const result = await api.get<Memo[]>(`/memos?${params}`);
-        if (Array.isArray(result)) matches = result;
-      } catch (err) {
-        console.warn("[memo-builder] dealId-prefill memo lookup failed:", err);
-      }
-      if (cancelled) return;
-
-      if (matches.length > 0) {
-        const best = [...matches].sort((a, b) =>
-          (b.updatedAt || "").localeCompare(a.updatedAt || "")
-        )[0];
-        try {
-          await loadMemo(best.id);
-        } catch (err) {
-          // If the memo can't load (deleted? permissions?), fall through to
-          // the create flow rather than leave the user on the empty state.
-          console.warn("[memo-builder] loadMemo failed, falling back to create:", err);
-          if (!cancelled) openCreateModal(urlDealId);
-        }
-      } else if (urlFromChat === "1") {
-        // Deal-chat redirect: skip the modal, auto-create with AI metadata.
-        // Create runs with autoGenerate: false (fast); /generate-all runs
-        // afterwards via onTriggerGenerateAll so its 60-150s wall time
-        // doesn't sit inside the create response.
+      // Chat-redirect path takes precedence over the existing-memo lookup:
+      // every deal-chat "Create memo" click produces a fresh draft, even if
+      // the deal already has memos. The chat agent (not the URL hook) is the
+      // arbiter of when to start a new memo. Skipping the /memos lookup also
+      // saves a DB round-trip on this hot path.
+      if (urlFromChat === "1") {
         onAutoCreateStart?.();
         let createdId: string | null = null;
         try {
@@ -250,6 +226,32 @@ export function useDealIdEffect(
         }
         if (createdId && !cancelled) {
           onTriggerGenerateAll?.(createdId);
+        }
+        return;
+      }
+
+      // Non-chat path: prefer an existing memo for this deal; if none, open
+      // the Create modal. Any throw falls through to the modal rather than
+      // stranding the user on an empty state.
+      let matches: Memo[] = [];
+      try {
+        const params = new URLSearchParams({ dealId: urlDealId });
+        const result = await api.get<Memo[]>(`/memos?${params}`);
+        if (Array.isArray(result)) matches = result;
+      } catch (err) {
+        console.warn("[memo-builder] dealId-prefill memo lookup failed:", err);
+      }
+      if (cancelled) return;
+
+      if (matches.length > 0) {
+        const best = [...matches].sort((a, b) =>
+          (b.updatedAt || "").localeCompare(a.updatedAt || "")
+        )[0];
+        try {
+          await loadMemo(best.id);
+        } catch (err) {
+          console.warn("[memo-builder] loadMemo failed, falling back to create:", err);
+          if (!cancelled) openCreateModal(urlDealId);
         }
       } else {
         openCreateModal(urlDealId);
