@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef, Suspense } from "react";
+import { useCallback, useEffect, useState, useRef, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -157,7 +157,18 @@ function MemoBuilderPageInner() {
   // handleGenerateAll when the memoId matches. Avoids stale-closure bugs
   // where handleGenerateAll's selectedMemo would be the previous memo.
   const [pendingGenerateMemoId, setPendingGenerateMemoId] = useState<string | null>(null);
-  const triggerGenerateAll = (memoId: string) => setPendingGenerateMemoId(memoId);
+
+  // useCallback so these have stable identity across renders. Otherwise
+  // useDealIdEffect's dep array changes every render, the effect tears
+  // down + reruns, and the cleanup sets cancelled=true on the in-flight
+  // IIFE — which means the trailing onTriggerGenerateAll(createdId) call
+  // (gated by !cancelled) gets skipped. That's why /generate-all wasn't
+  // firing on chat-redirect even though suggest-meta + create succeeded.
+  const triggerGenerateAll = useCallback((memoId: string) => {
+    setPendingGenerateMemoId(memoId);
+  }, []);
+  const handleAutoCreateStart = useCallback(() => setAutoCreating(true), []);
+  const handleAutoCreateEnd = useCallback(() => setAutoCreating(false), []);
 
   // URL ?dealId=X / ?memoId=X consumption — see data-loaders.ts for details.
   useDealIdEffect(
@@ -165,8 +176,8 @@ function MemoBuilderPageInner() {
     urlFromChat,
     loadMemo,
     openCreateModal,
-    () => setAutoCreating(true),
-    () => setAutoCreating(false),
+    handleAutoCreateStart,
+    handleAutoCreateEnd,
     setError,
     triggerGenerateAll,
   );
