@@ -156,34 +156,36 @@ router.post('/deals/:dealId/activities', async (req, res) => {
 
     // @-mention notifications. Activity insert is the source of truth for
     // notes; the client doesn't send mentioned-id metadata so we resolve
-    // names against the org User table here. Fire-and-forget — the activity
-    // POST shouldn't block on notification fan-out.
+    // names against the org User table here. Awaited (not fire-and-forget)
+    // because Vercel's serverless runtime can freeze the function once the
+    // response is sent, dropping pending promises — that's why the previous
+    // post-response IIFE never reached the Notification insert. Failures
+    // are logged but never fail the request: the activity itself succeeded.
     if (data.description) {
-      (async () => {
-        try {
-          const { data: orgUsers } = await supabase
-            .from('User')
-            .select('id, name, email')
-            .eq('organizationId', orgId);
-          const candidates = (orgUsers || []).map((u) => ({
-            id: u.id as string,
-            name: (u.name as string | null) ?? null,
-            email: (u.email as string | null) ?? null,
-          }));
-          log.info('Mention scan: orgUsers fetched', {
-            dealId,
-            orgId,
-            count: candidates.length,
-            displayNames: candidates.map((u) => mentionDisplayName(u)).filter(Boolean),
-          });
-          const mentioned = parseMentions(data.description as string, candidates);
-          log.info('Mention scan: parseMentions done', {
-            dealId,
-            descriptionPreview: (data.description as string).slice(0, 120),
-            matched: mentioned.size,
-            userIds: Array.from(mentioned),
-          });
-          if (mentioned.size === 0) return;
+      try {
+        const { data: orgUsers } = await supabase
+          .from('User')
+          .select('id, name, email')
+          .eq('organizationId', orgId);
+        const candidates = (orgUsers || []).map((u) => ({
+          id: u.id as string,
+          name: (u.name as string | null) ?? null,
+          email: (u.email as string | null) ?? null,
+        }));
+        log.info('Mention scan: orgUsers fetched', {
+          dealId,
+          orgId,
+          count: candidates.length,
+          displayNames: candidates.map((u) => mentionDisplayName(u)).filter(Boolean),
+        });
+        const mentioned = parseMentions(data.description as string, candidates);
+        log.info('Mention scan: parseMentions done', {
+          dealId,
+          descriptionPreview: (data.description as string).slice(0, 120),
+          matched: mentioned.size,
+          userIds: Array.from(mentioned),
+        });
+        if (mentioned.size > 0) {
           const snippet = (data.description as string).slice(0, 200);
           const results = await Promise.all(
             Array.from(mentioned).map((userId) =>
@@ -201,10 +203,10 @@ router.post('/deals/:dealId/activities', async (req, res) => {
           );
           const created = results.filter((r) => r !== null).length;
           log.info('Mention scan: notifications created', { dealId, attempted: mentioned.size, created });
-        } catch (err) {
-          log.error('Mention parsing failed', err);
         }
-      })();
+      } catch (err) {
+        log.error('Mention parsing failed', err);
+      }
     }
 
     res.status(201).json(activity);
