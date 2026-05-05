@@ -29,6 +29,7 @@ import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
 import internalRouter from './routes/internal-usage.js';
+import usageRouter from './routes/usage.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -280,6 +281,7 @@ app.use('/api/onboarding', authMiddleware, orgMiddleware, usageContextMiddleware
 app.use('/api/contacts', authMiddleware, orgMiddleware, usageContextMiddleware, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, usageContextMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, financialsRouter);
+app.use('/api/usage', authMiddleware, orgMiddleware, usageContextMiddleware, usageRouter);
 
 // ========================================
 // Internal Admin Routes (requireInternalAdmin gate inside router)
