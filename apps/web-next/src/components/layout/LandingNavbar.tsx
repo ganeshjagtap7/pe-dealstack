@@ -17,7 +17,6 @@ export function LandingNavbar() {
         <nav className="hidden lg:flex items-center gap-8">
           <a className="text-sm font-medium text-primary" href="#features">Platform</a>
           <Link className="text-sm font-medium hover:text-primary transition-colors" href="/solutions">Solutions</Link>
-          <Link className="text-sm font-medium hover:text-primary transition-colors" href="/pricing">Pricing</Link>
           <Link className="text-sm font-medium hover:text-primary transition-colors" href="/resources">Resources</Link>
           <Link className="text-sm font-medium hover:text-primary transition-colors" href="/company">Company</Link>
         </nav>
@@ -41,7 +40,6 @@ export function LandingNavbar() {
         <div className="lg:hidden border-t border-[#f0f2f4] bg-white px-4 py-4 flex flex-col gap-3 animate-[slideDown_0.2s_ease-out]">
           <a className="text-sm font-medium text-text-main hover:text-primary py-2" href="#features" onClick={() => setMobileOpen(false)}>Platform</a>
           <Link className="text-sm font-medium text-text-main hover:text-primary py-2" href="/solutions" onClick={() => setMobileOpen(false)}>Solutions</Link>
-          <Link className="text-sm font-medium text-text-main hover:text-primary py-2" href="/pricing" onClick={() => setMobileOpen(false)}>Pricing</Link>
           <Link className="text-sm font-medium text-text-main hover:text-primary py-2" href="/resources" onClick={() => setMobileOpen(false)}>Resources</Link>
           <Link className="text-sm font-medium text-text-main hover:text-primary py-2" href="/company" onClick={() => setMobileOpen(false)}>Company</Link>
           <div className="flex flex-col gap-2 pt-3 border-t border-[#f0f2f4]">

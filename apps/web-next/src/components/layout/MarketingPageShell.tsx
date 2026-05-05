@@ -27,7 +27,6 @@ export function MarketingPageShell({
   const navLinks: Array<{ href: string; label: string; slug: MarketingPageSlug | "platform" }> = [
     { href: "/", label: "Platform", slug: "platform" },
     { href: "/solutions", label: "Solutions", slug: "solutions" },
-    { href: "/pricing", label: "Pricing", slug: "pricing" },
     { href: "/resources", label: "Resources", slug: "resources" },
     { href: "/company", label: "Company", slug: "company" },
   ];
