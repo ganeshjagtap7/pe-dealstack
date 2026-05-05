@@ -189,3 +189,47 @@ export async function trackedDirectChatCompletion(
     throw err;
   }
 }
+
+/**
+ * Wrapped OpenAI Responses API call (used by visionExtractor for native PDF
+ * file inputs). The Responses API returns `usage.input_tokens` /
+ * `usage.output_tokens` (not prompt_tokens/completion_tokens like
+ * chat.completions). Always provider='openai' since OpenRouter does not
+ * proxy /v1/responses.
+ */
+export async function trackedDirectResponsesCreate(
+  operation: string,
+  params: any,
+  options?: any,
+) {
+  if (!openaiDirect) throw new Error('Direct OpenAI client not configured');
+  const start = Date.now();
+  const model = (params as any).model as string;
+  try {
+    const response: any = await (openaiDirect as any).responses.create(params, options);
+    const promptTokens = response?.usage?.input_tokens ?? 0;
+    const completionTokens = response?.usage?.output_tokens ?? 0;
+    void recordUsageEvent({
+      operation,
+      model,
+      provider: 'openai',
+      promptTokens,
+      completionTokens,
+      status: 'success',
+      durationMs: Date.now() - start,
+    });
+    return response;
+  } catch (err) {
+    void recordUsageEvent({
+      operation,
+      model,
+      provider: 'openai',
+      promptTokens: 0,
+      completionTokens: 0,
+      status: 'error',
+      durationMs: Date.now() - start,
+      metadata: { errorMessage: err instanceof Error ? err.message : String(err) },
+    });
+    throw err;
+  }
+}

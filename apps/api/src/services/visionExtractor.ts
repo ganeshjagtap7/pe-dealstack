@@ -9,7 +9,7 @@
  * so the rest of the pipeline is unchanged.
  */
 
-import { openaiDirect } from '../openai.js';
+import { openaiDirect, trackedDirectResponsesCreate } from '../openai.js';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
 import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, StatementType, PeriodType, UnitScale } from './financialClassifier.js';
@@ -53,7 +53,7 @@ export async function classifyFinancialsVision(
 
     // Use the Responses API which natively supports PDF file inputs.
     // Must hit OpenAI directly — OpenRouter does not proxy /v1/responses.
-    const response = await (openaiDirect as any).responses.create({
+    const response = await trackedDirectResponsesCreate('financial_extraction', {
       model: 'gpt-4.1',
       instructions: buildExtractionPrompt({ includeSourceCitations: false, currencyHint }),
       input: [
