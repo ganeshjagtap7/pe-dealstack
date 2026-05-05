@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
-import { openai, isAIEnabled, DEAL_ANALYSIS_SYSTEM_PROMPT, generateDealContext } from '../openai.js';
+import { isAIEnabled } from '../openai.js';
 import multer from 'multer';
 import { createRequire } from 'module';
 import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';

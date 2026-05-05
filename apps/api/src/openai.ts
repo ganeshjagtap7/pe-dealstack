@@ -150,8 +150,10 @@ export async function trackedChatCompletion(
 }
 
 /**
- * Same as trackedChatCompletion but routes through the direct OpenAI client
- * (used by visionExtractor for the Responses API). Always provider='openai'.
+ * chat.completions wrapper that routes through the direct OpenAI client
+ * (always provider='openai'). Use when a callsite must bypass OpenRouter
+ * — e.g., features that depend on OpenAI-only endpoints. The Responses API
+ * has its own wrapper, trackedDirectResponsesCreate, below.
  */
 export async function trackedDirectChatCompletion(
   operation: string,
