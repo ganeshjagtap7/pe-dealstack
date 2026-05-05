@@ -108,4 +108,25 @@ describe('recordUsageEvent', () => {
     expect(row.units).toBe(3);
     expect(row.model).toBeNull();
   });
+
+  it('does not throw when getCreditsForOperation throws', async () => {
+    const { getCreditsForOperation } = await import('../../src/services/usage/operationCredits.js');
+    vi.mocked(getCreditsForOperation).mockRejectedValueOnce(new Error('db down'));
+    await runWithUsageContext(
+      { userId: 'u1', organizationId: 'o1', source: 'test' },
+      async () => {
+        // Must not throw, must not crash
+        await expect(recordUsageEvent({
+          operation: 'deal_chat',
+          model: 'gpt-4o',
+          provider: 'openai',
+          promptTokens: 100,
+          completionTokens: 50,
+          status: 'success',
+        })).resolves.toBeUndefined();
+      },
+    );
+    // Insert should not have been called because the function bailed out in catch
+    expect(insertSpy).not.toHaveBeenCalled();
+  });
 });

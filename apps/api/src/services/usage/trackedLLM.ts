@@ -14,18 +14,33 @@ export type UsageProvider =
 
 export type UsageStatus = 'success' | 'error' | 'rate_limited' | 'blocked';
 
-export interface RecordUsageEventInput {
+interface RecordUsageEventBase {
   operation: string;
-  model?: string;
   provider: UsageProvider;
-  promptTokens?: number;
-  completionTokens?: number;
-  units?: number;          // for non-LLM providers (searches, pages)
-  unitCostUsd?: number;    // pre-computed cost for non-LLM providers
   status: UsageStatus;
   durationMs?: number;
   metadata?: Record<string, unknown>;
 }
+
+/** LLM call: cost is computed from token counts × ModelPrice lookup. */
+interface RecordUsageEventLLM extends RecordUsageEventBase {
+  model: string;
+  promptTokens: number;
+  completionTokens: number;
+  unitCostUsd?: never;
+  units?: never;
+}
+
+/** Non-LLM call (Apify, Azure DocIntel): caller supplies the cost directly. */
+interface RecordUsageEventNonLLM extends RecordUsageEventBase {
+  model?: never;
+  promptTokens?: never;
+  completionTokens?: never;
+  unitCostUsd: number;
+  units: number;
+}
+
+export type RecordUsageEventInput = RecordUsageEventLLM | RecordUsageEventNonLLM;
 
 /**
  * Insert one UsageEvent row attributing AI consumption to the current
@@ -48,50 +63,50 @@ export async function recordUsageEvent(input: RecordUsageEventInput): Promise<vo
     return;
   }
 
-  const promptTokens = input.promptTokens ?? 0;
-  const completionTokens = input.completionTokens ?? 0;
-  const totalTokens = promptTokens + completionTokens;
-
-  let costUsd = 0;
-  const extraMetadata: Record<string, unknown> = {};
-
-  if (input.unitCostUsd !== undefined) {
-    costUsd = input.unitCostUsd;
-  } else if (input.model) {
-    const price = await getModelPrice(input.model);
-    if (price) {
-      costUsd = computeCostUsd(price, promptTokens, completionTokens);
-    } else {
-      log.warn('recordUsageEvent: unknown model, costUsd=0', { model: input.model });
-      extraMetadata.priceLookupFailed = true;
-    }
-  }
-
-  const credits = await getCreditsForOperation(input.operation);
-
-  const row = {
-    userId: ctx.userId,
-    organizationId: ctx.organizationId,
-    operation: input.operation,
-    model: input.model ?? null,
-    provider: input.provider,
-    promptTokens,
-    completionTokens,
-    totalTokens,
-    units: input.units ?? 0,
-    costUsd,
-    credits,
-    status: input.status,
-    durationMs: input.durationMs ?? null,
-    metadata: { ...(input.metadata ?? {}), ...extraMetadata, requestId: ctx.requestId },
-  };
-
   try {
+    const promptTokens = input.promptTokens ?? 0;
+    const completionTokens = input.completionTokens ?? 0;
+    const totalTokens = promptTokens + completionTokens;
+
+    let costUsd = 0;
+    const extraMetadata: Record<string, unknown> = {};
+
+    if (input.unitCostUsd !== undefined) {
+      costUsd = input.unitCostUsd;
+    } else if (input.model) {
+      const price = await getModelPrice(input.model);
+      if (price) {
+        costUsd = computeCostUsd(price, promptTokens, completionTokens);
+      } else {
+        log.warn('recordUsageEvent: unknown model, costUsd=0', { model: input.model });
+        extraMetadata.priceLookupFailed = true;
+      }
+    }
+
+    const credits = await getCreditsForOperation(input.operation);
+
+    const row = {
+      userId: ctx.userId,
+      organizationId: ctx.organizationId,
+      operation: input.operation,
+      model: input.model ?? null,
+      provider: input.provider,
+      promptTokens,
+      completionTokens,
+      totalTokens,
+      units: input.units ?? 0,
+      costUsd,
+      credits,
+      status: input.status,
+      durationMs: input.durationMs ?? null,
+      metadata: { ...(input.metadata ?? {}), ...extraMetadata, requestId: ctx.requestId },
+    };
+
     const { error } = await supabase.from('UsageEvent').insert(row);
     if (error) {
       log.error('recordUsageEvent: insert failed', { error, operation: input.operation });
     }
   } catch (err) {
-    log.error('recordUsageEvent: unexpected error', err);
+    log.error('recordUsageEvent: unexpected error', { err, operation: input.operation });
   }
 }
