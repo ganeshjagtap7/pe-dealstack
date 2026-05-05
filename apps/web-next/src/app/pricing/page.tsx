@@ -8,14 +8,6 @@ export const metadata: Metadata = {
     "Flexible pricing plans for PE OS. From emerging managers to global institutions, find the right plan for your private equity firm's needs.",
 };
 
-const TRUST_LOGOS = [
-  { icon: "account_balance", name: "KINGSFORD" },
-  { icon: "terrain", name: "SUMMIT" },
-  { icon: "token", name: "BLACKSTONE" },
-  { icon: "public", name: "GLOBAL HARBOR" },
-  { icon: "diamond", name: "APEX" },
-];
-
 type Cell = { type: "text"; value: string } | { type: "check" } | { type: "cross" };
 
 type FeatureRow = {
@@ -123,21 +115,6 @@ export default function PricingPage() {
           </div>
 
           <PricingTable />
-
-          {/* Trust Section */}
-          <div className="flex flex-col items-center justify-center mb-20 gap-8">
-            <p className="text-sm font-semibold text-[#64748b] uppercase tracking-widest text-center">
-              Trusted by leading PE Firms globally
-            </p>
-            <div className="flex flex-wrap justify-center gap-x-12 gap-y-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-              {TRUST_LOGOS.map((logo) => (
-                <div key={logo.name} className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-2xl">{logo.icon}</span>
-                  <span className="text-lg font-bold tracking-tight">{logo.name}</span>
-                </div>
-              ))}
-            </div>
-          </div>
 
           {/* Feature Comparison Table */}
           <div className="flex flex-col mb-20">

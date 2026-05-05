@@ -178,17 +178,7 @@ const CATEGORIES: Category[] = [
       },
       {
         q: "What plans are available?",
-        a: (
-          <>
-            Visit our{" "}
-            <Link href="/pricing" className="text-primary hover:underline">
-              pricing page
-            </Link>{" "}
-            for current plans and features. We offer tiers for emerging funds,
-            mid-market firms, and enterprise PE firms. All plans include core AI
-            features, deal tracking, and document management.
-          </>
-        ),
+        a: "We offer tiers for emerging funds, mid-market firms, and enterprise PE firms. All plans include core AI features, deal tracking, and document management. Contact sales for current pricing and upgrade options.",
       },
       {
         q: "How do I upgrade or change my plan?",

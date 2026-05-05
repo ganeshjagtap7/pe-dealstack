@@ -31,9 +31,10 @@ const QUICK_START = [
           verification email to confirm your account.
         </p>
         <p className="text-sm text-[#64748b]">
-          Once verified, log in and you&apos;ll be taken to your dashboard. The
-          account creator is automatically assigned the{" "}
-          <strong className="text-[#111418]">Admin</strong> role.
+          Once verified, log in and you&apos;ll be taken to your dashboard.
+          New accounts default to the <strong className="text-[#111418]">Member</strong> role;
+          your workspace admin can elevate your role from Settings if you need
+          to invite admins or view audit logs.
         </p>
       </>
     ),
@@ -44,9 +45,10 @@ const QUICK_START = [
     body: (
       <>
         <p className="text-sm text-[#64748b] mb-3">
-          Navigate to <strong className="text-[#111418]">Deal Intake</strong>{" "}
-          from the sidebar. Upload a CIM, teaser, or any deal document (PDF,
-          Word, Excel).
+          Open the <strong className="text-[#111418]">Deal Intake</strong> page
+          (visit <code>/deal-intake</code> or trigger the global ingest action
+          from the command palette). Upload a CIM, teaser, or any deal document
+          (PDF, Word, Excel).
         </p>
         <p className="text-sm text-[#64748b]">
           Our AI extracts key data — company name, financials, industry — in
@@ -84,7 +86,11 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     items: [
       {
         heading: "File Upload",
-        body: "Upload PDF, Word (.docx), Excel (.xlsx, .csv), or plain text files. The system automatically detects the file type and routes it to the appropriate parser. Excel files with multiple deals are processed as bulk imports.",
+        body: "Upload PDF, Word (.docx, .doc), Excel (.xlsx, .xls), or plain text files to auto-create a deal. The system detects file type and routes it to the appropriate parser. Additional formats — CSV, images, and .eml/.msg emails — are accepted when uploading documents to an existing deal.",
+      },
+      {
+        heading: "Bulk Excel/CSV Import",
+        body: "Excel or CSV files containing multiple deals can be imported in bulk via the deal-import flow (up to 500 deals per file) with AI-assisted column mapping and duplicate detection.",
       },
       {
         heading: "Text Paste",
@@ -92,7 +98,7 @@ const FEATURE_GUIDES: FeatureGuide[] = [
       },
       {
         heading: "URL Research",
-        body: "Enter a company website URL and PE OS scrapes multiple pages (About, Team, Products, Services) to build a comprehensive company profile. Optionally preview the extraction before creating a deal.",
+        body: "Enter a company website URL and PE OS scrapes the homepage plus common subpages (About, Company, Team, Leadership, Products, Services) — up to 10 paths in parallel — to build a comprehensive company profile. Optionally preview the extraction before creating a deal.",
       },
       {
         heading: "Email Forwarding",
@@ -100,7 +106,7 @@ const FEATURE_GUIDES: FeatureGuide[] = [
       },
       {
         heading: "Confidence Scores",
-        body: "Every extracted field gets a confidence score (0-100%). Fields below 60% are automatically flagged for manual review. Color-coded bars show extraction quality at a glance: green (>80%), yellow (60-80%), red (<60%).",
+        body: "Every extracted field gets a confidence score (0–100%). Fields below 70% are automatically flagged for manual review. Color-coded bars show extraction quality at a glance: green (≥80%), yellow (60–79%), red (<60%).",
       },
     ],
   },
@@ -112,7 +118,7 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     items: [
       {
         heading: "Deal Pipeline",
-        body: "View all deals in your CRM with filtering by stage (Initial Review, Due Diligence, LOI, Closing, Closed, Passed), status (Active, On Hold, Dead), and industry. Sort by date, name, or deal size.",
+        body: "View all deals in your CRM with filtering by stage (Initial Review, Due Diligence, IOI Submitted, LOI Submitted, Negotiation, Closing, Passed, Closed Won, Closed Lost), status (Active, Passed, On Hold, Pending Review), and industry. Sort by date, name, or deal size.",
       },
       {
         heading: "Deal Details",
@@ -120,11 +126,11 @@ const FEATURE_GUIDES: FeatureGuide[] = [
       },
       {
         heading: "Deal Team",
-        body: "Assign team members to specific deals with access levels: View (read-only), Edit (modify deal data), or Admin (full control including delete). Track who's working on what.",
+        body: "Assign team members to specific deals as Lead, Member, or Viewer. Lead also updates the deal's lead-partner field for visibility. Edit and delete permissions are governed by workspace roles (Admin / Member / Viewer), not by the per-deal team-member label. Track who's working on what.",
       },
       {
         heading: "Activity Feed",
-        body: "Every action on a deal is logged — document uploads, stage changes, AI extractions, memo creation, team changes. The timeline gives a complete audit trail of deal progress.",
+        body: "Every key action on a deal is logged — document uploads, stage changes, status updates, notes added, meetings scheduled, calls logged, and emails sent. The timeline gives a clear audit trail of deal progress.",
       },
     ],
   },
@@ -136,15 +142,15 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     items: [
       {
         heading: "AI Data Extraction",
-        body: "Powered by GPT-4, the system extracts company name, industry, revenue, EBITDA, margins, employee count, headquarters, and more from any document. Financial data is validated against PE industry norms to catch extraction errors.",
+        body: "Powered by Claude Sonnet 4.5 with GPT-4.1 fallback, the system extracts company name, industry, revenue, EBITDA, EBITDA margin, revenue growth, employee count, headquarters, founded year, deal size, key risks, and investment highlights from any document. Financial values are sanity-checked for accounting consistency and obvious extraction errors (e.g., EBITDA exceeding revenue, implausible revenue-per-employee ratios).",
       },
       {
         heading: "Chat with Deals",
-        body: "Ask natural language questions about any deal. The AI uses RAG (Retrieval-Augmented Generation) to search across all documents for the deal and provide sourced answers. Example: \"What's the revenue growth trend?\" or \"Summarize the management team.\"",
+        body: "Ask natural-language questions about any deal. The AI uses RAG (Retrieval-Augmented Generation) — vector search over embedded document chunks — to find relevant passages and quote them in its answers. Example: \"What's the revenue growth trend?\" or \"Summarize the management team.\"",
       },
       {
         heading: "Investment Memo Builder",
-        body: "Generate professional investment memos with AI-assisted sections: Executive Summary, Company Overview, Market Analysis, Financial Analysis, Investment Thesis, Risks, and Recommendation. Edit and customize each section.",
+        body: "Generate professional IC memos with AI-assisted sections. The standard preset includes Executive Summary, Company Overview, Financial Performance, Market Dynamics, Risk Assessment, and Deal Structure. The Comprehensive preset adds Quality of Earnings, Competitive Landscape, Value Creation Plan, and Exit Analysis. Edit and customize each section freely.",
       },
       {
         heading: "Multi-Document Analysis",
@@ -160,7 +166,7 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     items: [
       {
         heading: "Document Organization",
-        body: "Create folders and subfolders to organize deal documents. Supported types: CIM, Teaser, Financial Model, NDA, LOI, Due Diligence reports, and custom document types.",
+        body: "Create folders and subfolders to organize deal documents. Documents are classified into one of: CIM, Teaser, Financials, Legal, NDA, LOI, Email, PDF, Excel, Doc, or Other. Type is auto-detected from the filename and can be overridden at upload.",
       },
       {
         heading: "File Management",
@@ -182,21 +188,22 @@ const FEATURE_GUIDES: FeatureGuide[] = [
         heading: "Workspace Roles",
         body: (
           <>
-            <strong>Admin</strong> — full access: manage users, invite team,
-            delete deals, view audit logs, export data. <strong>Member</strong>{" "}
-            — standard access: create/edit deals, upload documents, use AI
-            features. <strong>Viewer</strong> — read-only access to deals and
-            documents.
+            <strong>Admin</strong> — full access: manage users, invite admins,
+            view audit logs, plus all standard operations.{" "}
+            <strong>Member</strong> — most operations: create / edit / delete
+            deals, upload documents, use AI features, export data, invite
+            Members and Viewers. <strong>Viewer</strong> — read-only access to
+            deals and documents.
           </>
         ),
       },
       {
         heading: "Invitations",
-        body: "Admins can invite new team members via email. Invitations expire after 7 days and can be revoked. Invited users join the same workspace and firm with the assigned role.",
+        body: "Anyone in the workspace can invite Members or Viewers; only Admins can invite Admins. Invitations expire after 7 days and can be revoked. Invited users join the same workspace and firm with the assigned role.",
       },
       {
         heading: "Display Titles",
-        body: "Set custom display titles (Managing Director, Vice President, Associate, Analyst) independently of system roles. Titles are visible to teammates but don't affect permissions.",
+        body: "Set a freeform display title (e.g. Managing Director, Vice President, Associate, Analyst) on your profile, independent of your system role. Titles are visible to teammates but don't affect permissions.",
       },
     ],
   },
@@ -208,11 +215,11 @@ const FEATURE_GUIDES: FeatureGuide[] = [
     items: [
       {
         heading: "Data Encryption",
-        body: "AES-256-GCM encryption at rest for sensitive deal fields. TLS 1.3 for all data in transit. Encryption keys are managed server-side and never exposed to clients.",
+        body: "All data in transit is protected by TLS 1.2+ (TLS 1.3 negotiated where supported). Data at rest is stored in Supabase Postgres with provider-managed encryption.",
       },
       {
-        heading: "Immutable Audit Trail",
-        body: "Every action is logged — deal creation, edits, document uploads, AI extractions, exports, logins. Audit logs are INSERT-ONLY (cannot be modified or deleted) for SEC/regulatory compliance.",
+        heading: "Append-Only Audit Trail",
+        body: "Every action is logged — deal creation, edits, document uploads, AI extractions, exports, logins. Audit logs are append-only via row-level security (no UPDATE or DELETE policies) and retained for 2 years for compliance.",
       },
       {
         heading: "Data Export",
@@ -254,7 +261,7 @@ export default function DocumentationPage() {
           <h2 className="text-2xl font-bold text-[#111418]">Quick Start Guide</h2>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {QUICK_START.map((s) => (
             <div
               key={s.step}

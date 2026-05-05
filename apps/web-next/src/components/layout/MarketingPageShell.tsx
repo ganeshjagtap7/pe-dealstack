@@ -27,13 +27,20 @@ export function MarketingPageShell({
   const navLinks: Array<{ href: string; label: string; slug: MarketingPageSlug | "platform" }> = [
     { href: "/", label: "Platform", slug: "platform" },
     { href: "/solutions", label: "Solutions", slug: "solutions" },
-    { href: "/pricing", label: "Pricing", slug: "pricing" },
     { href: "/resources", label: "Resources", slug: "resources" },
     { href: "/company", label: "Company", slug: "company" },
   ];
 
   return (
-    <div className="bg-[#f8fafc] text-[#111418] font-sans antialiased min-h-screen flex flex-col">
+    // Root <body> has overflow-hidden for the (app) shell, so marketing
+    // pages need their own scroll container — same pattern as
+    // (auth)/layout.tsx, (onboarding)/layout.tsx, and the landing page.
+    // Sticky header below stays pinned because it's sticky inside this
+    // scroll ancestor.
+    <div
+      className="bg-[#f8fafc] text-[#111418] font-sans antialiased flex flex-col overflow-y-auto"
+      style={{ height: "100vh" }}
+    >
       {/* Header */}
       <header className="sticky top-0 z-50 w-full border-b border-[#e5e7eb] bg-white/90 backdrop-blur-md">
         <div className="px-4 md:px-10 lg:px-20 py-3 flex items-center justify-between">

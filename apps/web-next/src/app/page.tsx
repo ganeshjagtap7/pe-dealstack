@@ -38,10 +38,10 @@ export default function LandingPage() {
                   <Link href="/signup" className="h-12 px-8 rounded-lg text-white text-base font-bold shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all transform hover:-translate-y-0.5 flex items-center justify-center" style={{ backgroundColor: "#003366" }}>
                     Get Started Free
                   </Link>
-                  <a href="#features" className="h-12 px-8 rounded-lg bg-white border border-slate-200 text-[#111418] text-base font-bold hover:bg-slate-50 transition-colors flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[20px]">play_circle</span>
+                  <Link href="/documentation" className="h-12 px-8 rounded-lg bg-white border border-slate-200 text-[#111418] text-base font-bold hover:bg-slate-50 transition-colors flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[20px]">menu_book</span>
                     View Documentation
-                  </a>
+                  </Link>
                 </div>
                 <div className="flex items-center justify-center lg:justify-start gap-2 text-sm text-slate-500 pt-2">
                   <span className="material-symbols-outlined text-[18px] text-green-500">check_circle</span>
@@ -74,27 +74,6 @@ export default function LandingPage() {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Trusted By */}
-      <div className="w-full bg-white border-y border-[#f0f2f4] py-12">
-        <div className="max-w-7xl mx-auto px-4 md:px-10 lg:px-40 text-center">
-          <h3 className="text-slate-500 text-sm font-semibold uppercase tracking-wider mb-8">Trusted by leading investment firms</h3>
-          <div className="flex flex-wrap justify-center gap-x-12 gap-y-8 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
-            {[
-              { icon: "account_balance", name: "KINGSFORD" },
-              { icon: "terrain", name: "SUMMIT PARTNERS" },
-              { icon: "token", name: "BLACKSTONE" },
-              { icon: "public", name: "GLOBAL HARBOR" },
-              { icon: "diamond", name: "APEX CAPITAL" },
-            ].map((logo) => (
-              <div key={logo.name} className="flex items-center gap-2">
-                <span className="material-symbols-outlined text-3xl">{logo.icon}</span>
-                <span className="text-xl font-bold tracking-tight">{logo.name}</span>
-              </div>
-            ))}
           </div>
         </div>
       </div>
@@ -181,7 +160,6 @@ export default function LandingPage() {
               <div className="flex gap-4">
                 <a className="text-slate-400 hover:text-primary transition-colors" href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><span className="material-symbols-outlined">public</span></a>
                 <a className="text-slate-400 hover:text-primary transition-colors" href="mailto:contact@pe-os.com" aria-label="Email"><span className="material-symbols-outlined">alternate_email</span></a>
-                <a className="text-slate-400 hover:text-primary transition-colors" href="#features" aria-label="Blog"><span className="material-symbols-outlined">rss_feed</span></a>
               </div>
             </div>
             <div>
@@ -196,7 +174,7 @@ export default function LandingPage() {
             <div>
               <h4 className="font-bold text-[#111418] mb-4">Company</h4>
               <ul className="flex flex-col gap-2 text-sm text-slate-500">
-                <li><a className="hover:text-primary transition-colors" href="#cta">About Us</a></li>
+                <li><Link className="hover:text-primary transition-colors" href="/company">About Us</Link></li>
                 <li><a className="hover:text-primary transition-colors" href="#cta">Careers</a></li>
                 <li><a className="hover:text-primary transition-colors" href="#features">Blog</a></li>
                 <li><a className="hover:text-primary transition-colors" href="#cta">Contact</a></li>
@@ -205,18 +183,18 @@ export default function LandingPage() {
             <div>
               <h4 className="font-bold text-[#111418] mb-4">Resources</h4>
               <ul className="flex flex-col gap-2 text-sm text-slate-500">
-                <li><a className="hover:text-primary transition-colors" href="#features">Documentation</a></li>
-                <li><a className="hover:text-primary transition-colors" href="#features">API Reference</a></li>
+                <li><Link className="hover:text-primary transition-colors" href="/documentation">Documentation</Link></li>
+                <li><Link className="hover:text-primary transition-colors" href="/api-reference">API Reference</Link></li>
                 <li><a className="hover:text-primary transition-colors" href="#cta">Community</a></li>
-                <li><a className="hover:text-primary transition-colors" href="#cta">Help Center</a></li>
+                <li><Link className="hover:text-primary transition-colors" href="/help-center">Help Center</Link></li>
               </ul>
             </div>
           </div>
           <div className="border-t border-slate-200 pt-8 flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-slate-400">&copy; 2026 PE OS. All rights reserved.</p>
             <div className="flex gap-6 text-sm text-slate-400">
-              <a className="hover:text-primary transition-colors" href="#cta">Privacy Policy</a>
-              <a className="hover:text-primary transition-colors" href="#cta">Terms of Service</a>
+              <Link className="hover:text-primary transition-colors" href="/privacy-policy">Privacy Policy</Link>
+              <Link className="hover:text-primary transition-colors" href="/terms-of-service">Terms of Service</Link>
               <a className="hover:text-primary transition-colors" href="#cta">Contact</a>
             </div>
           </div>
