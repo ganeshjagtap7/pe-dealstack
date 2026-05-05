@@ -9,6 +9,7 @@ export interface ModelPriceRow {
 const CACHE_TTL_MS = 10 * 60 * 1000; // 10 minutes
 let cache: Map<string, ModelPriceRow> | null = null;
 let cacheLoadedAt = 0;
+let loadingPromise: Promise<void> | null = null;
 
 async function loadCache(): Promise<void> {
   const { data, error } = await supabase
@@ -31,7 +32,10 @@ async function loadCache(): Promise<void> {
 
 export async function getModelPrice(model: string): Promise<ModelPriceRow | null> {
   if (!cache || Date.now() - cacheLoadedAt > CACHE_TTL_MS) {
-    await loadCache();
+    if (!loadingPromise) {
+      loadingPromise = loadCache().finally(() => { loadingPromise = null; });
+    }
+    await loadingPromise;
   }
   return cache?.get(model) ?? null;
 }
@@ -52,4 +56,5 @@ export function computeCostUsd(
 export function _resetModelPriceCache(): void {
   cache = null;
   cacheLoadedAt = 0;
+  loadingPromise = null;
 }

@@ -4,6 +4,7 @@ import { log } from '../../utils/logger.js';
 const CACHE_TTL_MS = 10 * 60 * 1000;
 let cache: Map<string, number> | null = null;
 let cacheLoadedAt = 0;
+let loadingPromise: Promise<void> | null = null;
 
 async function loadCache(): Promise<void> {
   const { data, error } = await supabase.from('OperationCredits').select('operation, credits');
@@ -20,7 +21,10 @@ async function loadCache(): Promise<void> {
 
 export async function getCreditsForOperation(operation: string): Promise<number> {
   if (!cache || Date.now() - cacheLoadedAt > CACHE_TTL_MS) {
-    await loadCache();
+    if (!loadingPromise) {
+      loadingPromise = loadCache().finally(() => { loadingPromise = null; });
+    }
+    await loadingPromise;
   }
   const credits = cache?.get(operation);
   if (credits == null) {
@@ -33,4 +37,5 @@ export async function getCreditsForOperation(operation: string): Promise<number>
 export function _resetOperationCreditsCache(): void {
   cache = null;
   cacheLoadedAt = 0;
+  loadingPromise = null;
 }
