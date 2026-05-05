@@ -169,7 +169,7 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     const truncatedText = text.slice(0, 20000);
     log.debug('AI extraction starting (structured output)', { textLength: truncatedText.length });
 
-    const model = getExtractionModel(3000);
+    const model = getExtractionModel(3000, 'financial_extraction');
     const structuredModel = model.withStructuredOutput(ExtractionOutputSchema);
 
     const extracted = await structuredModel.invoke([

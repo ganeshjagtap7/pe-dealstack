@@ -324,7 +324,7 @@ async function researchNode(state: typeof EnrichmentState.State) {
   const steps = [...(state.steps || [])];
   steps.push({ timestamp: new Date().toISOString(), node: 'research', message: 'Synthesizing profile from CRM data' });
 
-  const model = getChatModel(0.3, 2000);
+  const model = getChatModel(0.3, 2000, 'contact_enrichment');
 
   const hasCRMData = state.documentMentions.length > 0 || state.linkedDeals.length > 0;
 

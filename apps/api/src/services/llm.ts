@@ -5,6 +5,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { AIMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 import {
   AI_MODELS,
@@ -12,6 +13,7 @@ import {
   OPENROUTER_HEADERS,
   isOpenRouterEnabled,
 } from '../utils/aiModels.js';
+import { recordUsageEvent } from './usage/trackedLLM.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -42,6 +44,48 @@ const config: LLMConfig = {
 // (e.g. "anthropic/claude-sonnet-4.5") routed through the OpenAI-compatible
 // ChatOpenAI client below. Otherwise we fall back to bare OpenAI model names.
 const useOpenRouter = isOpenRouterEnabled();
+
+// ─── Usage Tracking Adapter ────────────────────────────────────────
+
+/**
+ * Wrap a BaseChatModel so every `.invoke()` call records a UsageEvent.
+ * Token counts come from LangChain's `usage_metadata` on the AIMessage result.
+ * Always provider='openrouter' when OpenRouter is configured, else 'openai'.
+ */
+function trackModel(model: BaseChatModel, operation: string, modelName: string): BaseChatModel {
+  const original = model.invoke.bind(model);
+  const provider: 'openrouter' | 'openai' = useOpenRouter ? 'openrouter' : 'openai';
+  model.invoke = async (input: any, options?: any) => {
+    const start = Date.now();
+    try {
+      const result = await original(input, options);
+      const usage = (result as AIMessage)?.usage_metadata;
+      void recordUsageEvent({
+        operation,
+        model: modelName,
+        provider,
+        promptTokens: usage?.input_tokens ?? 0,
+        completionTokens: usage?.output_tokens ?? 0,
+        status: 'success',
+        durationMs: Date.now() - start,
+      });
+      return result;
+    } catch (err) {
+      void recordUsageEvent({
+        operation,
+        model: modelName,
+        provider,
+        promptTokens: 0,
+        completionTokens: 0,
+        status: 'error',
+        durationMs: Date.now() - start,
+        metadata: { errorMessage: err instanceof Error ? err.message : String(err) },
+      });
+      throw err;
+    }
+  };
+  return model;
+}
 
 const MODELS = {
   openai: {
@@ -112,24 +156,33 @@ function createModel(
 // ─── Pre-built Model Instances ─────────────────────────────────────
 
 /** Primary chat model (Claude Sonnet 4.5 via OpenRouter, or GPT-4.1 direct) — for deal analysis, chat, memos */
-export function getChatModel(temperature = 0.7, maxTokens = 1500): BaseChatModel {
+export function getChatModel(temperature = 0.7, maxTokens = 1500, operation?: string): BaseChatModel {
   const provider = config.chatProvider;
-  const model = MODELS[provider].chat;
-  return createModel(provider, model, temperature, maxTokens);
+  const modelName = MODELS[provider].chat;
+  const model = createModel(provider, modelName, temperature, maxTokens);
+  if (operation) return trackModel(model, operation, modelName);
+  log.warn('getChatModel called without operation label — usage will not be tracked');
+  return model;
 }
 
 /** Fast/cheap model (GPT-4.1-mini via OpenRouter, or GPT-4.1-mini direct) — for sentiment, classification */
-export function getFastModel(temperature = 0.7, maxTokens = 500): BaseChatModel {
+export function getFastModel(temperature = 0.7, maxTokens = 500, operation?: string): BaseChatModel {
   const provider = config.fastProvider;
-  const model = MODELS[provider].fast;
-  return createModel(provider, model, temperature, maxTokens);
+  const modelName = MODELS[provider].fast;
+  const model = createModel(provider, modelName, temperature, maxTokens);
+  if (operation) return trackModel(model, operation, modelName);
+  log.warn('getFastModel called without operation label — usage will not be tracked');
+  return model;
 }
 
 /** Extraction model — low temperature for consistent structured output */
-export function getExtractionModel(maxTokens = 3000): BaseChatModel {
+export function getExtractionModel(maxTokens = 3000, operation?: string): BaseChatModel {
   const provider = config.chatProvider;
-  const model = MODELS[provider].extraction;
-  return createModel(provider, model, 0.1, maxTokens);
+  const modelName = MODELS[provider].extraction;
+  const model = createModel(provider, modelName, 0.1, maxTokens);
+  if (operation) return trackModel(model, operation, modelName);
+  log.warn('getExtractionModel called without operation label — usage will not be tracked');
+  return model;
 }
 
 /** Get a specific model by name (escape hatch) */

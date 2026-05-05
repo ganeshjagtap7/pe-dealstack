@@ -69,7 +69,7 @@ export async function generateFollowUpQuestions(
   }
 
   try {
-    const model = getFastModel(0.7, 800);
+    const model = getFastModel(0.7, 800, 'deal_chat');
     const structuredModel = model.withStructuredOutput(FollowUpQuestionSchema);
 
     const extractionContext = [

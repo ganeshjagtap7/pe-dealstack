@@ -72,7 +72,7 @@ const EMAIL_TEMPLATES: Record<string, { name: string; structure: string }> = {
 // ─── Node: Draft Email ─────────────────────────────────────────────
 
 async function draftNode(state: typeof EmailState.State) {
-  const model = getChatModel(0.7, 1500);
+  const model = getChatModel(0.7, 1500, 'email_drafting');
 
   const template = state.templateId ? EMAIL_TEMPLATES[state.templateId] : null;
   const templateGuide = template
@@ -107,7 +107,7 @@ Guidelines:
 // ─── Node: Tone Check ──────────────────────────────────────────────
 
 async function toneCheckNode(state: typeof EmailState.State) {
-  const model = getChatModel(0.2, 800);
+  const model = getChatModel(0.2, 800, 'email_drafting');
 
   const structuredModel = model.withStructuredOutput(z.object({
     score: z.number().min(0).max(100).describe('Tone appropriateness score'),
@@ -139,7 +139,7 @@ Target tone: ${state.tone || 'professional'}`),
 // ─── Node: Compliance Check ────────────────────────────────────────
 
 async function complianceCheckNode(state: typeof EmailState.State) {
-  const model = getChatModel(0.1, 800);
+  const model = getChatModel(0.1, 800, 'email_drafting');
 
   const structuredModel = model.withStructuredOutput(z.object({
     isCompliant: z.boolean(),

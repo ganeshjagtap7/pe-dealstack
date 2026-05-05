@@ -88,7 +88,7 @@ export async function synthesizeNode(
 
   steps.push(step('Starting GPT-4o structured extraction'));
 
-  const model = getExtractionModel(2000);
+  const model = getExtractionModel(2000, 'firm_research');
 
   // === Extract Firm Profile ===
   let firmProfile: FirmProfile | null = null;

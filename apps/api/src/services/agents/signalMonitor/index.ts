@@ -70,7 +70,7 @@ async function analyzeSignalsNode(state: typeof SignalState.State) {
     return { signals: [], processedCount: 0, status: 'completed' };
   }
 
-  const model = getChatModel(0.3, 3000);
+  const model = getChatModel(0.3, 3000, 'signal_monitor');
 
   // Batch analyze — process all deals at once for efficiency
   const dealsSummary = state.deals.map(d =>

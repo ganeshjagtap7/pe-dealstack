@@ -129,7 +129,7 @@ export async function generateSection(
   }
 
   try {
-    const model = getChatModel(0.7, 2000);
+    const model = getChatModel(0.7, 2000, 'memo_generation');
     const sectionPrompt = customPrompt ?? promptConfig.prompt;
     const contextText = formatContextForLLM(context);
 

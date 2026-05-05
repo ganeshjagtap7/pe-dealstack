@@ -158,7 +158,7 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
   }
 
   // Generate meeting brief with structured output
-  const model = getChatModel(0.5, 2000);
+  const model = getChatModel(0.5, 2000, 'meeting_prep');
   const structuredModel = model.withStructuredOutput(z.object({
     headline: z.string().describe('One-line meeting headline'),
     dealSummary: z.string().describe('2-3 sentence deal summary for quick context'),

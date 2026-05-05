@@ -57,7 +57,7 @@ async function generateQueries(
   firmProfile: FirmProfile | null,
   personProfile: PersonProfile | null,
 ): Promise<GeneratedQuery[]> {
-  const model = getChatModel(0.3, 1500);
+  const model = getChatModel(0.3, 1500, 'firm_research');
   const structuredModel = model.withStructuredOutput(QuerySchema);
 
   const systemPrompt = `You are a PE research analyst. Based on an initial scan of a firm, generate 8-12 targeted DuckDuckGo search queries to find DEEPER information.
@@ -187,7 +187,7 @@ async function synthesizePhase2(
   firmProfile: FirmProfile | null,
   personProfile: PersonProfile | null,
 ): Promise<{ firm: z.infer<typeof EnrichedFirmSchema>; person: z.infer<typeof EnrichedPersonSchema> }> {
-  const model = getChatModel(0.1, 2000);
+  const model = getChatModel(0.1, 2000, 'firm_research');
 
   const systemPrompt = `You are a PE research analyst. Extract NEW information found in deep research results that was NOT in the initial profile. Only include facts that are clearly stated in the source text. Do not guess.`;
 
