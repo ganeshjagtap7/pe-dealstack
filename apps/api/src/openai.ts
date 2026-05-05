@@ -3,6 +3,9 @@ import dotenv from 'dotenv';
 import { log } from './utils/logger.js';
 import { OPENROUTER_BASE_URL, OPENROUTER_HEADERS, isOpenRouterEnabled } from './utils/aiModels.js';
 import { recordUsageEvent } from './services/usage/trackedLLM.js';
+import { enforceUserGate, UserBlockedError } from './services/usage/enforcement.js';
+
+export { UserBlockedError } from './services/usage/enforcement.js';
 
 dotenv.config();
 
@@ -117,9 +120,10 @@ export async function trackedChatCompletion(
   options?: Parameters<NonNullable<typeof openai>['chat']['completions']['create']>[1],
 ) {
   if (!openai) throw new Error('LLM client not configured');
-  const start = Date.now();
   const model = (params as any).model as string;
-  const provider = useOpenRouter ? 'openrouter' : 'openai';
+  const provider: 'openrouter' | 'openai' = useOpenRouter ? 'openrouter' : 'openai';
+  await enforceUserGate(operation, model, provider);
+  const start = Date.now();
   try {
     const response: any = await openai.chat.completions.create(params as any, options);
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
@@ -161,8 +165,9 @@ export async function trackedDirectChatCompletion(
   options?: Parameters<NonNullable<typeof openaiDirect>['chat']['completions']['create']>[1],
 ) {
   if (!openaiDirect) throw new Error('Direct OpenAI client not configured');
-  const start = Date.now();
   const model = (params as any).model as string;
+  await enforceUserGate(operation, model, 'openai');
+  const start = Date.now();
   try {
     const response: any = await openaiDirect.chat.completions.create(params as any, options);
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
@@ -205,8 +210,9 @@ export async function trackedDirectResponsesCreate(
   options?: any,
 ) {
   if (!openaiDirect) throw new Error('Direct OpenAI client not configured');
-  const start = Date.now();
   const model = (params as any).model as string;
+  await enforceUserGate(operation, model, 'openai');
+  const start = Date.now();
   try {
     const response: any = await (openaiDirect as any).responses.create(params, options);
     const promptTokens = response?.usage?.input_tokens ?? 0;

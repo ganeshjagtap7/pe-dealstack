@@ -14,6 +14,9 @@ import {
   isOpenRouterEnabled,
 } from '../utils/aiModels.js';
 import { recordUsageEvent } from './usage/trackedLLM.js';
+import { enforceUserGate, UserBlockedError } from './usage/enforcement.js';
+
+export { UserBlockedError } from './usage/enforcement.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -56,6 +59,7 @@ function trackModel(model: BaseChatModel, operation: string, modelName: string):
   const original = model.invoke.bind(model);
   const provider: 'openrouter' | 'openai' = useOpenRouter ? 'openrouter' : 'openai';
   model.invoke = async (input: any, options?: any) => {
+    await enforceUserGate(operation, modelName, provider);
     const start = Date.now();
     try {
       const result = await original(input, options);
