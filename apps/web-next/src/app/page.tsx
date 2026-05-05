@@ -160,7 +160,6 @@ export default function LandingPage() {
               <div className="flex gap-4">
                 <a className="text-slate-400 hover:text-primary transition-colors" href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"><span className="material-symbols-outlined">public</span></a>
                 <a className="text-slate-400 hover:text-primary transition-colors" href="mailto:contact@pe-os.com" aria-label="Email"><span className="material-symbols-outlined">alternate_email</span></a>
-                <a className="text-slate-400 hover:text-primary transition-colors" href="#features" aria-label="Blog"><span className="material-symbols-outlined">rss_feed</span></a>
               </div>
             </div>
             <div>
