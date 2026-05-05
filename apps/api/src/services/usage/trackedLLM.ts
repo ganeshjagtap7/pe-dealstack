@@ -3,6 +3,7 @@ import { log } from '../../utils/logger.js';
 import { getUsageContext } from '../../middleware/usageContext.js';
 import { getModelPrice, computeCostUsd } from './modelPrices.js';
 import { getCreditsForOperation } from './operationCredits.js';
+import { checkRunawayThreshold } from './runawayMonitor.js';
 
 export type UsageProvider =
   | 'openai'
@@ -106,6 +107,7 @@ export async function recordUsageEvent(input: RecordUsageEventInput): Promise<vo
     if (error) {
       log.error('recordUsageEvent: insert failed', { error, operation: input.operation });
     }
+    void checkRunawayThreshold(ctx.userId);
   } catch (err) {
     log.error('recordUsageEvent: unexpected error', { err, operation: input.operation });
   }
