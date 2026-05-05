@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
-import { openai, isAIEnabled } from '../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { MODEL_REASONING } from '../utils/aiModels.js';
 import { SHARED_GUARDRAILS } from '../services/agents/guardrails.js';
 import { log } from '../utils/logger.js';
@@ -332,7 +332,7 @@ ${deal.aiThesis ? `\nAI Investment Thesis: ${deal.aiThesis}` : ''}`;
         // Add current message
         messages.push({ role: 'user', content });
 
-        const completion = await openai.chat.completions.create({
+        const completion = await trackedChatCompletion('deal_chat', {
           model: MODEL_REASONING,
           messages,
           max_tokens: 4096,

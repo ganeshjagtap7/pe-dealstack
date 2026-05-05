@@ -1,4 +1,4 @@
-import { openai, isAIEnabled } from '../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { MODEL_REASONING, MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
@@ -198,7 +198,7 @@ Respond in JSON format:
 }`;
 
     try {
-      const response = await openai.chat.completions.create({
+      const response = await trackedChatCompletion('multi_doc_analysis', {
         model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
         messages: [
           { role: 'system', content: synthesisPrompt },

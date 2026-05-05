@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
-import { openai, isAIEnabled } from '../openai.js';
+import { isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { log } from '../utils/logger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
@@ -135,7 +135,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
       Please generate comprehensive, professional content appropriate for this section.`;
 
     // Call OpenAI
-    const response = await openai!.chat.completions.create({
+    const response = await trackedChatCompletion('memo_generation', {
       model: MODEL_REASONING,
       messages: [
         { role: 'system', content: MEMO_ANALYST_PROMPT },

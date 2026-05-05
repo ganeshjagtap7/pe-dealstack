@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
-import { openai, isAIEnabled, DEAL_ANALYSIS_SYSTEM_PROMPT, generateDealContext } from '../openai.js';
+import { isAIEnabled, DEAL_ANALYSIS_SYSTEM_PROMPT, generateDealContext, trackedChatCompletion } from '../openai.js';
 import { z } from 'zod';
 import { AICache } from '../services/aiCache.js';
 import { log } from '../utils/logger.js';
@@ -216,7 +216,7 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
 
     log.info('Generating thesis for deal', { dealId, forceRefresh });
 
-    const completion = await openai!.chat.completions.create({
+    const completion = await trackedChatCompletion('deal_analysis', {
       model: MODEL_REASONING,
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
@@ -314,7 +314,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
 
     log.info('Analyzing risks for deal', { dealId, forceRefresh });
 
-    const completion = await openai!.chat.completions.create({
+    const completion = await trackedChatCompletion('deal_analysis', {
       model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },

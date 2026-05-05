@@ -1,4 +1,4 @@
-import { openai, isAIEnabled } from '../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
@@ -67,7 +67,7 @@ export async function classifyFinancials(
   log.debug('Financial classifier starting', { textLength: truncatedText.length });
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await trackedChatCompletion('financial_extraction', {
       model: MODEL_CLASSIFICATION,
       messages: [
         { role: 'system', content: buildExtractionPrompt({ includeSourceCitations: true }) },
