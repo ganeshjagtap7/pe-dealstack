@@ -12,7 +12,7 @@ import aiAgentsRouter from './ai-agents.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { MODEL_REASONING, MODEL_CLASSIFICATION } from '../utils/aiModels.js';
-import { classifyAIError } from '../utils/aiErrors.js';
+import { classifyAIErrorObject } from '../utils/aiErrors.js';
 
 const router = Router();
 
@@ -104,7 +104,8 @@ router.post('/deals/:dealId/chat', async (req, res) => {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     log.error('Error in AI chat', error);
-    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to process AI chat') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 
@@ -254,7 +255,8 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
     });
   } catch (error) {
     log.error('Error generating thesis', error);
-    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to generate thesis') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 
@@ -351,7 +353,8 @@ Format your response as a JSON array of risk objects with fields: title, descrip
     });
   } catch (error) {
     log.error('Error analyzing risks', error);
-    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to analyze risks') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 

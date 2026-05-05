@@ -8,7 +8,7 @@ import { getOrgId } from '../middleware/orgScope.js';
 import { runMemoChatAgent } from '../services/agents/memoAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { MODEL_REASONING } from '../utils/aiModels.js';
-import { classifyAIError } from '../utils/aiErrors.js';
+import { classifyAIErrorObject } from '../utils/aiErrors.js';
 
 const router = Router();
 
@@ -306,7 +306,8 @@ router.post('/:id/chat', async (req, res) => {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     log.error('Memo chat error', error);
-    res.status(500).json({ error: classifyAIError(error.message || 'Failed to process chat') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 

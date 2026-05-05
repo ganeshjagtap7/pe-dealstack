@@ -4,6 +4,7 @@ import { getOrgId } from '../middleware/orgScope.js';
 import { runFirmResearch, runDeepResearch } from '../services/agents/firmResearchAgent/index.js';
 import { log } from '../utils/logger.js';
 import { extractNameFromDomain } from '../utils/urlHelpers.js';
+import { runWithUsageContext } from '../middleware/usageContext.js';
 
 const router = Router();
 
@@ -392,17 +393,25 @@ router.post('/enrich-firm', async (req: Request, res: Response) => {
 
     res.json(result);
 
-    // Fire Phase 2 deep research in background (not awaited)
+    // Fire Phase 2 deep research in background (not awaited).
+    // We wrap in runWithUsageContext so every LLM call inside the background
+    // task is attributed to the correct user/org — AsyncLocalStorage is lost
+    // once the HTTP response has been sent.
     if (result.success && result.firmProfile && (websiteUrl || linkedinUrl)) {
-      runDeepResearch({
-        phase1Profile: result.firmProfile,
-        phase1PersonProfile: result.personProfile,
-        websiteUrl: websiteUrl || '',
-        linkedinUrl: linkedinUrl || '',
-        firmName,
-        userId,
-        organizationId: orgId,
-      }).catch(err => log.error('Deep research background task failed', { error: err.message }));
+      void runWithUsageContext(
+        { userId, organizationId: orgId, source: 'background' },
+        async () => {
+          await runDeepResearch({
+            phase1Profile: result.firmProfile!,
+            phase1PersonProfile: result.personProfile,
+            websiteUrl: websiteUrl || '',
+            linkedinUrl: linkedinUrl || '',
+            firmName,
+            userId,
+            organizationId: orgId,
+          }).catch(err => log.error('Deep research background task failed', { error: err.message }));
+        },
+      );
     }
   } catch (error: any) {
     log.error('Firm enrichment endpoint failed', { error: error.message, stack: error.stack });

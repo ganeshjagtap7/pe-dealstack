@@ -7,7 +7,7 @@ import { log } from '../utils/logger.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { generateAllSections, COMPREHENSIVE_IC_SECTIONS, STANDARD_IC_SECTIONS, SEARCH_FUND_SECTIONS, SCREENING_NOTE_SECTIONS } from '../services/agents/memoAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
-import { classifyAIError } from '../utils/aiErrors.js';
+import { classifyAIErrorObject } from '../utils/aiErrors.js';
 
 // Sub-routers
 import memoSectionsRouter from './memos-sections.js';
@@ -513,7 +513,8 @@ router.post('/:id/generate-all', async (req, res) => {
     res.json({ success: true, completed, total: generated.length });
   } catch (error: any) {
     log.error('Generate-all failed', error);
-    res.status(500).json({ error: classifyAIError(error.message || 'Failed to regenerate memo') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 

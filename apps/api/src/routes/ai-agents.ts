@@ -5,7 +5,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
-import { classifyAIError } from '../utils/aiErrors.js';
+import { classifyAIError, classifyAIErrorObject } from '../utils/aiErrors.js';
 import { getOrgId, verifyDealAccess, verifyContactAccess } from '../middleware/orgScope.js';
 import { supabase } from '../supabase.js';
 
@@ -56,7 +56,8 @@ router.post('/ai/enrich-contact', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Contact enrichment error', error);
-    res.status(500).json({ error: classifyAIError(error.message || 'Failed to enrich contact') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 
@@ -98,8 +99,8 @@ router.post('/ai/meeting-prep', async (req, res) => {
     res.json(brief);
   } catch (error: any) {
     log.error('Meeting prep error', error);
-    const msg = error instanceof Error ? error.message : String(error || 'Failed to generate meeting prep');
-    res.status(500).json({ error: classifyAIError(msg) });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 
@@ -117,7 +118,8 @@ router.post('/ai/scan-signals', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Signal scan error', error);
-    res.status(500).json({ error: classifyAIError(error.message || 'Failed to scan signals') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 
@@ -170,8 +172,8 @@ router.post('/ai/draft-email', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Email draft error', error);
-    const msg = error instanceof Error ? error.message : String(error || 'Failed to draft email');
-    res.status(500).json({ error: classifyAIError(msg) });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 

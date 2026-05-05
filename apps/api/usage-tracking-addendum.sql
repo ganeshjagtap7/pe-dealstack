@@ -18,5 +18,16 @@ ON CONFLICT (operation) DO UPDATE SET
   credits     = EXCLUDED.credits,
   description = EXCLUDED.description;
 
+-- claude-haiku-4-5-20251001 used by crossVerifyNode for multi-model ensemble verification.
+-- Pricing: $1.00 per 1M input tokens, $5.00 per 1M output tokens.
+INSERT INTO public."ModelPrice" (model, provider, "inputPricePer1M", "outputPricePer1M") VALUES
+  ('claude-haiku-4-5-20251001', 'anthropic', 1.0000, 5.0000)
+ON CONFLICT (model) DO UPDATE SET
+  provider           = EXCLUDED.provider,
+  "inputPricePer1M"  = EXCLUDED."inputPricePer1M",
+  "outputPricePer1M" = EXCLUDED."outputPricePer1M",
+  "updatedAt"        = now();
+
 -- Verify:
 -- SELECT operation, credits FROM public."OperationCredits" ORDER BY credits DESC;
+-- SELECT model, provider, "inputPricePer1M", "outputPricePer1M" FROM public."ModelPrice" WHERE provider = 'anthropic';

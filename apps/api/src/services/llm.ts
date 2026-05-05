@@ -5,7 +5,6 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import { AIMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 import {
   AI_MODELS,
@@ -15,6 +14,7 @@ import {
 } from '../utils/aiModels.js';
 import { recordUsageEvent } from './usage/trackedLLM.js';
 import { enforceUserGate, UserBlockedError } from './usage/enforcement.js';
+import type { BaseCallbackHandler } from '@langchain/core/callbacks/base';
 
 export { UserBlockedError } from './usage/enforcement.js';
 import dotenv from 'dotenv';
@@ -51,30 +51,56 @@ const useOpenRouter = isOpenRouterEnabled();
 // ─── Usage Tracking Adapter ────────────────────────────────────────
 
 /**
- * Wrap a BaseChatModel so every `.invoke()` call records a UsageEvent.
- * Token counts come from LangChain's `usage_metadata` on the AIMessage result.
- * Always provider='openrouter' when OpenRouter is configured, else 'openai'.
+ * Wrap a BaseChatModel so every LLM API call records a UsageEvent.
+ *
+ * Two-layer approach:
+ *
+ * 1. LangChain callback handler (handleLLMEnd / handleLLMError)
+ *    Fires for EVERY underlying LLM call regardless of how the model is
+ *    invoked — direct `.invoke()`, chained operators, or wrapped via
+ *    `.withStructuredOutput(schema).invoke(input)`. This is the primary
+ *    recording path for all 14 structured-output callsites.
+ *
+ * 2. Patched `.invoke()` — user-gate enforcement only.
+ *    The gate (isBlocked check) runs synchronously before the HTTP-path
+ *    model calls. For structured-output chains, the chain calls the
+ *    underlying model directly and bypasses this patch — so gate
+ *    enforcement for those paths is best-effort post-hoc via the
+ *    runaway monitor and the existing 30s flag cache. This trade-off is
+ *    acceptable because block enforcement at ingestion (HTTP middleware)
+ *    already prevents the request from reaching the LLM service.
+ *
+ * Provider widening: includes 'gemini' so Gemini-backed models are tagged
+ * correctly (previously always recorded as 'openai').
  */
 function trackModel(model: BaseChatModel, operation: string, modelName: string): BaseChatModel {
-  const original = model.invoke.bind(model);
-  const provider: 'openrouter' | 'openai' = useOpenRouter ? 'openrouter' : 'openai';
-  model.invoke = async (input: any, options?: any) => {
-    await enforceUserGate(operation, modelName, provider);
-    const start = Date.now();
-    try {
-      const result = await original(input, options);
-      const usage = (result as AIMessage)?.usage_metadata;
+  const provider: 'openrouter' | 'openai' | 'gemini' =
+    (model as any).constructor?.name?.includes('Google') ? 'gemini' :
+    useOpenRouter ? 'openrouter' : 'openai';
+
+  // 1. Attach a callback handler that fires for every LLM API call,
+  //    including nested calls inside withStructuredOutput chains.
+  const handler: Partial<BaseCallbackHandler> = {
+    name: 'usage-tracker',
+    handleLLMEnd(output: any) {
+      const gen0 = output?.generations?.[0]?.[0]?.message;
+      const usage =
+        gen0?.usage_metadata ??
+        output?.llmOutput?.tokenUsage ??
+        output?.llmOutput?.usage ??
+        null;
       void recordUsageEvent({
         operation,
         model: modelName,
         provider,
-        promptTokens: usage?.input_tokens ?? 0,
-        completionTokens: usage?.output_tokens ?? 0,
+        promptTokens:
+          usage?.input_tokens ?? usage?.promptTokens ?? usage?.prompt_tokens ?? 0,
+        completionTokens:
+          usage?.output_tokens ?? usage?.completionTokens ?? usage?.completion_tokens ?? 0,
         status: 'success',
-        durationMs: Date.now() - start,
       });
-      return result;
-    } catch (err) {
+    },
+    handleLLMError(err: any) {
       void recordUsageEvent({
         operation,
         model: modelName,
@@ -82,12 +108,23 @@ function trackModel(model: BaseChatModel, operation: string, modelName: string):
         promptTokens: 0,
         completionTokens: 0,
         status: 'error',
-        durationMs: Date.now() - start,
         metadata: { errorMessage: err instanceof Error ? err.message : String(err) },
       });
-      throw err;
-    }
+    },
   };
+
+  const existingCallbacks = ((model as any).callbacks as any[] | undefined) ?? [];
+  (model as any).callbacks = [...existingCallbacks, handler];
+
+  // 2. Keep the .invoke patch ONLY for the synchronous block gate.
+  //    The callback handler above already records usage — we do NOT
+  //    double-record from inside the patched invoke.
+  const originalInvoke = model.invoke.bind(model);
+  model.invoke = async (input: any, options?: any) => {
+    await enforceUserGate(operation, modelName, provider);
+    return originalInvoke(input, options);
+  };
+
   return model;
 }
 
