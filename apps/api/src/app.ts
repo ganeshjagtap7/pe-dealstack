@@ -28,6 +28,7 @@ import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
+import internalRouter from './routes/internal-usage.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
@@ -279,6 +280,12 @@ app.use('/api/onboarding', authMiddleware, orgMiddleware, usageContextMiddleware
 app.use('/api/contacts', authMiddleware, orgMiddleware, usageContextMiddleware, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, usageContextMiddleware, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, financialsRouter);
+
+// ========================================
+// Internal Admin Routes (requireInternalAdmin gate inside router)
+// No orgMiddleware — these routes intentionally query across orgs
+// ========================================
+app.use('/api/internal', authMiddleware, internalRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
