@@ -124,10 +124,6 @@
                                     <span class="material-symbols-outlined text-[20px]">domain</span>
                                     <span class="text-sm font-medium">Firm Profile</span>
                                 </a>
-                                <a href="#section-ai-usage" data-section="ai-usage" class="settings-nav-item flex items-center gap-3 px-4 py-2.5 rounded-lg border border-transparent text-text-secondary hover:bg-primary-light hover:text-primary transition-all">
-                                    <span class="material-symbols-outlined text-[20px]">analytics</span>
-                                    <span class="text-sm font-medium">AI Usage</span>
-                                </a>
                             </nav>
                         </aside>
 
@@ -360,34 +356,6 @@
                                 </div>
                             </section>
 
-                            <!-- AI Usage Section -->
-                            <section id="section-ai-usage" class="bg-surface-card rounded-xl border border-border-subtle shadow-card overflow-hidden">
-                              <div class="p-6 border-b border-border-subtle">
-                                <h3 class="text-lg font-bold text-text-main">AI Usage</h3>
-                                <p class="text-sm text-text-secondary mt-1">Free during beta. Tracking helps us understand how Pocket Fund is used.</p>
-                              </div>
-                              <div class="p-6">
-                                <div class="flex items-baseline gap-2 mb-2">
-                                  <div id="ai-usage-total" class="text-4xl font-bold" style="color: #003366;">—</div>
-                                  <div class="text-sm text-text-secondary">credits used this month</div>
-                                </div>
-                                <div class="bg-gray-100 rounded-full h-2 overflow-hidden mb-6">
-                                  <div id="ai-usage-bar-fill" class="h-full transition-all duration-300" style="background: #003366; width: 0%;"></div>
-                                </div>
-                                <table id="ai-usage-breakdown" class="w-full text-sm" hidden>
-                                  <thead>
-                                    <tr class="text-left text-xs uppercase tracking-wide text-text-secondary border-b border-border-subtle">
-                                      <th class="py-2">Operation</th>
-                                      <th class="py-2 text-right">Count</th>
-                                      <th class="py-2 text-right">Credits</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody id="ai-usage-breakdown-body"></tbody>
-                                </table>
-                                <div id="ai-usage-empty" class="text-sm text-text-secondary italic py-4">No AI activity yet this month.</div>
-                              </div>
-                            </section>
-
                             <!-- Deactivate Account -->
                             <div class="flex items-center justify-between p-5 bg-red-50 border border-red-200 rounded-xl">
                                 <div>
@@ -518,8 +486,6 @@
     <script defer src="js/settingsProfile.js"></script>
     <script defer src="js/settingsInvite.js"></script>
     <script defer src="settings.js"></script>
-
-    <script defer src="/js/settingsAiUsage.js"></script>
 
     <!-- Onboarding modules -->
     <script src="js/onboarding/onboarding-config.js"></script>
