@@ -271,12 +271,14 @@ export async function invokeStructured<T extends z.ZodTypeAny>(
   const primaryName = MODELS[config.chatProvider].extraction;
   try {
     const primary = createModel(config.chatProvider, primaryName, temperature, maxTokens);
-    return await primary.withStructuredOutput(schema).invoke(messages);
+    const tracked = trackModel(primary, label, primaryName);
+    return await tracked.withStructuredOutput(schema).invoke(messages);
   } catch (primaryErr: any) {
     log.warn(`${label}: primary model failed, retrying with fallback`, describeAIError(primaryErr));
     const fallbackName = isOpenRouterEnabled() ? AI_MODELS.TIER2 : 'gpt-4o';
     const fallback = createModel('openai', fallbackName, temperature, maxTokens);
-    return await fallback.withStructuredOutput(schema).invoke(messages);
+    const tracked = trackModel(fallback, label, fallbackName);
+    return await tracked.withStructuredOutput(schema).invoke(messages);
   }
 }
 
