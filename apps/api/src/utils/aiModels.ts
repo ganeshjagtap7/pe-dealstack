@@ -67,6 +67,6 @@ export function isOpenRouterEnabled(): boolean {
 
 /** Headers OpenRouter recommends for attribution / rate-limit pools */
 export const OPENROUTER_HEADERS = {
-  'HTTP-Referer': process.env.APP_URL || 'https://pe-dealstack.vercel.app',
-  'X-Title': 'PE OS',
+  'HTTP-Referer': process.env.APP_URL || 'https://lmmos.ai',
+  'X-Title': 'lmmos',
 };
