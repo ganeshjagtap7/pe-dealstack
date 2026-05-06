@@ -126,7 +126,7 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
   }
 
   try {
-    const model = getChatModel(0.7, 2500);
+    const model = getChatModel(0.7, 2500, 'deal_chat');
     const tools = getDealChatTools(input.dealId, input.orgId);
 
     const agent = createReactAgent({

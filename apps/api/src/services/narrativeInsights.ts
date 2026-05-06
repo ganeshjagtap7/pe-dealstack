@@ -7,7 +7,7 @@
  */
 
 import crypto from 'crypto';
-import { openai, isAIEnabled } from '../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { MODEL_INSIGHTS } from '../utils/aiModels.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
@@ -299,7 +299,7 @@ Return JSON:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await trackedChatCompletion('narrative_insights', {
       model: MODEL_INSIGHTS,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

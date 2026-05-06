@@ -5,6 +5,7 @@
 import { supabase } from './supabase.js';
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
 import { log } from './utils/logger.js';
+import { trackedEmbedDocuments, trackedEmbedQuery } from './services/usage/trackedEmbeddings.js';
 
 // ============================================================
 // Embeddings via LangChain
@@ -133,8 +134,14 @@ export async function embedDocument(
       return { success: true, chunkCount: 0 };
     }
 
-    // Use LangChain embeddings (batch)
-    const embeddings = await model.embedDocuments(chunks.map(c => c.content));
+    // Use LangChain embeddings (batch). Wrapped to record one UsageEvent
+    // per ingest with units = chunk count and char-based cost.
+    const chunkTexts = chunks.map(c => c.content);
+    const embeddings = await trackedEmbedDocuments(
+      'gemini_embed_doc',
+      chunkTexts,
+      () => model.embedDocuments(chunkTexts),
+    );
 
     // Delete existing chunks for this document
     await supabase
@@ -219,7 +226,11 @@ export async function searchDocumentChunks(
   }
 
   try {
-    const queryEmbedding = await model.embedQuery(query);
+    const queryEmbedding = await trackedEmbedQuery(
+      'gemini_embed_query',
+      query,
+      () => model.embedQuery(query),
+    );
     const embeddingStr = `[${queryEmbedding.join(',')}]`;
 
     const { data, error } = await supabase.rpc('search_document_chunks', {

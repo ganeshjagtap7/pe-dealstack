@@ -14,6 +14,8 @@ import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType, AgentStep } from '../state.js';
 import type { ClassifiedStatement } from '../../../financialClassifier.js';
 import { VERIFY_SAMPLE_SIZE } from '../config.js';
+import { recordUsageEvent } from '../../../usage/trackedLLM.js';
+import { enforceUserGate } from '../../../usage/enforcement.js';
 
 // ─── Interfaces ──────────────────────────────────────────────
 
@@ -250,12 +252,39 @@ export async function crossVerifyNode(
     const sourceTextSample = rawText.slice(0, VERIFY_SAMPLE_SIZE);
     const userPrompt = buildVerifyPrompt(extractedValues, sourceTextSample);
 
-    const message = await anthropic.messages.create({
+    await enforceUserGate('financial_extraction', 'claude-haiku-4-5-20251001', 'anthropic');
+    const start = Date.now();
+    let message;
+    try {
+      message = await anthropic.messages.create({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        system:
+          'You are a financial data verification assistant. You verify extracted financial values against source documents. Respond ONLY with a valid JSON array — no markdown, no code fences, no explanation.',
+        messages: [{ role: 'user', content: userPrompt }],
+      });
+    } catch (err) {
+      void recordUsageEvent({
+        operation: 'financial_extraction',
+        model: 'claude-haiku-4-5-20251001',
+        provider: 'anthropic',
+        promptTokens: 0,
+        completionTokens: 0,
+        status: 'error',
+        durationMs: Date.now() - start,
+        metadata: { errorMessage: err instanceof Error ? err.message : String(err) },
+      });
+      throw err;
+    }
+    const claudeUsage = (message as any)?.usage;
+    void recordUsageEvent({
+      operation: 'financial_extraction',
       model: 'claude-haiku-4-5-20251001',
-      max_tokens: 2000,
-      system:
-        'You are a financial data verification assistant. You verify extracted financial values against source documents. Respond ONLY with a valid JSON array — no markdown, no code fences, no explanation.',
-      messages: [{ role: 'user', content: userPrompt }],
+      provider: 'anthropic',
+      promptTokens: claudeUsage?.input_tokens ?? 0,
+      completionTokens: claudeUsage?.output_tokens ?? 0,
+      status: 'success',
+      durationMs: Date.now() - start,
     });
 
     const content = message.content[0];

@@ -14,6 +14,11 @@ import {
   OPENROUTER_HEADERS,
   isOpenRouterEnabled,
 } from '../utils/aiModels.js';
+import { recordUsageEvent } from './usage/trackedLLM.js';
+import { enforceUserGate, UserBlockedError } from './usage/enforcement.js';
+import type { BaseCallbackHandler } from '@langchain/core/callbacks/base';
+
+export { UserBlockedError } from './usage/enforcement.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -44,6 +49,86 @@ const config: LLMConfig = {
 // (e.g. "anthropic/claude-sonnet-4.5") routed through the OpenAI-compatible
 // ChatOpenAI client below. Otherwise we fall back to bare OpenAI model names.
 const useOpenRouter = isOpenRouterEnabled();
+
+// ─── Usage Tracking Adapter ────────────────────────────────────────
+
+/**
+ * Wrap a BaseChatModel so every LLM API call records a UsageEvent.
+ *
+ * Two-layer approach:
+ *
+ * 1. LangChain callback handler (handleLLMEnd / handleLLMError)
+ *    Fires for EVERY underlying LLM call regardless of how the model is
+ *    invoked — direct `.invoke()`, chained operators, or wrapped via
+ *    `.withStructuredOutput(schema).invoke(input)`. This is the primary
+ *    recording path for all 14 structured-output callsites.
+ *
+ * 2. Patched `.invoke()` — user-gate enforcement only.
+ *    The gate (isBlocked check) runs synchronously before the HTTP-path
+ *    model calls. For structured-output chains, the chain calls the
+ *    underlying model directly and bypasses this patch — so gate
+ *    enforcement for those paths is best-effort post-hoc via the
+ *    runaway monitor and the existing 30s flag cache. This trade-off is
+ *    acceptable because block enforcement at ingestion (HTTP middleware)
+ *    already prevents the request from reaching the LLM service.
+ *
+ * Provider widening: includes 'gemini' so Gemini-backed models are tagged
+ * correctly (previously always recorded as 'openai').
+ */
+function trackModel(model: BaseChatModel, operation: string, modelName: string): BaseChatModel {
+  const provider: 'openrouter' | 'openai' | 'gemini' =
+    (model as any).constructor?.name?.includes('Google') ? 'gemini' :
+    useOpenRouter ? 'openrouter' : 'openai';
+
+  // 1. Attach a callback handler that fires for every LLM API call,
+  //    including nested calls inside withStructuredOutput chains.
+  const handler: Partial<BaseCallbackHandler> = {
+    name: 'usage-tracker',
+    handleLLMEnd(output: any) {
+      const gen0 = output?.generations?.[0]?.[0]?.message;
+      const usage =
+        gen0?.usage_metadata ??
+        output?.llmOutput?.tokenUsage ??
+        output?.llmOutput?.usage ??
+        null;
+      void recordUsageEvent({
+        operation,
+        model: modelName,
+        provider,
+        promptTokens:
+          usage?.input_tokens ?? usage?.promptTokens ?? usage?.prompt_tokens ?? 0,
+        completionTokens:
+          usage?.output_tokens ?? usage?.completionTokens ?? usage?.completion_tokens ?? 0,
+        status: 'success',
+      });
+    },
+    handleLLMError(err: any) {
+      void recordUsageEvent({
+        operation,
+        model: modelName,
+        provider,
+        promptTokens: 0,
+        completionTokens: 0,
+        status: 'error',
+        metadata: { errorMessage: err instanceof Error ? err.message : String(err) },
+      });
+    },
+  };
+
+  const existingCallbacks = ((model as any).callbacks as any[] | undefined) ?? [];
+  (model as any).callbacks = [...existingCallbacks, handler];
+
+  // 2. Keep the .invoke patch ONLY for the synchronous block gate.
+  //    The callback handler above already records usage — we do NOT
+  //    double-record from inside the patched invoke.
+  const originalInvoke = model.invoke.bind(model);
+  model.invoke = async (input: any, options?: any) => {
+    await enforceUserGate(operation, modelName, provider);
+    return originalInvoke(input, options);
+  };
+
+  return model;
+}
 
 const MODELS = {
   openai: {
@@ -114,24 +199,33 @@ function createModel(
 // ─── Pre-built Model Instances ─────────────────────────────────────
 
 /** Primary chat model (Claude Sonnet 4.5 via OpenRouter, or GPT-4.1 direct) — for deal analysis, chat, memos */
-export function getChatModel(temperature = 0.7, maxTokens = 1500): BaseChatModel {
+export function getChatModel(temperature = 0.7, maxTokens = 1500, operation?: string): BaseChatModel {
   const provider = config.chatProvider;
-  const model = MODELS[provider].chat;
-  return createModel(provider, model, temperature, maxTokens);
+  const modelName = MODELS[provider].chat;
+  const model = createModel(provider, modelName, temperature, maxTokens);
+  if (operation) return trackModel(model, operation, modelName);
+  log.warn('getChatModel called without operation label — usage will not be tracked');
+  return model;
 }
 
 /** Fast/cheap model (GPT-4.1-mini via OpenRouter, or GPT-4.1-mini direct) — for sentiment, classification */
-export function getFastModel(temperature = 0.7, maxTokens = 500): BaseChatModel {
+export function getFastModel(temperature = 0.7, maxTokens = 500, operation?: string): BaseChatModel {
   const provider = config.fastProvider;
-  const model = MODELS[provider].fast;
-  return createModel(provider, model, temperature, maxTokens);
+  const modelName = MODELS[provider].fast;
+  const model = createModel(provider, modelName, temperature, maxTokens);
+  if (operation) return trackModel(model, operation, modelName);
+  log.warn('getFastModel called without operation label — usage will not be tracked');
+  return model;
 }
 
 /** Extraction model — low temperature for consistent structured output */
-export function getExtractionModel(maxTokens = 3000): BaseChatModel {
+export function getExtractionModel(maxTokens = 3000, operation?: string): BaseChatModel {
   const provider = config.chatProvider;
-  const model = MODELS[provider].extraction;
-  return createModel(provider, model, 0.1, maxTokens);
+  const modelName = MODELS[provider].extraction;
+  const model = createModel(provider, modelName, 0.1, maxTokens);
+  if (operation) return trackModel(model, operation, modelName);
+  log.warn('getExtractionModel called without operation label — usage will not be tracked');
+  return model;
 }
 
 /** Get a specific model by name (escape hatch) */
@@ -177,12 +271,14 @@ export async function invokeStructured<T extends z.ZodTypeAny>(
   const primaryName = MODELS[config.chatProvider].extraction;
   try {
     const primary = createModel(config.chatProvider, primaryName, temperature, maxTokens);
-    return await primary.withStructuredOutput(schema).invoke(messages);
+    const tracked = trackModel(primary, label, primaryName);
+    return await tracked.withStructuredOutput(schema).invoke(messages);
   } catch (primaryErr: any) {
     log.warn(`${label}: primary model failed, retrying with fallback`, describeAIError(primaryErr));
     const fallbackName = isOpenRouterEnabled() ? AI_MODELS.TIER2 : 'gpt-4o';
     const fallback = createModel('openai', fallbackName, temperature, maxTokens);
-    return await fallback.withStructuredOutput(schema).invoke(messages);
+    const tracked = trackModel(fallback, label, fallbackName);
+    return await tracked.withStructuredOutput(schema).invoke(messages);
   }
 }
 

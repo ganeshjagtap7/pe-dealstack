@@ -15,7 +15,7 @@
  * not a full extraction. Typically costs ~$0.003 per run.
  */
 
-import { openai, isAIEnabled } from '../../../../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../../../../openai.js';
 import { MODEL_FAST } from '../../../../utils/aiModels.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
@@ -122,7 +122,7 @@ export async function verifyNode(
     // Use a relevant sample of source text (first 15K chars — enough for verification)
     const sourceTextSample = rawText.slice(0, VERIFY_SAMPLE_SIZE);
 
-    const response = await openai.chat.completions.create({
+    const response = await trackedChatCompletion('financial_extraction', {
       model: MODEL_FAST, // cheap + fast for verification
       messages: [
         { role: 'system', content: VERIFY_SYSTEM_PROMPT },

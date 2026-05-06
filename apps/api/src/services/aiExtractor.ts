@@ -214,7 +214,7 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
 
     let extracted: any;
     try {
-      const model = getExtractionModel(3000);
+      const model = getExtractionModel(3000, 'financial_extraction');
       const structuredModel = model.withStructuredOutput(ExtractionOutputSchema);
       extracted = await structuredModel.invoke(messages);
     } catch (primaryErr: any) {
