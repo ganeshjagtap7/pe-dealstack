@@ -93,7 +93,6 @@ function makeUsageHandler(
     // before continuing the agent loop, so the Supabase insert completes before
     // the lambda freezes. Fire-and-forget here drops the insert on Vercel.
     async handleLLMEnd(output: any): Promise<void> {
-      log.info('[usage] handleLLMEnd FIRED', { operation, modelName, provider });
       const gen0 = output?.generations?.[0]?.[0]?.message;
       const usage =
         gen0?.usage_metadata ??
@@ -112,7 +111,6 @@ function makeUsageHandler(
       });
     },
     async handleLLMError(err: any): Promise<void> {
-      log.info('[usage] handleLLMError FIRED', { operation, modelName, provider });
       await recordUsageEvent({
         operation,
         model: modelName,
