@@ -8,6 +8,7 @@ export interface AppUser {
   systemRole: UserRole;
   avatar: string;
   preferences: Record<string, unknown>;
+  isInternal: boolean;
 }
 
 export interface Deal {
