@@ -286,7 +286,8 @@ subRouter.get('/ai/market-sentiment', async (req, res) => {
         new SystemMessage(`You are a private equity market analyst. Generate a brief, actionable market sentiment analysis for a PE firm. Current date: ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}.`),
         new HumanMessage(`Generate market sentiment for a PE firm with this focus:\n${portfolioContext}\n\nFocus sectors: ${focusSectors.join(', ')}`),
       ]);
-    } catch {
+    } catch (err) {
+      log.warn('ai-portfolio: market sentiment LLM call failed, using fallback', { error: err instanceof Error ? err.message : String(err) });
       sentimentData = {
         headline: 'Market analysis temporarily unavailable',
         analysis: 'Unable to generate analysis at this time.',

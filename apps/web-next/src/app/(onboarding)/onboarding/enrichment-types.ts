@@ -39,7 +39,7 @@ export interface EnrichmentResponse {
 }
 
 // Map profile.checkSizeRange / aum string into our 4 AUM buttons.
-// Mirrors applyEnrichmentToForm in apps/web/js/onboarding/onboarding-tasks.js.
+// Mirrors applyEnrichmentToForm in onboarding-tasks.js.
 export function matchAumBucket(profile: FirmProfile): string | null {
   const raw = (profile.checkSizeRange || profile.aum || "").toLowerCase();
   if (!raw) return null;

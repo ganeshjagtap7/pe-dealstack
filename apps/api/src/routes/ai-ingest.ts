@@ -2,17 +2,13 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { isAIEnabled } from '../openai.js';
 import multer from 'multer';
-import { createRequire } from 'module';
 import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES } from '../services/fileValidator.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { createNotification, resolveUserId } from './notifications.js';
 import { getOrgId } from '../middleware/orgScope.js';
-
-// Use createRequire to load CommonJS pdf-parse module
-const require = createRequire(import.meta.url);
-const pdfParse = require('pdf-parse');
+import { extractTextFromPDF } from './ingest-shared.js';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -59,20 +55,28 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
     const safeName = validation.sanitizedFilename || sanitizeFilename(file.originalname);
     log.info('AI Ingest processing file', { filename: safeName, mimeType: file.mimetype });
 
-    // Extract text from PDF
+    // Extract text from PDF (LlamaParse → pdf-parse fallback)
     let extractedText = '';
     let numPages = 0;
 
     if (file.mimetype === 'application/pdf') {
-      try {
-        const pdfData = await pdfParse(file.buffer);
-        extractedText = pdfData.text?.replace(/\u0000/g, '') || '';
-        numPages = pdfData.numpages || 1;
-        log.info('PDF text extracted', { textLength: extractedText.length, numPages });
-      } catch (pdfError) {
-        log.error('PDF extraction error', pdfError);
-        return res.status(400).json({ error: 'Failed to extract text from PDF' });
+      log.info('AI Ingest: extracting PDF (LlamaParse → pdf-parse)', { filename: safeName });
+      const extraction = await extractTextFromPDF(file.buffer, safeName);
+      if (!extraction) {
+        log.error('AI Ingest: PDF extraction failed in both layers', undefined, { filename: safeName });
+        return res.status(422).json({
+          error:
+            "Couldn't extract data from this document. The PDF may be encrypted, password-protected, or malformed.",
+        });
       }
+      extractedText = extraction.text;
+      numPages = extraction.numPages;
+      log.info('AI Ingest: PDF text extracted', {
+        layer: extraction.source,
+        textLength: extractedText.length,
+        numPages,
+        sparse: extraction.sparse,
+      });
     } else {
       // For non-PDF files, attempt text extraction or return error
       return res.status(400).json({
@@ -81,9 +85,13 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
     }
 
     if (extractedText.length < 100) {
-      return res.status(400).json({
-        error: 'Insufficient text content',
-        message: 'Document does not contain enough text for AI analysis',
+      log.warn('AI Ingest: extracted text too short for AI', {
+        filename: safeName,
+        textLength: extractedText.length,
+      });
+      return res.status(422).json({
+        error:
+          "Couldn't extract data from this document. The PDF appears to be image-only or scanned — please upload a text-based PDF.",
       });
     }
 
@@ -92,9 +100,13 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
     const extractedData = await extractDealDataFromText(extractedText);
 
     if (!extractedData) {
-      return res.status(500).json({
-        error: 'AI extraction failed',
-        message: 'Could not extract deal information from document',
+      log.error('AI Ingest: AI extraction returned null', undefined, {
+        filename: safeName,
+        textLength: extractedText.length,
+      });
+      return res.status(422).json({
+        error:
+          "Couldn't extract data from this document. The AI couldn't identify any deal information.",
       });
     }
 
@@ -347,24 +359,44 @@ subRouter.post('/ai/extract', upload.single('file'), async (req, res) => {
       return res.status(400).json({ error: 'Only PDF files are supported' });
     }
 
-    const pdfData = await pdfParse(file.buffer);
-    const extractedText = pdfData.text?.replace(/\u0000/g, '') || '';
+    const safeName = validation.sanitizedFilename || file.originalname;
+    log.info('AI Extract: extracting PDF (LlamaParse → pdf-parse)', { filename: safeName });
+    const extraction = await extractTextFromPDF(file.buffer, safeName);
+    if (!extraction) {
+      log.error('AI Extract: PDF extraction failed in both layers', undefined, { filename: safeName });
+      return res.status(422).json({
+        error:
+          "Couldn't extract data from this document. The PDF may be encrypted, password-protected, or malformed.",
+      });
+    }
+    const extractedText = extraction.text;
+    log.info('AI Extract: PDF text extracted', {
+      layer: extraction.source,
+      textLength: extractedText.length,
+      numPages: extraction.numPages,
+      sparse: extraction.sparse,
+    });
 
     if (extractedText.length < 100) {
-      return res.status(400).json({ error: 'Insufficient text content' });
+      return res.status(422).json({
+        error:
+          "Couldn't extract data from this document. The PDF appears to be image-only or scanned.",
+      });
     }
 
     // Extract deal data
     const extractedData = await extractDealDataFromText(extractedText);
 
     if (!extractedData) {
-      return res.status(500).json({ error: 'AI extraction failed' });
+      return res.status(422).json({
+        error: "AI couldn't identify any deal information in this document.",
+      });
     }
 
     res.json({
       success: true,
-      filename: validation.sanitizedFilename || file.originalname,
-      numPages: pdfData.numpages || 1,
+      filename: safeName,
+      numPages: extraction.numPages,
       textLength: extractedText.length,
       extracted: extractedData,
     });

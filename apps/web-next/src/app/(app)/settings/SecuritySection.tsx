@@ -169,6 +169,9 @@ function MfaSection({ onToast }: { onToast: (msg: string, type: "success" | "err
   };
 
   useEffect(() => {
+    // refresh() awaits Supabase listFactors — its setStates run in
+    // deferred async callbacks, not synchronously during this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
   }, []);
 

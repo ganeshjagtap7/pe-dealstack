@@ -332,7 +332,8 @@ Format your response as a JSON array of risk objects with fields: title, descrip
       const content = completion.choices[0]?.message?.content || '{"risks":[]}';
       const parsed = JSON.parse(content);
       risks = parsed.risks || parsed;
-    } catch {
+    } catch (err) {
+      log.warn('ai: risk analysis JSON parse failed, using fallback', { error: err instanceof Error ? err.message : String(err), dealId });
       risks = [{ title: 'Analysis Error', description: 'Could not parse risk analysis', severity: 'Medium' }];
     }
 

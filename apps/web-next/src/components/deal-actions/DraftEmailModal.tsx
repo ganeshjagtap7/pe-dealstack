@@ -1,6 +1,6 @@
 "use client";
 
-// Ported from apps/web/js/ai-email-drafter.js (openEmailDraftModal +
+// Ported from ai-email-drafter.js (openEmailDraftModal +
 // generateEmailDraft + renderEmailDraft + copyEmailDraft).
 // Calls GET /api/ai/email-templates and POST /api/ai/draft-email.
 // Response shape: see EmailDraftResult in
@@ -110,7 +110,8 @@ export function DraftEmailModal({
       await navigator.clipboard.writeText(`Subject: ${result.subject}\n\n${result.draft}`);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch {
+    } catch (err) {
+      console.warn("[DraftEmailModal/copy] clipboard write failed:", err);
       setError("Failed to copy to clipboard");
     }
   };

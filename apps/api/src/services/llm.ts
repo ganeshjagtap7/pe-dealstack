@@ -5,6 +5,8 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
+import type { BaseMessage } from '@langchain/core/messages';
+import type { z } from 'zod';
 import { log } from '../utils/logger.js';
 import {
   AI_MODELS,
@@ -30,7 +32,7 @@ interface LLMConfig {
   chatProvider: LLMProvider;
   /** Provider for fast/cheap tasks (sentiment, classification) */
   fastProvider: LLMProvider;
-  /** Provider for embeddings — always Gemini (768-dim text-embedding-004) */
+  /** Provider for embeddings — always Gemini (gemini-embedding-001) */
   embeddingProvider: 'gemini';
 }
 
@@ -234,6 +236,48 @@ export function getModel(
   maxTokens?: number
 ): BaseChatModel {
   return createModel(provider, modelName, temperature, maxTokens);
+}
+
+// ─── Structured Output with Fallback ───────────────────────────────
+// LangChain's withStructuredOutput emits an OpenAI tool-call schema. Anthropic
+// (Claude Sonnet 4.5 via OpenRouter, our Tier-1 default) sometimes rejects
+// that schema after OpenRouter's translation, returning a 400 "Provider
+// returned error" with no useful body. OpenAI-native models accept the same
+// schema as-is. invokeStructured wraps the call once with the primary
+// extraction model and retries with Tier 2 (gpt-4.1 via OpenRouter, or gpt-4o
+// direct) on any error so callers don't have to duplicate the fallback.
+function describeAIError(err: any): Record<string, unknown> {
+  return {
+    message: err?.message,
+    status: err?.status,
+    code: err?.code,
+    providerRaw: err?.error?.metadata?.raw,
+    providerMsg: err?.error?.message,
+    type: err?.error?.type,
+  };
+}
+
+export async function invokeStructured<T extends z.ZodTypeAny>(
+  schema: T,
+  messages: BaseMessage[],
+  opts?: { maxTokens?: number; temperature?: number; label?: string }
+): Promise<z.infer<T>> {
+  const maxTokens = opts?.maxTokens ?? 2000;
+  const temperature = opts?.temperature ?? 0.1;
+  const label = opts?.label ?? 'invokeStructured';
+  // Construct primary directly so caller's temperature is honoured. Using
+  // getExtractionModel would hardcode 0.1, which is wrong for emails / meeting
+  // briefs / signal analysis where higher variance is desirable.
+  const primaryName = MODELS[config.chatProvider].extraction;
+  try {
+    const primary = createModel(config.chatProvider, primaryName, temperature, maxTokens);
+    return await primary.withStructuredOutput(schema).invoke(messages);
+  } catch (primaryErr: any) {
+    log.warn(`${label}: primary model failed, retrying with fallback`, describeAIError(primaryErr));
+    const fallbackName = isOpenRouterEnabled() ? AI_MODELS.TIER2 : 'gpt-4o';
+    const fallback = createModel('openai', fallbackName, temperature, maxTokens);
+    return await fallback.withStructuredOutput(schema).invoke(messages);
+  }
 }
 
 // ─── Availability Checks ──────────────────────────────────────────

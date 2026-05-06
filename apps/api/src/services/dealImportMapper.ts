@@ -262,7 +262,6 @@ Map each column to our Deal schema. Return JSON only.`;
 
 // ============================================
 // Row Transformation
-// SYNC: Transform logic duplicated in apps/web/js/deal-import.js — keep both in sync
 // ============================================
 
 const VALID_STAGES = [

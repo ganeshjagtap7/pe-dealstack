@@ -183,7 +183,9 @@ async function fetchDDGLite(query: string, maxResults: number): Promise<SearchRe
       if (title || snippet) results.push({ title, snippet, url: resultUrl });
     }
     return results;
-  } catch {
+  } catch (err) {
+    // Best-effort fallback — caller will try the next search backend.
+    log.warn('webSearch: DDG Lite fetch failed', { query, error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }
@@ -222,7 +224,9 @@ async function fetchDDGHtml(query: string, maxResults: number): Promise<SearchRe
       if (title || snippet) results.push({ title, snippet, url: resultUrl });
     }
     return results;
-  } catch {
+  } catch (err) {
+    // Best-effort fallback — last-resort backend; empty array means no results.
+    log.warn('webSearch: DDG HTML fetch failed', { query, error: err instanceof Error ? err.message : String(err) });
     return [];
   }
 }

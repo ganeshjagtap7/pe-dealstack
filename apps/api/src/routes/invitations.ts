@@ -39,17 +39,29 @@ export function getExpirationDate(): Date {
   return date;
 }
 
+// Resolve the public base URL the invite link should point to. Prefers the
+// caller's Origin header (so a preview-deployment admin gets links back to
+// THEIR preview, and a prod admin gets prod links) over the static APP_URL
+// env var. Falls back to APP_URL, then localhost for dev.
+function resolveBaseUrl(req?: Request): string {
+  const origin = req?.headers?.origin;
+  if (origin && /^https?:\/\//.test(origin)) return origin.replace(/\/$/, '');
+  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  return 'http://localhost:3000';
+}
+
 // Helper: Send invitation email via Resend
 export async function sendInvitationEmail(
   email: string,
   inviterName: string,
   firmName: string,
   token: string,
-  role: string
+  role: string,
+  req?: Request
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-    const inviteUrl = `${baseUrl}/accept-invite.html?token=${token}`;
+    const baseUrl = resolveBaseUrl(req);
+    const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
 
     log.info('Sending invitation email', { email, inviterName, firmName, role, inviteUrl });
 
@@ -147,10 +159,10 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
     if (error) throw error;
 
     // Decorate with full invite URL for pending invites; strip token from accepted/expired
-    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+    const baseUrl = resolveBaseUrl(req);
     const decorated = (invitations || []).map((inv: any) => {
       const isPending = inv.status === 'PENDING';
-      const url = isPending && inv.token ? `${baseUrl}/accept-invite.html?token=${inv.token}` : null;
+      const url = isPending && inv.token ? `${baseUrl}/accept-invite?token=${inv.token}` : null;
       // Don't leak the raw token for non-pending invites
       const { token, ...rest } = inv;
       return { ...rest, inviteUrl: url };
@@ -184,10 +196,18 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     log.info('Creating invitation', { email, role, userId: user.id });
 
+    // Self-invite check — compare against the authenticated user's email
+    if (user.email && email.toLowerCase() === user.email.toLowerCase()) {
+      return res.status(400).json({
+        error: "You can't invite yourself.",
+        code: 'INVITE_SELF',
+      });
+    }
+
     // Get current user's info + org name
     const { data: currentUser, error: userError } = await supabase
       .from('User')
-      .select('id, name, firmName, organizationId, role')
+      .select('id, name, email, firmName, organizationId, role')
       .eq('authId', user.id)
       .maybeSingle();
 
@@ -199,6 +219,14 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
 
     if (!currentUser?.organizationId) {
       return res.status(400).json({ error: 'You must belong to an organization to invite members' });
+    }
+
+    // Secondary self-invite check against the User row's email
+    if (currentUser.email && email.toLowerCase() === currentUser.email.toLowerCase()) {
+      return res.status(400).json({
+        error: "You can't invite yourself.",
+        code: 'INVITE_SELF',
+      });
     }
 
     // Get org name for email
@@ -226,7 +254,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     log.info('Existing user check', { existingUser, error: existingUserErr?.message });
 
     if (existingUser) {
-      return res.status(400).json({ error: 'User is already a member of your organization' });
+      return res.status(400).json({
+        error: `${email} is already on the team.`,
+        code: 'INVITE_ALREADY_MEMBER',
+      });
     }
 
     // Check for existing pending invitation
@@ -241,7 +272,10 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
     log.info('Existing invite check', { existingInvite, error: existingInviteErr?.message });
 
     if (existingInvite) {
-      return res.status(400).json({ error: 'An invitation is already pending for this email' });
+      return res.status(400).json({
+        error: `${email} already has a pending invitation.`,
+        code: 'INVITE_ALREADY_PENDING',
+      });
     }
 
     // Create invitation
@@ -276,16 +310,17 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       currentUser.name || 'A team member',
       orgName,
       token,
-      role
+      role,
+      req
     );
 
     if (!emailResult.success) {
       log.warn('Email send failed but invitation created', { error: emailResult.error });
     }
 
-    // Build invite URL for fallback sharing
-    const baseUrl = process.env.APP_URL || 'http://localhost:3000';
-    const inviteUrl = `${baseUrl}/accept-invite.html?token=${token}`;
+    // Build invite URL for fallback sharing — same origin as the inviter's session
+    const baseUrl = resolveBaseUrl(req);
+    const inviteUrl = `${baseUrl}/accept-invite?token=${token}`;
 
     // Audit log
     await AuditLog.log(req, {
@@ -414,7 +449,8 @@ router.post('/bulk', async (req: Request, res: Response, next: NextFunction) => 
           currentUser.name || 'A team member',
           orgName,
           token,
-          role
+          role,
+          req
         );
 
         results.push({ email, status: 'sent' });

@@ -154,8 +154,9 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
           if (parsed.sectionType) sectionType = parsed.sectionType;
           if (parsed.title) title = parsed.title;
         }
-      } catch {
-        // Not JSON tool output — skip
+      } catch (err) {
+        // Not JSON tool output — skip. Log at debug to avoid noise on every non-JSON tool.
+        log.debug('memoAgent: tool message JSON parse skipped', { error: err instanceof Error ? err.message : String(err) });
       }
     }
 

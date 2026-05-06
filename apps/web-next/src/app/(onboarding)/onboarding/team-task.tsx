@@ -5,7 +5,7 @@ import { TEAM_ROLES, TeamInvite } from "./types";
 
 // Team invite task — dynamic rows of (email, role). Matches legacy
 // behavior: the form collects data but does NOT submit invites during
-// onboarding (apps/web/js/onboarding/onboarding-tasks.js team task +
+// onboarding (onboarding-tasks.js team task +
 // onboarding-flow.js completeTask — no POST to /invitations). Users
 // send real invites later from Settings. The role labels here are
 // visual-only; the Settings invite flow uses the API's enum

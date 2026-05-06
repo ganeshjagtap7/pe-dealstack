@@ -5,8 +5,12 @@ import { runFirmResearch, runDeepResearch } from '../services/agents/firmResearc
 import { log } from '../utils/logger.js';
 import { extractNameFromDomain } from '../utils/urlHelpers.js';
 import { runWithUsageContext } from '../middleware/usageContext.js';
+import firmProfileRouter from './onboarding-firm.js';
 
 const router = Router();
+
+// Sub-routers
+router.use('/', firmProfileRouter);
 
 const VALID_STEPS = ['createDeal', 'uploadDocument', 'reviewExtraction', 'tryDealChat', 'inviteTeamMember'];
 
@@ -22,12 +26,16 @@ const DEFAULT_STATUS = {
   },
 };
 
-// Check if user is genuinely new (no existing deals/activity)
-async function isNewUser(userId: string, orgId: string): Promise<boolean> {
+// Check if THIS user is genuinely new (has no audit-log activity of their own).
+// Org-scoped checks were wrong: a fresh invitee joining a populated org, or
+// any signup into an org that already had demo deals, would be classified as
+// "existing" and silently bypass onboarding. AuditLog.userId is the
+// per-actor signal — pre-existing users have entries, fresh users don't.
+async function isNewUser(userId: string, _orgId: string): Promise<boolean> {
   const { count } = await supabase
-    .from('Deal')
+    .from('AuditLog')
     .select('id', { count: 'exact', head: true })
-    .eq('organizationId', orgId);
+    .eq('userId', userId);
   return (count ?? 0) === 0;
 }
 
@@ -81,95 +89,39 @@ export async function tryCompleteOnboardingStep(userId: string, step: string): P
 }
 
 /**
- * Backfill onboarding steps from actual user data.
- * Catches cases where the backend auto-complete hooks were missed
- * (e.g. user existed before hooks were added, or used a path that bypassed them).
+ * Backfill onboarding steps from THIS user's audit-log activity.
+ * Org-scoped queries were silently auto-completing onboarding for fresh
+ * invitees (any deal in the org → step ticked). Audit-log filtered by
+ * userId is the only signal that distinguishes the actor from the org.
  */
-async function backfillStepsFromActivity(orgId: string, status: any): Promise<{ status: any; changed: boolean }> {
+async function backfillStepsFromActivity(userId: string, status: any): Promise<{ status: any; changed: boolean }> {
   if (!status.steps) status.steps = { ...DEFAULT_STATUS.steps };
   let changed = false;
 
-  const checks: Array<{ step: string; query: () => Promise<boolean> }> = [
-    {
-      step: 'createDeal',
-      query: async () => {
-        const { count } = await supabase
-          .from('Deal')
-          .select('id', { count: 'exact', head: true })
-          .eq('organizationId', orgId);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'uploadDocument',
-      query: async () => {
-        // Document table has no organizationId — scope via Deal
-        const { data: deals } = await supabase
-          .from('Deal')
-          .select('id')
-          .eq('organizationId', orgId);
-        const dealIds = (deals || []).map(d => d.id);
-        if (dealIds.length === 0) return false;
-        const { count } = await supabase
-          .from('Document')
-          .select('id', { count: 'exact', head: true })
-          .in('dealId', dealIds);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'reviewExtraction',
-      query: async () => {
-        const { data: deals } = await supabase
-          .from('Deal')
-          .select('id')
-          .eq('organizationId', orgId);
-        const dealIds = (deals || []).map(d => d.id);
-        if (dealIds.length === 0) return false;
-        const { count } = await supabase
-          .from('FinancialStatement')
-          .select('id', { count: 'exact', head: true })
-          .in('dealId', dealIds);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'tryDealChat',
-      query: async () => {
-        const { data: deals } = await supabase
-          .from('Deal')
-          .select('id')
-          .eq('organizationId', orgId);
-        const dealIds = (deals || []).map(d => d.id);
-        if (dealIds.length === 0) return false;
-        const { count } = await supabase
-          .from('ChatMessage')
-          .select('id', { count: 'exact', head: true })
-          .in('dealId', dealIds);
-        return (count ?? 0) > 0;
-      },
-    },
-    {
-      step: 'inviteTeamMember',
-      query: async () => {
-        const { count } = await supabase
-          .from('Invitation')
-          .select('id', { count: 'exact', head: true })
-          .eq('organizationId', orgId);
-        return (count ?? 0) > 0;
-      },
-    },
+  const checks: Array<{ step: string; actions: string[] }> = [
+    { step: 'createDeal',       actions: ['DEAL_CREATED'] },
+    { step: 'uploadDocument',   actions: ['DOCUMENT_UPLOADED'] },
+    { step: 'tryDealChat',      actions: ['AI_CHAT'] },
+    { step: 'inviteTeamMember', actions: ['INVITATION_SENT'] },
+    // reviewExtraction has no clean audit-log signal; left to explicit
+    // complete-step calls or stays false.
   ];
 
-  for (const { step, query } of checks) {
+  for (const { step, actions } of checks) {
     if (status.steps[step]) continue;
     try {
-      if (await query()) {
+      const { count } = await supabase
+        .from('AuditLog')
+        .select('id', { count: 'exact', head: true })
+        .eq('userId', userId)
+        .in('action', actions);
+      if ((count ?? 0) > 0) {
         status.steps[step] = true;
         changed = true;
       }
-    } catch {
+    } catch (err) {
       // Best-effort — never block status fetch
+      log.warn('onboarding: audit-log backfill check failed', { step, error: err instanceof Error ? err.message : String(err) });
     }
   }
 
@@ -216,7 +168,7 @@ router.get('/status', async (req: Request, res: Response) => {
     // Backfill any steps the user has actually completed via activity
     // (handles missed hook fires + manual check-off persistence)
     if (!status.checklistDismissed) {
-      const { status: updated, changed } = await backfillStepsFromActivity(orgId, status);
+      const { status: updated, changed } = await backfillStepsFromActivity(userId, status);
       if (changed) {
         status = updated;
         await supabase
@@ -370,9 +322,9 @@ router.post('/enrich-firm', async (req: Request, res: Response) => {
           return res.status(429).json({ error: 'Max 3 enrichment runs per hour. Try again later.' });
         }
       }
-    } catch {
+    } catch (err) {
       // Org not available yet — agent will still scrape and search, just won't save to org
-      log.warn('Enrichment: org not available, running without save', { userId });
+      log.warn('Enrichment: org not available, running without save', { userId, error: err instanceof Error ? err.message : String(err) });
     }
 
     // Extract firm name from website URL as fallback
@@ -476,18 +428,27 @@ router.post('/create-demo-deal', async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid sample deal ID' });
     }
 
-    // Resolve org
+    // Resolve org and the User table's internal id. Deal.assignedTo /
+    // Folder.createdBy foreign-key to User.id, NOT the Supabase authId
+    // — passing req.user.id (the auth UUID) directly would 23503.
     let orgId: string = req.user?.organizationId || '';
-    if (!orgId) {
+    let userInternalId: string | null = null;
+    {
       const { data: userData } = await supabase
         .from('User')
-        .select('organizationId')
+        .select('id, organizationId')
         .eq('authId', userId)
         .single();
-      orgId = userData?.organizationId || '';
+      if (userData) {
+        userInternalId = userData.id;
+        if (!orgId) orgId = userData.organizationId || '';
+      }
     }
     if (!orgId) {
       return res.status(400).json({ error: 'Organization not set up yet' });
+    }
+    if (!userInternalId) {
+      return res.status(400).json({ error: 'User profile not set up yet' });
     }
 
     // Check if sample deal already exists (prevent duplicates)
@@ -505,7 +466,7 @@ router.post('/create-demo-deal', async (req: Request, res: Response) => {
 
     // Create the sample deal
     const { createSampleDeal } = await import('../services/sampleDealService.js');
-    const dealId = await createSampleDeal(orgId, userId);
+    const dealId = await createSampleDeal(orgId, userInternalId);
 
     if (!dealId) {
       return res.status(500).json({ error: 'Failed to create demo deal' });

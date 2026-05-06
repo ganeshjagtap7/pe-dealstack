@@ -29,7 +29,7 @@ import {
   ResultDisplay,
 } from "@/app/(app)/deal-intake/components";
 import { FollowUpQuestions, WarningBanner } from "@/app/(app)/deal-intake/intake-widgets";
-import { FileUploadPanel, TextInputPanel, UrlInputPanel } from "@/app/(app)/deal-intake/tab-panels";
+import { FileUploadPanel, TextInputPanel } from "@/app/(app)/deal-intake/tab-panels";
 
 interface IngestDealFormProps {
   /** "page" renders the standalone /deal-intake page chrome (heading + outer scroll
@@ -61,10 +61,6 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
   const [textInput, setTextInput] = useState("");
   const [textSourceType, setTextSourceType] = useState("other");
 
-  /* ---- URL ---- */
-  const [urlInput, setUrlInput] = useState("");
-  const [urlCompanyName, setUrlCompanyName] = useState("");
-
   /* ---- Processing ---- */
   const [processing, setProcessing] = useState(false);
   const [progressMessage, setProgressMessage] = useState("");
@@ -89,7 +85,10 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
     try {
       const res = await api.get<DealOption[] | { deals: DealOption[] }>(`/deals?search=${encodeURIComponent(query)}&limit=10`);
       setDealOptions(Array.isArray(res) ? res.slice(0, 10) : (res?.deals ?? []));
-    } catch { setDealOptions([]); }
+    } catch (err) {
+      console.warn("[deal-intake] searchDeals failed:", err);
+      setDealOptions([]);
+    }
     finally { setLoadingDeals(false); }
   }, []);
 
@@ -141,12 +140,6 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
   };
 
   /* ================================================================ */
-  /*  URL validation                                                    */
-  /* ================================================================ */
-
-  const isValidUrl = (() => { try { new URL(urlInput); return true; } catch { return false; } })();
-
-  /* ================================================================ */
   /*  Follow-up questions                                              */
   /* ================================================================ */
 
@@ -168,7 +161,9 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
         },
       });
       setFollowUpQuestions(res.questions || []);
-    } catch { /* Non-blocking */ }
+    } catch (err) {
+      console.warn("[deal-intake] fetchFollowUpQuestions failed:", err);
+    }
     finally { setFollowUpLoading(false); }
   }, []);
 
@@ -191,7 +186,7 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
   };
 
   const resetForm = () => {
-    setSelectedFile(null); setTextInput(""); setUrlInput(""); setUrlCompanyName("");
+    setSelectedFile(null); setTextInput("");
     setWarning(null); clearState();
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -261,28 +256,15 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
     finally { endProcessing(); }
   };
 
-  const handleExtractUrl = async () => {
-    if (!isValidUrl) return;
-    if (mode === "existing" && !selectedDeal) { setError("Please select a deal first."); return; }
-    beginProcessing("Extracting deal data...");
-    try {
-      const body: Record<string, string> = { url: urlInput };
-      if (urlCompanyName.trim()) body.companyName = urlCompanyName.trim();
-      if (mode === "existing" && selectedDeal) body.dealId = selectedDeal.id;
-      const data = await api.post<IngestResponse>("/ingest/url", body);
-      setResult(data);
-      fireFollowUp(data);
-    } catch (err) { setError(err instanceof Error ? err.message : "URL scraping failed"); }
-    finally { endProcessing(); }
-  };
-
   const handleSaveFollowUpAndGoToDeal = async () => {
     if (!result?.deal?.id || Object.keys(followUpAnswers).length === 0) return;
     try {
       await api.patch(`/deals/${result.deal.id}`, {
         customFields: { aiFollowUp: { generatedAt: new Date().toISOString(), questions: followUpQuestions, answers: followUpAnswers } },
       });
-    } catch { /* Non-blocking */ }
+    } catch (err) {
+      console.warn("[deal-intake] save follow-up answers failed:", err);
+    }
     // Close modal (if any) before navigating so the overlay doesn't flash
     // briefly over the destination page.
     onClose?.();
@@ -300,7 +282,7 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       {variant === "page" && (
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold text-text-main tracking-tight font-display">Deal Intake</h1>
-          <p className="text-text-secondary text-sm">Upload a document, paste text, or enter a company URL to create a new deal.</p>
+          <p className="text-text-secondary text-sm">Upload a document or paste text to create a new deal.</p>
         </div>
       )}
 
@@ -366,18 +348,6 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
               actionLabel={actionLabel}
             />
           )}
-          {activeTab === "url" && (
-            <UrlInputPanel
-              urlInput={urlInput}
-              setUrlInput={setUrlInput}
-              urlCompanyName={urlCompanyName}
-              setUrlCompanyName={setUrlCompanyName}
-              onExtract={handleExtractUrl}
-              processing={processing}
-              isValidUrl={isValidUrl}
-              actionLabel={actionLabel}
-            />
-          )}
         </>
       )}
 
@@ -402,7 +372,7 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
             <span className="material-symbols-outlined text-red-500 mt-0.5">error</span>
             <div className="flex-1">
               <p className="text-sm font-medium text-red-800">
-                {activeTab === "url" ? "URL scraping failed" : activeTab === "text" ? "Text extraction failed" : "Upload failed"}
+                {activeTab === "text" ? "Text extraction failed" : "Upload failed"}
               </p>
               <p className="text-xs text-red-600 mt-1">{error}</p>
             </div>

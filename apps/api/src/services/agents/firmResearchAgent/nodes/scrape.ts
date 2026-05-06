@@ -60,7 +60,9 @@ export async function scrapeNode(
             const pageUrl = new URL(path, baseUrl).href;
             const text = await scrapePageText(pageUrl);
             return { path, text };
-          } catch {
+          } catch (err) {
+            // Best-effort per-subpage scrape — caller iterates and skips null results.
+            log.warn('firmResearch/scrape: subpage scrape failed', { baseUrl, path, error: err instanceof Error ? err.message : String(err) });
             return { path, text: null };
           }
         })

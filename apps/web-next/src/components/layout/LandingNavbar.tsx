@@ -16,10 +16,9 @@ export function LandingNavbar() {
         </div>
         <nav className="hidden lg:flex items-center gap-8">
           <a className="text-sm font-medium text-primary" href="#features">Platform</a>
-          <a className="text-sm font-medium hover:text-primary transition-colors" href="#features">Solutions</a>
-          <a className="text-sm font-medium hover:text-primary transition-colors" href="#cta">Pricing</a>
-          <a className="text-sm font-medium hover:text-primary transition-colors" href="#features">Resources</a>
-          <a className="text-sm font-medium hover:text-primary transition-colors" href="#cta">Company</a>
+          <Link className="text-sm font-medium hover:text-primary transition-colors" href="/solutions">Solutions</Link>
+          <Link className="text-sm font-medium hover:text-primary transition-colors" href="/resources">Resources</Link>
+          <Link className="text-sm font-medium hover:text-primary transition-colors" href="/company">Company</Link>
         </nav>
         <div className="flex items-center gap-4">
           <Link href="/login" className="hidden sm:block text-sm font-medium text-slate-600 hover:text-primary transition-colors">Login</Link>
@@ -40,10 +39,9 @@ export function LandingNavbar() {
       {mobileOpen && (
         <div className="lg:hidden border-t border-[#f0f2f4] bg-white px-4 py-4 flex flex-col gap-3 animate-[slideDown_0.2s_ease-out]">
           <a className="text-sm font-medium text-text-main hover:text-primary py-2" href="#features" onClick={() => setMobileOpen(false)}>Platform</a>
-          <a className="text-sm font-medium text-text-main hover:text-primary py-2" href="#features" onClick={() => setMobileOpen(false)}>Solutions</a>
-          <a className="text-sm font-medium text-text-main hover:text-primary py-2" href="#cta" onClick={() => setMobileOpen(false)}>Pricing</a>
-          <a className="text-sm font-medium text-text-main hover:text-primary py-2" href="#features" onClick={() => setMobileOpen(false)}>Resources</a>
-          <a className="text-sm font-medium text-text-main hover:text-primary py-2" href="#cta" onClick={() => setMobileOpen(false)}>Company</a>
+          <Link className="text-sm font-medium text-text-main hover:text-primary py-2" href="/solutions" onClick={() => setMobileOpen(false)}>Solutions</Link>
+          <Link className="text-sm font-medium text-text-main hover:text-primary py-2" href="/resources" onClick={() => setMobileOpen(false)}>Resources</Link>
+          <Link className="text-sm font-medium text-text-main hover:text-primary py-2" href="/company" onClick={() => setMobileOpen(false)}>Company</Link>
           <div className="flex flex-col gap-2 pt-3 border-t border-[#f0f2f4]">
             <Link href="/login" className="text-sm font-medium text-slate-600 hover:text-primary py-2" onClick={() => setMobileOpen(false)}>Login</Link>
             <Link href="/signup" className="flex h-10 items-center justify-center rounded-lg text-white text-sm font-bold" style={{ backgroundColor: "#003366" }} onClick={() => setMobileOpen(false)}>

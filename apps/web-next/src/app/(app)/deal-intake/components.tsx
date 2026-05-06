@@ -58,7 +58,6 @@ export const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
 export const TABS = [
   { key: "file", label: "Upload File", icon: "upload_file" },
   { key: "text", label: "Paste Text", icon: "edit_note" },
-  { key: "url", label: "Enter URL", icon: "language" },
 ] as const;
 
 export type TabKey = (typeof TABS)[number]["key"];

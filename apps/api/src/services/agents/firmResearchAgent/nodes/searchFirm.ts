@@ -2,6 +2,7 @@
 import { FirmResearchStateType, AgentStep } from '../state.js';
 import { searchWeb } from '../../../webSearch.js';
 import { log } from '../../../../utils/logger.js';
+import { getLinkedInKind, extractLinkedInCompanySlug } from '../../../../utils/urlHelpers.js';
 
 const MAX_SEARCH_CHARS = 5000;
 const NODE_TIMEOUT_MS = 15000;
@@ -10,11 +11,41 @@ function step(message: string, detail?: string): AgentStep {
   return { timestamp: new Date().toISOString(), node: 'searchFirm', message, detail };
 }
 
+/**
+ * Humanise a LinkedIn company slug for use as a fallback firm name.
+ * "pocket-fund" → "pocket fund", "blackstone-group_2" → "blackstone group"
+ */
+function humaniseCompanySlug(slug: string): string {
+  return slug
+    .replace(/[-_]+/g, ' ')
+    .replace(/\d+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 export async function searchFirmNode(
   state: FirmResearchStateType,
 ): Promise<Partial<FirmResearchStateType>> {
   const steps: AgentStep[] = [];
-  const firmName = state.firmName;
+
+  // Detect a LinkedIn company URL up-front so we can use it as a signal:
+  //   1. fall back to a humanised slug as firm name when state.firmName is empty
+  //   2. add 1-2 extra DDG queries that surface the company's "About" page
+  const linkedinKind = state.linkedinUrl ? getLinkedInKind(state.linkedinUrl) : null;
+  const companySlug =
+    linkedinKind === 'company' ? extractLinkedInCompanySlug(state.linkedinUrl) : null;
+  const inferredFirmName =
+    !state.firmName && companySlug ? humaniseCompanySlug(companySlug) : '';
+  const firmName = state.firmName || inferredFirmName;
+
+  if (inferredFirmName) {
+    steps.push(
+      step(
+        'Inferred firm name from LinkedIn company slug',
+        `${companySlug} → ${inferredFirmName}`,
+      ),
+    );
+  }
 
   if (!firmName) {
     steps.push(step('No firm name available, skipping firm search'));
@@ -28,6 +59,14 @@ export async function searchFirmNode(
     `"${firmName}" portfolio deals investments`,
     `"${firmName}" fund raise announcement`,
   ];
+
+  // Extra signals when we have a LinkedIn company URL — DDG's snippets give us
+  // the firm description/About text without hitting LinkedIn directly (which
+  // rate-limits and auth-walls unauthenticated scrapers).
+  if (companySlug) {
+    queries.push(`"${companySlug}" linkedin company`);
+    queries.push(state.linkedinUrl);
+  }
 
   const timeoutPromise = new Promise<null>((resolve) =>
     setTimeout(() => resolve(null), NODE_TIMEOUT_MS)

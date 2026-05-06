@@ -4,7 +4,7 @@
 // Uses LangGraph checkpointing so partial runs can resume.
 
 import { StateGraph, Annotation, END, START } from '@langchain/langgraph';
-import { getChatModel, isLLMAvailable } from '../../llm.js';
+import { isLLMAvailable, invokeStructured } from '../../llm.js';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { z } from 'zod';
 import { supabase } from '../../../supabase.js';
@@ -70,30 +70,26 @@ async function analyzeSignalsNode(state: typeof SignalState.State) {
     return { signals: [], processedCount: 0, status: 'completed' };
   }
 
-  const model = getChatModel(0.3, 3000, 'signal_monitor');
-
   // Batch analyze — process all deals at once for efficiency
   const dealsSummary = state.deals.map(d =>
     `- ${d.name} (${d.industry || 'N/A'}): ${d.stage}, Revenue $${d.revenue || 0}M, Company: ${d.company || 'N/A'}`
   ).join('\n');
 
-  const structuredModel = model.withStructuredOutput(z.object({
-    signals: z.array(z.object({
-      dealName: z.string(),
-      signalType: z.enum([
-        'leadership_change', 'financial_event', 'market_shift',
-        'competitive_threat', 'regulatory_change', 'growth_opportunity',
-        'risk_escalation', 'milestone_approaching',
-      ]),
-      severity: z.enum(['critical', 'warning', 'info']),
-      title: z.string().describe('Brief signal title'),
-      description: z.string().describe('1-2 sentence explanation'),
-      suggestedAction: z.string().describe('Recommended next step'),
-    })),
-  }));
-
   try {
-    const result = await structuredModel.invoke([
+    const result = await invokeStructured(z.object({
+      signals: z.array(z.object({
+        dealName: z.string(),
+        signalType: z.enum([
+          'leadership_change', 'financial_event', 'market_shift',
+          'competitive_threat', 'regulatory_change', 'growth_opportunity',
+          'risk_escalation', 'milestone_approaching',
+        ]),
+        severity: z.enum(['critical', 'warning', 'info']),
+        title: z.string().describe('Brief signal title'),
+        description: z.string().describe('1-2 sentence explanation'),
+        suggestedAction: z.string().describe('Recommended next step'),
+      })),
+    }), [
       new SystemMessage(`You are a PE deal monitoring system. Analyze the portfolio and generate signals — potential risks, opportunities, or required actions for each deal based on their current status, industry trends, and deal lifecycle.
 
 Signal types:
@@ -108,7 +104,7 @@ Signal types:
 
 Generate 1-3 signals per deal, focusing on the most actionable ones. Only generate signals that are realistic based on the deal's industry and stage.`),
       new HumanMessage(`Analyze these portfolio deals for signals:\n\n${dealsSummary}\n\nToday's date: ${new Date().toISOString().split('T')[0]}`),
-    ]);
+    ], { maxTokens: 3000, temperature: 0.3, label: 'signalMonitor.analyze' });
 
     // Map deal names back to IDs
     const signals = result.signals.map((s: any) => {

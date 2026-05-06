@@ -72,8 +72,9 @@ export function OnboardingChecklist() {
         const allDone = STEPS.every((s) => data.steps?.[s.id]);
         if (allDone) return;
         setStatus(data);
-      } catch {
-        // silently skip
+      } catch (err) {
+        // Best-effort fetch — silently skip if onboarding API is unavailable.
+        console.warn("[onboarding/OnboardingChecklist] failed to load status:", err);
       }
     })();
     return () => {

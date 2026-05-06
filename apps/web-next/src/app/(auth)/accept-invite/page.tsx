@@ -56,7 +56,8 @@ function AcceptInviteContent() {
         inviter: data.inviter || null,
       });
       setStatus("valid");
-    } catch {
+    } catch (err) {
+      console.warn("[auth/accept-invite] failed to verify invitation:", err);
       setErrorMessage("Unable to verify invitation. Please try again later.");
       setStatus("invalid");
     }

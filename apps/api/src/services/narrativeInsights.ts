@@ -66,7 +66,9 @@ export async function getCachedInsights(
       .single();
 
     return data?.insights as InsightsResult | null;
-  } catch {
+  } catch (err) {
+    // Cache miss / DB error — caller will regenerate. Log so persistent failures are visible.
+    log.warn('narrativeInsights: getCachedInsights failed', { error: err instanceof Error ? err.message : String(err), dealId });
     return null;
   }
 }

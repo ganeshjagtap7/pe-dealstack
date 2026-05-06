@@ -1,6 +1,6 @@
 // ─── RAG Pipeline — LangChain Vector Store ─────────────────────────
 // Uses LangChain's embedding abstraction + Supabase vector store.
-// Supports Gemini text-embedding-004 (primary) with graceful fallback.
+// Supports Gemini gemini-embedding-001 (primary) with graceful fallback.
 
 import { supabase } from './supabase.js';
 import { GoogleGenerativeAIEmbeddings } from '@langchain/google-genai';
@@ -19,7 +19,7 @@ function getEmbeddingsModel(): GoogleGenerativeAIEmbeddings | null {
     return null;
   }
   embeddingsModel = new GoogleGenerativeAIEmbeddings({
-    modelName: 'text-embedding-004',
+    modelName: process.env.EMBEDDING_MODEL || 'gemini-embedding-001',
     apiKey: process.env.GEMINI_API_KEY,
   });
   return embeddingsModel;

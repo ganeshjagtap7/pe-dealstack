@@ -5,6 +5,7 @@
  * Handles country subdomains (in.linkedin.com, uk.linkedin.com),
  * protocol normalization, and SSRF prevention.
  */
+import { log } from './logger.js';
 
 /**
  * Normalize a URL — add https:// if missing, trim whitespace.
@@ -18,7 +19,9 @@ export function normalizeUrl(url: string): string {
   // Validate it's a real URL
   try {
     new URL(normalized);
-  } catch {
+  } catch (_err) {
+    // Defensive: invalid URL string — caller treats '' as "not a URL", which is the correct
+    // semantic for normalizeUrl. No log: this is a routine validator, not an error path.
     return '';
   }
   return normalized;
@@ -39,21 +42,95 @@ export function isLinkedInUrl(url: string): boolean {
     if (!hostname.endsWith('linkedin.com')) return false;
     // Must have /in/ or /company/ path
     return /^\/(in|company)\/[^/?#]+/i.test(parsed.pathname);
-  } catch {
+  } catch (_err) {
+    // Defensive: normalizeUrl already validated above, so reaching here is unexpected.
+    // Return false (not a LinkedIn URL) — same semantic as a malformed input.
     return false;
   }
 }
 
 /**
- * Extract LinkedIn profile slug from URL.
+ * The kind of LinkedIn URL: a personal profile, a company page, or null
+ * for anything that isn't a recognised LinkedIn URL.
+ */
+export type LinkedInKind = 'person' | 'company' | null;
+
+/**
+ * Returns the kind of LinkedIn URL, or null if not LinkedIn / unrecognised.
+ * Tolerates www., trailing slash, and the ?originalSubdomain=in regional
+ * redirect query LinkedIn appends for non-US users.
+ */
+export function getLinkedInKind(url: string): LinkedInKind {
+  const normalized = normalizeUrl(url);
+  if (!normalized) return null;
+  try {
+    const parsed = new URL(normalized);
+    const hostname = parsed.hostname.toLowerCase();
+    if (!hostname.endsWith('linkedin.com')) return null;
+    // pathname is independent of query string, so ?originalSubdomain=in is harmless here.
+    const path = parsed.pathname;
+    if (/^\/in\/[^/?#]+/i.test(path)) return 'person';
+    if (/^\/company\/[^/?#]+/i.test(path)) return 'company';
+    return null;
+  } catch (err) {
+    log.warn('urlHelpers: getLinkedInKind parse failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/**
+ * Extract LinkedIn profile slug from a /in/<slug> URL.
+ * Returns null for /company/<slug> URLs (use extractLinkedInCompanySlug for those)
+ * or for non-LinkedIn / unrecognised URLs.
+ *
+ * Strips trailing slash and query params (e.g. ?originalSubdomain=in).
+ *
  * "https://in.linkedin.com/in/devlikesbizness" → "devlikesbizness"
- * "linkedin.com/company/pocket-fund" → "pocket-fund"
+ * "https://www.linkedin.com/in/dev/?originalSubdomain=in" → "dev"
+ * "linkedin.com/company/pocket-fund" → null
  */
 export function extractLinkedInSlug(url: string): string | null {
   const normalized = normalizeUrl(url);
   if (!normalized) return null;
-  const match = normalized.match(/linkedin\.com\/(in|company)\/([^/?#]+)/i);
-  return match ? match[2] : null;
+  try {
+    const parsed = new URL(normalized);
+    if (!parsed.hostname.toLowerCase().endsWith('linkedin.com')) return null;
+    const match = parsed.pathname.match(/^\/in\/([^/?#]+)/i);
+    return match ? match[1] : null;
+  } catch (err) {
+    log.warn('urlHelpers: extractLinkedInSlug parse failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
+}
+
+/**
+ * Extract the company slug from a /company/<slug> URL.
+ * Returns null if the URL is not a LinkedIn company URL.
+ *
+ * Strips trailing slash and query params (e.g. ?originalSubdomain=in) so we
+ * never return a slug like "pocket-fund/?originalSubdomain=in".
+ *
+ * "https://www.linkedin.com/company/pocket-fund/?originalSubdomain=in" → "pocket-fund"
+ * "https://linkedin.com/in/devlikesbizness" → null
+ */
+export function extractLinkedInCompanySlug(url: string): string | null {
+  const normalized = normalizeUrl(url);
+  if (!normalized) return null;
+  try {
+    const parsed = new URL(normalized);
+    if (!parsed.hostname.toLowerCase().endsWith('linkedin.com')) return null;
+    const match = parsed.pathname.match(/^\/company\/([^/?#]+)/i);
+    return match ? match[1] : null;
+  } catch (err) {
+    log.warn('urlHelpers: extractLinkedInCompanySlug parse failed', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return null;
+  }
 }
 
 /**
@@ -84,7 +161,9 @@ export function isPrivateUrl(url: string): boolean {
     }
 
     return false;
-  } catch {
+  } catch (_err) {
+    // Defensive: normalizeUrl already validated above, so reaching here is unexpected.
+    // Treat unparseable URLs as private (fail-closed for SSRF prevention).
     return true;
   }
 }
@@ -105,7 +184,9 @@ export function extractBaseDomain(url: string): string {
       return parts.slice(-3).join('.');
     }
     return parts.slice(-2).join('.');
-  } catch {
+  } catch (_err) {
+    // Defensive: normalizeUrl already validated above. Return '' so callers get the same
+    // "no domain" semantic they'd see for an empty input.
     return '';
   }
 }
@@ -135,7 +216,9 @@ export function isSocialMediaUrl(url: string): boolean {
       'tiktok.com', 'threads.net', 'reddit.com',
     ];
     return socialDomains.includes(domain);
-  } catch {
+  } catch (_err) {
+    // Defensive: extractBaseDomain already handles parse errors. Return false (not a known
+    // social URL) — same semantic as a non-matching domain.
     return false;
   }
 }

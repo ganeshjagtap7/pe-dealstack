@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
+import { resolveUserId } from './notifications.js';
 
 const router = Router();
 
@@ -39,7 +40,9 @@ router.post('/', async (req: any, res) => {
     }
 
     const orgId = getOrgId(req);
-    const userId = req.user?.id;
+    // Watchlist.addedBy FKs to User.id (the table PK), not the Supabase
+    // authId. Same fix pattern as 2d7912e for create-demo-deal.
+    const addedBy = req.user?.id ? await resolveUserId(req.user.id) : null;
 
     const { data, error } = await supabase
       .from('Watchlist')
@@ -48,7 +51,7 @@ router.post('/', async (req: any, res) => {
         companyName: parsed.data.companyName.trim(),
         industry: parsed.data.industry?.trim() || null,
         notes: parsed.data.notes?.trim() || null,
-        addedBy: userId || null,
+        addedBy,
       })
       .select('*')
       .single();
