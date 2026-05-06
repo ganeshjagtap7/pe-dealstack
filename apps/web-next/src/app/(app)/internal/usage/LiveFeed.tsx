@@ -45,11 +45,13 @@ function presetToFrom(preset: RangePreset): string {
   return ""; // "custom" — caller supplies dates
 }
 
-/** ISO timestamp for `to` filter. Always uses "now" for non-custom presets so
- * the filter is inclusive of events that just landed this minute. */
+/** ISO timestamp for `to` filter. For Today/7d/30d we don't send a `to` —
+ * we only want events newer than `from`, and there's no need to cap the end.
+ * Returning a fresh timestamp every render would cause an infinite re-fetch
+ * loop since this value feeds into a useEffect dep array. */
 function presetToTo(preset: RangePreset): string {
   if (preset === "custom") return "";
-  return new Date().toISOString();
+  return ""; // intentional — no upper bound on non-custom presets
 }
 
 /** Convert a date input value (YYYY-MM-DD, user's local) into a UTC ISO
