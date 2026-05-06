@@ -22,17 +22,44 @@ function isoDate(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Beginning of the given UTC day as a full ISO timestamp. */
+function startOfDayUtc(d: Date): string {
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())).toISOString();
+}
+
+/** End of the given UTC day (inclusive) as a full ISO timestamp. */
+function endOfDayUtc(d: Date): string {
+  return new Date(
+    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 23, 59, 59, 999),
+  ).toISOString();
+}
+
+/** ISO timestamp for `from` filter. Use full timestamps (not bare dates) so
+ * Supabase's gte/lte against `createdAt` (timestamptz) doesn't accidentally
+ * exclude events recorded later the same day. */
 function presetToFrom(preset: RangePreset): string {
-  const today = isoDate(new Date());
-  if (preset === "today") return today;
-  if (preset === "7d")    return isoDate(new Date(Date.now() - 6  * 86400_000));
-  if (preset === "30d")   return isoDate(new Date(Date.now() - 29 * 86400_000));
+  const now = new Date();
+  if (preset === "today") return startOfDayUtc(now);
+  if (preset === "7d")    return startOfDayUtc(new Date(Date.now() - 6  * 86400_000));
+  if (preset === "30d")   return startOfDayUtc(new Date(Date.now() - 29 * 86400_000));
   return ""; // "custom" — caller supplies dates
 }
 
+/** ISO timestamp for `to` filter. Always uses "now" for non-custom presets so
+ * the filter is inclusive of events that just landed this minute. */
 function presetToTo(preset: RangePreset): string {
   if (preset === "custom") return "";
-  return isoDate(new Date());
+  return new Date().toISOString();
+}
+
+/** Convert a date input value (YYYY-MM-DD, user's local) into a UTC ISO
+ * timestamp. `from` uses start-of-day; `to` uses end-of-day. */
+function customDateToIso(value: string, edge: "from" | "to"): string {
+  if (!value) return "";
+  const [y, m, d] = value.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return edge === "from" ? startOfDayUtc(date) : endOfDayUtc(date);
 }
 
 // ── Refresh icon ─────────────────────────────────────────────────────────────
@@ -70,11 +97,12 @@ export function LiveFeed() {
   const [errorsOnly, setErrorsOnly]       = useState(false);
   const loadingTimerRef                   = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Effective date range — flat strings so they can be stable deps
+  // Effective date range — full ISO timestamps (not bare dates) so the API's
+  // gte/lte against the timestamptz column matches the entire selected day.
   const effectiveFrom =
-    rangePreset === "custom" ? customFrom : presetToFrom(rangePreset);
+    rangePreset === "custom" ? customDateToIso(customFrom, "from") : presetToFrom(rangePreset);
   const effectiveTo =
-    rangePreset === "custom" ? customTo : presetToTo(rangePreset);
+    rangePreset === "custom" ? customDateToIso(customTo, "to") : presetToTo(rangePreset);
 
   const load = useCallback(async () => {
     if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
