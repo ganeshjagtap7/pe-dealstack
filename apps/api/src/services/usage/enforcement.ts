@@ -26,7 +26,7 @@ export async function enforceUserGate(
   if (!ctx) return;
   const flags = await getUserFlags(ctx.userId);
   if (flags.isBlocked) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       model: model ?? 'unknown',
       provider,

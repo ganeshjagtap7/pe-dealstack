@@ -128,7 +128,7 @@ export async function trackedChatCompletion(
     const response: any = await openai.chat.completions.create(params as any, options);
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
     const completionTokens = response?.usage?.completion_tokens ?? 0;
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       model,
       provider,
@@ -139,7 +139,7 @@ export async function trackedChatCompletion(
     });
     return response;
   } catch (err) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       model,
       provider,
@@ -172,7 +172,7 @@ export async function trackedDirectChatCompletion(
     const response: any = await openaiDirect.chat.completions.create(params as any, options);
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
     const completionTokens = response?.usage?.completion_tokens ?? 0;
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       model,
       provider: 'openai',
@@ -183,7 +183,7 @@ export async function trackedDirectChatCompletion(
     });
     return response;
   } catch (err) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       model,
       provider: 'openai',
@@ -217,7 +217,7 @@ export async function trackedDirectResponsesCreate(
     const response: any = await (openaiDirect as any).responses.create(params, options);
     const promptTokens = response?.usage?.input_tokens ?? 0;
     const completionTokens = response?.usage?.output_tokens ?? 0;
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       model,
       provider: 'openai',
@@ -228,7 +228,7 @@ export async function trackedDirectResponsesCreate(
     });
     return response;
   } catch (err) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       model,
       provider: 'openai',

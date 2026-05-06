@@ -89,7 +89,10 @@ function makeUsageHandler(
 ): Partial<BaseCallbackHandler> {
   return {
     name: 'usage-tracker',
-    handleLLMEnd(output: any) {
+    // IMPORTANT: return the promise (not `void`). LangChain awaits handleLLMEnd
+    // before continuing the agent loop, so the Supabase insert completes before
+    // the lambda freezes. Fire-and-forget here drops the insert on Vercel.
+    async handleLLMEnd(output: any): Promise<void> {
       log.info('[usage] handleLLMEnd FIRED', { operation, modelName, provider });
       const gen0 = output?.generations?.[0]?.[0]?.message;
       const usage =
@@ -97,7 +100,7 @@ function makeUsageHandler(
         output?.llmOutput?.tokenUsage ??
         output?.llmOutput?.usage ??
         null;
-      void recordUsageEvent({
+      await recordUsageEvent({
         operation,
         model: modelName,
         provider,
@@ -108,9 +111,9 @@ function makeUsageHandler(
         status: 'success',
       });
     },
-    handleLLMError(err: any) {
+    async handleLLMError(err: any): Promise<void> {
       log.info('[usage] handleLLMError FIRED', { operation, modelName, provider });
-      void recordUsageEvent({
+      await recordUsageEvent({
         operation,
         model: modelName,
         provider,

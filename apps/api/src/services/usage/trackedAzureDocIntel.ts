@@ -18,7 +18,7 @@ export async function trackedAzureDocIntelCall<T>(
   try {
     const result = await fn();
     const pages = result == null ? 0 : Math.max(0, getPageCount(result));
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation: 'pdf_ocr',
       provider: 'azure_doc_intelligence',
       units: pages,
@@ -28,7 +28,7 @@ export async function trackedAzureDocIntelCall<T>(
     });
     return result;
   } catch (err) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation: 'pdf_ocr',
       provider: 'azure_doc_intelligence',
       units: 0,
