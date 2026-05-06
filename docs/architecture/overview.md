@@ -103,7 +103,7 @@ See [`13-multi-tenancy-org-isolation.mmd`](../diagrams/13-multi-tenancy-org-isol
 
 ## AI layer
 
-The API uses **eight LangGraph / ReAct agents** that all route through one unified LLM client at [`services/llm.ts`](../../apps/api/src/services/llm.ts):
+The API uses **eight LangGraph / ReAct agents** that all route through one unified LLM client at [`services/llm.ts`](../../apps/api/src/services/llm.ts). Every call through that client — and through the raw OpenAI, Anthropic, Apify, Azure DocIntel, and Gemini embedding paths — is attributed to a specific User and Organization by the **AI Usage Tracking** system (shipped May 2026). Internal admins can inspect consumption at `/internal/usage`; users see a passive credit meter in Settings → AI Usage. See [`docs/AI-USAGE-TRACKING.md`](../AI-USAGE-TRACKING.md) for architecture, code map, runbook, and the five bugs that were fixed in production.
 
 - `getChatModel()` — GPT-4o for reasoning
 - `getFastModel()` — GPT-4o-mini for verification and classification (cheaper)

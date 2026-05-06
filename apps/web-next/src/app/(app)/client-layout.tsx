@@ -23,9 +23,17 @@ function isFullBleedPage(pathname: string): boolean {
   );
 }
 
+// Pages where the global AI Assistant FAB doesn't belong. Internal admin
+// telemetry pages aren't a place where you'd ask the AI for help — the FAB
+// just adds visual noise and distracts from the data.
+function shouldHideAIAssistant(pathname: string): boolean {
+  return pathname.startsWith("/internal/");
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const fullBleed = isFullBleedPage(pathname);
+  const hideAIAssistant = shouldHideAIAssistant(pathname);
   return (
     <AuthProvider>
       <UserProvider>
@@ -55,7 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                 </main>
-                <AIAssistant />
+                {!hideAIAssistant && <AIAssistant />}
                 <CommandPalette />
               </div>
             </IngestDealModalProvider>

@@ -201,6 +201,17 @@ UNION ALL
 SELECT 'Memo', COUNT(*) FROM "Memo";
 ```
 
+## AI Usage Tracking Migrations (May 2026)
+
+| Order | File | Description |
+|-------|------|-------------|
+| — | `apps/api/usage-tracking-migration.sql` | Creates `UsageEvent`, `ModelPrice`, `OperationCredits`, `UsageAlert` tables; adds `isInternal`/`isThrottled`/`isBlocked` to `User`; seeds 14 model prices + 13 canonical operations; seeds `isInternal=true` for Pocket Fund team emails. |
+| — | `apps/api/usage-tracking-addendum.sql` | Adds 16 additional `OperationCredits` rows (granular `invokeStructured` labels + Gemini embedding ops); adds `claude-haiku-4-5-20251001` to `ModelPrice`. Run after the main migration. |
+
+Both files are idempotent. Run addendum after migration. See [`docs/AI-USAGE-TRACKING.md`](AI-USAGE-TRACKING.md) for full details.
+
+---
+
 ## Best Practices
 
 ### 1. Always Use IF NOT EXISTS / IF EXISTS
