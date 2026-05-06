@@ -90,6 +90,7 @@ function makeUsageHandler(
   return {
     name: 'usage-tracker',
     handleLLMEnd(output: any) {
+      log.info('[usage] handleLLMEnd FIRED', { operation, modelName, provider });
       const gen0 = output?.generations?.[0]?.[0]?.message;
       const usage =
         gen0?.usage_metadata ??
@@ -108,6 +109,7 @@ function makeUsageHandler(
       });
     },
     handleLLMError(err: any) {
+      log.info('[usage] handleLLMError FIRED', { operation, modelName, provider });
       void recordUsageEvent({
         operation,
         model: modelName,
