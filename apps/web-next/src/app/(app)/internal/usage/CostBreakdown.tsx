@@ -48,8 +48,11 @@ export function CostBreakdown() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
 
+    // Don't synchronously flip loading=true on day-range change — that
+    // triggers a cascading render and the lint rule blocks it. The new
+    // data updates in place when it arrives; previous chart stays
+    // visible until then. Initial mount already starts loading=true.
     api
       .get<{
         series: CostBreakdownSeriesPoint[];
