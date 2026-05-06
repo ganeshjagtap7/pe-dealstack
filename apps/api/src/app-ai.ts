@@ -49,6 +49,9 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0.1,
+    // See app-lite.ts for the rationale — auto-HTTP instrumentation recurses
+    // when the underlying server is the proxyToExpress fake req/res adapter.
+    defaultIntegrations: false,
   });
   log.info('Sentry error tracking initialized (AI function)');
 }

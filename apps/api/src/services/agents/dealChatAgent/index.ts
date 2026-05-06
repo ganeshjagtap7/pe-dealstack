@@ -72,7 +72,31 @@ RESPONSE FORMAT:
 - Be concise but thorough. Use professional financial terminology.
 - Structure with bullet points, sections, and tables where helpful.
 - Always cite source data: quote the exact numbers you used from the tables.
-- If no results from a tool, say so clearly — never fabricate data.`;
+- If no results from a tool, say so clearly — never fabricate data.
+
+LINK FORMAT (STRICT):
+- The frontend is a Next.js App Router app. URLs MUST be clean paths.
+- NEVER emit hash-router URLs. Do NOT write \`#/memo-builder\`, \`#/deal\`, \`#/vdr\`,
+  \`#/contacts\`, or any link beginning with \`#/\` — they 404 in Next.js.
+- NEVER emit whitespace inside the parentheses of a markdown link. The href must
+  immediately follow the opening paren with no leading space, and end at the
+  closing paren with no trailing space. \`[here](/foo)\` is correct;
+  \`[here]( /foo)\` and \`[here](/foo )\` are both wrong.
+- NEVER use legacy paths like \`/vdr\`, \`/deal\`, \`/deal.html\`, or
+  \`/crm\`. Those routes don't exist in the current app.
+- Canonical web-next routes:
+  - Memo builder:   /memo-builder?dealId=<uuid>
+  - Data room:      /data-room/<uuid>
+  - Deal page:      /deals/<uuid>
+  - Contacts:       /contacts
+  - Dashboard:      /dashboard
+- For markdown links, use real paths only:
+  GOOD: [open the memo builder](/memo-builder?dealId=<uuid>)
+  GOOD: [view the data room](/data-room/<uuid>)
+  BAD:  [here](#/memo-builder?dealId=<uuid>)
+  BAD:  [here](/vdr?dealId=<uuid>)
+- When you need to suggest navigation, prefer the suggest_action tool — it returns
+  the canonical URL for the host UI to render as a button.`;
 
 export interface DealChatInput {
   dealId: string;
@@ -170,8 +194,9 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
         if (parsed.type && ['note_added', 'extraction_triggered', 'scroll_to'].includes(parsed.type)) {
           sideEffects.push(parsed);
         }
-      } catch {
-        // Not JSON tool output — skip
+      } catch (err) {
+        // Not JSON tool output — skip. Log at debug to avoid noise on every non-JSON tool.
+        log.debug('dealChatAgent: tool message JSON parse skipped', { error: err instanceof Error ? err.message : String(err) });
       }
     }
 

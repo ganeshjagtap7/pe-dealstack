@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { cn } from "@/lib/cn";
-import { formatCurrency, formatRelativeTime, formatFileSize, getDocIcon } from "@/lib/formatters";
 import { STAGE_LABELS } from "@/lib/constants";
+import { DocumentRow, DocumentAnalysisModal } from "./document-row";
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -63,11 +64,13 @@ export interface TeamMember {
   email?: string;
   avatar?: string;
   role?: string;
-  // Optional ISO timestamp — populated by a future presence endpoint.
-  // TODO(presence): wire to a real /api/presence or /api/users/online
-  // route once the backend supports it. Until then, callers leave this
-  // undefined and the UI renders "Offline".
-  lastActiveAt?: string;
+}
+
+export interface ChatAction {
+  type: string;
+  label: string;
+  description?: string;
+  url: string;
 }
 
 export interface ChatMessage {
@@ -75,6 +78,7 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   createdAt?: string;
+  action?: ChatAction;
 }
 
 export interface Activity {
@@ -140,6 +144,11 @@ export function DocumentsTab({
   fileInputRef: React.RefObject<HTMLInputElement | null>;
   onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
+  // Modal state for AI-only docs (those without a backing file). Lifted here
+  // so the modal renders alongside the row list and can be opened from either
+  // the row click or the inline action button.
+  const [analysisDoc, setAnalysisDoc] = useState<DocItem | null>(null);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -175,35 +184,23 @@ export function DocumentsTab({
           <p className="text-xs text-text-muted mt-1">Upload files to get started</p>
         </div>
       ) : (
-        <div className="rounded-xl divide-y divide-border-subtle" style={{ background: "rgba(255, 255, 255, 0.8)", backdropFilter: "blur(8px)", border: "1px solid rgba(229, 231, 235, 0.8)", boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)" }}>
+        <div
+          className="rounded-xl divide-y divide-border-subtle"
+          style={{
+            background: "rgba(255, 255, 255, 0.8)",
+            backdropFilter: "blur(8px)",
+            border: "1px solid rgba(229, 231, 235, 0.8)",
+            boxShadow: "0 1px 3px 0 rgba(0, 0, 0, 0.05)",
+          }}
+        >
           {documents.map((doc) => (
-            <div
-              key={doc.id}
-              className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition-colors"
-            >
-              <span className="material-symbols-outlined text-[20px] text-text-muted">
-                {getDocIcon(doc.name)}
-              </span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-text-main truncate">{doc.name}</p>
-                <p className="text-xs text-text-muted">
-                  {formatFileSize(doc.fileSize)}{" "}
-                  {doc.createdAt && <>· {formatRelativeTime(doc.createdAt)}</>}
-                </p>
-              </div>
-              {doc.url && (
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 text-text-muted hover:text-primary transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[20px]">download</span>
-                </a>
-              )}
-            </div>
+            <DocumentRow key={doc.id} doc={doc} onShowAnalysis={setAnalysisDoc} />
           ))}
         </div>
+      )}
+
+      {analysisDoc && (
+        <DocumentAnalysisModal doc={analysisDoc} onClose={() => setAnalysisDoc(null)} />
       )}
     </div>
   );

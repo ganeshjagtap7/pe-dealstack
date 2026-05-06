@@ -53,8 +53,22 @@ export function NotificationCenter() {
     }
   }, [userId, setUnreadCount]);
 
-  // Lazy load when either surface opens (cuts initial render cost)
+  // Eager load once the user is signed in. Lazy-loading on bell click made the
+  // first interaction feel sluggish — we'd round-trip /notifications?limit=50
+  // before showing any content. Doing it once at mount means the dropdown is
+  // populated by the time the bell is clicked. Subsequent opens still re-load
+  // so freshly-arrived items show.
   useEffect(() => {
+    if (!userId) return;
+    // load() is async — its setStates fire from deferred callbacks, not
+    // synchronously inside this effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [userId, load]);
+
+  useEffect(() => {
+    // Same as above — async load, deferred setState.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (dropdownOpen || panelOpen) load();
   }, [dropdownOpen, panelOpen, load]);
 

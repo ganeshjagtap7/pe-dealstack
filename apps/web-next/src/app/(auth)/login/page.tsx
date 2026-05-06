@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-// Order, icons, copy mirror apps/web/login.html on main (commit 37a3392).
+// Order, icons, copy mirror login.html on main (commit 37a3392).
 const AI_AGENTS = [
   { name: "Financial Extractor", desc: "Auto-parses CIMs & balance sheets in seconds", icon: "table_chart", color: "#4F7CFF" },
   { name: "Deal Chat AI", desc: "Ask anything — instant answers from your data", icon: "smart_toy", color: "#A855F7" },
@@ -134,8 +134,8 @@ export default function LoginPage() {
   };
 
   const handleSso = () => {
-    // Placeholder — matches legacy behavior until real IdP wiring lands.
-    window.alert("SSO integration would be configured here.\n\nThis would typically redirect to your identity provider (Okta, Azure AD, etc.)");
+    // Placeholder — real IdP wiring (Okta, Azure AD, etc.) lands later.
+    // No user-facing message yet; the button click is a no-op until then.
   };
 
   return (

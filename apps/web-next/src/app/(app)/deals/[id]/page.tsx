@@ -1,17 +1,10 @@
 "use client";
 
 import { useEffect, useState, useRef, useCallback } from "react";
-import { useParams, useRouter, usePathname } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { api } from "@/lib/api";
-import { getDealDisplayName } from "@/lib/formatters";
-import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/cn";
-import { useAuth } from "@/providers/AuthProvider";
-import { useUser } from "@/providers/UserProvider";
 import { useToast } from "@/providers/ToastProvider";
-import Link from "next/link";
-import { NotificationCenter } from "@/components/layout/NotificationPanel";
-import { HelpSupportModal } from "@/components/layout/Header";
 
 import {
   type DealDetail,
@@ -19,42 +12,42 @@ import {
   type ChatMessage,
   type Activity,
   type Tab,
-  TERMINAL_STAGES,
-  OverviewTab,
-  DocumentsTab,
   ChatTab,
-  ActivityTab,
-  StageChangeModal,
-  StagePipeline,
-  DealMetadataRow,
-  FinancialMetricsRow,
-  FinancialStatementsSection,
-  DealAnalysisSection,
-  DealActionsMenu,
-  TeamAvatarStack,
-  DealViewers,
-  FinancialStatusBadge,
 } from "./components";
-import { EditDealModal, TerminalStageModal } from "./deal-panels";
 import { useResizablePanel } from "./use-resizable-panel";
-import { Skeleton } from "@/components/ui/Skeleton";
+import { DealPageLoadingSkeleton, DealPageErrorState } from "./deal-page-skeletons";
+import { DealPageHeader } from "./deal-page-header";
+import { DealPageLeftPanel } from "./deal-page-left-panel";
+import { DealPageModals, type StageModalState } from "./deal-page-modals";
+import {
+  openStageModal,
+  openTerminalModal,
+  confirmStageChange as confirmStageChangeFn,
+  selectTerminalStage,
+  confirmDeleteDeal as confirmDeleteDealFn,
+  uploadDocuments,
+  sendPrompt as sendPromptFn,
+  clearChatHistory as clearChatHistoryFn,
+} from "./deal-page-handlers";
 
 // ---------------------------------------------------------------------------
-// Page component
+// Page component — owns all data + UI state for the deal detail screen.
+//
+// Composition (top → bottom): <DealPageHeader /> + two-column layout
+// (<DealPageLeftPanel /> | resize handle | <ChatTab />), then
+// <DealPageModals /> for everything dialog-shaped.
+//
+// Sub-components are kept "dumb" (state + setters as props). The data loading
+// orchestration (loadDeal/loadActivities/loadChatHistory) and the resizable
+// panel logic stay here so they can be coordinated in one place.
 // ---------------------------------------------------------------------------
 
 export default function DealDetailPage() {
   const params = useParams<{ id: string }>();
   const dealId = params.id;
   const router = useRouter();
-  const pathname = usePathname();
-  const { user } = useUser();
-  const { signOut } = useAuth();
   const { showToast } = useToast();
-  const [linkCopied, setLinkCopied] = useState(false);
-  const [userDropdownOpen, setUserDropdownOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const userDropdownRef = useRef<HTMLDivElement>(null);
 
   // Resizable panels (drag divider between deal content and chat)
   const {
@@ -74,7 +67,7 @@ export default function DealDetailPage() {
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
 
   // Stage change modal
-  const [stageModal, setStageModal] = useState<{ from: string; to: string } | null>(null);
+  const [stageModal, setStageModal] = useState<StageModalState | null>(null);
   const [stageNote, setStageNote] = useState("");
   const [stageChanging, setStageChanging] = useState(false);
   const [stageError, setStageError] = useState("");
@@ -84,6 +77,12 @@ export default function DealDetailPage() {
 
   // Edit deal modal
   const [showEditModal, setShowEditModal] = useState(false);
+
+  // Manage team modal (header "+" / avatar stack)
+  const [showTeamModal, setShowTeamModal] = useState(false);
+
+  // Delete-deal confirmation
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Documents
   const [documents, setDocuments] = useState<DocItem[]>([]);
@@ -99,6 +98,10 @@ export default function DealDetailPage() {
   // Activity (loaded eagerly for inline feed in Overview)
   const [activities, setActivities] = useState<Activity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(false);
+
+  // Fullscreen overlay for Financials / Analysis sections (ports legacy
+  // dealFullscreen.js). null = closed.
+  const [fullscreenSection, setFullscreenSection] = useState<"financials" | "analysis" | null>(null);
 
   // -----------------------------------------------------------------------
   // Data loading
@@ -141,8 +144,8 @@ export default function DealDetailPage() {
       } else {
         setActivities(data.data || data.activities || []);
       }
-    } catch {
-      // non-critical
+    } catch (err) {
+      console.warn("[deal] loadActivities failed:", err);
     } finally {
       setActivitiesLoading(false);
     }
@@ -154,8 +157,8 @@ export default function DealDetailPage() {
         `/deals/${dealId}/chat/history`
       );
       setMessages(Array.isArray(data) ? data : data.messages || []);
-    } catch {
-      // non-critical
+    } catch (err) {
+      console.warn("[deal] loadChatHistory failed:", err);
     }
   }, [dealId]);
 
@@ -180,7 +183,7 @@ export default function DealDetailPage() {
   // Hash-scroll: the onboarding checklist links to /deals/:id#financials-section
   // etc. Sections render async after the deal loads, so the browser's native
   // hash scroll fires before targets exist. Poll up to 8s for the element then
-  // smooth-scroll. Ported from apps/web/deal.js scrollToHashWhenReady (ee35074).
+  // smooth-scroll. Ported from deal.js scrollToHashWhenReady (ee35074).
   useEffect(() => {
     if (!deal) return;
     const hash = window.location.hash?.slice(1);
@@ -201,228 +204,64 @@ export default function DealDetailPage() {
     return () => clearInterval(interval);
   }, [deal]);
 
-  // Close user dropdown when clicking outside
-  useEffect(() => {
-    function handleClickOutside(e: MouseEvent) {
-      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
-        setUserDropdownOpen(false);
-      }
-    }
-    document.addEventListener("click", handleClickOutside);
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, []);
-
   // -----------------------------------------------------------------------
-  // Stage change
+  // Handlers — pure logic lives in deal-page-handlers.ts. These thin wrappers
+  // bind the current state + setters to the handler signatures.
   // -----------------------------------------------------------------------
 
-  const handleStageClick = (targetStage: string) => {
-    if (!deal || targetStage === deal.stage) return;
-    if (TERMINAL_STAGES.includes(deal.stage)) return;
-    setStageModal({ from: deal.stage, to: targetStage });
-    setStageNote("");
-  };
+  const handleStageClick = (targetStage: string) =>
+    openStageModal(targetStage, { deal, setStageModal, setStageNote });
 
-  // "Change Stage" button handler: opens terminal stage modal (like legacy)
-  const handleChangeStageBtn = () => {
+  const handleChangeStageBtn = () =>
+    openTerminalModal({ deal, setShowTerminalModal });
+
+  const confirmStageChange = () =>
+    confirmStageChangeFn({
+      dealId,
+      stageModal,
+      deal,
+      setStageChanging,
+      setStageError,
+      setDeal,
+      setStageModal,
+      loadActivities,
+    });
+
+  const handleTerminalSelect = (stage: string) =>
+    selectTerminalStage(stage, {
+      dealId,
+      setShowTerminalModal,
+      setDeal,
+      loadActivities,
+      showToast,
+    });
+
+  const handleDeleteDeal = () => {
     if (!deal) return;
-    if (TERMINAL_STAGES.includes(deal.stage)) return;
-    setShowTerminalModal(true);
+    setShowDeleteConfirm(true);
   };
 
-  const confirmStageChange = async () => {
-    if (!stageModal || !deal) return;
-    setStageChanging(true);
-    setStageError("");
-    try {
-      const updated = await api.patch<DealDetail>(`/deals/${dealId}`, {
-        stage: stageModal.to,
-      });
-      setDeal(updated);
-      setStageModal(null);
-      loadActivities();
-    } catch (err) {
-      setStageError(err instanceof Error ? err.message : "Failed to update deal stage");
-    } finally {
-      setStageChanging(false);
-    }
-  };
+  const confirmDeleteDeal = () =>
+    confirmDeleteDealFn({ dealId, setShowDeleteConfirm, router, showToast });
 
-  const handleTerminalSelect = async (stage: string) => {
-    setShowTerminalModal(false);
-    try {
-      const updated = await api.patch<DealDetail>(`/deals/${dealId}`, {
-        stage,
-      });
-      setDeal(updated);
-      loadActivities();
-    } catch {
-      // non-critical
-    }
-  };
-
-  // -----------------------------------------------------------------------
-  // Delete deal
-  // -----------------------------------------------------------------------
-
-  const handleDeleteDeal = async () => {
-    if (!deal) return;
-    const confirmed = window.confirm(
-      `Are you sure you want to delete "${deal.name}"?\n\nThis will also delete all associated data room files, documents, and team assignments. This action cannot be undone.`
-    );
-    if (!confirmed) return;
-
-    try {
-      await api.delete(`/deals/${dealId}`);
-      router.push("/deals");
-    } catch {
-      // non-critical
-    }
-  };
-
-  // -----------------------------------------------------------------------
-  // Documents
-  // -----------------------------------------------------------------------
-
-  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files?.length) return;
-    setUploading(true);
-    try {
-      const supabase = createClient();
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData.session?.access_token;
-
-      const formData = new FormData();
-      Array.from(files).forEach((f) => formData.append("files", f));
-
-      const res = await fetch(`/api/deals/${dealId}/documents`, {
-        method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        body: formData,
-      });
-      if (!res.ok) throw new Error("Upload failed");
-      const result = await res.json();
-      const newDocs: DocItem[] = result.documents || result || [];
-      setDocuments((prev) => [...prev, ...newDocs]);
-    } catch {
-      // ignore
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
-  };
-
-  // -----------------------------------------------------------------------
-  // Chat
-  // -----------------------------------------------------------------------
+  const handleUpload = (e: React.ChangeEvent<HTMLInputElement>) =>
+    uploadDocuments(e, { dealId, setUploading, setDocuments, fileInputRef, showToast });
 
   // Send a specific text (used by suggestion chips) without relying on
   // chatInput state -- setState is async so a chip click can't setChatInput
   // then immediately read it.
-  const sendPrompt = useCallback(async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || chatSending) return;
-
-    const userMsg: ChatMessage = {
-      id: `temp-${Date.now()}`,
-      role: "user",
-      content: trimmed,
-      createdAt: new Date().toISOString(),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setChatSending(true);
-
-    try {
-      const data = await api.post<{
-        response: string;
-        model?: string;
-        updates?: Array<{ field: string; value: unknown }>;
-        sideEffects?: Array<{
-          type: "note_added" | "extraction_triggered" | "scroll_to";
-          section?: string;
-          message?: string;
-        }>;
-      }>(
-        `/deals/${dealId}/chat`,
-        { message: trimmed }
-      );
-      const responseText =
-        data.response || (data as unknown as { content?: string }).content || "";
-
-      // Show error-styled message if agent returned an error model
-      if ((data as unknown as { model?: string }).model === "error") {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `err-${Date.now()}`,
-            role: "assistant",
-            content: `\u26A0\uFE0F ${responseText}`,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      } else if (responseText) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `ai-${Date.now()}`,
-            role: "assistant",
-            content: responseText,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      }
-
-      // If there were deal-field updates, refresh the deal data
-      if (data.updates && data.updates.length > 0) {
-        showToast("Changes have been applied", "success", { title: "Deal Updated" });
-        try { await loadDeal(); } catch { /* ignore */ }
-      }
-
-      // Handle side effects (notes, extraction, scroll)
-      if (data.sideEffects && data.sideEffects.length > 0) {
-        for (const effect of data.sideEffects) {
-          if (effect.type === "note_added") {
-            showToast("Activity feed updated", "success", { title: "Note Added" });
-            try { await loadDeal(); } catch { /* ignore */ }
-          }
-          if (effect.type === "extraction_triggered") {
-            showToast(effect.message || "Financial extraction queued", "info", { title: "Extraction" });
-          }
-          if (effect.type === "scroll_to") {
-            const sectionMap: Record<string, string> = {
-              financials: "financials-section",
-              analysis: "analysis-section",
-              activity: "activity-feed",
-              documents: "documents-list",
-              risks: "key-risks-list",
-            };
-            const elId = effect.section ? sectionMap[effect.section] : undefined;
-            const el = elId ? document.getElementById(elId) : null;
-            if (el) {
-              el.scrollIntoView({ behavior: "smooth", block: "start" });
-            }
-          }
-        }
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong";
-      const isServerError =
-        msg.includes("API error 5") || msg.includes("API error 429");
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          role: "assistant",
-          content: isServerError
-            ? "The server is temporarily unavailable. Please try again in a moment."
-            : `Sorry, I couldn't process your request. ${msg}`,
-        },
-      ]);
-    } finally {
-      setChatSending(false);
-    }
-  }, [dealId, chatSending, showToast, loadDeal]);
+  const sendPrompt = useCallback(
+    (text: string) =>
+      sendPromptFn(text, {
+        dealId,
+        chatSending,
+        setChatSending,
+        setMessages,
+        showToast,
+        loadDeal,
+      }),
+    [dealId, chatSending, showToast, loadDeal],
+  );
 
   const sendMessage = async () => {
     const text = chatInput.trim();
@@ -432,455 +271,147 @@ export default function DealDetailPage() {
   };
 
   // Clear chat history (ported from deal-chat.js clearChatConfirm)
-  const clearChatHistory = useCallback(async () => {
-    try {
-      await api.delete(`/deals/${dealId}/chat/history`);
-      setMessages([]);
-    } catch {
-      // non-critical
-    }
-  }, [dealId]);
+  const clearChatHistory = useCallback(
+    () => clearChatHistoryFn({ dealId, setMessages, showToast }),
+    [dealId, showToast],
+  );
 
   // -----------------------------------------------------------------------
-  // Render helpers
+  // Render
   // -----------------------------------------------------------------------
 
   if (loading) {
-    return (
-      <div className="flex flex-col h-full overflow-hidden">
-        {/* Header skeleton */}
-        <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card">
-          <div className="flex items-center gap-3">
-            <Skeleton width={28} height={28} rounded="md" />
-            <Skeleton.Line width={60} height={14} />
-            <Skeleton.Line width={140} height={14} />
-          </div>
-          <div className="flex items-center gap-3">
-            <Skeleton width={120} height={36} rounded="lg" />
-            <Skeleton.Circle size={32} />
-          </div>
-        </header>
-        <div className="flex flex-1 overflow-hidden">
-          {/* Left panel skeleton */}
-          <section className="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar gap-4">
-            {/* Deal header */}
-            <div className="flex items-start gap-4">
-              <Skeleton width={64} height={64} rounded="xl" />
-              <div className="flex-1 flex flex-col gap-2">
-                <Skeleton.Line width="55%" height={24} />
-                <Skeleton.Line width="35%" height={13} />
-                <div className="flex gap-2 mt-1">
-                  <Skeleton.Badge width={88} height={20} />
-                </div>
-              </div>
-            </div>
-            {/* Stage pipeline */}
-            <div className="flex items-center gap-2 py-3">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <Skeleton key={i} width="100%" height={28} rounded="md" className="flex-1" />
-              ))}
-            </div>
-            {/* Metadata + financial rows */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              {Array.from({ length: 8 }).map((_, i) => (
-                <div key={i} className="bg-white border border-border-subtle rounded-lg p-3 flex flex-col gap-2">
-                  <Skeleton.Line width="60%" height={10} />
-                  <Skeleton.Line width="80%" height={16} />
-                </div>
-              ))}
-            </div>
-            {/* Financial Statements / Analysis */}
-            <div className="bg-white border border-border-subtle rounded-lg p-5 flex flex-col gap-3">
-              <Skeleton.Line width="35%" height={16} />
-              <Skeleton.Line width="100%" height={12} />
-              <Skeleton.Line width="90%" height={12} />
-              <Skeleton.Line width="75%" height={12} />
-            </div>
-            <div className="bg-white border border-border-subtle rounded-lg p-5 flex flex-col gap-3">
-              <Skeleton.Line width="40%" height={16} />
-              <Skeleton.Line width="100%" height={12} />
-              <Skeleton.Line width="95%" height={12} />
-              <Skeleton.Line width="80%" height={12} />
-            </div>
-            {/* Tabs */}
-            <div className="flex items-center gap-4 border-b border-border-subtle pb-3">
-              <Skeleton.Line width={70} height={14} />
-              <Skeleton.Line width={80} height={14} />
-              <Skeleton.Line width={60} height={14} />
-            </div>
-          </section>
-          {/* Right panel skeleton */}
-          <section className="hidden lg:flex flex-1 flex-col bg-background-body border-l border-border-subtle/60 p-6 gap-3" style={{ minWidth: 300 }}>
-            <div className="flex items-center gap-2">
-              <Skeleton.Circle size={28} />
-              <Skeleton.Line width="40%" height={14} />
-            </div>
-            <div className="flex flex-col gap-3 mt-2">
-              <Skeleton width="80%" height={48} rounded="lg" />
-              <Skeleton width="65%" height={48} rounded="lg" className="self-end" />
-              <Skeleton width="75%" height={48} rounded="lg" />
-            </div>
-          </section>
-        </div>
-      </div>
-    );
+    return <DealPageLoadingSkeleton />;
   }
 
   if (error || !deal) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center max-w-md">
-          <span className="material-symbols-outlined text-4xl text-red-400">error</span>
-          <h2 className="mt-3 text-lg font-semibold text-text-main">Deal not found</h2>
-          <p className="mt-1 text-sm text-text-muted">
-            {error || "Could not load this deal."}
-          </p>
-          <Link
-            href="/deals"
-            className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 text-sm font-medium text-white rounded-lg"
-            style={{ backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-            Back to Deals
-          </Link>
-        </div>
-      </div>
-    );
+    return <DealPageErrorState error={error} />;
   }
-
-  const initials = user?.name?.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2) || "";
 
   return (
     <>
-    <div className="flex flex-col h-full overflow-hidden">
-      {/* HEADER BAR — breadcrumb + actions, spans full width above both panels */}
-      <header className="flex h-14 shrink-0 items-center justify-between border-b border-border-subtle px-6 bg-surface-card z-40 relative">
-        <div className="flex items-center gap-4 flex-1">
-          <nav className="flex items-center gap-1.5 text-sm">
-            <button
-              onClick={() => router.back()}
-              className="flex items-center justify-center size-7 rounded-md hover:bg-primary-light text-text-muted hover:text-primary transition-colors mr-1"
-              title="Go back"
-            >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
-            </button>
-            <Link href="/deals" className="text-text-muted hover:text-primary transition-colors">
-              Deals
-            </Link>
-            <span className="material-symbols-outlined text-[14px] text-text-muted">chevron_right</span>
-            <span className="text-text-main font-medium truncate max-w-[300px]">
-              {getDealDisplayName(deal)}
-            </span>
-          </nav>
-        </div>
-        <div className="flex items-center gap-4">
-          {/* Team Avatar Stack */}
-          <div className="hidden md:flex items-center cursor-pointer hover:opacity-80 transition-opacity">
-            <TeamAvatarStack team={deal.team || []} />
-          </div>
+      <div className="flex flex-col h-full overflow-hidden">
+        {/* HEADER BAR — breadcrumb + actions, spans full width above both panels */}
+        <DealPageHeader
+          deal={deal}
+          dealId={dealId}
+          setShowEditModal={setShowEditModal}
+          setShowTeamModal={setShowTeamModal}
+          setHelpOpen={setHelpOpen}
+        />
 
-          <Link
-            href={`/data-room/${dealId}`}
-            className="hidden md:flex items-center gap-2 px-3 py-2 text-sm font-medium text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors border border-border-subtle"
-          >
-            <span className="material-symbols-outlined text-[18px]">folder_open</span>
-            Data Room
-          </Link>
-          <button
-            onClick={async () => {
-              try {
-                await navigator.clipboard.writeText(window.location.origin + pathname);
-                setLinkCopied(true);
-                setTimeout(() => setLinkCopied(false), 2000);
-              } catch {
-                // Fallback for non-secure contexts
-              }
-            }}
-            className="hidden md:flex items-center justify-center p-2 text-text-secondary hover:text-primary hover:bg-primary-light rounded-lg transition-colors"
-            title="Copy share link"
-          >
-            <span className="material-symbols-outlined text-[20px]">{linkCopied ? "check" : "link"}</span>
-          </button>
-          <button
-            onClick={() => setShowEditModal(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white rounded-lg shadow-sm hover:bg-primary-hover transition-colors"
-            style={{ backgroundColor: "#003366" }}
-          >
-            <span className="material-symbols-outlined text-[18px]">edit_document</span>
-            Edit Deal
-          </button>
+        {/* TWO-COLUMN LAYOUT — below header */}
+        <div ref={containerRef} className="flex flex-1 overflow-hidden">
+          {/* LEFT PANEL — deal content, scrolls independently */}
+          <DealPageLeftPanel
+            deal={deal}
+            dealId={dealId}
+            leftRef={leftRef}
+            leftPanelStyle={leftPanelStyle}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onStageClick={handleStageClick}
+            onChangeStage={handleChangeStageBtn}
+            onDelete={handleDeleteDeal}
+            activities={activities}
+            activitiesLoading={activitiesLoading}
+            loadActivities={loadActivities}
+            documents={documents}
+            uploading={uploading}
+            fileInputRef={fileInputRef}
+            onUpload={handleUpload}
+            onOpenFinancialsFullscreen={() => setFullscreenSection("financials")}
+            onOpenAnalysisFullscreen={() => setFullscreenSection("analysis")}
+          />
 
-          {/* Divider */}
-          <div className="h-6 w-px bg-border-subtle" />
-
-          {/* Notification bell */}
-          <NotificationCenter />
-
-          {/* Divider */}
-          <div className="h-6 w-px bg-border-subtle" />
-
-          {/* User menu */}
-          <div className="relative" ref={userDropdownRef}>
-            <button
-              onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="flex items-center gap-2 text-sm font-medium text-text-main hover:text-primary transition-colors"
-              title="Profile & Settings"
-            >
-              <div
-                className="bg-center bg-no-repeat bg-cover rounded-full size-8 border border-gray-200 shadow-sm flex items-center justify-center bg-primary text-white text-xs font-bold"
-                style={user?.avatar ? { backgroundImage: `url('${encodeURI(user.avatar)}')` } : {}}
-              >
-                {initials}
-              </div>
-              <span className="hidden md:inline">{user?.name || "Loading..."}</span>
-              <span
-                className={`material-symbols-outlined text-[18px] text-text-muted transition-transform duration-200 ${
-                  userDropdownOpen ? "rotate-180" : ""
-                }`}
-              >
-                expand_more
-              </span>
-            </button>
-
-            {userDropdownOpen && (
-              <div className="absolute right-0 top-full mt-2 w-56 rounded-lg shadow-lg py-1 z-50 bg-surface-card border border-border-subtle dropdown-animate">
-                <div className="px-4 py-3 border-b border-border-subtle">
-                  <p className="text-sm font-medium text-text-main">{user?.name}</p>
-                  <p className="text-xs text-text-muted truncate">{user?.role}</p>
-                </div>
-                <div className="py-1">
-                  <Link
-                    href="/settings"
-                    className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm text-text-secondary transition-colors"
-                    onClick={() => setUserDropdownOpen(false)}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">person</span>
-                    Profile
-                  </Link>
-                  <Link
-                    href="/settings"
-                    className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm text-text-secondary transition-colors"
-                    onClick={() => setUserDropdownOpen(false)}
-                  >
-                    <span className="material-symbols-outlined text-[18px]">settings</span>
-                    Settings
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setUserDropdownOpen(false);
-                      setHelpOpen(true);
-                    }}
-                    className="user-dropdown-item flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-text-secondary transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">help</span>
-                    Help &amp; Support
-                  </button>
-                </div>
-                <div className="border-t border-border-subtle py-1">
-                  <button
-                    onClick={signOut}
-                    className="user-dropdown-item-logout flex items-center gap-3 px-4 py-2 text-sm w-full text-left text-red-600 transition-colors"
-                  >
-                    <span className="material-symbols-outlined text-[18px]">logout</span>
-                    Log out
-                  </button>
-                </div>
-              </div>
+          {/* RESIZE HANDLE — draggable divider between panels */}
+          <div
+            ref={handleRef}
+            onMouseDown={onMouseDown}
+            onTouchStart={onTouchStart}
+            onDoubleClick={onDoubleClick}
+            className={cn(
+              "hidden lg:flex w-1.5 cursor-col-resize flex-shrink-0 relative items-center justify-center z-10 transition-colors",
+              isDragging
+                ? "bg-[rgba(0,51,102,0.15)]"
+                : "hover:bg-primary/20 active:bg-primary/40",
             )}
-          </div>
-        </div>
-      </header>
-
-      {/* TWO-COLUMN LAYOUT — below header */}
-      <div ref={containerRef} className="flex flex-1 overflow-hidden">
-      {/* LEFT PANEL — deal content, scrolls independently */}
-      <section
-        ref={leftRef}
-        className="w-full lg:w-7/12 xl:w-1/2 flex flex-col overflow-y-auto border-r border-border-subtle bg-surface-card p-6 custom-scrollbar"
-        style={leftPanelStyle}
-      >
-
-        {/* Deal content */}
-        <div className="flex flex-col gap-3">
-          {/* Deal header */}
-          <div className="flex justify-between items-start">
-            <div className="flex items-start gap-4">
-              <div className="size-16 rounded-xl bg-white p-1 border border-border-subtle shadow-card">
-                <div className="w-full h-full bg-primary-light rounded-lg flex items-center justify-center border border-border-subtle">
-                  <span className="material-symbols-outlined text-primary text-3xl">
-                    {deal.icon || "business"}
-                  </span>
-                </div>
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-text-main leading-tight">
-                  {getDealDisplayName(deal)}
-                </h1>
-                {/* Recently active team members ("@User on this deal") */}
-                {(deal.team?.length ?? 0) > 0 && (
-                  <DealViewers team={deal.team || []} />
-                )}
-                <div className="flex flex-wrap gap-2 mt-1">
-                  {/* Financial status badge */}
-                  <FinancialStatusBadge dealId={dealId} />
-                </div>
-              </div>
-            </div>
-            {/* Deal Actions Menu */}
-            <DealActionsMenu
-              dealId={dealId}
-              dealName={deal.name}
-              onDelete={handleDeleteDeal}
+            title="Drag to resize (double-click to reset)"
+          >
+            {/* Wider invisible hit area for easier grabbing */}
+            <div className="absolute inset-y-0 -left-2 -right-2" />
+            {/* Visual grip indicator */}
+            <div
+              className={cn(
+                "w-0.5 h-8 rounded-full transition-colors",
+                isDragging ? "bg-primary/50 opacity-100" : "bg-gray-300 opacity-0 hover:opacity-100",
+              )}
             />
           </div>
 
-          {/* Stage Pipeline */}
-          <StagePipeline
-            deal={deal}
-            onStageClick={handleStageClick}
-            onChangeStage={handleChangeStageBtn}
-          />
-
-          {/* Metadata row */}
-          <DealMetadataRow deal={deal} />
-
-          {/* Financial metrics row */}
-          <FinancialMetricsRow deal={deal} />
-
-          {/* Financial Statements section */}
-          <FinancialStatementsSection dealId={dealId} />
-
-          {/* AI Financial Analysis section */}
-          <DealAnalysisSection dealId={dealId} />
-
-          {/* Tabs */}
-          <div className="flex items-center gap-1 border-b border-border-subtle mt-1">
-            {(["Overview", "Documents", "Activity"] as const).map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={cn(
-                  "px-4 py-3 text-sm font-medium transition-colors relative",
-                  activeTab === tab
-                    ? "text-primary"
-                    : "text-text-muted hover:text-text-secondary"
-                )}
-              >
-                {tab}
-                {activeTab === tab && (
-                  <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary rounded-full" />
-                )}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content */}
-          <div>
-            {activeTab === "Overview" && (
-              <OverviewTab
-                deal={deal}
-                activities={activities}
-                activitiesLoading={activitiesLoading}
-                onRefreshActivities={loadActivities}
-              />
-            )}
-            {activeTab === "Documents" && (
-              <DocumentsTab
-                documents={documents}
-                uploading={uploading}
-                fileInputRef={fileInputRef}
-                onUpload={handleUpload}
-              />
-            )}
-            {activeTab === "Activity" && (
-              <ActivityTab activities={activities} loading={activitiesLoading} />
-            )}
-          </div>
+          {/* RIGHT PANEL — AI Chat (desktop only, fills remaining space) */}
+          <section
+            className="hidden lg:flex flex-1 flex-col bg-background-body border-l border-border-subtle/60 shadow-inner relative"
+            style={{ minWidth: 300 }}
+          >
+            <ChatTab
+              deal={deal}
+              messages={messages}
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              chatSending={chatSending}
+              onSend={sendMessage}
+              onSendPrompt={sendPrompt}
+              onClearChat={clearChatHistory}
+              chatEndRef={chatEndRef}
+            />
+          </section>
         </div>
-      </section>
-
-      {/* RESIZE HANDLE — draggable divider between panels */}
-      <div
-        ref={handleRef}
-        onMouseDown={onMouseDown}
-        onTouchStart={onTouchStart}
-        onDoubleClick={onDoubleClick}
-        className={cn(
-          "hidden lg:flex w-1.5 cursor-col-resize flex-shrink-0 relative items-center justify-center z-10 transition-colors",
-          isDragging
-            ? "bg-[rgba(0,51,102,0.15)]"
-            : "hover:bg-primary/20 active:bg-primary/40",
-        )}
-        title="Drag to resize (double-click to reset)"
-      >
-        {/* Wider invisible hit area for easier grabbing */}
-        <div className="absolute inset-y-0 -left-2 -right-2" />
-        {/* Visual grip indicator */}
-        <div className={cn(
-          "w-0.5 h-8 rounded-full transition-colors",
-          isDragging ? "bg-primary/50 opacity-100" : "bg-gray-300 opacity-0 hover:opacity-100",
-        )} />
+        {/* end two-column */}
       </div>
+      {/* end flex-col container */}
 
-      {/* RIGHT PANEL — AI Chat (desktop only, fills remaining space) */}
-      <section className="hidden lg:flex flex-1 flex-col bg-background-body border-l border-border-subtle/60 shadow-inner relative" style={{ minWidth: 300 }}>
-        <ChatTab
-          deal={deal}
-          messages={messages}
-          chatInput={chatInput}
-          setChatInput={setChatInput}
-          chatSending={chatSending}
-          onSend={sendMessage}
-          onSendPrompt={sendPrompt}
-          onClearChat={clearChatHistory}
-          chatEndRef={chatEndRef}
-        />
-      </section>
-      </div>{/* end two-column */}
-    </div>{/* end flex-col container */}
-
-      {/* Stage Change Modal */}
-      {stageModal && (
-        <StageChangeModal
-          from={stageModal.from}
-          to={stageModal.to}
-          note={stageNote}
-          setNote={setStageNote}
-          loading={stageChanging}
-          error={stageError}
-          onConfirm={confirmStageChange}
-          onClose={() => {
-            setStageModal(null);
-            setStageError("");
-          }}
-        />
-      )}
-
-      {/* Terminal Stage Modal (Close Deal) */}
-      {showTerminalModal && (
-        <TerminalStageModal
-          dealName={deal.name}
-          onSelect={handleTerminalSelect}
-          onClose={() => setShowTerminalModal(false)}
-        />
-      )}
-
-      {/* Edit Deal Modal */}
-      {showEditModal && deal && (
-        <EditDealModal
-          deal={deal}
-          onClose={() => setShowEditModal(false)}
-          onSaved={(updated) => {
-            setDeal((prev) => (prev ? { ...prev, ...updated } : updated));
-            showToast("Deal details have been saved", "success", { title: "Deal Updated" });
-            loadActivities();
-          }}
-        />
-      )}
-
-      {/* Help & Support Modal (opened from user dropdown) */}
-      <HelpSupportModal open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {/* All modals */}
+      <DealPageModals
+        deal={deal}
+        dealId={dealId}
+        stageModal={stageModal}
+        stageNote={stageNote}
+        setStageNote={setStageNote}
+        stageChanging={stageChanging}
+        stageError={stageError}
+        onConfirmStageChange={confirmStageChange}
+        onCloseStageModal={() => {
+          setStageModal(null);
+          setStageError("");
+        }}
+        showTerminalModal={showTerminalModal}
+        onTerminalSelect={handleTerminalSelect}
+        onCloseTerminalModal={() => setShowTerminalModal(false)}
+        showEditModal={showEditModal}
+        onCloseEditModal={() => setShowEditModal(false)}
+        onDealEdited={(updated) => {
+          setDeal((prev) => (prev ? { ...prev, ...updated } : updated));
+          showToast("Deal details have been saved", "success", { title: "Deal Updated" });
+          loadActivities();
+        }}
+        showTeamModal={showTeamModal}
+        onCloseTeamModal={() => {
+          setShowTeamModal(false);
+          // Reload activities — adds/removes/role-changes log activity rows.
+          loadActivities();
+        }}
+        onTeamChanged={(team) => {
+          setDeal((prev) => (prev ? { ...prev, team } : prev));
+        }}
+        helpOpen={helpOpen}
+        onCloseHelp={() => setHelpOpen(false)}
+        showDeleteConfirm={showDeleteConfirm}
+        onConfirmDelete={confirmDeleteDeal}
+        onCancelDelete={() => setShowDeleteConfirm(false)}
+        fullscreenSection={fullscreenSection}
+        onCloseFullscreen={() => setFullscreenSection(null)}
+      />
     </>
   );
 }

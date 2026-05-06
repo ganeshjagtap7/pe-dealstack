@@ -1,4 +1,4 @@
-// Shared types for the onboarding flow. Ported from apps/web/js/onboarding/*.
+// Shared types for the onboarding flow. Ported from *.
 
 export type TaskId = "firm" | "cim" | "team";
 
@@ -43,7 +43,7 @@ export interface TeamInvite {
 
 // Visual role labels only — these do NOT submit to the API during
 // onboarding (matches legacy behavior). Matches the <select> options
-// in apps/web/js/onboarding/onboarding-tasks.js team hydrator.
+// in onboarding-tasks.js team hydrator.
 export const TEAM_ROLES = ["Analyst", "VP", "Partner", "Admin"];
 
 // API response shape — matches DEFAULT_STATUS in
@@ -57,7 +57,7 @@ export interface OnboardingStatus {
 }
 
 // Legacy step IDs stored on the backend ↔ current 3-task flow.
-// Matches the mapping in apps/web/js/onboarding/onboarding-flow.js.
+// Matches the mapping in onboarding-flow.js.
 export const TASK_TO_LEGACY_STEP: Record<TaskId, string> = {
   firm: "createDeal",
   cim: "uploadDocument",

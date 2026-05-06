@@ -60,7 +60,9 @@ export async function verifyNode(
           verifiedPortfolio.push({ ...company, verified: false });
           steps.push(step(`Portfolio "${company.name}" — not verified (no co-occurrence)`));
         }
-      } catch {
+      } catch (err) {
+        // Search backend failed — keep the company unverified (same semantic as no co-occurrence).
+        log.warn('firmResearch/verify: portfolio verification search failed', { company: company.name, error: err instanceof Error ? err.message : String(err) });
         verifiedPortfolio.push({ ...company, verified: false });
       }
     }

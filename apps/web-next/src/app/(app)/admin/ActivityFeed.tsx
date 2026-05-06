@@ -4,66 +4,31 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import {
+  formatAuditAction,
+  getActorName,
+  groupLogsByDay,
+  isAIAction,
+  type AuditLog,
+} from "../dashboard/widgets/activity-formatters";
 import type { AdminAuditLog } from "./types";
 
 const PAGE_SIZE = 10;
 
-const ACTION_META: Record<string, { text: (entity: string) => string; icon: string }> = {
-  DEAL_CREATED: { text: (e) => `created deal ${e}`, icon: "add_circle" },
-  DEAL_UPDATED: { text: (e) => `updated ${e}`, icon: "edit" },
-  DEAL_DELETED: { text: (e) => `deleted deal ${e}`, icon: "delete" },
-  DEAL_STAGE_CHANGED: { text: (e) => `moved ${e} to a new stage`, icon: "arrow_forward" },
-  DEAL_ASSIGNED: { text: (e) => `assigned ${e}`, icon: "person_add" },
-  DEAL_VIEWED: { text: (e) => `viewed ${e}`, icon: "visibility" },
-  DEAL_EXPORTED: { text: (e) => `exported ${e}`, icon: "file_download" },
-  DOCUMENT_UPLOADED: { text: (e) => `uploaded ${e}`, icon: "upload_file" },
-  DOCUMENT_DELETED: { text: (e) => `deleted document ${e}`, icon: "delete" },
-  DOCUMENT_DOWNLOADED: { text: (e) => `downloaded ${e}`, icon: "download" },
-  DOCUMENT_VIEWED: { text: (e) => `viewed document ${e}`, icon: "visibility" },
-  MEMO_CREATED: { text: (e) => `created memo ${e}`, icon: "description" },
-  MEMO_UPDATED: { text: (e) => `updated memo ${e}`, icon: "edit_note" },
-  MEMO_EXPORTED: { text: (e) => `exported memo ${e}`, icon: "file_download" },
-  USER_CREATED: { text: (e) => `added team member ${e}`, icon: "person_add" },
-  USER_UPDATED: { text: (e) => `updated user ${e}`, icon: "manage_accounts" },
-  USER_INVITED: { text: (e) => `invited ${e}`, icon: "mail" },
-  INVITATION_SENT: { text: (e) => `sent invitation to ${e}`, icon: "send" },
-  INVITATION_ACCEPTED: { text: (e) => `${e} accepted invitation`, icon: "how_to_reg" },
-  AI_INGEST: { text: (e) => `ingested document ${e}`, icon: "auto_awesome" },
-  AI_GENERATE: { text: (e) => `generated analysis for ${e}`, icon: "auto_awesome" },
-  AI_CHAT: { text: (e) => `chatted with ${e || "PE OS AI"}`, icon: "auto_awesome" },
-  LOGIN: { text: () => "logged in", icon: "login" },
-  LOGOUT: { text: () => "logged out", icon: "logout" },
-  SETTINGS_CHANGED: { text: () => "updated settings", icon: "settings" },
-};
-
+// Mirrors legacy getInitials in activity-formatters.js —
+// splits on whitespace AND `@` so an email-derived display name still produces
+// two-letter initials (e.g. "alice.bobson@firm.com" → "AF"). The shared
+// getInitials in lib/formatters.ts only splits on space, so it's not a direct
+// substitute here.
 function initials(raw: string): string {
-  return raw
-    .split(/[\s@]+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("") || "?";
-}
-
-function groupByDay(logs: AdminAuditLog[]): Array<[string, AdminAuditLog[]]> {
-  const now = new Date();
-  const today = now.toDateString();
-  const yesterday = new Date(now.getTime() - 86_400_000).toDateString();
-  const groups = new Map<string, AdminAuditLog[]>();
-
-  for (const log of logs) {
-    const d = new Date(log.createdAt);
-    const str = d.toDateString();
-    const label =
-      str === today
-        ? "Today"
-        : str === yesterday
-          ? "Yesterday"
-          : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    if (!groups.has(label)) groups.set(label, []);
-    groups.get(label)!.push(log);
-  }
-  return Array.from(groups.entries());
+  return (
+    raw
+      .split(/[\s@]+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0].toUpperCase())
+      .join("") || "?"
+  );
 }
 
 export function ActivityFeed() {
@@ -74,36 +39,39 @@ export function ActivityFeed() {
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const load = useCallback(async (append: boolean) => {
-    const nextOffset = append ? offset : 0;
-    if (append) setLoadingMore(true);
-    else {
-      setLoading(true);
-      setError(false);
-    }
-    try {
-      const data = await api.get<{ logs: AdminAuditLog[] }>(
-        `/audit?limit=${PAGE_SIZE}&offset=${nextOffset}`,
-      );
-      const newLogs = data.logs || [];
-      setLogs((prev) => (append ? prev.concat(newLogs) : newLogs));
-      setOffset(nextOffset + newLogs.length);
-      setHasMore(newLogs.length === PAGE_SIZE);
-    } catch (err) {
-      console.warn("[admin] activity feed load failed:", err);
-      setError(true);
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, [offset]);
+  const load = useCallback(
+    async (append: boolean) => {
+      const nextOffset = append ? offset : 0;
+      if (append) setLoadingMore(true);
+      else {
+        setLoading(true);
+        setError(false);
+      }
+      try {
+        const data = await api.get<{ logs: AdminAuditLog[] }>(
+          `/audit?limit=${PAGE_SIZE}&offset=${nextOffset}`,
+        );
+        const newLogs = data.logs || [];
+        setLogs((prev) => (append ? prev.concat(newLogs) : newLogs));
+        setOffset(nextOffset + newLogs.length);
+        setHasMore(newLogs.length === PAGE_SIZE);
+      } catch (err) {
+        console.warn("[admin] activity feed load failed:", err);
+        setError(true);
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [offset],
+  );
 
   useEffect(() => {
     load(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const grouped = groupByDay(logs);
+  const grouped = groupLogsByDay(logs as AuditLog[]);
 
   return (
     <div
@@ -117,6 +85,16 @@ export function ActivityFeed() {
         </h2>
       </div>
       <div className="flex-1 overflow-y-auto p-5 relative custom-scrollbar">
+        {/* Vertical timeline rail — matches admin-dashboard.html .activity-timeline::before:
+            2px wide, gray, 24px inset from top/bottom of the scroll container, at left:17px
+            (sits just inside the 20px container padding, against the left edge of the avatar column). */}
+        {!loading && !error && logs.length > 0 && (
+          <div
+            aria-hidden
+            className="absolute w-0.5 bg-border-subtle pointer-events-none"
+            style={{ left: 17, top: 24, bottom: 24 }}
+          />
+        )}
         {loading ? (
           <div className="text-center py-8 text-text-muted">
             <span className="material-symbols-outlined text-[24px] mb-2 block animate-spin">
@@ -143,66 +121,15 @@ export function ActivityFeed() {
             <p className="text-xs mt-1">Actions across your org will appear here</p>
           </div>
         ) : (
-          <div className="space-y-5 relative">
-            {/* Timeline vertical line */}
-            <div className="absolute left-[17px] top-6 bottom-6 w-px bg-border-subtle" />
-            {grouped.map(([label, dayLogs]) => (
+          <div className="relative">
+            {grouped.map(({ label, logs: dayLogs }) => (
               <div key={label}>
                 <p className="text-[10px] font-bold uppercase tracking-wider text-text-muted mt-2 mb-2 first:mt-0">
                   {label}
                 </p>
-                {dayLogs.map((log) => {
-                  const userName = log.userName || log.userEmail?.split("@")[0] || "System";
-                  const isAI = log.action?.startsWith("AI_");
-                  const meta = ACTION_META[log.action];
-                  const entity = log.entityName || log.resourceName || "";
-                  const text = meta
-                    ? meta.text(entity)
-                    : `performed ${log.action || "an action"}`;
-                  const icon = meta?.icon || "info";
-
-                  return (
-                    <div key={log.id} className="flex gap-3 relative z-10 mb-4">
-                      <div className="relative flex-shrink-0">
-                        <div
-                          className="w-9 h-9 rounded-full text-white text-xs font-medium flex items-center justify-center"
-                          style={{ backgroundColor: "#003366" }}
-                        >
-                          {isAI ? (
-                            <span className="material-symbols-outlined text-[18px]">
-                              auto_awesome
-                            </span>
-                          ) : (
-                            initials(userName)
-                          )}
-                        </div>
-                        <div
-                          className="absolute -bottom-0.5 -right-0.5 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white"
-                          style={{ backgroundColor: "#003366" }}
-                        >
-                          <span className="material-symbols-outlined text-white text-[10px]">
-                            {icon}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex-1 pt-0.5">
-                        <p className="text-sm text-text-main">
-                          <span className={cn("font-semibold", isAI && "text-primary")}>
-                            {isAI ? "PE OS AI" : userName}
-                          </span>{" "}
-                          {entity ? (
-                            <HighlightEntity text={text} entity={entity} />
-                          ) : (
-                            text
-                          )}
-                        </p>
-                        <p className="text-xs text-text-muted mt-1">
-                          {formatRelativeTime(log.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                })}
+                {dayLogs.map((log) => (
+                  <ActivityItem key={log.id} log={log as AuditLog} />
+                ))}
               </div>
             ))}
           </div>
@@ -224,15 +151,53 @@ export function ActivityFeed() {
   );
 }
 
-// Highlight the entity within the text using React elements (no raw HTML).
-function HighlightEntity({ text, entity }: { text: string; entity: string }) {
-  const idx = text.indexOf(entity);
-  if (idx === -1) return <>{text}</>;
+// Single activity row. Matches the legacy renderActivityItem layout in
+// activity-formatters.js, with the corrected action-icon
+// badge sizing from commit 3d87c52 (badge 18×18, icon 12px font-size, opsz 20).
+function ActivityItem({ log }: { log: AuditLog }) {
+  const ai = isAIAction(log);
+  const actor = getActorName(log);
+  const { prefix, entity, suffix, icon } = formatAuditAction(log);
+
   return (
-    <>
-      {text.slice(0, idx)}
-      <span className="text-primary font-medium">{entity}</span>
-      {text.slice(idx + entity.length)}
-    </>
+    <div className="flex gap-3 relative z-10 mb-4">
+      <div className="relative flex-shrink-0">
+        <div
+          className="w-9 h-9 rounded-full text-white text-xs font-medium flex items-center justify-center"
+          style={{ backgroundColor: "#003366" }}
+        >
+          {ai ? (
+            <span className="material-symbols-outlined text-[18px]">auto_awesome</span>
+          ) : (
+            initials(actor)
+          )}
+        </div>
+        <div
+          className="absolute -bottom-0.5 -right-0.5 rounded-full w-[18px] h-[18px] flex items-center justify-center border-2 border-white overflow-hidden"
+          style={{ backgroundColor: "#003366" }}
+        >
+          {/* opsz 20 is the lowest Material Symbols optical-size variant — pair with 12px font-size so glyphs render at their designed metrics. */}
+          <span
+            className="material-symbols-outlined text-white leading-none"
+            style={{
+              fontSize: "12px",
+              fontVariationSettings: "'opsz' 20, 'wght' 400, 'FILL' 1, 'GRAD' 0",
+              lineHeight: 1,
+            }}
+          >
+            {icon}
+          </span>
+        </div>
+      </div>
+      <div className="flex-1 pt-0.5">
+        <p className="text-sm text-text-main">
+          <span className={cn("font-semibold", ai && "text-primary")}>{actor}</span>{" "}
+          {prefix}
+          {entity && <span className="text-primary font-medium">{entity}</span>}
+          {suffix}
+        </p>
+        <p className="text-xs text-text-muted mt-1">{formatRelativeTime(log.createdAt)}</p>
+      </div>
+    </div>
   );
 }

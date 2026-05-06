@@ -5,7 +5,7 @@ import { CompletionFindings } from "./completion-findings";
 import { TaskId, TASKS } from "./types";
 
 // Checklist view — the 3-task list with progress bar. Ported from
-// apps/web/onboarding.html #view-checklist + renderChecklist/updateProgress
+// onboarding.html #view-checklist + renderChecklist/updateProgress
 // in onboarding-flow.js.
 export function ChecklistView({
   completed,

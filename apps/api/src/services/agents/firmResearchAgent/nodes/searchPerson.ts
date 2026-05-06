@@ -2,7 +2,7 @@
 import { FirmResearchStateType, AgentStep } from '../state.js';
 import { searchWeb, scrapeLinkedInProfile } from '../../../webSearch.js';
 import { log } from '../../../../utils/logger.js';
-import { isLinkedInUrl, extractLinkedInSlug } from '../../../../utils/urlHelpers.js';
+import { isLinkedInUrl, extractLinkedInSlug, getLinkedInKind } from '../../../../utils/urlHelpers.js';
 
 const MAX_SEARCH_CHARS = 5000;
 const NODE_TIMEOUT_MS = 60000; // 60s — Apify LinkedIn scraping needs startup time
@@ -47,6 +47,14 @@ export async function searchPersonNode(
 
   if (!isLinkedInUrl(state.linkedinUrl)) {
     steps.push(step('Invalid LinkedIn URL format, skipping', state.linkedinUrl));
+    return { personSearchResults: '', steps };
+  }
+
+  // Company URLs are handled by searchFirmNode — the personal-profile Apify
+  // actor (anchor/linkedin-profile-scraper) only works on /in/<slug> pages,
+  // and person-shaped queries don't make sense for a firm page.
+  if (getLinkedInKind(state.linkedinUrl) === 'company') {
+    steps.push(step('Company LinkedIn URL detected — skipping person search', state.linkedinUrl));
     return { personSearchResults: '', steps };
   }
 

@@ -45,7 +45,8 @@ function loadHistory(ctx: ChatContext): ChatMessage[] {
       (m) =>
         m && (m.role === "user" || m.role === "assistant") && typeof m.content === "string",
     );
-  } catch {
+  } catch (err) {
+    console.warn("[layout/AIAssistant] failed to load chat history:", err);
     return [];
   }
 }
@@ -57,8 +58,9 @@ function saveHistory(ctx: ChatContext, messages: ChatMessage[]) {
     const parsed: HistoryStore = raw ? JSON.parse(raw) : {};
     parsed[ctx.type] = messages.slice(-MAX_PERSISTED_MESSAGES);
     window.localStorage.setItem(historyKey(), JSON.stringify(parsed));
-  } catch {
-    // Quota or parse error — silent fail, history is best-effort
+  } catch (err) {
+    // Quota or parse error — history is best-effort.
+    console.warn("[layout/AIAssistant] failed to save chat history:", err);
   }
 }
 

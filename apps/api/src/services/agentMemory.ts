@@ -196,7 +196,8 @@ export async function getBestExtractionSource(
       .single();
 
     return data?.bestExtractionSource || null;
-  } catch {
+  } catch (err) {
+    log.warn('agentMemory: getBestExtractionSource failed', { error: err instanceof Error ? err.message : String(err), documentPattern, fileType });
     return null;
   }
 }

@@ -2,7 +2,7 @@
 // Parallel fetch: contact history + deal status + RAG doc summaries
 // Then LLM compiles a meeting brief with talking points.
 
-import { getChatModel, isLLMAvailable } from '../../llm.js';
+import { isLLMAvailable, invokeStructured } from '../../llm.js';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { searchDocumentChunks, buildRAGContext, isRAGEnabled } from '../../../rag.js';
 import { supabase } from '../../../supabase.js';
@@ -158,8 +158,7 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
   }
 
   // Generate meeting brief with structured output
-  const model = getChatModel(0.5, 2000);
-  const structuredModel = model.withStructuredOutput(z.object({
+  const brief = await invokeStructured(z.object({
     headline: z.string().describe('One-line meeting headline'),
     dealSummary: z.string().describe('2-3 sentence deal summary for quick context'),
     contactProfile: z.string().nullable().describe('Brief profile of the person being met'),
@@ -168,9 +167,7 @@ export async function generateMeetingPrep(input: MeetingPrepInput): Promise<Meet
     risksToAddress: z.array(z.string()).describe('2-3 risks or concerns to discuss'),
     documentHighlights: z.array(z.string()).describe('Key findings from uploaded documents'),
     suggestedAgenda: z.array(z.string()).describe('4-6 agenda items in order'),
-  }));
-
-  const brief = await structuredModel.invoke([
+  }), [
     new SystemMessage(`You are a PE deal team meeting prep assistant. Generate a comprehensive meeting brief that helps the deal team walk in prepared.
 ${TOPIC_GUARDRAILS}
 ${CONTEXT_ANCHORING}
@@ -183,7 +180,7 @@ CRITICAL REQUIREMENTS:
 - Talking points should cite specific numbers from the context
 - If limited financial data is available, acknowledge what data IS available and what's missing`),
     new HumanMessage(`Generate a meeting prep brief for this context:\n\n${contextParts.join('\n')}\n\nMeeting topic: ${input.meetingTopic || 'General deal discussion'}\nMeeting date: ${input.meetingDate || 'Today'}`),
-  ]);
+  ], { maxTokens: 2000, temperature: 0.5, label: 'meetingPrep.brief' });
 
   log.info('Meeting prep generated', { dealId: input.dealId, talkingPoints: brief.keyTalkingPoints.length });
 

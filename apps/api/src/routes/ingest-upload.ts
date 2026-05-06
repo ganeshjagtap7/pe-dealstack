@@ -61,14 +61,36 @@ router.post('/', upload.single('file'), async (req, res) => {
     let numPages: number | null = null;
 
     if (mimeType === 'application/pdf') {
-      log.debug('Step 1: Extracting text from PDF');
-      const extraction = await extractTextFromPDF(file.buffer);
-      if (extraction) {
-        extractedText = extraction.text.replace(/\u0000/g, '');
-        numPages = extraction.numPages;
-        log.debug('PDF extracted', { numPages, charCount: extractedText.length });
-      } else {
-        return res.status(400).json({ error: 'Failed to extract text from PDF' });
+      log.info('Step 1: Extracting text from PDF (LlamaParse → pdf-parse)', { documentName });
+      const extraction = await extractTextFromPDF(file.buffer, documentName);
+      if (!extraction) {
+        // Both layers hard-failed (encrypted / malformed). Don't 500 — give the user a hint.
+        log.error('PDF extraction failed in both layers', undefined, { documentName });
+        return res.status(422).json({
+          error:
+            "Couldn't extract data from this document. The PDF may be encrypted, password-protected, or malformed — try uploading a different copy.",
+        });
+      }
+      extractedText = extraction.text.replace(/\u0000/g, '');
+      numPages = extraction.numPages;
+      log.info('PDF extracted', {
+        layer: extraction.source,
+        numPages,
+        charCount: extractedText.length,
+        sparse: extraction.sparse,
+      });
+      // Image-only one-pagers (scanned PDFs) yield ~0 chars from pdf-parse.
+      // Surface a useful 422 instead of letting the AI extractor return null.
+      if (extraction.sparse && extractedText.trim().length < 100) {
+        log.warn('PDF text too sparse for AI extraction', {
+          documentName,
+          chars: extractedText.trim().length,
+          layer: extraction.source,
+        });
+        return res.status(422).json({
+          error:
+            "Couldn't extract data from this document. The PDF appears to be image-only or scanned — please upload a text-based PDF, or contact support to enable OCR for this file type.",
+        });
       }
     } else if (
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
@@ -124,7 +146,14 @@ router.post('/', upload.single('file'), async (req, res) => {
     }
 
     if (!aiData) {
-      return res.status(400).json({ error: 'AI could not extract deal data from document' });
+      log.error('AI extraction returned null', undefined, {
+        documentName,
+        textLength: extractedText.length,
+      });
+      return res.status(422).json({
+        error:
+          "Couldn't extract data from this document. The AI couldn't identify any deal information in the text — please verify it's a CIM, teaser, or financial document.",
+      });
     }
 
     log.debug('AI extraction completed', {
