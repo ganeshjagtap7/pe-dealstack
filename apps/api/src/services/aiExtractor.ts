@@ -34,53 +34,53 @@ function formatExtractedValue(valueInMillions: number): string {
 const ExtractionOutputSchema = z.object({
   companyName: z.object({
     value: z.string().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
     source: z.string().nullable(),
   }).describe('Company name extracted from document'),
   industry: z.object({
     value: z.string().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
     source: z.string().nullable(),
   }).describe('Industry classification'),
   description: z.object({
     value: z.string(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
   }).describe('2-3 sentence business description'),
   currency: z.string().describe('ISO 4217 currency code detected from document (e.g. USD, INR, EUR, GBP). Default to USD if not detected.'),
   revenue: z.object({
     value: z.number().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
     source: z.string().nullable(),
   }).describe('Annual revenue in millions (in the original document currency). If only MRR (monthly recurring revenue) is given, multiply by 12 to get annual. If only ARR is given, use that directly. Always return the annualized figure.'),
   ebitda: z.object({
     value: z.number().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
     source: z.string().nullable(),
   }).describe('EBITDA in millions (in the original document currency)'),
   ebitdaMargin: z.object({
     value: z.number().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
   }).describe('EBITDA margin as percentage'),
   revenueGrowth: z.object({
     value: z.number().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
     source: z.string().nullable(),
   }).describe('YoY revenue growth percentage'),
   employees: z.object({
     value: z.number().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
   }).describe('Employee count'),
   foundedYear: z.object({
     value: z.number().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
   }).describe('Year company was founded'),
   headquarters: z.object({
     value: z.string().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
   }).describe('City, State or City, Country'),
   dealSize: z.object({
     value: z.number().nullable(),
-    confidence: z.number().min(0).max(100),
+    confidence: z.number(),
     source: z.string().nullable(),
   }).describe('Enterprise value, asking price, or deal size in millions (in the original document currency). Look for terms like "enterprise value", "EV", "asking price", "valuation", "deal value". Return null if not mentioned.'),
   keyRisks: z.array(z.string()).describe('3-5 key investment risks'),
@@ -171,8 +171,10 @@ STEP 2 — CONVERT TO MILLIONS:
 - "$6,000" → 0.006
 - "$1,800" → 0.0018
 - "$500" → 0.0005
-- "₹9 Crores" → 90 (1 Crore = 10 Million)
+- "₹9 Crores" → 90 (MANDATORY: 1 Crore = 10 Million. You MUST multiply Crores by 10)
 - "₹50 Lakhs" → 5 (1 Lakh = 0.1 Million)
+- WARNING: If the source says "INR Cr" and the value is "187.6", the answer is 1876 (187.6 * 10), NOT 18.8 or 18.76.
+- DO NOT CONFUSE CRORE WITH MILLION. 1 Crore is 10X larger than 1 Million.
 - Bare "45" in a "$ in thousands" table → 0.045 (NOT 45)
 - Bare "45" in a "$ in millions" table → 45
 - Remove commas before parsing.

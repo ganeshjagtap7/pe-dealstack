@@ -54,8 +54,8 @@ export function prepareData(rows: any[]): PreparedData {
     if (row.periodType !== 'HISTORICAL') continue;
     const map =
       row.statementType === 'INCOME_STATEMENT' ? income :
-      row.statementType === 'BALANCE_SHEET' ? balance :
-      row.statementType === 'CASH_FLOW' ? cashflow : null;
+        row.statementType === 'BALANCE_SHEET' ? balance :
+          row.statementType === 'CASH_FLOW' ? cashflow : null;
     if (map) map.set(row.period, row.lineItems as LineItems);
   }
 

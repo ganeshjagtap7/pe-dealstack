@@ -383,7 +383,7 @@ router.post('/', upload.single('file'), async (req, res) => {
           reviewReasons: aiData.reviewReasons,
         },
         extractedText,
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
+        extractionStatus: aiData.needsReview ? 'pending_review' : 'analyzed',
         confidence: aiData.overallConfidence / 100,
         aiAnalyzedAt: new Date().toISOString(),
       })

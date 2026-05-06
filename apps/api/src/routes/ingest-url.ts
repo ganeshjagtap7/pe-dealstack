@@ -238,7 +238,7 @@ subRouter.post('/url', async (req, res) => {
           reviewReasons: aiData.reviewReasons,
         },
         aiAnalysis: overviewText,
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
+        extractionStatus: aiData.needsReview ? 'pending_review' : 'analyzed',
         confidence: aiData.overallConfidence / 100,
         aiAnalyzedAt: new Date().toISOString(),
         mimeType: 'text/markdown',

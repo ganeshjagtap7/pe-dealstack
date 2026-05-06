@@ -234,7 +234,7 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
         mimeType: file.mimetype,
         extractedText,
         extractedData,
-        status: extractedData.needsReview ? 'pending_review' : 'analyzed',
+        extractionStatus: extractedData.needsReview ? 'pending_review' : 'analyzed',
         confidence: extractedData.overallConfidence / 100,
         aiAnalyzedAt: new Date().toISOString(),
       })

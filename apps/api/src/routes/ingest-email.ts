@@ -139,7 +139,7 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
           needsReview: aiData.needsReview,
           reviewReasons: aiData.reviewReasons,
         },
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
+        extractionStatus: aiData.needsReview ? 'pending_review' : 'analyzed',
         confidence: aiData.overallConfidence / 100,
         aiAnalyzedAt: new Date().toISOString(),
         mimeType: 'message/rfc822',

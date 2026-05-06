@@ -35,7 +35,7 @@ export const dealsQuerySchema = z.object({
   stage: z.enum(['INITIAL_REVIEW', 'DUE_DILIGENCE', 'IOI_SUBMITTED',
     'LOI_SUBMITTED', 'NEGOTIATION', 'CLOSING', 'PASSED',
     'CLOSED_WON', 'CLOSED_LOST']).optional(),
-  status: z.enum(['ACTIVE', 'PROCESSING', 'PASSED', 'ARCHIVED']).optional(),
+  status: z.enum(['ACTIVE', 'PROCESSING', 'PASSED', 'ARCHIVED', 'PENDING_REVIEW']).optional(),
   industry: z.string().max(100).optional(),
   search: z.string().max(200).optional(),
   sortBy: z.enum(['updatedAt', 'createdAt', 'dealSize', 'irrProjected', 'revenue', 'ebitda', 'name', 'priority']).optional(),

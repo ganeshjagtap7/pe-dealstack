@@ -73,7 +73,6 @@ router.get('/', async (req, res) => {
       .select(`
         *,
         company:Company(*),
-        assignedUser:User!assignedTo(id, name, avatar, email),
         teamMembers:DealTeamMember(
           id,
           role,
@@ -130,7 +129,6 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
       .select(`
         *,
         company:Company(*),
-        assignedUser:User!assignedTo(id, name, avatar, email, title),
         teamMembers:DealTeamMember(
           id,
           role,
@@ -157,7 +155,6 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
         folders:Folder(
           id,
           name,
-          fileCount,
           isRestricted
         )
       `)

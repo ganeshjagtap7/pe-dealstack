@@ -70,8 +70,7 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) =>
       })
       .select(`
         *,
-        company:Company(*),
-        assignedUser:User!assignedTo(id, name, avatar, email)
+        company:Company(*)
       `)
       .single();
 

@@ -53,7 +53,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     let query = supabase
       .from('Task')
-      .select('*, assignee:User!assignedTo(id, name, email, avatar, role), deal:Deal!dealId(id, name, stage)', { count: 'exact' })
+      .select('*', { count: 'exact' })
       .eq('organizationId', orgId)
       .order('createdAt', { ascending: false });
     if (status) query = query.eq('status', status);
@@ -107,7 +107,7 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_ASSIGN), async (req: Request
         createdBy,
         organizationId: orgId,
       })
-      .select('*, assignee:User!assignedTo(id, name, email, avatar, role), deal:Deal!dealId(id, name, stage)')
+      .select('*')
       .single();
 
     if (error) {
@@ -182,7 +182,7 @@ router.patch('/:id', async (req: Request, res: Response, next: NextFunction) => 
       .update({ ...data, updatedAt: new Date().toISOString() })
       .eq('id', id)
       .eq('organizationId', orgId)
-      .select('*, assignee:User!assignedTo(id, name, email, avatar, role), deal:Deal!dealId(id, name, stage)')
+      .select('*')
       .single();
 
     if (error) {

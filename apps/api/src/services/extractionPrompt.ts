@@ -76,10 +76,10 @@ If NO unit declaration is found:
 - When in doubt, assume ACTUAL dollars — it is better to report $0.002M than to incorrectly report $2M
 
 STEP 2 — EXTRACT:
-1. Extract EVERY year/period column you find — do not skip any
+1. Extract EVERY year/period column you find — do not skip any (especially future projection years like 2026, 2027)
 2. Normalize ALL values to MILLIONS in the ORIGINAL currency (see conversion below)
 3. Label each period: HISTORICAL (past actuals), PROJECTED (forecasts), or LTM (last twelve months)
-4. Projected periods are identified by: "E", "F", "Est", "Forecast", "Budget", "Proj" suffix, or future years
+4. Projected periods are identified by: "E", "F", "Est", "Forecast", "Budget", "Proj" suffix, or future years (2025, 2026, 2027+)
 5. If a value is not present, use null — never guess
 ${sourceCitationRules}
 
@@ -93,7 +93,11 @@ UNIT CONVERSION — ALL values must be in MILLIONS. Divide by 1,000,000 if in ac
 - HEADER SAYS "in thousands" or "$000s": "50" → 0.05, "1,500" → 1.5, "50,000" → 50
 - HEADER SAYS "in millions" or "$M": "50" → 50, "1.5" → 1.5
 - EXPLICIT SUFFIX: "50M" → 50, "1.5B" → 1500, "500K" → 0.5
-- INDIAN UNITS: "₹50 Cr" (crore = 10M) → 500, "₹50 Lakh" (lakh = 0.1M) → 5
+- INDIAN UNITS:
+  - "₹50 Cr" (crore = 10M) → 500 (MANDATORY: 1 Crore = 10 Million. Multiply the value by 10 to get Millions)
+  - "₹50 Lakh" (lakh = 0.1M) → 5 (1 Lakh = 0.1 Million. Multiply the value by 0.1 to get Millions)
+  - WARNING: If the header says "INR Cr" and the value is "187.6", the answer is 1876 (187.6 * 10), NOT 18.8 or 18.76.
+  - DO NOT CONFUSE CRORE WITH MILLION. 1 Crore is 10X larger than 1 Million.
 - Do NOT convert between currencies — only convert units within the same currency
 
 STEP 3 — VERIFY YOUR MATH:

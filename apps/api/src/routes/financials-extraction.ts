@@ -1,9 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { createRequire } from 'module';
+import os from 'os';
+import fs from 'fs';
+import path from 'path';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { runDeepPass } from '../services/financialExtractionOrchestrator.js';
+import { runExtractionPipeline, savePipelineResults } from '../services/extraction/pipeline.js';
 import { classifyFinancialsVision } from '../services/visionExtractor.js';
 import { extractTextFromExcel, isExcelFile } from '../services/excelFinancialExtractor.js';
 import { validateStatements } from '../services/financialValidator.js';
@@ -135,14 +139,15 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
     }
 
     // Route to appropriate parser based on document type
-    if (documentType === 'payment_data' || documentType === 'bank_statement' || documentType === 'accounting_export') {
+    const docTypeStr = documentType as string;
+    if (docTypeStr === 'payment_data' || docTypeStr === 'bank_statement' || docTypeStr === 'accounting_export') {
       let result;
       let method = 'csv_parser';
 
-      if (documentType === 'payment_data') {
+      if (docTypeStr === 'payment_data') {
         const { parsePaymentData } = await import('../services/parsers/parserRouter.js');
         result = await parsePaymentData(fileBuffer, doc.name, dealId, doc.id);
-      } else if (documentType === 'bank_statement') {
+      } else if (docTypeStr === 'bank_statement') {
         const { parseBankCSV } = await import('../services/parsers/bankParser.js');
         result = await parseBankCSV(fileBuffer, doc.name, dealId, doc.id);
         method = 'bank_parser';
@@ -169,48 +174,87 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
       });
     }
 
-    // For financial_statements, auto_detect, or unsupported types: use existing agent
-    if (!acquireExtractionSlot(orgId)) {
-      return res.status(429).json({
-        error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',
+    // Save buffer to temp file for the pipeline
+    const tempDir = os.tmpdir();
+    const filePath = path.join(tempDir, `extract-${doc.id}-${Date.now()}`);
+    fs.writeFileSync(filePath, fileBuffer);
+
+    // Route to appropriate parser based on document type
+    if (docTypeStr === 'payment_data' || docTypeStr === 'bank_statement' || docTypeStr === 'accounting_export') {
+      let result;
+      let method = 'csv_parser';
+
+      if (docTypeStr === 'payment_data') {
+        const { parsePaymentData } = await import('../services/parsers/parserRouter.js');
+        result = await parsePaymentData(fileBuffer, doc.name, dealId, doc.id);
+      } else if (docTypeStr === 'bank_statement') {
+        const { parseBankCSV } = await import('../services/parsers/bankParser.js');
+        result = await parseBankCSV(fileBuffer, doc.name, dealId, doc.id);
+        method = 'bank_parser';
+      } else {
+        const { parseAccountingCSV } = await import('../services/parsers/accountingParser.js');
+        result = await parseAccountingCSV(fileBuffer, doc.name, dealId, doc.id);
+        method = 'accounting_parser';
+      }
+
+      return res.json({
+        success: true,
+        documentUsed: { id: doc.id, name: doc.name },
+        extractionMethod: method,
+        result: {
+          statementsStored: result.periodsStored,
+          periodsStored: result.periodsStored,
+          overallConfidence: 100,
+          statementIds: result.statementIds,
+          warnings: result.warnings,
+          hasConflicts: false,
+        },
+        hasConflicts: false,
+        agent: { status: 'completed', retryCount: 0, steps: result.steps },
       });
     }
 
-    let agentResult;
+    // Use the NEW extraction pipeline
+    let pipelineResult;
     try {
-      agentResult = await runFinancialAgent({
-        dealId,
-        documentId: doc.id,
-        fileBuffer,
-        fileName: doc.name ?? 'document',
-        fileType: detectFileType(doc.mimeType, doc.name),
-        organizationId: orgId,
-      });
+      pipelineResult = await runExtractionPipeline(
+        filePath,
+        doc.mimeType ?? 'application/pdf',
+        doc.name ?? 'document'
+      );
+    } catch (err: any) {
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      log.error('Pipeline failed in route', err);
+      return res.status(422).json({ error: err.message || 'Extraction pipeline failed' });
     } finally {
-      releaseExtractionSlot(orgId);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
+
+    // Save to database
+    const { statementIds } = await savePipelineResults(
+      supabase,
+      dealId,
+      doc.id,
+      pipelineResult
+    );
 
     res.json({
-      success: agentResult.status === 'completed',
+      success: pipelineResult.status !== 'failed',
       documentUsed: { id: doc.id, name: doc.name },
-      extractionMethod: agentResult.extractionSource,
+      extractionMethod: pipelineResult.metadata.extractionMethod,
       result: {
-        statementsStored: agentResult.statementIds.length,
-        periodsStored: agentResult.periodsStored,
-        overallConfidence: agentResult.overallConfidence,
-        statementIds: agentResult.statementIds,
-        warnings: agentResult.warnings,
-        hasConflicts: agentResult.hasConflicts,
+        statementsStored: statementIds.length,
+        periodsStored: pipelineResult.statements.reduce((acc, s) => acc + s.periods.length, 0),
+        overallConfidence: pipelineResult.validation.overallConfidence,
+        statementIds,
+        warnings: pipelineResult.validation.checks.filter(c => !c.passed).map(c => c.details),
+        hasConflicts: pipelineResult.validation.errorCount > 0,
       },
-      hasConflicts: agentResult.hasConflicts,
-      // Agent-specific fields (new)
-      agent: {
-        status: agentResult.status,
-        retryCount: agentResult.retryCount,
-        validationResult: agentResult.validationResult,
-        steps: agentResult.steps,
-        error: agentResult.error,
-        crossVerifyResult: agentResult.crossVerifyResult || null,
+      hasConflicts: pipelineResult.validation.errorCount > 0,
+      pipeline: {
+        status: pipelineResult.status,
+        processingTime: pipelineResult.metadata.processingTime,
+        validation: pipelineResult.validation,
       },
     });
   } catch (err: any) {

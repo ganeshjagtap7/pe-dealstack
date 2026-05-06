@@ -277,7 +277,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         mimeType,
         extractedData: extractedDataToSave,
         extractedText,
-        status: extractionStatus,
+        extractionStatus: extractionStatus,
         confidence: aiExtractedData ? 0.85 : (req.body.confidence ? parseFloat(req.body.confidence) : null),
         aiAnalysis,
         aiAnalyzedAt: aiExtractedData ? new Date().toISOString() : (aiAnalysis ? new Date().toISOString() : null),

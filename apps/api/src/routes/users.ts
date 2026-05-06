@@ -31,7 +31,6 @@ const createUserSchema = z.object({
   role: z.enum(['ADMIN', 'MEMBER', 'VIEWER']).optional().default('MEMBER'),
   department: z.string().optional(),
   title: z.string().optional(),
-  phone: z.string().optional(),
 });
 
 const updateUserSchema = z.object({
@@ -40,7 +39,6 @@ const updateUserSchema = z.object({
   role: z.enum(['ADMIN', 'MEMBER', 'VIEWER']).optional(),
   department: z.string().optional(),
   title: z.string().optional(),
-  phone: z.string().optional(),
   isActive: z.boolean().optional(),
   firmName: z.string().optional(),
 });
@@ -59,7 +57,7 @@ router.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
     let query = supabase
       .from('User')
-      .select('id, email, name, avatar, role, department, title, phone, isActive, firmName, organizationId')
+      .select('id, email, name, avatar, role, department, title, isActive, firmName, organizationId')
       .eq('organizationId', orgId)
       .order('name', { ascending: true });
 

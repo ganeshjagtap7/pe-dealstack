@@ -77,12 +77,10 @@ router.get('/deals/:dealId/financials/summary', async (req, res) => {
       return res.json({ hasData: false, periods: [] });
     }
 
-    // Latest historical period for the headline numbers
-    const historical = incomeRows
-      .filter(r => r.periodType === 'HISTORICAL')
-      .sort((a, b) => b.period.localeCompare(a.period));
-
-    const latest = historical[0];
+    // Get latest period for the headline numbers (prefer historical, fallback to projected)
+    const sortedRows = [...incomeRows].sort((a, b) => b.period.localeCompare(a.period));
+    const latestHistorical = sortedRows.find(r => r.periodType === 'HISTORICAL');
+    const latest = latestHistorical || sortedRows[0];
     const li = (row: any, key: string) =>
       (row.lineItems as Record<string, number | null>)?.[key] ?? null;
 

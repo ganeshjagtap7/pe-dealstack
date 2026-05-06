@@ -37,9 +37,9 @@ router.get('/:dealId/chat/history', async (req, res) => {
     // Fetch the most recent messages (descending), then reverse to chronological order
     const { data: messages, error } = await supabase
       .from('ChatMessage')
-      .select('id, role, content, metadata, createdAt')
+      .select('id, role, content, metadata, created_at')
       .eq('dealId', dealId)
-      .order('createdAt', { ascending: false })
+      .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
     // Reverse to chronological order for display
