@@ -22,14 +22,18 @@ import invitationsRouter from './routes/invitations.js';
 import invitationsAcceptRouter from './routes/invitations-accept.js';
 import templatesRouter from './routes/templates.js';
 import auditRouter from './routes/audit.js';
+import auditExportRouter from './routes/audit-export.js';
 import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
+import organizationsRouter from './routes/organizations.js';
+import authSessionsRouter from './routes/auth-sessions.js';
+import adminSecurityRouter from './routes/admin-security.js';
 import { supabase } from './supabase.js';
-import { authMiddleware } from './middleware/auth.js';
+import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
@@ -259,34 +263,40 @@ app.use('/api/public/invitations', invitationsAcceptRouter);
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
-app.use('/api/deals/import', authMiddleware, orgMiddleware, dealImportRouter);
-app.use('/api/deals', authMiddleware, orgMiddleware, dealsRouter);
-app.use('/api/companies', authMiddleware, orgMiddleware, companiesRouter);
-app.use('/api', authMiddleware, orgMiddleware, activitiesRouter);
-app.use('/api/documents', authMiddleware, orgMiddleware, documentsAlertsRouter);
-app.use('/api', authMiddleware, orgMiddleware, documentsRouter);
-app.use('/api', authMiddleware, orgMiddleware, foldersRouter);
-app.use('/api/users', authMiddleware, orgMiddleware, usersRouter);
-app.use('/api', authMiddleware, orgMiddleware, chatRouter);
-app.use('/api/notifications', authMiddleware, orgMiddleware, notificationsRouter);
-app.use('/api/ingest', authMiddleware, orgMiddleware, ingestRouter);
-app.use('/api/memos', authMiddleware, orgMiddleware, memosRouter);
-app.use('/api/templates', authMiddleware, orgMiddleware, templatesRouter);
+app.use('/api/deals/import', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, dealImportRouter);
+app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, dealsRouter);
+app.use('/api/companies', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, companiesRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, activitiesRouter);
+app.use('/api/documents', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, documentsAlertsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, documentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, foldersRouter);
+app.use('/api/users', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usersRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, chatRouter);
+app.use('/api/notifications', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, notificationsRouter);
+app.use('/api/ingest', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, ingestRouter);
+app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, memosRouter);
+app.use('/api/templates', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, templatesRouter);
 // Authenticated invitation routes (list, create, revoke, resend)
-app.use('/api/invitations', authMiddleware, orgMiddleware, invitationsRouter);
-app.use('/api/audit', authMiddleware, orgMiddleware, auditRouter);
-app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
-app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
-app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
-app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
-app.use('/api/watchlist', authMiddleware, orgMiddleware, watchlistRouter);
-app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
+app.use('/api/invitations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, invitationsRouter);
+// Audit export must be mounted BEFORE the generic /api/audit router so /export.csv matches first
+app.use('/api/audit', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, auditExportRouter);
+app.use('/api/audit', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, auditRouter);
+app.use('/api/organizations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, organizationsRouter);
+app.use('/api/tasks', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, tasksRouter);
+app.use('/api/export', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, exportRouter);
+app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, onboardingRouter);
+app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, adminSecurityRouter);
+// Auth-scoped self-service routes (MFA bypass active for /api/auth/* in middleware)
+app.use('/api/auth', authMiddleware, authSessionsRouter);
+app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, contactsRouter);
+app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, watchlistRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, financialsRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
 // ========================================
 // AI deal chat and analysis endpoints (require auth + org)
-app.use('/api', authMiddleware, orgMiddleware, aiRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, aiRouter);
 
 // AI status endpoint (public - no auth required)
 app.get('/api/ai/status', (_req, res) => {

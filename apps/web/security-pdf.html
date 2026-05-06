@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Pocket Fund — Security Overview</title>
+  <style>
+    @page { size: Letter; margin: 0.6in; }
+    body { font-family: 'Inter', system-ui, sans-serif; color: #1F2937; font-size: 10.5pt; line-height: 1.45; margin: 0; }
+    h1 { color: #003366; font-size: 22pt; margin: 0 0 4pt 0; }
+    h2 { color: #003366; font-size: 13pt; margin: 14pt 0 4pt 0; border-bottom: 1.5pt solid #003366; padding-bottom: 2pt; }
+    h3 { color: #1F2937; font-size: 11pt; margin: 8pt 0 2pt 0; }
+    p { margin: 0 0 6pt 0; }
+    ul { margin: 4pt 0 6pt 18pt; padding: 0; }
+    li { margin: 1pt 0; }
+    .header { display: flex; justify-content: space-between; align-items: baseline; }
+    .subtitle { color: #6B7280; font-size: 11pt; }
+    .badges { margin: 8pt 0; }
+    .badge { display: inline-block; background: #E6EEF5; color: #003366; padding: 2pt 8pt; border-radius: 99pt; font-size: 8.5pt; font-weight: 600; margin-right: 4pt; }
+    table { width: 100%; border-collapse: collapse; margin: 4pt 0; font-size: 9pt; }
+    th, td { text-align: left; padding: 3pt 4pt; border-bottom: 0.5pt solid #E5E7EB; }
+    th { background: #F8F9FA; font-weight: 600; color: #4B5563; }
+    .page-break { page-break-after: always; }
+    .footer-note { font-size: 8.5pt; color: #6B7280; text-align: center; margin-top: 12pt; }
+  </style>
+</head>
+<body>
+
+  <div class="header">
+    <h1>Pocket Fund — Security Overview</h1>
+    <span class="subtitle">For private equity firms</span>
+  </div>
+  <div class="badges">
+    <span class="badge">SOC 2 infra</span>
+    <span class="badge">AES-256 at rest</span>
+    <span class="badge">TLS 1.2+</span>
+    <span class="badge">34 isolation tests</span>
+    <span class="badge">9-tier RBAC</span>
+    <span class="badge">MFA available</span>
+  </div>
+
+  <h2>Where your data lives</h2>
+  <p>All data processed and stored on enterprise-grade SOC 2 Type II infrastructure: Supabase (Postgres, AWS US), Vercel (application hosting), and AI processing via OpenAI, Anthropic, Google, and Azure — all on API tiers with no model training on customer data. Full sub-processor list on page 2.</p>
+
+  <h2>Encryption</h2>
+  <p><strong>In transit:</strong> TLS 1.2+ (TLS 1.3 negotiated when client supports). HTTPS enforced via HSTS.</p>
+  <p><strong>At rest:</strong> AES-256 via Supabase-managed disk encryption. File storage encrypted at rest.</p>
+
+  <h2>Tenant isolation</h2>
+  <p>Every record in scoped tables tagged with <code>organizationId</code>. Server-side middleware enforces on every API route — no client-trusted path. Verified by:</p>
+  <ul>
+    <li><strong>34 automated cross-organization integration tests</strong> run on every deploy</li>
+    <li><strong>268 explicit org-scope checks</strong> across 45 API route files</li>
+    <li>Cross-org access returns HTTP 404 (not 403) to prevent enumeration</li>
+  </ul>
+  <p>Customers can run live isolation checks from Settings → Security and download a JSON report.</p>
+
+  <h2>AI &amp; LLM data handling</h2>
+  <p>OpenAI, Anthropic, Google, and Azure API tiers — all contractually do not train models on customer data. Your CIMs, LOIs, and memos never feed any model.</p>
+
+  <div class="page-break"></div>
+
+  <h2>Access controls &amp; rate limiting</h2>
+  <ul>
+    <li><strong>Authentication:</strong> Supabase Auth with optional TOTP-based 2FA (Google Authenticator, Authy, 1Password)</li>
+    <li><strong>Org-wide MFA:</strong> admins can require all members to enroll 2FA</li>
+    <li><strong>9-tier RBAC:</strong> admin, partner, principal, vp, associate, analyst, ops, member, viewer</li>
+    <li><strong>Rate limiting:</strong> general (600 req / 15 min), AI (10 req / min), writes (30 req / min) — all per user/IP</li>
+    <li><strong>Standard hardening:</strong> helmet, CORS allow-list, JWT-based sessions</li>
+  </ul>
+
+  <h2>Audit logging</h2>
+  <p>60+ distinct action types across 9 resource types tracked with user ID, organization ID, resource ID, timestamp, severity. Customer admins view, filter, and export their organization's audit log directly from the Admin Dashboard. Categories: authentication, deal lifecycle, document operations, memo operations, user management, and system operations.</p>
+
+  <h2>Sub-processors</h2>
+  <table>
+    <thead>
+      <tr><th>Provider</th><th>Service</th><th>Region</th><th>Cert.</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>Supabase</td><td>DB, auth, storage</td><td>US (AWS)</td><td>SOC 2 Type II</td></tr>
+      <tr><td>Vercel</td><td>Application hosting</td><td>Global</td><td>SOC 2 Type II</td></tr>
+      <tr><td>OpenAI</td><td>GPT-4o</td><td>US</td><td>SOC 2 Type II</td></tr>
+      <tr><td>Anthropic</td><td>Claude</td><td>US</td><td>SOC 2 Type II</td></tr>
+      <tr><td>Google</td><td>Gemini</td><td>US</td><td>SOC 2</td></tr>
+      <tr><td>Microsoft Azure</td><td>Document Intelligence</td><td>US</td><td>SOC 2 Type II, ISO 27001</td></tr>
+      <tr><td>Apify</td><td>Web search</td><td>US/EU</td><td>SOC 2</td></tr>
+      <tr><td>Resend</td><td>Transactional email</td><td>US</td><td>SOC 2 Type II</td></tr>
+      <tr><td>Sentry</td><td>Error monitoring (sanitized)</td><td>US</td><td>SOC 2 Type II</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Compliance roadmap</h2>
+  <ul>
+    <li><strong>SOC 2 Type I:</strong> in progress; target completion date available on request</li>
+    <li><strong>SOC 2 Type II:</strong> following Type I</li>
+    <li><strong>Annual penetration test:</strong> planned for next quarter</li>
+    <li><strong>GDPR:</strong> DPA available on request; data deletion within 30 days post-termination</li>
+  </ul>
+
+  <h2>Contact</h2>
+  <p><strong>Security &amp; compliance:</strong> security@pocket-fund.com</p>
+  <p><strong>Urgent issues:</strong> tech@pocket-fund.com</p>
+
+  <p class="footer-note">© 2026 Pocket Fund. Last updated: April 30, 2026. For the live version, visit pocket-fund.com/security.</p>
+
+</body>
+</html>

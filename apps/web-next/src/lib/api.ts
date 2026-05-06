@@ -77,6 +77,16 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       res.statusText ||
       `API error ${res.status}`;
     const code = (body as { code?: string }).code;
+
+    // Org has enforced 2FA but the user hasn't enrolled — bounce them to
+    // the security panel where the existing enrollment UI lives. The API
+    // bypasses /api/auth/, /api/users/me, and /api/organizations/me so the
+    // enrollment flow itself can still run after the redirect.
+    if (res.status === 403 && code === "MFA_REQUIRED" && typeof window !== "undefined") {
+      window.location.href = "/settings#section-security";
+      throw new ApiError(message, res.status, code);
+    }
+
     throw new ApiError(message, res.status, code);
   }
 
