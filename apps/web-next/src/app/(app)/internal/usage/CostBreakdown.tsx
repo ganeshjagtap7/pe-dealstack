@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
@@ -17,42 +17,47 @@ import type {
   CostBreakdownSeriesPoint,
   CostBreakdownReconciliationRow,
 } from "./types";
+import { PillGroup, EmptyState, ErrorPanel, KpiCard } from "./_ui";
 
 ChartJS.register(BarElement, CategoryScale, LinearScale, Tooltip, Legend);
 
-// Enough colors for typical operation counts; cycles if needed.
 const PALETTE = [
-  "#003366",
-  "#10b981",
-  "#f59e0b",
-  "#ef4444",
-  "#8b5cf6",
-  "#06b6d4",
-  "#84cc16",
-  "#ec4899",
-  "#f97316",
-  "#14b8a6",
+  "#003366", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6",
+  "#06b6d4", "#84cc16", "#ec4899", "#f97316", "#14b8a6",
 ];
 
-const DAY_OPTIONS = [7, 14, 30, 60] as const;
-type DayRange = (typeof DAY_OPTIONS)[number];
+type DayRange = 7 | 14 | 30 | 60;
+
+const DAY_PILL_OPTIONS: { value: DayRange; label: string }[] = [
+  { value: 7,  label: "7d"  },
+  { value: 14, label: "14d" },
+  { value: 30, label: "30d" },
+  { value: 60, label: "60d" },
+];
+
+// ── Main component ────────────────────────────────────────────────────────────
 
 export function CostBreakdown() {
   const { showToast } = useToast();
-  const [series, setSeries] = useState<CostBreakdownSeriesPoint[]>([]);
-  const [reconciliation, setReconciliation] = useState<
-    CostBreakdownReconciliationRow[]
-  >([]);
-  const [loading, setLoading] = useState(true);
-  const [days, setDays] = useState<DayRange>(30);
+  const [series, setSeries]                 = useState<CostBreakdownSeriesPoint[]>([]);
+  const [reconciliation, setReconciliation] = useState<CostBreakdownReconciliationRow[]>([]);
+  const [showLoading, setShowLoading]       = useState(true); // true on mount
+  const [hasError, setHasError]             = useState(false);
+  const [days, setDays]                     = useState<DayRange>(30);
+  const loadingTimerRef                     = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    // Don't synchronously flip loading=true on day-range change — that
-    // triggers a cascading render and the lint rule blocks it. The new
-    // data updates in place when it arrives; previous chart stays
-    // visible until then. Initial mount already starts loading=true.
+    // Delay indicator on subsequent changes (not on mount — already showing)
+    if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+    loadingTimerRef.current = setTimeout(() => {
+      if (!cancelled) setShowLoading(true);
+    }, 300);
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHasError(false);
+
     api
       .get<{
         series: CostBreakdownSeriesPoint[];
@@ -66,18 +71,23 @@ export function CostBreakdown() {
       .catch((err) => {
         if (cancelled) return;
         console.warn("[CostBreakdown] failed to load cost data", err);
+        setHasError(true);
         showToast("Failed to load cost breakdown data.", "error");
       })
       .finally(() => {
-        if (!cancelled) setLoading(false);
+        if (cancelled) return;
+        if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
+        setShowLoading(false);
       });
 
     return () => {
       cancelled = true;
+      if (loadingTimerRef.current) clearTimeout(loadingTimerRef.current);
     };
   }, [days, showToast]);
 
-  // Collect all unique operation names across every day in the series.
+  // ── Derived values ──────────────────────────────────────────────────────────
+
   const allOperations = Array.from(
     new Set(series.flatMap((s) => Object.keys(s.byOperation))),
   ).sort();
@@ -95,7 +105,16 @@ export function CostBreakdown() {
   const chartOptions = {
     responsive: true,
     plugins: {
-      legend: { position: "bottom" as const },
+      legend: {
+        position: "top" as const,
+        align:    "start" as const,
+        labels: {
+          boxWidth:  8,
+          boxHeight: 8,
+          padding:   16,
+          font: { size: 11 },
+        },
+      },
       tooltip: {
         callbacks: {
           label: (ctx: TooltipItem<"bar">) =>
@@ -112,95 +131,134 @@ export function CostBreakdown() {
         },
       },
     },
+    maintainAspectRatio: false,
   };
 
-  const totalCost = reconciliation.reduce((sum, r) => sum + r.costUsd, 0);
-  const totalCredits = reconciliation.reduce((sum, r) => sum + r.credits, 0);
+  // KPI totals
+  const totalCost    = reconciliation.reduce((s, r) => s + r.costUsd, 0);
+  const totalCalls   = reconciliation.reduce((s, r) => s + r.credits, 0); // credits ≈ calls proxy
+  const topOp        = reconciliation.reduce<CostBreakdownReconciliationRow | null>(
+    (best, r) => (!best || r.costUsd > best.costUsd ? r : best),
+    null,
+  );
+
+  // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <div>
-      {/* Day range selector */}
-      <div className="flex gap-2 mb-4 items-center flex-wrap">
-        <span className="text-sm text-text-secondary">Range:</span>
-        {DAY_OPTIONS.map((d) => (
-          <button
-            key={d}
-            onClick={() => setDays(d)}
-            className={
-              days === d
-                ? "px-3 py-1 text-sm rounded border text-white border-transparent"
-                : "px-3 py-1 text-sm rounded border bg-white border-border-subtle text-text-secondary hover:bg-gray-50"
-            }
-            style={
-              days === d
-                ? { backgroundColor: "#003366", borderColor: "#003366" }
-                : undefined
-            }
-          >
-            {d}d
-          </button>
-        ))}
+      {/* ── Day-range selector ── */}
+      <div className="flex flex-wrap gap-2 items-center mb-6">
+        <PillGroup
+          options={DAY_PILL_OPTIONS}
+          value={days}
+          onChange={(v) => setDays(v)}
+        />
       </div>
 
-      {/* Chart */}
-      {loading ? (
-        <div className="text-text-secondary py-6">Loading cost breakdown…</div>
+      {hasError ? (
+        <ErrorPanel message="Couldn't load cost breakdown. Try refreshing." />
+      ) : showLoading ? (
+        <div className="text-xs text-gray-400 py-8 text-center">Loading cost breakdown…</div>
       ) : series.length === 0 ? (
-        <div className="text-text-secondary py-6 italic">
-          No cost data for this period.
-        </div>
+        <EmptyState
+          heading="No cost data yet"
+          body="Cost data will appear here once users make AI calls within this period."
+        />
       ) : (
-        <div className="bg-white border border-border-subtle rounded p-4 mb-6">
-          <h2 className="text-sm font-semibold mb-3" style={{ color: "#003366" }}>
-            Daily $ Cost by Operation
-          </h2>
-          <Bar data={chartData} options={chartOptions} />
-        </div>
-      )}
-
-      {/* Reconciliation table */}
-      {!loading && reconciliation.length > 0 && (
-        <div className="bg-white border border-border-subtle rounded overflow-hidden">
-          <div className="px-4 py-3 border-b border-border-subtle bg-gray-50">
-            <h2 className="text-sm font-semibold" style={{ color: "#003366" }}>
-              Reconciliation — last {days} days
-            </h2>
+        <>
+          {/* ── KPI strip ── */}
+          <div className="flex gap-10 mb-6 px-1">
+            <KpiCard
+              value={`$${totalCost.toFixed(2)}`}
+              caption={`Total · last ${days}d`}
+            />
+            <KpiCard
+              value={totalCalls.toLocaleString()}
+              caption="Credits used"
+            />
+            <KpiCard
+              value={topOp?.operation ?? "—"}
+              caption="Top operation"
+            />
           </div>
-          <table className="w-full text-sm">
-            <thead className="text-xs uppercase text-text-secondary bg-gray-50">
-              <tr>
-                <th className="text-left p-2 pl-4">Operation</th>
-                <th className="text-right p-2">$ Cost</th>
-                <th className="text-right p-2 pr-4">Credits</th>
-              </tr>
-            </thead>
-            <tbody>
-              {reconciliation.map((r) => (
-                <tr
-                  key={r.operation}
-                  className="border-t border-border-subtle hover:bg-gray-50"
-                >
-                  <td className="p-2 pl-4 font-mono text-xs">{r.operation}</td>
-                  <td className="p-2 text-right text-xs">
-                    ${Number(r.costUsd).toFixed(4)}
-                  </td>
-                  <td className="p-2 pr-4 text-right text-xs">{r.credits}</td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="border-t-2 border-border-subtle bg-gray-50">
-              <tr>
-                <td className="p-2 pl-4 text-sm font-semibold">Total</td>
-                <td className="p-2 text-right text-sm font-semibold">
-                  ${totalCost.toFixed(4)}
-                </td>
-                <td className="p-2 pr-4 text-right text-sm font-semibold">
-                  {totalCredits}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+
+          {/* ── Chart card ── */}
+          <div className="bg-white border border-gray-200 rounded-lg p-5 mb-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-4">
+              Daily $ Cost by Operation
+            </p>
+            <div style={{ height: 360 }}>
+              <Bar data={chartData} options={chartOptions} />
+            </div>
+          </div>
+
+          {/* ── Reconciliation table ── */}
+          {reconciliation.length > 0 && (
+            <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
+              <div className="px-5 py-3 border-b border-gray-200 bg-gray-50/60">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+                  Reconciliation — last {days} days
+                </p>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead className="text-gray-400 uppercase tracking-wide border-b border-gray-200 bg-white">
+                    <tr>
+                      <th className="text-left px-5 py-2.5 font-medium">Operation</th>
+                      <th
+                        className="text-right px-4 py-2.5 font-medium whitespace-nowrap"
+                        title="Cumulative AI provider cost for this operation"
+                      >
+                        $ Cost
+                      </th>
+                      <th
+                        className="text-right px-5 py-2.5 font-medium whitespace-nowrap"
+                        title="Internal credits charged; $/credit ratio flags mispriced operations"
+                      >
+                        Credits
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {reconciliation.map((r, idx) => (
+                      <tr
+                        key={r.operation}
+                        className={
+                          idx % 2 === 0
+                            ? "bg-white border-t border-gray-100"
+                            : "bg-gray-50/60 border-t border-gray-100"
+                        }
+                      >
+                        <td className="px-5 py-2.5 font-mono text-gray-800">
+                          {r.operation}
+                        </td>
+                        <td className="px-4 py-2.5 text-right tabular-nums text-gray-800 font-medium">
+                          ${Number(r.costUsd).toFixed(4)}
+                        </td>
+                        <td className="px-5 py-2.5 text-right tabular-nums text-gray-700">
+                          {r.credits}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-gray-200 bg-gray-50/60">
+                    <tr>
+                      <td className="px-5 py-3 text-sm font-semibold text-gray-700">
+                        Total
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-semibold tabular-nums text-gray-800">
+                        ${totalCost.toFixed(4)}
+                      </td>
+                      <td className="px-5 py-3 text-right text-sm font-semibold tabular-nums text-gray-800">
+                        {totalCalls}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
