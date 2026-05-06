@@ -19,7 +19,7 @@ export async function trackedApifyCall<T>(
   const start = Date.now();
   try {
     const result = await fn();
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       provider: 'apify',
       units,
@@ -29,7 +29,7 @@ export async function trackedApifyCall<T>(
     });
     return result;
   } catch (err) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       provider: 'apify',
       units,

@@ -264,7 +264,7 @@ export async function crossVerifyNode(
         messages: [{ role: 'user', content: userPrompt }],
       });
     } catch (err) {
-      void recordUsageEvent({
+      await recordUsageEvent({
         operation: 'financial_extraction',
         model: 'claude-haiku-4-5-20251001',
         provider: 'anthropic',
@@ -277,7 +277,7 @@ export async function crossVerifyNode(
       throw err;
     }
     const claudeUsage = (message as any)?.usage;
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation: 'financial_extraction',
       model: 'claude-haiku-4-5-20251001',
       provider: 'anthropic',

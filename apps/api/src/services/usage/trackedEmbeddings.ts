@@ -35,7 +35,7 @@ export async function trackedEmbedDocuments<T>(
   const chars = totalChars(texts);
   try {
     const result = await fn();
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       provider: 'gemini',
       units: texts.length,
@@ -46,7 +46,7 @@ export async function trackedEmbedDocuments<T>(
     });
     return result;
   } catch (err) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       provider: 'gemini',
       units: texts.length,
@@ -75,7 +75,7 @@ export async function trackedEmbedQuery<T>(
   const chars = text?.length ?? 0;
   try {
     const result = await fn();
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       provider: 'gemini',
       units: 1,
@@ -86,7 +86,7 @@ export async function trackedEmbedQuery<T>(
     });
     return result;
   } catch (err) {
-    void recordUsageEvent({
+    await recordUsageEvent({
       operation,
       provider: 'gemini',
       units: 1,
