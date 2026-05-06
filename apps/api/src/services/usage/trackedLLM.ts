@@ -55,15 +55,9 @@ export type RecordUsageEventInput = RecordUsageEventLLM | RecordUsageEventNonLLM
  *   unitCostUsd directly and the model lookup is skipped.
  */
 export async function recordUsageEvent(input: RecordUsageEventInput): Promise<void> {
-  log.info('[usage] recordUsageEvent ENTRY', {
-    operation: input.operation,
-    model: input.model,
-    provider: input.provider,
-  });
-
   const ctx = getUsageContext();
   if (!ctx) {
-    log.warn('[usage] recordUsageEvent skipped — no usage context bound', {
+    log.warn('recordUsageEvent: no usage context bound, skipping', {
       operation: input.operation,
     });
     return;
@@ -84,7 +78,7 @@ export async function recordUsageEvent(input: RecordUsageEventInput): Promise<vo
       if (price) {
         costUsd = computeCostUsd(price, promptTokens, completionTokens);
       } else {
-        log.warn('[usage] unknown model, costUsd=0', { model: input.model });
+        log.warn('recordUsageEvent: unknown model, costUsd=0', { model: input.model });
         extraMetadata.priceLookupFailed = true;
       }
     }
@@ -108,35 +102,18 @@ export async function recordUsageEvent(input: RecordUsageEventInput): Promise<vo
       metadata: { ...(input.metadata ?? {}), ...extraMetadata, requestId: ctx.requestId },
     };
 
-    log.info('[usage] inserting UsageEvent row', {
-      operation: row.operation,
-      userId: row.userId,
-      organizationId: row.organizationId,
-      promptTokens: row.promptTokens,
-      completionTokens: row.completionTokens,
-      costUsd: row.costUsd,
-    });
-
-    const { error, data } = await supabase.from('UsageEvent').insert(row).select('id');
+    const { error } = await supabase.from('UsageEvent').insert(row);
     if (error) {
-      log.error('[usage] INSERT FAILED', {
+      log.error('recordUsageEvent: insert failed', {
         error,
         message: error.message,
-        details: error.details,
-        hint: error.hint,
         code: error.code,
         operation: input.operation,
-        rowKeys: Object.keys(row),
-      });
-    } else {
-      log.info('[usage] insert OK', {
-        operation: input.operation,
-        insertedId: data?.[0]?.id,
       });
     }
   } catch (err) {
-    log.error('[usage] recordUsageEvent threw', {
-      err: err instanceof Error ? { message: err.message, stack: err.stack } : err,
+    log.error('recordUsageEvent: threw', {
+      err: err instanceof Error ? { message: err.message } : err,
       operation: input.operation,
     });
   }
