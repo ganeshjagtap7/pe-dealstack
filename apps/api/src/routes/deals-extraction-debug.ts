@@ -47,9 +47,14 @@ router.get('/:id/extraction-debug', async (req, res) => {
     // 1. Full Deal row — pulls top-line numbers stored on the Deal record
     //    itself (these are what the deals listing card shows; useful to
     //    cross-check against the FinancialStatement-derived figures).
+    //    select('*') over a typed list because (a) some columns the agent
+    //    initially listed aren't actually on the Deal table and a typo
+    //    causes Supabase to return 400 → route 404s with "Deal not found"
+    //    even though the row exists, (b) we want every column anyway for
+    //    audit purposes.
     const { data: deal, error: dealErr } = await supabase
       .from('Deal')
-      .select('id, name, companyName, currency, revenue, ebitda, dealSize, stage, status, industry, createdAt, updatedAt')
+      .select('*')
       .eq('id', dealId)
       .eq('organizationId', orgId)
       .single();
@@ -62,11 +67,13 @@ router.get('/:id/extraction-debug', async (req, res) => {
     //    cap each sample at TEXT_SAMPLE_LIMIT so the JSON stays manageable.
     //    extractedTextLength is reported separately so the user knows when
     //    the sample was truncated.
+    //    Column names: Document table uses `status` (not extractionStatus)
+    //    and `aiAnalysis` (not aiSummary) — original SELECT had typos that
+    //    triggered Supabase column-not-found errors. select('*') sidesteps
+    //    the issue and pulls everything for audit.
     const { data: docs, error: docsErr } = await supabase
       .from('Document')
-      .select(
-        'id, name, type, mimeType, fileSize, fileUrl, extractionStatus, extractedText, aiSummary, tags, createdAt, updatedAt',
-      )
+      .select('*')
       .eq('dealId', dealId)
       .order('createdAt', { ascending: false });
 
@@ -82,12 +89,12 @@ router.get('/:id/extraction-debug', async (req, res) => {
         mimeType: d.mimeType,
         fileSize: d.fileSize,
         fileUrl: d.fileUrl,
-        extractionStatus: d.extractionStatus,
+        status: d.status,
         extractedTextLength: len,
         extractedTextSample:
           text && len > TEXT_SAMPLE_LIMIT ? text.slice(0, TEXT_SAMPLE_LIMIT) : text,
         extractedTextSampleTruncated: len > TEXT_SAMPLE_LIMIT,
-        aiSummary: d.aiSummary,
+        aiAnalysis: d.aiAnalysis,
         tags: d.tags,
         createdAt: d.createdAt,
         updatedAt: d.updatedAt,

@@ -156,6 +156,100 @@ export interface QuantitativeReconciliationPhase1 {
   warnings: string[];
 }
 
+// ─── Phase 2 — narrative input (LLM-augmented blocks) ──────────────
+//
+// Phase 2 modules read narrative documents (CIM, teaser, IM) — NOT
+// the FinancialStatement rows Phase 1 already aggregated. The agent
+// extracts explicit claims from prose, then deterministic logic
+// matches each claim to the computed ground truth and emits a verdict.
+
+export interface NarrativeDocumentInput {
+  /** Document.id for trace correlation */
+  id: string;
+  name: string;
+  /** Document.type — "CIM", "TEASER", "FINANCIAL_DATA", etc. */
+  type: string | null;
+  /** mimeType for additional context */
+  mimeType: string | null;
+  /** Full extracted text, capped by caller (Phase 2 prompts are big
+   * enough that we typically slice to ~20K chars per doc). */
+  extractedText: string;
+}
+
+export interface DealRecordInput {
+  id: string;
+  name: string;
+  companyName: string | null;
+  industry: string | null;
+  currency: string;
+  /** Stored top-line numbers (in millions per schema convention). May
+   * be null if extraction never set them. Used by extractionQualityFeedback
+   * to compare what the agent claimed against what the data sums to. */
+  revenue: number | null;       // millions
+  ebitda: number | null;        // millions
+  dealSize: number | null;      // millions (= asking price / 1M)
+}
+
+// ─── Phase 2 — output blocks ───────────────────────────────────────
+
+export type ClaimVerdict =
+  | 'VERIFIED'
+  | 'VERIFIED_LOWER_END'
+  | 'VERIFIED_UPPER_END'
+  | 'MINOR_DISCREPANCY'
+  | 'MATERIAL_UNDERSTATEMENT'
+  | 'MATERIAL_OVERSTATEMENT'
+  | 'UNDERSTATEMENT_FAVORABLE_TO_BUYER'
+  | 'OVERSTATEMENT_UNFAVORABLE_TO_BUYER'
+  | 'UNVERIFIABLE_FROM_FINANCIALS';
+
+export interface CimClaimValidation {
+  claim: string;
+  claimSource: string;        // "CIM", "TEASER", filename, etc.
+  /** Computed ground-truth value. null when claim is unverifiable from financials. */
+  computedValue: number | string | null;
+  computedSource: string;     // "Spreadsheet, 3-month avg MRR × 12 (Jan-Mar 2026)"
+  /** Variance % (claim vs computed). null when not numeric or unverifiable. */
+  variance_pct: number | null;
+  verdict: ClaimVerdict;
+  implication: string;
+}
+
+export interface RecommendedAction {
+  priority: number;
+  owner: string;              // "Buyer" | "Seller" | "Auditor"
+  action: string;
+}
+
+export interface ExtractionQualityFeedback {
+  issuesWithPriorExtraction: string[];
+  rootCauseDiagnosis: string;
+  promptingFixForPEOS: string;
+}
+
+export interface DocumentSet {
+  primaryFinancialFile: string | null;
+  primaryNarrativeFile: string | null;
+  asOfDate: string;           // ISO date — latest period in the financials
+  extractionRunDate: string;  // ISO date — when this reconciliation ran
+}
+
+// ─── Combined Phase-2 output (Phase 1 + LLM-augmented blocks) ──────
+
+export interface QuantitativeReconciliationPhase2 extends QuantitativeReconciliationPhase1 {
+  documentSet: DocumentSet;
+  cimClaimValidation: CimClaimValidation[];
+  /** Phase 2 LLM call appends to the materialFindings array Phase 1 produced.
+   * The combined list lives on the parent QuantitativeReconciliationPhase1.materialFindings
+   * field — Phase 2 callers should not introduce a separate array. */
+  recommendedNextActions: RecommendedAction[];
+  extractionQualityFeedback: ExtractionQualityFeedback;
+  /** True when at least one Phase 2 block ran successfully. False when
+   * LLM unavailable / API key missing — caller falls back to Phase 1
+   * output without the LLM blocks. */
+  llmAugmented: boolean;
+}
+
 // ─── Period helpers (used by every module) ─────────────────────────
 //
 // Statements have heterogeneous period labels — "Mar-26", "Apr-2026",

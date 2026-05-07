@@ -257,6 +257,34 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
     }
   }, [dealId, reconciling, downloadJsonAttachment, showToast]);
 
+  // Phase-2 full audit — Phase 1 + LLM-augmented blocks (CIM claim
+  // validation, material findings synthesis, extraction-quality
+  // critique, prioritised diligence to-do list). Hits the same endpoint
+  // with ?level=full. Slow (~30-60s, makes 4 LLM calls in parallel)
+  // and costs a few cents per run, so split out as a separate button.
+  const [fullAuditing, setFullAuditing] = useState(false);
+  const handleDownloadFullAudit = useCallback(async () => {
+    if (fullAuditing) return;
+    setFullAuditing(true);
+    showToast(
+      "Running full audit (~30-60s, makes 4 LLM calls)…",
+      "info",
+      { title: "Full audit in progress" },
+    );
+    try {
+      await downloadJsonAttachment(
+        `/deals/${dealId}/reconcile?level=full`,
+        "reconcile-full",
+        "Couldn't run full audit",
+      );
+    } catch (err) {
+      console.warn("[deal-financials] full audit failed:", err);
+      showToast("Couldn't run full audit", "warning", { title: "Full audit failed" });
+    } finally {
+      setFullAuditing(false);
+    }
+  }, [dealId, fullAuditing, downloadJsonAttachment, showToast]);
+
   useEffect(() => { loadFinancials(); }, [loadFinancials]);
 
   // Derived state
@@ -489,6 +517,21 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
           >
             <span className="material-symbols-outlined text-sm">
               {reconciling ? "progress_activity" : "calculate"}
+            </span>
+          </button>
+          {/* Phase-2 full audit — Phase 1 + LLM-augmented blocks.
+              Slow (~30-60s, 4 LLM calls in parallel) and costs a few
+              cents per run, hence the separate button. */}
+          <button
+            onClick={handleDownloadFullAudit}
+            disabled={fullAuditing}
+            title="Full audit — Phase 1 + LLM-extracted CIM claim variances, material findings, extraction-quality critique, and a prioritised diligence to-do list. ~30-60s."
+            aria-label="Run full reconciliation audit (LLM)"
+            className="flex items-center justify-center text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
+            style={{ width: 30, height: 30 }}
+          >
+            <span className="material-symbols-outlined text-sm">
+              {fullAuditing ? "progress_activity" : "verified"}
             </span>
           </button>
         </div>
