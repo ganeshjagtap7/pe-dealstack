@@ -1,6 +1,7 @@
 import { supabase } from '../supabase.js';
 import { extractDealDataFromText, ExtractedDealData } from './aiExtractor.js';
 import { classifyFinancials, ClassificationResult, ClassifiedStatement } from './financialClassifier.js';
+import { dedupeStatementPeriods } from './financialPeriodNormalizer.js';
 import { log } from '../utils/logger.js';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -87,6 +88,22 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
       warnings: classification?.warnings ?? ['No financial data found in document'],
       hasConflicts: false,
     };
+  }
+
+  // Period dedup pass: collapse equivalent labels ("FY26 Est." vs "FY26 Est",
+  // "YTD 2026" vs "2026 YTD" vs "YTD Total") before upsert so the time
+  // series doesn't end up with 6 rows for what should be 2 distinct periods.
+  // Runs in-place per statement, scoped to (statementType, periodType).
+  const totalBefore = classification.statements.reduce((n, s) => n + s.periods.length, 0);
+  for (const stmt of classification.statements) {
+    stmt.periods = dedupeStatementPeriods(stmt.statementType, stmt.periods);
+  }
+  const totalAfter = classification.statements.reduce((n, s) => n + s.periods.length, 0);
+  if (totalAfter < totalBefore) {
+    log.info(
+      `Period dedup: ${totalBefore} input → ${totalAfter} output (dropped ${totalBefore - totalAfter} duplicates)`,
+      { dealId: input.dealId },
+    );
   }
 
   const statementIds: string[] = [];
