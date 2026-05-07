@@ -1,10 +1,21 @@
 # Security & Trust — Master TODO
 
-> **Last updated:** 2026-05-07
-> **Audience:** any developer picking up the next slice of security/trust work after PR #9 + #28 shipped.
+> **Last updated:** 2026-05-07 (after PR #30, #31, #32)
+> **Audience:** any developer picking up the next slice of security/trust work.
 > **Read first:** [`docs/SECURITY-TRUST-DEVELOPER-HANDOFF.md`](SECURITY-TRUST-DEVELOPER-HANDOFF.md) for context on what already shipped.
 
 This is the single source of truth for what's left. Pick a priority, branch off `main`, ship a focused PR.
+
+---
+
+## 🚨 Outstanding ops items (block features from being "fully done")
+
+| # | What | Owner | Blocks |
+|---|---|---|---|
+| **OPS-1** | Set `POCKET_FUND_STAFF_EMAILS` env var on Vercel (production scope, comma-separated staff emails) | Founder | PR #30 staff access log being **effective** — without it the middleware no-ops cleanly so the feature is dead-effective until set |
+| **OPS-2** | Expose Supabase `auth` schema in PostgREST (Project Settings → API → Exposed schemas) | Founder | Active sessions UI shows real data instead of "Unavailable"; security dashboard's `activeSessions` metric becomes non-null |
+
+Until these are done, the relevant features ship code-complete but are limited in customer-visible value. Re-check at every demo prep.
 
 ---
 
