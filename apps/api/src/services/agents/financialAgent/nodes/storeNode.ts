@@ -115,15 +115,36 @@ export async function storeNode(
       ));
     }
 
-    // Confidence-gated storage
-    if (tier === 'very_low') {
-      steps.push(step('store', 'Confidence too low (<60%) — NOT storing. User must review manually.'));
+    // Confidence-aware storage. Previously: tier 'very_low' (<60%) was a hard
+    // refusal — the entire batch was discarded and the user saw nothing. That
+    // silently lost legitimate data when cross-verify flagged a few derived
+    // fields the source genuinely didn't have (e.g., a P&L without an explicit
+    // EBITDA line gets EBITDA flagged → composite drops to ~58 → store
+    // refused). For a 36-month spreadsheet, throwing away every period because
+    // 4 derived fields disagreed is the wrong tradeoff.
+    //
+    // New behaviour: ALWAYS store, but surface the confidence tier as the
+    // mergeStatus so the UI can flag low-confidence extractions for review.
+    // Below ~30% composite (extreme garbage) we still skip — at that point the
+    // extraction is so unreliable that polluting the deal record is worse than
+    // showing nothing.
+    if (compositeScore < 30) {
+      steps.push(step('store', `Composite confidence ${compositeScore}% is critically low — refusing to store. User must re-extract.`));
       return {
         status: 'completed',
         overallConfidence: compositeScore,
-        warnings: [...(state.warnings || []), `Extraction confidence too low (${compositeScore}%). Manual review required.`],
+        warnings: [...(state.warnings || []), `Extraction confidence critically low (${compositeScore}%). Storage skipped.`],
         steps,
       };
+    }
+    if (tier === 'very_low') {
+      // 30-60% — store but flag for review. User can fix individual periods
+      // rather than re-running the whole 5-minute extraction.
+      steps.push(step(
+        'store',
+        `Composite confidence ${compositeScore}% — storing with needs_review flag so you can audit individual periods.`,
+        `Common cause: cross-verify flagged derived fields (EBITDA, margins) the source doesn't actually have. The raw revenue / opex / net income periods are usually fine.`,
+      ));
     }
 
     const result = await runDeepPass({
