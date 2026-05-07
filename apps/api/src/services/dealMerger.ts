@@ -105,7 +105,35 @@ export async function mergeIntoExistingDeal(
       skippedLowConfidence.push(`revenue (${aiData.revenue.confidence}%)`);
     }
   }
-  if (aiData.ebitda.value != null && (existingDeal.ebitda == null || aiData.ebitda.confidence > existingConf)) {
+  // Defensive units-mismatch guard: when both revenue and ebitda are being
+  // written fresh (existing.revenue is null), reject ebitda values that imply
+  // an EBITDA/revenue ratio above 50×. A real EBITDA margin lives in the
+  // -50%..+50% range — never 50× revenue. A ratio that high almost always
+  // indicates the LLM returned ebitda in a different unit (raw dollars or
+  // thousands) than revenue. Skipping the write here prevents a
+  // 1000×-wrong value from polluting every downstream view.
+  const ebitdaUnitsMismatch =
+    aiData.revenue.value != null &&
+    aiData.ebitda.value != null &&
+    existingDeal.revenue == null &&
+    Math.abs(aiData.revenue.value) > 0 &&
+    Math.abs(aiData.ebitda.value / aiData.revenue.value) > 50;
+
+  if (ebitdaUnitsMismatch) {
+    const r = aiData.revenue.value as number;
+    const e = aiData.ebitda.value as number;
+    const ratio = e / r;
+    log.warn('Deal merge: ebitda units mismatch suspected, skipping ebitda write', {
+      dealId,
+      sourceName,
+      revenue: r,
+      ebitda: e,
+      ratio,
+    });
+    skippedLowConfidence.push(
+      `ebitda (${aiData.ebitda.confidence}%, units mismatch: ebitda/revenue=${ratio.toFixed(1)}x)`,
+    );
+  } else if (aiData.ebitda.value != null && (existingDeal.ebitda == null || aiData.ebitda.confidence > existingConf)) {
     if (aiData.ebitda.confidence >= FIELD_AUTOMERGE_CONFIDENCE_FLOOR) {
       updates.ebitda = aiData.ebitda.value;
     } else {

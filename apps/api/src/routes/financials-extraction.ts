@@ -416,6 +416,7 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         statementsStored: r.statementsStored,
         periodsStored: r.periodsStored,
         overallConfidence: r.overallConfidence,
+        agent: r.agent ?? null,
         ...(r.error ? { error: r.error } : {}),
       })),
       result: {

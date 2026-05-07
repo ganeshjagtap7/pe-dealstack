@@ -8,6 +8,10 @@
  *
  *   "FY26 Est"  ↔  "FY26 Est."  ↔  "FY26 Estimated"  ↔  "2026 FY Est"
  *   "YTD 2026"  ↔  "2026 YTD"  ↔  "YTD Total"  ↔  "YTD Total (Jan-Apr 20, 2026)"
+ *   "Apr-26"   ↔  "2026-04"   ↔  "April 2026"  ↔  "Apr-2026"  ↔  "apr-26"
+ *   "Apr-26 LTM" ↔ "2026-04_LTM" ↔ "2026-04-LTM" ↔ "Apr 26 (LTM)"
+ *   "Q1-26"    ↔  "1Q26"     ↔  "Q1 2026"
+ *   "H1-26"    ↔  "1H26"     ↔  "H1 2026"
  *
  * The LLM (financialClassifier.ts) reads these labels verbatim, so the same
  * period ends up as two-to-six rows in `FinancialStatement` and the chart
@@ -22,8 +26,10 @@
  *   "2026 YTD"  / "YTD Total (Jan-Apr…)"                  →  "YTD 2026"
  *   "YTD Total" with sibling rows all on same year         →  "YTD <year>"
  *   "YTD Total" with mixed/no sibling years                →  "YTD Total"
- *   monthly labels ("Jan-26", "Feb 2026") are passed through untouched
- *   quarterly labels ("Q1 2026") are passed through untouched
+ *   month-year labels ("Jan-26", "2026-01", "January 2026") →  "Jan 2026"
+ *   month-year LTM labels ("Apr-26 LTM", "2026-04_LTM")    →  "Apr 2026 LTM"
+ *   quarter labels ("Q1-26", "1Q26", "Q1 2026")            →  "Q1 2026"
+ *   half labels ("H1-26", "1H26", "H1 2026")               →  "H1 2026"
  *
  * Dedup runs per (statementType, periodType) bucket. Within each bucket,
  * rows that normalise to the same key are merged: line-item values from
@@ -34,15 +40,18 @@
  *   - "FY26 Est." vs "FY26 Est" vs "2026 FY Est"
  *   - "YTD 2026" / "2026 YTD" / "YTD Total" / "YTD Total (Jan-Apr 20, 2026)"
  *   - Whitespace and trailing-punctuation variants
- *   - Case differences ("ytd 2026" vs "YTD 2026")
+ *   - Case differences ("ytd 2026" vs "YTD 2026", "apr-26" vs "Apr-26")
  *   - Bare "YTD Total" inferred from sibling-row years (when unambiguous)
+ *   - 2-digit years folded to 20XX ("26" → "2026", "99" → "2099")
  *
- * NOT canonicalised (intentionally — too many false positives):
- *   - "Q1 2026" vs "Q1-2026" vs "Q1'26" — preserved as-is. Mostly the LLM
- *     already emits one of these consistently per document.
- *   - "H1 2026" vs "1H 2026" vs "H1'26" — preserved as-is.
- *   - "Jan-26" vs "Jan 2026" vs "January 2026" — preserved as-is.
- *   - Rolling-period labels like "L3M", "LTM", "TTM" — preserved as-is.
+ * NOT canonicalised (intentionally):
+ *   - "Current_Month_Range" / "Current Month Range" / "Current Period" /
+ *     "Current" — these are LLM-synthesised placeholder labels that should
+ *     be resolved upstream to a real period (e.g. "Apr 2026") by the
+ *     extractor before storage. We leave them alone here so we do not
+ *     silently drop or mis-merge them. They will NOT dedup against
+ *     "Apr 2026". Future improvement: resolve these in the extractor.
+ *   - Rolling-period labels like "L3M", "TTM" — preserved as-is.
  *   - Bare "YTD Total" with mixed-year siblings — left as-is to avoid
  *     cross-year false-merges.
  */
@@ -76,6 +85,15 @@ export interface BucketedPeriod extends FinancialPeriod {
  *   normalizePeriodLabel("YTD Total")                          // "YTD Total"
  *   normalizePeriodLabel("YTD Total (Jan-Apr 20, 2026)")       // "YTD Total"
  *   normalizePeriodLabel(" Q1   2026 ")                        // "Q1 2026"
+ *   normalizePeriodLabel("Apr-26")                             // "Apr 2026"
+ *   normalizePeriodLabel("2026-04")                            // "Apr 2026"
+ *   normalizePeriodLabel("April 2026")                         // "Apr 2026"
+ *   normalizePeriodLabel("Apr-26 LTM")                         // "Apr 2026 LTM"
+ *   normalizePeriodLabel("2026-04_LTM")                        // "Apr 2026 LTM"
+ *   normalizePeriodLabel("Q1-26")                              // "Q1 2026"
+ *   normalizePeriodLabel("1Q26")                               // "Q1 2026"
+ *   normalizePeriodLabel("H1-26")                              // "H1 2026"
+ *   normalizePeriodLabel("Current_Month_Range")                // "Current_Month_Range"
  */
 export function normalizePeriodLabel(label: string): string {
   if (!label) return '';
@@ -89,8 +107,29 @@ export function normalizePeriodLabel(label: string): string {
   // 3. Collapse internal whitespace runs to single space
   s = s.replace(/\s+/g, ' ');
 
+  // 3a. Carve out LLM-synthesised placeholder labels that we explicitly
+  //     refuse to canonicalise. These are emitted by the extractor when it
+  //     cannot identify a concrete period, and they should be resolved
+  //     UPSTREAM (in the extractor) to a real period like "Apr 2026" before
+  //     reaching dedup. We pass them through here so we don't silently drop
+  //     data — but they intentionally will NOT collide with any real period
+  //     bucket like "Apr 2026". Future improvement: resolve these in the
+  //     extractor before storage so this carve-out becomes unnecessary.
+  if (/^(?:Current[\s_-]?Month[\s_-]?Range|Current[\s_-]?Period|Current)$/i.test(s)) {
+    return s;
+  }
+
   // 4. Synonym normalisation — applied in priority order.
   //    All matches are case-insensitive; output uses canonical casing.
+  //
+  //    Order rationale:
+  //      a) FY-Est rules first — they have a unique "FY" prefix that won't
+  //         collide with date formats like "Apr-26" or "Q1-26".
+  //      b) YTD rules second — also have a unique "YTD" token.
+  //      c) Then date formats: month-year, quarter, half. These rely on
+  //         pattern shape (numeric-numeric, Mon-numeric, etc.) so they
+  //         must run AFTER any rule that could rewrite the input into a
+  //         different shape.
 
   // 4a. "FY<NN> Estimated"  →  "FY<NN> Est"   (also handles "estimate")
   //     Only matches when "Estimated"/"estimate" is the trailing word.
@@ -159,12 +198,227 @@ export function normalizePeriodLabel(label: string): string {
     s = `YTD ${ytdYearMatch[1]}`;
   }
 
+  // 4e. Date-format canonicalisation (month-year, quarter, half).
+  //
+  // Each branch detects its shape, extracts the date components plus an
+  // optional LTM marker, and rewrites to the canonical form. We try
+  // QUARTER and HALF before MONTH-YEAR — the quarter/half regexes are
+  // more constrained (they require Q/H or 1-4Q/1-2H tokens) so the
+  // month-year fallback never sees them. After any branch matches, we
+  // return immediately to avoid a downstream branch re-matching its own
+  // output (e.g. once "Apr 2026" is produced, the quarter regex must
+  // not look at it).
+
+  // 4e-quarter:  "Q1-26", "1Q26", "Q1 2026", "Q1-2026" (+ optional LTM)
+  //
+  // Two shapes accepted:
+  //   - Q-first:    ^Q ([1-4]) <sep?> <year> <ltm?>$
+  //   - Number-first: ^([1-4]) Q <sep?> <year> <ltm?>$
+  // Separator is one of: " ", "-", "_", or empty (for "1Q26").
+  //
+  // Year alternative ORDER MATTERS: \d{4} must be tried BEFORE \d{2} so the
+  // engine prefers a 4-digit match over a 2-digit prefix. We additionally
+  // anchor with (?=\D|$) after the year so that "Q1 2026 LTM" does NOT get
+  // truncated to year=20 and tail="26 LTM". A simple \b would not suffice
+  // because underscore counts as a word character, breaking "Q1-26_LTM"-
+  // shaped inputs (none in the wild for quarters, but consistent with the
+  // numeric-first month-year branch where `_LTM` IS a real format).
+  {
+    const qFirst = s.match(/^Q([1-4])\s*[-_ ]?\s*(\d{4}|\d{2})(?=\D|$)\s*(.*)$/i);
+    const qLast = s.match(/^([1-4])Q\s*[-_ ]?\s*(\d{4}|\d{2})(?=\D|$)\s*(.*)$/i);
+    const m = qFirst ?? qLast;
+    if (m) {
+      const qNum = m[1];
+      const yr = normalizeYear(m[2]);
+      if (yr) {
+        const ltm = parseLtmTail(m[3]);
+        if (ltm !== null) {
+          return ltm ? `Q${qNum} ${yr} LTM` : `Q${qNum} ${yr}`;
+        }
+      }
+    }
+  }
+
+  // 4e-half:  "H1-26", "1H26", "H1 2026", "H1-2026" (+ optional LTM)
+  // Same year-ordering rule as quarter (4-digit first, (?=\D|$) anchor).
+  {
+    const hFirst = s.match(/^H([1-2])\s*[-_ ]?\s*(\d{4}|\d{2})(?=\D|$)\s*(.*)$/i);
+    const hLast = s.match(/^([1-2])H\s*[-_ ]?\s*(\d{4}|\d{2})(?=\D|$)\s*(.*)$/i);
+    const m = hFirst ?? hLast;
+    if (m) {
+      const hNum = m[1];
+      const yr = normalizeYear(m[2]);
+      if (yr) {
+        const ltm = parseLtmTail(m[3]);
+        if (ltm !== null) {
+          return ltm ? `H${hNum} ${yr} LTM` : `H${hNum} ${yr}`;
+        }
+      }
+    }
+  }
+
+  // 4e-month-year:  "Apr-26", "Apr 26", "Apr-2026", "Apr 2026", "April 2026"
+  //                 (+ optional LTM tail)
+  {
+    // Month name + year:  ^<month-word> <sep> <year> <ltm?>$
+    // Separator is one of: " ", "-", "_", "/", ".".
+    // Year alternative ordering: 4-digit first, (?=\D|$) after to prevent
+    // "Apr 2026 LTM" tokenising as year=20 / tail="26 LTM".
+    const m = s.match(/^([A-Za-z]{3,9})\s*[-_ /.]\s*(\d{4}|\d{2})(?=\D|$)\s*(.*)$/);
+    if (m) {
+      const mon = monthAbbrev(m[1]);
+      const yr = normalizeYear(m[2]);
+      if (mon && yr) {
+        const ltm = parseLtmTail(m[3]);
+        if (ltm !== null) {
+          return ltm ? `${mon} ${yr} LTM` : `${mon} ${yr}`;
+        }
+      }
+    }
+  }
+
+  // 4e-month-year (numeric-first):  "2026-04", "2026/04", "2026.04",
+  //                                 "04-2026", "04/2026", "2026-4"
+  //                                 (+ optional LTM tail with sep _ or -)
+  //
+  // Two shapes accepted:
+  //   - Year-first:   ^(\d{4}) <sep> (\d{1,2}) <ltm-sep ltm?>$
+  //   - Month-first:  ^(\d{1,2}) <sep> (\d{4})  <ltm-sep ltm?>$
+  // Separator is one of: "-", "/", ".".
+  //
+  // We DO NOT accept all-2-digit forms like "04-26" here — they are
+  // ambiguous with day-month or month-year and we'd rather pass through
+  // than guess wrong.
+  //
+  // We anchor the month digit-run with (?=\D|$) so that "2026-04_LTM" lets
+  // the LTM tail be consumed by parseLtmTail rather than swallowed by the
+  // word-boundary on '_' (underscores ARE word characters, so a plain \b
+  // would FAIL between '4' and '_'). The year-first regex requires the
+  // year to be exactly 4 digits.
+  {
+    const numericMonth = (mm: string): string | null => {
+      const n = parseInt(mm, 10);
+      if (!Number.isFinite(n) || n < 1 || n > 12) return null;
+      const NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+      return NAMES[n - 1];
+    };
+    const yearFirst = s.match(/^(\d{4})[-/.](\d{1,2})(?=\D|$)\s*(.*)$/);
+    const monthFirst = s.match(/^(\d{1,2})[-/.](\d{4})(?=\D|$)\s*(.*)$/);
+    if (yearFirst) {
+      const yr = normalizeYear(yearFirst[1]);
+      const mon = numericMonth(yearFirst[2]);
+      if (mon && yr) {
+        const ltm = parseLtmTail(yearFirst[3]);
+        if (ltm !== null) {
+          return ltm ? `${mon} ${yr} LTM` : `${mon} ${yr}`;
+        }
+      }
+    }
+    if (monthFirst) {
+      const mon = numericMonth(monthFirst[1]);
+      const yr = normalizeYear(monthFirst[2]);
+      if (mon && yr) {
+        const ltm = parseLtmTail(monthFirst[3]);
+        if (ltm !== null) {
+          return ltm ? `${mon} ${yr} LTM` : `${mon} ${yr}`;
+        }
+      }
+    }
+  }
+
   return s;
 }
 
 function capitalize(w: string): string {
   if (!w) return w;
   return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+}
+
+// ─── Date-format canonicalisation helpers ────────────────────
+
+/**
+ * Map any case of a 3-9 letter month name (short or long form) to its
+ * canonical 3-letter form with capital first letter. Returns null if the
+ * input is not a recognised month name.
+ *
+ *   "apr" / "Apr" / "APR" / "april" / "April"   →  "Apr"
+ *   "sept"                                      →  null  (not in table)
+ */
+function monthAbbrev(input: string): string | null {
+  if (!input) return null;
+  const lower = input.toLowerCase();
+  // Both short (3-letter) and long forms map to the canonical 3-letter form.
+  // We use a map rather than slicing because some months (e.g. "May") are
+  // the same as their short form, and we want exact-case-only matching to
+  // avoid swallowing arbitrary 3-9 letter words.
+  const TABLE: Record<string, string> = {
+    jan: 'Jan', january: 'Jan',
+    feb: 'Feb', february: 'Feb',
+    mar: 'Mar', march: 'Mar',
+    apr: 'Apr', april: 'Apr',
+    may: 'May',
+    jun: 'Jun', june: 'Jun',
+    jul: 'Jul', july: 'Jul',
+    aug: 'Aug', august: 'Aug',
+    sep: 'Sep', sept: 'Sep', september: 'Sep',
+    oct: 'Oct', october: 'Oct',
+    nov: 'Nov', november: 'Nov',
+    dec: 'Dec', december: 'Dec',
+  };
+  return TABLE[lower] ?? null;
+}
+
+/**
+ * Fold a 2-digit or 4-digit year string into a canonical 4-digit year.
+ * Returns null if the input is not a recognised year shape.
+ *
+ *   "26"   →  "2026"
+ *   "99"   →  "2099"
+ *   "2026" →  "2026"
+ *   "130"  →  null   (3 digits is not a valid year shape)
+ *   "20260"→  null   (5 digits is not a valid year shape)
+ *
+ * 2-digit years are always assumed to be 20XX. This matches the convention
+ * elsewhere in this file (`inferYearFromSiblings`) and reflects the fact
+ * that PE deal financials are essentially never older than 1999 or newer
+ * than 2099 in our data set.
+ */
+function normalizeYear(input: string): string | null {
+  if (!input) return null;
+  if (/^\d{2}$/.test(input)) return `20${input}`;
+  if (/^\d{4}$/.test(input)) return input;
+  return null;
+}
+
+/**
+ * Inspect the trailing text of a date label and report whether it is empty
+ * (no LTM marker, return false), an LTM marker (return true), or something
+ * we don't recognise (return null — caller should bail out and pass the
+ * original label through unchanged).
+ *
+ * Accepted LTM markers (case-insensitive):
+ *   ""               →  false       (no marker)
+ *   "LTM"            →  true
+ *   "(LTM)"          →  true
+ *   "_LTM"           →  true        (underscore prefix from "2026-04_LTM")
+ *   "-LTM"           →  true        (hyphen prefix from "2026-04-LTM")
+ *   anything else    →  null        (don't canonicalise)
+ *
+ * The leading separator is tolerated because the calling regex may have
+ * already absorbed only part of it (e.g. for "Apr-26 LTM" we already ate
+ * the space before "LTM"; for "2026-04_LTM" we may need to eat the "_" or
+ * "-" here).
+ */
+function parseLtmTail(tail: string): boolean | null {
+  if (!tail) return false;
+  const t = tail.trim();
+  if (!t) return false;
+  // Strip a single leading "_" or "-" (sometimes the date regex leaves it
+  // attached when the LTM token is glued on with no whitespace).
+  const stripped = t.replace(/^[-_]\s*/, '').trim();
+  if (!stripped) return false;
+  if (/^(?:LTM|\(LTM\))$/i.test(stripped)) return true;
+  return null;
 }
 
 // ─── inferYearFromSiblings ───────────────────────────────────

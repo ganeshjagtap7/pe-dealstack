@@ -56,7 +56,14 @@ const ExtractionOutputSchema = z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
     source: z.string().nullable(),
-  }).describe('EBITDA in millions (in the original document currency)'),
+  }).describe(`EBITDA in millions, in the original document currency. UNIT CONVERSION IS MANDATORY — you MUST convert from the source's units to millions BEFORE returning the value. Worked examples:
+- Source value $36,286 (raw dollars) → return 0.036286 (NOT 36.286)
+- Source value $36.3K (thousands) → return 0.0363
+- Source value $36M (millions) → return 36.0
+- If the source has a "$000s" / "(USD in thousands)" / "in $K" header, divide the displayed number by 1,000 to get millions (e.g. a table cell showing 36,286 under a "$ in thousands" header → 36.286 thousand-dollars → 0.036286 million)
+CROSS-FIELD CONSISTENCY: Use the SAME unit interpretation as you used for revenue in this same extraction. If revenue was returned as a small fraction (e.g. 0.32, indicating an under-$1M company), ebitda MUST also be a small fraction. Mixed units across fields in one document is a sign of a unit-handling error — prefer null + 0 confidence over a mismatched value. Common bug: returning revenue 0.326825 ($326,825) alongside ebitda 36.286 — that ebitda is 1000× too large; the correct value would be 0.036286.
+ONLY extract when the document states actual realized EBITDA ("EBITDA of $X", "Adjusted EBITDA of $X", "FY24 EBITDA $X", "TTM EBITDA $X", "run-rate EBITDA"). DO NOT extract from "EBITDA target", "projected EBITDA", "expected EBITDA", "forecast", "guidance", or any forward-looking figure — return null and a 0 confidence in those cases.
+PREFER NULL WHEN AMBIGUOUS: if the unit/scale is unclear or you cannot confidently identify the source's reporting scale, return null with confidence 0 rather than guessing — a missing value is recoverable, a 1000×-wrong value silently pollutes every downstream view.`),
   ebitdaMargin: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
