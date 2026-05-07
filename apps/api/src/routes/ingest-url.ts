@@ -63,13 +63,15 @@ subRouter.post('/url', async (req, res) => {
       aiData.companyName.confidence = 100;
     }
 
-    // Financial validation
+    // Financial validation — sourceLength allows tighter bounds on short docs
     const financialCheck = validateFinancials({
       revenue: aiData.revenue.value,
       ebitda: aiData.ebitda.value,
       ebitdaMargin: aiData.ebitdaMargin?.value,
       revenueGrowth: aiData.revenueGrowth?.value,
       employees: aiData.employees?.value,
+      dealSize: aiData.dealSize?.value,
+      sourceLength: researchText.length,
     });
     if (!financialCheck.isValid) {
       aiData.needsReview = true;
@@ -137,6 +139,15 @@ subRouter.post('/url', async (req, res) => {
       const dealIcon = getIconForIndustry(aiData.industry.value);
       const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
 
+      // Per-field confidence floor — see ingest-text.ts for rationale.
+      const FIELD_FLOOR = 60;
+      const safeRevenue = aiData.revenue.value != null && aiData.revenue.confidence >= FIELD_FLOOR
+        ? aiData.revenue.value : null;
+      const safeEbitda = aiData.ebitda.value != null && aiData.ebitda.confidence >= FIELD_FLOOR
+        ? aiData.ebitda.value : null;
+      const safeDealSize = aiData.dealSize?.value != null && aiData.dealSize.confidence >= FIELD_FLOOR
+        ? aiData.dealSize.value : null;
+
       const { data: newDeal, error: dealError } = await supabase
         .from('Deal')
         .insert({
@@ -147,10 +158,12 @@ subRouter.post('/url', async (req, res) => {
           status: dealStatus,
           industry: aiData.industry.value,
           description: aiData.description.value,
-          revenue: aiData.revenue.value,
-          ebitda: aiData.ebitda.value,
+          revenue: safeRevenue,
+          ebitda: safeEbitda,
           currency: aiData.currency || 'USD',
-          dealSize: aiData.revenue.value,
+          // dealSize is the EV/transaction value of the deal, NOT revenue.
+          // Use the dedicated dealSize extraction field, gated on confidence.
+          dealSize: safeDealSize,
           aiThesis: aiData.summary,
           icon: dealIcon,
           extractionConfidence: aiData.overallConfidence,

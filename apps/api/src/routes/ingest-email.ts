@@ -47,13 +47,15 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
       return res.status(400).json({ error: 'Could not extract deal data from email' });
     }
 
-    // Step 4: Financial validation
+    // Step 4: Financial validation — sourceLength enables short-doc bounds
     const financialCheck = validateFinancials({
       revenue: aiData.revenue.value,
       ebitda: aiData.ebitda.value,
       ebitdaMargin: aiData.ebitdaMargin?.value,
       revenueGrowth: aiData.revenueGrowth?.value,
       employees: aiData.employees?.value,
+      dealSize: aiData.dealSize?.value,
+      sourceLength: dealText.length,
     });
     if (!financialCheck.isValid) {
       aiData.needsReview = true;
@@ -91,6 +93,17 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
     const dealIcon = getIconForIndustry(aiData.industry.value);
     const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
 
+    // Per-field confidence floor — see ingest-text.ts for rationale.
+    // Email-bodies are typically very short, so this gate is critical here.
+    const FIELD_FLOOR = 60;
+    const safeRevenue = aiData.revenue.value != null && aiData.revenue.confidence >= FIELD_FLOOR
+      ? aiData.revenue.value : null;
+    const safeEbitda = aiData.ebitda.value != null && aiData.ebitda.confidence >= FIELD_FLOOR
+      ? aiData.ebitda.value : null;
+    // dealSize is the EV/transaction value of the deal, NOT revenue.
+    const safeDealSize = aiData.dealSize?.value != null && aiData.dealSize.confidence >= FIELD_FLOOR
+      ? aiData.dealSize.value : null;
+
     const { data: deal, error: dealError } = await supabase
       .from('Deal')
       .insert({
@@ -101,9 +114,9 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
         status: dealStatus,
         industry: aiData.industry.value,
         description: aiData.description.value,
-        revenue: aiData.revenue.value,
-        ebitda: aiData.ebitda.value,
-        dealSize: aiData.revenue.value,
+        revenue: safeRevenue,
+        ebitda: safeEbitda,
+        dealSize: safeDealSize,
         aiThesis: aiData.summary,
         icon: dealIcon,
         extractionConfidence: aiData.overallConfidence,
@@ -188,13 +201,21 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
       },
     });
 
-    // Step 10: Auto-assign creator as analyst
+    // Step 10: Auto-assign creator as analyst.
+    // DealTeamMember.userId is the internal User.id FK, NOT the Supabase
+    // auth UUID. resolveUserId() maps the JWT subject to the internal row.
+    // Skipping the mapping silently drops the team assignment via FK violation
+    // (matches the watchlist fix in 774f9f2 and the pattern already used by
+    // ingest-upload / ingest-text / ingest-url below).
     if (req.user?.id) {
-      await supabase.from('DealTeamMember').insert({
-        dealId: deal.id,
-        userId: req.user.id,
-        role: 'MEMBER',
-      });
+      const internalUserId = await resolveUserId(req.user.id);
+      if (internalUserId) {
+        await supabase.from('DealTeamMember').insert({
+          dealId: deal.id,
+          userId: internalUserId,
+          role: 'MEMBER',
+        }).then(({ error }) => { if (error) log.warn('Auto-assign analyst failed', error); });
+      }
     }
 
     // Step 11: RAG embed email body in background

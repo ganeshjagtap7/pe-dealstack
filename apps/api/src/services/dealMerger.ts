@@ -50,8 +50,22 @@ export function getIconForIndustry(industry: string | null): string {
 }
 
 /**
+ * Per-field confidence floor. Financial fields below this confidence are NOT
+ * auto-merged into the Deal table — they're surfaced via aiData.reviewReasons
+ * but the existing deal.revenue / deal.dealSize values are preserved. This
+ * prevents low-confidence extractions from a one-pager teaser from silently
+ * overwriting correct figures from a CIM or financial model.
+ */
+const FIELD_AUTOMERGE_CONFIDENCE_FLOOR = 60;
+
+/**
  * Merge AI-extracted data into an existing deal.
- * Updates financial fields only when new extraction has higher confidence or existing is null.
+ * Updates financial fields only when:
+ *   - existing value is null, OR
+ *   - new extraction has higher confidence than the deal's stored confidence
+ * AND the new extraction's per-field confidence clears FIELD_AUTOMERGE_CONFIDENCE_FLOOR.
+ * Low-confidence values are deliberately preserved-as-pending (still recorded
+ * in the Document.extractedData JSON, but not promoted to deal.X).
  * Returns the updated deal.
  */
 export async function mergeIntoExistingDeal(
@@ -78,13 +92,32 @@ export async function mergeIntoExistingDeal(
   };
 
   const existingConf = existingDeal.extractionConfidence || 0;
+  const skippedLowConfidence: string[] = [];
 
-  // Merge each financial field: update if existing is null or new confidence is higher
+  // Merge each financial field: update if existing is null or new confidence
+  // is higher AND per-field confidence clears the floor. Low-confidence
+  // financial values are left as pending — they won't overwrite correct
+  // numbers stored on the Deal from a higher-quality source.
   if (aiData.revenue.value != null && (existingDeal.revenue == null || aiData.revenue.confidence > existingConf)) {
-    updates.revenue = aiData.revenue.value;
+    if (aiData.revenue.confidence >= FIELD_AUTOMERGE_CONFIDENCE_FLOOR) {
+      updates.revenue = aiData.revenue.value;
+    } else {
+      skippedLowConfidence.push(`revenue (${aiData.revenue.confidence}%)`);
+    }
   }
   if (aiData.ebitda.value != null && (existingDeal.ebitda == null || aiData.ebitda.confidence > existingConf)) {
-    updates.ebitda = aiData.ebitda.value;
+    if (aiData.ebitda.confidence >= FIELD_AUTOMERGE_CONFIDENCE_FLOOR) {
+      updates.ebitda = aiData.ebitda.value;
+    } else {
+      skippedLowConfidence.push(`ebitda (${aiData.ebitda.confidence}%)`);
+    }
+  }
+  if (aiData.dealSize?.value != null && (existingDeal.dealSize == null || aiData.dealSize.confidence > existingConf)) {
+    if (aiData.dealSize.confidence >= FIELD_AUTOMERGE_CONFIDENCE_FLOOR) {
+      updates.dealSize = aiData.dealSize.value;
+    } else {
+      skippedLowConfidence.push(`dealSize (${aiData.dealSize.confidence}%)`);
+    }
   }
   if (aiData.industry.value && (!existingDeal.industry || aiData.industry.confidence > existingConf)) {
     updates.industry = aiData.industry.value;
@@ -95,6 +128,15 @@ export async function mergeIntoExistingDeal(
   }
   if (aiData.summary && (!existingDeal.aiThesis || aiData.overallConfidence > existingConf)) {
     updates.aiThesis = aiData.summary;
+  }
+
+  if (skippedLowConfidence.length > 0) {
+    log.info('Deal merge: skipped low-confidence fields', {
+      dealId,
+      sourceName,
+      skipped: skippedLowConfidence,
+      floor: FIELD_AUTOMERGE_CONFIDENCE_FLOOR,
+    });
   }
 
   // Merge risks/highlights (append new unique items)
@@ -108,11 +150,17 @@ export async function mergeIntoExistingDeal(
     updates.extractionConfidence = aiData.overallConfidence;
   }
 
-  // Clear needsReview if new extraction is confident
-  if (!aiData.needsReview && existingDeal.needsReview) {
+  // Clear needsReview only if new extraction is confident AND we didn't skip
+  // any fields for low confidence. Otherwise the deal still has unmerged
+  // pending data and shouldn't lose its review flag.
+  if (!aiData.needsReview && skippedLowConfidence.length === 0 && existingDeal.needsReview) {
     updates.needsReview = false;
     updates.reviewReasons = [];
     updates.status = 'ACTIVE';
+  } else if (aiData.needsReview && !existingDeal.needsReview) {
+    // Mark for review if new extraction flagged issues, even if existing was clean
+    updates.needsReview = true;
+    updates.reviewReasons = aiData.reviewReasons || [];
   }
 
   const { data: updatedDeal, error: updateErr } = await supabase

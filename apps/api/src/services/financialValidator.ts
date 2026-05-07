@@ -60,6 +60,11 @@ function fmtVal(v: number): string {
 /**
  * Validate and sanity-check extracted financial data.
  * Supports deals ranging from micro-acquisitions ($1K+) to large PE ($5B).
+ *
+ * Optional `sourceLength` lets the validator apply tighter bounds for short
+ * source documents (teasers / one-pagers / executive summaries), where
+ * absurd financial values almost always come from misclassified targets,
+ * valuations, or projections.
  */
 export function validateFinancials(data: {
   revenue?: number | null;
@@ -68,9 +73,13 @@ export function validateFinancials(data: {
   revenueGrowth?: number | null;
   dealSize?: number | null;
   employees?: number | null;
+  sourceLength?: number;
 }): ValidationResult {
   const warnings: string[] = [];
   const corrections: Record<string, { original: any; corrected: any; reason: string }> = {};
+
+  const SHORT_DOC_THRESHOLD = 5000;
+  const isShortDoc = typeof data.sourceLength === 'number' && data.sourceLength < SHORT_DOC_THRESHOLD;
 
   // Revenue sanity check (expect values in millions)
   if (data.revenue !== null && data.revenue !== undefined) {
@@ -88,6 +97,34 @@ export function validateFinancials(data: {
     }
     if (data.revenue < 0) {
       warnings.push('Revenue is negative — likely an error.');
+    }
+    // Short-doc cap — values above $500M from a one-pager are almost always
+    // a target or projection misclassified as actuals.
+    if (isShortDoc && data.revenue > 500) {
+      warnings.push(
+        `Revenue ${fmtVal(data.revenue)} from a short source document (~${Math.round((data.sourceLength ?? 0) / 2500)} pages) is unusual — verify it isn't a target, projection, or valuation.`
+      );
+    }
+  }
+
+  // Deal-size sanity check
+  if (data.dealSize !== null && data.dealSize !== undefined) {
+    if (isShortDoc && data.dealSize > 1000) {
+      warnings.push(
+        `Deal size ${fmtVal(data.dealSize)} from a short source document is unusual — verify it isn't a valuation or fundraise target.`
+      );
+    }
+    // Cross-field: revenue vastly exceeding dealSize on a short doc — one of the
+    // two is almost certainly a misclassified target/valuation.
+    if (
+      isShortDoc &&
+      data.revenue && data.revenue > 0 &&
+      data.dealSize > 0 &&
+      data.revenue > data.dealSize * 5
+    ) {
+      warnings.push(
+        `Revenue ${fmtVal(data.revenue)} >> deal size ${fmtVal(data.dealSize)} on a one-pager — one of these is likely a target or valuation, not the actual.`
+      );
     }
   }
 

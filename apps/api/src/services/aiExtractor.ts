@@ -51,7 +51,7 @@ const ExtractionOutputSchema = z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
     source: z.string().nullable(),
-  }).describe('Annual revenue in millions (in the original document currency). If only MRR (monthly recurring revenue) is given, multiply by 12 to get annual. If only ARR is given, use that directly. Always return the annualized figure.'),
+  }).describe('CURRENT ACTUAL annual revenue in millions (in the original document currency). ONLY extract when the document states actual realized revenue ("revenue of $X", "FY24 revenue $X", "TTM revenue $X", "ARR (current)"). DO NOT extract from "revenue target", "projected revenue", "expected revenue", "ARR target by 20XX", "forecast", "guidance", or any forward-looking figure — return null and a 0 confidence in those cases. If only MRR (monthly recurring revenue, current) is given, multiply by 12. If only current ARR is given, use that directly. Always return the annualized current figure.'),
   ebitda: z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
@@ -82,7 +82,7 @@ const ExtractionOutputSchema = z.object({
     value: z.number().nullable(),
     confidence: z.number().min(0).max(100),
     source: z.string().nullable(),
-  }).describe('Enterprise value, asking price, or deal size in millions (in the original document currency). Look for terms like "enterprise value", "EV", "asking price", "valuation", "deal value". Return null if not mentioned.'),
+  }).describe('Enterprise value / transaction size of the DEAL being evaluated, in millions (in the original document currency). ONLY extract when the source clearly states the EV / asking price / transaction value / purchase price for THIS specific deal: "enterprise value $X", "EV of $X", "asking price $X", "transaction value $X", "purchase price $X". DO NOT extract from: pre-money or post-money valuation, market cap, fundraise size, capital raise target, valuation cap, "valued at $X" (unless explicitly the deal price), or aspirational figures. Return null and 0 confidence if uncertain.'),
   keyRisks: z.array(z.string()).describe('3-5 key investment risks'),
   investmentHighlights: z.array(z.string()).describe('3-5 positive investment points'),
   summary: z.string().describe('3-4 sentence executive summary'),
@@ -186,7 +186,47 @@ STEP 3 — MANDATORY SOURCE QUOTE FOR REVENUE / EBITDA / DEALSIZE:
 COMMON ERROR TO AVOID:
    A small-business CIM with revenue of "$45,300" or "$300,000" is real — many lower-middle-market deals trade at $1M–$50M revenue. Do NOT inflate small values to millions because the deal "looks small". If the source reads "$45,300", the answer is 0.0453, not 45.3.
 
-IMPORTANT: Small values are valid. Do NOT round small amounts to 0 or null.`;
+CRITICAL — STATED-ACTUAL vs TARGET / PROJECTION / VALUATION (DO NOT CONFUSE THESE):
+
+REVENUE — only extract when the source unambiguously states a CURRENT, REALIZED, or LTM/TTM revenue figure. Reject the value (set null, confidence 0) when the source uses any of these forward-looking framings:
+- "revenue target", "target revenue", "targeting $X revenue", "aiming for $X revenue"
+- "revenue projection", "projected revenue", "forecast revenue", "expected revenue"
+- "ARR target", "ARR goal", "ARR by 2028", "$X ARR run-rate by 20XX"
+- "revenue plan", "guidance", "outlook", "expected $X by 20XX"
+- "potential revenue", "addressable revenue", "TAM"
+- "we will reach $X", "on track to $X"
+Worked examples of REJECT cases (these are NOT current revenue):
+  · "Revenue target of $50M by 2028" → revenue.value = null, confidence = 0
+  · "Projected $20M ARR by FY27" → revenue.value = null, confidence = 0
+  · "Plans to scale to $10B revenue" → revenue.value = null, confidence = 0
+  · "Target $100M ARR" with no current ARR stated → revenue.value = null, confidence = 0
+ACCEPT only when the source is in past or present-actual tense and clearly the realized number, e.g.:
+  · "FY24 revenue: $45M" → 45 (high confidence)
+  · "TTM revenue of $12.3M" → 12.3 (high confidence)
+  · "Current ARR: $8M (as of Mar 2025)" → 8 (high confidence)
+  · "Revenue grew from $30M (FY22) to $50M (FY23)" → 50 for FY23 (high confidence)
+If the document mixes current and target figures, prefer the most recent CURRENT/LTM/TTM value, never the target.
+
+DEALSIZE — only extract when the source clearly states the enterprise value or transaction value for THIS deal. DO NOT confuse with company valuation, fundraise size, or market cap. Reject (set null, confidence 0) for:
+- "$X valuation", "valued at $X", "$X pre-money", "$X post-money" (unless explicitly stated as the transaction price)
+- "raising $X", "$X round", "Series A of $X" (this is fundraise size, NOT deal size)
+- "valuation cap of $X" (cap-table term, not deal size)
+- "market cap $X" (public company term)
+- "EV/Revenue multiple of X" (a multiple, not a price)
+ACCEPT only:
+  · "Enterprise value: $250M" → 250
+  · "Asking price $150M" → 150
+  · "Transaction value: $500M" → 500
+  · "Purchase price: $80M" → 80
+If unclear whether a number is the deal price vs. the company's valuation cap or fundraise, set value to null with confidence 0.
+
+DOCUMENT-LENGTH CALIBRATION:
+- A teaser, one-pager, or executive summary (under ~5,000 characters / ~2 pages) by definition contains LIMITED financial detail. Most figures in such documents are aspirational, headline numbers, or forward-looking targets — NOT comprehensive current actuals.
+- When the document is short, BIAS TOWARD CONSERVATIVE EXTRACTION. Set extracted-field confidence ≤ 60 unless a number is explicitly framed as a current actual with surrounding context.
+- Page numbers, section headers, and aspirational figures should never be captured as financial fields. If you see "Page 3" or a year ("2028") in a header, that is NOT a financial value.
+
+IMPORTANT: Small values are valid. Do NOT round small amounts to 0 or null.
+IMPORTANT: When in doubt about whether a number is current-actual vs. target/projection/valuation, return null with confidence 0 — it's far better to miss a value than to silently inflate the deal record with a target or valuation.`;
 
 /**
  * Extract structured deal data from document text using AI
@@ -205,11 +245,20 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
 
   try {
     const truncatedText = text.slice(0, 20000);
-    log.debug('AI extraction starting (structured output)', { textLength: truncatedText.length });
+    const sourceLen = text.length;
+    // Document-length classification — biases the extractor toward conservative
+    // values for short docs. Teasers/one-pagers are dominated by aspirational
+    // figures, not current actuals.
+    const approxPages = Math.max(1, Math.round(sourceLen / 2500));
+    const isShortDoc = sourceLen < 5000;
+    const docLengthHint = isShortDoc
+      ? `\n\nDOCUMENT-LENGTH CONTEXT: This document is ${sourceLen} characters (~${approxPages} page${approxPages === 1 ? '' : 's'}) — a SHORT document (teaser / one-pager / executive summary). Short documents rarely contain comprehensive current financials — most numbers are headlines, targets, or projections. CALIBRATE CONFIDENCE ACCORDINGLY: cap revenue/EBITDA/dealSize confidence at 60 unless the source explicitly frames the figure as a current actual (e.g. "FY24 revenue", "TTM", "as of Mar 2025"). When uncertain whether a number is actual vs. target, return null.`
+      : `\n\nDOCUMENT-LENGTH CONTEXT: This document is ${sourceLen} characters (~${approxPages} pages) — a STANDARD-length document (CIM / IM / financial model). You may have full context to extract current financials with high confidence when explicitly stated.`;
+    log.debug('AI extraction starting (structured output)', { textLength: truncatedText.length, fullLength: sourceLen, isShortDoc });
 
     const messages = [
       new SystemMessage(EXTRACTION_SYSTEM_PROMPT),
-      new HumanMessage(`Analyze this document and extract business/financial data with confidence scores:\n\n${truncatedText}`),
+      new HumanMessage(`Analyze this document and extract business/financial data with confidence scores:${docLengthHint}\n\n${truncatedText}`),
     ];
 
     let extracted: any;
@@ -251,6 +300,24 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
       reviewReasons: [],
     };
 
+    // Short-doc confidence guard — defensive backstop in case the LLM ignores
+    // the prompt-level instruction. Teasers / one-pagers (< 5,000 chars) cap
+    // financial-field confidence at 60 so downstream merge logic treats them
+    // as needing review even when the model claims 90% confidence.
+    const SHORT_DOC_THRESHOLD = 5000;
+    const SHORT_DOC_CONF_CAP = 60;
+    if (sourceLen < SHORT_DOC_THRESHOLD) {
+      const fields: Array<keyof Pick<ExtractedDealData, 'revenue' | 'ebitda' | 'ebitdaMargin' | 'dealSize' | 'revenueGrowth'>> = [
+        'revenue', 'ebitda', 'ebitdaMargin', 'dealSize', 'revenueGrowth',
+      ];
+      for (const k of fields) {
+        const f = result[k];
+        if (f && f.value !== null && f.confidence > SHORT_DOC_CONF_CAP) {
+          (result[k] as ExtractedField<number | null>).confidence = SHORT_DOC_CONF_CAP;
+        }
+      }
+    }
+
     // Calculate overall confidence and determine if review is needed
     const confidenceScores: number[] = [];
     const reviewReasons: string[] = [];
@@ -277,6 +344,33 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
         reviewReasons.push(`EBITDA uncertain: ${formatExtractedValue(result.ebitda.value)} (${result.ebitda.confidence}% confidence)`);
       }
       confidenceScores.push(result.ebitda.confidence);
+    }
+
+    // Short-doc with large absolute values — flag unconditionally for review.
+    // A 1-page teaser claiming $500M+ revenue or $1B+ deal size is almost
+    // always a target / valuation / projection misclassified as actuals.
+    if (sourceLen < SHORT_DOC_THRESHOLD) {
+      reviewReasons.push(`Short source document (${sourceLen} chars / ~${approxPages} page${approxPages === 1 ? '' : 's'}) — verify financial values against the source.`);
+      if (result.revenue.value !== null && result.revenue.value > 500) {
+        reviewReasons.push(`Revenue ${formatExtractedValue(result.revenue.value)} from a one-pager is unusual — verify it isn't a target or projection.`);
+      }
+      if (result.dealSize.value !== null && result.dealSize.value > 1000) {
+        reviewReasons.push(`Deal size ${formatExtractedValue(result.dealSize.value)} from a one-pager is unusual — verify it isn't a valuation or fundraise target.`);
+      }
+    }
+
+    // Cross-field sanity: revenue should generally not exceed dealSize by an
+    // implausible multiple. If revenue is more than 5x dealSize on a short
+    // document, that's a sign one of the two is likely a target/valuation.
+    if (
+      sourceLen < SHORT_DOC_THRESHOLD &&
+      result.revenue.value !== null && result.revenue.value > 0 &&
+      result.dealSize.value !== null && result.dealSize.value > 0 &&
+      result.revenue.value > result.dealSize.value * 5
+    ) {
+      reviewReasons.push(
+        `Revenue ${formatExtractedValue(result.revenue.value)} >> deal size ${formatExtractedValue(result.dealSize.value)} — one of these is likely a target or valuation, not the actual.`
+      );
     }
 
     result.overallConfidence = confidenceScores.length > 0

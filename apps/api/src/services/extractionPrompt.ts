@@ -100,6 +100,49 @@ INCOME STATEMENT: ${LINE_ITEM_KEYS.INCOME_STATEMENT}
 BALANCE SHEET: ${LINE_ITEM_KEYS.BALANCE_SHEET}
 CASH FLOW: ${LINE_ITEM_KEYS.CASH_FLOW}
 
+DYNAMIC SUB-CATEGORIES (when the source breaks a line item into named components):
+Many sources break a single canonical line item ("R&D", "COGS", "OpEx", "CapEx", etc.) into source-specific sub-buckets — for example R&D split into "Engineering R&D / Product R&D / Applied R&D", or COGS split into "Cost of Goods" and "Cost of Services", or CapEx split into "Maintenance CapEx" and "Growth CapEx". Capture each sub-bucket as its own key using the convention:
+    <parent_canonical_key>_<short_lowercase_label>
+- The "<parent_canonical_key>" MUST be one of the canonical keys listed above (rd, cogs, sga, other_opex, total_opex, capex, ppe_net, accounts_receivable, inventory, etc.). Do NOT invent new parents.
+- "<short_lowercase_label>" is a snake_case ASCII slug derived from the source's label (max ~24 chars). Strip the parent's name from the label if it appears redundantly (e.g. "Engineering R&D" under R&D becomes "engineering", not "engineering_rd").
+- ALSO emit the rolled-up parent total under the parent's canonical key (e.g. "rd": 10) — children should sum to the parent within rounding. The frontend renders sub-categories indented under the parent.
+- Skip the convention if the source does NOT break the parent down — only emit children when the source explicitly itemizes them.
+- Sub-category values follow the same unit scale as the rest of the statement (do NOT mix scales).
+- Confidence/_source citations apply to children too: emit "<parent>_<label>_source" alongside "<parent>_<label>" when source citations are required.
+
+WORKED EXAMPLE — source page reads:
+    R&D Expense                        FY2023
+      Engineering R&D                    5.2
+      Product R&D                        3.1
+      Applied R&D                        1.7
+      Total R&D                         10.0
+Emit:
+    "rd": 10.0,
+    "rd_engineering": 5.2,
+    "rd_product": 3.1,
+    "rd_applied": 1.7
+(Plus matching _source fields if source citations are on.)
+
+WORKED EXAMPLE — source page reads:
+    Cost of Goods Sold                  18.5
+    Cost of Services                     6.2
+    Total COGS                          24.7
+Emit:
+    "cogs": 24.7,
+    "cogs_goods": 18.5,
+    "cogs_services": 6.2
+
+WORKED EXAMPLE — source page reads:
+    Maintenance CapEx                    1.2
+    Growth CapEx                         3.4
+    Total CapEx                          4.6
+Emit:
+    "capex": 4.6,
+    "capex_maintenance": 1.2,
+    "capex_growth": 3.4
+
+DO NOT emit children for line items already broken out as their own canonical keys (e.g. don't emit "total_opex_sga" because "sga" is already canonical). Only use the convention when the source's sub-buckets have NO canonical home.
+
 UNIT SCALE — store values AS WRITTEN at the source's scale, then tag unitScale accordingly. Do NOT convert:
 - HEADER SAYS "in millions" or "$M": value "50" → store 50, set unitScale "MILLIONS"
 - HEADER SAYS "in thousands" or "$000s": value "1,500" → store 1500, set unitScale "THOUSANDS"

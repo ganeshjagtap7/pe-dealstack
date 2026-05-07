@@ -164,13 +164,15 @@ router.post('/', upload.single('file'), async (req, res) => {
       needsReview: aiData.needsReview,
     });
 
-    // Financial validation
+    // Financial validation — sourceLength enables short-doc bounds
     const financialCheck = validateFinancials({
       revenue: aiData.revenue.value,
       ebitda: aiData.ebitda.value,
       ebitdaMargin: aiData.ebitdaMargin?.value,
       revenueGrowth: aiData.revenueGrowth?.value,
       employees: aiData.employees?.value,
+      dealSize: aiData.dealSize?.value,
+      sourceLength: extractedText.length,
     });
     if (!financialCheck.isValid) {
       aiData.needsReview = true;
@@ -229,6 +231,16 @@ router.post('/', upload.single('file'), async (req, res) => {
       const dealIcon = getIconForIndustry(aiData.industry.value);
       const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
 
+      // Per-field confidence floor — values below this don't auto-populate
+      // the Deal table. Same gate as merge path (see dealMerger.ts).
+      const FIELD_FLOOR = 60;
+      const safeRevenue = aiData.revenue.value != null && aiData.revenue.confidence >= FIELD_FLOOR
+        ? aiData.revenue.value : null;
+      const safeEbitda = aiData.ebitda.value != null && aiData.ebitda.confidence >= FIELD_FLOOR
+        ? aiData.ebitda.value : null;
+      const safeDealSize = aiData.dealSize?.value != null && aiData.dealSize.confidence >= FIELD_FLOOR
+        ? aiData.dealSize.value : null;
+
       // User-provided deal context (optional fields from ingest form)
       const userSource = req.body?.source || null;
       const userThesis = req.body?.userThesis || null;
@@ -262,10 +274,10 @@ router.post('/', upload.single('file'), async (req, res) => {
           priority: userPriority,
           industry: aiData.industry.value,
           description: aiData.description.value,
-          revenue: aiData.revenue.value,
-          ebitda: aiData.ebitda.value,
+          revenue: safeRevenue,
+          ebitda: safeEbitda,
           currency: aiData.currency || 'USD',
-          dealSize: aiData.dealSize?.value || null,
+          dealSize: safeDealSize,
           aiThesis: userThesis || aiData.summary,
           icon: dealIcon,
           ...(userSource ? { source: userSource } : {}),

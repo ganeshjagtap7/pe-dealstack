@@ -115,8 +115,13 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
     const companyName = extractedData.companyName.value;
     const industryValue = extractedData.industry.value;
     const descriptionValue = extractedData.description.value;
-    const revenueValue = extractedData.revenue.value;
-    const ebitdaValue = extractedData.ebitda.value;
+    // Per-field confidence floor — same gate as the other ingest routes.
+    // Low-confidence financial values are NOT auto-populated on the Deal.
+    const FIELD_FLOOR = 60;
+    const revenueValue = extractedData.revenue.value != null && extractedData.revenue.confidence >= FIELD_FLOOR
+      ? extractedData.revenue.value : null;
+    const ebitdaValue = extractedData.ebitda.value != null && extractedData.ebitda.confidence >= FIELD_FLOOR
+      ? extractedData.ebitda.value : null;
 
     if (companyName) {
       // Check if company already exists in this org

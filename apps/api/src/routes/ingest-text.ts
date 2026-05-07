@@ -39,13 +39,15 @@ subRouter.post('/text', async (req, res) => {
       return res.status(400).json({ error: 'Could not extract deal data from text. Try providing more detail.' });
     }
 
-    // Financial validation
+    // Financial validation — sourceLength allows tighter bounds on short docs
     const financialCheck = validateFinancials({
       revenue: aiData.revenue.value,
       ebitda: aiData.ebitda.value,
       ebitdaMargin: aiData.ebitdaMargin?.value,
       revenueGrowth: aiData.revenueGrowth?.value,
       employees: aiData.employees?.value,
+      dealSize: aiData.dealSize?.value,
+      sourceLength: text.length,
     });
     if (!financialCheck.isValid) {
       aiData.needsReview = true;
@@ -94,6 +96,20 @@ subRouter.post('/text', async (req, res) => {
       const dealIcon = getIconForIndustry(aiData.industry.value);
       const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
 
+      // Per-field confidence floor — values below this don't auto-populate
+      // the Deal table (they remain on the Document.extractedData blob for
+      // manual review). Prevents one-pager teasers / aspirational figures
+      // from overwriting deal-level fields.
+      const FIELD_FLOOR = 60;
+      const safeRevenue = aiData.revenue.value != null && aiData.revenue.confidence >= FIELD_FLOOR
+        ? aiData.revenue.value : null;
+      const safeEbitda = aiData.ebitda.value != null && aiData.ebitda.confidence >= FIELD_FLOOR
+        ? aiData.ebitda.value : null;
+      // dealSize is the EV/transaction value of the deal — NOT revenue.
+      // Only populate from the dedicated dealSize field, never from revenue.
+      const safeDealSize = aiData.dealSize?.value != null && aiData.dealSize.confidence >= FIELD_FLOOR
+        ? aiData.dealSize.value : null;
+
       const { data: newDeal, error: dealError } = await supabase
         .from('Deal')
         .insert({
@@ -104,10 +120,10 @@ subRouter.post('/text', async (req, res) => {
           status: dealStatus,
           industry: aiData.industry.value,
           description: aiData.description.value,
-          revenue: aiData.revenue.value,
-          ebitda: aiData.ebitda.value,
+          revenue: safeRevenue,
+          ebitda: safeEbitda,
           currency: aiData.currency || 'USD',
-          dealSize: aiData.revenue.value,
+          dealSize: safeDealSize,
           aiThesis: aiData.summary,
           icon: dealIcon,
           extractionConfidence: aiData.overallConfidence,

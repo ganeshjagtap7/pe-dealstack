@@ -215,12 +215,17 @@ export function extractTextFromExcel(buffer: Buffer): string | null {
   }
 }
 
-/** Returns true if the MIME type or filename looks like an Excel file */
+/** Returns true if the MIME type or filename looks like an Excel-family file
+ *  (XLSX/XLS/XLSM/XLSB or CSV — XLSX.read parses CSV from a buffer too, so we
+ *  funnel both through the same extractor). The frontend file picker exposes
+ *  .csv to users; without this match the non-bulk ingest path falls into the
+ *  "Unsupported file type" branch. */
 export function isExcelFile(mimeType?: string | null, filename?: string | null): boolean {
   if (mimeType) {
     if (
       mimeType.includes('spreadsheet') ||
       mimeType.includes('excel') ||
+      mimeType.includes('csv') ||
       mimeType === 'application/vnd.ms-excel' ||
       mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     ) {
@@ -228,7 +233,7 @@ export function isExcelFile(mimeType?: string | null, filename?: string | null):
     }
   }
   if (filename) {
-    return /\.(xlsx|xls|xlsm|xlsb)$/i.test(filename);
+    return /\.(xlsx|xls|xlsm|xlsb|csv)$/i.test(filename);
   }
   return false;
 }
