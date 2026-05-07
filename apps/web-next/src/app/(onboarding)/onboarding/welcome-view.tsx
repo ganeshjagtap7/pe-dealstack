@@ -24,14 +24,14 @@ export function WelcomeView({
         <div className="md:col-span-3">
           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary-light text-primary text-[11px] font-semibold uppercase tracking-wider mb-6">
             <span className="w-1.5 h-1.5 rounded-full bg-secondary" />
-            Purpose-built for PE
+            Built for deal teams
           </div>
           <h1 className="font-display text-[44px] leading-[1.05] font-bold tracking-tight text-text-main">
-            Let&apos;s analyze your first deal.
-            <span className="block text-text-muted">Three short steps.</span>
+            Screen your first deal.
+            <span className="block text-text-muted">Three steps.</span>
           </h1>
           <p className="mt-5 text-[15px] text-text-secondary max-w-lg leading-relaxed">
-            Tell us who you are, drop in a CIM, and we&apos;ll show you what PE OS does. No prompts to write. No training required.
+            Set your thesis, drop in a CIM, and we&apos;ll mark it up the way an associate would. No prompts. No setup.
           </p>
           <div className="mt-8 flex items-center gap-3 flex-wrap">
             <button
@@ -40,7 +40,7 @@ export function WelcomeView({
               className="inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-white font-semibold text-sm transition-all hover:opacity-90"
               style={{ backgroundColor: "#003366" }}
             >
-              Let&apos;s go
+              Start
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </button>
             <button
@@ -48,7 +48,7 @@ export function WelcomeView({
               onClick={onSample}
               className="inline-flex items-center rounded-lg border border-border-subtle bg-white px-4 py-2.5 text-text-secondary font-medium text-sm hover:border-border-focus hover:text-text-main transition-colors"
             >
-              Use a sample deal
+              Walk through a sample CIM
             </button>
             <span className="text-[12px] text-text-muted ml-2 hidden sm:inline">
               <kbd className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-gray-100 border border-gray-200">↵</kbd>
@@ -58,9 +58,9 @@ export function WelcomeView({
 
           <div className="mt-14 pt-8 border-t border-border-subtle grid grid-cols-3 gap-6 max-w-lg">
             {[
-              { value: "< 3min", label: "To first insight" },
-              { value: "No prompts", label: "Pre-loaded context" },
-              { value: "SOC 2", label: "Enterprise ready" },
+              { value: "< 3 min", label: "First-pass screen" },
+              { value: "No prompts", label: "Thesis-aware out of the box" },
+              { value: "SOC 2", label: "Audit-grade trail" },
             ].map((s) => (
               <div key={s.label}>
                 <div className="font-display text-[22px] font-bold text-primary">{s.value}</div>
@@ -74,25 +74,25 @@ export function WelcomeView({
           <div className="bg-white border border-border-subtle rounded-xl shadow-card p-5">
             <div className="flex items-center gap-2 text-[11px] uppercase tracking-wider text-text-muted font-medium mb-4">
               <span className="material-symbols-outlined text-[14px]">checklist</span>
-              Your checklist
+              What we&apos;ll set up
             </div>
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-[13px]">
                 <ChecklistCircle text="1" />
-                <span className="text-text-secondary">Define your investment focus</span>
+                <span className="text-text-secondary">Set your investment thesis</span>
               </li>
               <li className="flex items-center gap-3 text-[13px]">
                 <ChecklistCircle text="2" />
-                <span className="text-text-secondary">Upload your first deal</span>
+                <span className="text-text-secondary">Drop in your first CIM</span>
               </li>
               <li className="flex items-center gap-3 text-[13px]">
                 <ChecklistCircle text="3" />
-                <span className="text-text-secondary">Invite your team</span>
+                <span className="text-text-secondary">Bring in your deal team</span>
                 <span className="ml-auto text-[10.5px] text-text-muted uppercase">optional</span>
               </li>
             </ul>
             <div className="mt-4 pt-4 border-t border-border-subtle text-[12px] text-text-muted leading-relaxed">
-              That&apos;s it. Pipeline, sources, and more live in the app — set them up when you need them.
+              That&apos;s the floor. Pipeline, sources, comps, and IC memos live inside — wire those up when a deal calls for it.
             </div>
           </div>
         </div>
