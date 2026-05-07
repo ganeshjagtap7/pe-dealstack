@@ -177,8 +177,17 @@ function normalizeUnitScale(raw: string): UnitScale {
     MILLIONS: 'MILLIONS',
     THOUSANDS: 'THOUSANDS',
     ACTUALS: 'ACTUALS',
+    BILLIONS: 'BILLIONS',
   };
-  return map[String(raw ?? '').toUpperCase().trim()] ?? 'MILLIONS';
+  const key = String(raw ?? '').toUpperCase().trim();
+  const matched = map[key];
+  if (matched) return matched;
+  // Mirror financialClassifier.normalizeUnitScale: unknown/missing → ACTUALS
+  // (no silent ×1,000,000 inflation) and warn so model regressions surface.
+  if (key !== '') {
+    log.warn('Vision extractor: unknown unitScale from LLM, defaulting to ACTUALS', { raw });
+  }
+  return 'ACTUALS';
 }
 
 function normalizeLineItems(raw: Record<string, any>): Record<string, number | null> {

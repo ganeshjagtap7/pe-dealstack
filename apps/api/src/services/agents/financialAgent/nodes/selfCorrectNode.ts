@@ -52,7 +52,7 @@ RULES:
 1. Focus specifically on the issues listed above
 2. Double-check your math: Revenue - COGS must equal Gross Profit, Assets must equal Liabilities + Equity, etc.
 3. If a value truly cannot be determined from the text, use null — do not guess
-4. Normalize all values to MILLIONS USD
+4. Preserve the source's unit scale. Set unitScale to whatever the source uses: MILLIONS, THOUSANDS, ACTUALS, or BILLIONS. Do NOT convert values — store them at the source's scale (e.g., a startup spreadsheet showing "$6,700" in actual dollars stays as 6700 with unitScale "ACTUALS", NOT 0.0067 with "MILLIONS").
 5. confidence: only use 90+ if you are certain the value is correct
 
 INCOME STATEMENT line item keys:
@@ -68,12 +68,12 @@ long_term_debt, total_liabilities, total_equity
 CASH FLOW line item keys:
 operating_cf, capex, fcf, acquisitions, debt_repayment, dividends, net_change_cash
 
-Return ONLY valid JSON:
+Return ONLY valid JSON. Set unitScale to whatever matches the source: "MILLIONS" | "THOUSANDS" | "ACTUALS" | "BILLIONS". Example below uses THOUSANDS — do NOT default to MILLIONS, mirror the source:
 {
   "statements": [
     {
       "statementType": "BALANCE_SHEET",
-      "unitScale": "MILLIONS",
+      "unitScale": "<MILLIONS|THOUSANDS|ACTUALS|BILLIONS — match the source>",
       "currency": "USD",
       "periods": [
         {

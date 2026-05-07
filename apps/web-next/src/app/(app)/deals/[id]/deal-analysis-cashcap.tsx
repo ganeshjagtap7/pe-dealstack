@@ -1,5 +1,6 @@
 "use client";
 
+import { formatFinancialValue, type UnitScale } from "@/lib/formatters";
 import {
   type AnalysisData,
   type CashFlowAnalysis,
@@ -27,6 +28,8 @@ export function CashCapitalPanel({ analysis }: { analysis: AnalysisData | null }
   const cfa = analysis.cashFlowAnalysis;
   const wc = analysis.workingCapital;
   const dc = analysis.debtCapacity;
+  const scale = (analysis.unitScale ?? undefined) as UnitScale | undefined;
+  const currency = analysis.currency ?? "USD";
 
   if (!cfa && !wc && !dc) {
     return <EmptyTabState icon="payments" message="Cash flow, working capital, and debt capacity analysis will appear here once enough financial data is extracted." />;
@@ -34,15 +37,32 @@ export function CashCapitalPanel({ analysis }: { analysis: AnalysisData | null }
 
   return (
     <div className="flex flex-col gap-4">
-      {cfa && <CashFlowAnalysisCard cfa={cfa} />}
-      {wc && <WorkingCapitalCard wc={wc} />}
-      {dc && <DebtCapacityCard dc={dc} />}
+      {cfa && <CashFlowAnalysisCard cfa={cfa} scale={scale} currency={currency} />}
+      {wc && <WorkingCapitalCard wc={wc} scale={scale} currency={currency} />}
+      {dc && <DebtCapacityCard dc={dc} scale={scale} currency={currency} />}
     </div>
   );
 }
 
+// Local helper — wraps formatFinancialValue with the panel-level scale.
+function fmt(
+  v: number | null | undefined,
+  scale: UnitScale | undefined,
+  currency: string,
+): string {
+  return formatFinancialValue(v, scale, { currency });
+}
+
 // Card: Cash Flow Analysis (matches legacy renderCashFlowAnalysis)
-function CashFlowAnalysisCard({ cfa }: { cfa: CashFlowAnalysis }) {
+function CashFlowAnalysisCard({
+  cfa,
+  scale,
+  currency,
+}: {
+  cfa: CashFlowAnalysis;
+  scale: UnitScale | undefined;
+  currency: string;
+}) {
   const vp = cfa.periods.filter((p) => p.ebitda != null || p.fcf != null);
   if (!vp.length) return null;
   const convColor = cfa.avgConversion == null ? "#64748B" : cfa.avgConversion >= 70 ? "#059669" : cfa.avgConversion >= 50 ? "#d97706" : "#dc2626";
@@ -65,19 +85,19 @@ function CashFlowAnalysisCard({ cfa }: { cfa: CashFlowAnalysis }) {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-gray-100"><td className="p-2.5 font-semibold text-gray-800">EBITDA</td>{vp.map((p) => <td key={p.period} className="text-right p-2.5 text-gray-800">{p.ebitda != null ? `$${p.ebitda}M` : "--"}</td>)}</tr>
-            <tr className="border-b border-gray-100"><td className="p-2.5" style={{ color: "#dc2626" }}>- CapEx</td>{vp.map((p) => <td key={p.period} className="text-right p-2.5" style={{ color: "#dc2626" }}>{p.capex != null ? `($${p.capex}M)` : "--"}</td>)}</tr>
-            <tr className="border-b border-gray-100"><td className="p-2.5" style={{ color: "#d97706" }}>- WC Change</td>{vp.map((p) => <td key={p.period} className="text-right p-2.5" style={{ color: "#d97706" }}>{p.wcChange != null ? (p.wcChange >= 0 ? `($${p.wcChange}M)` : `+$${Math.abs(p.wcChange)}M`) : "--"}</td>)}</tr>
+            <tr className="border-b border-gray-100"><td className="p-2.5 font-semibold text-gray-800">EBITDA</td>{vp.map((p) => <td key={p.period} className="text-right p-2.5 text-gray-800">{fmt(p.ebitda, scale, currency)}</td>)}</tr>
+            <tr className="border-b border-gray-100"><td className="p-2.5" style={{ color: "#dc2626" }}>- CapEx</td>{vp.map((p) => <td key={p.period} className="text-right p-2.5" style={{ color: "#dc2626" }}>{p.capex != null ? `(${fmt(p.capex, scale, currency)})` : "—"}</td>)}</tr>
+            <tr className="border-b border-gray-100"><td className="p-2.5" style={{ color: "#d97706" }}>- WC Change</td>{vp.map((p) => <td key={p.period} className="text-right p-2.5" style={{ color: "#d97706" }}>{p.wcChange != null ? (p.wcChange >= 0 ? `(${fmt(p.wcChange, scale, currency)})` : `+${fmt(Math.abs(p.wcChange), scale, currency)}`) : "—"}</td>)}</tr>
             <tr className="bg-gradient-to-r from-gray-100 to-gray-50 border-t-2 border-gray-200">
               <td className="p-2.5 font-bold" style={{ color: BANKER_BLUE }}>= Free Cash Flow</td>
-              {vp.map((p) => <td key={p.period} className="text-right p-2.5 font-bold" style={{ color: BANKER_BLUE }}>{p.fcf != null ? `$${p.fcf}M` : "--"}</td>)}
+              {vp.map((p) => <td key={p.period} className="text-right p-2.5 font-bold" style={{ color: BANKER_BLUE }}>{fmt(p.fcf, scale, currency)}</td>)}
             </tr>
             <tr>
               <td className="p-2.5 text-[10px] text-gray-500">Conversion %</td>
               {vp.map((p) => {
                 const c = p.ebitdaToFcfConversion;
                 const cc = c == null ? "#94A3B8" : c >= 70 ? "#059669" : c >= 50 ? "#d97706" : "#dc2626";
-                return <td key={p.period} className="text-right p-2.5 text-[11px] font-semibold" style={{ color: cc }}>{c != null ? `${c}%` : "--"}</td>;
+                return <td key={p.period} className="text-right p-2.5 text-[11px] font-semibold" style={{ color: cc }}>{c != null ? `${c.toFixed(1)}%` : "—"}</td>;
               })}
             </tr>
           </tbody>
@@ -88,14 +108,22 @@ function CashFlowAnalysisCard({ cfa }: { cfa: CashFlowAnalysis }) {
 }
 
 // Card: Working Capital (matches legacy renderWorkingCapital)
-function WorkingCapitalCard({ wc }: { wc: WorkingCapital }) {
+function WorkingCapitalCard({
+  wc,
+  scale,
+  currency,
+}: {
+  wc: WorkingCapital;
+  scale: UnitScale | undefined;
+  currency: string;
+}) {
   if (!wc.periods.length) return null;
   return (
     <AnalysisCard>
       <CardHeader icon="account_balance_wallet" title="Working Capital">
         {wc.normalizedNwc != null && (
           <span className="text-[10px] font-semibold px-2.5 py-0.5 rounded-full" style={{ background: BANKER_BLUE_MUTED, color: BANKER_BLUE }}>
-            Normalized NWC: ${wc.normalizedNwc}M
+            Normalized NWC: {fmt(wc.normalizedNwc, scale, currency)}
           </span>
         )}
       </CardHeader>
@@ -108,16 +136,16 @@ function WorkingCapitalCard({ wc }: { wc: WorkingCapital }) {
             </tr>
           </thead>
           <tbody>
-            <tr className="border-b border-gray-100"><td className="p-2.5 text-gray-800">Accounts Receivable</td>{wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 text-gray-800">{p.ar != null ? `$${p.ar}M` : "--"}</td>)}</tr>
-            <tr className="border-b border-gray-100"><td className="p-2.5 text-gray-800">Inventory</td>{wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 text-gray-800">{p.inventory != null ? `$${p.inventory}M` : "--"}</td>)}</tr>
-            <tr className="border-b border-gray-100"><td className="p-2.5" style={{ color: "#dc2626" }}>Accounts Payable</td>{wc.periods.map((p) => <td key={p.period} className="text-right p-2.5" style={{ color: "#dc2626" }}>{p.ap != null ? `($${p.ap}M)` : "--"}</td>)}</tr>
+            <tr className="border-b border-gray-100"><td className="p-2.5 text-gray-800">Accounts Receivable</td>{wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 text-gray-800">{fmt(p.ar, scale, currency)}</td>)}</tr>
+            <tr className="border-b border-gray-100"><td className="p-2.5 text-gray-800">Inventory</td>{wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 text-gray-800">{fmt(p.inventory, scale, currency)}</td>)}</tr>
+            <tr className="border-b border-gray-100"><td className="p-2.5" style={{ color: "#dc2626" }}>Accounts Payable</td>{wc.periods.map((p) => <td key={p.period} className="text-right p-2.5" style={{ color: "#dc2626" }}>{p.ap != null ? `(${fmt(p.ap, scale, currency)})` : "—"}</td>)}</tr>
             <tr className="bg-gradient-to-r from-gray-100 to-gray-50 border-t-2 border-gray-200">
               <td className="p-2.5 font-bold" style={{ color: BANKER_BLUE }}>Net Working Capital</td>
-              {wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 font-bold" style={{ color: BANKER_BLUE }}>{p.nwc != null ? `$${p.nwc}M` : "--"}</td>)}
+              {wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 font-bold" style={{ color: BANKER_BLUE }}>{fmt(p.nwc, scale, currency)}</td>)}
             </tr>
             <tr>
               <td className="p-2.5 text-[10px] text-gray-500">NWC % Revenue</td>
-              {wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 text-[11px] text-gray-500">{p.nwcPctRevenue != null ? p.nwcPctRevenue + "%" : "--"}</td>)}
+              {wc.periods.map((p) => <td key={p.period} className="text-right p-2.5 text-[11px] text-gray-500">{p.nwcPctRevenue != null ? p.nwcPctRevenue.toFixed(1) + "%" : "—"}</td>)}
             </tr>
           </tbody>
         </table>
@@ -127,15 +155,23 @@ function WorkingCapitalCard({ wc }: { wc: WorkingCapital }) {
 }
 
 // Card: Debt Capacity (matches legacy renderDebtCapacity)
-function DebtCapacityCard({ dc }: { dc: DebtCapacity }) {
+function DebtCapacityCard({
+  dc,
+  scale,
+  currency,
+}: {
+  dc: DebtCapacity;
+  scale: UnitScale | undefined;
+  currency: string;
+}) {
   const dscrColor = dc.dscr == null ? "#64748B" : dc.dscr >= 1.5 ? "#059669" : dc.dscr >= 1.25 ? "#d97706" : "#dc2626";
   const metrics: { label: string; value: string; color: string; sub?: string }[] = [
-    { label: "Current Leverage", value: dc.currentLeverage != null ? dc.currentLeverage + "x" : "--", color: BANKER_BLUE },
-    { label: "Max Debt @3x", value: dc.maxDebt3x != null ? `$${dc.maxDebt3x}M` : "--", color: BANKER_BLUE },
-    { label: "Max Debt @4x", value: dc.maxDebt4x != null ? `$${dc.maxDebt4x}M` : "--", color: BANKER_BLUE },
-    { label: "DSCR", value: dc.dscr != null ? dc.dscr + "x" : "--", color: dscrColor, sub: "Banks want >1.25x" },
-    { label: "Debt Headroom", value: dc.debtHeadroom != null ? `$${dc.debtHeadroom}M` : "--", color: "#059669", sub: "vs 4x capacity" },
-    { label: "Interest Coverage", value: dc.interestCoverage != null ? dc.interestCoverage + "x" : "--", color: BANKER_BLUE },
+    { label: "Current Leverage", value: dc.currentLeverage != null ? dc.currentLeverage + "x" : "—", color: BANKER_BLUE },
+    { label: "Max Debt @3x", value: fmt(dc.maxDebt3x, scale, currency), color: BANKER_BLUE },
+    { label: "Max Debt @4x", value: fmt(dc.maxDebt4x, scale, currency), color: BANKER_BLUE },
+    { label: "DSCR", value: dc.dscr != null ? dc.dscr + "x" : "—", color: dscrColor, sub: "Banks want >1.25x" },
+    { label: "Debt Headroom", value: fmt(dc.debtHeadroom, scale, currency), color: "#059669", sub: "vs 4x capacity" },
+    { label: "Interest Coverage", value: dc.interestCoverage != null ? dc.interestCoverage + "x" : "—", color: BANKER_BLUE },
   ];
 
   return (

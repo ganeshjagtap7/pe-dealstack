@@ -24,7 +24,176 @@ in the growth chart on top of whatever periods come back from the API.
 
 ---
 
-## Just shipped (this commit)
+## Just shipped (this commit) — pipeline honors the source's actual unit scale
+
+The whole financial-extraction pipeline was forcibly converting every
+value to "MILLIONS" regardless of source. A startup spreadsheet with
+`Revenue: $6,700` (actual dollars) ended up stored as `0.0067` with
+`unitScale: MILLIONS`. Five places baked that assumption in. Three
+parallel agents (X / Y / Z) ripped it out across prompts, storage, and
+UI in one coordinated pass.
+
+**Production symptoms this fixes:**
+- Tiny absolute values (`$0.0067M`) appearing for small-business
+  extractions, with `M` suffix everywhere even when source has no unit
+  hint or is explicitly in actual dollars / thousands.
+- Cross-document verification flagging huge phantom discrepancies
+  because doc A stored revenue at `MILLIONS=53.7` and doc B at
+  `ACTUALS=53,700,000` — same underlying number, but compared raw
+  triggered a 999,999% discrepancy.
+- AI cross-verify (Claude Haiku) confused into flagging valid actual-
+  dollar values because the prompt told it to assume millions.
+- `EBITDA margin > 95%` validator warnings firing on legitimate small
+  SaaS numbers because validator thresholds are calibrated for
+  millions-scale companies.
+
+### Agent X — strip "convert to MILLIONS" from every prompt + default
+
+**Files modified (5 in scope, +3 symmetric fixes the agent found):**
+- `apps/api/src/services/excelFinancialExtractor.ts` — `detectUnitScale`
+  hints now name the source unit and instruct Claude to *preserve* it
+  (`"Store values as written; set unitScale to <UNIT>. Do NOT convert."`)
+  rather than the prior "divide by N to get millions".
+- `apps/api/src/services/agents/financialAgent/nodes/selfCorrectNode.ts`
+  — system rule "Normalize all values to MILLIONS USD" → "Preserve the
+  source's unit scale. Set unitScale to whatever the source uses". JSON
+  schema example placeholder `"<MILLIONS|THOUSANDS|ACTUALS|BILLIONS — match the source>"`.
+- `apps/api/src/services/agents/financialAgent/nodes/verifyNode.ts` —
+  prompt now opens with a per-unitScale interpretation table (showing
+  `value 6700, unitScale ACTUALS = $6,700` is correct) and tells the
+  verifier `correctValue MUST be expressed at the SAME unitScale as the
+  statement`.
+- `apps/api/src/services/agents/financialAgent/nodes/crossVerifyNode.ts`
+  — `collectTopValues` now returns `{ values, meta }` carrying per-field
+  `{ unitScale, currency }`. `buildVerifyPrompt` annotates each value
+  line as `revenue: 6700  (unitScale: ACTUALS, currency: USD)` so Haiku
+  verifies at the right scale. Replaced "in millions USD unless
+  otherwise stated" with the per-unitScale interpretation table.
+- `apps/api/src/services/financialClassifier.ts` — `UnitScale` type
+  now includes `'BILLIONS'`. `normalizeUnitScale` defaults unknown /
+  missing to `'ACTUALS'` (was silently `'MILLIONS'`) and emits
+  `log.warn` so we catch model regressions in prod.
+- `apps/api/src/services/extractionPrompt.ts` (the *original* "always
+  millions" sin) — STEP 1 now sets `unitScale: ACTUALS` when no header
+  is found; STEP 2 rule 2 → "PRESERVE THE SOURCE'S UNIT SCALE … Do NOT
+  convert"; UNIT CONVERSION block became a unit-scale-tagging block;
+  JSON example shows the placeholder rather than `"MILLIONS"`.
+- `apps/api/src/services/visionExtractor.ts` — same `normalizeUnitScale`
+  treatment as the classifier.
+- `apps/api/src/services/documentChunker.ts` — chunk-merge fallback
+  `?? 'MILLIONS'` → `?? 'ACTUALS'`.
+- `apps/api/src/routes/financials.ts` — Zod enum extended with
+  `'BILLIONS'` so the API patch endpoint accepts it.
+
+### Agent Y — thread `unitScale` through storage, API responses, and cross-doc compare
+
+**Schema check:** `FinancialStatement.unitScale TEXT NOT NULL DEFAULT 'MILLIONS' CHECK (… IN ('MILLIONS','THOUSANDS','ACTUALS'))` already exists. CHECK constraint did NOT include `'BILLIONS'`. **New migration required** before a BILLIONS classification can land — see deploy-step note below.
+
+**Storage path verified:** `financialExtractionOrchestrator.ts:154,187`
+both INSERT and UPSERT include `unitScale: stmt.unitScale`. CSV parsers
+(`squareParser.ts`, `bankParser.ts`, `paypalParser.ts`) all set
+`unitScale: 'ACTUALS'`. No fix needed there.
+
+**Read paths fixed:**
+- `apps/api/src/routes/financials-merge.ts:42-58` — conflicts endpoint
+  versions array now exposes `unitScale + currency` per version.
+- `apps/api/src/routes/deals-chat-ai.ts:20-64,213-218` — `FinancialRow`
+  interface gained `unitScale + currency`. The hard-coded "All values
+  in $M USD" header in the LLM context now shows actual scales, with
+  per-statement labels when mixed.
+
+**Cross-doc verification fix (the user-reported "millions of issues"):**
+`apps/api/src/routes/financials-analysis.ts:221-285` was comparing raw
+`lineItems` values across documents without normalising for `unitScale`.
+Added `toMillions` helper that converts each value to a common scale
+before computing `discrepancyPct`. Display values preserve the source
+scale; only the comparison is normalised. Per-version `unitScale` now
+returned in `values[]` so the frontend renders each at the right unit.
+
+**Bonus normalisation fix:** `financials-memo.ts:33-83` peer-benchmark
+endpoint had the same cross-deal raw-comparison bug. Same `toMillions`
+helper applied.
+
+**Frontend type chain updated:**
+- `apps/web-next/src/app/(app)/deals/[id]/deal-financials-conflicts.tsx:3-15`
+  — `ConflictVersion` gained `unitScale + currency`.
+
+### Agent Z — frontend `formatFinancialValue` + per-call-site rollout
+
+**New helper** in `apps/web-next/src/lib/formatters.ts` (164 → 288 lines):
+- `formatFinancialValue(value, unitScale?, { currency?, precision? })`
+  — converts the stored value to actual dollars via `unitScale`, then
+  auto-renders at the most appropriate magnitude:
+  `< 1,000` raw, `1K–999K`, `1M–999M`, `≥ 1B`. Em-dash on null /
+  undefined / NaN. INR uses `Cr`/`L`. Default scale `ACTUALS`,
+  precision `1`. Worked examples:
+  - `formatFinancialValue(0.0067, 'MILLIONS')` → `"$6.7K"`
+  - `formatFinancialValue(6700, 'ACTUALS')` → `"$6.7K"` (same dollar
+    amount, different storage unit, same display)
+  - `formatFinancialValue(53.7, 'THOUSANDS')` → `"$53.7K"`
+  - `formatFinancialValue(1.5, 'BILLIONS')` → `"$1.5B"`
+- `formatPercent(value, decimals?)` — kept distinct from currency for
+  ratio / margin / growth fields.
+- `toActualDollars(value, unitScale?)` — chart datasets share the
+  scaling logic without duplicating the multiplier table.
+
+**Applied across 13 call sites** (replacing hardcoded `${val}M`-style
+literals):
+1. `deal-financials-formatters.tsx` — `fmtMoney` delegates to the new helper.
+2. `deal-financials-table.tsx` — per-row `unitScale` (was first-row only).
+3. `deal-financials-charts.tsx` — `RevenueChart` + `BalanceSheetChart`
+   pre-convert via `toActualDollars`; y-axis ticks + tooltips
+   auto-scale.
+4. `deal-financials-modal.tsx` — fmtVal uses helper + latest statement's `unitScale`.
+5. `deal-analysis-diligence.tsx` (Cross-Document Verification) — replaced
+   `${v.value}M` with `formatFinancialValue(v.value, scale, { currency })`.
+6. `deal-analysis-cashcap.tsx` — Cash Flow / Working Capital / Debt
+   Capacity panels (8 sites in this file).
+7. `deal-analysis-overview.tsx` — EBITDA Bridge (3 sites).
+8. `deal-analysis-deepdive.tsx` — Financial Ratios + Cost Structure.
+9. `deal-analysis-valuation.tsx` — LBO entry EBITDA + Benchmark (3 sites).
+10. `deal-analysis-types.ts` — `AnalysisData` and `CrossDocConflict`
+    extended with optional `unitScale + currency` per value.
+11. `deal-financials-conflicts.tsx` — `ConflictVersion` extended.
+12. `formatters.test.ts` — 16 new tests, all passing.
+
+**Hardcoded `M` suffixes** in 5 files removed in favour of auto-scaled
+labels. Chart axes now derive their suffix from the rendered tick value.
+
+**Percentages kept separate** — `_pct` / `_margin` / IRR / CAGR / growth
+all routed through `formatPercent`, not `formatFinancialValue`.
+
+### Deploy step required for BILLIONS support
+
+Before any extraction can return `unitScale: BILLIONS`, run the migration:
+
+```
+apps/api/financial-statement-billions-migration.sql
+```
+
+It drops + re-adds the CHECK constraint to allow `BILLIONS` alongside
+the three existing values. Idempotent. Until this runs, a BILLIONS
+classification will hit a Postgres CHECK violation on insert. The
+classifier doesn't currently emit BILLIONS for the deals we've seen,
+but $B-scale source documents will trigger it.
+
+### Backwards compatibility
+
+**Existing rows tagged `MILLIONS` aren't migrated.** Old extractions
+that were silently converted to millions stay tagged that way. Their
+displayed value will look correct because (a) the storage value is at
+the millions scale and (b) the new formatter respects the stored
+`unitScale`. No data loss; no display change for old data. Re-extract
+a deal to get the new "honor source unit" behaviour.
+
+The default-flip from `MILLIONS` → `ACTUALS` in `normalizeUnitScale`
+means any older code path that *relied* on the silent default will
+now tag values as ACTUALS instead. Mitigated by the new `log.warn` so
+we can spot regressions in prod logs.
+
+---
+
+## Just shipped (previous commit)
 
 Three independent fixes pushed together because they all chase the same
 production symptom — the `Fight_AI_YTD_Financials_2026.xlsx` extraction
@@ -207,6 +376,24 @@ fail the upload.
 
 ## Open follow-ups (not in scope for this round)
 
+- **Run the BILLIONS migration.** `apps/api/financial-statement-billions-migration.sql`
+  must be applied to Supabase before any extraction returning
+  `unitScale: BILLIONS` will succeed. Idempotent. Until then a CHECK
+  violation will surface on insert.
+- **Backfill old `MILLIONS`-tagged rows that were actually source-other.**
+  Pre-honor-source-unit extractions are tagged `MILLIONS` regardless of
+  source. They display correctly because storage + tag are consistent,
+  but cross-doc compares against new ACTUALS-tagged extractions of the
+  same deal will rely on the unit-aware `toMillions` normaliser. Worth
+  a `re-extract all` script for historic deals.
+- **Deal-level fields on the Deal table** (`deal.dealSize`,
+  `deal.revenue`, `deal.ebitda`) still use the legacy `formatCurrency`
+  helper which assumes "value is millions of currency". They don't
+  carry a `unitScale` column. If we want them to honor source unit
+  too, add `dealRevenueUnit` etc. or move them to the
+  `formatFinancialValue` helper after Agent X-style work on
+  `aiExtractor.ts` and `dealImportMapper.ts` (they're a separate
+  pipeline from FinancialStatement extraction).
 - **Encryption utility is dead code.** `apps/api/src/services/encryption.ts`
   implements AES-256-GCM but is never imported. Either wire it up or
   delete.
@@ -218,7 +405,8 @@ fail the upload.
 - **`detectUnitScale` per-sheet hint is computed by the Excel parser
   but not threaded through to the verify node.** If it were, the
   verify node could anchor on the parser's hint and avoid even
-  *attempting* a unit correction on actual-dollar files.
+  *attempting* a unit correction on actual-dollar files. (Lower
+  priority now that the verifier reads `unitScale` from each statement.)
 - **Period-scope inference duplicated client + server.** Frontend
   `inferPeriodScope` (regex on labels) and server normalisation rules
   drift independently. Long-term they should share a canonical

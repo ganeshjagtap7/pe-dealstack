@@ -24,6 +24,7 @@ import {
   PERIOD_SCOPE_LABEL,
   groupRowsByScope,
 } from "./deal-financials-period-scope";
+import { formatFinancialValue, toActualDollars } from "@/lib/formatters";
 
 // Register Chart.js components once
 ChartJS.register(
@@ -50,7 +51,7 @@ export interface FinancialStatement {
   period: string;
   periodType?: "ACTUAL" | "PROJECTED";
   currency?: string;
-  unitScale?: "ACTUALS" | "THOUSANDS" | "MILLIONS";
+  unitScale?: "ACTUALS" | "THOUSANDS" | "MILLIONS" | "BILLIONS";
   extractionConfidence?: number | null;
   extractionSource?: string | null;
   lineItems?: Record<string, number | null>;
@@ -122,17 +123,19 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
   }
 
   const labels = rows.map((r) => r.period);
-  const revenues = rows.map((r) => r.lineItems?.revenue ?? null);
-  const ebitdas = rows.map((r) => r.lineItems?.ebitda ?? null);
+  // Convert each row's stored value into actual dollars using its own
+  // `unitScale` so the y-axis auto-scales correctly even when periods mix scales.
+  const revenues = rows.map((r) => toActualDollars(r.lineItems?.revenue ?? null, r.unitScale));
+  const ebitdas = rows.map((r) => toActualDollars(r.lineItems?.ebitda ?? null, r.unitScale));
   const margins = rows.map((r) => r.lineItems?.ebitda_margin_pct ?? null);
-  const unitLabel = rows[0]?.unitScale === "THOUSANDS" ? "$K" : "$M";
+  const currency = rows[0]?.currency ?? "USD";
 
   const data: ChartData<"bar" | "line", (number | null)[], string> = {
     labels,
     datasets: [
       {
         type: "bar" as const,
-        label: `Revenue (${unitLabel})`,
+        label: "Revenue",
         data: revenues,
         backgroundColor: "rgba(0,51,102,0.7)",
         borderColor: "transparent",
@@ -146,7 +149,7 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
       },
       {
         type: "bar" as const,
-        label: `EBITDA (${unitLabel})`,
+        label: "EBITDA",
         data: ebitdas,
         backgroundColor: "rgba(5,150,105,0.7)",
         borderColor: "transparent",
@@ -196,7 +199,7 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
             const v = ctx.raw as number | null;
             if (v === null || v === undefined) return "";
             if (ctx.dataset.yAxisID === "y1") return ` EBITDA Margin: ${Number(v).toFixed(1)}%`;
-            return ` ${ctx.dataset.label}: $${Number(v).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
+            return ` ${ctx.dataset.label}: ${formatFinancialValue(v, "ACTUALS", { currency })}`;
           },
         },
       },
@@ -210,11 +213,10 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
       y: {
         type: "linear",
         position: "left",
-        title: { display: true, text: unitLabel, font: { size: 11, family: "Inter", weight: "normal" }, color: "#9ca3af" },
         ticks: {
           font: { size: 10, family: "Inter" },
           color: "#9ca3af",
-          callback: (v) => "$" + Number(v).toLocaleString(),
+          callback: (v) => formatFinancialValue(Number(v), "ACTUALS", { currency }),
           padding: 8,
         },
         grid: { color: "rgba(0,0,0,0.04)" },
@@ -420,8 +422,9 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
   }
 
   const labels = rows.map((r) => r.period);
-  const li = (row: FinancialStatement, key: string) => row.lineItems?.[key] ?? 0;
-  const unitLabel = rows[0]?.unitScale === "THOUSANDS" ? "$K" : "$M";
+  // Convert per-row to actual dollars so the y-axis auto-scales uniformly.
+  const li = (row: FinancialStatement, key: string) => toActualDollars(row.lineItems?.[key] ?? 0, row.unitScale) ?? 0;
+  const currency = rows[0]?.currency ?? "USD";
 
   const data: ChartData<"bar", number[], string> = {
     labels,
@@ -430,7 +433,7 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
       { label: "Receivables", data: rows.map((r) => li(r, "accounts_receivable")), backgroundColor: "#2563eb", stack: "assets", borderWidth: 0, borderRadius: 3 },
       { label: "Inventory", data: rows.map((r) => li(r, "inventory")), backgroundColor: "#60a5fa", stack: "assets", borderWidth: 0, borderRadius: 3 },
       { label: "PP&E", data: rows.map((r) => li(r, "ppe_net")), backgroundColor: "#93c5fd", stack: "assets", borderWidth: 0, borderRadius: 3 },
-      { label: "Goodwill + Intangibles", data: rows.map((r) => (li(r, "goodwill") || 0) + (li(r, "intangibles") || 0)), backgroundColor: "#bfdbfe", stack: "assets", borderWidth: 0, borderRadius: 3 },
+      { label: "Goodwill + Intangibles", data: rows.map((r) => li(r, "goodwill") + li(r, "intangibles")), backgroundColor: "#bfdbfe", stack: "assets", borderWidth: 0, borderRadius: 3 },
       { label: "Current Liab.", data: rows.map((r) => li(r, "total_current_liabilities")), backgroundColor: "#dc2626", stack: "liabilities", borderWidth: 0, borderRadius: 3 },
       { label: "LT Debt", data: rows.map((r) => li(r, "long_term_debt")), backgroundColor: "#f87171", stack: "liabilities", borderWidth: 0, borderRadius: 3 },
       { label: "Equity", data: rows.map((r) => li(r, "total_equity")), backgroundColor: "#059669", stack: "liabilities", borderWidth: 0, borderRadius: 3 },
@@ -452,7 +455,7 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
           label: (ctx) => {
             const v = ctx.raw as number;
             if (!v) return "";
-            return ` ${ctx.dataset.label}: $${Number(v).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${unitLabel.replace("$", "")}`;
+            return ` ${ctx.dataset.label}: ${formatFinancialValue(v, "ACTUALS", { currency })}`;
           },
         },
       },
@@ -473,11 +476,10 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
       },
       y: {
         stacked: true,
-        title: { display: true, text: unitLabel, font: { size: 11, family: "Inter", weight: "normal" }, color: "#9ca3af" },
         ticks: {
           font: { size: 10, family: "Inter" },
           color: "#9ca3af",
-          callback: (v) => "$" + Number(v).toLocaleString(),
+          callback: (v) => formatFinancialValue(Number(v), "ACTUALS", { currency }),
           padding: 8,
         },
         grid: { color: "rgba(0,0,0,0.04)" },

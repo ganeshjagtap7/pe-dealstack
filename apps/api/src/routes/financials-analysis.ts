@@ -222,11 +222,28 @@ router.get('/deals/:dealId/financials/cross-doc', async (req, res) => {
       statementType: string;
       period: string;
       field: string;
-      values: { documentName: string; value: number | null; isActive: boolean }[];
+      values: { documentName: string; value: number | null; isActive: boolean; unitScale?: string | null }[];
       discrepancyPct: number;
     }[] = [];
 
     const keyFields = ['revenue', 'ebitda', 'net_income', 'total_assets', 'total_equity', 'operating_cf'];
+
+    // Normalise extracted values to a common scale (MILLIONS) before
+    // comparing them across documents. Without this, two docs that report
+    // the same revenue at different unitScales (e.g. one in ACTUALS, one
+    // in MILLIONS) get flagged as a 1,000,000× discrepancy when in fact
+    // the figures agree. This was the source of the "Cross-Document
+    // Verification flagging tons of false conflicts" bug.
+    const toMillions = (val: number | null, unit: string | null | undefined): number | null => {
+      if (val == null) return null;
+      switch ((unit || 'MILLIONS').toUpperCase()) {
+        case 'BILLIONS':  return val * 1000;
+        case 'MILLIONS':  return val;
+        case 'THOUSANDS': return val / 1000;
+        case 'ACTUALS':   return val / 1_000_000;
+        default:          return val;
+      }
+    };
 
     for (const [key, rows] of groups) {
       if (rows.length < 2) continue;
@@ -234,22 +251,33 @@ router.get('/deals/:dealId/financials/cross-doc', async (req, res) => {
 
       for (const field of keyFields) {
         const values = rows
-          .map(r => ({
-            documentName: (r as any).Document?.name ?? 'Unknown',
-            value: (r.lineItems as Record<string, number | null>)?.[field] ?? null,
-            isActive: r.isActive,
-          }))
-          .filter(v => v.value != null);
+          .map(r => {
+            const raw = (r.lineItems as Record<string, number | null>)?.[field] ?? null;
+            const unit = (r as any).unitScale ?? 'MILLIONS';
+            return {
+              documentName: (r as any).Document?.name ?? 'Unknown',
+              // Display value: the original (so the UI can show
+              // "$53,700K" vs "$53.7M" with the source's own scale).
+              value: raw,
+              unitScale: unit,
+              // Comparison value: rebased to millions.
+              _normalized: toMillions(raw, unit),
+              isActive: r.isActive,
+            };
+          })
+          .filter(v => v.value != null && v._normalized != null);
 
         if (values.length < 2) continue;
 
-        const nums = values.map(v => v.value!);
+        const nums = values.map(v => v._normalized!);
         const maxVal = Math.max(...nums.map(Math.abs));
         const spread = Math.max(...nums) - Math.min(...nums);
         const discrepancyPct = maxVal > 0 ? (spread / maxVal) * 100 : 0;
 
         if (discrepancyPct > 2) {
-          conflicts.push({ statementType, period, field, values, discrepancyPct: Math.round(discrepancyPct * 10) / 10 });
+          // Strip the internal _normalized helper from the wire payload
+          const cleanedValues = values.map(({ _normalized: _omit, ...rest }) => rest);
+          conflicts.push({ statementType, period, field, values: cleanedValues, discrepancyPct: Math.round(discrepancyPct * 10) / 10 });
         }
       }
     }

@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { getCurrencySymbol, formatCurrency } from "@/lib/formatters";
+import {
+  getCurrencySymbol,
+  formatFinancialValue,
+  formatPercent,
+} from "@/lib/formatters";
 import { type FinancialStatement } from "./deal-financials-charts";
 
 export interface ExtractionResult {
@@ -50,24 +54,21 @@ export function ExtractionResultModal({
   const incomeStmts = statements
     .filter((s) => s.statementType === "INCOME_STATEMENT")
     .sort((a, b) => b.period.localeCompare(a.period));
-  const latestIncome = incomeStmts[0]?.lineItems ?? {};
+  const latestStmt = incomeStmts[0];
+  const latestIncome = latestStmt?.lineItems ?? {};
   const revenue = latestIncome.revenue ?? null;
   const ebitda = latestIncome.ebitda ?? null;
   const grossMargin = latestIncome.gross_margin_pct ?? null;
   const ebitdaMargin = latestIncome.ebitda_margin_pct ?? null;
-  const latestPeriod = incomeStmts[0]?.period ?? "";
+  const latestPeriod = latestStmt?.period ?? "";
+  const latestScale = latestStmt?.unitScale ?? "ACTUALS";
 
   // Confidence color
   const confColor = overallConf >= 80 ? "#059669" : overallConf >= 50 ? "#d97706" : "#dc2626";
 
-  const fmtVal = (val: number | null | undefined) => {
-    if (val == null) return "—";
-    return formatCurrency(val, currency);
-  };
-  const fmtPctVal = (val: number | null | undefined) => {
-    if (val == null) return "—";
-    return Number(val).toFixed(1) + "%";
-  };
+  const fmtVal = (val: number | null | undefined) =>
+    formatFinancialValue(val, latestScale, { currency });
+  const fmtPctVal = formatPercent;
 
   // Close on Escape
   useEffect(() => {

@@ -160,19 +160,34 @@ function inferUniformMultiplier(
 }
 
 const VERIFY_SYSTEM_PROMPT = `You are a financial data QA analyst. You will receive:
-1. EXTRACTED VALUES — structured financial data that was extracted from a document
+1. EXTRACTED VALUES — structured financial data that was extracted from a document. Each statement is labelled with its declared unitScale (MILLIONS, THOUSANDS, ACTUALS, or BILLIONS) and currency.
 2. SOURCE TEXT — a sample of the original document text
 
-Your job: compare the extracted values against the source text and find errors.
+Your job: verify each value against the source AT THE STATED unitScale for that statement. Do NOT assume MILLIONS by default. Values are stored at the source's scale on purpose — preserving raw scale is correct behaviour.
+
+INTERPRETING VALUES BY unitScale:
+- unitScale "MILLIONS": value 53.7 means $53.7M
+- unitScale "THOUSANDS": value 53700 means $53,700K = $53.7M
+- unitScale "ACTUALS": value 6700 means $6,700 (six thousand seven hundred dollars). This is correct for small businesses / startups — do NOT flag it as a unit error just because the absolute number is small.
+- unitScale "BILLIONS": value 1.5 means $1.5B
 
 CHECK FOR:
-- UNIT SCALE ERRORS: If the source says "$53,700" (thousands) but extracted value is 53.7 (millions), that's wrong — it should be 53.7 if in thousands or 0.0537 if in actuals
+- UNIT SCALE ERRORS: Only flag a unit-scale issue if the extracted value DOES NOT MATCH the source when interpreted at the stated unitScale. Example: statement says unitScale "MILLIONS" and value is 53.7, but source clearly shows "$53,700K" — that's an error. Example: statement says unitScale "ACTUALS" and value is 6700, source shows "$6,700" — that's correct, do NOT flag.
 - TRANSPOSED/WRONG DIGITS: Revenue extracted as 125 but source clearly shows 152
 - WRONG ROW MAPPING: A value from one line item assigned to a different field
 - SIGN ERRORS: Positive value should be negative (e.g., expenses, losses)
 - MISSING VALUES: Key values visible in source but null in extraction
 
-For each issue found, return a correction.
+For each issue found, return a correction. correctValue MUST be expressed at the SAME unitScale as the statement (do not silently rescale).
+
+DO NOT FLAG these (they are correct):
+- Statement unitScale ACTUALS, extracted 6700, source shows "$6,700" → correct, leave alone.
+- Statement unitScale MILLIONS, extracted 53.7, source shows "$53.7 million" → correct, leave alone.
+- Statement unitScale THOUSANDS, extracted 53700, source shows "$53,700 (in thousands)" → correct, leave alone.
+
+DO FLAG these (real unit-scale errors):
+- Statement unitScale MILLIONS, extracted 53.7, source shows "$53,700" with a "(in thousands)" header → mismatch by 1000×.
+- Statement unitScale MILLIONS, extracted 0.0067, source shows "$6,700" with no unit header (actuals) → should be unitScale ACTUALS with value 6700.
 
 RESPOND WITH ONLY JSON:
 {
@@ -182,12 +197,12 @@ RESPOND WITH ONLY JSON:
       "statementType": "INCOME_STATEMENT",
       "period": "2023",
       "field": "revenue",
-      "extractedValue": 53.7,
+      "extractedValue": 0.0537,
       "correctValue": 53700,
-      "reason": "Unit scale error: source shows $53,700K (thousands), not millions"
+      "reason": "Statement unitScale is THOUSANDS but value 0.0537 reads as $0.05 thousand. Source shows $53,700K → correct value at THOUSANDS scale is 53700."
     }
   ],
-  "unitScaleIssue": null or "Source appears to be in THOUSANDS but extraction assumed MILLIONS",
+  "unitScaleIssue": null or "Statement declares unitScale MILLIONS but source clearly shows THOUSANDS — every value mismatched by 1000×",
   "confidence": 85
 }
 
@@ -259,7 +274,7 @@ export async function verifyNode(
         { role: 'system', content: VERIFY_SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `EXTRACTED VALUES:\n${extractionSummary}\n\n---\n\nSOURCE TEXT:\n${sourceTextSample}`,
+          content: `EXTRACTED VALUES (each statement header shows its declared unitScale — verify values AT THAT scale, do NOT assume MILLIONS):\n${extractionSummary}\n\n---\n\nSOURCE TEXT:\n${sourceTextSample}`,
         },
       ],
       response_format: { type: 'json_object' },

@@ -82,7 +82,6 @@ export function FinancialTable({
     return <p className="text-xs text-gray-400 py-4 text-center">No {statementType.replace(/_/g, " ").toLowerCase()} data available.</p>;
   }
 
-  const unitScale = rows[0]?.unitScale ?? "ACTUALS";
   const currency = rows[0]?.currency ?? "USD";
   const allKeys = new Set<string>();
   rows.forEach((r) => Object.keys(r.lineItems ?? {}).forEach((k) => allKeys.add(k)));
@@ -90,10 +89,9 @@ export function FinancialTable({
   allKeys.forEach((k) => { if (!orderedKeys.includes(k)) orderedKeys.push(k); });
 
   const sym = getCurrencySymbol(currency);
-  const code = (currency || "USD").toUpperCase();
-  const unitSuffix = code === "INR"
-    ? (unitScale === "MILLIONS" ? "Cr" : unitScale === "THOUSANDS" ? "L" : "")
-    : (unitScale === "MILLIONS" ? "M" : unitScale === "THOUSANDS" ? "K" : "");
+  // Cells auto-scale via formatFinancialValue, so we only label the currency
+  // here. Per-cell suffixes (K/M/B/Cr/L) are applied at render time.
+  const headerLabel = sym.trim();
 
   const docMap = new Map<string, string>();
   rows.forEach((r) => { if (r.Document?.id) docMap.set(r.Document.id, r.Document.name ?? "Unknown document"); });
@@ -113,7 +111,7 @@ export function FinancialTable({
             <tr style={{ background: "#fafbfc" }}>
               <th className="px-3 py-3 text-left text-[11px] font-semibold text-gray-500 sticky left-0 min-w-[160px]"
                 style={{ background: "#fafbfc", zIndex: 3, boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>
-                Line Item <span className="text-[10px] font-normal text-gray-400">({sym}{unitSuffix})</span>
+                Line Item <span className="text-[10px] font-normal text-gray-400">({headerLabel})</span>
               </th>
               {rows.map((r) => {
                 const hasConflict = conflictPeriodSet.has(r.period);
@@ -151,7 +149,12 @@ export function FinancialTable({
                     style={{ zIndex: 2, background: rowBg, boxShadow: "2px 0 4px -2px rgba(0,0,0,0.06)" }}>{label}</td>
                   {rows.map((r) => {
                     const val = (r.lineItems ?? {})[key];
-                    const display = isPct ? fmtPct(val) : fmtMoney(val, unitScale, currency);
+                    // Each row carries its own `unitScale`; per-cell formatting
+                    // means a single statement can mix periods stored at
+                    // different scales without mis-rendering.
+                    const display = isPct
+                      ? fmtPct(val)
+                      : fmtMoney(val, r.unitScale ?? "ACTUALS", r.currency ?? currency);
                     const valCls = r.periodType === "PROJECTED" ? "text-gray-400 italic"
                       : isSubtotal ? "text-gray-900 font-semibold" : "text-gray-700";
                     return <td key={r.id} className={cn("px-3 py-2 text-right text-xs", valCls)}>{display}</td>;

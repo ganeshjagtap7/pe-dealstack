@@ -45,6 +45,11 @@ router.get('/deals/:dealId/financials/conflicts', async (req, res) => {
           documentName: (v as any).Document?.name ?? 'Unknown',
           isActive: v.isActive,
           lineItems: v.lineItems,
+          // Carry the source-document unit scale + currency through so the
+          // frontend can format each version correctly (one doc may be in
+          // ACTUALS, another in MILLIONS — the UI must not assume MILLIONS).
+          unitScale: v.unitScale,
+          currency: v.currency,
           extractionConfidence: v.extractionConfidence,
           extractionSource: v.extractionSource,
           extractedAt: v.extractedAt,

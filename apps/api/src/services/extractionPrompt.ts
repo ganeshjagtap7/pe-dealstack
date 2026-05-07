@@ -64,20 +64,14 @@ Search the document for unit declarations:
 State your finding in the "unitsDetected" field.
 If NO unit declaration is found:
 - The values are most likely in ACTUAL dollars/currency (not thousands, not millions)
-- Convert by dividing by 1,000,000 to get millions. Examples:
-  - Revenue of "$2,100" → 0.0021 (actual dollars, divide by 1M)
-  - Revenue of "$50,000" → 0.05 (actual dollars, divide by 1M)
-  - Revenue of "$1,500,000" → 1.5 (actual dollars, divide by 1M)
-  - Revenue of "$125,000,000" → 125 (actual dollars, divide by 1M)
-- ONLY assume "in thousands" if the header/footer explicitly says so (e.g., "$000s", "in thousands")
-- ONLY assume "in millions" if the header/footer explicitly says so (e.g., "$M", "in millions")
-- For small businesses/startups, values under $100K are common and should NOT be inflated
+- Set unitScale to "ACTUALS" and store values as written (do NOT convert)
+- For small businesses/startups, values under $100K are common — store them at face value, do NOT inflate
 - Set confidence to 70 max when units are inferred, not declared
-- When in doubt, assume ACTUAL dollars — it is better to report $0.002M than to incorrectly report $2M
+- When in doubt, assume ACTUAL dollars and tag unitScale "ACTUALS" — it is better to store $6,700 (with unitScale ACTUALS) than to silently inflate it to $6,700M
 
 STEP 2 — EXTRACT:
 1. Extract EVERY year/period column you find — do not skip any
-2. Normalize ALL values to MILLIONS in the ORIGINAL currency (see conversion below)
+2. PRESERVE THE SOURCE'S UNIT SCALE. Store values exactly as they appear in the document and set unitScale to whichever value matches the source: "MILLIONS", "THOUSANDS", "ACTUALS", or "BILLIONS". Do NOT convert values between scales.
 3. Label each period: HISTORICAL (past actuals), PROJECTED (forecasts), or LTM (last twelve months)
 4. Projected periods are identified by: "E", "F", "Est", "Forecast", "Budget", "Proj" suffix, or future years
 5. If a value is not present, use null — never guess
@@ -88,13 +82,14 @@ INCOME STATEMENT: ${LINE_ITEM_KEYS.INCOME_STATEMENT}
 BALANCE SHEET: ${LINE_ITEM_KEYS.BALANCE_SHEET}
 CASH FLOW: ${LINE_ITEM_KEYS.CASH_FLOW}
 
-UNIT CONVERSION — ALL values must be in MILLIONS. Divide by 1,000,000 if in actual dollars:
-- ACTUAL DOLLARS (no unit header): "$2,100" → 0.0021, "$50,000" → 0.05, "$1,500,000" → 1.5
-- HEADER SAYS "in thousands" or "$000s": "50" → 0.05, "1,500" → 1.5, "50,000" → 50
-- HEADER SAYS "in millions" or "$M": "50" → 50, "1.5" → 1.5
-- EXPLICIT SUFFIX: "50M" → 50, "1.5B" → 1500, "500K" → 0.5
-- INDIAN UNITS: "₹50 Cr" (crore = 10M) → 500, "₹50 Lakh" (lakh = 0.1M) → 5
-- Do NOT convert between currencies — only convert units within the same currency
+UNIT SCALE — store values AS WRITTEN at the source's scale, then tag unitScale accordingly. Do NOT convert:
+- HEADER SAYS "in millions" or "$M": value "50" → store 50, set unitScale "MILLIONS"
+- HEADER SAYS "in thousands" or "$000s": value "1,500" → store 1500, set unitScale "THOUSANDS"
+- HEADER SAYS "in billions" or "$B": value "1.5" → store 1.5, set unitScale "BILLIONS"
+- ACTUAL DOLLARS (no unit header): value "$2,100" → store 2100, set unitScale "ACTUALS"
+- EXPLICIT INLINE SUFFIX (e.g. "$50M" inside a table without a header): you MAY still preserve the suffix's scale. Prefer matching the dominant unit declared at the table header; if values within one statement use mixed inline suffixes, normalize to the table's declared header scale and only then store.
+- INDIAN UNITS: report unitScale matching the source's declared unit ("Cr" → record values as written; if the table is in crore, document this in the "unitsDetected" field)
+- Do NOT convert between currencies — only document the source's stated currency
 
 STEP 3 — VERIFY YOUR MATH:
 Before returning, check these relationships:
@@ -106,13 +101,13 @@ Before returning, check these relationships:
 If any check fails, re-examine your extraction and fix the error.
 If the source document itself has inconsistent numbers, set confidence to 60-70 and add a warning.
 
-Return JSON with this structure:
+Return JSON with this structure. unitScale MUST match the source — do NOT default to MILLIONS:
 {
   "unitsDetected": "string describing units found",
   "statements": [
     {
       "statementType": "INCOME_STATEMENT | BALANCE_SHEET | CASH_FLOW",
-      "unitScale": "MILLIONS",
+      "unitScale": "MILLIONS | THOUSANDS | ACTUALS | BILLIONS",
       "currency": "USD",
       "periods": [
         {

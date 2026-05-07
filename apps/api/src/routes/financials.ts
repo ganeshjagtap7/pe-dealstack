@@ -23,7 +23,7 @@ const patchStatementSchema = z.object({
   period: z.string().optional(),
   periodType: z.enum(['HISTORICAL', 'PROJECTED', 'LTM']).optional(),
   currency: z.string().optional(),
-  unitScale: z.enum(['MILLIONS', 'THOUSANDS', 'ACTUALS']).optional(),
+  unitScale: z.enum(['MILLIONS', 'THOUSANDS', 'ACTUALS', 'BILLIONS']).optional(),
 });
 
 // ─── 5a: GET /api/deals/:dealId/financials ────────────────────

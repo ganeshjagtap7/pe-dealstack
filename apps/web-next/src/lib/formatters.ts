@@ -67,6 +67,130 @@ export function formatNumber(value: number | null | undefined, decimals = 1): st
   });
 }
 
+/**
+ * Convert any unit-scaled value to actual dollars.
+ * Used by `formatFinancialValue` and any caller that needs raw magnitude.
+ */
+export type UnitScale = "MILLIONS" | "THOUSANDS" | "ACTUALS" | "BILLIONS";
+
+const UNIT_SCALE_MULTIPLIER: Record<UnitScale, number> = {
+  ACTUALS: 1,
+  THOUSANDS: 1_000,
+  MILLIONS: 1_000_000,
+  BILLIONS: 1_000_000_000,
+};
+
+/**
+ * Convert a stored value at the given `unitScale` into actual dollars.
+ * Returns `null` when the input is null/undefined/NaN, so callers can
+ * pass the result directly to chart datasets without further guarding.
+ */
+export function toActualDollars(
+  value: number | null | undefined,
+  unitScale?: UnitScale | null,
+): number | null {
+  if (value === null || value === undefined) return null;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return null;
+  return n * (UNIT_SCALE_MULTIPLIER[unitScale ?? "ACTUALS"] ?? 1);
+}
+
+/**
+ * Format a financial value stored at any scale at the most appropriate
+ * human-readable magnitude. The stored value is converted to "actual"
+ * units via `unitScale`, then auto-rendered as B / M / K / raw.
+ *
+ *   formatFinancialValue(0.0067, "MILLIONS")  -> "$6.7K"
+ *   formatFinancialValue(6700, "ACTUALS")     -> "$6.7K"
+ *   formatFinancialValue(53.7, "THOUSANDS")   -> "$53.7K"
+ *   formatFinancialValue(1.5, "BILLIONS")     -> "$1.5B"
+ *   formatFinancialValue(6700)                -> "$6.7K"   // ACTUALS default
+ *   formatFinancialValue(null)                -> "\u2014"
+ *
+ * Notes:
+ *   - INR keeps its own Crore/Lakh scale via `formatCurrency` semantics
+ *     (the caller can pass currency: "INR"). For INR we render Cr/L instead
+ *     of B/M/K, mirroring the existing `formatCurrency` convention.
+ *   - `precision` defaults to 1 decimal for K/M/B and 0 for raw < 1000.
+ */
+export function formatFinancialValue(
+  value: number | null | undefined,
+  unitScale?: UnitScale | null,
+  options?: { currency?: string | null; precision?: number },
+): string {
+  if (value === null || value === undefined) return "\u2014";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "\u2014";
+
+  const scale = unitScale ?? "ACTUALS";
+  const mult = UNIT_SCALE_MULTIPLIER[scale] ?? 1;
+  const actual = n * mult;
+  const sign = actual < 0 ? "-" : "";
+  const absActual = Math.abs(actual);
+
+  const sym = getCurrencySymbol(options?.currency);
+  const code = (options?.currency || "USD").toUpperCase();
+  const userPrecision = options?.precision;
+
+  // INR \u2014 Crore/Lakh system. 1 Cr = 10,000,000; 1 L = 100,000.
+  if (code === "INR") {
+    const p = userPrecision ?? 1;
+    if (absActual >= 10_000_000) {
+      return sign + sym + (absActual / 10_000_000).toFixed(p) + "Cr";
+    }
+    if (absActual >= 100_000) {
+      return sign + sym + (absActual / 100_000).toFixed(p) + "L";
+    }
+    if (absActual >= 1_000) {
+      return sign + sym + (absActual / 1_000).toFixed(p) + "K";
+    }
+    return (
+      sign +
+      sym +
+      absActual.toLocaleString("en-IN", {
+        maximumFractionDigits: userPrecision ?? 0,
+      })
+    );
+  }
+
+  // Default scale (USD/EUR/GBP/etc): B / M / K / raw.
+  const p = userPrecision ?? 1;
+  if (absActual >= 1_000_000_000) {
+    return sign + sym + (absActual / 1_000_000_000).toFixed(p) + "B";
+  }
+  if (absActual >= 1_000_000) {
+    return sign + sym + (absActual / 1_000_000).toFixed(p) + "M";
+  }
+  if (absActual >= 1_000) {
+    return sign + sym + (absActual / 1_000).toFixed(p) + "K";
+  }
+  // Below 1,000: render raw with no scale suffix.
+  return (
+    sign +
+    sym +
+    absActual.toLocaleString("en-US", {
+      maximumFractionDigits: userPrecision ?? 0,
+    })
+  );
+}
+
+/**
+ * Format a unitless ratio/percentage. Use this for fields like
+ * `ebitda_margin_pct`, `gross_margin_pct`, growth rates, etc.
+ *
+ *   formatPercent(12.345)   -> "12.3%"
+ *   formatPercent(null)     -> "\u2014"
+ */
+export function formatPercent(
+  value: number | null | undefined,
+  decimals = 1,
+): string {
+  if (value === null || value === undefined) return "\u2014";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "\u2014";
+  return n.toFixed(decimals) + "%";
+}
+
 export function formatRelativeTime(dateString: string | null | undefined): string {
   if (!dateString) return "\u2014";
   const date = new Date(dateString);

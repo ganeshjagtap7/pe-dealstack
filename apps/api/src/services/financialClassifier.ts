@@ -9,7 +9,7 @@ import { validateLineItems } from './financialSchema.js';
 
 export type StatementType = 'INCOME_STATEMENT' | 'BALANCE_SHEET' | 'CASH_FLOW';
 export type PeriodType = 'HISTORICAL' | 'PROJECTED' | 'LTM';
-export type UnitScale = 'MILLIONS' | 'THOUSANDS' | 'ACTUALS';
+export type UnitScale = 'MILLIONS' | 'THOUSANDS' | 'ACTUALS' | 'BILLIONS';
 
 /** One period's worth of line items — maps directly to a FinancialStatement DB row */
 export interface FinancialPeriod {
@@ -201,8 +201,18 @@ function normalizeUnitScale(raw: string): UnitScale {
     MILLIONS: 'MILLIONS',
     THOUSANDS: 'THOUSANDS',
     ACTUALS: 'ACTUALS',
+    BILLIONS: 'BILLIONS',
   };
-  return map[String(raw ?? '').toUpperCase().trim()] ?? 'MILLIONS';
+  const key = String(raw ?? '').toUpperCase().trim();
+  const matched = map[key];
+  if (matched) return matched;
+  // Unknown / missing unit string. Default to ACTUALS — the safest fallback
+  // because it means "do not multiply", so values are stored as-written instead
+  // of being silently inflated 1,000,000× (the old MILLIONS default).
+  if (key !== '') {
+    log.warn('Financial classifier: unknown unitScale from LLM, defaulting to ACTUALS', { raw });
+  }
+  return 'ACTUALS';
 }
 
 function normalizeLineItems(raw: Record<string, any>): Record<string, number | null> {

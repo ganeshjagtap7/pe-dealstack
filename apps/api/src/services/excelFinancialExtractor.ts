@@ -84,16 +84,16 @@ export function detectUnitScale(sheet: XLSX.WorkSheet): string | null {
       const val = String(cell.v).toLowerCase();
 
       if (/\$\s*in\s*millions|\(\$m\)|\$\s*mm|\(millions\)|in\s*millions?\s*usd/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in MILLIONS USD ($M)';
+        return 'IMPORTANT: Values in this sheet are in MILLIONS USD ($M). Store values as written; set unitScale to "MILLIONS". Do NOT convert.';
       }
       if (/\$\s*in\s*thousands|\(\$000s?\)|\$\s*000|\(thousands\)|in\s*thousands/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in THOUSANDS USD ($000s) — divide by 1,000 to get millions';
+        return 'IMPORTANT: Values in this sheet are in THOUSANDS USD ($000s). Store values as written; set unitScale to "THOUSANDS". Do NOT convert.';
       }
       if (/\$\s*in\s*billions|\(\$b\)|\(billions\)/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in BILLIONS USD ($B) — multiply by 1,000 to get millions';
+        return 'IMPORTANT: Values in this sheet are in BILLIONS USD ($B). Store values as written; set unitScale to "BILLIONS". Do NOT convert.';
       }
       if (/in\s*actual|in\s*dollars|\(\$\)$/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in ACTUAL DOLLARS — divide by 1,000,000 to get millions';
+        return 'IMPORTANT: Values in this sheet are in ACTUAL DOLLARS. Store values as written; set unitScale to "ACTUALS". Do NOT convert.';
       }
     }
   }
