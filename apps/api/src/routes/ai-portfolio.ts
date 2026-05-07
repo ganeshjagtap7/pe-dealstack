@@ -166,7 +166,7 @@ subRouter.post('/portfolio/chat', async (req, res) => {
 
     const orgId = getOrgId(req);
 
-    const model = getChatModel(0.3, 1500);
+    const model = getChatModel(0.3, 1500, 'deal_analysis');
     const tools = getPortfolioTools(orgId);
 
     const agent = createReactAgent({
@@ -262,7 +262,7 @@ subRouter.get('/ai/market-sentiment', async (req, res) => {
     const dealsByStage: Record<string, number> = {};
     activeDeals.forEach(d => { dealsByStage[d.stage] = (dealsByStage[d.stage] || 0) + 1; });
 
-    const model = getFastModel(0.7, 500);
+    const model = getFastModel(0.7, 500, 'deal_analysis');
     const structuredModel = model.withStructuredOutput(z.object({
       headline: z.string().describe('One sentence market headline, max 100 chars'),
       analysis: z.string().describe('2-3 sentences of market analysis'),

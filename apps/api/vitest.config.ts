@@ -12,5 +12,9 @@ export default defineConfig({
     },
     testTimeout: 10000,
     hookTimeout: 10000,
+    env: {
+      SUPABASE_URL: 'https://test.supabase.co',
+      SUPABASE_ANON_KEY: 'test-key',
+    },
   },
 });

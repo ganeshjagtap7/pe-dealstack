@@ -1,4 +1,4 @@
-import { openai, isAIEnabled } from '../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { MODEL_INSIGHTS } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
 
@@ -96,7 +96,7 @@ Generate insights as JSON.`;
 
     log.info('Generating folder insights', { folderName, docCount: documents.length });
 
-    const response = await openai.chat.completions.create({
+    const response = await trackedChatCompletion('folder_insights', {
       model: MODEL_INSIGHTS,
       messages: [
         { role: 'system', content: FOLDER_INSIGHTS_SYSTEM_PROMPT },

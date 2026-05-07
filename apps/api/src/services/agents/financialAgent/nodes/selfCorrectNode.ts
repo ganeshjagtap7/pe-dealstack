@@ -12,7 +12,7 @@
  * Max retries controlled by state.maxRetries (default 3).
  */
 
-import { openai, isAIEnabled } from '../../../../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../../../../openai.js';
 import { MODEL_CLASSIFICATION } from '../../../../utils/aiModels.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { log } from '../../../../utils/logger.js';
@@ -165,7 +165,7 @@ export async function selfCorrectNode(
 
       const prompt = buildCorrectionPrompt(failedChecks, rawText);
 
-      const response = await openai.chat.completions.create({
+      const response = await trackedChatCompletion('financial_extraction', {
         model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
         messages: [
           { role: 'user', content: prompt },

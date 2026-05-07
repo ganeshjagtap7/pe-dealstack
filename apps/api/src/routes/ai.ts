@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
-import { openai, isAIEnabled, DEAL_ANALYSIS_SYSTEM_PROMPT, generateDealContext } from '../openai.js';
+import { isAIEnabled, DEAL_ANALYSIS_SYSTEM_PROMPT, generateDealContext, trackedChatCompletion } from '../openai.js';
 import { z } from 'zod';
 import { AICache } from '../services/aiCache.js';
 import { log } from '../utils/logger.js';
@@ -12,7 +12,7 @@ import aiAgentsRouter from './ai-agents.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { MODEL_REASONING, MODEL_CLASSIFICATION } from '../utils/aiModels.js';
-import { classifyAIError } from '../utils/aiErrors.js';
+import { classifyAIErrorObject } from '../utils/aiErrors.js';
 
 const router = Router();
 
@@ -104,7 +104,8 @@ router.post('/deals/:dealId/chat', async (req, res) => {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     log.error('Error in AI chat', error);
-    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to process AI chat') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 
@@ -216,7 +217,7 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
 
     log.info('Generating thesis for deal', { dealId, forceRefresh });
 
-    const completion = await openai!.chat.completions.create({
+    const completion = await trackedChatCompletion('deal_analysis', {
       model: MODEL_REASONING,
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
@@ -254,7 +255,8 @@ Generate a professional investment thesis that a PE analyst would write. Be spec
     });
   } catch (error) {
     log.error('Error generating thesis', error);
-    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to generate thesis') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 
@@ -314,7 +316,7 @@ Format your response as a JSON array of risk objects with fields: title, descrip
 
     log.info('Analyzing risks for deal', { dealId, forceRefresh });
 
-    const completion = await openai!.chat.completions.create({
+    const completion = await trackedChatCompletion('deal_analysis', {
       model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
       messages: [
         { role: 'system', content: DEAL_ANALYSIS_SYSTEM_PROMPT },
@@ -352,7 +354,8 @@ Format your response as a JSON array of risk objects with fields: title, descrip
     });
   } catch (error) {
     log.error('Error analyzing risks', error);
-    res.status(500).json({ error: classifyAIError((error as any).message || 'Failed to analyze risks') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 

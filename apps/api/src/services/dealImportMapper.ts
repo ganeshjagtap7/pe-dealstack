@@ -168,7 +168,7 @@ export async function analyzeImportData(
   // Call GPT-4o for mapping (dynamic import to avoid pulling LangChain into lite bundle)
   const { getChatModel } = await import('./llm.js');
   const { HumanMessage, SystemMessage } = await import('@langchain/core/messages');
-  const model = getChatModel(0.1, 2000);
+  const model = getChatModel(0.1, 2000, 'deal_import_mapping');
   const userPrompt = `Column headers: ${JSON.stringify(headers)}
 
 Sample data (first ${sampleRows.length} rows):

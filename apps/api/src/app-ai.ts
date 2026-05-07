@@ -12,6 +12,7 @@ import ingestRouter from './routes/ingest.js';
 import onboardingRouter from './routes/onboarding.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
+import { usageContextMiddleware } from './middleware/usageContext.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { isAIEnabled } from './openai.js';
@@ -79,10 +80,9 @@ app.use(helmet({
 // CORS - whitelist allowed origins (configurable via ALLOWED_ORIGINS env var)
 const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 const allowedOrigins = [
-  'https://pe-os.onrender.com',
-  'https://pe-dealstack.vercel.app',
   'https://lmmos.ai',
   'https://www.lmmos.ai',
+  'https://pe-dealstack.vercel.app',
   ...extraOrigins,
   ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
 ];
@@ -155,17 +155,17 @@ app.use(requestIdMiddleware);
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
-app.use('/api', authMiddleware, orgMiddleware, chatRouter);
-app.use('/api/ingest', authMiddleware, orgMiddleware, ingestRouter);
-app.use('/api/memos', authMiddleware, orgMiddleware, memosRouter);
-app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
-app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
+app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, chatRouter);
+app.use('/api/ingest', authMiddleware, orgMiddleware, usageContextMiddleware, ingestRouter);
+app.use('/api/memos', authMiddleware, orgMiddleware, usageContextMiddleware, memosRouter);
+app.use('/api/onboarding', authMiddleware, orgMiddleware, usageContextMiddleware, onboardingRouter);
+app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, financialsRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
 // ========================================
 // AI deal chat and analysis endpoints (require auth + org)
-app.use('/api', authMiddleware, orgMiddleware, aiRouter);
+app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, aiRouter);
 
 // AI status endpoint (public - no auth required)
 app.get('/api/ai/status', (_req, res) => {

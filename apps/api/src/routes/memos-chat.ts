@@ -1,14 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
-import { openai, isAIEnabled } from '../openai.js';
+import { isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { log } from '../utils/logger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { runMemoChatAgent } from '../services/agents/memoAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { MODEL_REASONING } from '../utils/aiModels.js';
-import { classifyAIError } from '../utils/aiErrors.js';
+import { classifyAIErrorObject } from '../utils/aiErrors.js';
 
 const router = Router();
 
@@ -135,7 +135,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
       Please generate comprehensive, professional content appropriate for this section.`;
 
     // Call OpenAI
-    const response = await openai!.chat.completions.create({
+    const response = await trackedChatCompletion('memo_generation', {
       model: MODEL_REASONING,
       messages: [
         { role: 'system', content: MEMO_ANALYST_PROMPT },
@@ -306,7 +306,8 @@ router.post('/:id/chat', async (req, res) => {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     log.error('Memo chat error', error);
-    res.status(500).json({ error: classifyAIError(error.message || 'Failed to process chat') });
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
   }
 });
 

@@ -21,9 +21,12 @@ import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import dealImportRouter from './routes/deal-import.js';
+import internalRouter from './routes/internal-usage.js';
+import usageRouter from './routes/usage.js';
 import { supabase } from './supabase.js';
 import { authMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
+import { usageContextMiddleware } from './middleware/usageContext.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { log } from './utils/logger.js';
@@ -94,10 +97,9 @@ app.use(helmet({
 // CORS - whitelist allowed origins (configurable via ALLOWED_ORIGINS env var)
 const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 const allowedOrigins = [
-  'https://pe-os.onrender.com',
-  'https://pe-dealstack.vercel.app',
   'https://lmmos.ai',
   'https://www.lmmos.ai',
+  'https://pe-dealstack.vercel.app',
   ...extraOrigins,
   ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
 ];
@@ -206,23 +208,30 @@ app.use('/api/public/invitations', invitationsAcceptRouter);
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
-app.use('/api/deals/import', authMiddleware, orgMiddleware, dealImportRouter);
-app.use('/api/deals', authMiddleware, orgMiddleware, dealsRouter);
-app.use('/api/companies', authMiddleware, orgMiddleware, companiesRouter);
-app.use('/api', authMiddleware, orgMiddleware, activitiesRouter);
-app.use('/api/documents', authMiddleware, orgMiddleware, documentsAlertsRouter);
-app.use('/api', authMiddleware, orgMiddleware, documentsRouter);
-app.use('/api', authMiddleware, orgMiddleware, foldersRouter);
-app.use('/api/users', authMiddleware, orgMiddleware, usersRouter);
-app.use('/api/notifications', authMiddleware, orgMiddleware, notificationsRouter);
-app.use('/api/templates', authMiddleware, orgMiddleware, templatesRouter);
+app.use('/api/deals/import', authMiddleware, orgMiddleware, usageContextMiddleware, dealImportRouter);
+app.use('/api/deals', authMiddleware, orgMiddleware, usageContextMiddleware, dealsRouter);
+app.use('/api/companies', authMiddleware, orgMiddleware, usageContextMiddleware, companiesRouter);
+app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, activitiesRouter);
+app.use('/api/documents', authMiddleware, orgMiddleware, usageContextMiddleware, documentsAlertsRouter);
+app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, documentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, foldersRouter);
+app.use('/api/users', authMiddleware, orgMiddleware, usageContextMiddleware, usersRouter);
+app.use('/api/notifications', authMiddleware, orgMiddleware, usageContextMiddleware, notificationsRouter);
+app.use('/api/templates', authMiddleware, orgMiddleware, usageContextMiddleware, templatesRouter);
 // Authenticated invitation routes (list, create, revoke, resend)
-app.use('/api/invitations', authMiddleware, orgMiddleware, invitationsRouter);
-app.use('/api/audit', authMiddleware, orgMiddleware, auditRouter);
-app.use('/api/tasks', authMiddleware, orgMiddleware, tasksRouter);
-app.use('/api/export', authMiddleware, orgMiddleware, exportRouter);
-app.use('/api/contacts', authMiddleware, orgMiddleware, contactsRouter);
-app.use('/api/watchlist', authMiddleware, orgMiddleware, watchlistRouter);
+app.use('/api/invitations', authMiddleware, orgMiddleware, usageContextMiddleware, invitationsRouter);
+app.use('/api/audit', authMiddleware, orgMiddleware, usageContextMiddleware, auditRouter);
+app.use('/api/tasks', authMiddleware, orgMiddleware, usageContextMiddleware, tasksRouter);
+app.use('/api/export', authMiddleware, orgMiddleware, usageContextMiddleware, exportRouter);
+app.use('/api/contacts', authMiddleware, orgMiddleware, usageContextMiddleware, contactsRouter);
+app.use('/api/watchlist', authMiddleware, orgMiddleware, usageContextMiddleware, watchlistRouter);
+
+// User-facing usage rollup (org-scoped)
+app.use('/api/usage', authMiddleware, orgMiddleware, usageContextMiddleware, usageRouter);
+
+// Internal admin (Pocket Fund team only — gate is inside the router via requireInternalAdmin)
+// Note: NO orgMiddleware — internal routes intentionally query across orgs.
+app.use('/api/internal', authMiddleware, internalRouter);
 
 // Sentry error handler (must be before custom error handler)
 if (process.env.SENTRY_DSN) {
