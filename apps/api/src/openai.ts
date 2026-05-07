@@ -1,5 +1,6 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
+import { wrapOpenAI } from 'langsmith/wrappers/openai';
 import { log } from './utils/logger.js';
 import { OPENROUTER_BASE_URL, OPENROUTER_HEADERS, isOpenRouterEnabled } from './utils/aiModels.js';
 import { recordUsageEvent } from './services/usage/trackedLLM.js';
@@ -22,7 +23,15 @@ if (!apiKey) {
   log.warn('No LLM API key set (OPENROUTER_API_KEY / OPENAI_API_KEY), AI features disabled');
 }
 
-export const openai = apiKey
+// LangSmith tracing: when enabled, wrap the OpenAI singletons once so every
+// chat.completions / responses / embeddings call auto-traces. wrapOpenAI returns
+// a drop-in proxy with identical method signatures, so all existing call sites
+// (trackedChatCompletion, trackedDirectChatCompletion, trackedDirectResponsesCreate
+// and any direct openai.* / openaiDirect.* usages) work unchanged. No-op when
+// LANGSMITH_TRACING is unset/false.
+const tracingEnabled = process.env.LANGSMITH_TRACING === 'true';
+
+const rawOpenAI = apiKey
   ? new OpenAI({
       apiKey,
       baseURL: useOpenRouter ? OPENROUTER_BASE_URL : undefined,
@@ -30,10 +39,22 @@ export const openai = apiKey
     })
   : null;
 
+export const openai = rawOpenAI
+  ? (tracingEnabled
+      ? (wrapOpenAI(rawOpenAI, { name: useOpenRouter ? 'openrouter-sdk' : 'openai-sdk' }) as typeof rawOpenAI)
+      : rawOpenAI)
+  : null;
+
 // Direct OpenAI client (never routed through OpenRouter). Required for code paths
 // that depend on OpenAI-specific endpoints like the Responses API (PDF file inputs
 // for vision extraction), which OpenRouter does not proxy.
-export const openaiDirect = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
+const rawOpenAIDirect = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
+
+export const openaiDirect = rawOpenAIDirect
+  ? (tracingEnabled
+      ? (wrapOpenAI(rawOpenAIDirect, { name: 'openai-sdk-direct' }) as typeof rawOpenAIDirect)
+      : rawOpenAIDirect)
+  : null;
 
 export const isAIEnabled = () => !!openai;
 
