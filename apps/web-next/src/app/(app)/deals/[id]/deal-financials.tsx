@@ -185,27 +185,23 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
     }
   }, [dealId, extracting, loadFinancials, showToast]);
 
-  // Per-deal extraction debug dump. Hits GET /deals/:id/extraction-debug
-  // which streams a JSON file (Content-Disposition: attachment). We use
-  // authFetchRaw so we can pull res.blob() and force a download — the
+  // Shared download helper — both the extraction-debug and reconcile
+  // endpoints stream JSON with Content-Disposition: attachment. Using
+  // authFetchRaw lets us pull res.blob() and force a download; the
   // shared api client only returns parsed JSON.
-  const [debugDownloading, setDebugDownloading] = useState(false);
-  const handleDownloadDebug = useCallback(async () => {
-    if (debugDownloading) return;
-    setDebugDownloading(true);
-    try {
-      const res = await authFetchRaw(`/deals/${dealId}/extraction-debug`);
+  const downloadJsonAttachment = useCallback(
+    async (path: string, fallbackBaseName: string, errorTitle: string) => {
+      const res = await authFetchRaw(path);
       if (!res.ok) {
         const msg = res.status === 404 ? "Deal not found" : `Server returned ${res.status}`;
-        showToast(msg, "warning", { title: "Couldn't download extraction" });
+        showToast(msg, "warning", { title: errorTitle });
         return;
       }
       const blob = await res.blob();
       const datePart = new Date().toISOString().split("T")[0];
-      // Try to honour the server's filename; fall back to our own pattern.
       const cd = res.headers.get("Content-Disposition") || "";
       const match = cd.match(/filename="?([^";]+)"?/i);
-      const filename = match?.[1] || `extraction-${dealId}-${datePart}.json`;
+      const filename = match?.[1] || `${fallbackBaseName}-${dealId}-${datePart}.json`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -215,13 +211,51 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
       a.remove();
       // Defer revoke so the browser has time to start the download.
       setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
+    [dealId, showToast],
+  );
+
+  const [debugDownloading, setDebugDownloading] = useState(false);
+  const handleDownloadDebug = useCallback(async () => {
+    if (debugDownloading) return;
+    setDebugDownloading(true);
+    try {
+      await downloadJsonAttachment(
+        `/deals/${dealId}/extraction-debug`,
+        "extraction",
+        "Couldn't download extraction",
+      );
     } catch (err) {
       console.warn("[deal-financials] debug download failed:", err);
       showToast("Couldn't download extraction JSON", "warning", { title: "Download failed" });
     } finally {
       setDebugDownloading(false);
     }
-  }, [dealId, debugDownloading, showToast]);
+  }, [dealId, debugDownloading, downloadJsonAttachment, showToast]);
+
+  // Phase-1 quantitative reconciliation. Hits GET /deals/:id/reconcile
+  // which aggregates FinancialStatement rows into computed ground truth
+  // (annual sums, TTM, MRR, margins), channel concentration + HHI,
+  // valuation framing vs micro-SaaS bands, and OpEx step-up findings.
+  // Pure-TS server side — no LLM cost — so this is safe to re-run
+  // whenever the user wants to gut-check extraction quality.
+  const [reconciling, setReconciling] = useState(false);
+  const handleDownloadReconcile = useCallback(async () => {
+    if (reconciling) return;
+    setReconciling(true);
+    try {
+      await downloadJsonAttachment(
+        `/deals/${dealId}/reconcile`,
+        "reconcile",
+        "Couldn't run reconciliation",
+      );
+    } catch (err) {
+      console.warn("[deal-financials] reconcile download failed:", err);
+      showToast("Couldn't run reconciliation", "warning", { title: "Reconciliation failed" });
+    } finally {
+      setReconciling(false);
+    }
+  }, [dealId, reconciling, downloadJsonAttachment, showToast]);
 
   useEffect(() => { loadFinancials(); }, [loadFinancials]);
 
@@ -439,6 +473,22 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
           >
             <span className="material-symbols-outlined text-sm">
               {debugDownloading ? "progress_activity" : "download"}
+            </span>
+          </button>
+          {/* Phase-1 reconciliation download — computed ground truth
+              (annual sums, TTM, MRR, margins), channel concentration,
+              valuation framing vs comp bands, OpEx step-up findings.
+              Pure-TS server side; safe to re-run anytime. */}
+          <button
+            onClick={handleDownloadReconcile}
+            disabled={reconciling}
+            title="Run quantitative reconciliation (compute TTM/MRR/margins/HHI/valuation from raw line items, download as JSON)"
+            aria-label="Run quantitative reconciliation"
+            className="flex items-center justify-center text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
+            style={{ width: 30, height: 30 }}
+          >
+            <span className="material-symbols-outlined text-sm">
+              {reconciling ? "progress_activity" : "calculate"}
             </span>
           </button>
         </div>
