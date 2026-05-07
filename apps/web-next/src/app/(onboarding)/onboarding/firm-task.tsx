@@ -176,7 +176,7 @@ export function FirmTaskModal({
         />
       )}
 
-      <label className="block text-[12px] font-medium text-text-secondary mb-1.5">AUM</label>
+      <label className="block text-[12px] font-medium text-text-secondary mb-1.5">Fund size</label>
       <div className="grid grid-cols-4 gap-2 mb-4">
         {AUM_OPTIONS.map((v) => (
           <button

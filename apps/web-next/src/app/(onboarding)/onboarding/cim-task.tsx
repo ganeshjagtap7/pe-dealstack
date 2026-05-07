@@ -66,7 +66,7 @@ export function CimTaskModal({
       onComplete={onComplete}
       canComplete={canComplete}
       busy={busy}
-      busyLabel={sampleId ? "Loading sample..." : "Reading the CIM..."}
+      busyLabel={sampleId ? "Creating demo deal..." : "Uploading the CIM..."}
     >
       <p className="text-[13.5px] text-text-secondary mb-4">
         CIM, teaser, IM, balance sheet — we read every table, footnote, and chart.
