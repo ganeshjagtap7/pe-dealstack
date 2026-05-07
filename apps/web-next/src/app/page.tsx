@@ -295,14 +295,14 @@ export default function LandingPage() {
             Watch a real CIM get uploaded, analyzed, and turned into a structured
             deal brief.
           </p>
-          <div className="relative rounded-xl overflow-hidden shadow-2xl bg-white border border-slate-200 aspect-video flex items-center justify-center group cursor-pointer">
-            <div
-              className="absolute inset-0"
-              style={{ background: "linear-gradient(135deg, #003366 0%, #004488 40%, #0055AA 70%, #1a6bb5 100%)" }}
+          <div className="relative rounded-xl overflow-hidden shadow-2xl bg-black border border-slate-200 aspect-video">
+            <iframe
+              className="absolute inset-0 w-full h-full"
+              src="https://www.youtube.com/embed/9mQC_HHFt28?start=2"
+              title="PE OS demo"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
             />
-            <div className="relative size-20 rounded-full bg-white/95 flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform">
-              <span className="material-symbols-outlined text-[44px] text-primary">play_arrow</span>
-            </div>
           </div>
         </div>
       </section>
