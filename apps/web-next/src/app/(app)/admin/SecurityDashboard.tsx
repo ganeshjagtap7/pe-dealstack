@@ -3,10 +3,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 
-// Customer security dashboard. Aggregates 6 metrics from existing audit
-// log + user/session data into a single 6-card grid for compliance
-// officers. Admin/partner/principal-only (server-enforced; the parent
-// admin page already gates on these roles).
+// Customer security dashboard. Asymmetric, banker-grade narrative for a
+// compliance officer scanning posture in 30 seconds.
+//
+// Order is the story:
+//   1. Status hero (the headline takeaway)
+//   2. Featured signal — Pocket Fund staff access (the unique moat)
+//   3. Trust strip — three small verified-state metrics
+//   4. Activity ledger — admin actions + most-viewed deals as lists
+//   5. Inline footnote — degraded states (e.g., session counts unavailable)
+//
+// Zero is celebrated, not shown as empty.
 
 interface RecentAdminAction {
   action: string;
@@ -37,6 +44,10 @@ interface SecurityDashboardData {
   topDeals: TopDeal[];
 }
 
+const BANKER_BLUE = "#003366";
+
+// ─── helpers ────────────────────────────────────────────────────────
+
 function relTime(ts: string): string {
   const ms = Date.now() - new Date(ts).getTime();
   if (Number.isNaN(ms)) return ts;
@@ -52,64 +63,68 @@ function relTime(ts: string): string {
 
 function actionLabel(action: string): string {
   const map: Record<string, string> = {
-    USER_INVITED: "Invited a user",
-    USER_ROLE_CHANGED: "Changed a user role",
-    USER_DELETED: "Removed a user",
-    SETTINGS_CHANGED: "Changed settings",
-    ORG_MFA_REQUIRED: "Enabled org-wide 2FA",
-    ORG_MFA_NOT_REQUIRED: "Disabled org-wide 2FA",
-    SECURITY_TEST_RUN: "Ran isolation test",
-    STAFF_WEBHOOK_TEST: "Updated staff-access notifications",
+    USER_INVITED: "invited a user",
+    USER_ROLE_CHANGED: "changed a user role",
+    USER_DELETED: "removed a user",
+    SETTINGS_CHANGED: "updated settings",
+    ORG_MFA_REQUIRED: "enabled org-wide 2FA",
+    ORG_MFA_NOT_REQUIRED: "disabled org-wide 2FA",
+    SECURITY_TEST_RUN: "ran isolation test",
+    STAFF_WEBHOOK_TEST: "updated staff-access notifications",
   };
-  return map[action] ?? action;
+  return map[action] ?? action.toLowerCase().replace(/_/g, " ");
 }
 
-function MetricCard({
-  title,
-  value,
-  caption,
-  variant,
-  children,
-}: {
-  title: string;
-  value?: string | number | null;
-  caption?: string;
-  variant?: "default" | "good" | "warn";
-  children?: React.ReactNode;
-}) {
-  const ringColor =
-    variant === "good"
-      ? "border-green-200 bg-green-50"
-      : variant === "warn"
-        ? "border-amber-200 bg-amber-50"
-        : "border-border-subtle bg-white";
+// ─── headline computation ───────────────────────────────────────────
 
+function summariseHeadline(data: SecurityDashboardData): {
+  status: "clear" | "watch" | "attention";
+  title: string;
+  subtitle: string;
+} {
+  const failedLogins = data.failedLogins.count ?? 0;
+  const staffAccess = data.staffAccess.count ?? 0;
+
+  if (staffAccess === 0 && failedLogins <= 2) {
+    return {
+      status: "clear",
+      title: "All clear",
+      subtitle: "No staff access, no anomalies, no incidents in the last 30 days.",
+    };
+  }
+  if (staffAccess > 0) {
+    return {
+      status: "watch",
+      title: `${staffAccess} staff access ${staffAccess === 1 ? "event" : "events"}`,
+      subtitle:
+        "Pocket Fund staff have accessed your data. Review the entries in Settings → Security.",
+    };
+  }
+  return {
+    status: "watch",
+    title: `${failedLogins} failed login attempts`,
+    subtitle: "Higher than baseline. Review the activity feed for patterns.",
+  };
+}
+
+// ─── small UI atoms ─────────────────────────────────────────────────
+
+function Skeleton() {
   return (
-    <div className={`p-5 rounded-xl border ${ringColor} flex flex-col gap-2`}>
-      <p className="text-xs font-bold text-text-muted uppercase tracking-wider">
-        {title}
-      </p>
-      {value !== undefined && (
-        <p
-          className="text-3xl font-bold leading-none"
-          style={{ color: "#003366" }}
-        >
-          {value === null ? (
-            <span className="text-base font-medium text-text-muted">
-              Unavailable
-            </span>
-          ) : (
-            value
-          )}
-        </p>
-      )}
-      {caption ? (
-        <p className="text-xs text-text-muted">{caption}</p>
-      ) : null}
-      {children}
+    <div
+      className="rounded-xl bg-white p-8 border border-border-subtle"
+      style={{ minHeight: 180 }}
+    >
+      <div className="animate-pulse space-y-4">
+        <div className="h-3 w-24 bg-gray-200 rounded" />
+        <div className="h-12 w-32 bg-gray-200 rounded" />
+        <div className="h-3 w-48 bg-gray-200 rounded" />
+      </div>
     </div>
   );
 }
+
+// ─── main component ─────────────────────────────────────────────────
 
 export function SecurityDashboard() {
   const [data, setData] = useState<SecurityDashboardData | null>(null);
@@ -136,13 +151,7 @@ export function SecurityDashboard() {
     load();
   }, [load]);
 
-  if (loading && data === null) {
-    return (
-      <div className="rounded-xl p-5 bg-white border border-border-subtle">
-        <p className="text-sm text-text-muted">Loading security dashboard...</p>
-      </div>
-    );
-  }
+  if (loading && data === null) return <Skeleton />;
 
   if (error || !data) {
     return (
@@ -159,136 +168,300 @@ export function SecurityDashboard() {
     );
   }
 
-  const failedLoginsCritical =
-    typeof data.failedLogins.count === "number" && data.failedLogins.count > 10;
+  const headline = summariseHeadline(data);
+  const staffAccessZero = (data.staffAccess.count ?? 0) === 0;
+  const failedZero = (data.failedLogins.count ?? 0) === 0;
+  const adminActionsZero = data.adminActions.total === 0;
 
   return (
-    <section className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-bold text-text-main flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary">
-              dashboard
-            </span>
-            Security overview
-          </h2>
-          <p className="text-xs text-text-muted">
-            Your firm&apos;s security posture at a glance.
-          </p>
-        </div>
+    <section className="space-y-5">
+      {/* ───── Refresh control ───── */}
+      <div className="flex items-baseline justify-between">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-text-muted">
+          Security · Last 30 days
+        </p>
         <button
           type="button"
           onClick={load}
           disabled={loading}
-          className="text-xs text-primary hover:text-primary-hover font-medium flex items-center gap-1 transition-colors disabled:opacity-50"
+          className="text-[11px] font-bold uppercase tracking-wider text-text-muted hover:text-text-main transition-colors disabled:opacity-50 inline-flex items-center gap-1"
         >
           <span className="material-symbols-outlined text-sm">refresh</span>
           Refresh
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-        {/* 1. Active sessions */}
-        <MetricCard
-          title="Active sessions"
-          value={data.activeSessions}
-          caption={
-            data.activeSessions === null
-              ? "Active session counts require Supabase auth schema to be exposed."
-              : data.activeSessions === 1
-                ? "1 device signed in across your team"
-                : `${data.activeSessions} devices signed in across your team`
-          }
-        />
-
-        {/* 2. MFA enrollment */}
-        <MetricCard
-          title="Members"
-          value={data.members.total}
-          caption={
-            data.members.requireMFA
-              ? "Org-wide 2FA: required ✓"
-              : "Org-wide 2FA: optional"
-          }
-        >
-          <a
-            href="/settings#section-team"
-            className="text-[10px] uppercase tracking-wide font-semibold mt-1"
-            style={{ color: "#003366" }}
+      {/* ───── Status hero ───── */}
+      <div
+        className="rounded-2xl px-6 py-7"
+        style={{
+          background:
+            headline.status === "clear"
+              ? "linear-gradient(180deg, rgba(0,51,102,0.04) 0%, rgba(0,51,102,0) 100%)"
+              : "linear-gradient(180deg, rgba(245,158,11,0.06) 0%, rgba(245,158,11,0) 100%)",
+          border:
+            headline.status === "clear"
+              ? "1px solid rgba(0,51,102,0.12)"
+              : "1px solid rgba(245,158,11,0.18)",
+        }}
+      >
+        <div className="flex items-start gap-4">
+          <span
+            className="material-symbols-outlined"
+            style={{
+              fontSize: 36,
+              color: headline.status === "clear" ? BANKER_BLUE : "#b45309",
+              fontVariationSettings: "'FILL' 0, 'wght' 300, 'GRAD' 0",
+            }}
           >
-            Manage in Settings →
-          </a>
-        </MetricCard>
+            {headline.status === "clear" ? "verified_user" : "warning"}
+          </span>
+          <div className="flex-1 min-w-0">
+            <h2
+              className="text-2xl md:text-3xl font-bold leading-tight tracking-tight"
+              style={{ color: BANKER_BLUE }}
+            >
+              {headline.title}
+            </h2>
+            <p className="mt-1 text-sm text-text-secondary max-w-prose">
+              {headline.subtitle}
+            </p>
+          </div>
+        </div>
+      </div>
 
-        {/* 3. Pocket Fund staff access */}
-        <MetricCard
-          title="Pocket Fund staff access"
-          value={data.staffAccess.count ?? 0}
-          caption={`In the last ${data.staffAccess.windowDays} days. Real-time entries appear in Settings → Security.`}
-          variant={(data.staffAccess.count ?? 0) === 0 ? "good" : "warn"}
-        />
+      {/* ───── Featured signal — Pocket Fund staff access ───── */}
+      <div
+        className="rounded-2xl border bg-white px-6 py-6 sm:px-7 sm:py-7"
+        style={{
+          borderColor: staffAccessZero
+            ? "rgba(0,51,102,0.12)"
+            : "rgba(245,158,11,0.25)",
+        }}
+      >
+        <div className="grid grid-cols-1 sm:grid-cols-[auto_1fr] gap-x-8 gap-y-3 items-baseline">
+          <div className="flex items-baseline gap-3">
+            <span
+              className="font-bold leading-none tracking-tight tabular-nums"
+              style={{
+                fontSize: "clamp(56px, 9vw, 96px)",
+                color: BANKER_BLUE,
+                letterSpacing: "-0.02em",
+              }}
+            >
+              {data.staffAccess.count ?? 0}
+            </span>
+            {staffAccessZero ? (
+              <span
+                className="material-symbols-outlined"
+                style={{
+                  fontSize: 28,
+                  color: "#15803d",
+                  marginLeft: -8,
+                  fontVariationSettings: "'FILL' 1, 'wght' 600",
+                }}
+              >
+                check_circle
+              </span>
+            ) : null}
+          </div>
+          <div className="self-end pb-2">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
+              Pocket Fund staff access · {data.staffAccess.windowDays} days
+            </p>
+            <p className="mt-2 text-base text-text-main font-medium leading-snug">
+              {staffAccessZero
+                ? "Pocket Fund staff have not accessed your data."
+                : `Pocket Fund staff accessed your data ${data.staffAccess.count} time${
+                    data.staffAccess.count === 1 ? "" : "s"
+                  }.`}
+            </p>
+            <p className="mt-1 text-sm text-text-muted">
+              {staffAccessZero
+                ? "When they do, you'll see entries here in real-time."
+                : "Review the entries in Settings → Security."}
+            </p>
+            <a
+              href="/settings#section-security"
+              className="mt-3 inline-flex items-center gap-1 text-xs font-bold uppercase tracking-wider hover:underline"
+              style={{ color: BANKER_BLUE }}
+            >
+              {staffAccessZero
+                ? "Configure real-time alerts"
+                : "Open access log"}
+              <span className="material-symbols-outlined text-sm">arrow_forward</span>
+            </a>
+          </div>
+        </div>
+      </div>
 
-        {/* 4. Failed logins */}
-        <MetricCard
-          title="Failed logins"
-          value={data.failedLogins.count ?? 0}
-          caption={`In the last ${data.failedLogins.windowDays} days.`}
-          variant={failedLoginsCritical ? "warn" : "default"}
-        />
-
-        {/* 5. Admin actions */}
-        <MetricCard
-          title={`Admin actions (${data.adminActions.windowDays}d)`}
-          value={data.adminActions.total}
-          caption={`Recent invites, role changes, and settings updates.`}
+      {/* ───── Trust strip — three supporting metrics, dense row ───── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 rounded-2xl border bg-white overflow-hidden divide-y sm:divide-y-0 sm:divide-x divide-border-subtle">
+        <a
+          href="/settings#section-team"
+          className="group block px-6 py-5 hover:bg-gray-50 transition-colors"
         >
-          {data.adminActions.recent.length > 0 ? (
-            <ul className="mt-2 space-y-1.5 text-[11px]">
-              {data.adminActions.recent.slice(0, 3).map((a) => (
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
+            Members
+          </p>
+          <p
+            className="mt-2 font-bold leading-none tabular-nums"
+            style={{ fontSize: 36, color: BANKER_BLUE, letterSpacing: "-0.015em" }}
+          >
+            {data.members.total}
+          </p>
+          <p className="mt-2 text-xs text-text-secondary">
+            <span
+              className={
+                data.members.requireMFA
+                  ? "font-semibold text-emerald-700"
+                  : "font-semibold text-amber-700"
+              }
+            >
+              {data.members.requireMFA ? "2FA required" : "2FA optional"}
+            </span>
+            <span className="ml-1 text-text-muted opacity-70 group-hover:opacity-100 transition-opacity">
+              · manage →
+            </span>
+          </p>
+        </a>
+
+        <div className="px-6 py-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
+            Failed logins · 7d
+          </p>
+          <p
+            className="mt-2 font-bold leading-none tabular-nums"
+            style={{
+              fontSize: 36,
+              color: failedZero ? BANKER_BLUE : "#b45309",
+              letterSpacing: "-0.015em",
+            }}
+          >
+            {data.failedLogins.count ?? 0}
+          </p>
+          <p className="mt-2 text-xs text-text-muted">
+            {failedZero
+              ? "No failed login attempts."
+              : "Review the activity feed for patterns."}
+          </p>
+        </div>
+
+        <div className="px-6 py-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
+            Admin actions · 30d
+          </p>
+          <p
+            className="mt-2 font-bold leading-none tabular-nums"
+            style={{ fontSize: 36, color: BANKER_BLUE, letterSpacing: "-0.015em" }}
+          >
+            {data.adminActions.total}
+          </p>
+          <p className="mt-2 text-xs text-text-muted">
+            {adminActionsZero
+              ? "No invites, role changes, or settings updates."
+              : "Recent invites, role changes, settings updates."}
+          </p>
+        </div>
+      </div>
+
+      {/* ───── Activity ledger — admin actions + top deals as lists ───── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        {/* Recent admin actions */}
+        <div className="rounded-2xl border border-border-subtle bg-white px-6 py-5">
+          <div className="flex items-baseline justify-between mb-3">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted">
+              Recent admin actions
+            </p>
+            {data.adminActions.recent.length > 0 ? (
+              <p className="text-[10px] text-text-muted tabular-nums">
+                showing {Math.min(data.adminActions.recent.length, 5)} of{" "}
+                {data.adminActions.total}
+              </p>
+            ) : null}
+          </div>
+          {data.adminActions.recent.length === 0 ? (
+            <p className="text-sm text-text-muted py-4">
+              Nothing to report — your settings have been quiet for 30 days.
+            </p>
+          ) : (
+            <ol className="divide-y divide-border-subtle">
+              {data.adminActions.recent.slice(0, 5).map((a) => (
                 <li
                   key={a.createdAt + a.action}
-                  className="flex items-baseline justify-between gap-2"
+                  className="py-2.5 flex items-baseline gap-3"
                 >
-                  <span className="text-text-main truncate">
+                  <span className="text-xs text-text-muted tabular-nums whitespace-nowrap min-w-[60px]">
+                    {relTime(a.createdAt)}
+                  </span>
+                  <p className="text-sm text-text-main truncate flex-1">
                     <span className="font-semibold">
                       {a.userName ?? a.userEmail ?? "Someone"}
                     </span>{" "}
-                    {actionLabel(a.action)}
-                  </span>
-                  <span className="text-text-muted whitespace-nowrap">
-                    {relTime(a.createdAt)}
-                  </span>
+                    <span className="text-text-secondary">{actionLabel(a.action)}</span>
+                  </p>
                 </li>
               ))}
-            </ul>
-          ) : null}
-        </MetricCard>
+            </ol>
+          )}
+        </div>
 
-        {/* 6. Top viewed deals */}
-        <MetricCard title="Most-viewed deals (30d)">
+        {/* Most-viewed deals */}
+        <div className="rounded-2xl border border-border-subtle bg-white px-6 py-5">
+          <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-text-muted mb-3">
+            Most-viewed deals · 30d
+          </p>
           {data.topDeals.length === 0 ? (
-            <p className="text-xs text-text-muted">No deal views logged yet.</p>
+            <p className="text-sm text-text-muted py-4">
+              No deal views logged yet — activity will appear as your team reviews
+              deals.
+            </p>
           ) : (
-            <ul className="mt-1 space-y-2 text-xs">
-              {data.topDeals.slice(0, 3).map((d) => (
-                <li key={d.dealId}>
+            <ol className="divide-y divide-border-subtle">
+              {data.topDeals.slice(0, 5).map((d, idx) => (
+                <li
+                  key={d.dealId}
+                  className="py-2.5 flex items-baseline gap-3"
+                >
+                  <span
+                    className="text-xs font-bold tabular-nums tracking-wider"
+                    style={{
+                      color: idx === 0 ? BANKER_BLUE : "#94a3b8",
+                      minWidth: 18,
+                    }}
+                  >
+                    {idx + 1}
+                  </span>
                   <a
                     href={`/deals/${d.dealId}`}
-                    className="font-semibold hover:underline truncate block"
-                    style={{ color: "#003366" }}
+                    className="flex-1 truncate text-sm font-semibold text-text-main hover:underline"
                   >
                     {d.dealName ?? d.dealId}
                   </a>
-                  <span className="text-text-muted">
+                  <span className="text-xs text-text-muted tabular-nums whitespace-nowrap">
                     {d.views} {d.views === 1 ? "view" : "views"} · {d.uniqueViewers}{" "}
                     {d.uniqueViewers === 1 ? "viewer" : "viewers"}
                   </span>
                 </li>
               ))}
-            </ul>
+            </ol>
           )}
-        </MetricCard>
+        </div>
       </div>
+
+      {/* ───── Footnote — degraded states ───── */}
+      {data.activeSessions === null ? (
+        <p className="text-[11px] text-text-muted px-1">
+          Active session counts unavailable — Supabase{" "}
+          <code className="font-mono">auth</code> schema needs to be exposed in
+          PostgREST. (See master TODO ops item OPS-2.)
+        </p>
+      ) : (
+        <p className="text-[11px] text-text-muted px-1">
+          {data.activeSessions} active session
+          {data.activeSessions === 1 ? "" : "s"} across your team right now.
+        </p>
+      )}
     </section>
   );
 }
