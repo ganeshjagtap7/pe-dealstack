@@ -303,18 +303,67 @@ function normalizeUnitScale(raw: string): UnitScale {
  *
  * Mutates `result.statements` in-place.
  */
+/**
+ * Magnitude thresholds above which a MILLIONS or THOUSANDS classification
+ * implies an extraordinarily large company (>= $1B at the stated scale).
+ * Real $1B+ companies almost always declare scale explicitly via "$B" or
+ * "(in billions)" — so a MILLIONS-tagged statement carrying values > 1000
+ * is much more likely a small-business P&L mis-classified than a real
+ * unicorn. We tolerate this asymmetric mistake because the user base
+ * skews lower-mid-market.
+ */
+const MILLIONS_MAX_BEFORE_OVERRIDE = 1_000;
+const THOUSANDS_MAX_BEFORE_OVERRIDE = 1_000_000;
+
+/** Largest absolute numeric line-item value across every period of a
+ * statement, ignoring percentages / ratios / `_source` citation strings. */
+function maxAbsLineItem(stmt: ClassifiedStatement): number {
+  let max = 0;
+  for (const period of stmt.periods) {
+    for (const [k, v] of Object.entries(period.lineItems)) {
+      if (k.endsWith('_source')) continue;
+      const lower = k.toLowerCase();
+      if (lower.endsWith('_pct') || lower.endsWith('_percent') || lower.endsWith('_ratio')) continue;
+      if (lower.includes('margin')) continue;
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        const abs = Math.abs(v);
+        if (abs > max) max = abs;
+      }
+    }
+  }
+  return max;
+}
+
 function applyExplicitUnitOverride(
   result: ClassificationResult,
   explicitUnitFromText: UnitScale | null,
 ): void {
-  if (explicitUnitFromText !== null) {
-    // Source declared a scale — trust the LLM (it had a fact to anchor on).
-    return;
-  }
-
   for (const stmt of result.statements) {
-    if (stmt.unitScale === 'ACTUALS') continue; // LLM already agrees with us
+    if (stmt.unitScale === 'ACTUALS' || stmt.unitScale === 'BILLIONS') {
+      // ACTUALS: LLM already agrees. BILLIONS: rare + almost always explicit
+      // in the source, leave it alone (the magnitude check below would
+      // require values > $1Q to flip it which never happens).
+      continue;
+    }
+
     const originalScale = stmt.unitScale;
+    const maxValue = maxAbsLineItem(stmt);
+    let reason: string | null = null;
+
+    if (explicitUnitFromText === null) {
+      reason = 'no explicit unit marker in source';
+    } else if (originalScale === 'MILLIONS' && maxValue > MILLIONS_MAX_BEFORE_OVERRIDE) {
+      // Marker exists somewhere in the source text, but the values are
+      // far too large to plausibly be at MILLIONS scale (>$1B). The
+      // marker is likely narrative prose ("a $50M-scale deal") rather
+      // than a table-header convention. Trust the magnitude.
+      reason = `marker found in source but max value ${maxValue} > ${MILLIONS_MAX_BEFORE_OVERRIDE} implies scale beyond MILLIONS`;
+    } else if (originalScale === 'THOUSANDS' && maxValue > THOUSANDS_MAX_BEFORE_OVERRIDE) {
+      reason = `marker found in source but max value ${maxValue} > ${THOUSANDS_MAX_BEFORE_OVERRIDE} implies scale beyond THOUSANDS`;
+    }
+
+    if (reason === null) continue; // trust the LLM
+
     // Capture a sample value for logging diagnostics
     let valueSample: number | null = null;
     for (const period of stmt.periods) {
@@ -329,11 +378,13 @@ function applyExplicitUnitOverride(
     }
     stmt.unitScale = 'ACTUALS';
     log.warn(
-      `Financial classifier: source has no explicit unit marker — overriding LLM-inferred ${originalScale} to ACTUALS`,
+      `Financial classifier: overriding LLM-inferred ${originalScale} to ACTUALS — ${reason}`,
       {
         statementType: stmt.statementType,
         originalScale,
         valueSample,
+        maxValue,
+        explicitUnitFromText,
       },
     );
   }
