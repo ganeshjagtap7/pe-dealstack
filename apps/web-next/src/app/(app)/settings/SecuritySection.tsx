@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { TrustPosture } from "./SecuritySection.trust";
 import { ActiveSessions } from "./SecuritySection.sessions";
 import { IsolationTest } from "./SecuritySection.isolationTest";
+import { StaffAccessLog } from "./SecuritySection.staffAccessLog";
 
 // ─── Password change ────────────────────────────────────────────────
 
@@ -407,6 +408,7 @@ export function SecuritySection({
         <PasswordChange onToast={onToast} />
         <MfaSection onToast={onToast} />
         <TrustPosture />
+        <StaffAccessLog onToast={onToast} />
         <ActiveSessions onToast={onToast} />
         <IsolationTest onToast={onToast} />
       </div>
