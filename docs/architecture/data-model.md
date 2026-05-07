@@ -262,6 +262,25 @@ Saved companies a firm wants to track without yet creating a deal.
 | `companyName`, `industry`, `notes` | text |
 | `addedBy`, `organizationId` | FKs |
 
+## AI Usage Tracking tables (added May 2026)
+
+Four tables + three `User` columns added by the AI Usage Tracking system. See [`docs/AI-USAGE-TRACKING.md`](../AI-USAGE-TRACKING.md) for full DDL, seeded data, and usage details.
+
+| Table | Purpose | FK targets |
+|---|---|---|
+| `UsageEvent` | Truth ledger — one row per AI call. Captures user, org, operation, model, provider, tokens, costUsd, credits, status, durationMs, metadata. | `User.id`, `Organization.id` |
+| `ModelPrice` | Per-1M-token pricing reference (14+ models seeded). 10-min in-memory TTL cache. | — (lookup table) |
+| `OperationCredits` | Operation label → user-facing credits mapping (29 ops seeded). Falls back to 1 credit + warn log for unknown ops. | — (lookup table) |
+| `UsageAlert` | Dedup table for runaway-monitor alerts. Currently dormant (monitor was removed before shipping). | `User.id` |
+
+`User` table additions:
+
+| Column | Type | Purpose |
+|---|---|---|
+| `isInternal` | boolean default false | Pocket Fund team flag — grants `/internal/usage` access |
+| `isThrottled` | boolean default false | Soft throttle: 1 req / 2s. Set via admin Leaderboard. |
+| `isBlocked` | boolean default false | Hard kill-switch: all AI calls refuse with 403. Set via admin Leaderboard. |
+
 ## Migrations
 
 Migration files live in [`apps/api/`](../../apps/api/) (e.g. `organization-migration.sql`, `onboarding-migration.sql`). Run on staging before production. See [`docs/DATABASE_MIGRATIONS.md`](../DATABASE_MIGRATIONS.md).

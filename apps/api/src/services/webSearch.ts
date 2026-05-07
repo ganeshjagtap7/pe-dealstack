@@ -1,6 +1,7 @@
 // apps/api/src/services/webSearch.ts
 import { ApifyClient } from 'apify-client';
 import { log } from '../utils/logger.js';
+import { trackedApifyCall, APIFY_PRICES } from './usage/trackedApify.js';
 
 export interface SearchResult {
   title: string;
@@ -35,40 +36,42 @@ export async function searchWeb(query: string, maxResults = 8): Promise<SearchRe
 // ==========================================
 
 async function searchViaApify(query: string, maxResults: number): Promise<SearchResult[]> {
-  try {
-    const client = new ApifyClient({ token: APIFY_API_KEY });
+  return trackedApifyCall('web_search', 1, APIFY_PRICES.searchUsd, async () => {
+    try {
+      const client = new ApifyClient({ token: APIFY_API_KEY });
 
-    const run = await client.actor('apify/google-search-scraper').call({
-      queries: query,
-      maxPagesPerQuery: 1,
-      resultsPerPage: maxResults,
-      languageCode: 'en',
-      countryCode: 'us',
-    }, {
-      timeout: 30, // seconds
-      memory: 256, // MB — minimum to save credits
-    });
+      const run = await client.actor('apify/google-search-scraper').call({
+        queries: query,
+        maxPagesPerQuery: 1,
+        resultsPerPage: maxResults,
+        languageCode: 'en',
+        countryCode: 'us',
+      }, {
+        timeout: 30, // seconds
+        memory: 256, // MB — minimum to save credits
+      });
 
-    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+      const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-    const results: SearchResult[] = [];
-    const firstItem = items[0] as Record<string, any>;
-    if (firstItem?.organicResults) {
-      for (const r of (firstItem.organicResults as any[]).slice(0, maxResults)) {
-        results.push({
-          title: r.title || '',
-          snippet: r.description || '',
-          url: r.url || '',
-        });
+      const results: SearchResult[] = [];
+      const firstItem = items[0] as Record<string, any>;
+      if (firstItem?.organicResults) {
+        for (const r of (firstItem.organicResults as any[]).slice(0, maxResults)) {
+          results.push({
+            title: r.title || '',
+            snippet: r.description || '',
+            url: r.url || '',
+          });
+        }
       }
-    }
 
-    log.info('Apify search complete', { query, results: results.length });
-    return results;
-  } catch (error) {
-    log.error('Apify search failed', { query, error: (error as Error).message });
-    return [];
-  }
+      log.info('Apify search complete', { query, results: results.length });
+      return results;
+    } catch (error) {
+      log.error('Apify search failed', { query, error: (error as Error).message });
+      return [];
+    }
+  });
 }
 
 // ==========================================
@@ -96,47 +99,49 @@ export async function scrapeLinkedInProfile(linkedinUrl: string): Promise<Linked
     return null;
   }
 
-  try {
-    const client = new ApifyClient({ token: APIFY_API_KEY });
+  return trackedApifyCall('linkedin_scrape', 1, APIFY_PRICES.linkedInProfileUsd, async () => {
+    try {
+      const client = new ApifyClient({ token: APIFY_API_KEY });
 
-    const run = await client.actor('anchor/linkedin-profile-scraper').call({
-      profileUrls: [linkedinUrl],
-    }, {
-      timeout: 45,
-      memory: 512,
-    });
+      const run = await client.actor('anchor/linkedin-profile-scraper').call({
+        profileUrls: [linkedinUrl],
+      }, {
+        timeout: 45,
+        memory: 512,
+      });
 
-    const { items } = await client.dataset(run.defaultDatasetId).listItems();
+      const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-    if (items.length === 0) return null;
+      if (items.length === 0) return null;
 
-    const profile = items[0] as Record<string, any>;
-    const result: LinkedInProfile = {
-      name: profile.fullName || profile.name || '',
-      headline: profile.headline || profile.title || '',
-      summary: profile.summary || profile.about || '',
-      location: profile.location || '',
-      profileUrl: linkedinUrl,
-      experience: (profile.experience || profile.positions || []).map((e: any) => ({
-        title: e.title || e.position || '',
-        company: e.companyName || e.company || '',
-        duration: e.duration || e.dateRange || '',
-        description: e.description || '',
-      })).slice(0, 10),
-      education: (profile.education || []).map((e: any) => ({
-        school: e.schoolName || e.school || '',
-        degree: e.degree || e.degreeName || '',
-        field: e.fieldOfStudy || e.field || '',
-      })).slice(0, 5),
-      skills: (profile.skills || []).map((s: any) => typeof s === 'string' ? s : s.name || '').slice(0, 15),
-    };
+      const profile = items[0] as Record<string, any>;
+      const result: LinkedInProfile = {
+        name: profile.fullName || profile.name || '',
+        headline: profile.headline || profile.title || '',
+        summary: profile.summary || profile.about || '',
+        location: profile.location || '',
+        profileUrl: linkedinUrl,
+        experience: (profile.experience || profile.positions || []).map((e: any) => ({
+          title: e.title || e.position || '',
+          company: e.companyName || e.company || '',
+          duration: e.duration || e.dateRange || '',
+          description: e.description || '',
+        })).slice(0, 10),
+        education: (profile.education || []).map((e: any) => ({
+          school: e.schoolName || e.school || '',
+          degree: e.degree || e.degreeName || '',
+          field: e.fieldOfStudy || e.field || '',
+        })).slice(0, 5),
+        skills: (profile.skills || []).map((s: any) => typeof s === 'string' ? s : s.name || '').slice(0, 15),
+      };
 
-    log.info('LinkedIn profile scraped', { name: result.name, experience: result.experience.length });
-    return result;
-  } catch (error) {
-    log.error('LinkedIn scrape failed', { linkedinUrl, error: (error as Error).message });
-    return null;
-  }
+      log.info('LinkedIn profile scraped', { name: result.name, experience: result.experience.length });
+      return result;
+    } catch (error) {
+      log.error('LinkedIn scrape failed', { linkedinUrl, error: (error as Error).message });
+      return null;
+    }
+  });
 }
 
 // ==========================================

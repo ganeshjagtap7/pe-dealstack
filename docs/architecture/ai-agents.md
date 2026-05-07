@@ -198,6 +198,16 @@ Reach via `POST /api/ai/draft-email` or via the Deal Chat tool `draft_email`.
 
 ---
 
+## AI usage tracking
+
+Every LLM call made through `getChatModel()`, `getFastModel()`, `getExtractionModel()`, or `invokeStructured()` — including every step inside LangGraph ReAct loops — produces a `UsageEvent` row attributed to the calling User and Organization. The same applies to Apify, Azure DocIntel, and Gemini embedding calls. This means each agent tool invocation in a ReAct loop generates its own event (one row per LLM step, not one per agent run).
+
+When building a new agent, pass an `operation` label as the third argument to `getChatModel` / `getFastModel`. This label maps to a credits value in the `OperationCredits` table and appears in the user-facing Settings panel. Do not call `new ChatOpenAI()` directly — callbacks are only attached when going through the factory functions.
+
+Full details: [`docs/AI-USAGE-TRACKING.md`](../AI-USAGE-TRACKING.md).
+
+---
+
 ## Adding a new agent
 
 Pattern that has worked for us:

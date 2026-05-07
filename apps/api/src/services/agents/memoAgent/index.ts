@@ -64,7 +64,7 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
   }
 
   try {
-    const model = getChatModel(0.7, 2000);
+    const model = getChatModel(0.7, 2000, 'memo_generation');
     const tools = getMemoAgentTools(input.memoId, input.dealId, input.orgId);
 
     const agent = createReactAgent({ llm: model, tools });

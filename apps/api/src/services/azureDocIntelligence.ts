@@ -14,6 +14,7 @@
 
 import { createRequire } from 'module';
 import { log } from '../utils/logger.js';
+import { trackedAzureDocIntelCall } from './usage/trackedAzureDocIntel.js';
 
 const require = createRequire(import.meta.url);
 
@@ -81,13 +82,16 @@ export async function extractTablesFromPdf(buffer: Buffer): Promise<AzureExtract
   });
 
   try {
-    // Kick off analysis
-    const poller = await client.beginAnalyzeDocument('prebuilt-layout', buffer, {
-      contentType: 'application/pdf',
-    });
-
-    // Poll until done (Azure typically takes 5-30s for a CIM)
-    const result = await poller.pollUntilDone();
+    // Kick off analysis & wrap with usage tracking
+    const result = await trackedAzureDocIntelCall(
+      async () => {
+        const poller = await client.beginAnalyzeDocument('prebuilt-layout', buffer, {
+          contentType: 'application/pdf',
+        });
+        return poller.pollUntilDone();
+      },
+      (r: any) => (r?.pages ?? []).length,
+    );
 
     if (!result) {
       log.warn('Azure Doc Intelligence: no result returned');

@@ -2,6 +2,39 @@
 // Maps raw LLM errors to specific, user-friendly messages.
 // Used by all AI agents for consistent error reporting.
 
+import { UserBlockedError } from '../services/usage/enforcement.js';
+
+export type AIErrorResponse = {
+  statusCode: number;
+  userMessage: string;
+  code: string;
+};
+
+/**
+ * Classify an unknown error (Error object or string) into a structured
+ * HTTP response descriptor. Handles UserBlockedError as a 403 so callers
+ * don't need to import enforcement.ts themselves.
+ *
+ * Usage in route catch blocks:
+ *   const { statusCode, userMessage } = classifyAIErrorObject(error);
+ *   res.status(statusCode).json({ error: userMessage });
+ */
+export function classifyAIErrorObject(err: unknown): AIErrorResponse {
+  if (err instanceof UserBlockedError) {
+    return {
+      statusCode: 403,
+      userMessage: 'Your AI access has been paused. Please contact support.',
+      code: 'AI_USER_BLOCKED',
+    };
+  }
+  const msg = err instanceof Error ? err.message : String(err);
+  return {
+    statusCode: 500,
+    userMessage: classifyAIError(msg),
+    code: 'AI_ERROR',
+  };
+}
+
 /** Classify an AI/LLM error into a specific user-facing message */
 export function classifyAIError(errorMsg: string): string {
   const msg = errorMsg.toLowerCase();
