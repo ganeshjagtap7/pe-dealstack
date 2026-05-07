@@ -47,7 +47,12 @@
  *     cross-year false-merges.
  */
 import { log } from '../utils/logger.js';
-import type { FinancialPeriod, PeriodType, StatementType } from './financialClassifier.js';
+import type {
+  ClassifiedStatement,
+  FinancialPeriod,
+  PeriodType,
+  StatementType,
+} from './financialClassifier.js';
 
 // ─── Public types ────────────────────────────────────────────
 
@@ -404,4 +409,87 @@ export function dedupeStatementPeriods(
   }
 
   return out;
+}
+
+// ─── Statement-level dedup (merges same statementType siblings) ────────────
+
+/**
+ * Collapse multiple `ClassifiedStatement` entries of the same `statementType`
+ * into one merged statement. The classifier sometimes emits a separate
+ * statement object per source section (e.g. one `BALANCE_SHEET` for working
+ * capital, another for AR/AP, another for fixed assets). Each section may
+ * carry overlapping period labels (e.g. all four reference "2026-03-31").
+ *
+ * If we hand that raw list to the upserter, every period whose
+ * `(dealId, statementType, period, documentId)` key collides with a sibling
+ * statement's period will overwrite the previously-stored row's `lineItems`
+ * column wholesale — we end up with N upserts mapping to the same DB row, so
+ * only the LAST-iterated section's keys survive. Bug observed in production
+ * (LangSmith trace 2026-05-07 11:16:10): four BALANCE_SHEET sections all
+ * referencing "2026-03-31" upserted to the same UUID; the final row only
+ * carried `other_current_liabilities` because the deferred-revenue section
+ * was processed last.
+ *
+ * Strategy:
+ *   1. Bucket statements by `statementType`.
+ *   2. Within a bucket, concatenate all `periods` arrays.
+ *   3. Run the existing per-period dedup (`dedupeStatementPeriods`) which
+ *      already knows how to merge two `FinancialPeriod` values whose labels
+ *      collide — line-item KEYS from each side are unioned, with higher-
+ *      confidence values winning per key. That's exactly the behaviour we
+ *      want when two sibling statements describe different facets of the
+ *      same period.
+ *   4. Merge `unitScale` / `currency` from the first occurrence — these are
+ *      already deterministic per file (the LLM doesn't switch units mid-
+ *      document) so first-wins is fine.
+ *
+ * Logs a per-merge info line when a `statementType` had >1 source statement.
+ */
+export function mergeStatementsBySameType(
+  statements: ClassifiedStatement[],
+): ClassifiedStatement[] {
+  if (statements.length <= 1) return statements;
+
+  const byType = new Map<StatementType, ClassifiedStatement[]>();
+  for (const s of statements) {
+    const arr = byType.get(s.statementType) ?? [];
+    arr.push(s);
+    byType.set(s.statementType, arr);
+  }
+
+  const merged: ClassifiedStatement[] = [];
+  for (const [statementType, group] of byType.entries()) {
+    if (group.length === 1) {
+      merged.push(group[0]);
+      continue;
+    }
+
+    // Multiple statements of the same type — concatenate periods then dedup.
+    const allPeriods: FinancialPeriod[] = [];
+    for (const s of group) {
+      for (const p of s.periods) allPeriods.push(p);
+    }
+    const dedupedPeriods = dedupeStatementPeriods(statementType, allPeriods);
+
+    log.info(
+      `Statement merge: ${group.length} ${statementType} statements → 1 ` +
+        `(${allPeriods.length} input periods → ${dedupedPeriods.length} after dedup)`,
+      {
+        statementType,
+        sourceCount: group.length,
+        inputPeriods: allPeriods.length,
+        outputPeriods: dedupedPeriods.length,
+      },
+    );
+
+    // First-wins for unitScale/currency — see header comment.
+    merged.push({
+      statementType,
+      unitScale: group[0].unitScale,
+      currency: group[0].currency,
+      periods: dedupedPeriods,
+    });
+  }
+
+  return merged;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { api, NotFoundError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import {
@@ -43,7 +43,16 @@ export function DealAnalysisSection({ dealId, onFullscreen }: { dealId: string; 
   // "noData" = the /analysis endpoint returned hasData=false or 404 — no analysis yet.
   const [noData, setNoData] = useState(false);
 
+  // Guards against duplicate parallel fetches:
+  //  - React Strict Mode double-invokes effects in dev
+  //  - User mashing the refresh button fires multiple in-flight requests
+  // Without this guard, the /financials/insights endpoint was being hit
+  // multiple times in the same session, each triggering a fresh LLM call.
+  const inFlightRef = useRef(false);
+
   const loadData = useCallback(async () => {
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
     setLoading(true);
     setError(false);
     setNoData(false);
@@ -87,6 +96,7 @@ export function DealAnalysisSection({ dealId, onFullscreen }: { dealId: string; 
       setError(true);
     } finally {
       setLoading(false);
+      inFlightRef.current = false;
     }
   }, [dealId]);
 

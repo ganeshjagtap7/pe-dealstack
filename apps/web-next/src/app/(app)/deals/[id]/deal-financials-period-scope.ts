@@ -57,14 +57,20 @@ export function inferPeriodScope(period: string | null | undefined): PeriodScope
   if (/\bLTM\b/.test(upper) || /\bTTM\b/.test(upper)) return "ltm";
   // FY Estimate / Forecast / Budget / Projected — "FY26 Est", "FY26 Est."
   if (/\b(EST|ESTIMATE|FORECAST|BUDGET|PROJ|PROJECTED)\b/.test(upper)) return "estimate";
+  // Bare ARR / annualised revenue — "Current ARR", "ARR (Annualised)".
+  // Treat as annual scope so it's not grouped with monthly/MRR rows
+  // (ARR ≈ MRR × 12 — a unit conversion, not growth).
+  if (/\bARR\b/.test(upper) || /\bANNUAL(IZED|ISED)?\b/.test(upper)) return "annual";
   // Annual: bare "2025", "FY2025", "FY25" (no other qualifiers)
   if (/^FY\s?\d{2,4}$/.test(upper) || /^\d{4}$/.test(p)) return "annual";
-  // Quarterly: "Q1 2025", "Q4-24", "1Q25"
-  if (/\bQ[1-4]\b/.test(upper) || /^[1-4]Q\d{2,4}$/.test(upper)) return "quarterly";
+  // Quarterly: "Q1 2025", "Q4-24", "1Q25", or bare "Quarterly"
+  if (/\bQ[1-4]\b/.test(upper) || /^[1-4]Q\d{2,4}$/.test(upper) || /\bQUARTERLY\b/.test(upper)) return "quarterly";
   // Monthly single-month: "Jan-25", "Feb 2026", "Mar-26", "March 2026"
   const monthRe =
     /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC|JANUARY|FEBRUARY|MARCH|APRIL|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\b/;
   if (monthRe.test(upper)) return "monthly";
+  // Bare "Monthly" / "MRR" tokens — "Current Monthly", "MRR (Current)".
+  if (/\bMRR\b/.test(upper) || /\bMONTHLY\b/.test(upper)) return "monthly";
 
   return "other";
 }

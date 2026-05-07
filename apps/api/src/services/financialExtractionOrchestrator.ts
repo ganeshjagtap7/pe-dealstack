@@ -1,7 +1,7 @@
 import { supabase } from '../supabase.js';
 import { extractDealDataFromText, ExtractedDealData } from './aiExtractor.js';
 import { classifyFinancials, ClassificationResult, ClassifiedStatement } from './financialClassifier.js';
-import { dedupeStatementPeriods } from './financialPeriodNormalizer.js';
+import { dedupeStatementPeriods, mergeStatementsBySameType } from './financialPeriodNormalizer.js';
 import { log } from '../utils/logger.js';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -90,10 +90,30 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
     };
   }
 
+  // Statement merge pass: collapse multiple statements of the same type into
+  // one. The classifier sometimes returns separate ClassifiedStatement
+  // entries for each source section (e.g. four BALANCE_SHEET objects: one
+  // for working capital, one for AR/AP, one for fixed assets, one for
+  // deferred revenue). Each section may carry an overlapping period label
+  // (e.g. all four describe "2026-03-31"). Without this merge the upsert
+  // loop below — keyed on (dealId, statementType, period, documentId) —
+  // collapses N sections into a single DB row, with each iteration's
+  // `lineItems` overwriting the previous one's. The bug reported as
+  // "Stored 5 periods but only 2 distinct UUIDs" in LangSmith.
+  //
+  // mergeStatementsBySameType uses the existing per-period merge logic so
+  // overlapping line-item KEYS are unioned (higher-confidence value wins
+  // per key, missing keys filled from the loser).
+  classification.statements = mergeStatementsBySameType(classification.statements);
+
   // Period dedup pass: collapse equivalent labels ("FY26 Est." vs "FY26 Est",
   // "YTD 2026" vs "2026 YTD" vs "YTD Total") before upsert so the time
   // series doesn't end up with 6 rows for what should be 2 distinct periods.
   // Runs in-place per statement, scoped to (statementType, periodType).
+  // Note: mergeStatementsBySameType already calls dedupeStatementPeriods
+  // for any same-type group, so this loop is a no-op for those statements.
+  // We keep it for the single-statement-per-type case (still need to dedup
+  // intra-statement label variants like "FY26 Est." vs "FY26 Est").
   const totalBefore = classification.statements.reduce((n, s) => n + s.periods.length, 0);
   for (const stmt of classification.statements) {
     stmt.periods = dedupeStatementPeriods(stmt.statementType, stmt.periods);
@@ -121,6 +141,11 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
   });
 
   const statementIds: string[] = [];
+  // Parallel array tracking which (statementType, period) input each entry
+  // in statementIds came from. Used by the post-loop collision detector to
+  // name the colliding labels even when some upserts failed (and therefore
+  // skipped pushing into statementIds). Push order matches statementIds.
+  const idLabels: string[] = [];
   let periodsStored = 0;
   let hasConflicts = false;
   const now = new Date().toISOString();
@@ -190,7 +215,10 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
             });
             continue;
           }
-          if (data?.id) statementIds.push(data.id);
+          if (data?.id) {
+            statementIds.push(data.id);
+            idLabels.push(`${stmt.statementType}:${periodData.period}`);
+          }
           periodsStored++;
           hasConflicts = true;
         } else {
@@ -225,7 +253,10 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
             });
             continue;
           }
-          if (data?.id) statementIds.push(data.id);
+          if (data?.id) {
+            statementIds.push(data.id);
+            idLabels.push(`${stmt.statementType}:${periodData.period}`);
+          }
           periodsStored++;
         }
       } catch (err) {
@@ -237,12 +268,50 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
     }
   }
 
+  // Defensive: if any UUID appears more than once in `statementIds`, that
+  // means two distinct (statementType, period) inputs upserted to the same
+  // DB row. Even with mergeStatementsBySameType in place, surfacing this
+  // here protects us from future regressions (e.g. a new bucket in the
+  // dedup keying that lets two `FinancialPeriod` entries with the SAME
+  // normalised label survive into the upsert loop). Log a WARNING so it
+  // shows up in LangSmith — the previous failure mode (silent overwrite)
+  // had no log line at all.
+  const idCounts = new Map<string, number>();
+  for (const id of statementIds) {
+    idCounts.set(id, (idCounts.get(id) ?? 0) + 1);
+  }
+  const dupes = Array.from(idCounts.entries()).filter(([, n]) => n > 1);
+  if (dupes.length > 0) {
+    const labelsByDupeId = new Map<string, string[]>();
+    for (let i = 0; i < statementIds.length; i++) {
+      const id = statementIds[i];
+      if ((idCounts.get(id) ?? 0) <= 1) continue;
+      const arr = labelsByDupeId.get(id) ?? [];
+      arr.push(idLabels[i] ?? '<unknown>');
+      labelsByDupeId.set(id, arr);
+    }
+    for (const [id, count] of dupes) {
+      log.warn(
+        `Deep pass: statementId collision — ${count} period inputs upserted to the same DB row`,
+        {
+          dealId: input.dealId,
+          documentId: input.documentId,
+          statementId: id,
+          collidingPeriods: labelsByDupeId.get(id) ?? [],
+          hint: 'Sibling statements of the same statementType should have been merged by mergeStatementsBySameType — investigate dedup keying.',
+        },
+      );
+    }
+  }
+
   log.info('Deep pass completed', {
     dealId: input.dealId,
     statementsFound: classification.statements.length,
     periodsStored,
     hasConflicts,
     overallConfidence: classification.overallConfidence,
+    distinctStatementIds: idCounts.size,
+    collisionCount: dupes.length,
   });
 
   return {

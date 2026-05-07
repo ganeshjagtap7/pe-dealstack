@@ -95,6 +95,37 @@ export function detectExplicitUnitInText(text: string): UnitScale | null {
   return strongest;
 }
 
+// ─── Explicit Small-Dollar Detection (positive ACTUALS signal) ────────────
+//
+// Counts inline "$X,XXX" / "$X,XXX,XXX" / "$X thousand" amounts as positive
+// evidence the document is reporting actual dollar figures (not millions).
+//
+// This is the inverse of detectExplicitUnitInText — that function only catches
+// the cases where the source DECLARES a scale ("$M", "in thousands"). Many
+// micro-deal CIMs never declare a scale at all — instead they write out values
+// like "$16,000 MRR", "Asking Price: $350,000". The LLM has no header to
+// anchor on, sees a few small integers, and sometimes mis-tags MILLIONS or
+// (post-prompt-fix) still emits BILLIONS via narrative magnitude.
+//
+// We use this as a safety net: when the LLM emits a NON-ACTUALS scale + the
+// extracted line items are small (< 100) + the source clearly contains
+// comma-separated dollar amounts, we override to ACTUALS.
+const SMALL_DOLLAR_PATTERNS: RegExp[] = [
+  // $1,000 to $999,999,999 written with thousands-separator commas, with at
+  // least one comma group (so plain "$5" doesn't trigger). Catches "$16,000",
+  // "$350,000", "$1,250,000".
+  /\$\s*\d{1,3}(?:,\d{3})+(?:\.\d+)?\b/,
+  // "$X thousand" / "$X thousands" — explicit textual cue
+  /\$\s*\d+(?:\.\d+)?\s+thousand[s]?\b/i,
+  // "X thousand dollars"
+  /\b\d+(?:\.\d+)?\s+thousand\s+dollars\b/i,
+];
+
+export function hasExplicitSmallDollarAmounts(text: string): boolean {
+  if (!text) return false;
+  return SMALL_DOLLAR_PATTERNS.some(p => p.test(text));
+}
+
 // ─── Main Function ────────────────────────────────────────────
 
 /**
@@ -126,9 +157,16 @@ export async function classifyFinancials(
   // override LLM-emitted MILLIONS/THOUSANDS/BILLIONS to ACTUALS post-call.
   const explicitUnitFromText = detectExplicitUnitInText(truncatedText);
 
+  // Pre-scan for explicit small-dollar amounts ("$16,000", "$350,000",
+  // "$5 thousand"). Used as a positive ACTUALS signal in the second-tier
+  // override below — protects micro-deal CIMs whose body text writes raw
+  // dollar amounts but whose numeric tables have no scale header at all.
+  const hasSmallDollars = hasExplicitSmallDollarAmounts(truncatedText);
+
   log.debug('Financial classifier starting', {
     textLength: truncatedText.length,
     explicitUnitFromText,
+    hasSmallDollars,
   });
 
   try {
@@ -162,6 +200,15 @@ export async function classifyFinancials(
     // The prompt should already produce ACTUALS in this case — this catches
     // regressions where the LLM second-guesses based on number magnitude.
     applyExplicitUnitOverride(result, explicitUnitFromText);
+
+    // Second-tier guard for micro-deal CIMs. The first override only handles
+    // MILLIONS/THOUSANDS — but in production we have seen the LLM tag
+    // BILLIONS for tiny SaaS where the source clearly says "$16,000 MRR,
+    // $350,000 asking price". When raw line-item magnitudes are small AND
+    // the prose has comma-separated dollar amounts, the only consistent
+    // interpretation is ACTUALS. This is the inverse of the existing
+    // "MILLIONS with values > 1000 → ACTUALS" guard.
+    applySmallDollarActualsOverride(result, hasSmallDollars, explicitUnitFromText);
 
     log.debug('Financial classifier completed', {
       statementsFound: result.statements.length,
@@ -385,6 +432,87 @@ function applyExplicitUnitOverride(
         valueSample,
         maxValue,
         explicitUnitFromText,
+      },
+    );
+  }
+}
+
+/**
+ * Largest-line-item magnitude below which a MILLIONS or BILLIONS tag is
+ * suspicious. The prompt encourages ACTUALS for micro-deals; the LLM still
+ * occasionally tags BILLIONS based on narrative prose ("$1B opportunity").
+ * If the actual extracted numbers are small AND the source text clearly
+ * contains explicit dollar figures, force ACTUALS.
+ */
+const SMALL_VALUE_OVERRIDE_THRESHOLD = 100;
+
+/**
+ * Second-tier override: when the LLM tags MILLIONS/BILLIONS but the line
+ * items are small (< 100 at the stated scale, i.e. < $100M MILLIONS or
+ * < $100B BILLIONS — both implausible vs. the explicit dollar amounts in
+ * the source), and the source text has explicit thousands-comma amounts
+ * like "$16,000" or "$350,000", force the scale to ACTUALS.
+ *
+ * Why this is a separate pass from applyExplicitUnitOverride:
+ *   - The first pass only fires when the source has NO marker at all, OR
+ *     when MILLIONS/THOUSANDS values exceed implausibility thresholds.
+ *     It deliberately leaves BILLIONS alone (the existing comment notes
+ *     real $1B+ companies always declare scale explicitly via "$B").
+ *   - But in micro-deal CIMs the LLM sometimes tags BILLIONS because of
+ *     narrative magnitude ("a $1B market opportunity"), even when no
+ *     "$B" header exists for the table. This pass catches that.
+ */
+function applySmallDollarActualsOverride(
+  result: ClassificationResult,
+  hasSmallDollars: boolean,
+  explicitUnitFromText: UnitScale | null,
+): void {
+  if (!hasSmallDollars) return;
+  for (const stmt of result.statements) {
+    if (stmt.unitScale === 'ACTUALS' || stmt.unitScale === 'THOUSANDS') {
+      // ACTUALS: already correct. THOUSANDS: a plausible scale for
+      // 4-to-6-digit raw values; we do not flip this case automatically
+      // since "$16,000" is consistent with both ACTUALS=16000 and
+      // THOUSANDS=16 — the LLM's choice gets the benefit of the doubt.
+      continue;
+    }
+    // Hard safety: if the source DECLARES a non-ACTUALS scale ("$M",
+    // "in billions", etc.), trust the LLM. A real $50M-revenue company
+    // can have stored MILLIONS=50 (small magnitude) AND have "$1,000,000+
+    // market" narrative phrasing — we must not flip that to ACTUALS.
+    // We only flip when the source's explicit marker is also non-existent
+    // OR explicitly says THOUSANDS (a contradiction with MILLIONS/BILLIONS).
+    if (explicitUnitFromText === 'MILLIONS' || explicitUnitFromText === 'BILLIONS') {
+      continue;
+    }
+    const originalScale = stmt.unitScale;
+    const maxValue = maxAbsLineItem(stmt);
+    if (maxValue >= SMALL_VALUE_OVERRIDE_THRESHOLD) continue;
+
+    // Capture a sample value for logging diagnostics
+    let valueSample: number | null = null;
+    for (const period of stmt.periods) {
+      for (const [k, v] of Object.entries(period.lineItems)) {
+        if (k.endsWith('_source')) continue;
+        if (typeof v === 'number' && Number.isFinite(v)) {
+          valueSample = v;
+          break;
+        }
+      }
+      if (valueSample !== null) break;
+    }
+    stmt.unitScale = 'ACTUALS';
+    result.warnings.push(
+      `Overrode ${originalScale} → ACTUALS for ${stmt.statementType}: max value ${maxValue} is small and source text has explicit small-dollar amounts.`,
+    );
+    log.warn(
+      `Financial classifier: small-dollar guard — overriding LLM-inferred ${originalScale} to ACTUALS`,
+      {
+        statementType: stmt.statementType,
+        originalScale,
+        maxValue,
+        valueSample,
+        smallValueThreshold: SMALL_VALUE_OVERRIDE_THRESHOLD,
       },
     );
   }

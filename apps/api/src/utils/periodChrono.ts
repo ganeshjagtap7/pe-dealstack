@@ -29,11 +29,21 @@ const MONTH_INDEX: Record<string, number> = {
   JULY: 7, AUGUST: 8, SEPTEMBER: 9, OCTOBER: 10, NOVEMBER: 11, DECEMBER: 12,
 };
 
-type PeriodScope =
+export type PeriodScope =
   | 'annual' | 'estimate' | 'ltm' | 'ytd'
   | 'quarterly' | 'mtd' | 'monthly' | 'other';
 
-function inferPeriodScope(period: string | null | undefined): PeriodScope {
+/**
+ * Classify a period label into one of our scope buckets.
+ *
+ * Mirrors `inferPeriodScope` in
+ * apps/web-next/src/app/(app)/deals/[id]/deal-financials-period-scope.ts —
+ * keep the two implementations in sync. Used by the validator's pairwise
+ * growth scan so we don't compute deltas across different period scopes
+ * (e.g. MRR → ARR or monthly → annual): those aren't growth, they're the
+ * same quantity at a different aggregation.
+ */
+export function inferPeriodScope(period: string | null | undefined): PeriodScope {
   if (!period) return 'other';
   const upper = period.trim().toUpperCase();
   if (!upper) return 'other';
@@ -41,10 +51,16 @@ function inferPeriodScope(period: string | null | undefined): PeriodScope {
   if (/\bMTD\b/.test(upper)) return 'mtd';
   if (/\bLTM\b/.test(upper) || /\bTTM\b/.test(upper)) return 'ltm';
   if (/\b(EST|ESTIMATE|FORECAST|BUDGET|PROJ|PROJECTED)\b/.test(upper)) return 'estimate';
+  // Bare ARR / annualised revenue tokens — "Current ARR", "ARR (Annualised)".
+  // Treat as annual scope so it's not grouped with monthly/MRR rows
+  // (ARR ≈ MRR × 12 — a unit conversion, not growth).
+  if (/\bARR\b/.test(upper) || /\bANNUAL(IZED|ISED)?\b/.test(upper)) return 'annual';
   if (/^FY\s?\d{2,4}$/.test(upper) || /^\d{4}$/.test(upper)) return 'annual';
-  if (/\bQ[1-4]\b/.test(upper) || /^[1-4]Q\d{2,4}$/.test(upper)) return 'quarterly';
+  if (/\bQ[1-4]\b/.test(upper) || /^[1-4]Q\d{2,4}$/.test(upper) || /\bQUARTERLY\b/.test(upper)) return 'quarterly';
   const monthRe = /\b(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|SEPT|OCT|NOV|DEC|JANUARY|FEBRUARY|MARCH|APRIL|JUNE|JULY|AUGUST|SEPTEMBER|OCTOBER|NOVEMBER|DECEMBER)\b/;
   if (monthRe.test(upper)) return 'monthly';
+  // Bare "Monthly" / "MRR" tokens — "Current Monthly", "MRR (Current)".
+  if (/\bMRR\b/.test(upper) || /\bMONTHLY\b/.test(upper)) return 'monthly';
   return 'other';
 }
 

@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import dotenv from 'dotenv';
 import { wrapOpenAI } from 'langsmith/wrappers/openai';
+import { traceable } from 'langsmith/traceable';
 import { log } from './utils/logger.js';
 import { OPENROUTER_BASE_URL, OPENROUTER_HEADERS, isOpenRouterEnabled } from './utils/aiModels.js';
 import { recordUsageEvent } from './services/usage/trackedLLM.js';
@@ -62,6 +63,57 @@ log.info('LLM client status', {
   enabled: isAIEnabled(),
   provider: useOpenRouter ? 'openrouter' : 'openai-direct',
 });
+
+// ─── LangSmith trace metadata ──────────────────────────────────────
+//
+// Lets callers attach business context (dealId, documentId, userId, etc.)
+// to a tracked LLM call. The metadata becomes searchable in LangSmith so
+// you can filter the trace timeline by deal — instead of seeing 100
+// generic `openrouter-sdk` calls a day with no way to tell them apart.
+//
+// `tags` show up as filter chips in the LangSmith UI; `name` (when given)
+// overrides the default span name (which is the `operation` arg).
+export interface TraceMeta {
+  dealId?: string;
+  documentId?: string;
+  userId?: string;
+  orgId?: string;
+  /** Free-form extra metadata visible in LangSmith run details. */
+  [key: string]: string | number | boolean | undefined;
+}
+
+interface TrackedCallExtras {
+  /** Override the LangSmith span name. Defaults to the `operation` arg. */
+  name?: string;
+  /** Tags shown as filter chips in LangSmith. */
+  tags?: string[];
+  /** Business-context metadata attached to the trace. */
+  traceMeta?: TraceMeta;
+}
+
+const tracingEnabledFlag = process.env.LANGSMITH_TRACING === 'true';
+
+// Wraps an async LLM-call function with a `traceable` span so the SDK
+// auto-trace (named `openrouter-sdk` / `openai-sdk`) nests under a
+// human-readable parent (e.g. `narrative_insights`). No-op when tracing
+// is disabled — the inner fn runs directly so we don't pay any overhead.
+function withTrace<T>(
+  operation: string,
+  extras: TrackedCallExtras | undefined,
+  fn: () => Promise<T>,
+): Promise<T> {
+  if (!tracingEnabledFlag) return fn();
+  // run_type 'chain' for the parent so the SDK auto-trace (which uses 'llm')
+  // appears as a child span — gives a clean two-level view in LangSmith
+  // instead of stacking two LLM spans on top of each other.
+  const traced = traceable(fn, {
+    name: extras?.name ?? operation,
+    run_type: 'chain',
+    tags: extras?.tags,
+    metadata: extras?.traceMeta as Record<string, unknown> | undefined,
+  });
+  return traced();
+}
 
 // System prompt for deal analysis
 export const DEAL_ANALYSIS_SYSTEM_PROMPT = `You are DealOS AI, an expert private equity analyst assistant. You help analyze deals, financial data, and investment opportunities.
@@ -139,6 +191,7 @@ export async function trackedChatCompletion(
   operation: string,
   params: Parameters<NonNullable<typeof openai>['chat']['completions']['create']>[0],
   options?: Parameters<NonNullable<typeof openai>['chat']['completions']['create']>[1],
+  extras?: TrackedCallExtras,
 ) {
   if (!openai) throw new Error('LLM client not configured');
   const model = (params as any).model as string;
@@ -146,7 +199,9 @@ export async function trackedChatCompletion(
   await enforceUserGate(operation, model, provider);
   const start = Date.now();
   try {
-    const response: any = await openai.chat.completions.create(params as any, options);
+    const response: any = await withTrace(operation, extras, () =>
+      openai!.chat.completions.create(params as any, options),
+    );
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
     const completionTokens = response?.usage?.completion_tokens ?? 0;
     await recordUsageEvent({
@@ -184,13 +239,16 @@ export async function trackedDirectChatCompletion(
   operation: string,
   params: Parameters<NonNullable<typeof openaiDirect>['chat']['completions']['create']>[0],
   options?: Parameters<NonNullable<typeof openaiDirect>['chat']['completions']['create']>[1],
+  extras?: TrackedCallExtras,
 ) {
   if (!openaiDirect) throw new Error('Direct OpenAI client not configured');
   const model = (params as any).model as string;
   await enforceUserGate(operation, model, 'openai');
   const start = Date.now();
   try {
-    const response: any = await openaiDirect.chat.completions.create(params as any, options);
+    const response: any = await withTrace(operation, extras, () =>
+      openaiDirect!.chat.completions.create(params as any, options),
+    );
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
     const completionTokens = response?.usage?.completion_tokens ?? 0;
     await recordUsageEvent({
@@ -229,13 +287,16 @@ export async function trackedDirectResponsesCreate(
   operation: string,
   params: any,
   options?: any,
+  extras?: TrackedCallExtras,
 ) {
   if (!openaiDirect) throw new Error('Direct OpenAI client not configured');
   const model = (params as any).model as string;
   await enforceUserGate(operation, model, 'openai');
   const start = Date.now();
   try {
-    const response: any = await (openaiDirect as any).responses.create(params, options);
+    const response: any = await withTrace(operation, extras, () =>
+      (openaiDirect as any).responses.create(params, options),
+    );
     const promptTokens = response?.usage?.input_tokens ?? 0;
     const completionTokens = response?.usage?.output_tokens ?? 0;
     await recordUsageEvent({

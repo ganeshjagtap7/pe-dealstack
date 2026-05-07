@@ -262,20 +262,36 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     ];
 
     let extracted: any;
+    // Use `functionCalling` (tool use) instead of LangChain's default `jsonSchema`.
+    // Default sends `response_format: { type: 'json_schema', strict: true }`, which
+    // Claude via OpenRouter rejects with "400 Provider returned error". Tool use is
+    // supported natively by Claude AND OpenAI models, so the same code path works
+    // for both primary and fallback without provider-specific branching.
+    const invokeOpts = {
+      runName: 'financial_extraction',
+      tags: ['extraction', 'aiExtractor', isShortDoc ? 'short-doc' : 'standard-doc'],
+      metadata: { sourceLength: sourceLen, isShortDoc, approxPages },
+    };
     try {
       const model = getExtractionModel(3000, 'financial_extraction');
-      const structuredModel = model.withStructuredOutput(ExtractionOutputSchema);
-      extracted = await structuredModel.invoke(messages);
+      const structuredModel = model.withStructuredOutput(ExtractionOutputSchema, {
+        method: 'functionCalling',
+        name: 'extract_deal_data',
+      });
+      extracted = await structuredModel.invoke(messages, invokeOpts);
     } catch (primaryErr: any) {
-      // Claude Sonnet 4.5 via OpenRouter sometimes rejects the tool schema
-      // LangChain emits for withStructuredOutput. Fall back to an OpenAI-native
-      // model (gpt-4.1 via OpenRouter, or gpt-4o direct) — both have first-class
-      // function-calling support that handles this schema reliably.
       log.warn('AI extraction primary model failed; retrying with fallback', describeAIError(primaryErr));
       const fallbackModelName = isOpenRouterEnabled() ? AI_MODELS.TIER2 : 'gpt-4o';
       const fallbackModel = getModel('openai', fallbackModelName, 0.1, 3000);
-      const structuredFallback = fallbackModel.withStructuredOutput(ExtractionOutputSchema);
-      extracted = await structuredFallback.invoke(messages);
+      const structuredFallback = fallbackModel.withStructuredOutput(ExtractionOutputSchema, {
+        method: 'functionCalling',
+        name: 'extract_deal_data',
+      });
+      extracted = await structuredFallback.invoke(messages, {
+        ...invokeOpts,
+        runName: 'financial_extraction_fallback',
+        tags: [...invokeOpts.tags, 'fallback', fallbackModelName],
+      });
     }
 
     // Build result with proper defaults

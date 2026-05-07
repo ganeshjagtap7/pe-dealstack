@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { api, NotFoundError } from "@/lib/api";
+import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/providers/ToastProvider";
 import {
@@ -184,6 +185,44 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
     }
   }, [dealId, extracting, loadFinancials, showToast]);
 
+  // Per-deal extraction debug dump. Hits GET /deals/:id/extraction-debug
+  // which streams a JSON file (Content-Disposition: attachment). We use
+  // authFetchRaw so we can pull res.blob() and force a download — the
+  // shared api client only returns parsed JSON.
+  const [debugDownloading, setDebugDownloading] = useState(false);
+  const handleDownloadDebug = useCallback(async () => {
+    if (debugDownloading) return;
+    setDebugDownloading(true);
+    try {
+      const res = await authFetchRaw(`/deals/${dealId}/extraction-debug`);
+      if (!res.ok) {
+        const msg = res.status === 404 ? "Deal not found" : `Server returned ${res.status}`;
+        showToast(msg, "warning", { title: "Couldn't download extraction" });
+        return;
+      }
+      const blob = await res.blob();
+      const datePart = new Date().toISOString().split("T")[0];
+      // Try to honour the server's filename; fall back to our own pattern.
+      const cd = res.headers.get("Content-Disposition") || "";
+      const match = cd.match(/filename="?([^";]+)"?/i);
+      const filename = match?.[1] || `extraction-${dealId}-${datePart}.json`;
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Defer revoke so the browser has time to start the download.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.warn("[deal-financials] debug download failed:", err);
+      showToast("Couldn't download extraction JSON", "warning", { title: "Download failed" });
+    } finally {
+      setDebugDownloading(false);
+    }
+  }, [dealId, debugDownloading, showToast]);
+
   useEffect(() => { loadFinancials(); }, [loadFinancials]);
 
   // Derived state
@@ -298,6 +337,20 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
                 </>
               )}
             </button>
+            {/* Debug download — useful when extraction yielded nothing
+                so the user can see what text the parser actually saw. */}
+            <div className="mt-3">
+              <button
+                onClick={handleDownloadDebug}
+                disabled={debugDownloading}
+                className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 disabled:opacity-60"
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  {debugDownloading ? "progress_activity" : "download"}
+                </span>
+                Download extraction JSON (debug)
+              </button>
+            </div>
           </div>
         </FinancialShell>
       </>
@@ -373,6 +426,20 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
                 Re-extract
               </>
             )}
+          </button>
+          {/* Extraction-debug JSON download — audit what the AI got from
+              the source docs vs what's in the deal record. */}
+          <button
+            onClick={handleDownloadDebug}
+            disabled={debugDownloading}
+            title="Download extraction JSON (audit what AI extracted from the source docs)"
+            aria-label="Download extraction debug JSON"
+            className="flex items-center justify-center text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
+            style={{ width: 30, height: 30 }}
+          >
+            <span className="material-symbols-outlined text-sm">
+              {debugDownloading ? "progress_activity" : "download"}
+            </span>
           </button>
         </div>
         {/* Chart or Table */}

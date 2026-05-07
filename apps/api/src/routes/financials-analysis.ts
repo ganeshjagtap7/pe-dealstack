@@ -6,7 +6,7 @@ import { analyzeFinancials } from '../services/analysis/index.js';
 import {
   generateNarrativeInsights,
   computeAnalysisHash,
-  getCachedInsights,
+  getOrGenerateInsights,
   cacheInsights,
   invalidateCache,
 } from '../services/narrativeInsights.js';
@@ -80,13 +80,9 @@ router.get('/deals/:dealId/financials/insights', async (req, res) => {
     const analysis = await analyzeFinancials(dealId, rows);
     const analysisHash = computeAnalysisHash(analysis);
 
-    // Check cache
-    const cached = await getCachedInsights(dealId, analysisHash);
-    if (cached) {
-      return res.json({ hasData: true, insights: cached, fromCache: true });
-    }
-
-    // Fetch deal context
+    // Fetch deal context (cheap; needed even on cache hit for downstream
+    // memory snapshotting). We still call getOrGenerateInsights below which
+    // checks the cache before any LLM call.
     const { data: deal } = await supabase
       .from('Deal')
       .select('name, industry, dealSize, revenue, ebitda')
@@ -99,8 +95,12 @@ router.get('/deals/:dealId/financials/insights', async (req, res) => {
       getPortfolioSummary(orgId, dealId),
     ]);
 
-    // Generate AI insights
-    const insights = await generateNarrativeInsights(
+    // Coordinated cache + dedup + generate. Concurrent requests for the
+    // same (dealId, analysisHash) share a single LLM call.
+    const { insights, fromCache } = await getOrGenerateInsights(
+      dealId,
+      orgId,
+      analysisHash,
       analysis,
       {
         dealName: deal?.name,
@@ -112,9 +112,9 @@ router.get('/deals/:dealId/financials/insights', async (req, res) => {
       { industry: industryMem, portfolio: portfolioMem },
     );
 
-    // Fire-and-forget: cache + memory updates
-    cacheInsights(dealId, orgId, analysisHash, insights).catch(() => {});
-    if (deal?.industry) {
+    // Fire-and-forget memory updates (only on a fresh generation — repeated
+    // cache hits don't need to keep re-snapshotting the same metrics).
+    if (!fromCache && deal?.industry) {
       const metrics: Record<string, number> = {};
       if (analysis.qoe?.score != null) metrics.qoe_score = analysis.qoe.score;
       if (analysis.revenueQuality?.revenueCAGR != null) metrics.revenue_cagr = analysis.revenueQuality.revenueCAGR;
@@ -122,9 +122,11 @@ router.get('/deals/:dealId/financials/insights', async (req, res) => {
       if (analysis.debtCapacity?.currentLeverage != null) metrics.leverage = analysis.debtCapacity.currentLeverage;
       updateIndustryMemory(orgId, deal.industry, metrics).catch(() => {});
     }
-    snapshotDealMetrics(orgId, dealId, analysis, deal?.industry, deal?.revenue, deal?.ebitda).catch(() => {});
+    if (!fromCache) {
+      snapshotDealMetrics(orgId, dealId, analysis, deal?.industry, deal?.revenue, deal?.ebitda).catch(() => {});
+    }
 
-    res.json({ hasData: true, insights, fromCache: false });
+    res.json({ hasData: true, insights, fromCache });
   } catch (err) {
     log.error('GET financials insights error', err);
     res.status(500).json({ error: 'Failed to generate insights' });
