@@ -16,6 +16,7 @@ import { excelToMarkdown } from '../services/excelToMarkdown.js';
 import { isExcelFile } from '../services/excelFinancialExtractor.js';
 import { extractTextFromPDF } from '../services/pdfExtractor.js';
 import { runDeepPass } from '../services/financialExtractionOrchestrator.js';
+import { acquireExtractionSlot, releaseExtractionSlot } from '../services/agents/financialAgent/concurrency.js';
 
 const router = Router();
 
@@ -320,26 +321,43 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     // upload (text + AI fields are already saved). Only fires for Excel
     // because PDFs have a different financial extraction path.
     if (file && isExcelFile(mimeType, documentName) && extractedText) {
-      try {
-        log.info('Running deep financial extraction', { documentId: document.id, dealId });
-        const deepResult = await runDeepPass({
-          text: extractedText,
-          dealId,
+      // Concurrency-slot guard mirrors /api/deals/:id/financials/extract
+      // (financials-extraction.ts:173). Without it, parallel uploads from the
+      // same org both run runDeepPass concurrently and can blow Vercel's
+      // function memory on a multi-statement workbook. If the slot isn't
+      // available, log and skip — the user can re-extract manually via the
+      // Re-extract button on the deal page rather than the upload failing.
+      const slotAcquired = acquireExtractionSlot(orgId);
+      if (!slotAcquired) {
+        log.warn('Deep financial extraction skipped — org at concurrency cap', {
           documentId: document.id,
+          dealId,
+          orgId,
         });
-        if (deepResult) {
-          log.info('Deep financial extraction complete', {
+      } else {
+        try {
+          log.info('Running deep financial extraction', { documentId: document.id, dealId });
+          const deepResult = await runDeepPass({
+            text: extractedText,
+            dealId,
             documentId: document.id,
-            statementsStored: deepResult.statementsStored,
-            periodsStored: deepResult.periodsStored,
-            overallConfidence: deepResult.overallConfidence,
-            warnings: deepResult.warnings,
           });
-        } else {
-          log.info('Deep financial extraction: no statements detected', { documentId: document.id });
+          if (deepResult) {
+            log.info('Deep financial extraction complete', {
+              documentId: document.id,
+              statementsStored: deepResult.statementsStored,
+              periodsStored: deepResult.periodsStored,
+              overallConfidence: deepResult.overallConfidence,
+              warnings: deepResult.warnings,
+            });
+          } else {
+            log.info('Deep financial extraction: no statements detected', { documentId: document.id });
+          }
+        } catch (deepErr) {
+          log.error('Deep financial extraction failed', deepErr, { documentId: document.id });
+        } finally {
+          releaseExtractionSlot(orgId);
         }
-      } catch (deepErr) {
-        log.error('Deep financial extraction failed', deepErr, { documentId: document.id });
       }
     }
 

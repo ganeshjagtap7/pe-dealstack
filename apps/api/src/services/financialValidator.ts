@@ -1,6 +1,27 @@
 import { log } from '../utils/logger.js';
-import type { ClassifiedStatement } from './financialClassifier.js';
+import type { ClassifiedStatement, UnitScale } from './financialClassifier.js';
 import { TOLERANCE_LARGE, TOLERANCE_SMALL } from './agents/financialAgent/config.js';
+import { comparePeriodChronologically } from '../utils/periodChrono.js';
+
+// Convert a stored numeric value to actual dollars given the statement's
+// unitScale. Used by the revenue-floor gate so we don't false-flag tiny
+// startups for "EBITDA margin > 60%" — small SaaS legitimately runs that high.
+const SCALE_TO_DOLLARS: Record<string, number> = {
+  ACTUALS: 1,
+  THOUSANDS: 1_000,
+  MILLIONS: 1_000_000,
+  BILLIONS: 1_000_000_000,
+};
+function toActualDollars(value: number | null, unitScale?: UnitScale | string | null): number | null {
+  if (value == null || !Number.isFinite(value)) return null;
+  const mult = SCALE_TO_DOLLARS[unitScale ?? 'ACTUALS'] ?? 1;
+  return value * mult;
+}
+// Below this revenue threshold, suppress the "unusually high margin" warning —
+// small SaaS / IP-licence businesses legitimately run >95% margin and the
+// warning is just noise. $5M is the lower-mid-market floor where benchmarks
+// start being meaningful.
+const HIGH_MARGIN_REVENUE_FLOOR_USD = 5_000_000;
 
 export interface ValidationResult {
   isValid: boolean;
@@ -141,6 +162,7 @@ function withinTolerance(a: number, b: number): boolean {
 function checkIncomeStatement(
   lineItems: Record<string, number | null>,
   period: string,
+  unitScale?: UnitScale | string | null,
 ): StatementCheck[] {
   const checks: StatementCheck[] = [];
   const li = (k: string) => lineItems[k] ?? null;
@@ -193,15 +215,26 @@ function checkIncomeStatement(
         period,
       });
     }
+    // Revenue-floor gate: suppress the "unusually high margin" warning for
+    // companies below $5M revenue. Small SaaS / IP-licence / early-stage
+    // businesses legitimately run >95% margin and the warning is noise.
+    // Below the floor we still flag losses, but we don't second-guess high
+    // margins — they're expected at that scale.
+    const revenueUSD = toActualDollars(revenue, unitScale);
+    const isSmallCompany = revenueUSD !== null && revenueUSD < HIGH_MARGIN_REVENUE_FLOOR_USD;
+    const highMargin = calcMargin > 60;
+    const flagAsHighMargin = highMargin && !isSmallCompany;
     checks.push({
       check: 'is_ebitda_margin_sane',
       passed: calcMargin >= -50 && calcMargin <= 80,
-      severity: calcMargin > 60 ? 'warning' : 'info',
-      message: calcMargin > 60
+      severity: flagAsHighMargin ? 'warning' : 'info',
+      message: flagAsHighMargin
         ? `EBITDA margin of ${calcMargin.toFixed(1)}% is unusually high — verify`
-        : calcMargin < 0
-          ? `EBITDA margin of ${calcMargin.toFixed(1)}% indicates losses`
-          : `EBITDA margin of ${calcMargin.toFixed(1)}% is within normal range`,
+        : highMargin && isSmallCompany
+          ? `EBITDA margin of ${calcMargin.toFixed(1)}% — high but expected at this revenue scale`
+          : calcMargin < 0
+            ? `EBITDA margin of ${calcMargin.toFixed(1)}% indicates losses`
+            : `EBITDA margin of ${calcMargin.toFixed(1)}% is within normal range`,
       period,
     });
   }
@@ -316,7 +349,7 @@ function checkYoYGrowth(
   // Only check historical periods in chronological order
   const historical = periods
     .filter(p => p.periodType === 'HISTORICAL')
-    .sort((a, b) => a.period.localeCompare(b.period));
+    .sort((a, b) => comparePeriodChronologically(a.period, b.period));
 
   for (let i = 1; i < historical.length; i++) {
     const prev = historical[i - 1];
@@ -371,7 +404,7 @@ export function validateStatements(statements: ClassifiedStatement[]): Statement
       let periodChecks: StatementCheck[] = [];
 
       if (stmt.statementType === 'INCOME_STATEMENT') {
-        periodChecks = checkIncomeStatement(period.lineItems, period.period);
+        periodChecks = checkIncomeStatement(period.lineItems, period.period, stmt.unitScale);
       } else if (stmt.statementType === 'BALANCE_SHEET') {
         periodChecks = checkBalanceSheet(period.lineItems, period.period);
       } else if (stmt.statementType === 'CASH_FLOW') {
