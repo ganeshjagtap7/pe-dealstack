@@ -15,6 +15,7 @@ import { tryCompleteOnboardingStep } from './onboarding.js';
 import { excelToMarkdown } from '../services/excelToMarkdown.js';
 import { isExcelFile } from '../services/excelFinancialExtractor.js';
 import { extractTextFromPDF } from '../services/pdfExtractor.js';
+import { runDeepPass } from '../services/financialExtractionOrchestrator.js';
 
 const router = Router();
 
@@ -185,7 +186,12 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         log.warn('PDF extraction failed', { documentName });
       }
     } else if (file && isExcelFile(mimeType, documentName)) {
-      // Excel extraction — convert sheets to Markdown tables
+      // Excel extraction — convert sheets to Markdown tables for RAG / chat
+      // context, then run the same AI deal-level extraction the PDF branch
+      // does so company name / industry / revenue / EBITDA populate on the
+      // deal from financial models. FinancialStatement rows (per-period
+      // line items) are populated below via runDeepPass after the Document
+      // row exists.
       extractionStatus = 'processing';
       log.info('Starting Excel-to-Markdown extraction', { documentName });
       try {
@@ -193,10 +199,26 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         if (markdownText) {
           extractedText = markdownText.replace(/\u0000/g, '');
           log.info('Excel extraction completed', { documentName, textLength: extractedText.length });
+
+          try {
+            log.info('Starting AI data extraction', { documentName });
+            const aiData = await extractDealDataFromText(extractedText);
+            if (aiData) {
+              aiExtractedData = aiData;
+              extractionStatus = 'analyzed';
+              log.info('AI extraction completed', { documentName, companyName: aiData.companyName, industry: aiData.industry });
+            } else {
+              extractionStatus = 'completed';
+              log.info('AI extraction returned no data', { documentName });
+            }
+          } catch (aiError) {
+            log.error('AI extraction failed', aiError, { documentName });
+            extractionStatus = 'completed';
+          }
         } else {
           log.info('Excel extraction: no meaningful content', { documentName });
+          extractionStatus = 'completed';
         }
-        extractionStatus = 'completed';
       } catch (excelError) {
         log.error('Excel extraction failed', excelError, { documentName });
         extractionStatus = 'completed'; // don't block upload
@@ -288,6 +310,38 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       .single();
 
     if (docError) throw docError;
+
+    // Excel-only follow-up: populate FinancialStatement rows so the
+    // Financial Analysis tab can show per-period revenue / EBITDA / line
+    // items extracted from the spreadsheet. Awaited (not fire-and-forget)
+    // because Vercel can freeze the function once res.json is sent — a
+    // background promise would silently drop. Typical wall time is 10-30s
+    // for a real financial model; failures are logged but never fail the
+    // upload (text + AI fields are already saved). Only fires for Excel
+    // because PDFs have a different financial extraction path.
+    if (file && isExcelFile(mimeType, documentName) && extractedText) {
+      try {
+        log.info('Running deep financial extraction', { documentId: document.id, dealId });
+        const deepResult = await runDeepPass({
+          text: extractedText,
+          dealId,
+          documentId: document.id,
+        });
+        if (deepResult) {
+          log.info('Deep financial extraction complete', {
+            documentId: document.id,
+            statementsStored: deepResult.statementsStored,
+            periodsStored: deepResult.periodsStored,
+            overallConfidence: deepResult.overallConfidence,
+            warnings: deepResult.warnings,
+          });
+        } else {
+          log.info('Deep financial extraction: no statements detected', { documentId: document.id });
+        }
+      } catch (deepErr) {
+        log.error('Deep financial extraction failed', deepErr, { documentId: document.id });
+      }
+    }
 
     // Update deal's lastDocument field
     await supabase
