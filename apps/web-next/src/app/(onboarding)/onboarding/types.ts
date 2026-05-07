@@ -11,9 +11,9 @@ export interface TaskDef {
 }
 
 export const TASKS: TaskDef[] = [
-  { id: "firm", title: "Define your investment focus", subtitle: "So we can tailor findings to your strategy", icon: "business", time: "30s" },
-  { id: "cim", title: "Upload your first deal", subtitle: "A CIM, teaser, or use our sample to try it out", icon: "upload_file", time: "10s" },
-  { id: "team", title: "Invite your team", subtitle: "Optional — you can do this later", icon: "group_add", time: "30s" },
+  { id: "firm", title: "Set your investment thesis", subtitle: "So findings show up the way your IC reads them", icon: "business", time: "30s" },
+  { id: "cim", title: "Drop in your first CIM", subtitle: "A CIM, teaser, or kick the tires on a sample", icon: "upload_file", time: "10s" },
+  { id: "team", title: "Bring in your deal team", subtitle: "Optional — you can do this later", icon: "group_add", time: "30s" },
 ];
 
 // Firm task state
