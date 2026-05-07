@@ -106,6 +106,20 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
     );
   }
 
+  // Diagnostic: log every (statement, period) the classifier produced after
+  // dedup. Lets us tell apart "LLM only emitted 3 periods" (max_tokens
+  // truncation) from "LLM emitted 12 but storage dropped 9" (upsert race
+  // condition with isActive multi-row).
+  log.info('Deep pass: post-dedup periods', {
+    dealId: input.dealId,
+    documentId: input.documentId,
+    byStatement: classification.statements.map(s => ({
+      type: s.statementType,
+      count: s.periods.length,
+      periods: s.periods.map(p => p.period),
+    })),
+  });
+
   const statementIds: string[] = [];
   let periodsStored = 0;
   let hasConflicts = false;
@@ -114,15 +128,23 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
   for (const stmt of classification.statements) {
     for (const periodData of stmt.periods) {
       try {
-        // Check for existing active row from a DIFFERENT document
-        const { data: existing } = await supabase
+        // Check for existing active row(s) from a DIFFERENT document.
+        // Use limit(1) + array fetch instead of .maybeSingle() — if a
+        // previous race condition left multiple active rows for the same
+        // (deal, type, period), .maybeSingle() throws "JSON object
+        // requested, multiple (or no) rows returned" which the catch
+        // block silently swallows, dropping the entire period from the
+        // re-extraction. This was the bug that caused only 3 of 12
+        // months to survive a multi-doc re-extract.
+        const { data: existingRows } = await supabase
           .from('FinancialStatement')
           .select('id, documentId, isActive')
           .eq('dealId', input.dealId)
           .eq('statementType', stmt.statementType)
           .eq('period', periodData.period)
           .eq('isActive', true)
-          .maybeSingle();
+          .limit(1);
+        const existing = existingRows && existingRows.length > 0 ? existingRows[0] : null;
 
         const isConflict = existing && existing.documentId !== (input.documentId ?? null);
 

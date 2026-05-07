@@ -130,6 +130,30 @@ export function DealAnalysisSection({ dealId, onFullscreen }: { dealId: string; 
           {analysis?.qoe && <QoEBadge score={analysis.qoe.score} />}
         </div>
         <div className="flex items-center gap-2">
+          <span
+            role="button"
+            tabIndex={0}
+            className={cn(
+              "material-symbols-outlined text-[16px] transition-colors",
+              loading ? "cursor-not-allowed animate-spin" : "cursor-pointer",
+            )}
+            style={{ color: "rgba(255,255,255,0.5)" }}
+            title={loading ? "Refreshing…" : "Refresh analysis"}
+            aria-label={loading ? "Refreshing analysis" : "Refresh analysis"}
+            onMouseEnter={(e) => { if (!loading) (e.target as HTMLElement).style.color = "rgba(255,255,255,0.9)"; }}
+            onMouseLeave={(e) => { (e.target as HTMLElement).style.color = "rgba(255,255,255,0.5)"; }}
+            onClick={(e) => { e.stopPropagation(); if (!loading) loadData(); }}
+            onKeyDown={(e) => {
+              if (loading) return;
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                e.stopPropagation();
+                loadData();
+              }
+            }}
+          >
+            refresh
+          </span>
           {onFullscreen && (
             <span
               role="button"
