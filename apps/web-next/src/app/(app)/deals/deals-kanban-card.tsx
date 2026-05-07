@@ -1,11 +1,15 @@
 "use client";
 
 import { type DragEvent } from "react";
-import { formatCurrency, getDealDisplayName } from "@/lib/formatters";
+import {
+  formatCurrency,
+  formatFinancialValue,
+  getDealDisplayName,
+} from "@/lib/formatters";
 import { METRIC_CONFIG, type MetricKey } from "@/lib/constants";
 import { cn } from "@/lib/cn";
 import Link from "next/link";
-import type { Deal } from "@/types";
+import type { Deal, FinancialSummary } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Kanban Card (Compact) with drag-and-drop support
@@ -14,10 +18,17 @@ export function KanbanCard({
   deal,
   activeMetrics,
   onDragStart,
+  summary,
 }: {
   deal: Deal;
   activeMetrics: MetricKey[];
   onDragStart?: (e: DragEvent<HTMLDivElement>, dealId: string) => void;
+  /**
+   * Latest INCOME_STATEMENT summary — when present we format
+   * revenue/EBITDA at the correct unitScale. Optional so cards still
+   * render before the bulk fetch resolves.
+   */
+  summary?: FinancialSummary;
 }) {
   const hasRiskFlag = (deal.ebitda ?? 0) < 0 || deal.stage === "PASSED";
   const kanbanMetrics = activeMetrics.slice(0, 3);
@@ -58,7 +69,17 @@ export function KanbanCard({
           {kanbanMetrics.map((key) => {
             const cfg = METRIC_CONFIG[key];
             if (!cfg) return null;
-            const value = deal[key as keyof Deal] as number | undefined | null;
+            // Pull revenue/EBITDA from the income-statement summary
+            // (correct unitScale + currency) when available; fall back
+            // to the legacy deal-level columns otherwise.
+            const stmtValue =
+              summary && key === "revenue"
+                ? summary.revenue
+                : summary && key === "ebitda"
+                  ? summary.ebitda
+                  : null;
+            const dealValue = deal[key as keyof Deal] as number | undefined | null;
+            const value = stmtValue != null ? stmtValue : dealValue;
             return (
               <div key={key} className="flex-1 bg-background-body rounded px-2 py-1.5">
                 <span className="text-[9px] text-text-muted font-medium uppercase block">{cfg.kanbanLabel}</span>
@@ -72,7 +93,9 @@ export function KanbanCard({
                     ? (value != null ? Number(value).toFixed(1) + "%" : "\u2014")
                     : key === "mom"
                       ? (value != null ? Number(value).toFixed(1) + "x" : "\u2014")
-                      : formatCurrency(value as number | null | undefined, deal.currency)}
+                      : summary && (key === "revenue" || key === "ebitda")
+                        ? formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency })
+                        : formatCurrency(value as number | null | undefined, deal.currency)}
                 </span>
               </div>
             );

@@ -11,6 +11,7 @@ import {
 import { comparePeriodChronologically } from "./deal-financials-period-scope";
 import { STAGE_LABELS } from "@/lib/constants";
 import { api } from "@/lib/api";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { type DealDetail, type TeamMember, PIPELINE_STAGES, TERMINAL_STAGES } from "./components";
 
 // Minimal shape of an income-statement row needed to render the headline
@@ -218,9 +219,16 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
   // Falling back to the deal-level columns keeps the legacy display behaviour
   // for rows that don't yet have any extracted statements.
   const [latestIncome, setLatestIncome] = useState<IncomeStatementRow | null>(null);
+  // True while the /deals/:id/financials request is in flight. Without this,
+  // the legacy `deal.revenue` / `deal.ebitda` columns render first (with a
+  // possibly-wrong margin computed from MILLIONS-assumed values), then snap
+  // to the in-unit FinancialStatement values once the fetch returns — visible
+  // flicker on the EBITDA Margin card especially.
+  const [statementLoading, setStatementLoading] = useState<boolean>(Boolean(deal.id));
 
   useEffect(() => {
     let cancelled = false;
+    setStatementLoading(true);
     (async () => {
       try {
         const data = await api.get<IncomeStatementRow[]>(`/deals/${deal.id}/financials`);
@@ -247,6 +255,8 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
         // table below renders independently and surfaces its own errors.
         console.warn("[deal-layout] FinancialMetricsRow income fetch failed:", err);
         if (!cancelled) setLatestIncome(null);
+      } finally {
+        if (!cancelled) setStatementLoading(false);
       }
     })();
     return () => {
@@ -285,25 +295,41 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
       ? (deal.ebitda! / deal.revenue!) * 100
       : null;
 
-  type MetricDef = { key: string; label: string; value: unknown; formatted: string; badge?: string; extra?: string };
+  // The revenue / EBITDA / margin cards depend on the FinancialStatement
+  // fetch. Mark them so the render block can swap in a skeleton placeholder
+  // until the fetch settles, instead of flashing the legacy-computed value.
+  type MetricDef = {
+    key: string;
+    label: string;
+    value: unknown;
+    formatted: string;
+    badge?: string;
+    extra?: string;
+    loading?: boolean;
+  };
   const allMetrics: MetricDef[] = [
     {
       key: "revenue",
       label: "Revenue (LTM)",
-      value: revenueValue,
+      // Keep the card visible during load (so the row doesn't reflow when
+      // data arrives) by treating loading as "has data".
+      value: statementLoading ? "loading" : revenueValue,
       formatted: revenueFormatted,
+      loading: statementLoading,
     },
     {
       key: "ebitdaMargin",
       label: "EBITDA Margin",
-      value: hasMarginData ? ebitdaValue : null,
+      value: statementLoading ? "loading" : (hasMarginData ? ebitdaValue : null),
       formatted: marginPct != null ? marginPct.toFixed(0) + "%" : "\u2014",
+      loading: statementLoading,
     },
     {
       key: "ebitda",
       label: "EBITDA",
-      value: ebitdaValue,
+      value: statementLoading ? "loading" : ebitdaValue,
       formatted: ebitdaFormatted,
+      loading: statementLoading,
     },
     {
       key: "dealSize",
@@ -362,16 +388,29 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
         >
           <p className="text-[10px] text-text-muted font-semibold uppercase tracking-wider">{m.label}</p>
           <div className="flex items-baseline gap-2 mt-2">
-            <span className="text-xl font-bold text-text-main leading-none tabular-nums">{m.formatted}</span>
-            {m.badge && (
+            {m.loading ? (
+              // Shimmer placeholder while the FinancialStatement fetch is in
+              // flight. Sized to the same line-height as the formatted value
+              // so the card doesn't pop when real data arrives.
+              <Skeleton.Line width={84} height={20} />
+            ) : (
+              <span className="text-xl font-bold text-text-main leading-none tabular-nums">{m.formatted}</span>
+            )}
+            {!m.loading && m.badge && (
               <span className="text-[10px] font-bold text-secondary bg-secondary-light border border-secondary/20 px-1.5 py-0.5 rounded">
                 {m.badge}
               </span>
             )}
           </div>
-          {m.extra && <p className="text-[10px] text-text-muted font-medium mt-1.5">{m.extra}</p>}
-          {/* Visual confidence indicators -- matches legacy mini charts */}
-          {m.key === "revenue" && (
+          {!m.loading && m.extra && <p className="text-[10px] text-text-muted font-medium mt-1.5">{m.extra}</p>}
+          {/* Visual confidence indicators -- matches legacy mini charts.
+              Suppressed during load so the mini-bar / margin bar don't render
+              with stale-fallback data. Reserve the same 8px height so card
+              heights stay constant between loading and loaded states. */}
+          {m.loading && (m.key === "revenue" || m.key === "ebitdaMargin") && (
+            <div className="h-8 mt-2 w-full" aria-hidden="true" />
+          )}
+          {!m.loading && m.key === "revenue" && (
             <div className="h-8 mt-2 w-full flex items-end gap-1 opacity-80">
               <div className="flex-1 bg-secondary/60 h-[40%] rounded-t-sm" />
               <div className="flex-1 bg-secondary/60 h-[50%] rounded-t-sm" />
@@ -380,7 +419,7 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
               <div className="flex-1 bg-secondary h-[80%] rounded-t-sm" />
             </div>
           )}
-          {m.key === "ebitdaMargin" && marginPct != null && (
+          {!m.loading && m.key === "ebitdaMargin" && marginPct != null && (
             <div className="h-8 mt-2 w-full flex items-center">
               <div className="w-full h-2 bg-border-subtle rounded-full overflow-hidden">
                 <div

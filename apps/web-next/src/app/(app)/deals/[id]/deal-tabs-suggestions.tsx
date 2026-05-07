@@ -1,6 +1,7 @@
 "use client";
 
-import { formatCurrency } from "@/lib/formatters";
+import { formatCurrency, formatFinancialValue } from "@/lib/formatters";
+import type { FinancialSummary } from "@/types";
 import type { DealDetail } from "./components";
 
 // ---------------------------------------------------------------------------
@@ -19,13 +20,20 @@ export const DEFAULT_PROMPTS: SuggestionPrompt[] = [
   { icon: "trending_up", label: "Growth & exit potential", prompt: "Outline 3 realistic exit scenarios with estimated timeline and return multiples." },
 ];
 
-export function buildSuggestionPrompts(deal: DealDetail | null): SuggestionPrompt[] {
+export function buildSuggestionPrompts(
+  deal: DealDetail | null,
+  summary?: FinancialSummary | null,
+): SuggestionPrompt[] {
   if (!deal) return DEFAULT_PROMPTS;
 
   const name = deal.name || deal.companyName || "this company";
   const industry = deal.industry || null;
-  const revenue = deal.revenue;
-  const ebitda = deal.ebitda;
+  // Prefer the income-statement summary when present — its values come
+  // with a unitScale + currency, so formatFinancialValue renders the
+  // correct magnitude (e.g. "$6.7K" instead of formatCurrency()'s
+  // MILLIONS-assumed "$6.7M").
+  const revenue = summary?.revenue ?? deal.revenue ?? null;
+  const ebitda = summary?.ebitda ?? deal.ebitda ?? null;
   const hasDocs = (deal.documents?.length || 0) > 0;
 
   const prompts: SuggestionPrompt[] = [];
@@ -45,8 +53,12 @@ export function buildSuggestionPrompts(deal: DealDetail | null): SuggestionPromp
 
   // 2. Financial deep-dive
   if (revenue != null && ebitda != null) {
-    const fmtRev = formatCurrency(revenue, deal.currency);
-    const fmtEbitda = formatCurrency(ebitda, deal.currency);
+    const fmtRev = summary
+      ? formatFinancialValue(revenue, summary.unitScale, { currency: summary.currency })
+      : formatCurrency(revenue, deal.currency);
+    const fmtEbitda = summary
+      ? formatFinancialValue(ebitda, summary.unitScale, { currency: summary.currency })
+      : formatCurrency(ebitda, deal.currency);
     const margin = revenue > 0 ? ((ebitda / revenue) * 100).toFixed(1) : null;
     prompts.push({
       icon: "analytics",
@@ -91,8 +103,16 @@ export function buildSuggestionPrompts(deal: DealDetail | null): SuggestionPromp
   return prompts;
 }
 
-export function SuggestionChips({ deal, onPick }: { deal: DealDetail | null; onPick: (prompt: string) => void }) {
-  const prompts = buildSuggestionPrompts(deal);
+export function SuggestionChips({
+  deal,
+  onPick,
+  summary,
+}: {
+  deal: DealDetail | null;
+  onPick: (prompt: string) => void;
+  summary?: FinancialSummary | null;
+}) {
+  const prompts = buildSuggestionPrompts(deal, summary);
   return (
     <div className="flex flex-wrap gap-1.5 px-3 pt-2 pb-1.5 border-t border-border-subtle bg-surface-card">
       {prompts.map((p) => (

@@ -12,7 +12,11 @@ import {
 } from "@/lib/constants";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
-import type { Deal, DealFilters } from "@/types";
+import type {
+  Deal,
+  DealFilters,
+  FinancialSummariesMap,
+} from "@/types";
 import {
   DeleteModal,
   StageChangeModal,
@@ -29,6 +33,11 @@ import { exportDealsToCSV } from "./deals-csv-export";
 export default function DealsPage() {
   const { openDealIntake } = useIngestDealModal();
   const [deals, setDeals] = useState<Deal[]>([]);
+  // Latest INCOME_STATEMENT summary per deal — fetched in parallel with
+  // the deals list so cards can render revenue/EBITDA at the correct
+  // unitScale instead of falling through formatCurrency() (which assumes
+  // MILLIONS and turns extracted "$6.7K" data into "$6.7M").
+  const [summaries, setSummaries] = useState<FinancialSummariesMap>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "kanban">("list");
@@ -93,6 +102,28 @@ export default function DealsPage() {
       }));
       setDeals(list);
       setIndustries([...new Set(list.map((d) => d.industry).filter(Boolean) as string[])].sort());
+
+      // Fire-and-forget bulk financial summaries — does NOT block the
+      // initial cards render. When it resolves the cards re-format with
+      // the correct unitScale; until then they fall back to
+      // formatCurrency(deal.revenue) (legacy behaviour, no worse than
+      // before this fix shipped).
+      void (async () => {
+        try {
+          const dealIds = list.map((d) => d.id).join(",");
+          if (!dealIds) {
+            setSummaries({});
+            return;
+          }
+          const resp = await api.get<{ summaries: FinancialSummariesMap }>(
+            `/deals/financial-summaries?dealIds=${encodeURIComponent(dealIds)}`,
+          );
+          setSummaries(resp?.summaries ?? {});
+        } catch (err) {
+          console.warn("[deals] financial summaries fetch failed:", err);
+          setSummaries({});
+        }
+      })();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load deals");
     } finally {
@@ -329,6 +360,7 @@ export default function DealsPage() {
               onDelete={(id, name) => setDeleteTarget({ id, name })}
               activeMetrics={activeMetrics}
               onRemoveSample={handleRemoveSample}
+              summary={summaries[deal.id]}
             />
           ))}
           <UploadCard onClick={openDealIntake} />
@@ -341,6 +373,7 @@ export default function DealsPage() {
           dragOverStage={dragOverStage}
           setDragOverStage={setDragOverStage}
           onDrop={handleKanbanDrop}
+          summaries={summaries}
         />
       )}
 

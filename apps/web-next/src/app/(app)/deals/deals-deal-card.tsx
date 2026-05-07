@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { formatCurrency, getDocIcon, getDealDisplayName } from "@/lib/formatters";
+import {
+  formatCurrency,
+  formatFinancialValue,
+  getDocIcon,
+  getDealDisplayName,
+} from "@/lib/formatters";
 import { useLiveTime } from "@/lib/useLiveTime";
 import {
   STAGE_STYLES,
@@ -12,7 +17,7 @@ import {
 import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Deal } from "@/types";
+import type { Deal, FinancialSummary } from "@/types";
 
 // ---------------------------------------------------------------------------
 // Deal Card (List View)
@@ -24,6 +29,7 @@ export function DealCard({
   onDelete,
   activeMetrics,
   onRemoveSample,
+  summary,
 }: {
   deal: Deal;
   selected: boolean;
@@ -31,6 +37,13 @@ export function DealCard({
   onDelete: (id: string, name: string) => void;
   activeMetrics: MetricKey[];
   onRemoveSample?: (id: string) => void;
+  /**
+   * Latest INCOME_STATEMENT summary for this deal — when present we
+   * format revenue/EBITDA at the correct unitScale instead of going
+   * through formatCurrency() (which assumes MILLIONS). Optional so
+   * cards still render before the bulk fetch resolves.
+   */
+  summary?: FinancialSummary;
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
@@ -185,7 +198,21 @@ export function DealCard({
             {activeMetrics.map((key) => {
               const cfg = METRIC_CONFIG[key];
               if (!cfg) return null;
-              const value = deal[key as keyof Deal] as number | undefined | null;
+              // Revenue / EBITDA come from the extracted income statement
+              // when available \u2014 both their value and their unit live on
+              // `summary`. EBITDA color (red < 0) still uses the
+              // statement value because it's already at the same scale.
+              const stmtValue =
+                summary && key === "revenue"
+                  ? summary.revenue
+                  : summary && key === "ebitda"
+                    ? summary.ebitda
+                    : null;
+              const dealValue = deal[key as keyof Deal] as number | undefined | null;
+              const value =
+                stmtValue != null
+                  ? stmtValue
+                  : dealValue;
               return (
                 <div key={key} className="bg-background-body rounded-md p-3">
                   <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
@@ -201,7 +228,9 @@ export function DealCard({
                       ? (value != null ? Number(value).toFixed(1) + "%" : "\u2014")
                       : key === "mom"
                         ? (value != null ? Number(value).toFixed(1) + "x" : "\u2014")
-                        : formatCurrency(value as number | null | undefined, deal.currency)}
+                        : summary && (key === "revenue" || key === "ebitda")
+                          ? formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency })
+                          : formatCurrency(value as number | null | undefined, deal.currency)}
                   </span>
                 </div>
               );
