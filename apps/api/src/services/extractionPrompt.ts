@@ -19,12 +19,23 @@ export const LINE_ITEM_KEYS = {
 export function buildExtractionPrompt(options?: {
   includeSourceCitations?: boolean;
   currencyHint?: string;
+  /** Today's date in ISO format (YYYY-MM-DD). Used to anchor HISTORICAL vs
+   * PROJECTED period classification — without this the LLM defaults to its
+   * training cutoff (often Jan 2025 or earlier) and mislabels recent past
+   * months as PROJECTED. Defaults to the server's current date. */
+  todayIso?: string;
 }): string {
-  const { includeSourceCitations = true, currencyHint } = options ?? {};
+  const {
+    includeSourceCitations = true,
+    currencyHint,
+    todayIso = new Date().toISOString().split('T')[0],
+  } = options ?? {};
 
   const currencyHintLine = currencyHint
     ? `\nNOTE: The document currency has been pre-detected as ${currencyHint}. Verify this against the document content.\n`
     : '';
+
+  const dateContextLine = `\nDATE CONTEXT — TODAY IS ${todayIso}. Use THIS date as the boundary for HISTORICAL vs PROJECTED classification, NOT your training cutoff. Any period whose end date is on or before ${todayIso} is HISTORICAL. Any period whose end date is after ${todayIso} is PROJECTED. Examples: if today is 2026-05-07, then "Mar-26" is HISTORICAL (it has already happened), "Aug-26" is PROJECTED (it has not yet happened), "FY24" is HISTORICAL, "FY27E" is PROJECTED. Do NOT label past months as PROJECTED just because they look "recent" — check against ${todayIso}.\n`;
 
   const sourceCitationRules = includeSourceCitations
     ? `6. For EVERY extracted value, include a source_quote: the exact text from the document where you found that number
@@ -47,7 +58,7 @@ export function buildExtractionPrompt(options?: {
   return `You are a senior private equity analyst extracting structured financial data from deal documents (CIMs, teasers, standalone financials).
 
 Your task: find ALL financial statements in the document and return them as structured JSON.
-${currencyHintLine}
+${currencyHintLine}${dateContextLine}
 STEP 0 — IDENTIFY CURRENCY:
 Before extracting any financial data, determine the document currency:
 - Look for symbols: $, €, £, ₹, ¥
@@ -90,8 +101,8 @@ CRITICAL: WITHIN A SINGLE EXTRACTION, ALL STATEMENTS FROM THE SAME DOCUMENT MUST
 STEP 2 — EXTRACT:
 1. Extract EVERY year/period column you find — do not skip any
 2. PRESERVE THE SOURCE'S UNIT SCALE. Store values exactly as they appear in the document and set unitScale to whichever value matches the source: "MILLIONS", "THOUSANDS", "ACTUALS", or "BILLIONS". Do NOT convert values between scales.
-3. Label each period: HISTORICAL (past actuals), PROJECTED (forecasts), or LTM (last twelve months)
-4. Projected periods are identified by: "E", "F", "Est", "Forecast", "Budget", "Proj" suffix, or future years
+3. Label each period: HISTORICAL (past actuals), PROJECTED (forecasts), or LTM (last twelve months). Use the DATE CONTEXT above to decide HISTORICAL vs PROJECTED — past relative to TODAY = HISTORICAL, future relative to TODAY = PROJECTED. Do NOT use your own knowledge cutoff.
+4. PROJECTED is signalled by EITHER (a) explicit suffix: "E", "F", "Est", "Forecast", "Budget", "Proj"; OR (b) the period's end date is strictly after today. A period without an explicit suffix whose date is in the past must be HISTORICAL — even if the year (e.g. 2025, 2026) is more recent than your training data.
 5. If a value is not present, use null — never guess
 ${sourceCitationRules}
 
