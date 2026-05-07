@@ -181,7 +181,12 @@ export async function classifyFinancials(
       ],
       response_format: { type: 'json_object' },
       temperature: 0.1,
-      max_tokens: 16000,
+      // 32K to fit a full 36-month × 5-channel time series with sub-category
+      // line items + source quotes per period. The 16K budget was tuned for
+      // 5-7 annual periods × 1-2 channels and silently truncated wide
+      // monthly grids (the LLM either gave up at 16K or skipped months).
+      // GPT-4.1 / Claude Sonnet 4.5 both accept up to 32K via OpenRouter.
+      max_tokens: 32000,
     }, { timeout: 120000 });
 
     const content = response.choices[0]?.message?.content;

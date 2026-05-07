@@ -95,6 +95,34 @@ STEP 2 — EXTRACT:
 5. If a value is not present, use null — never guess
 ${sourceCitationRules}
 
+CRITICAL — MONTHLY TIME-SERIES TABLES (e.g. P&L sheets with month columns):
+When the source has columns labelled with MONTH names ("Apr-23", "May-23", ..., "Mar-26") — often grouped under year header rows — emit ONE PERIOD PER MONTH. The "period" field is the monthly label verbatim from the column header (e.g. "Apr-23", "May-23"). This is the ONLY correct interpretation — do NOT collapse months into annual aggregates, do NOT skip any month.
+
+ANTI-PATTERNS for monthly time series (these are bugs we have actually shipped — do not repeat):
+- ❌ Emitting one period per YEAR (e.g. period: "2024") with revenue summed from monthly columns. Wrong because it loses the monthly granularity that downstream MRR / TTM / 3-month-avg computations need.
+- ❌ Emitting period: "2024" with revenue: 0 and source: "No annual total for 2024 provided; only monthly values present, annual total not found." This is a refusal to do the work — emit MONTHLY periods instead. Never emit a 0-value row for a year that has monthly data.
+- ❌ Reading a "Total" column at the end of the row and assigning it to one of the year buckets. The grand-total column belongs to nothing — it is the sum across the entire history. Either skip it or emit it as a separate "TOTAL" period.
+- ❌ Emitting 4 annual periods (one per year) when the source has 36 monthly columns. The correct output is 36 monthly periods, full stop.
+
+WORKED EXAMPLE — monthly time-series source:
+    Title    | 2023                            | 2024 | 2025 | 2026
+             | Apr-23 | May-23 | Jun-23 | ...  | ...  | ...  | Mar-26
+    Revenue  | 119.15 | 346.63 | 447.44 | ...  | ...  | ...  | 16,231.91
+Emit (one period per month, ALL months):
+    [
+      { "period": "Apr-23", "periodType": "HISTORICAL", "lineItems": { "revenue": 119.15, ... } },
+      { "period": "May-23", "periodType": "HISTORICAL", "lineItems": { "revenue": 346.63, ... } },
+      ... // every month, all 36
+      { "period": "Mar-26", "periodType": "HISTORICAL", "lineItems": { "revenue": 16231.91, ... } }
+    ]
+
+WORKED EXAMPLE — when revenue is split into channels (Stripe / Wix / Shopify rows):
+Use the DYNAMIC SUB-CATEGORIES convention below (revenue_stripe, revenue_wix_website_speedy, etc.). Each monthly period carries the channel-tagged keys, and the rolled-up parent "revenue" is the sum of the channels for THAT month.
+
+Each monthly period needs its own periodType. Months in the past = HISTORICAL. Months in the future (relative to today) = PROJECTED. The "as-of" date is whatever the latest filled month is.
+
+If the source ALSO has explicit annual total rows / columns alongside the monthly grid, you may emit those as ADDITIONAL periods labelled "2023", "2024" etc. — but the monthly periods take priority, and the annual aggregates must agree with the sum of their constituent months (within rounding).
+
 Use these line item keys exactly:
 INCOME STATEMENT: ${LINE_ITEM_KEYS.INCOME_STATEMENT}
 BALANCE SHEET: ${LINE_ITEM_KEYS.BALANCE_SHEET}
