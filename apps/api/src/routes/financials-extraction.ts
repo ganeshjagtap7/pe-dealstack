@@ -27,6 +27,31 @@ async function fetchBuffer(fileUrlOrPath: string): Promise<Buffer | null> {
   return downloadFileBuffer(fileUrlOrPath);
 }
 
+/**
+ * "Financial-shaped" predicate for filtering Documents during re-extract.
+ * Returns true if the doc is type-tagged as CIM/FINANCIALS/EXCEL OR if its
+ * mimeType / filename indicate a spreadsheet. The predicate is permissive
+ * on purpose — older XLSX uploads may have been auto-classified as OTHER
+ * because the filename had no obvious keyword (e.g. "Master Sheet.xlsx").
+ * Without this fallback, Re-extract silently skips them and the deal looks
+ * like it has no financial data even when a 36-month spreadsheet sits on
+ * the deal record.
+ */
+function isFinancialDoc(d: { type: string | null; name: string | null; mimeType: string | null }): boolean {
+  const t = (d.type ?? '').toUpperCase();
+  if (t === 'CIM' || t === 'FINANCIALS' || t === 'EXCEL') return true;
+  const n = (d.name ?? '').toLowerCase();
+  if (n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.csv')) return true;
+  const m = (d.mimeType ?? '').toLowerCase();
+  if (
+    m.includes('spreadsheet') ||
+    m.includes('excel') ||
+    m === 'text/csv' ||
+    m === 'application/csv'
+  ) return true;
+  return false;
+}
+
 /** Extract text from a PDF stored in Supabase */
 async function extractTextFromUrl(fileUrl: string): Promise<string | null> {
   const buffer = await fetchBuffer(fileUrl);
@@ -175,13 +200,18 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         .single();
       if (data) docs = [data];
     } else if (mode === 'all_financials') {
+      // Pull every doc, then JS-filter for "looks-financial" (type-tagged
+      // OR spreadsheet-mimeType). The earlier `.in('type', [...])` filter
+      // skipped XLSX uploads classified as OTHER — common for files like
+      // "Master Sheet.xlsx" that have no obvious keyword in the name.
+      // This fix means the deep extraction loop now picks up spreadsheets
+      // even when their type tag is wrong.
       const { data } = await supabase
         .from('Document')
         .select('id, fileUrl, name, type, mimeType, createdAt')
         .eq('dealId', dealId)
-        .in('type', ['CIM', 'FINANCIALS'])
         .order('createdAt', { ascending: false });
-      docs = (data ?? []).filter((d) => !!d.fileUrl);
+      docs = (data ?? []).filter((d) => !!d.fileUrl && isFinancialDoc(d));
     } else if (mode === 'all') {
       const { data } = await supabase
         .from('Document')
@@ -190,26 +220,19 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
         .order('createdAt', { ascending: false });
       docs = (data ?? []).filter((d) => !!d.fileUrl);
     } else {
-      // mode === 'single': prefer most recent CIM or FINANCIALS, fallback to any.
-      const { data } = await supabase
+      // mode === 'single': prefer most recent financial-shaped doc
+      // (type CIM/FINANCIALS or spreadsheet mimeType). Fallback to any.
+      const { data: allDocs } = await supabase
         .from('Document')
         .select('id, fileUrl, name, type, mimeType, createdAt')
         .eq('dealId', dealId)
-        .in('type', ['CIM', 'FINANCIALS'])
-        .order('createdAt', { ascending: false })
-        .limit(1)
-        .single();
-      if (data) docs = [data];
-
-      if (docs.length === 0) {
-        const { data: anyDoc } = await supabase
-          .from('Document')
-          .select('id, fileUrl, name, type, mimeType, createdAt')
-          .eq('dealId', dealId)
-          .order('createdAt', { ascending: false })
-          .limit(1)
-          .single();
-        if (anyDoc) docs = [anyDoc];
+        .order('createdAt', { ascending: false });
+      const financialDocs = (allDocs ?? []).filter((d) => !!d.fileUrl && isFinancialDoc(d));
+      if (financialDocs.length > 0) {
+        docs = [financialDocs[0]];
+      } else if (allDocs && allDocs.length > 0) {
+        const fallback = allDocs.find((d) => !!d.fileUrl);
+        if (fallback) docs = [fallback];
       }
     }
 

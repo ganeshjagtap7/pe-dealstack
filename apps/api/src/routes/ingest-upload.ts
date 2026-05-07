@@ -327,11 +327,36 @@ router.post('/', upload.single('file'), async (req, res) => {
     // Step 6: Create document record with confidence data
     log.debug('Step 6: Creating document record');
 
+    // Auto-classify by filename + mimeType. Spreadsheets default to
+    // FINANCIALS so the re-extract loop in financials-extraction.ts
+    // (which filters `type IN ('CIM','FINANCIALS')`) picks them up.
     let docType = 'OTHER';
     const lowerName = documentName.toLowerCase();
+    const lowerMime = (mimeType ?? '').toLowerCase();
+    const looksLikeSpreadsheet =
+      lowerName.endsWith('.xlsx') ||
+      lowerName.endsWith('.xls') ||
+      lowerName.endsWith('.csv') ||
+      lowerMime.includes('spreadsheet') ||
+      lowerMime.includes('excel') ||
+      lowerMime === 'text/csv' ||
+      lowerMime === 'application/csv';
+
     if (lowerName.includes('cim') || lowerName.includes('confidential')) docType = 'CIM';
     else if (lowerName.includes('teaser')) docType = 'TEASER';
-    else if (lowerName.includes('financial') || lowerName.includes('model')) docType = 'FINANCIALS';
+    else if (
+      lowerName.includes('financial') ||
+      lowerName.includes('model') ||
+      lowerName.includes('p&l') ||
+      lowerName.includes('p_l') ||
+      lowerName.includes('income') ||
+      lowerName.includes('balance') ||
+      lowerName.includes('cashflow') ||
+      lowerName.includes('cash flow') ||
+      lowerName.includes('master sheet') ||
+      lowerName.includes('mastersheet') ||
+      looksLikeSpreadsheet
+    ) docType = 'FINANCIALS';
     else if (lowerName.includes('loi') || lowerName.includes('letter')) docType = 'LOI';
     else if (lowerName.includes('due diligence') || lowerName.includes('dd')) docType = 'DD_REPORT';
 

@@ -117,13 +117,40 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       }
     }
 
-    // Determine document type from filename if not provided
+    // Determine document type from filename if not provided. Spreadsheets
+    // (XLSX / XLS / CSV) default to FINANCIALS so the re-extract loop in
+    // financials-extraction.ts (which filters `type IN ('CIM','FINANCIALS')`)
+    // picks them up. Without this, a Master Sheet upload silently misses
+    // the deep extraction path and ends up as OTHER, never producing
+    // FinancialStatement rows even though the data is sitting in the DB.
     let docType = req.body.type || 'OTHER';
     if (docType === 'OTHER' && documentName) {
       const lowerName = documentName.toLowerCase();
+      const lowerMime = (mimeType ?? '').toLowerCase();
+      const looksLikeSpreadsheet =
+        lowerName.endsWith('.xlsx') ||
+        lowerName.endsWith('.xls') ||
+        lowerName.endsWith('.csv') ||
+        lowerMime.includes('spreadsheet') ||
+        lowerMime.includes('excel') ||
+        lowerMime === 'text/csv' ||
+        lowerMime === 'application/csv';
+
       if (lowerName.includes('cim') || lowerName.includes('confidential')) docType = 'CIM';
       else if (lowerName.includes('teaser')) docType = 'TEASER';
-      else if (lowerName.includes('financial') || lowerName.includes('model')) docType = 'FINANCIALS';
+      else if (
+        lowerName.includes('financial') ||
+        lowerName.includes('model') ||
+        lowerName.includes('p&l') ||
+        lowerName.includes('p_l') ||
+        lowerName.includes('income') ||
+        lowerName.includes('balance') ||
+        lowerName.includes('cashflow') ||
+        lowerName.includes('cash flow') ||
+        lowerName.includes('master sheet') ||
+        lowerName.includes('mastersheet') ||
+        looksLikeSpreadsheet
+      ) docType = 'FINANCIALS';
       else if (lowerName.includes('legal') || lowerName.includes('dd')) docType = 'LEGAL';
       else if (lowerName.includes('nda')) docType = 'NDA';
       else if (lowerName.includes('loi') || lowerName.includes('letter')) docType = 'LOI';
