@@ -1,95 +1,28 @@
 "use client";
 
-import { useRef } from "react";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  BarController,
-  LineElement,
-  LineController,
-  PointElement,
-  Filler,
-  Tooltip,
-  Legend,
-  Title,
-  type ChartOptions,
-  type ChartData,
-} from "chart.js";
+import { useRef, useState } from "react";
+import type { Chart as ChartJS, ChartOptions, ChartData } from "chart.js";
 import { Chart } from "react-chartjs-2";
 
+import { comparePeriodChronologically } from "./deal-financials-period-scope";
 import {
-  type PeriodScope,
-  PERIOD_SCOPE_LABEL,
-  groupRowsByScope,
-  comparePeriodChronologically,
-} from "./deal-financials-period-scope";
+  type ChartScopeFilter,
+  ChartToolbar,
+  ScopeEmptyState,
+  ScopeFilterPills,
+  filterRowsByScope,
+} from "./deal-financials-chart-controls";
+import {
+  type FinancialStatement,
+  CHART_TOOLTIP,
+  CHART_LEGEND,
+} from "./deal-financials-charts-shared";
 import { formatFinancialValue, toActualDollars } from "@/lib/formatters";
 
-// Register Chart.js components once
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  BarController,
-  LineElement,
-  LineController,
-  PointElement,
-  Filler,
-  Tooltip,
-  Legend,
-  Title,
-);
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface FinancialStatement {
-  id: string;
-  statementType: "INCOME_STATEMENT" | "BALANCE_SHEET" | "CASH_FLOW";
-  period: string;
-  periodType?: "ACTUAL" | "PROJECTED";
-  currency?: string;
-  unitScale?: "ACTUALS" | "THOUSANDS" | "MILLIONS" | "BILLIONS";
-  extractionConfidence?: number | null;
-  extractionSource?: string | null;
-  lineItems?: Record<string, number | null>;
-  Document?: { id: string; name: string } | null;
-}
-
-// ---------------------------------------------------------------------------
-// Shared chart config (ported from legacy CHART_TOOLTIP / CHART_LEGEND)
-// ---------------------------------------------------------------------------
-
-const CHART_TOOLTIP = {
-  backgroundColor: "rgba(255,255,255,0.98)",
-  titleColor: "#111827",
-  titleFont: { size: 12 as const, family: "Inter", weight: "bold" as const },
-  bodyColor: "#4b5563",
-  bodyFont: { size: 11 as const, family: "Inter" },
-  borderColor: "#e5e7eb",
-  borderWidth: 1,
-  padding: { top: 10, bottom: 10, left: 14, right: 14 },
-  cornerRadius: 10,
-  boxPadding: 4,
-  usePointStyle: true as const,
-  caretSize: 6,
-};
-
-const CHART_LEGEND = {
-  position: "bottom" as const,
-  labels: {
-    font: { size: 11 as const, family: "Inter", weight: "normal" as const },
-    boxWidth: 14,
-    boxHeight: 8,
-    padding: 18,
-    color: "#6b7280",
-    usePointStyle: true as const,
-    pointStyleWidth: 14,
-  },
-};
+// Re-export so existing consumers (deal-financials.tsx) don't have to change
+// their import paths after the file split.
+export type { FinancialStatement } from "./deal-financials-charts-shared";
+export { GrowthChart } from "./deal-financials-chart-growth";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -104,23 +37,44 @@ function filterConsistentPeriods(rows: FinancialStatement[]): FinancialStatement
   return rows;
 }
 
-// Period-scope inference helpers live in `./deal-financials-period-scope`.
-
 // ---------------------------------------------------------------------------
 // Revenue + EBITDA + Margin chart
 // ---------------------------------------------------------------------------
 
 export function RevenueChart({ statements }: { statements: FinancialStatement[] }) {
   const canvasRef = useRef<ChartJS | null>(null);
+  const [scopeFilter, setScopeFilter] = useState<ChartScopeFilter>("all");
 
-  let rows = statements
-    .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => comparePeriodChronologically(a.period, b.period));
+  // Filter by scope BEFORE sort + chart construction so the empty-state check
+  // sees the post-filter row count.
+  let rows = statements.filter((s) => s.statementType === "INCOME_STATEMENT");
+  rows = filterRowsByScope(rows, scopeFilter);
+  rows = rows.sort((a, b) => comparePeriodChronologically(a.period, b.period));
 
-  rows = filterConsistentPeriods(rows);
+  // Only fall back to FY-vs-non-FY consistency filtering when the user hasn't
+  // already locked the scope down. With an explicit scope filter, all rows
+  // share a scope by definition.
+  if (scopeFilter === "all") {
+    rows = filterConsistentPeriods(rows);
+  }
+
+  const toolbar = (
+    <ChartToolbar>
+      <ScopeFilterPills value={scopeFilter} onChange={setScopeFilter} />
+    </ChartToolbar>
+  );
 
   if (rows.length === 0) {
-    return <p className="text-xs text-gray-400 text-center py-8">No income statement data available.</p>;
+    return (
+      <div className="w-full">
+        {toolbar}
+        {scopeFilter === "all" ? (
+          <p className="text-xs text-gray-400 text-center py-8">No income statement data available.</p>
+        ) : (
+          <ScopeEmptyState filter={scopeFilter} />
+        )}
+      </div>
+    );
   }
 
   const labels = rows.map((r) => r.period);
@@ -241,161 +195,12 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
   };
 
   return (
-    <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
-      {/* @ts-expect-error -- react-chartjs-2 mixed type chart has loose generics */}
-      <Chart ref={canvasRef} type="bar" data={data} options={options} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Revenue Growth chart
-// ---------------------------------------------------------------------------
-
-export function GrowthChart({ statements }: { statements: FinancialStatement[] }) {
-  const incomeRows = statements
-    .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => comparePeriodChronologically(a.period, b.period));
-
-  if (incomeRows.length < 2) {
-    return <p className="text-xs text-gray-400 text-center py-8">Need at least 2 periods to show growth.</p>;
-  }
-
-  // Group by inferred period scope so growth deltas are only computed between
-  // periods of the same kind (e.g. Monthly→Monthly, never Monthly→YTD).
-  const groups = groupRowsByScope(incomeRows);
-
-  // Per-group palette (distinct colors so the legend communicates scope).
-  // Negative values get the corresponding red shade for that group's hue.
-  const GROUP_PALETTE: Record<PeriodScope, { pos: string; neg: string; border: string }> = {
-    annual:    { pos: "rgba(0,51,102,0.75)",   neg: "rgba(220,38,38,0.75)", border: "rgba(0,51,102,0.65)" },
-    estimate:  { pos: "rgba(124,58,237,0.7)",  neg: "rgba(220,38,38,0.7)",  border: "rgba(124,58,237,0.6)" },
-    ltm:       { pos: "rgba(13,148,136,0.7)",  neg: "rgba(220,38,38,0.7)",  border: "rgba(13,148,136,0.6)" },
-    ytd:       { pos: "rgba(217,119,6,0.7)",   neg: "rgba(220,38,38,0.7)",  border: "rgba(217,119,6,0.6)" },
-    quarterly: { pos: "rgba(37,99,235,0.7)",   neg: "rgba(220,38,38,0.7)",  border: "rgba(37,99,235,0.6)" },
-    monthly:   { pos: "rgba(5,150,105,0.7)",   neg: "rgba(220,38,38,0.7)",  border: "rgba(5,150,105,0.6)" },
-    mtd:       { pos: "rgba(2,132,199,0.7)",   neg: "rgba(220,38,38,0.7)",  border: "rgba(2,132,199,0.6)" },
-    other:     { pos: "rgba(107,114,128,0.7)", neg: "rgba(220,38,38,0.7)",  border: "rgba(107,114,128,0.6)" },
-  };
-
-  // Build a contiguous X-axis: each group's labels appear together, in order.
-  // Each group becomes its own dataset, with `null` at positions outside the
-  // group — this gives a natural visual gap between scope clusters.
-  // The first row of each group has no prior period of the same scope, so it
-  // is skipped (growth is undefined for the first point in any series).
-  const allLabels: string[] = [];
-  const groupSpans: { scope: PeriodScope; startIdx: number; labels: string[]; growth: (number | null)[] }[] = [];
-
-  for (const g of groups) {
-    const labels: string[] = [];
-    const growth: (number | null)[] = [];
-    for (let i = 1; i < g.rows.length; i++) {
-      const prev = g.rows[i - 1].lineItems?.revenue;
-      const curr = g.rows[i].lineItems?.revenue;
-      if (prev != null && curr != null && prev !== 0) {
-        const pct = ((curr - prev) / Math.abs(prev)) * 100;
-        labels.push(g.rows[i].period);
-        growth.push(parseFloat(pct.toFixed(1)));
-      }
-    }
-    if (labels.length > 0) {
-      groupSpans.push({ scope: g.scope, startIdx: allLabels.length, labels, growth });
-      allLabels.push(...labels);
-    }
-  }
-
-  if (allLabels.length === 0) {
-    return <p className="text-xs text-gray-400 text-center py-8">No revenue data available for growth calculation.</p>;
-  }
-
-  // One dataset per scope group. Each dataset has `null` outside its own span
-  // so bars only render in their group's slot — this creates the visual divider.
-  const datasets = groupSpans.map((span) => {
-    const fullData: (number | null)[] = new Array(allLabels.length).fill(null);
-    const bgColors: string[] = new Array(allLabels.length).fill("rgba(0,0,0,0)");
-    const borderColors: string[] = new Array(allLabels.length).fill("rgba(0,0,0,0)");
-    const palette = GROUP_PALETTE[span.scope];
-    for (let i = 0; i < span.growth.length; i++) {
-      const v = span.growth[i];
-      const slot = span.startIdx + i;
-      fullData[slot] = v;
-      bgColors[slot] = (v ?? 0) >= 0 ? palette.pos : palette.neg;
-      borderColors[slot] = (v ?? 0) >= 0 ? palette.border : "rgba(220,38,38,0.6)";
-    }
-    return {
-      label: PERIOD_SCOPE_LABEL[span.scope],
-      data: fullData,
-      backgroundColor: bgColors,
-      borderColor: borderColors,
-      borderWidth: 1,
-      borderRadius: 6,
-      borderSkipped: false,
-      barPercentage: 0.65,
-      categoryPercentage: 0.9,
-    };
-  });
-
-  const data: ChartData<"bar", (number | null)[], string> = {
-    labels: allLabels,
-    datasets,
-  };
-
-  // Tooltip needs to know which scope a given X position belongs to so the
-  // header can label the comparison correctly.
-  const scopeForLabelIdx = new Array(allLabels.length).fill("other") as PeriodScope[];
-  for (const span of groupSpans) {
-    for (let i = 0; i < span.labels.length; i++) {
-      scopeForLabelIdx[span.startIdx + i] = span.scope;
-    }
-  }
-
-  const options: ChartOptions<"bar"> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: groupSpans.length > 1
-        ? { ...CHART_LEGEND, labels: { ...CHART_LEGEND.labels } }
-        : { display: false },
-      tooltip: {
-        ...CHART_TOOLTIP,
-        callbacks: {
-          title: (items) => {
-            const idx = items[0]?.dataIndex ?? 0;
-            const label = items[0]?.label ?? "";
-            const scope = scopeForLabelIdx[idx] ?? "other";
-            return `${label} · ${PERIOD_SCOPE_LABEL[scope]}`;
-          },
-          label: (ctx) => {
-            const v = ctx.raw as number | null;
-            if (v === null || v === undefined) return "";
-            const sign = v >= 0 ? "+" : "";
-            return ` Revenue Growth: ${sign}${v.toFixed(1)}%`;
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        ticks: { font: { size: 11, family: "Inter" }, color: "#9ca3af", maxRotation: 45 },
-        border: { display: false },
-      },
-      y: {
-        ticks: {
-          font: { size: 10, family: "Inter" },
-          color: "#9ca3af",
-          callback: (v) => (Number(v) >= 0 ? "+" : "") + v + "%",
-          padding: 8,
-        },
-        grid: { color: "rgba(0,0,0,0.04)" },
-        border: { display: false },
-      },
-    },
-  };
-
-  return (
-    <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
-      <Chart type="bar" data={data} options={options} />
+    <div className="w-full">
+      {toolbar}
+      <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
+        {/* @ts-expect-error -- react-chartjs-2 mixed type chart has loose generics */}
+        <Chart ref={canvasRef} type="bar" data={data} options={options} />
+      </div>
     </div>
   );
 }
@@ -405,12 +210,32 @@ export function GrowthChart({ statements }: { statements: FinancialStatement[] }
 // ---------------------------------------------------------------------------
 
 export function BalanceSheetChart({ statements }: { statements: FinancialStatement[] }) {
-  const rows = statements
-    .filter((s) => s.statementType === "BALANCE_SHEET")
-    .sort((a, b) => comparePeriodChronologically(a.period, b.period));
+  const [scopeFilter, setScopeFilter] = useState<ChartScopeFilter>("all");
+
+  // Filter by scope BEFORE sort so empty-state checks see the right count.
+  const filteredBaseRows = filterRowsByScope(
+    statements.filter((s) => s.statementType === "BALANCE_SHEET"),
+    scopeFilter,
+  );
+  const rows = filteredBaseRows.sort((a, b) => comparePeriodChronologically(a.period, b.period));
+
+  const toolbar = (
+    <ChartToolbar>
+      <ScopeFilterPills value={scopeFilter} onChange={setScopeFilter} />
+    </ChartToolbar>
+  );
 
   if (rows.length === 0) {
-    return <p className="text-xs text-gray-400 text-center py-8">No balance sheet data available.</p>;
+    return (
+      <div className="w-full">
+        {toolbar}
+        {scopeFilter !== "all" ? (
+          <ScopeEmptyState filter={scopeFilter} />
+        ) : (
+          <p className="text-xs text-gray-400 text-center py-8">No balance sheet data available.</p>
+        )}
+      </div>
+    );
   }
 
   const chartKeys = [
@@ -419,7 +244,12 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
   ];
   const hasChartData = rows.some((r) => chartKeys.some((k) => r.lineItems?.[k] != null && r.lineItems[k] !== 0));
   if (!hasChartData) {
-    return <p className="text-xs text-gray-400 text-center py-8">Balance sheet data exists but key values are not yet extracted.</p>;
+    return (
+      <div className="w-full">
+        {toolbar}
+        <p className="text-xs text-gray-400 text-center py-8">Balance sheet data exists but key values are not yet extracted.</p>
+      </div>
+    );
   }
 
   const labels = rows.map((r) => r.period);
@@ -490,8 +320,11 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
   };
 
   return (
-    <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
-      <Chart type="bar" data={data} options={options} />
+    <div className="w-full">
+      {toolbar}
+      <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
+        <Chart type="bar" data={data} options={options} />
+      </div>
     </div>
   );
 }

@@ -12,7 +12,7 @@
 // +14079%). This module classifies labels into scope buckets and groups
 // periods so growth deltas only compare like-for-like.
 
-import type { FinancialStatement } from "./deal-financials-charts";
+import type { FinancialStatement } from "./deal-financials-charts-shared";
 
 export type PeriodScope =
   | "annual"

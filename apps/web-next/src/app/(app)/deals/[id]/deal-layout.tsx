@@ -2,10 +2,29 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/cn";
-import { formatCurrency, formatRelativeTime } from "@/lib/formatters";
+import {
+  formatCurrency,
+  formatFinancialValue,
+  formatRelativeTime,
+  type UnitScale,
+} from "@/lib/formatters";
+import { comparePeriodChronologically } from "./deal-financials-period-scope";
 import { STAGE_LABELS } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { type DealDetail, type TeamMember, PIPELINE_STAGES, TERMINAL_STAGES } from "./components";
+
+// Minimal shape of an income-statement row needed to render the headline
+// Revenue / EBITDA cards. Mirrors the public columns the API returns from
+// /deals/:id/financials. Defined locally so this layout module doesn't depend
+// on the larger FinancialStatement type defined alongside the chart code.
+interface IncomeStatementRow {
+  statementType?: string;
+  period?: string;
+  periodType?: string | null;
+  unitScale?: UnitScale | null;
+  currency?: string | null;
+  lineItems?: Record<string, number | null> | null;
+}
 
 // ---------------------------------------------------------------------------
 // Stage Pipeline
@@ -189,29 +208,102 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
 // ---------------------------------------------------------------------------
 
 export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
-  // Dynamic financial metrics — only show cards with data, prioritized by
-  // relevance. Ported from deal.js renderDynamicMetrics.
-  const hasMarginData = deal.ebitda != null && deal.revenue != null && deal.revenue !== 0;
+  // Headline metrics on the deal page header. Two parallel sources for
+  // Revenue / EBITDA exist:
+  //   1) deal.revenue / deal.ebitda — legacy columns assumed by formatCurrency
+  //      to be in MILLIONS. Wrong when extraction stores at ACTUALS.
+  //   2) FinancialStatement (INCOME_STATEMENT) — carries unitScale + currency
+  //      per row, matching what the income-statement table on the same page
+  //      already renders. Treat this as the source of truth when present.
+  // Falling back to the deal-level columns keeps the legacy display behaviour
+  // for rows that don't yet have any extracted statements.
+  const [latestIncome, setLatestIncome] = useState<IncomeStatementRow | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<IncomeStatementRow[]>(`/deals/${deal.id}/financials`);
+        if (cancelled) return;
+        const rows = Array.isArray(data) ? data : [];
+        const incomeRows = rows.filter((r) => r.statementType === "INCOME_STATEMENT");
+        if (incomeRows.length === 0) {
+          setLatestIncome(null);
+          return;
+        }
+        // Prefer historical/LTM periods (skip projections). The API uses
+        // HISTORICAL/PROJECTED/LTM; older snapshots may use ACTUAL.
+        const historical = incomeRows.filter(
+          (r) => r.periodType === "HISTORICAL" || r.periodType === "ACTUAL" || r.periodType === "LTM",
+        );
+        const candidates = historical.length > 0 ? historical : incomeRows;
+        // comparePeriodChronologically sorts ascending; reverse to get newest.
+        const sorted = [...candidates].sort((a, b) =>
+          comparePeriodChronologically(b.period, a.period),
+        );
+        setLatestIncome(sorted[0] ?? null);
+      } catch (err) {
+        // Fall back to deal-level fields silently — the income statement
+        // table below renders independently and surfaces its own errors.
+        console.warn("[deal-layout] FinancialMetricsRow income fetch failed:", err);
+        if (!cancelled) setLatestIncome(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [deal.id]);
+
+  // Pull authoritative revenue/EBITDA from the latest income statement row.
+  // Fall back to the legacy deal-level columns when no statement exists.
+  const stmtRevenue = latestIncome?.lineItems?.revenue ?? null;
+  const stmtEbitda = latestIncome?.lineItems?.ebitda ?? null;
+  const stmtUnit: UnitScale = (latestIncome?.unitScale as UnitScale | null) ?? "ACTUALS";
+  const stmtCurrency = latestIncome?.currency ?? deal.currency ?? null;
+
+  const revenueValue = stmtRevenue ?? deal.revenue ?? null;
+  const revenueFormatted =
+    stmtRevenue != null
+      ? formatFinancialValue(stmtRevenue, stmtUnit, { currency: stmtCurrency })
+      : formatCurrency(deal.revenue, deal.currency);
+
+  const ebitdaValue = stmtEbitda ?? deal.ebitda ?? null;
+  const ebitdaFormatted =
+    stmtEbitda != null
+      ? formatFinancialValue(stmtEbitda, stmtUnit, { currency: stmtCurrency })
+      : formatCurrency(deal.ebitda, deal.currency);
+
+  // Margin must be computed in the SAME unit so the ratio stays scale-free.
+  // When statement data is present, both values share unitScale; otherwise
+  // fall back to the legacy deal-level pair.
+  const stmtHasMargin = stmtRevenue != null && stmtEbitda != null && stmtRevenue !== 0;
+  const dealHasMargin = deal.ebitda != null && deal.revenue != null && deal.revenue !== 0;
+  const hasMarginData = stmtHasMargin || dealHasMargin;
+  const marginPct = stmtHasMargin
+    ? (stmtEbitda! / stmtRevenue!) * 100
+    : dealHasMargin
+      ? (deal.ebitda! / deal.revenue!) * 100
+      : null;
 
   type MetricDef = { key: string; label: string; value: unknown; formatted: string; badge?: string; extra?: string };
   const allMetrics: MetricDef[] = [
     {
       key: "revenue",
       label: "Revenue (LTM)",
-      value: deal.revenue,
-      formatted: formatCurrency(deal.revenue, deal.currency),
+      value: revenueValue,
+      formatted: revenueFormatted,
     },
     {
       key: "ebitdaMargin",
       label: "EBITDA Margin",
-      value: hasMarginData ? deal.ebitda : null,
-      formatted: hasMarginData ? ((deal.ebitda! / deal.revenue!) * 100).toFixed(0) + "%" : "\u2014",
+      value: hasMarginData ? ebitdaValue : null,
+      formatted: marginPct != null ? marginPct.toFixed(0) + "%" : "\u2014",
     },
     {
       key: "ebitda",
       label: "EBITDA",
-      value: deal.ebitda,
-      formatted: formatCurrency(deal.ebitda, deal.currency),
+      value: ebitdaValue,
+      formatted: ebitdaFormatted,
     },
     {
       key: "dealSize",
@@ -288,13 +380,13 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
               <div className="flex-1 bg-secondary h-[80%] rounded-t-sm" />
             </div>
           )}
-          {m.key === "ebitdaMargin" && deal.ebitda != null && deal.revenue != null && deal.revenue !== 0 && (
+          {m.key === "ebitdaMargin" && marginPct != null && (
             <div className="h-8 mt-2 w-full flex items-center">
               <div className="w-full h-2 bg-border-subtle rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{
-                    width: `${Math.min(Math.round((deal.ebitda! / deal.revenue!) * 100), 100)}%`,
+                    width: `${Math.min(Math.round(marginPct), 100)}%`,
                     backgroundColor: "#003366",
                   }}
                 />
