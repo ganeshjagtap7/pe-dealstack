@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { api, NotFoundError } from "@/lib/api";
 import { authFetchRaw } from "@/app/(app)/deal-intake/components";
-import { cn } from "@/lib/cn";
 import { useToast } from "@/providers/ToastProvider";
 import {
   type FinancialStatement,
@@ -31,6 +30,17 @@ import {
   ExtractionResultModal,
   type ExtractionResult,
 } from "./deal-financials-modal";
+import {
+  DealFinancialsReextractList,
+  isFinancialShaped,
+  type FinancialDocLite,
+} from "./deal-financials-reextract-list";
+import { DealFinancialsEmptyState } from "./deal-financials-empty-state";
+import { DealFinancialsToolbar } from "./deal-financials-toolbar";
+import {
+  DealFinancialsLoadingState,
+  DealFinancialsErrorState,
+} from "./deal-financials-status-states";
 
 // --- Main Panel ---
 
@@ -47,19 +57,25 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
   const [chartType, setChartType] = useState<ChartType>("revenue");
   const [periodFilter, setPeriodFilter] = useState<"all" | "annual" | "quarterly">("all");
   const [extracting, setExtracting] = useState(false);
+  const [extractingDocId, setExtractingDocId] = useState<string | null>(null);
   const [extractionModalResult, setExtractionModalResult] = useState<ExtractionResult | null>(null);
+  const [dealDocs, setDealDocs] = useState<FinancialDocLite[]>([]);
 
   const loadFinancials = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      // Fetch statements, validation flags, and conflict groups in parallel.
+      // Fetch statements, validation flags, conflict groups, and the deal's
+      // documents in parallel. We need the doc list to render per-document
+      // Re-extract buttons; fetching it from /deals/:id (rather than a
+      // dedicated documents endpoint) matches what page.tsx already does.
       // Validation and conflicts endpoints may return 404 if not yet implemented —
       // we treat that gracefully (fall back to client-side derivation).
-      const [stmtData, validData, conflictData] = await Promise.allSettled([
+      const [stmtData, validData, conflictData, dealData] = await Promise.allSettled([
         api.get<FinancialStatement[]>(`/deals/${dealId}/financials`),
         api.get<ValidationResult>(`/deals/${dealId}/financials/validation`),
         api.get<{ conflicts: ConflictGroup[]; count: number }>(`/deals/${dealId}/financials/conflicts`),
+        api.get<{ documents?: FinancialDocLite[] }>(`/deals/${dealId}`),
       ]);
 
       if (stmtData.status === "fulfilled") {
@@ -95,6 +111,12 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
       } else {
         setConflicts([]);
       }
+
+      if (dealData.status === "fulfilled" && Array.isArray(dealData.value?.documents)) {
+        setDealDocs(dealData.value.documents);
+      } else {
+        setDealDocs([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -114,9 +136,15 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
   // Progress messages matching legacy (cycle every 15s)
   const [extractLabel, setExtractLabel] = useState("");
 
-  const handleExtract = useCallback(async () => {
+  // handleExtract accepts an optional (documentId, documentName) pair. When
+  // provided, the request runs single-doc against that document only — the
+  // API forces single-mode whenever documentId is set
+  // (financials-extraction.ts:193-201). Without args, runs the bulk
+  // 'all_financials' loop across every financial-shaped doc on the deal.
+  const handleExtract = useCallback(async (documentId?: string, documentName?: string) => {
     if (extracting) return;
     setExtracting(true);
+    if (documentId) setExtractingDocId(documentId);
     setExtractLabel("Extracting… (30–60s)");
 
     const progressMsgs = [
@@ -131,14 +159,16 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
     }, 15000);
 
     try {
-      // Process every CIM/FINANCIALS document in the deal, not just the most
-      // recent one. The agent loops sequentially through each doc and
-      // runDeepPass merges by (statementType, period) so values combine
-      // across documents naturally. Falls back to single-doc behaviour on
-      // older API versions because the server defaults to 'single'.
+      // Single-doc path passes documentId in the body; the API forces
+      // mode='single' regardless of the mode field. Bulk path stays on
+      // 'all_financials' which loops every CIM/FINANCIALS/spreadsheet doc
+      // and merges by (statementType, period) inside runDeepPass.
+      const body = documentId
+        ? { documentId, mode: "single" as const }
+        : { mode: "all_financials" as const };
       const result = await api.post<ExtractionResult>(
         `/deals/${dealId}/financials/extract`,
-        { mode: "all_financials" },
+        body,
       );
 
       // Small delay before fetching — the API may return success before data
@@ -162,8 +192,12 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
             : "No financial data found in the documents. Try uploading a P&L, Balance Sheet, or CIM.";
         showToast(warningMsg, "warning", { title: "No Data Extracted" });
       } else {
-        // Surface multi-doc result count in the modal title where useful.
-        if (docsUsed && docsUsed > 1) {
+        // Distinct toast for the single-doc path so the user sees which
+        // doc was just re-extracted; bulk path keeps the across-N-docs copy.
+        if (documentId) {
+          const label = documentName ?? "document";
+          showToast(`Re-extracted: ${label}`, "success", { title: "Extraction complete" });
+        } else if (docsUsed && docsUsed > 1) {
           showToast(
             `Re-extracted across ${docsUsed} document${docsUsed === 1 ? "" : "s"}${docsFailed ? ` (${docsFailed} failed)` : ""}.`,
             "success",
@@ -181,6 +215,7 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
     } finally {
       clearInterval(progressTimer);
       setExtracting(false);
+      setExtractingDocId(null);
       setExtractLabel("");
     }
   }, [dealId, extracting, loadFinancials, showToast]);
@@ -287,6 +322,14 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
 
   useEffect(() => { loadFinancials(); }, [loadFinancials]);
 
+  // Filter docs to financial-shaped only — same predicate the API uses for
+  // mode='all_financials'. Keeps the per-doc Re-extract list scoped to
+  // documents that actually feed the financial agent.
+  const financialDocs = useMemo(
+    () => dealDocs.filter(isFinancialShaped),
+    [dealDocs],
+  );
+
   // Derived state
   const hasData = statements.length > 0;
   const availableTabs = TAB_CONFIG.filter((t) => statements.some((s) => s.statementType === t.key));
@@ -345,10 +388,7 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
       <>
         {extractionModal}
         <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed} onFullscreen={onFullscreen}>
-          <div className="text-center py-10">
-            <span className="material-symbols-outlined text-gray-300 text-3xl animate-spin block mb-2">progress_activity</span>
-            <p className="text-xs text-gray-400">Loading financial data...</p>
-          </div>
+          <DealFinancialsLoadingState />
         </FinancialShell>
       </>
     );
@@ -360,11 +400,7 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
       <>
         {extractionModal}
         <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed} onFullscreen={onFullscreen}>
-          <div className="text-center py-10">
-            <span className="material-symbols-outlined text-red-300 text-3xl block mb-2">error</span>
-            <p className="text-xs text-gray-500">{error}</p>
-            <button onClick={loadFinancials} className="mt-3 text-xs text-blue-600 hover:underline">Retry</button>
-          </div>
+          <DealFinancialsErrorState message={error} onRetry={loadFinancials} />
         </FinancialShell>
       </>
     );
@@ -376,59 +412,15 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
       <>
         {extractionModal}
         <FinancialShell collapsed={collapsed} onToggle={toggleCollapsed} onFullscreen={onFullscreen}>
-          <div className="text-center" style={{ padding: "40px 16px" }}>
-            <span className="material-symbols-outlined text-gray-300 block mb-2" style={{ fontSize: 40 }}>table_chart</span>
-            <p className="text-sm font-semibold text-gray-800" style={{ marginBottom: 4 }}>No Financial Data Yet</p>
-            <p className="text-xs text-gray-500" style={{ marginBottom: 20 }}>
-              Upload a CIM, P&amp;L, or financial PDF to extract the 3-statement model automatically.
-            </p>
-            <button
-              onClick={handleExtract}
-              disabled={extracting}
-              className="inline-flex items-center gap-2 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-60"
-              style={{ padding: "10px 20px", backgroundColor: "#003366" }}>
-              {extracting ? (
-                <>
-                  <span className="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>
-                  {extractLabel || "Extracting… (30–60s)"}
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
-                  Extract Financials
-                </>
-              )}
-            </button>
-            {/* Debug download — useful when extraction yielded nothing
-                so the user can see what text the parser actually saw. */}
-            <div className="mt-3">
-              <button
-                onClick={handleDownloadDebug}
-                disabled={debugDownloading}
-                className="inline-flex items-center gap-1 text-[11px] text-gray-400 hover:text-gray-700 disabled:opacity-60"
-              >
-                <span className="material-symbols-outlined text-[14px]">
-                  {debugDownloading ? "progress_activity" : "download"}
-                </span>
-                Download extraction JSON (debug)
-              </button>
-            </div>
-          </div>
+          <DealFinancialsEmptyState
+            extracting={extracting}
+            extractLabel={extractLabel}
+            onExtract={() => handleExtract()}
+            debugDownloading={debugDownloading}
+            onDownloadDebug={handleDownloadDebug}
+          />
         </FinancialShell>
       </>
-    );
-  }
-
-  // Chart toggle button
-  function ChartBtn({ type, label, icon }: { type: ChartType; label: string; icon: string }) {
-    const active = chartVisible && chartType === type;
-    return (
-      <button onClick={() => toggleChart(type)}
-        className={cn("flex items-center gap-1.5 text-xs border rounded-md px-3 py-1.5 transition-all",
-          active ? "text-white border-transparent shadow-sm" : "text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-300 hover:bg-gray-50")}
-        style={active ? { backgroundColor: "#003366", borderColor: "#003366" } : undefined}>
-        <span className="material-symbols-outlined text-sm">{icon}</span>{label}
-      </button>
     );
   }
 
@@ -445,96 +437,32 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
         <ConflictBanner conflicts={conflicts} onAutoResolve={handleAutoResolve} />
 
         {/* Tabs + controls */}
-        <div className="flex items-center gap-2 mb-4 flex-wrap">
-          <div className="flex gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
-            {availableTabs.map((t) => (
-              <button key={t.key} onClick={() => handleTabSwitch(t.key)}
-                className={cn("flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium rounded-md transition-all",
-                  resolvedTab === t.key ? "text-white shadow-sm" : "text-gray-500 hover:text-gray-800 hover:bg-gray-100")}
-                style={resolvedTab === t.key ? { backgroundColor: "#003366" } : undefined}>
-                <span className="material-symbols-outlined text-sm">{t.icon}</span>{t.label}
-              </button>
-            ))}
-          </div>
-          <div className="flex gap-1.5">
-            {resolvedTab === "INCOME_STATEMENT" && (
-              <><ChartBtn type="revenue" label="Revenue" icon="bar_chart" /><ChartBtn type="growth" label="Growth" icon="trending_up" /></>
-            )}
-            {resolvedTab === "BALANCE_SHEET" && <ChartBtn type="composition" label="Composition" icon="donut_large" />}
-          </div>
-          {showPeriodToggle && (
-            <div className="flex gap-1 ml-auto bg-gray-50 rounded-lg p-0.5 border border-gray-100">
-              {(["all", "annual", "quarterly"] as const).map((p) => (
-                <button key={p} onClick={() => setPeriodFilter(p)}
-                  className={cn("px-2.5 py-1 text-[10px] font-medium rounded-md transition-all capitalize",
-                    periodFilter === p ? "bg-white shadow-sm text-gray-800" : "text-gray-400 hover:text-gray-600")}>{p}</button>
-              ))}
-            </div>
-          )}
-          {/* Re-extract button */}
-          <button
-            onClick={handleExtract}
-            disabled={extracting}
-            className="ml-auto flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md px-3 py-1.5 transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
-          >
-            {extracting ? (
-              <>
-                <span className="material-symbols-outlined text-sm animate-spin">progress_activity</span>
-                {extractLabel || "Extracting…"}
-              </>
-            ) : (
-              <>
-                <span className="material-symbols-outlined text-sm">refresh</span>
-                Re-extract
-              </>
-            )}
-          </button>
-          {/* Extraction-debug JSON download — audit what the AI got from
-              the source docs vs what's in the deal record. */}
-          <button
-            onClick={handleDownloadDebug}
-            disabled={debugDownloading}
-            title="Download extraction JSON (audit what AI extracted from the source docs)"
-            aria-label="Download extraction debug JSON"
-            className="flex items-center justify-center text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
-            style={{ width: 30, height: 30 }}
-          >
-            <span className="material-symbols-outlined text-sm">
-              {debugDownloading ? "progress_activity" : "download"}
-            </span>
-          </button>
-          {/* Phase-1 reconciliation download — computed ground truth
-              (annual sums, TTM, MRR, margins), channel concentration,
-              valuation framing vs comp bands, OpEx step-up findings.
-              Pure-TS server side; safe to re-run anytime. */}
-          <button
-            onClick={handleDownloadReconcile}
-            disabled={reconciling}
-            title="Run quantitative reconciliation (compute TTM/MRR/margins/HHI/valuation from raw line items, download as JSON)"
-            aria-label="Run quantitative reconciliation"
-            className="flex items-center justify-center text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
-            style={{ width: 30, height: 30 }}
-          >
-            <span className="material-symbols-outlined text-sm">
-              {reconciling ? "progress_activity" : "calculate"}
-            </span>
-          </button>
-          {/* Phase-2 full audit — Phase 1 + LLM-augmented blocks.
-              Slow (~30-60s, 4 LLM calls in parallel) and costs a few
-              cents per run, hence the separate button. */}
-          <button
-            onClick={handleDownloadFullAudit}
-            disabled={fullAuditing}
-            title="Full audit — Phase 1 + LLM-extracted CIM claim variances, material findings, extraction-quality critique, and a prioritised diligence to-do list. ~30-60s."
-            aria-label="Run full reconciliation audit (LLM)"
-            className="flex items-center justify-center text-gray-500 hover:text-gray-800 border border-gray-200 hover:border-gray-300 rounded-md transition-all hover:bg-gray-50 disabled:opacity-60 disabled:pointer-events-none"
-            style={{ width: 30, height: 30 }}
-          >
-            <span className="material-symbols-outlined text-sm">
-              {fullAuditing ? "progress_activity" : "verified"}
-            </span>
-          </button>
-        </div>
+        <DealFinancialsToolbar
+          availableTabs={availableTabs}
+          resolvedTab={resolvedTab}
+          onTabChange={handleTabSwitch}
+          chartVisible={chartVisible}
+          chartType={chartType}
+          onToggleChart={toggleChart}
+          showPeriodToggle={showPeriodToggle}
+          periodFilter={periodFilter}
+          onPeriodFilterChange={setPeriodFilter}
+          extracting={extracting}
+          extractLabel={extractLabel}
+          onExtract={() => handleExtract()}
+          debugDownloading={debugDownloading}
+          onDownloadDebug={handleDownloadDebug}
+          reconciling={reconciling}
+          onDownloadReconcile={handleDownloadReconcile}
+          fullAuditing={fullAuditing}
+          onDownloadFullAudit={handleDownloadFullAudit}
+        />
+        <DealFinancialsReextractList
+          financialDocs={financialDocs}
+          extracting={extracting}
+          extractingDocId={extractingDocId}
+          onReextract={(docId, docName) => handleExtract(docId, docName)}
+        />
         {/* Chart or Table */}
         {showChart ? (
           <>

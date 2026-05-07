@@ -9,20 +9,58 @@ import {
 import { type FinancialStatement } from "./deal-financials-charts";
 import { comparePeriodChronologically } from "./deal-financials-period-scope";
 
+// Local structural shape mirroring AgentStep in
+// apps/api/src/services/agents/financialAgent/state.ts (lines 42-47).
+// Defined here (not in shared types) so we can render the step log without
+// expanding the global ExtractionResult contract.
+type AgentStep = {
+  message: string;
+  timestamp?: string | null;
+  detail?: unknown;
+  node?: string;
+};
+
+// Per-document record from the aggregate extraction response.
+// Mirrors documentsProcessed[] from financials-extraction.ts:412-420.
+type ProcessedDoc = {
+  id?: string;
+  name?: string;
+  status?: string;
+  statementsStored?: number;
+  periodsStored?: number;
+  overallConfidence?: number | null;
+  error?: string;
+  agent?: { steps?: AgentStep[] };
+};
+
 export interface ExtractionResult {
   result?: {
     periodsStored?: number;
+    statementsStored?: number;
+    documentsUsed?: number;
+    documentsFailed?: number;
     warnings?: string[];
     overallConfidence?: number;
     hasConflicts?: boolean;
   };
   agent?: {
     retryCount?: number;
+    steps?: AgentStep[];
   };
   documentUsed?: {
     name?: string;
   };
+  documentsProcessed?: ProcessedDoc[];
   extractionMethod?: string;
+}
+
+// Format an ISO timestamp to HH:MM:SS for the step log. Returns "" when
+// the input is missing or unparseable so the caller can omit the slot.
+function formatStepTime(ts: string | null | undefined): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toTimeString().slice(0, 8);
 }
 
 export function ExtractionResultModal({
@@ -43,6 +81,42 @@ export function ExtractionResultModal({
   const warnings = result.warnings ?? [];
   const hasConflicts = result.hasConflicts ?? false;
   const retryCount = extractionResult.agent?.retryCount ?? 0;
+
+  // Counts pulled from the aggregate response. Each is optional —
+  // omitted from the UI when the field is absent rather than rendering "0".
+  const periodsStored = result.periodsStored;
+  const statementsStored = result.statementsStored;
+  const documentsUsed = result.documentsUsed;
+  const documentsFailed = result.documentsFailed;
+  const processedDocs = extractionResult.documentsProcessed ?? [];
+  const failedDocs = processedDocs.filter(
+    (d) => d.status && d.status !== "completed",
+  );
+
+  // Single-doc responses surface the step log on the top-level `agent` field
+  // (financials-extraction.ts:405). Multi-doc responses nest the per-doc
+  // agent.steps under documentsProcessed[].agent.steps. Build a unified
+  // per-doc list so the modal renders one section per document either way.
+  const docStepGroups: { name: string; steps: AgentStep[] }[] = (() => {
+    if (processedDocs.length > 0) {
+      return processedDocs
+        .filter((d) => Array.isArray(d.agent?.steps) && d.agent!.steps!.length > 0)
+        .map((d) => ({
+          name: d.name ?? "Unknown document",
+          steps: d.agent!.steps!,
+        }));
+    }
+    const topSteps = extractionResult.agent?.steps ?? [];
+    if (topSteps.length === 0) return [];
+    return [{ name: docName, steps: topSteps }];
+  })();
+  const hasExtractionDetails =
+    periodsStored != null ||
+    statementsStored != null ||
+    documentsUsed != null ||
+    documentsFailed != null ||
+    failedDocs.length > 0 ||
+    docStepGroups.length > 0;
 
   const sym = getCurrencySymbol(currency);
 
@@ -227,6 +301,158 @@ export function ExtractionResultModal({
                 ))}
               </ul>
             </div>
+          </div>
+        )}
+
+        {/* Extraction details — collapsed by default. Surfaces the agent
+            step log + per-doc counts so the user can audit what actually
+            happened (especially how many periods got stored vs. deduped). */}
+        {hasExtractionDetails && (
+          <div className="px-6 pb-4">
+            <details className="rounded-lg border border-gray-100 bg-gray-50/60">
+              <summary className="cursor-pointer px-3 py-2 text-xs font-medium text-gray-600 hover:text-gray-800 select-none flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-sm">
+                  list_alt
+                </span>
+                Extraction details
+              </summary>
+              <div className="px-3 pb-3 pt-1 space-y-3">
+                {/* Counts row — periods + statements + docs used/failed.
+                    Skips any field the response didn't include. */}
+                {(periodsStored != null ||
+                  statementsStored != null ||
+                  documentsUsed != null ||
+                  documentsFailed != null) && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {periodsStored != null && (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{
+                          background: "#eff6ff",
+                          color: "#1e40af",
+                          border: "1px solid #bfdbfe",
+                        }}
+                      >
+                        {periodsStored} period{periodsStored === 1 ? "" : "s"}{" "}
+                        stored
+                      </span>
+                    )}
+                    {statementsStored != null && (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{
+                          background: "#f0fdf4",
+                          color: "#166534",
+                          border: "1px solid #bbf7d0",
+                        }}
+                      >
+                        {statementsStored} statement
+                        {statementsStored === 1 ? "" : "s"}
+                      </span>
+                    )}
+                    {documentsUsed != null && (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{
+                          background: "#f8fafc",
+                          color: "#334155",
+                          border: "1px solid #e2e8f0",
+                        }}
+                      >
+                        {documentsUsed} doc{documentsUsed === 1 ? "" : "s"} used
+                      </span>
+                    )}
+                    {documentsFailed != null && documentsFailed > 0 && (
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{
+                          background: "#fef2f2",
+                          color: "#991b1b",
+                          border: "1px solid #fecaca",
+                        }}
+                      >
+                        {documentsFailed} failed
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Failed-doc errors — surface the per-doc error string from
+                    the 240s timeout / agent failure cases at the top so the
+                    user immediately sees which doc shed data. */}
+                {failedDocs.length > 0 && (
+                  <div
+                    className="p-2.5 rounded-md"
+                    style={{
+                      background: "#fef2f2",
+                      border: "1px solid #fecaca",
+                    }}
+                  >
+                    <p
+                      className="text-[11px] font-semibold mb-1"
+                      style={{ color: "#991b1b" }}
+                    >
+                      Documents that didn&rsquo;t complete:
+                    </p>
+                    <ul
+                      className="text-[11px] space-y-0.5"
+                      style={{ color: "#b91c1c" }}
+                    >
+                      {failedDocs.map((d, i) => (
+                        <li
+                          key={d.id ?? i}
+                          className="flex items-start gap-1.5"
+                        >
+                          <span className="mt-0.5 shrink-0">&bull;</span>
+                          <span className="truncate">
+                            <span className="font-medium">
+                              {d.name ?? "document"}
+                            </span>
+                            {d.error ? ` — ${d.error}` : ` — ${d.status}`}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Per-document step log. One block per doc; messages render
+                    in monospace so timestamps + numbers line up. */}
+                {docStepGroups.length > 0 && (
+                  <div className="space-y-2">
+                    {docStepGroups.map((g, gi) => (
+                      <div key={gi}>
+                        <p className="text-[11px] font-semibold text-gray-700 truncate">
+                          {g.name}
+                        </p>
+                        <ol
+                          className="mt-1 rounded-md bg-white border border-gray-100 px-2.5 py-1.5 max-h-48 overflow-y-auto font-mono text-[10px] text-gray-600 space-y-0.5"
+                        >
+                          {g.steps.map((s, si) => {
+                            const t = formatStepTime(s.timestamp);
+                            return (
+                              <li
+                                key={si}
+                                className="flex items-start gap-2 leading-snug"
+                              >
+                                {t && (
+                                  <span className="text-gray-400 shrink-0">
+                                    {t}
+                                  </span>
+                                )}
+                                <span className="break-words">
+                                  {s.message}
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ol>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </details>
           </div>
         )}
 
