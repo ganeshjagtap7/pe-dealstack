@@ -104,20 +104,20 @@ router.get('/:dealId/access-timeline', async (req: Request, res: Response) => {
     if (idsNeedingNames.length > 0) {
       const { data: users } = await supabase
         .from('User')
-        .select('id, name, email, systemRole')
+        .select('id, name, email, role')
         .in('id', idsNeedingNames);
       if (users) {
         for (const u of users as Array<{
           id: string;
           name: string | null;
           email: string | null;
-          systemRole: string | null;
+          role: string | null;
         }>) {
           const summary = byUser.get(u.id);
           if (summary) {
             if (!summary.userName) summary.userName = u.name;
             if (!summary.userEmail) summary.userEmail = u.email;
-            if (!summary.userRole) summary.userRole = u.systemRole;
+            if (!summary.userRole) summary.userRole = u.role;
           }
         }
       }
