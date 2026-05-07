@@ -24,7 +24,72 @@ in the growth chart on top of whatever periods come back from the API.
 
 ---
 
-## Just shipped (this commit) — pipeline honors the source's actual unit scale
+## Just shipped (this commit) — chronological period sort + cashcap empty cards
+
+### Charts + tables sort periods chronologically, not alphabetically
+
+**Symptom:** Revenue, Growth, and the income/balance/cashflow tables on the
+Financial Analysis tab rendered periods in **alphabetical** order
+(`Apr-26 < Aug-26 < Dec-26 < Feb-26 < Jan-26 …`) because every consumer
+used `rows.sort((a, b) => a.period.localeCompare(b.period))`. Bars
+appeared in scrambled order; growth deltas computed across alphabetically-
+adjacent periods (Apr → Aug → Dec) were meaningless.
+
+**Fix:** new `comparePeriodChronologically(a, b)` and `periodChronoKey(p)`
+helpers in `deal-financials-period-scope.ts`. Parse `(year, sub)` from
+the label using a `MONTH_INDEX` table, the existing `inferPeriodScope`,
+and a year extractor that handles both 4-digit (`2026`) and 2-digit
+(`FY26`, `Apr-26`) forms. Sort by `(year asc, sub asc)` where sub
+encodes:
+- monthly / MTD: `0.01–0.12` (Jan = 0.01, Dec = 0.12)
+- quarterly: `0.25 / 0.50 / 0.75 / 1.00`
+- YTD: `1.10`, LTM: `1.20`, annual: `1.50`, FY estimate: `1.80`, other: `2.00`
+
+So within a year, monthly periods sort Jan → Dec, then YTD sits after
+December, then annual, then FY estimates last (projections come after
+historicals). Across years, year wins.
+
+**Files:**
+- `apps/web-next/src/app/(app)/deals/[id]/deal-financials-period-scope.ts` (added comparator)
+- `apps/web-next/src/app/(app)/deals/[id]/deal-financials-charts.tsx` (3 sort sites: RevenueChart, GrowthChart, BalanceSheetChart)
+- `apps/web-next/src/app/(app)/deals/[id]/deal-financials-table.tsx` (Income / Balance / Cash Flow tables)
+- `apps/web-next/src/app/(app)/deals/[id]/deal-financials-modal.tsx` (extraction-result modal — descending order for "latest first")
+
+**Server-side `localeCompare` sorts** in `apps/api/src/routes/financials.ts:83`,
+`apps/api/src/services/financialValidator.ts:319`, and CSV parsers
+(`bankParser`, `stripeParser`, `squareParser`, `paypalParser`) are
+**deliberately untouched** — the parsers use a separate `periodSort`
+field that's already chronological (e.g. `2026-04`); the API + validator
+sort is a follow-up if validator growth warnings still misfire.
+
+### Cash & Capital tab now explains which document each card needs
+
+**Symptom:** the Cash & Capital tab on the AI Financial Analysis surface
+appeared "broken" / empty when a deal only had a P&L source document
+(e.g. Fight_AI's `YTD P&L` sheet). The catch-all empty-state copy said
+"will appear here once enough financial data is extracted" — useless,
+because the user couldn't tell what specifically was missing.
+
+**Root cause:** the three sub-cards (Cash Flow Analysis, Working Capital,
+Debt Capacity) require different source data. Cash Flow needs
+INCOME_STATEMENT (ebitda) + CASH_FLOW (capex / fcf). Working Capital
+needs BALANCE_SHEET (AR / AP / inventory / current assets / current
+liabilities). Debt Capacity needs BALANCE_SHEET (debt + cash) + INCOME
+(interest expense). On an income-only deal, all three return either
+`undefined` or objects full of nulls, and the panel collapses to one
+generic empty state.
+
+**Fix:** per-card emptiness detection. Each of the three cards now either
+renders with data, or shows an inline `CashCapEmptyCard` that names the
+exact source document needed. Top-level fallback (when *all three* are
+empty) explicitly says "needs a Balance Sheet and Cash Flow statement
+in addition to the Income Statement".
+
+**File:** `apps/web-next/src/app/(app)/deals/[id]/deal-analysis-cashcap.tsx`
+
+---
+
+## Previously shipped — pipeline honors the source's actual unit scale
 
 The whole financial-extraction pipeline was forcibly converting every
 value to "MILLIONS" regardless of source. A startup spreadsheet with

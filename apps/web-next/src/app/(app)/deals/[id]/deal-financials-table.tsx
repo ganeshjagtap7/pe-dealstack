@@ -3,6 +3,7 @@
 import { cn } from "@/lib/cn";
 import { getCurrencySymbol } from "@/lib/formatters";
 import { type FinancialStatement } from "./deal-financials-charts";
+import { comparePeriodChronologically } from "./deal-financials-period-scope";
 import {
   LINE_ITEM_LABELS,
   ORDERED_LINE_ITEMS,
@@ -77,7 +78,7 @@ export function FinancialTable({
   statementType: StatementType;
   conflicts: ConflictGroup[];
 }) {
-  const rows = statements.filter((s) => s.statementType === statementType).sort((a, b) => a.period.localeCompare(b.period));
+  const rows = statements.filter((s) => s.statementType === statementType).sort((a, b) => comparePeriodChronologically(a.period, b.period));
   if (rows.length === 0) {
     return <p className="text-xs text-gray-400 py-4 text-center">No {statementType.replace(/_/g, " ").toLowerCase()} data available.</p>;
   }

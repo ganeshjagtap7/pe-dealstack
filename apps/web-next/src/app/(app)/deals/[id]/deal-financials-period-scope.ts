@@ -70,6 +70,71 @@ export function inferPeriodScope(period: string | null | undefined): PeriodScope
 }
 
 /**
+ * Chronological sort key for a period label. Returns `[year, sub]` where
+ * `sub` is a fractional ordering within the year:
+ *   monthly      → 0.01–0.12 (Jan = 0.01, Dec = 0.12)
+ *   quarterly    → 0.25–1.00 (Q1 = 0.25, Q4 = 1.00)
+ *   YTD          → 1.10
+ *   LTM / TTM    → 1.20
+ *   annual       → 1.50
+ *   FY estimate  → 1.80 (after annual — projections come last)
+ *   other        → 2.00 (sorted to end)
+ *
+ * Used as `rows.sort((a, b) => comparePeriodChronologically(a.period, b.period))`
+ * to fix the chart bug where alphabetical sort scrambled months
+ * ("Apr-26 < Aug-26 < Dec-26 < Feb-26 < Jan-26 …").
+ */
+const MONTH_INDEX: Record<string, number> = {
+  JAN: 1, FEB: 2, MAR: 3, APR: 4, MAY: 5, JUN: 6,
+  JUL: 7, AUG: 8, SEP: 9, SEPT: 9, OCT: 10, NOV: 11, DEC: 12,
+  JANUARY: 1, FEBRUARY: 2, MARCH: 3, APRIL: 4, JUNE: 6,
+  JULY: 7, AUGUST: 8, SEPTEMBER: 9, OCTOBER: 10, NOVEMBER: 11, DECEMBER: 12,
+};
+
+function extractYear(upper: string): number | null {
+  // Prefer 4-digit year ("2026"), fall back to 2-digit FY/MMM-YY ("FY26", "Apr-26").
+  const four = upper.match(/\b(20\d{2}|19\d{2})\b/);
+  if (four) return Number(four[1]);
+  const two = upper.match(/\b(\d{2})\b/);
+  if (two) return 2000 + Number(two[1]);
+  return null;
+}
+
+export function periodChronoKey(period: string | null | undefined): [number, number] {
+  if (!period) return [Number.POSITIVE_INFINITY, 2.0];
+  const upper = period.trim().toUpperCase();
+  const year = extractYear(upper) ?? Number.POSITIVE_INFINITY;
+  const scope = inferPeriodScope(period);
+
+  if (scope === "monthly" || scope === "mtd") {
+    for (const [name, idx] of Object.entries(MONTH_INDEX)) {
+      if (new RegExp(`\\b${name}\\b`).test(upper)) return [year, idx / 100];
+    }
+    return [year, 0.99]; // unknown month within year — sort late inside year
+  }
+  if (scope === "quarterly") {
+    const m = upper.match(/Q([1-4])|([1-4])Q/);
+    const q = m ? Number(m[1] ?? m[2]) : 1;
+    return [year, q * 0.25];
+  }
+  if (scope === "ytd") return [year, 1.10];
+  if (scope === "ltm") return [year, 1.20];
+  if (scope === "annual") return [year, 1.50];
+  if (scope === "estimate") return [year, 1.80];
+  return [year, 2.00];
+}
+
+export function comparePeriodChronologically(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): number {
+  const [ay, asub] = periodChronoKey(a);
+  const [by, bsub] = periodChronoKey(b);
+  if (ay !== by) return ay - by;
+  return asub - bsub;
+}
+
+/**
  * Group rows by inferred scope, preserving the original date order within each
  * group (caller is expected to have sorted `rows` already). Returns groups in
  * a stable display order (long-horizon scopes first, then drilldowns) so the

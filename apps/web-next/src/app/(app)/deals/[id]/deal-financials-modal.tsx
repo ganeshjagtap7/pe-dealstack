@@ -7,6 +7,7 @@ import {
   formatPercent,
 } from "@/lib/formatters";
 import { type FinancialStatement } from "./deal-financials-charts";
+import { comparePeriodChronologically } from "./deal-financials-period-scope";
 
 export interface ExtractionResult {
   result?: {
@@ -53,7 +54,7 @@ export function ExtractionResultModal({
   // Latest revenue & EBITDA
   const incomeStmts = statements
     .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => b.period.localeCompare(a.period));
+    .sort((a, b) => comparePeriodChronologically(b.period, a.period));
   const latestStmt = incomeStmts[0];
   const latestIncome = latestStmt?.lineItems ?? {};
   const revenue = latestIncome.revenue ?? null;

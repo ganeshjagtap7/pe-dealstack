@@ -23,6 +23,7 @@ import {
   type PeriodScope,
   PERIOD_SCOPE_LABEL,
   groupRowsByScope,
+  comparePeriodChronologically,
 } from "./deal-financials-period-scope";
 import { formatFinancialValue, toActualDollars } from "@/lib/formatters";
 
@@ -114,7 +115,7 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
 
   let rows = statements
     .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => a.period.localeCompare(b.period));
+    .sort((a, b) => comparePeriodChronologically(a.period, b.period));
 
   rows = filterConsistentPeriods(rows);
 
@@ -254,7 +255,7 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
 export function GrowthChart({ statements }: { statements: FinancialStatement[] }) {
   const incomeRows = statements
     .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => a.period.localeCompare(b.period));
+    .sort((a, b) => comparePeriodChronologically(a.period, b.period));
 
   if (incomeRows.length < 2) {
     return <p className="text-xs text-gray-400 text-center py-8">Need at least 2 periods to show growth.</p>;
@@ -406,7 +407,7 @@ export function GrowthChart({ statements }: { statements: FinancialStatement[] }
 export function BalanceSheetChart({ statements }: { statements: FinancialStatement[] }) {
   const rows = statements
     .filter((s) => s.statementType === "BALANCE_SHEET")
-    .sort((a, b) => a.period.localeCompare(b.period));
+    .sort((a, b) => comparePeriodChronologically(a.period, b.period));
 
   if (rows.length === 0) {
     return <p className="text-xs text-gray-400 text-center py-8">No balance sheet data available.</p>;

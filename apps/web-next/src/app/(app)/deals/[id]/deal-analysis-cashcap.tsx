@@ -31,16 +31,47 @@ export function CashCapitalPanel({ analysis }: { analysis: AnalysisData | null }
   const scale = (analysis.unitScale ?? undefined) as UnitScale | undefined;
   const currency = analysis.currency ?? "USD";
 
-  if (!cfa && !wc && !dc) {
-    return <EmptyTabState icon="payments" message="Cash flow, working capital, and debt capacity analysis will appear here once enough financial data is extracted." />;
+  // Each of the three cards needs different source data:
+  //   Cash Flow      ← INCOME_STATEMENT (ebitda) + CASH_FLOW (capex, fcf)
+  //   Working Cap    ← BALANCE_SHEET (AR/AP/inventory/current-assets/current-liabilities) + INCOME_STATEMENT (revenue)
+  //   Debt Capacity  ← BALANCE_SHEET (debt, cash) + INCOME_STATEMENT (interest expense, ebitda)
+  // We render whichever cards have data, and call out specifically which
+  // source-document type the empty cards need so the user knows what to upload
+  // (rather than the old catch-all "extract more financial data" message).
+  const cfaHasData = !!cfa && cfa.periods.some((p) => p.ebitda != null || p.fcf != null);
+  const wcHasData = !!wc && wc.periods.some((p) => p.nwc != null);
+  const dcHasData = !!dc && (dc.currentLeverage != null || dc.interestCoverage != null || dc.debtHeadroom != null);
+
+  if (!cfaHasData && !wcHasData && !dcHasData) {
+    return <EmptyTabState icon="payments" message="Cash & Capital needs a Balance Sheet and Cash Flow statement (in addition to the Income Statement) to populate. Upload one of those documents to the data room and re-extract." />;
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {cfa && <CashFlowAnalysisCard cfa={cfa} scale={scale} currency={currency} />}
-      {wc && <WorkingCapitalCard wc={wc} scale={scale} currency={currency} />}
-      {dc && <DebtCapacityCard dc={dc} scale={scale} currency={currency} />}
+      {cfaHasData
+        ? <CashFlowAnalysisCard cfa={cfa!} scale={scale} currency={currency} />
+        : <CashCapEmptyCard icon="payments" title="Cash Flow Analysis" need="Cash Flow statement (for capex + free cash flow)" />}
+      {wcHasData
+        ? <WorkingCapitalCard wc={wc!} scale={scale} currency={currency} />
+        : <CashCapEmptyCard icon="account_balance_wallet" title="Working Capital" need="Balance Sheet (for AR / AP / inventory / current assets / current liabilities)" />}
+      {dcHasData
+        ? <DebtCapacityCard dc={dc!} scale={scale} currency={currency} />
+        : <CashCapEmptyCard icon="balance" title="Debt Capacity" need="Balance Sheet (for debt + cash) and Income Statement (for interest coverage)" />}
     </div>
+  );
+}
+
+// Inline empty-state card matching the AnalysisCard frame so the panel
+// keeps its visual rhythm even when one or two sub-cards lack source data.
+function CashCapEmptyCard({ icon, title, need }: { icon: string; title: string; need: string }) {
+  return (
+    <AnalysisCard>
+      <CardHeader icon={icon} title={title} />
+      <p className="text-xs text-gray-500 px-1 py-2">
+        Needs <span className="font-medium text-gray-700">{need}</span>. Upload it to the
+        data room and the analysis will populate on the next extraction.
+      </p>
+    </AnalysisCard>
   );
 }
 
