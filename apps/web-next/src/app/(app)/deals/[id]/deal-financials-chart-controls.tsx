@@ -17,27 +17,36 @@ import type { FinancialStatement } from "./deal-financials-charts-shared";
 // Scope filter pill
 // ---------------------------------------------------------------------------
 
-/** Filter buckets exposed in the per-chart pill row. `all` is the default. */
-export type ChartScopeFilter = "all" | "monthly" | "quarterly" | "annual" | "ytd";
+/** Filter buckets exposed in the per-chart pill row. `all` is the default.
+ *
+ * Two buckets, both include projected:
+ * - `monthly` → single-month periods (Jan-26, Apr-26 MTD, etc.)
+ * - `yearly`  → every multi-month aggregate (annual / FY estimate /
+ *   LTM / TTM / YTD cumulative / quarterly / anything else)
+ *
+ * `periodType: PROJECTED` is included in both buckets — the filter is
+ * about how big a window the row covers, not whether it's actuals or
+ * forecasts.
+ */
+export type ChartScopeFilter = "all" | "monthly" | "yearly";
 
 /** Every scope-filter option except `all`, paired with the underlying
  * `PeriodScope` values it accepts. Drives both the pill row and the row filter. */
 const SCOPE_FILTER_TO_SCOPES: Record<Exclude<ChartScopeFilter, "all">, PeriodScope[]> = {
   monthly: ["monthly", "mtd"],
-  quarterly: ["quarterly"],
-  annual: ["annual", "estimate"],
-  ytd: ["ytd", "ltm"],
+  // Yearly bucket = every aggregate scope. Quarterly + ytd + ltm sit here
+  // because they all cover more than a single month. `other` is included
+  // so periods we couldn't classify don't silently disappear from the chart.
+  yearly: ["annual", "estimate", "quarterly", "ytd", "ltm", "other"],
 };
 
 const SCOPE_FILTER_LABEL: Record<ChartScopeFilter, string> = {
   all: "All",
   monthly: "Monthly",
-  quarterly: "Quarterly",
-  annual: "Annual",
-  ytd: "YTD",
+  yearly: "Yearly",
 };
 
-const SCOPE_FILTER_ORDER: ChartScopeFilter[] = ["all", "monthly", "quarterly", "annual", "ytd"];
+const SCOPE_FILTER_ORDER: ChartScopeFilter[] = ["all", "monthly", "yearly"];
 
 /**
  * Apply a scope filter to a row list. Use BEFORE chronological sort + chart
@@ -133,9 +142,7 @@ export function AxisScalePills({
 const SCOPE_FILTER_NICE_NAME: Record<ChartScopeFilter, string> = {
   all: "",
   monthly: "monthly",
-  quarterly: "quarterly",
-  annual: "annual",
-  ytd: "YTD",
+  yearly: "yearly",
 };
 
 export function ScopeEmptyState({ filter }: { filter: ChartScopeFilter }) {
