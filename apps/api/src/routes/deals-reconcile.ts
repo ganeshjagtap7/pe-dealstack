@@ -52,9 +52,15 @@ router.get('/:id/reconcile', async (req, res) => {
     // dealRecord input that Phase 2's extractionFeedback module
     // critiques against computed truth. dealSize is stored in millions
     // per schema convention; we convert to actual dollars for Phase 1.
+    //
+    // select('*') because the Deal table doesn't have a `companyName`
+    // column (company name lives on the related Company table via
+    // companyId). An earlier explicit list included companyName and
+    // every reconcile request 404'd because Supabase returned 400 on
+    // the missing column → outer catch translated to "Deal not found".
     const { data: deal, error: dealErr } = await supabase
       .from('Deal')
-      .select('id, name, companyName, industry, currency, dealSize, revenue, ebitda')
+      .select('*')
       .eq('id', dealId)
       .eq('organizationId', orgId)
       .single();
