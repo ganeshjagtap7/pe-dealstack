@@ -21,7 +21,9 @@ router.get('/me', async (req: Request, res: Response) => {
     const orgId = getOrgId(req);
     const { data, error } = await supabase
       .from('Organization')
-      .select('id, name, slug, logo, industry, plan, maxUsers, isActive, requireMFA')
+      .select(
+        'id, name, slug, logo, industry, plan, maxUsers, isActive, requireMFA, staffAccessWebhookUrl, staffAccessNotifyEmail',
+      )
       .eq('id', orgId)
       .single();
 
