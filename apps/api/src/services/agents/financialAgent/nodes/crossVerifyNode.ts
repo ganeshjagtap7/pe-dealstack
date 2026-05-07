@@ -264,9 +264,20 @@ export async function crossVerifyNode(
       return { steps };
     }
 
+    // Strip markdown code fences before parsing. The system prompt asks for
+    // raw JSON, but Claude Haiku occasionally wraps the array in ```json …
+    // ``` anyway — JSON.parse choked on the leading backtick and the whole
+    // cross-verify pass got skipped. Same defensive strip used in
+    // memos-suggest.ts. Cheap and idempotent for already-clean responses.
+    const cleanedText = content.text
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/i, '')
+      .trim();
+
     let claudeResults: ClaudeVerification[];
     try {
-      claudeResults = JSON.parse(content.text) as ClaudeVerification[];
+      claudeResults = JSON.parse(cleanedText) as ClaudeVerification[];
     } catch (err) {
       steps.push(step('crossVerify', 'Cross-verification skipped — could not parse Claude response as JSON'));
       log.warn('crossVerifyNode: JSON parse failure', { raw: content.text.slice(0, 200), error: err instanceof Error ? err.message : String(err) });
