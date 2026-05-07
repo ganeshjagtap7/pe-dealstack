@@ -298,27 +298,89 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
       });
     }
 
-    // Agent-based extraction. Sequential loop — each doc acquires/releases its
-    // own slot inside processOneDoc, keeping the 2-concurrent-per-org invariant.
+    // Agent-based extraction. Each doc acquires/releases its own slot inside
+    // processOneDoc, keeping the 2-concurrent-per-org invariant.
+    //
     // Single-mode: surface 429 up-front if no slot (BC). Multi-doc modes:
     // record 'skipped_no_slot' per doc and continue.
+    //
+    // Multi-doc execution: PARALLEL via Promise.allSettled so total wall time
+    // is max(t1, t2, ...) instead of t1+t2+... — sequential blew the 300s
+    // Vercel function limit when both a CIM (250s) and a 36-month XLSX (290s)
+    // were on the same deal. Each doc also wrapped in a per-doc timeout
+    // race so a single runaway doc can't take down the whole batch — when the
+    // timeout fires we mark that doc 'timeout' and let the others continue.
     const perDoc: PerDocResult[] = [];
 
-    for (const doc of docs) {
-      if (effectiveMode === 'single') {
-        if (!acquireExtractionSlot(orgId)) {
-          return res.status(429).json({
-            error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',
-          });
-        }
-        // Release immediately — processOneDoc re-acquires its own slot.
-        releaseExtractionSlot(orgId);
-      }
+    // Per-doc time budget. 240s leaves ~60s headroom under Vercel's 300s
+    // hard limit for response serialization, slot release, etc.
+    const PER_DOC_BUDGET_MS = 240_000;
 
-      const r = await processOneDoc(doc, dealId, orgId);
+    const withDocTimeout = (
+      doc: { id: string; fileUrl: string; name: string | null; type?: string | null; mimeType?: string | null },
+    ): Promise<PerDocResult> => {
+      const baseName = doc.name ?? 'document';
+      let timeoutHandle: NodeJS.Timeout | undefined;
+      const timeoutPromise = new Promise<PerDocResult>((resolve) => {
+        timeoutHandle = setTimeout(() => {
+          log.warn('Per-doc extraction timeout — abandoning so others can complete', {
+            dealId, docId: doc.id, budgetMs: PER_DOC_BUDGET_MS,
+          });
+          resolve({
+            id: doc.id,
+            name: baseName,
+            status: 'failed',
+            statementsStored: 0,
+            periodsStored: 0,
+            overallConfidence: null,
+            hasConflicts: false,
+            error: `Extraction exceeded ${PER_DOC_BUDGET_MS / 1000}s per-doc budget`,
+          });
+        }, PER_DOC_BUDGET_MS);
+      });
+      return Promise.race([processOneDoc(doc, dealId, orgId), timeoutPromise])
+        .finally(() => { if (timeoutHandle) clearTimeout(timeoutHandle); });
+    };
+
+    if (effectiveMode === 'single') {
+      // Single-doc: keep the up-front 429 check (BC contract for callers).
+      if (!acquireExtractionSlot(orgId)) {
+        return res.status(429).json({
+          error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',
+        });
+      }
+      releaseExtractionSlot(orgId); // processOneDoc re-acquires its own slot.
+      const r = await withDocTimeout(docs[0]);
       perDoc.push(r);
       if (r.status !== 'completed') {
-        log.warn('Per-doc extraction issue', { dealId, docId: doc.id, status: r.status, error: r.error });
+        log.warn('Per-doc extraction issue', { dealId, docId: docs[0].id, status: r.status, error: r.error });
+      }
+    } else {
+      // Multi-doc modes: parallel execution. Slot acquisition inside
+      // processOneDoc enforces the 2-concurrent-per-org cap — anything beyond
+      // gets 'skipped_no_slot' and the user can retry.
+      const settled = await Promise.allSettled(docs.map(withDocTimeout));
+      for (let i = 0; i < settled.length; i++) {
+        const s = settled[i];
+        const doc = docs[i];
+        const baseName = doc.name ?? 'document';
+        if (s.status === 'fulfilled') {
+          perDoc.push(s.value);
+          if (s.value.status !== 'completed') {
+            log.warn('Per-doc extraction issue', { dealId, docId: doc.id, status: s.value.status, error: s.value.error });
+          }
+        } else {
+          // Promise.allSettled fulfilled with rejected — should be rare since
+          // processOneDoc + withDocTimeout both catch internally. Capture
+          // anyway as a defensive belt-and-suspenders.
+          perDoc.push({
+            id: doc.id, name: baseName, status: 'failed',
+            statementsStored: 0, periodsStored: 0,
+            overallConfidence: null, hasConflicts: false,
+            error: s.reason instanceof Error ? s.reason.message : String(s.reason),
+          });
+          log.error('Per-doc extraction rejected', { dealId, docId: doc.id, err: s.reason });
+        }
       }
     }
 
