@@ -278,6 +278,13 @@ router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, re
     }
     await supabase.from('Memo').delete().eq('dealId', id);
     await supabase.from('Notification').delete().eq('dealId', id);
+    // Task table was created out-of-band in Supabase Studio without
+    // ON DELETE CASCADE on its dealId FK (Task_dealId_fkey), so the manual
+    // delete is required until apps/api/task-cascade-migration.sql is run.
+    // Without this, deleting a deal with any associated tasks fails with
+    // "update or delete on table Deal violates foreign key constraint
+    // Task_dealId_fkey on table Task" (Postgres error code 23503).
+    await supabase.from('Task').delete().eq('dealId', id);
 
     // Finally, delete the deal itself
     const { error } = await supabase
