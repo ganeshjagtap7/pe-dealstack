@@ -9,6 +9,7 @@ import { ResourceAllocation } from "./ResourceAllocation";
 import { TaskTable } from "./TaskTable";
 import { UpcomingReviews } from "./UpcomingReviews";
 import { ActivityFeed } from "./ActivityFeed";
+import { SecurityDashboard } from "./SecurityDashboard";
 import {
   AssignDealModal,
   CreateTaskModal,
@@ -279,6 +280,7 @@ export default function AdminPage() {
           />
         </div>
         <div className="xl:col-span-1 space-y-6">
+          <SecurityDashboard />
           <ActivityFeed />
           <UpcomingReviews
             tasks={tasks}
