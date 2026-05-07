@@ -21,19 +21,20 @@ export async function orgMiddleware(
     }
 
     // Look up the User record by authId to get organizationId.
-    // Also pull systemRole — the JWT's user_metadata.role defaults to 'MEMBER'
-    // for everyone (auth middleware sets it from Supabase user_metadata, which
-    // is rarely populated). The canonical role for permission checks lives in
-    // the User.systemRole column. Override req.user.role here once so every
-    // downstream admin check sees the real role.
+    // Also pull `role` — the JWT's user_metadata.role defaults to 'MEMBER' for
+    // everyone (auth middleware sets it from Supabase user_metadata, which is
+    // rarely populated). The User.role column carries the canonical value
+    // (set by findOrCreateUser, updated by invitation/role-change flows).
+    // Override req.user.role here once so every downstream admin check sees
+    // the table value.
     const { data: userRecord, error } = await supabase
       .from('User')
-      .select('id, organizationId, systemRole')
+      .select('id, organizationId, role')
       .eq('authId', req.user.id)
       .single();
 
-    if (userRecord?.systemRole && req.user) {
-      req.user.role = String(userRecord.systemRole);
+    if (userRecord?.role && req.user) {
+      req.user.role = String(userRecord.role);
     }
 
     if (error && error.code === 'PGRST116') {
