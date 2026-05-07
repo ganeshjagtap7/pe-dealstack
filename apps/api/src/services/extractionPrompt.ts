@@ -58,16 +58,34 @@ Before extracting any financial data, determine the document currency:
 
 STEP 1 — IDENTIFY UNITS:
 Search the document for unit declarations:
-- Header text: "in thousands", "in millions", "$000s", "₹ Cr", "€M"
-- Table headers: "(000s)", "(mn)", "(Cr)", "(Lakh)"
+- Header text: "in thousands", "in millions", "in billions", "$000s", "₹ Cr", "€M"
+- Table headers: "(000s)", "(mn)", "(M)", "(B)", "(Cr)", "(Lakh)", "$M", "$K", "$B"
+- Inline scale modifiers paired with the currency symbol: "$M", "$000s", "$K", "$B"
 - Footnotes: "All figures in millions unless otherwise stated"
 State your finding in the "unitsDetected" field.
-If NO unit declaration is found:
-- The values are most likely in ACTUAL dollars/currency (not thousands, not millions)
-- Set unitScale to "ACTUALS" and store values as written (do NOT convert)
-- For small businesses/startups, values under $100K are common — store them at face value, do NOT inflate
-- Set confidence to 70 max when units are inferred, not declared
-- When in doubt, assume ACTUAL dollars and tag unitScale "ACTUALS" — it is better to store $6,700 (with unitScale ACTUALS) than to silently inflate it to $6,700M
+
+CRITICAL — DEFAULT TO ACTUALS WHEN IN DOUBT:
+- If the source has NO scale marker ($M, $000s, $K, $B, "in millions", "in thousands", "in billions", "(M)", "(B)", etc.), assume ACTUALS — store values exactly as written. Do NOT guess based on value magnitude.
+- DO NOT use the SIZE of the number to decide a unit. A value like 22027 or 6700 looks "thousands-shaped" but is just as plausibly $22,027 (a small business's monthly revenue) or $6,700 (a YTD partial-period total). Trust the source. If it doesn't say a scale, use ACTUALS.
+- DO NOT infer MILLIONS just because the company "looks like" it should be larger. Many real businesses (small SaaS, sole proprietors, partial-period totals) operate at low absolute dollar amounts.
+- Disclaimer-text patterns that mean ACTUALS (NOT a scale modifier):
+  · "All figures in USD" — no scale word, treat as ACTUALS
+  · "in actual dollars"
+  · "$ USD" used as a column header without an M/K/B suffix
+  · "Amounts in dollars" without "thousands"/"millions"/"billions"
+- Scale words MUST appear next to the currency or a unit indicator to count: "in millions", "in thousands", "$M", "$K", "$000s". The bare phrase "All figures in USD" is NOT a scale modifier — it only states the currency.
+- For small businesses/startups, values under $100K are common — store them at face value, do NOT inflate.
+- Set confidence to 70 max when units are inferred, not declared.
+- When in doubt, assume ACTUAL dollars and tag unitScale "ACTUALS" — it is better to store $6,700 (with unitScale ACTUALS) than to silently inflate it to $6,700M.
+
+SAME-VALUE-DIFFERENT-UNIT WORKED EXAMPLES (read these carefully — they show the trap):
+- Sheet header says "(in $M)", value reads "2,500" → store 2500, unitScale MILLIONS (this represents $2.5B).
+- Sheet header says "(in $000s)", value reads "2,500" → store 2500, unitScale THOUSANDS (this represents $2.5M).
+- No scale header anywhere, footnote says "All figures in USD", value reads "2,500" → store 2500, unitScale ACTUALS (this represents exactly $2,500).
+- No scale header anywhere, value reads "22,027" → store 22027, unitScale ACTUALS (this represents exactly $22,027 — do NOT promote to $22M).
+- No scale header anywhere, value reads "6,700" → store 6700, unitScale ACTUALS (this represents exactly $6,700 — do NOT promote to $6.7M).
+- Sheet labelled "Revenue ($M)", value reads "6.7" → store 6.7, unitScale MILLIONS (this represents $6.7M).
+CRITICAL: WITHIN A SINGLE EXTRACTION, ALL STATEMENTS FROM THE SAME DOCUMENT MUST USE A CONSISTENT unitScale unless the source explicitly switches scales between tables. Do not tag one period MILLIONS and another ACTUALS based on the magnitude of individual numbers — that is a hallucination.
 
 STEP 2 — EXTRACT:
 1. Extract EVERY year/period column you find — do not skip any

@@ -130,9 +130,14 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
     }, 15000);
 
     try {
+      // Process every CIM/FINANCIALS document in the deal, not just the most
+      // recent one. The agent loops sequentially through each doc and
+      // runDeepPass merges by (statementType, period) so values combine
+      // across documents naturally. Falls back to single-doc behaviour on
+      // older API versions because the server defaults to 'single'.
       const result = await api.post<ExtractionResult>(
         `/deals/${dealId}/financials/extract`,
-        {},
+        { mode: "all_financials" },
       );
 
       // Small delay before fetching — the API may return success before data
@@ -142,15 +147,28 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
 
       const stored = result?.result?.periodsStored ?? 0;
       const warnings = result?.result?.warnings ?? [];
+      const docsUsed =
+        (result as unknown as { result?: { documentsUsed?: number } })?.result
+          ?.documentsUsed;
+      const docsFailed =
+        (result as unknown as { result?: { documentsFailed?: number } })?.result
+          ?.documentsFailed;
 
       if (stored === 0) {
         const warningMsg =
           warnings.length > 0
             ? warnings[0]
-            : "No financial data found in the document. Try uploading a P&L, Balance Sheet, or CIM.";
+            : "No financial data found in the documents. Try uploading a P&L, Balance Sheet, or CIM.";
         showToast(warningMsg, "warning", { title: "No Data Extracted" });
       } else {
-        // Show extraction results modal instead of a simple toast
+        // Surface multi-doc result count in the modal title where useful.
+        if (docsUsed && docsUsed > 1) {
+          showToast(
+            `Re-extracted across ${docsUsed} document${docsUsed === 1 ? "" : "s"}${docsFailed ? ` (${docsFailed} failed)` : ""}.`,
+            "success",
+            { title: "Extraction complete" },
+          );
+        }
         setExtractionModalResult(result);
       }
     } catch (err) {

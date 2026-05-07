@@ -75,7 +75,78 @@ function detectFileType(mimeType?: string | null, fileName?: string | null): Fil
 const extractSchema = z.object({
   documentId: z.string().uuid().optional(),
   documentType: z.enum(['financial_statements', 'payment_data', 'bank_statement', 'accounting_export', 'auto_detect']).optional().default('auto_detect'),
+  // 'single'         — most-recent CIM/FINANCIALS, fallback to any (default, BC).
+  // 'all_financials' — every CIM/FINANCIALS doc on the deal, sequentially.
+  // 'all'            — every doc on the deal regardless of type.
+  // Always coerced to 'single' when documentId is provided.
+  mode: z.enum(['single', 'all_financials', 'all']).optional().default('single'),
 });
+
+// Per-doc helper: runs slot acquire/release + runFinancialAgent for one doc
+// and returns a normalized record for the aggregate response.
+
+interface PerDocResult {
+  id: string;
+  name: string;
+  status: 'completed' | 'failed' | 'skipped_no_slot';
+  statementsStored: number;
+  periodsStored: number;
+  overallConfidence: number | null;
+  hasConflicts: boolean;
+  extractionMethod?: string;
+  agent?: any;
+  error?: string;
+}
+
+async function processOneDoc(
+  doc: { id: string; fileUrl: string; name: string | null; type?: string | null; mimeType?: string | null },
+  dealId: string,
+  orgId: string,
+): Promise<PerDocResult> {
+  const baseName = doc.name ?? 'document';
+  const fail = (status: 'failed' | 'skipped_no_slot', error: string): PerDocResult => ({
+    id: doc.id, name: baseName, status, statementsStored: 0, periodsStored: 0, overallConfidence: null, hasConflicts: false, error,
+  });
+
+  const fileBuffer = await fetchBuffer(doc.fileUrl);
+  if (!fileBuffer) return fail('failed', 'Could not download document file');
+  if (!acquireExtractionSlot(orgId)) return fail('skipped_no_slot', 'Extraction slot unavailable');
+
+  try {
+    const agentResult = await runFinancialAgent({
+      dealId,
+      documentId: doc.id,
+      fileBuffer,
+      fileName: baseName,
+      fileType: detectFileType(doc.mimeType, doc.name),
+      organizationId: orgId,
+    });
+    return {
+      id: doc.id,
+      name: baseName,
+      status: agentResult.status === 'completed' ? 'completed' : 'failed',
+      statementsStored: agentResult.statementIds.length,
+      periodsStored: agentResult.periodsStored,
+      overallConfidence: agentResult.overallConfidence,
+      hasConflicts: agentResult.hasConflicts,
+      extractionMethod: agentResult.extractionSource,
+      agent: {
+        status: agentResult.status,
+        retryCount: agentResult.retryCount,
+        validationResult: agentResult.validationResult,
+        steps: agentResult.steps,
+        error: agentResult.error,
+        crossVerifyResult: agentResult.crossVerifyResult || null,
+      },
+      error: agentResult.error ?? undefined,
+    };
+  } catch (err: any) {
+    log.error('processOneDoc failed', { dealId, docId: doc.id, err: err?.message });
+    return fail('failed', err?.message ?? 'Agent run failed');
+  } finally {
+    releaseExtractionSlot(orgId);
+  }
+}
 
 // ─── 5d: POST /api/deals/:dealId/financials/extract ──────────
 // Trigger financial agent extraction on a deal's documents
@@ -87,55 +158,77 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
     const dealAccess = await verifyDealAccess(dealId, orgId);
     if (!dealAccess) return res.status(404).json({ error: 'Deal not found' });
 
-    const { documentId, documentType } = extractSchema.parse(req.body);
+    const { documentId, documentType, mode } = extractSchema.parse(req.body);
 
-    // Find the document to extract from
-    let doc: any = null;
+    // Resolve target documents based on mode + documentId precedence.
+    // documentId always wins (single-doc behaviour) regardless of mode.
+    let docs: any[] = [];
+    let effectiveMode: 'single' | 'all_financials' | 'all' = mode;
 
     if (documentId) {
+      effectiveMode = 'single';
       const { data } = await supabase
         .from('Document')
-        .select('id, fileUrl, name, type, mimeType')
+        .select('id, fileUrl, name, type, mimeType, createdAt')
         .eq('id', documentId)
         .eq('dealId', dealId)
         .single();
-      doc = data;
-    } else {
-      // Prefer most recent CIM or FINANCIALS document
+      if (data) docs = [data];
+    } else if (mode === 'all_financials') {
       const { data } = await supabase
         .from('Document')
-        .select('id, fileUrl, name, type, mimeType')
+        .select('id, fileUrl, name, type, mimeType, createdAt')
+        .eq('dealId', dealId)
+        .in('type', ['CIM', 'FINANCIALS'])
+        .order('createdAt', { ascending: false });
+      docs = (data ?? []).filter((d) => !!d.fileUrl);
+    } else if (mode === 'all') {
+      const { data } = await supabase
+        .from('Document')
+        .select('id, fileUrl, name, type, mimeType, createdAt')
+        .eq('dealId', dealId)
+        .order('createdAt', { ascending: false });
+      docs = (data ?? []).filter((d) => !!d.fileUrl);
+    } else {
+      // mode === 'single': prefer most recent CIM or FINANCIALS, fallback to any.
+      const { data } = await supabase
+        .from('Document')
+        .select('id, fileUrl, name, type, mimeType, createdAt')
         .eq('dealId', dealId)
         .in('type', ['CIM', 'FINANCIALS'])
         .order('createdAt', { ascending: false })
         .limit(1)
         .single();
-      doc = data;
+      if (data) docs = [data];
 
-      if (!doc) {
+      if (docs.length === 0) {
         const { data: anyDoc } = await supabase
           .from('Document')
-          .select('id, fileUrl, name, type, mimeType')
+          .select('id, fileUrl, name, type, mimeType, createdAt')
           .eq('dealId', dealId)
           .order('createdAt', { ascending: false })
           .limit(1)
           .single();
-        doc = anyDoc;
+        if (anyDoc) docs = [anyDoc];
       }
     }
 
-    if (!doc?.fileUrl) {
+    if (docs.length === 0 || !docs[0]?.fileUrl) {
       return res.status(404).json({ error: 'No document found to extract from' });
     }
 
-    // Download file buffer for the agent
-    const fileBuffer = await fetchBuffer(doc.fileUrl);
-    if (!fileBuffer) {
-      return res.status(422).json({ error: 'Could not download document file' });
-    }
+    // CSV-style parsers (payment/bank/accounting) are single-doc only — explicit
+    // user choices, no multi-doc loop. Preserves pre-existing single-doc shape.
+    if (
+      effectiveMode === 'single' &&
+      (documentType === 'payment_data' || documentType === 'bank_statement' || documentType === 'accounting_export')
+    ) {
+      const doc = docs[0];
+      const fileBuffer = await fetchBuffer(doc.fileUrl);
+      if (!fileBuffer) {
+        return res.status(422).json({ error: 'Could not download document file' });
+      }
 
-    // Route to appropriate parser based on document type
-    if (documentType === 'payment_data' || documentType === 'bank_statement' || documentType === 'accounting_export') {
       let result;
       let method = 'csv_parser';
 
@@ -154,11 +247,24 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
 
       return res.json({
         success: true,
+        mode: effectiveMode,
         documentUsed: { id: doc.id, name: doc.name },
+        documentsProcessed: [
+          {
+            id: doc.id,
+            name: doc.name ?? 'document',
+            status: 'completed',
+            statementsStored: result.periodsStored,
+            periodsStored: result.periodsStored,
+            overallConfidence: 100,
+          },
+        ],
         extractionMethod: method,
         result: {
           statementsStored: result.periodsStored,
           periodsStored: result.periodsStored,
+          documentsUsed: 1,
+          documentsFailed: 0,
           overallConfidence: 100,
           statementIds: result.statementIds,
           warnings: result.warnings,
@@ -169,49 +275,73 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
       });
     }
 
-    // For financial_statements, auto_detect, or unsupported types: use existing agent
-    if (!acquireExtractionSlot(orgId)) {
-      return res.status(429).json({
-        error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',
-      });
+    // Agent-based extraction. Sequential loop — each doc acquires/releases its
+    // own slot inside processOneDoc, keeping the 2-concurrent-per-org invariant.
+    // Single-mode: surface 429 up-front if no slot (BC). Multi-doc modes:
+    // record 'skipped_no_slot' per doc and continue.
+    const perDoc: PerDocResult[] = [];
+
+    for (const doc of docs) {
+      if (effectiveMode === 'single') {
+        if (!acquireExtractionSlot(orgId)) {
+          return res.status(429).json({
+            error: 'Too many concurrent extractions. Please wait for the current extraction to complete.',
+          });
+        }
+        // Release immediately — processOneDoc re-acquires its own slot.
+        releaseExtractionSlot(orgId);
+      }
+
+      const r = await processOneDoc(doc, dealId, orgId);
+      perDoc.push(r);
+      if (r.status !== 'completed') {
+        log.warn('Per-doc extraction issue', { dealId, docId: doc.id, status: r.status, error: r.error });
+      }
     }
 
-    let agentResult;
-    try {
-      agentResult = await runFinancialAgent({
-        dealId,
-        documentId: doc.id,
-        fileBuffer,
-        fileName: doc.name ?? 'document',
-        fileType: detectFileType(doc.mimeType, doc.name),
-        organizationId: orgId,
-      });
-    } finally {
-      releaseExtractionSlot(orgId);
-    }
+    const totals = perDoc.reduce(
+      (acc, r) => {
+        acc.statementsStored += r.statementsStored;
+        acc.periodsStored += r.periodsStored;
+        if (r.status === 'completed') acc.documentsUsed += 1;
+        else acc.documentsFailed += 1;
+        if (r.hasConflicts) acc.hasConflicts = true;
+        return acc;
+      },
+      { statementsStored: 0, periodsStored: 0, documentsUsed: 0, documentsFailed: 0, hasConflicts: false },
+    );
 
-    res.json({
-      success: agentResult.status === 'completed',
-      documentUsed: { id: doc.id, name: doc.name },
-      extractionMethod: agentResult.extractionSource,
+    const aggregateSuccess = perDoc.some((r) => r.status === 'completed');
+
+    // Single-doc back-compat: flat fields alongside the new aggregate.
+    const first = perDoc[0];
+    const singleDocFields =
+      effectiveMode === 'single' && first
+        ? { documentUsed: { id: first.id, name: first.name }, extractionMethod: first.extractionMethod, agent: first.agent ?? null }
+        : {};
+
+    return res.json({
+      success: aggregateSuccess,
+      mode: effectiveMode,
+      ...singleDocFields,
+      documentsProcessed: perDoc.map((r) => ({
+        id: r.id,
+        name: r.name,
+        status: r.status,
+        statementsStored: r.statementsStored,
+        periodsStored: r.periodsStored,
+        overallConfidence: r.overallConfidence,
+        ...(r.error ? { error: r.error } : {}),
+      })),
       result: {
-        statementsStored: agentResult.statementIds.length,
-        periodsStored: agentResult.periodsStored,
-        overallConfidence: agentResult.overallConfidence,
-        statementIds: agentResult.statementIds,
-        warnings: agentResult.warnings,
-        hasConflicts: agentResult.hasConflicts,
+        statementsStored: totals.statementsStored,
+        periodsStored: totals.periodsStored,
+        documentsUsed: totals.documentsUsed,
+        documentsFailed: totals.documentsFailed,
+        overallConfidence: first?.overallConfidence ?? null,
+        hasConflicts: totals.hasConflicts,
       },
-      hasConflicts: agentResult.hasConflicts,
-      // Agent-specific fields (new)
-      agent: {
-        status: agentResult.status,
-        retryCount: agentResult.retryCount,
-        validationResult: agentResult.validationResult,
-        steps: agentResult.steps,
-        error: agentResult.error,
-        crossVerifyResult: agentResult.crossVerifyResult || null,
-      },
+      hasConflicts: totals.hasConflicts,
     });
   } catch (err: any) {
     log.error('POST financials extract error', err);

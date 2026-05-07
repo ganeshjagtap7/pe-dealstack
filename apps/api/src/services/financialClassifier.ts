@@ -37,6 +37,64 @@ export interface ClassificationResult {
 // ─── Prompt ──────────────────────────────────────────────────
 // Prompt is built via shared extractionPrompt.ts — single source of truth.
 
+// ─── Explicit-Unit Detection (deterministic post-classifier guard) ────────
+//
+// Scans source text for explicit scale markers. If none are present and the
+// LLM tags a statement MILLIONS/THOUSANDS/BILLIONS, that's almost always a
+// magnitude-based hallucination — we override to ACTUALS as a safety net.
+//
+// Markers we accept (case-insensitive):
+//   $M, $K, $B, $000s
+//   ($M), ($K), ($B), ($000s)
+//   in millions, in thousands, in billions
+// "All figures in USD" alone is intentionally NOT a marker — it only declares
+// currency, not scale. The earlier prompt fix already covers that case.
+const EXPLICIT_UNIT_PATTERNS: Array<{ pattern: RegExp; scale: UnitScale }> = [
+  // BILLIONS — strongest signal first
+  { pattern: /\$B\b/i,                       scale: 'BILLIONS' },
+  { pattern: /\(\s*\$B\s*\)/i,               scale: 'BILLIONS' },
+  { pattern: /\bin\s+billions\b/i,           scale: 'BILLIONS' },
+  // MILLIONS
+  { pattern: /\$M\b/i,                       scale: 'MILLIONS' },
+  { pattern: /\(\s*\$M\s*\)/i,               scale: 'MILLIONS' },
+  { pattern: /\bin\s+millions\b/i,           scale: 'MILLIONS' },
+  // THOUSANDS — includes $000s and $K
+  { pattern: /\$000s\b/i,                    scale: 'THOUSANDS' },
+  { pattern: /\(\s*\$000s\s*\)/i,            scale: 'THOUSANDS' },
+  { pattern: /\$K\b/i,                       scale: 'THOUSANDS' },
+  { pattern: /\(\s*\$K\s*\)/i,               scale: 'THOUSANDS' },
+  { pattern: /\bin\s+thousands\b/i,          scale: 'THOUSANDS' },
+];
+
+/**
+ * Scan source text for an explicit unit-scale marker.
+ * Returns the strongest signal found (BILLIONS > MILLIONS > THOUSANDS) or null.
+ *
+ * Used as a deterministic override: if the source has NO marker, the LLM
+ * has no factual basis to tag MILLIONS/THOUSANDS — those classifications
+ * must be magnitude-based guesses and should fall back to ACTUALS.
+ */
+export function detectExplicitUnitInText(text: string): UnitScale | null {
+  if (!text) return null;
+  // Order in EXPLICIT_UNIT_PATTERNS already encodes priority (BILLIONS first),
+  // but we rank explicitly to make the strongest-signal contract obvious.
+  const priority: Record<UnitScale, number> = {
+    BILLIONS: 3,
+    MILLIONS: 2,
+    THOUSANDS: 1,
+    ACTUALS: 0,
+  };
+  let strongest: UnitScale | null = null;
+  for (const { pattern, scale } of EXPLICIT_UNIT_PATTERNS) {
+    if (pattern.test(text)) {
+      if (strongest === null || priority[scale] > priority[strongest]) {
+        strongest = scale;
+      }
+    }
+  }
+  return strongest;
+}
+
 // ─── Main Function ────────────────────────────────────────────
 
 /**
@@ -64,7 +122,14 @@ export async function classifyFinancials(
   // This catches financial data buried deep in 50+ page CIMs that were previously cut off
   const truncatedText = text.slice(0, MAX_TEXT_LENGTH);
 
-  log.debug('Financial classifier starting', { textLength: truncatedText.length });
+  // Pre-scan source for explicit unit markers. If none, we deterministically
+  // override LLM-emitted MILLIONS/THOUSANDS/BILLIONS to ACTUALS post-call.
+  const explicitUnitFromText = detectExplicitUnitInText(truncatedText);
+
+  log.debug('Financial classifier starting', {
+    textLength: truncatedText.length,
+    explicitUnitFromText,
+  });
 
   try {
     const response = await trackedChatCompletion('financial_extraction', {
@@ -91,6 +156,12 @@ export async function classifyFinancials(
 
     // Normalize and validate the response
     const result = normalizeClassificationResult(raw);
+
+    // Belt-and-suspenders: if the source has NO explicit unit marker but the
+    // LLM still emitted MILLIONS/THOUSANDS/BILLIONS, override to ACTUALS.
+    // The prompt should already produce ACTUALS in this case — this catches
+    // regressions where the LLM second-guesses based on number magnitude.
+    applyExplicitUnitOverride(result, explicitUnitFromText);
 
     log.debug('Financial classifier completed', {
       statementsFound: result.statements.length,
@@ -213,6 +284,59 @@ function normalizeUnitScale(raw: string): UnitScale {
     log.warn('Financial classifier: unknown unitScale from LLM, defaulting to ACTUALS', { raw });
   }
   return 'ACTUALS';
+}
+
+/**
+ * Override LLM-inferred unit scales to ACTUALS when the source text contains
+ * no explicit unit marker. The prompt already pushes the LLM toward ACTUALS
+ * in this case, but the model has a tendency to over-guess MILLIONS for
+ * values > 1000. This is the deterministic safety net.
+ *
+ * Rules:
+ *   - If `explicitUnitFromText` is non-null, the source DOES declare a scale.
+ *     We trust the LLM's choice (it should match the explicit marker; if not,
+ *     that's a separate downstream concern, but we don't override).
+ *   - If `explicitUnitFromText` is null, the source has NO marker. Any
+ *     LLM-emitted MILLIONS/THOUSANDS/BILLIONS is a magnitude-based guess —
+ *     override to ACTUALS.
+ *   - If the LLM already emitted ACTUALS, leave it alone.
+ *
+ * Mutates `result.statements` in-place.
+ */
+function applyExplicitUnitOverride(
+  result: ClassificationResult,
+  explicitUnitFromText: UnitScale | null,
+): void {
+  if (explicitUnitFromText !== null) {
+    // Source declared a scale — trust the LLM (it had a fact to anchor on).
+    return;
+  }
+
+  for (const stmt of result.statements) {
+    if (stmt.unitScale === 'ACTUALS') continue; // LLM already agrees with us
+    const originalScale = stmt.unitScale;
+    // Capture a sample value for logging diagnostics
+    let valueSample: number | null = null;
+    for (const period of stmt.periods) {
+      for (const [k, v] of Object.entries(period.lineItems)) {
+        if (k.endsWith('_source')) continue;
+        if (typeof v === 'number' && !isNaN(v)) {
+          valueSample = v;
+          break;
+        }
+      }
+      if (valueSample !== null) break;
+    }
+    stmt.unitScale = 'ACTUALS';
+    log.warn(
+      `Financial classifier: source has no explicit unit marker — overriding LLM-inferred ${originalScale} to ACTUALS`,
+      {
+        statementType: stmt.statementType,
+        originalScale,
+        valueSample,
+      },
+    );
+  }
 }
 
 function normalizeLineItems(raw: Record<string, any>): Record<string, number | null> {

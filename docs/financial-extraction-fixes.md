@@ -24,7 +24,139 @@ in the growth chart on top of whatever periods come back from the API.
 
 ---
 
-## Just shipped (this commit) — chronological period sort + cashcap empty cards
+## Just shipped (this commit) — multi-doc re-extract + force ACTUALS + extended dedup
+
+Three independent fixes for the production symptom on the Fight_AI deal:
+re-extract showed `Revenue $6.7M / EBITDA $6.4M` (off by 1000×) plus
+multiple X-axis duplicates (`FY26 Est`, `FY26 Est.`, `2026 FY Est`,
+`YTD Total`, `YTD Total (Jan-Apr 20, 2026)`) even after clicking
+Re-extract — and the deal had 12 source files but only 1 was being
+processed.
+
+### A. Re-extract processes ALL financial documents in the deal
+
+**Symptom:** the Re-extract button on the Financial Analysis tab posted
+to `/api/deals/:dealId/financials/extract` with no body. The endpoint
+picked the most-recent CIM/FINANCIALS doc with `.limit(1).single()`
+and stopped. Other 11 docs (other financial models, balance sheets,
+historical periods, appendices) silently ignored. ss3 confirmed every
+column header in the income table for Fight_AI shows the same
+`Fight_AI_YTD_Fin…` source.
+
+**Fix:** added a new `mode` param to `extractSchema`:
+- `'single'` (default — backwards compat): existing behaviour
+- `'all_financials'`: every doc where `type IN ('CIM', 'FINANCIALS')`
+- `'all'`: every doc on the deal regardless of type
+
+When multi-doc, the route loops sequentially through the docs (one at
+a time so the per-org `acquireExtractionSlot` invariant holds), runs
+`runFinancialAgent` on each, and collects per-doc results. The
+`runDeepPass` upsert merges by `(dealId, statementType, period)` so
+multiple docs that contribute to the same statement+period combine
+naturally.
+
+The aggregate response now includes `documentsProcessed[]`,
+`result.documentsUsed`, `result.documentsFailed`, and per-doc
+`{status, statementsStored, periodsStored, error?}`. A doc failure
+doesn't short-circuit the loop; aggregate `success` is `true` if at
+least one doc completed.
+
+The frontend Re-extract button (`deal-financials.tsx:133`) now sends
+`mode: "all_financials"` by default, with a follow-up toast naming the
+doc count when N > 1.
+
+**Files:**
+- `apps/api/src/routes/financials-extraction.ts` (350 → 480 lines, all
+  new code in `processOneDoc` helper + the rewritten POST handler)
+- `apps/web-next/src/app/(app)/deals/[id]/deal-financials.tsx`
+  (re-extract call + multi-doc toast)
+
+### B. Force ACTUALS when source has no explicit unit marker
+
+**Symptom:** the same value `6700` from the Fight_AI Excel was tagged
+3 different ways inside one extraction:
+- `YTD Total (Jan-Apr 20, 2026) = 6700` → `unitScale: ACTUALS` (✓ $6.7K)
+- `YTD Total = 6700` → `unitScale: MILLIONS, value 6.7` (✗ $6.7M)
+- `FY26 Est = 22027` → `unitScale: MILLIONS, value 22.027` (✗ $22.0M)
+
+The classifier was second-guessing on numbers > 1000 and tagging them
+THOUSANDS / MILLIONS even though the source disclaimer literally said
+`"All figures in USD"` (no scale modifier). The verifier's atomic
+multiplier guard didn't fire because the verifier didn't think there
+was an issue.
+
+**Fix — two parts:**
+
+1. **Strengthened classifier prompt** (`apps/api/src/services/extractionPrompt.ts`)
+   - New "CRITICAL — DEFAULT TO ACTUALS WHEN IN DOUBT" block telling
+     Claude not to guess scale based on value magnitude
+   - Worked examples: same value `2,500` resolves to `$2.5B` /
+     `$2.5M` / `$2,500` depending on the header — without a header,
+     ACTUALS
+   - Explicit clarification that `"All figures in USD"` is currency,
+     not scale
+
+2. **Deterministic post-classifier override** (`apps/api/src/services/financialClassifier.ts`)
+   - New `detectExplicitUnitInText(text)` regex-scans for `$M`, `$K`,
+     `$B`, `$000s`, `(in millions)`, `(in thousands)`, `(in billions)`,
+     `(M)`, `(B)` (case-insensitive)
+   - After classification, if a statement is tagged `MILLIONS` or
+     `THOUSANDS` but no marker is found in the source text, override to
+     `ACTUALS` and `log.warn` so we can monitor the LLM's tendency to
+     over-guess in prod
+
+Conservative: only fires when the LLM picked MILLIONS/THOUSANDS/BILLIONS
+without textual evidence. ACTUALS values left untouched. The worst
+case (sheet has a marker the regex misses) is recoverable — display
+shows the source value at native scale, asymmetrically better than
+silent 1000× inflation.
+
+### C. Period dedup handles year-first FY-Est + plain "YTD Total"
+
+**Symptom:** ss3 showed 5 income-statement columns for what should be
+2 distinct concepts: `FY26 Est`, `FY26 Est.`, `2026 FY Est`, `YTD Total`,
+`YTD Total (Jan-Apr 20, 2026)`. The earlier dedup pass collapsed
+trailing-period and parentheses-year variants but not the year-first
+ordering nor the bare `YTD Total`.
+
+**Fix:** extended `normalizePeriodLabel` and `dedupePeriods`:
+
+1. **Year-first FY-Est rule** — regex
+   `^(\d{2,4})\s+FY\s+Est(?:imated?)?\.?$` (case-insensitive) →
+   canonical `"FY<YY> Est"`. Handles `2026 FY Est`, `2026 FY Est.`,
+   `2026 FY Estimate`, `2026 FY Estimated`, `26 FY Est`. Output matches
+   the existing canonical so the existing dedup loop folds them with
+   any pre-existing `"FY26 Est"` rows.
+
+2. **Plain `YTD Total` → infer year from siblings.** New
+   `inferYearFromSiblings` helper walks every sibling label in the
+   bucket (same `statementType + periodType`), collects 4-digit and
+   2-digit year tokens. If exactly one year emerges, rewrites the bare
+   `"YTD Total"` → `"YTD <YEAR>"`. If years are mixed (cross-year
+   doc), bails — leaves it as `"YTD Total"` to avoid wrong-year merges.
+
+Logged: `Period dedup: inferred year for 'YTD Total' from siblings → 'YTD 2026'` and
+`Period dedup: merged 'A' + 'B' + 'C' into 'X' (3 → 1, kept highest-confidence values)`.
+
+**File:** `apps/api/src/services/financialPeriodNormalizer.ts`
+(282 → 407 lines).
+
+**Deliberately not normalised** (intentional — false-merge risk):
+quarterly variants `Q1 2026 / Q1-2026 / Q1'26`, half-year `H1 2026`,
+month-name variants `Jan-26 / January 2026`. Revisit when prod evidence
+surfaces these.
+
+### Frontend follow-up notes
+
+The Re-extract button now defaults to multi-doc; per-doc Re-extract
+endpoints (e.g. clicking re-extract from a single document in the data
+room) keep the single-doc path. If a "this doc only" toggle is wanted,
+the API supports `mode: "single" | "all_financials" | "all"` — UI work
+is just adding the toggle.
+
+---
+
+## Previously shipped — chronological period sort + cashcap empty cards
 
 ### Charts + tables sort periods chronologically, not alphabetically
 
