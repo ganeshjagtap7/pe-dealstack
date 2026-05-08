@@ -345,26 +345,30 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
     const confidenceScores: number[] = [];
     const reviewReasons: string[] = [];
 
+    // Per-field review reasons. Avoid embedding the raw "(N% confidence)"
+    // parenthetical — when the per-field score is 0, the legacy phrasing
+    // read like the OVERALL extraction was at 0% in the UI popup, alarming
+    // users whose overall extractionConfidence was actually high.
     if (result.companyName.confidence < 70) {
-      reviewReasons.push(`Company name uncertain (${result.companyName.confidence}% confidence)`);
+      reviewReasons.push("Company name could not be confidently identified — please verify.");
     }
     if (result.companyName.value) confidenceScores.push(result.companyName.confidence);
 
     if (result.industry.confidence < 70) {
-      reviewReasons.push(`Industry uncertain (${result.industry.confidence}% confidence)`);
+      reviewReasons.push("Industry could not be confidently identified — please verify.");
     }
     if (result.industry.value) confidenceScores.push(result.industry.confidence);
 
     if (result.revenue.value !== null) {
       if (result.revenue.confidence < 70) {
-        reviewReasons.push(`Revenue uncertain: ${formatExtractedValue(result.revenue.value)} (${result.revenue.confidence}% confidence)`);
+        reviewReasons.push(`Revenue value ${formatExtractedValue(result.revenue.value)} is uncertain — please verify against the source.`);
       }
       confidenceScores.push(result.revenue.confidence);
     }
 
     if (result.ebitda.value !== null) {
       if (result.ebitda.confidence < 70) {
-        reviewReasons.push(`EBITDA uncertain: ${formatExtractedValue(result.ebitda.value)} (${result.ebitda.confidence}% confidence)`);
+        reviewReasons.push(`EBITDA value ${formatExtractedValue(result.ebitda.value)} is uncertain — please verify against the source.`);
       }
       confidenceScores.push(result.ebitda.confidence);
     }

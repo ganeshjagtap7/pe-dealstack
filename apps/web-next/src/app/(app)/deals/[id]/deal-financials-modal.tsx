@@ -77,8 +77,18 @@ export function ExtractionResultModal({
   const result = extractionResult.result ?? {};
   const docName = extractionResult.documentUsed?.name ?? "Unknown document";
   const method = (extractionResult.extractionMethod ?? "gpt4o").toUpperCase();
-  const overallConf = result.overallConfidence ?? 0;
-  const warnings = result.warnings ?? [];
+  // Treat missing/zero confidence as "not reported" rather than alarming red
+  // "0%". The bulk path returns null when the agent didn't surface a
+  // top-level confidence number; data still got stored either way.
+  const rawConf = result.overallConfidence;
+  const hasConf = typeof rawConf === "number" && rawConf > 0;
+  const overallConf = hasConf ? rawConf : 0;
+  // Strip trailing "(N% confidence)" — same alarming substring fix as in
+  // the deal-intake ResultDisplay; warnings here come from a different
+  // backend path but can also embed the per-field score parenthetical.
+  const warnings = (result.warnings ?? []).map((w) =>
+    w.replace(/\s*\(\d+%\s*confidence\)\s*$/i, ""),
+  );
   const hasConflicts = result.hasConflicts ?? false;
   const retryCount = extractionResult.agent?.retryCount ?? 0;
 
@@ -138,8 +148,16 @@ export function ExtractionResultModal({
   const latestPeriod = latestStmt?.period ?? "";
   const latestScale = latestStmt?.unitScale ?? "ACTUALS";
 
-  // Confidence color
-  const confColor = overallConf >= 80 ? "#059669" : overallConf >= 50 ? "#d97706" : "#dc2626";
+  // Confidence color — neutral grey when confidence wasn't reported so we
+  // don't render an alarming red "0%" bar for what is usually a successful
+  // extraction (the bulk path doesn't always populate overallConfidence).
+  const confColor = !hasConf
+    ? "#6b7280"
+    : overallConf >= 80
+      ? "#059669"
+      : overallConf >= 50
+        ? "#d97706"
+        : "#dc2626";
 
   const fmtVal = (val: number | null | undefined) =>
     formatFinancialValue(val, latestScale, { currency });
@@ -219,13 +237,13 @@ export function ExtractionResultModal({
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-gray-600">Overall Confidence</span>
             <span className="text-sm font-bold" style={{ color: confColor }}>
-              {overallConf}%
+              {hasConf ? `${overallConf}%` : "Not reported"}
             </span>
           </div>
           <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#f3f4f6" }}>
             <div
               className="h-2 rounded-full transition-all"
-              style={{ width: `${overallConf}%`, background: confColor }}
+              style={{ width: `${hasConf ? overallConf : 0}%`, background: confColor }}
             />
           </div>
         </div>
