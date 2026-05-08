@@ -8,6 +8,29 @@ import {
 } from "./deal-financials-constants";
 import { DealFinancialsAuditButtons } from "./deal-financials-audit-buttons";
 
+// Chart toggle button — extracted to module scope so it isn't
+// recreated on every parent render (react-hooks/static-components).
+type ChartBtnProps = {
+  type: ChartType;
+  label: string;
+  icon: string;
+  chartVisible: boolean;
+  chartType: ChartType;
+  onToggleChart: (type: ChartType) => void;
+};
+
+function ChartBtn({ type, label, icon, chartVisible, chartType, onToggleChart }: ChartBtnProps) {
+  const active = chartVisible && chartType === type;
+  return (
+    <button onClick={() => onToggleChart(type)}
+      className={cn("flex items-center gap-1.5 text-xs border rounded-md px-3 py-1.5 transition-all",
+        active ? "text-white border-transparent shadow-sm" : "text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-300 hover:bg-gray-50")}
+      style={active ? { backgroundColor: "#003366", borderColor: "#003366" } : undefined}>
+      <span className="material-symbols-outlined text-sm">{icon}</span>{label}
+    </button>
+  );
+}
+
 interface DealFinancialsToolbarProps {
   /** Tabs that have at least one matching statement on the deal. */
   availableTabs: typeof TAB_CONFIG;
@@ -64,20 +87,6 @@ export function DealFinancialsToolbar({
   fullAuditing,
   onDownloadFullAudit,
 }: DealFinancialsToolbarProps) {
-  // Chart toggle button — local to the toolbar since it's the only
-  // place this style of pill button is used.
-  function ChartBtn({ type, label, icon }: { type: ChartType; label: string; icon: string }) {
-    const active = chartVisible && chartType === type;
-    return (
-      <button onClick={() => onToggleChart(type)}
-        className={cn("flex items-center gap-1.5 text-xs border rounded-md px-3 py-1.5 transition-all",
-          active ? "text-white border-transparent shadow-sm" : "text-gray-500 hover:text-gray-800 border-gray-200 hover:border-gray-300 hover:bg-gray-50")}
-        style={active ? { backgroundColor: "#003366", borderColor: "#003366" } : undefined}>
-        <span className="material-symbols-outlined text-sm">{icon}</span>{label}
-      </button>
-    );
-  }
-
   return (
     <div className="flex items-center gap-2 mb-4 flex-wrap">
       <div className="flex gap-1 bg-gray-50 rounded-lg p-1 border border-gray-100">
@@ -92,9 +101,14 @@ export function DealFinancialsToolbar({
       </div>
       <div className="flex gap-1.5">
         {resolvedTab === "INCOME_STATEMENT" && (
-          <><ChartBtn type="revenue" label="Revenue" icon="bar_chart" /><ChartBtn type="growth" label="Growth" icon="trending_up" /></>
+          <>
+            <ChartBtn type="revenue" label="Revenue" icon="bar_chart" chartVisible={chartVisible} chartType={chartType} onToggleChart={onToggleChart} />
+            <ChartBtn type="growth" label="Growth" icon="trending_up" chartVisible={chartVisible} chartType={chartType} onToggleChart={onToggleChart} />
+          </>
         )}
-        {resolvedTab === "BALANCE_SHEET" && <ChartBtn type="composition" label="Composition" icon="donut_large" />}
+        {resolvedTab === "BALANCE_SHEET" && (
+          <ChartBtn type="composition" label="Composition" icon="donut_large" chartVisible={chartVisible} chartType={chartType} onToggleChart={onToggleChart} />
+        )}
       </div>
       {showPeriodToggle && (
         <div className="flex gap-1 ml-auto bg-gray-50 rounded-lg p-0.5 border border-gray-100">
