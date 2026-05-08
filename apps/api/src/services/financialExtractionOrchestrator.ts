@@ -2,6 +2,7 @@ import { supabase } from '../supabase.js';
 import { extractDealDataFromText, ExtractedDealData } from './aiExtractor.js';
 import { classifyFinancials, ClassificationResult, ClassifiedStatement } from './financialClassifier.js';
 import { dedupeStatementPeriods, mergeStatementsBySameType } from './financialPeriodNormalizer.js';
+import { refreshDealCache } from './dealCacheWriteback.js';
 import { log } from '../utils/logger.js';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -302,6 +303,17 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
         },
       );
     }
+  }
+
+  // Phase 2 cache writeback: refresh Deal.cached* from the latest active
+  // income-statement row. Lives in dealCacheWriteback.ts (see header
+  // comment for why). Best-effort — if this fails we still want the
+  // extraction we just did to be visible via the bulk summaries
+  // endpoint, so we never let it bubble up. Skips when no periods were
+  // stored (would just be a no-op write of all-nulls, and we'd rather
+  // leave any earlier successful cache values intact in that case).
+  if (periodsStored > 0) {
+    await refreshDealCache(input.dealId, now);
   }
 
   log.info('Deep pass completed', {

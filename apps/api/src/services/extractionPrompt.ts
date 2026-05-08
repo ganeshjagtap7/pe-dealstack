@@ -15,6 +15,16 @@ export const LINE_ITEM_KEYS = {
  * Build the extraction system prompt.
  * @param options.includeSourceCitations — whether to require _source fields (text path: yes, vision: optional)
  * @param options.currencyHint — pre-detected currency to guide extraction
+ * @param options.expectedPeriods — pre-formatted "[Period headers detected]"
+ *   block(s) emitted by the Excel extractor. When present, the LLM is told
+ *   to emit one period per detected column instead of inferring the period
+ *   axis from the grid. Empty / undefined falls back to the prior behavior
+ *   (LLM derives periods from the text on its own).
+ * @param options.lineItemHints — pre-formatted "[Line item rows detected]"
+ *   block(s) emitted by the Excel extractor. Surfaces (row → canonical key)
+ *   anchors so the LLM doesn't mis-map "Operating Income" to ebitda or
+ *   "EBITDA Margin" to ebitda (we have actually shipped both bugs). Empty /
+ *   undefined falls back to the prior keyword-only guidance.
  */
 export function buildExtractionPrompt(options?: {
   includeSourceCitations?: boolean;
@@ -24,11 +34,15 @@ export function buildExtractionPrompt(options?: {
    * training cutoff (often Jan 2025 or earlier) and mislabels recent past
    * months as PROJECTED. Defaults to the server's current date. */
   todayIso?: string;
+  expectedPeriods?: string;
+  lineItemHints?: string;
 }): string {
   const {
     includeSourceCitations = true,
     currencyHint,
     todayIso = new Date().toISOString().split('T')[0],
+    expectedPeriods,
+    lineItemHints,
   } = options ?? {};
 
   const currencyHintLine = currencyHint
@@ -36,6 +50,19 @@ export function buildExtractionPrompt(options?: {
     : '';
 
   const dateContextLine = `\nDATE CONTEXT — TODAY IS ${todayIso}. Use THIS date as the boundary for HISTORICAL vs PROJECTED classification, NOT your training cutoff. Any period whose end date is on or before ${todayIso} is HISTORICAL. Any period whose end date is after ${todayIso} is PROJECTED. Examples: if today is 2026-05-07, then "Mar-26" is HISTORICAL (it has already happened), "Aug-26" is PROJECTED (it has not yet happened), "FY24" is HISTORICAL, "FY27E" is PROJECTED. Do NOT label past months as PROJECTED just because they look "recent" — check against ${todayIso}.\n`;
+
+  // Structured-extras injected by the Excel extractor. Both blocks
+  // already include their own header line ("[Period headers detected]" /
+  // "[Line item rows detected]") and per-sheet "Sheet \"…\":" tags, so we
+  // just wrap them with a STRUCTURED HINTS pre-amble that tells the LLM
+  // to TREAT THEM AS GROUND TRUTH for column→period and row→line-item
+  // anchors. The prior prompt asked the model to re-derive both from the
+  // grid, which dropped months on wide tables and mis-mapped percentage
+  // rows.
+  const hintsBlock = (expectedPeriods && expectedPeriods.length > 0)
+    || (lineItemHints && lineItemHints.length > 0)
+    ? `\nSTRUCTURED EXTRACTION HINTS (from spreadsheet pre-scan):\nThe extractor walked the grid and pre-identified the period-header row and column-A line-item rows. Treat these as the ground-truth column→period and row→line-item map for the corresponding sheet. If a period column is listed below but you do not emit a period for it, the validator will flag the omission.\n${expectedPeriods ? `\n${expectedPeriods}\n` : ''}${lineItemHints ? `\n${lineItemHints}\n` : ''}`
+    : '';
 
   const sourceCitationRules = includeSourceCitations
     ? `6. For EVERY extracted value, include a source_quote: the exact text from the document where you found that number
@@ -58,7 +85,7 @@ export function buildExtractionPrompt(options?: {
   return `You are a senior private equity analyst extracting structured financial data from deal documents (CIMs, teasers, standalone financials).
 
 Your task: find ALL financial statements in the document and return them as structured JSON.
-${currencyHintLine}${dateContextLine}
+${currencyHintLine}${dateContextLine}${hintsBlock}
 STEP 0 — IDENTIFY CURRENCY:
 Before extracting any financial data, determine the document currency:
 - Look for symbols: $, €, £, ₹, ¥

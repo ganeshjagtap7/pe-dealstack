@@ -37,6 +37,18 @@ export interface Deal {
   lastDocument?: string;
   lastDocumentUpdated?: string;
   tags?: string[];
+  // Phase 2 canonical cache: latest-period revenue/EBITDA in ACTUAL
+  // DOLLARS (unitScale already applied by the API). Refreshed on every
+  // FinancialStatement upsert by the extraction pipeline. Use these
+  // instead of `revenue` / `ebitda` (the legacy MILLIONS-only fields)
+  // when rendering deal headlines. Null until the extraction pipeline
+  // or backfill script populates them.
+  cachedRevenue?: number | null;
+  cachedEbitda?: number | null;
+  cachedEbitdaMargin?: number | null;
+  cachedPeriod?: string | null;
+  cachedCurrency?: string | null;
+  cachedAt?: string | null;
 }
 
 export interface DealFilters {

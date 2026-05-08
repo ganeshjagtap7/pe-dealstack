@@ -129,6 +129,19 @@ export function hasExplicitSmallDollarAmounts(text: string): boolean {
 // ─── Main Function ────────────────────────────────────────────
 
 /**
+ * Optional structured-extras pulled out of an Excel workbook by
+ * `extractStructuredExcel`. Both blocks are pre-formatted prompt-ready
+ * strings (see `excelStructureHints.ts` for the formatters); empty /
+ * undefined falls back to the prior keyword-only prompt behaviour.
+ */
+export interface ClassifyOptions {
+  /** Pre-formatted "[Period headers detected]" block per sheet. */
+  expectedPeriods?: string;
+  /** Pre-formatted "[Line item rows detected]" block per sheet. */
+  lineItemHints?: string;
+}
+
+/**
  * Extract full 3-statement financial model from raw document text.
  * Returns one ClassifiedStatement per statement type found,
  * each containing all periods (years) as separate FinancialPeriod entries.
@@ -138,6 +151,7 @@ export function hasExplicitSmallDollarAmounts(text: string): boolean {
  */
 export async function classifyFinancials(
   text: string,
+  options?: ClassifyOptions,
 ): Promise<ClassificationResult | null> {
   if (!isAIEnabled() || !openai) {
     log.warn('Financial classifier skipped: OpenAI not configured');
@@ -167,13 +181,22 @@ export async function classifyFinancials(
     textLength: truncatedText.length,
     explicitUnitFromText,
     hasSmallDollars,
+    hasPeriodHints: Boolean(options?.expectedPeriods),
+    hasLineItemHints: Boolean(options?.lineItemHints),
   });
 
   try {
     const response = await trackedChatCompletion('financial_extraction', {
       model: MODEL_CLASSIFICATION,
       messages: [
-        { role: 'system', content: buildExtractionPrompt({ includeSourceCitations: true }) },
+        {
+          role: 'system',
+          content: buildExtractionPrompt({
+            includeSourceCitations: true,
+            expectedPeriods: options?.expectedPeriods,
+            lineItemHints: options?.lineItemHints,
+          }),
+        },
         {
           role: 'user',
           content: `Extract all financial statements from this document:\n\n${truncatedText}`,
