@@ -4,6 +4,7 @@ import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { comparePeriodChronologically } from '../utils/periodChrono.js';
+import { refreshDealCache } from '../services/dealCacheWriteback.js';
 
 // Sub-routers
 import financialsExtractionRouter from './financials-extraction.js';
@@ -179,6 +180,9 @@ router.patch('/deals/:dealId/financials/:statementId', async (req, res) => {
       .single();
 
     if (updateError) throw updateError;
+
+    // Refresh cache so deal headline stays in sync with the row just edited.
+    await refreshDealCache(dealId);
 
     res.json(updated);
   } catch (err) {

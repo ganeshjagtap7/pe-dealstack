@@ -7,6 +7,7 @@
 import { supabase } from '../supabase.js';
 import { ExtractedDealData } from './aiExtractor.js';
 import { log } from '../utils/logger.js';
+import { refreshDealCache } from './dealCacheWriteback.js';
 
 // Map document type icons
 const industryIcons: Record<string, string> = {
@@ -199,6 +200,10 @@ export async function mergeIntoExistingDeal(
     .single();
 
   if (updateErr) throw updateErr;
+
+  // Refresh cache so legacy Deal.revenue/ebitda updates above don't leave the
+  // canonical cached* columns stale for ingest-driven merges.
+  await refreshDealCache(dealId);
 
   // Log activity
   await supabase.from('Activity').insert({

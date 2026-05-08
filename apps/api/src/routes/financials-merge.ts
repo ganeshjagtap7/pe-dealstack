@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { refreshDealCache } from '../services/dealCacheWriteback.js';
 
 const router = Router();
 
@@ -131,6 +132,9 @@ router.post('/deals/:dealId/financials/resolve', async (req, res) => {
         .eq('id', chosenVersionId);
     }
 
+    // Refresh cache so deal headline reflects the newly active version.
+    await refreshDealCache(dealId);
+
     res.json({ success: true });
   } catch (err) {
     log.error('POST financials resolve error', err);
@@ -196,6 +200,11 @@ router.post('/deals/:dealId/financials/resolve-all', async (req, res) => {
         .eq('id', sorted[0].id);
 
       resolved++;
+    }
+
+    // Refresh cache once after bulk resolution flips isActive across groups.
+    if (resolved > 0) {
+      await refreshDealCache(dealId);
     }
 
     res.json({ resolved });
