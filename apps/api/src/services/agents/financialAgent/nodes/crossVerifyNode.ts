@@ -9,7 +9,8 @@
  * Gracefully degrades if ANTHROPIC_API_KEY is not set.
  */
 
-import { anthropic, isClaudeEnabled } from '../../../../services/anthropic.js';
+import { ChatAnthropic } from '@langchain/anthropic';
+import { isClaudeEnabled } from '../../../../services/anthropic.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType, AgentStep } from '../state.js';
 import type { ClassifiedStatement } from '../../../financialClassifier.js';
@@ -260,7 +261,7 @@ export async function crossVerifyNode(
   const { statements, rawText } = state;
 
   // Skip if Claude not configured
-  if (!isClaudeEnabled() || !anthropic) {
+  if (!isClaudeEnabled()) {
     steps.push(step('crossVerify', 'Skipping cross-verification — ANTHROPIC_API_KEY not configured'));
     return { steps };
   }
@@ -288,15 +289,21 @@ export async function crossVerifyNode(
 
     await enforceUserGate('financial_extraction', 'claude-haiku-4-5-20251001', 'anthropic');
     const start = Date.now();
-    let message;
+    const claude = new ChatAnthropic({
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 2000,
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+    let response;
     try {
-      message = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 2000,
-        system:
-          'You are a financial data verification assistant. You verify extracted financial values against source documents. Respond ONLY with a valid JSON array — no markdown, no code fences, no explanation.',
-        messages: [{ role: 'user', content: userPrompt }],
-      });
+      response = await claude.invoke([
+        {
+          role: 'system',
+          content:
+            'You are a financial data verification assistant. You verify extracted financial values against source documents. Respond ONLY with a valid JSON array — no markdown, no code fences, no explanation.',
+        },
+        { role: 'user', content: userPrompt },
+      ]);
     } catch (err) {
       await recordUsageEvent({
         operation: 'financial_extraction',
@@ -310,7 +317,7 @@ export async function crossVerifyNode(
       });
       throw err;
     }
-    const claudeUsage = (message as any)?.usage;
+    const claudeUsage = response.usage_metadata;
     await recordUsageEvent({
       operation: 'financial_extraction',
       model: 'claude-haiku-4-5-20251001',
@@ -321,8 +328,8 @@ export async function crossVerifyNode(
       durationMs: Date.now() - start,
     });
 
-    const content = message.content[0];
-    if (!content || content.type !== 'text') {
+    const responseText = response.text;
+    if (!responseText || typeof responseText !== 'string') {
       steps.push(step('crossVerify', 'Cross-verification skipped — unexpected response format from Claude'));
       return { steps };
     }
@@ -332,7 +339,7 @@ export async function crossVerifyNode(
     // ``` anyway — JSON.parse choked on the leading backtick and the whole
     // cross-verify pass got skipped. Same defensive strip used in
     // memos-suggest.ts. Cheap and idempotent for already-clean responses.
-    const cleanedText = content.text
+    const cleanedText = responseText
       .trim()
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```$/i, '')
@@ -343,7 +350,7 @@ export async function crossVerifyNode(
       claudeResults = JSON.parse(cleanedText) as ClaudeVerification[];
     } catch (err) {
       steps.push(step('crossVerify', 'Cross-verification skipped — could not parse Claude response as JSON'));
-      log.warn('crossVerifyNode: JSON parse failure', { raw: content.text.slice(0, 200), error: err instanceof Error ? err.message : String(err) });
+      log.warn('crossVerifyNode: JSON parse failure', { raw: responseText.slice(0, 200), error: err instanceof Error ? err.message : String(err) });
       return { steps };
     }
 

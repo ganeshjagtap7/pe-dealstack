@@ -29,6 +29,8 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { ChatAnthropic } from '@langchain/anthropic';
+import { SystemMessage, HumanMessage, type AIMessageChunk } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 import {
   classifyFinancials,
@@ -62,12 +64,27 @@ const RECONCILE_TIMEOUT_MS = 180_000;
  */
 const VALUE_AGREEMENT_TOLERANCE = 0.005;
 
-let cachedClient: Anthropic | null = null;
+let cachedClient: ChatAnthropic | null = null;
 
-function getClient(): Anthropic | null {
+function getClient(): ChatAnthropic | null {
   if (cachedClient) return cachedClient;
   if (!process.env.ANTHROPIC_API_KEY) return null;
-  cachedClient = new Anthropic({ timeout: RECONCILE_TIMEOUT_MS });
+  cachedClient = new ChatAnthropic({
+    model: SONNET_MODEL,
+    maxTokens: RECONCILE_MAX_OUTPUT,
+    // Adaptive extended thinking — preserved exactly. The reconciler runs
+    // a deliberative compare-and-pick task over two extractions; adaptive
+    // thinking lets Sonnet allocate tokens to it as needed.
+    thinking: { type: 'adaptive' },
+    // Output effort — preserved exactly. "high" trades latency for
+    // thoroughness on the reconciliation pass.
+    outputConfig: { effort: 'high' },
+    // Stream + aggregate on invoke(); ChatAnthropic concats the chunks
+    // internally so invoke() returns an AIMessage equivalent to
+    // stream.finalMessage() from the bare SDK.
+    streaming: true,
+    clientOptions: { timeout: RECONCILE_TIMEOUT_MS },
+  });
   return cachedClient;
 }
 
@@ -323,27 +340,37 @@ async function reconcileWithSonnet(
   const userMessage = formatReconcileUserMessage(truncatedSource, gpt, claude, diffs);
 
   try {
-    const stream = client.messages.stream({
-      model: SONNET_MODEL,
-      max_tokens: RECONCILE_MAX_OUTPUT,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'high' },
-      system: [
+    // System message content is an array of TextBlockParams with
+    // cache_control: ephemeral — ChatAnthropic forwards the first
+    // SystemMessage's `content` straight through as the `system` field
+    // on the underlying API call, preserving the cache_control marker.
+    const systemMessage = new SystemMessage({
+      content: [
         {
           type: 'text',
           text: systemPrompt,
           cache_control: { type: 'ephemeral' },
         },
       ],
-      messages: [{ role: 'user', content: userMessage }],
     });
+    const humanMessage = new HumanMessage(userMessage);
 
-    const message = await stream.finalMessage();
+    // streaming: true on the constructor causes invoke() to internally
+    // stream and concat all chunks into a single AIMessageChunk —
+    // equivalent to the bare-SDK `stream.finalMessage()` pattern.
+    const message: AIMessageChunk = await client.invoke([systemMessage, humanMessage]);
 
+    // ChatAnthropic returns either a string (single text block) or an
+    // array of content blocks. Handle both, since we always want all
+    // text concatenated for JSON parsing.
     let textContent = '';
-    for (const block of message.content) {
-      if (block.type === 'text') {
-        textContent += block.text;
+    if (typeof message.content === 'string') {
+      textContent = message.content;
+    } else {
+      for (const block of message.content) {
+        if (typeof block === 'object' && block !== null && (block as { type?: string }).type === 'text') {
+          textContent += (block as { text: string }).text;
+        }
       }
     }
     if (!textContent) {
@@ -384,12 +411,19 @@ async function reconcileWithSonnet(
     log.info('Cross-verify reconciler completed', {
       statementsFound: result.statements.length,
       overallConfidence: result.overallConfidence,
-      cacheReadTokens: message.usage.cache_read_input_tokens,
-      cacheWriteTokens: message.usage.cache_creation_input_tokens,
+      // ChatAnthropic exposes Anthropic's cache token counts via
+      // usage_metadata.input_token_details (see
+      // @langchain/anthropic utils/message_outputs.js buildUsageMetadata).
+      cacheReadTokens: message.usage_metadata?.input_token_details?.cache_read,
+      cacheWriteTokens: message.usage_metadata?.input_token_details?.cache_creation,
     });
 
     return result;
   } catch (err) {
+    // LangChain's wrapAnthropicClientError preserves the original
+    // Anthropic.APIError instance (see utils/errors.js), so the
+    // instanceof check still distinguishes API errors from
+    // network/parse failures.
     if (err instanceof Anthropic.APIError) {
       log.error('Cross-verify reconciler: API error', { status: err.status, message: err.message });
     } else {

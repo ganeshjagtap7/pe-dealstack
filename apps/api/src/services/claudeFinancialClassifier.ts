@@ -18,8 +18,8 @@
  *     reuses the input prefix at ~10% of the input price.
  *   - Streaming required: max_tokens up to 32K to fit a deep monthly grid
  *     plus per-period source citations exceeds the SDK's non-streaming
- *     HTTP timeout window. We use stream() + finalMessage() per the
- *     SDK guidance.
+ *     HTTP timeout window. ChatAnthropic.invoke() handles streaming
+ *     internally when `streaming: true` is set on the constructor.
  *   - Same post-processing as the GPT path (normalizeClassificationResult,
  *     applyExplicitUnitOverride, applySmallDollarActualsOverride) — keeps
  *     outputs byte-comparable when both models agree, so the cross-verify
@@ -27,6 +27,8 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { ChatAnthropic } from '@langchain/anthropic';
+import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
@@ -48,7 +50,7 @@ const SONNET_MODEL = 'claude-sonnet-4-6';
 
 /** Output budget — matches the GPT path (32K) so a deep monthly grid +
  *  source citations fit. Values above ~16K mandate streaming on the
- *  Anthropic SDK, which we do via `messages.stream()` below. */
+ *  Anthropic SDK; ChatAnthropic streams internally when `streaming: true`. */
 const MAX_OUTPUT_TOKENS = 32_000;
 
 /** Higher per-request timeout than the SDK default. Sonnet 4.6 with
@@ -56,13 +58,26 @@ const MAX_OUTPUT_TOKENS = 32_000;
  *  grids; the GPT path uses 120s for the same reason. */
 const REQUEST_TIMEOUT_MS = 180_000;
 
-let cachedClient: Anthropic | null = null;
+let cachedModel: ChatAnthropic | null = null;
 
-function getClient(): Anthropic | null {
-  if (cachedClient) return cachedClient;
+function getModel(): ChatAnthropic | null {
+  if (cachedModel) return cachedModel;
   if (!process.env.ANTHROPIC_API_KEY) return null;
-  cachedClient = new Anthropic({ timeout: REQUEST_TIMEOUT_MS });
-  return cachedClient;
+  cachedModel = new ChatAnthropic({
+    model: SONNET_MODEL,
+    maxTokens: MAX_OUTPUT_TOKENS,
+    // Adaptive thinking: extraction is intelligence-sensitive (unit-scale
+    // inference, period classification, derived-field reconciliation).
+    thinking: { type: 'adaptive' },
+    // High effort — trades latency for thoroughness on the deep monthly grid.
+    outputConfig: { effort: 'high' },
+    // Stream internally so 32K output budgets don't hit the SDK's
+    // non-streaming HTTP timeout window. ChatAnthropic aggregates the
+    // chunks and returns a single AIMessage from .invoke().
+    streaming: true,
+    clientOptions: { timeout: REQUEST_TIMEOUT_MS },
+  });
+  return cachedModel;
 }
 
 /**
@@ -86,8 +101,8 @@ export async function classifyFinancialsWithClaude(
   text: string,
   options?: ClassifyOptions,
 ): Promise<ClassificationResult | null> {
-  const client = getClient();
-  if (!client) {
+  const model = getModel();
+  if (!model) {
     log.warn('Claude classifier skipped: ANTHROPIC_API_KEY not set');
     return null;
   }
@@ -120,46 +135,32 @@ export async function classifyFinancialsWithClaude(
   });
 
   try {
-    // Streaming required for max_tokens > ~16K — the SDK's non-streaming
-    // path hits its HTTP timeout before Sonnet 4.6 finishes a 32K output.
-    const stream = client.messages.stream({
-      model: SONNET_MODEL,
-      max_tokens: MAX_OUTPUT_TOKENS,
-      thinking: { type: 'adaptive' },
-      output_config: { effort: 'high' },
-      system: [
+    // System prompt as a single text block carrying cache_control. When
+    // ChatAnthropic sees a SystemMessage with array content, it forwards
+    // the array as-is to the Anthropic API as `system: TextBlockParam[]`,
+    // which preserves the inline cache_control marker. Caching the prompt
+    // prefix saves ~90% of input cost on re-extractions.
+    const systemMessage = new SystemMessage({
+      content: [
         {
           type: 'text',
           text: systemPrompt,
-          // Cache the prompt prefix. The system prompt is large (~5K
-          // tokens) and constant across re-extractions of the same doc
-          // and across docs with the same hint structure — reading from
-          // cache costs ~10% of input price.
           cache_control: { type: 'ephemeral' },
-        },
-      ],
-      messages: [
-        {
-          role: 'user',
-          content:
-            'Extract all financial statements from this document. Return JSON only — no surrounding prose, no markdown fences:\n\n' +
-            truncated,
-        },
+        } as never,
       ],
     });
 
-    const message = await stream.finalMessage();
+    const userMessage = new HumanMessage(
+      'Extract all financial statements from this document. Return JSON only — no surrounding prose, no markdown fences:\n\n' +
+        truncated,
+    );
 
-    // Concatenate all text blocks from the response. With adaptive
-    // thinking, the response usually contains thinking blocks (omitted
-    // text by default) followed by one or more text blocks carrying the
-    // JSON. We ignore thinking blocks and only parse text.
-    let textContent = '';
-    for (const block of message.content) {
-      if (block.type === 'text') {
-        textContent += block.text;
-      }
-    }
+    const response = await model.invoke([systemMessage, userMessage]);
+
+    // ChatAnthropic concatenates text blocks (and skips thinking blocks)
+    // automatically when materializing AIMessage.text. With adaptive
+    // thinking, only the JSON-bearing text blocks reach this string.
+    const textContent = response.text;
 
     if (!textContent) {
       log.error('Claude classifier: no text content in response');
@@ -185,19 +186,29 @@ export async function classifyFinancialsWithClaude(
     applyExplicitUnitOverride(result, explicitUnit);
     applySmallDollarActualsOverride(result, hasSmallDollars, explicitUnit);
 
+    // Pull the raw Anthropic Usage object from response_metadata so we
+    // log the same uncached input_tokens the SDK reported (the
+    // usage_metadata.input_tokens field is the *combined* total of raw
+    // input + cache_read + cache_creation, which would change semantics).
+    const rawUsage =
+      ((response.response_metadata as { usage?: Anthropic.Usage } | undefined)
+        ?.usage) ?? undefined;
+
     log.debug('Claude classifier completed', {
       model: SONNET_MODEL,
       statementsFound: result.statements.length,
       overallConfidence: result.overallConfidence,
-      cacheReadTokens: message.usage.cache_read_input_tokens,
-      cacheWriteTokens: message.usage.cache_creation_input_tokens,
-      inputTokens: message.usage.input_tokens,
-      outputTokens: message.usage.output_tokens,
+      cacheReadTokens: rawUsage?.cache_read_input_tokens,
+      cacheWriteTokens: rawUsage?.cache_creation_input_tokens,
+      inputTokens: rawUsage?.input_tokens,
+      outputTokens: rawUsage?.output_tokens,
     });
 
     return result;
   } catch (err) {
     // SDK typed exceptions per shared/error-codes.md — most-specific first.
+    // ChatAnthropic uses the bare SDK under the hood, so the same error
+    // classes still surface through .invoke() rejections.
     if (err instanceof Anthropic.RateLimitError) {
       log.warn('Claude classifier: rate limited (retry handled by SDK already exhausted)');
     } else if (err instanceof Anthropic.AuthenticationError) {
