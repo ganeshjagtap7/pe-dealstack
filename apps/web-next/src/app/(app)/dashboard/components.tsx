@@ -331,7 +331,7 @@ export function StageDetailModal({ stageModal, deals, onClose }: StageDetailModa
         </div>
         <div className="overflow-y-auto max-h-[60vh] divide-y divide-border-subtle">
           {filtered.length === 0 ? (
-            <div className="p-8 text-center text-text-muted text-sm">No deals in this stage</div>
+            <div className="p-8 text-center text-text-muted text-sm">No deals here.</div>
           ) : filtered.map((deal) => (
             <Link
               key={deal.id}
@@ -444,7 +444,7 @@ export function PortfolioAllocation({ loading, allocation, gradientParts }: Port
         ) : allocation.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-6 text-text-muted">
             <span className="material-symbols-outlined text-2xl mb-1 opacity-40">pie_chart</span>
-            <p className="text-xs">No deals yet</p>
+            <p className="text-xs">Nothing closed yet.</p>
           </div>
         ) : (
           <div className="flex items-center gap-6">

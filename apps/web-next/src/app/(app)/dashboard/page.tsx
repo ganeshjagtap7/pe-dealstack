@@ -244,7 +244,7 @@ export default function DashboardPage() {
             {getGreeting()}, {firstName}
           </h1>
           <p className="text-text-secondary text-sm">
-            Here is your deal flow update and AI market analysis for{" "}
+            Where pipeline stands as of{" "}
             <span className="font-medium text-primary">{today}</span>.
           </p>
         </div>
