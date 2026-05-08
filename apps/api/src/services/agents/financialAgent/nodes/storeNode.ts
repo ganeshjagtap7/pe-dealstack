@@ -13,6 +13,12 @@ import { recordExtractionLearning } from '../../../agentMemory.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep } from '../state.js';
+import type { ClassifiedStatement, FinancialPeriod } from '../../../financialClassifier.js';
+import {
+  parsePeriodToYearMonth,
+  getLineItemDollars,
+  REVENUE_KEYS,
+} from '../../../reconciler/shared.js';
 import {
   computeCompositeConfidence,
   getConfidenceTier,
@@ -24,6 +30,95 @@ import {
 /** Create a timestamped agent step */
 function step(node: string, message: string, detail?: string): AgentStep {
   return { timestamp: new Date().toISOString(), node, message, detail };
+}
+
+/**
+ * Pre-write dedup of overlapping annual + monthly periods AND zeroed annual
+ * projections. Mutates each statement's `periods[]` in place.
+ *
+ * Why pre-write (not post-store like the audit-report dedup in
+ * groundTruth.ts): runDeepPass() upserts every period as its own DB row, so
+ * by the time the audit reader collapses overlaps the duplicates already
+ * live in the DB and pollute every other consumer (UI tables,
+ * dealCacheWriteback, cross-doc reconciler). Mirroring groundTruth.ts'
+ * "monthly wins over annual for the same year" rule here keeps the DB clean
+ * intra-document. Cross-document reconciliation is a separate concern.
+ *
+ * Rule A: when a year has both an annual period and any monthly period,
+ *         drop the annual.
+ * Rule B: when an annual period has revenue == 0 but the same year's
+ *         monthly periods sum to materially non-zero revenue, drop the
+ *         (almost certainly stub) annual.
+ *
+ * Returns one log entry per dropped period so the agent log shows what
+ * happened.
+ */
+const ZERO_ANNUAL_REVENUE_THRESHOLD_USD = 1000;
+
+function dedupAnnualVsMonthly(statements: ClassifiedStatement[]): AgentStep[] {
+  const logs: AgentStep[] = [];
+
+  for (const stmt of statements) {
+    if (stmt.periods.length === 0) continue;
+
+    // Bucket each period into annual / monthly by parsed shape.
+    type Tagged = { period: FinancialPeriod; year: number; isMonthly: boolean };
+    const tagged: Tagged[] = [];
+    for (const period of stmt.periods) {
+      const parsed = parsePeriodToYearMonth(period.period);
+      if (!parsed) continue;
+      tagged.push({ period, year: parsed.year, isMonthly: parsed.month != null });
+    }
+
+    const yearsWithMonthly = new Set<number>();
+    for (const t of tagged) if (t.isMonthly) yearsWithMonthly.add(t.year);
+
+    // Sum monthly revenue per year (actual dollars) for Rule B.
+    const monthlyRevenueByYear = new Map<number, number>();
+    for (const t of tagged) {
+      if (!t.isMonthly) continue;
+      const rev = getLineItemDollars(t.period.lineItems, REVENUE_KEYS, stmt.unitScale);
+      if (rev == null) continue;
+      monthlyRevenueByYear.set(t.year, (monthlyRevenueByYear.get(t.year) ?? 0) + rev);
+    }
+
+    const periodsToDrop = new Set<FinancialPeriod>();
+
+    for (const t of tagged) {
+      if (t.isMonthly) continue;
+      // Rule A — annual + any monthly for the same year → drop annual.
+      if (yearsWithMonthly.has(t.year)) {
+        periodsToDrop.add(t.period);
+        logs.push(step(
+          'store',
+          `Dropped annual ${stmt.statementType} period "${t.period.period}" — monthly rows present for ${t.year}`,
+          'Pre-write dedup (Rule A: annual/monthly overlap).',
+        ));
+        continue;
+      }
+      // Rule B — annual revenue==0 but monthly sum > threshold → drop annual.
+      const annualRev = getLineItemDollars(t.period.lineItems, REVENUE_KEYS, stmt.unitScale);
+      const monthlyRev = monthlyRevenueByYear.get(t.year);
+      if (
+        annualRev === 0 &&
+        monthlyRev != null &&
+        Math.abs(monthlyRev) > ZERO_ANNUAL_REVENUE_THRESHOLD_USD
+      ) {
+        periodsToDrop.add(t.period);
+        logs.push(step(
+          'store',
+          `Dropped zeroed annual ${stmt.statementType} period "${t.period.period}" — monthly revenue sums to $${Math.round(monthlyRev).toLocaleString()} for ${t.year}`,
+          'Pre-write dedup (Rule B: zero annual + non-zero monthly).',
+        ));
+      }
+    }
+
+    if (periodsToDrop.size > 0) {
+      stmt.periods = stmt.periods.filter(p => !periodsToDrop.has(p));
+    }
+  }
+
+  return logs;
 }
 
 /**
@@ -54,6 +149,15 @@ export async function storeNode(
   steps.push(step('store', `Storing ${stmtTypes} (${totalPeriods} periods) to database`));
 
   try {
+    // Pre-write dedup. Mutates `statements` in place — must run BEFORE
+    // building classificationToStore so runDeepPass never sees the
+    // overlapping annual rows or the zeroed annual projections.
+    const dedupLogs = dedupAnnualVsMonthly(statements);
+    if (dedupLogs.length > 0) {
+      steps.push(...dedupLogs);
+      steps.push(step('store', `Pre-write dedup removed ${dedupLogs.length} period(s)`));
+    }
+
     // Build a ClassificationResult from the current (possibly corrected) statements
     const classificationToStore = {
       statements,
