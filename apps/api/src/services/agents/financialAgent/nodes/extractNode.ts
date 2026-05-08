@@ -11,7 +11,7 @@
  */
 
 import { createRequire } from 'module';
-import { classifyFinancials } from '../../../financialClassifier.js';
+import { classifyFinancialsCrossVerified as classifyFinancials } from '../../../financialCrossVerify.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { chunkDocument, mergeExtractionResults } from '../../../documentChunker.js';
 import type { ClassificationResult } from '../../../documentChunker.js';

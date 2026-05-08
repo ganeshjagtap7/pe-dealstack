@@ -253,7 +253,13 @@ export async function classifyFinancials(
 
 // ─── Normalization Helpers ────────────────────────────────────
 
-function normalizeClassificationResult(raw: any): ClassificationResult {
+/**
+ * Exported so the parallel Claude classifier (claudeFinancialClassifier.ts)
+ * can apply the same normalization, derived-field calc, and unit-override
+ * logic — keeps the two extractions byte-for-byte comparable when both
+ * models agree, so the cross-verify step only flags real disagreements.
+ */
+export function normalizeClassificationResult(raw: any): ClassificationResult {
   const warnings: string[] = Array.isArray(raw.warnings) ? raw.warnings : [];
 
   const statements: ClassifiedStatement[] = [];
@@ -409,7 +415,8 @@ function maxAbsLineItem(stmt: ClassifiedStatement): number {
   return max;
 }
 
-function applyExplicitUnitOverride(
+/** Exported for the Claude classifier — see normalizeClassificationResult above. */
+export function applyExplicitUnitOverride(
   result: ClassificationResult,
   explicitUnitFromText: UnitScale | null,
 ): void {
@@ -490,7 +497,8 @@ const SMALL_VALUE_OVERRIDE_THRESHOLD = 100;
  *     narrative magnitude ("a $1B market opportunity"), even when no
  *     "$B" header exists for the table. This pass catches that.
  */
-function applySmallDollarActualsOverride(
+/** Exported for the Claude classifier — see normalizeClassificationResult above. */
+export function applySmallDollarActualsOverride(
   result: ClassificationResult,
   hasSmallDollars: boolean,
   explicitUnitFromText: UnitScale | null,
