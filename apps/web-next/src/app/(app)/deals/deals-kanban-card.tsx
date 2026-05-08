@@ -19,6 +19,7 @@ export function KanbanCard({
   activeMetrics,
   onDragStart,
   summary,
+  summariesLoading,
 }: {
   deal: Deal;
   activeMetrics: MetricKey[];
@@ -29,8 +30,20 @@ export function KanbanCard({
    * render before the bulk fetch resolves.
    */
   summary?: FinancialSummary;
+  /** True until the bulk summaries fetch resolves; see DealCard. */
+  summariesLoading?: boolean;
 }) {
-  const hasRiskFlag = (deal.ebitda ?? 0) < 0 || deal.stage === "PASSED";
+  // Risk flag uses the in-unit summary EBITDA when available; otherwise
+  // falls through to deal.ebitda only after summaries finish loading
+  // and we know there's no statement (avoids the "$21.5M" mis-flag).
+  const summaryEbitda = summary?.ebitda;
+  const ebitdaForRiskFlag =
+    summaryEbitda != null
+      ? summaryEbitda
+      : !summariesLoading && summary === undefined
+        ? deal.ebitda
+        : null;
+  const hasRiskFlag = (ebitdaForRiskFlag ?? 0) < 0 || deal.stage === "PASSED";
   const kanbanMetrics = activeMetrics.slice(0, 3);
 
   return (
@@ -64,38 +77,47 @@ export function KanbanCard({
             </p>
           </div>
         </div>
-        {/* Dynamic compact metrics (first 3) */}
+        {/* Dynamic compact metrics (first 3) \u2014 revenue/EBITDA route
+            EXCLUSIVELY through the income-statement summary so we never
+            render the unit-less Deal.{revenue,ebitda} columns through
+            formatCurrency (which assumes MILLIONS). */}
         <div className="flex gap-3 mb-2">
           {kanbanMetrics.map((key) => {
             const cfg = METRIC_CONFIG[key];
             if (!cfg) return null;
-            // Pull revenue/EBITDA from the income-statement summary
-            // (correct unitScale + currency) when available; fall back
-            // to the legacy deal-level columns otherwise.
-            const stmtValue =
-              summary && key === "revenue"
-                ? summary.revenue
-                : summary && key === "ebitda"
-                  ? summary.ebitda
-                  : null;
+            const isStmtKey = key === "revenue" || key === "ebitda";
+            const stmtValue = isStmtKey
+              ? key === "revenue"
+                ? (summary?.revenue ?? null)
+                : (summary?.ebitda ?? null)
+              : null;
             const dealValue = deal[key as keyof Deal] as number | undefined | null;
-            const value = stmtValue != null ? stmtValue : dealValue;
+            const colorValue = isStmtKey ? stmtValue : dealValue;
+            const renderedValue = (() => {
+              if (key === "irrProjected") {
+                return dealValue != null ? Number(dealValue).toFixed(1) + "%" : "\u2014";
+              }
+              if (key === "mom") {
+                return dealValue != null ? Number(dealValue).toFixed(1) + "x" : "\u2014";
+              }
+              if (isStmtKey) {
+                if (summariesLoading) return "\u2014";
+                if (!summary) return "\u2014";
+                return formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency });
+              }
+              return formatCurrency(dealValue as number | null | undefined, deal.currency);
+            })();
             return (
               <div key={key} className="flex-1 bg-background-body rounded px-2 py-1.5">
                 <span className="text-[9px] text-text-muted font-medium uppercase block">{cfg.kanbanLabel}</span>
                 <span className={cn(
                   "text-xs font-bold",
-                  key === "mom" && value != null && value >= 3 ? "text-secondary" : "",
-                  key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
-                  !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
+                  key === "mom" && colorValue != null && colorValue >= 3 ? "text-secondary" : "",
+                  key === "ebitda" && colorValue != null && colorValue < 0 ? "text-red-600" : "",
+                  !(key === "mom" && colorValue != null && colorValue >= 3) && !(key === "ebitda" && colorValue != null && colorValue < 0) ? "text-text-main" : "",
+                  isStmtKey && summariesLoading ? "text-text-muted/60 animate-pulse" : "",
                 )}>
-                  {key === "irrProjected"
-                    ? (value != null ? Number(value).toFixed(1) + "%" : "\u2014")
-                    : key === "mom"
-                      ? (value != null ? Number(value).toFixed(1) + "x" : "\u2014")
-                      : summary && (key === "revenue" || key === "ebitda")
-                        ? formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency })
-                        : formatCurrency(value as number | null | undefined, deal.currency)}
+                  {renderedValue}
                 </span>
               </div>
             );

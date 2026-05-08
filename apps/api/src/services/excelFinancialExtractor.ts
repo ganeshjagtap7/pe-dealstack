@@ -67,66 +67,188 @@ export function scoreSheet(name: string): number {
   return maxScore;
 }
 
-// ─── Unit Scale Detection ────────────────────────────────────
+// ─── Merge Expansion ─────────────────────────────────────────
 
 /**
- * Scan the first few rows of a sheet for unit indicators.
- * Returns a human-readable string like "Units: $000s (thousands)" or null.
+ * Spread merged-cell values into every cell of each merge range.
+ *
+ * Why: the xlsx library only stores the merge value in the top-left cell
+ * of a merge range. The other cells are absent from the sheet object,
+ * so `sheet_to_csv` renders them as empty commas. A year banner row
+ * "FY 2024" merged across columns B–M becomes ",,,,FY 2024,,,,,,,,,," in
+ * CSV — the LLM has to guess that the empty cells belong to "FY 2024",
+ * which fails on wide grids and produces the absurd-magnitude / missing-
+ * line-item bugs we've shipped.
+ *
+ * After this pass: every cell in a merge range carries the same value as
+ * the top-left, so column alignment is preserved and the LLM can read
+ * the year banner and the month label below it as a coherent (year,
+ * month) pair.
+ *
+ * Mutates the sheet in place. Safe because `extractTextFromExcel` owns
+ * the workbook for the duration of the call (the markdown extractor
+ * runs on its own `XLSX.read` of the buffer).
  */
-export function detectUnitScale(sheet: XLSX.WorkSheet): string | null {
+export function expandMerges(sheet: XLSX.WorkSheet): void {
+  const merges = sheet['!merges'];
+  if (!merges || merges.length === 0) return;
+
+  for (const m of merges) {
+    const srcAddr = XLSX.utils.encode_cell({ r: m.s.r, c: m.s.c });
+    const srcCell = sheet[srcAddr];
+    if (!srcCell || srcCell.v == null || srcCell.v === '') continue;
+    for (let r = m.s.r; r <= m.e.r; r++) {
+      for (let c = m.s.c; c <= m.e.c; c++) {
+        if (r === m.s.r && c === m.s.c) continue;
+        const addr = XLSX.utils.encode_cell({ r, c });
+        // After XLSX round-trip, cells inside a merge range come back
+        // as empty-string placeholders ({t:'s', v:''}) rather than
+        // `undefined`. Treat any cell with a null/empty value as
+        // overwritable so the merge value broadcasts correctly.
+        const existing = sheet[addr];
+        if (existing && existing.v != null && existing.v !== '') continue;
+        sheet[addr] = { ...srcCell };
+      }
+    }
+  }
+}
+
+// ─── Unit Scale Detection ────────────────────────────────────
+
+/** Caps for the unit-scale scan — wide enough to catch declarations
+ *  buried in a footnote row (row 14, "Note: All figures in $000s") or
+ *  a far-right disclaimer column, narrow enough that a 1000-row data
+ *  sheet doesn't waste milliseconds on cells that are obviously numeric. */
+const UNIT_SCAN_MAX_ROWS = 25;
+const UNIT_SCAN_MAX_COLS = 25;
+
+/**
+ * Scan the sheet for unit indicators (millions / thousands / billions /
+ * actuals). Looks at:
+ *   1. Up to UNIT_SCAN_MAX_ROWS × UNIT_SCAN_MAX_COLS cells in the grid
+ *      (vs the previous 8×10 cap which missed footnote-row declarations).
+ *   2. The sheet name itself ("P&L (in $M)" or "Revenue ($000s)").
+ *
+ * Returns the strongest signal as a prompt-ready hint string, or null.
+ */
+export function detectUnitScale(
+  sheet: XLSX.WorkSheet,
+  sheetName?: string,
+): string | null {
+  const candidates: string[] = [];
+  if (sheetName) candidates.push(sheetName);
+
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
-  const maxRow = Math.min(range.e.r, 8); // check first 8 rows only
-
+  const maxRow = Math.min(range.e.r, range.s.r + UNIT_SCAN_MAX_ROWS - 1);
+  const maxCol = Math.min(range.e.c, range.s.c + UNIT_SCAN_MAX_COLS - 1);
   for (let r = range.s.r; r <= maxRow; r++) {
-    for (let c = range.s.c; c <= Math.min(range.e.c, 10); c++) {
+    for (let c = range.s.c; c <= maxCol; c++) {
       const cell = sheet[XLSX.utils.encode_cell({ r, c })];
-      if (!cell || !cell.v) continue;
-      const val = String(cell.v).toLowerCase();
+      if (!cell || cell.v == null) continue;
+      const val = String(cell.v);
+      // Cheap pre-filter: only look at strings that mention dollars, a
+      // scale word, or a parenthesised marker. Avoids regex-testing every
+      // numeric cell in a wide grid.
+      if (!/\$|\(|\bin\b|thousand|million|billion|actual/i.test(val)) continue;
+      candidates.push(val);
+    }
+  }
 
-      if (/\$\s*in\s*millions|\(\$m\)|\$\s*mm|\(millions\)|in\s*millions?\s*usd/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in MILLIONS USD ($M). Store values as written; set unitScale to "MILLIONS". Do NOT convert.';
-      }
-      if (/\$\s*in\s*thousands|\(\$000s?\)|\$\s*000|\(thousands\)|in\s*thousands/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in THOUSANDS USD ($000s). Store values as written; set unitScale to "THOUSANDS". Do NOT convert.';
-      }
-      if (/\$\s*in\s*billions|\(\$b\)|\(billions\)/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in BILLIONS USD ($B). Store values as written; set unitScale to "BILLIONS". Do NOT convert.';
-      }
-      if (/in\s*actual|in\s*dollars|\(\$\)$/i.test(val)) {
-        return 'IMPORTANT: Values in this sheet are in ACTUAL DOLLARS. Store values as written; set unitScale to "ACTUALS". Do NOT convert.';
-      }
+  for (const raw of candidates) {
+    const val = raw.toLowerCase();
+    if (/\$\s*in\s*millions|\(\$m\)|\$\s*mm|\(millions\)|in\s*millions?\s*usd|\(in\s*\$?m\)/i.test(val)) {
+      return 'IMPORTANT: Values in this sheet are in MILLIONS USD ($M). Store values as written; set unitScale to "MILLIONS". Do NOT convert.';
+    }
+    if (/\$\s*in\s*thousands|\(\$000s?\)|\$\s*000|\(thousands\)|in\s*thousands|\(in\s*\$?k\)/i.test(val)) {
+      return 'IMPORTANT: Values in this sheet are in THOUSANDS USD ($000s). Store values as written; set unitScale to "THOUSANDS". Do NOT convert.';
+    }
+    if (/\$\s*in\s*billions|\(\$b\)|\(billions\)|\(in\s*\$?b\)/i.test(val)) {
+      return 'IMPORTANT: Values in this sheet are in BILLIONS USD ($B). Store values as written; set unitScale to "BILLIONS". Do NOT convert.';
+    }
+    if (/in\s*actual|in\s*dollars|\(\$\)$/i.test(val)) {
+      return 'IMPORTANT: Values in this sheet are in ACTUAL DOLLARS. Store values as written; set unitScale to "ACTUALS". Do NOT convert.';
     }
   }
   return null;
 }
 
-// ─── Row Filtering ───────────────────────────────────────────
+// ─── Structured Row/Column Ingestion ─────────────────────────
 
 /**
- * Convert sheet to CSV but skip mostly-empty rows and formatting-only rows.
- * Returns cleaner text that's more token-efficient for AI classifier.
+ * Render a sheet as structured row/column text suitable for the LLM
+ * classifier.
+ *
+ * Approach (replaces the prior flat sheet_to_csv path):
+ *   1. Caller has already expanded merges, so year banners / quarter
+ *      bands fill every column they visually span.
+ *   2. Build a 2-D grid via sheet_to_json({ header: 1 }) — preserves
+ *      column alignment across rows of mixed length, which is
+ *      essential for spreadsheet semantics (period headers in row N,
+ *      line items in column A, values in B+ form a 2-D structure).
+ *   3. Pad short rows to maxCols so columns stay aligned in the
+ *      rendered output even when later rows have fewer cells.
+ *   4. Drop rows that are purely empty / formatting separators
+ *      (---, ===) but keep rows that have a label and zero values
+ *      (those carry section structure: "EBITDA Build", subheadings).
+ *   5. Emit a small grid header noting dimensions + the column-A
+ *      label preview, so the LLM has anchors to reason against
+ *      ("col A row 28 is 'EBITDA'") instead of inferring from the
+ *      raw blob.
+ *
+ * Returns a tab-separated grid (tab = column boundary) prefixed with
+ * a lightweight metadata block. Tab-separated rather than comma so we
+ * don't conflict with commas inside numbers like "1,250".
  */
-function sheetToCleanCSV(sheet: XLSX.WorkSheet): string {
-  const csv = XLSX.utils.sheet_to_csv(sheet, {
+function sheetToStructuredText(sheet: XLSX.WorkSheet): string {
+  const grid = XLSX.utils.sheet_to_json<unknown[]>(sheet, {
+    header: 1,
+    defval: '',
     blankrows: false,
-    strip: true,
+    raw: false, // use formatted text (cell.w) so dates render as "Apr-23"
   });
 
-  const lines = csv.split('\n');
-  const cleanLines: string[] = [];
+  if (grid.length === 0) return '';
 
-  for (const line of lines) {
-    // Skip lines that are just commas (empty rows)
-    const stripped = line.replace(/,/g, '').trim();
-    if (stripped.length < 2) continue;
+  // Pad short rows so the grid is a true rectangle. xlsx returns ragged
+  // rows when later columns are empty; pad with '' to keep column
+  // indices stable.
+  const maxCols = grid.reduce((m, r) => Math.max(m, r.length), 0);
 
-    // Skip lines that are only dashes/underscores/equals (formatting separators)
-    if (/^[-_=\s,]+$/.test(line)) continue;
+  const cleanRows: string[] = [];
+  for (let i = 0; i < grid.length; i++) {
+    const row = grid[i];
+    const padded: string[] = [];
+    for (let c = 0; c < maxCols; c++) {
+      const v = row[c];
+      // Render every cell as its string form. Tabs and newlines inside
+      // cells get squashed so they don't break the grid layout.
+      const s = v == null ? '' : String(v).replace(/[\t\n\r]+/g, ' ').trim();
+      padded.push(s);
+    }
+    const joined = padded.join('\t');
 
-    cleanLines.push(line);
+    // Skip purely-empty rows (all cells empty after merge expansion).
+    if (padded.every((cell) => cell === '')) continue;
+    // Skip pure formatting separators (------ or ====== rows).
+    if (/^[-_=\s\t]+$/.test(joined)) continue;
+
+    cleanRows.push(joined);
   }
 
-  return cleanLines.join('\n');
+  if (cleanRows.length === 0) return '';
+
+  // Lightweight per-sheet metadata. Helps the LLM anchor its reasoning
+  // to specific (row, col) coordinates instead of treating the blob as
+  // unstructured text. Column letters use spreadsheet convention
+  // (A=col 0, B=col 1, …) so the LLM's "column A is the label" prior
+  // matches what it sees.
+  const colLetters = Array.from({ length: maxCols }, (_, c) =>
+    XLSX.utils.encode_col(c),
+  ).join('\t');
+
+  const header = `[Grid: ${cleanRows.length} non-empty rows × ${maxCols} cols]\nCOL\t${colLetters}`;
+
+  return `${header}\n${cleanRows.join('\n')}`;
 }
 
 // ─── Main Extractor ──────────────────────────────────────────
@@ -182,18 +304,26 @@ export function extractTextFromExcel(buffer: Buffer): string | null {
       const sheet = workbook.Sheets[name];
       if (!sheet) continue;
 
-      const csv = sheetToCleanCSV(sheet);
-      if (csv.length < 20) continue; // empty sheet after cleaning
+      // Spread merged values (year banners, quarter bands) into every
+      // cell of their merge range BEFORE the structured walk; otherwise
+      // the LLM sees ",,,FY 2024,,,,,,,,," and has to guess which months
+      // belong to which year.
+      expandMerges(sheet);
 
-      // Detect unit scale from sheet headers
-      const unitHint = detectUnitScale(sheet);
+      const body = sheetToStructuredText(sheet);
+      if (body.length < 20) continue; // empty sheet after cleaning
+
+      // Detect unit scale across the whole sheet header zone (and the
+      // sheet name) — covers footnote-row declarations the old 8×10
+      // window missed.
+      const unitHint = detectUnitScale(sheet, name);
 
       // Build sheet header with context
       let header = `[Sheet: ${name}]`;
       if (score >= 70) header += ` (financial statement detected)`;
       if (unitHint) header += `\n${unitHint}`;
 
-      textParts.push(`${header}\n${csv}`);
+      textParts.push(`${header}\n${body}`);
     }
 
     if (textParts.length === 0) {

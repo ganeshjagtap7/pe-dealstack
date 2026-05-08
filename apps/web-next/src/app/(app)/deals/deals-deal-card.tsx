@@ -30,6 +30,7 @@ export function DealCard({
   activeMetrics,
   onRemoveSample,
   summary,
+  summariesLoading,
 }: {
   deal: Deal;
   selected: boolean;
@@ -44,13 +45,30 @@ export function DealCard({
    * cards still render before the bulk fetch resolves.
    */
   summary?: FinancialSummary;
+  /**
+   * True until the bulk summaries fetch resolves. While true the
+   * revenue/EBITDA cells render a placeholder so we never display
+   * the legacy unit-less Deal.revenue / Deal.ebitda columns.
+   */
+  summariesLoading?: boolean;
 }) {
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const style = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
   const isPassed = deal.status === "PASSED" || deal.stage === "PASSED";
-  const hasRiskFlag = (deal.ebitda ?? 0) < 0 || deal.stage === "PASSED";
+  // Risk flag prefers the in-unit summary EBITDA (already at the row's
+  // unitScale, so the sign comparison is meaningful) and only falls back
+  // to deal.ebitda once we know summaries finished loading and there
+  // simply isn't a statement for this deal.
+  const summaryEbitda = summary?.ebitda;
+  const ebitdaForRiskFlag =
+    summaryEbitda != null
+      ? summaryEbitda
+      : !summariesLoading && summary === undefined
+        ? deal.ebitda
+        : null;
+  const hasRiskFlag = (ebitdaForRiskFlag ?? 0) < 0 || deal.stage === "PASSED";
   const liveUpdated = useLiveTime(deal.lastDocumentUpdated || deal.updatedAt);
 
   useEffect(() => {
@@ -198,21 +216,37 @@ export function DealCard({
             {activeMetrics.map((key) => {
               const cfg = METRIC_CONFIG[key];
               if (!cfg) return null;
-              // Revenue / EBITDA come from the extracted income statement
-              // when available \u2014 both their value and their unit live on
-              // `summary`. EBITDA color (red < 0) still uses the
-              // statement value because it's already at the same scale.
-              const stmtValue =
-                summary && key === "revenue"
-                  ? summary.revenue
-                  : summary && key === "ebitda"
-                    ? summary.ebitda
-                    : null;
+              // Revenue / EBITDA are rendered EXCLUSIVELY through the
+              // income-statement summary (which carries unitScale +
+              // currency). We never fall through to formatCurrency on
+              // the legacy Deal.{revenue,ebitda} columns: those have
+              // no unit-scale tag, and formatCurrency assumes MILLIONS,
+              // which turns a stored 21.5 (intent: thousands) into
+              // "$21.5M" on the card. While summaries are loading we
+              // show an em-dash (and pulse it) so the card doesn't
+              // briefly lie about the magnitude.
+              const isStmtKey = key === "revenue" || key === "ebitda";
+              const stmtValue = isStmtKey
+                ? key === "revenue"
+                  ? (summary?.revenue ?? null)
+                  : (summary?.ebitda ?? null)
+                : null;
               const dealValue = deal[key as keyof Deal] as number | undefined | null;
-              const value =
-                stmtValue != null
-                  ? stmtValue
-                  : dealValue;
+              const colorValue = isStmtKey ? stmtValue : dealValue;
+              const renderedValue = (() => {
+                if (key === "irrProjected") {
+                  return dealValue != null ? Number(dealValue).toFixed(1) + "%" : "\u2014";
+                }
+                if (key === "mom") {
+                  return dealValue != null ? Number(dealValue).toFixed(1) + "x" : "\u2014";
+                }
+                if (isStmtKey) {
+                  if (summariesLoading) return "\u2014";
+                  if (!summary) return "\u2014";
+                  return formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency });
+                }
+                return formatCurrency(dealValue as number | null | undefined, deal.currency);
+              })();
               return (
                 <div key={key} className="bg-background-body rounded-md p-3">
                   <span className="text-text-muted text-[10px] font-bold uppercase tracking-wider block mb-1">
@@ -220,17 +254,12 @@ export function DealCard({
                   </span>
                   <span className={cn(
                     "font-bold text-lg",
-                    key === "mom" && value != null && value >= 3 ? "text-secondary" : "",
-                    key === "ebitda" && value != null && value < 0 ? "text-red-600" : "",
-                    !(key === "mom" && value != null && value >= 3) && !(key === "ebitda" && value != null && value < 0) ? "text-text-main" : "",
+                    key === "mom" && colorValue != null && colorValue >= 3 ? "text-secondary" : "",
+                    key === "ebitda" && colorValue != null && colorValue < 0 ? "text-red-600" : "",
+                    !(key === "mom" && colorValue != null && colorValue >= 3) && !(key === "ebitda" && colorValue != null && colorValue < 0) ? "text-text-main" : "",
+                    isStmtKey && summariesLoading ? "text-text-muted/60 animate-pulse" : "",
                   )}>
-                    {key === "irrProjected"
-                      ? (value != null ? Number(value).toFixed(1) + "%" : "\u2014")
-                      : key === "mom"
-                        ? (value != null ? Number(value).toFixed(1) + "x" : "\u2014")
-                        : summary && (key === "revenue" || key === "ebitda")
-                          ? formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency })
-                          : formatCurrency(value as number | null | undefined, deal.currency)}
+                    {renderedValue}
                   </span>
                 </div>
               );
@@ -262,20 +291,26 @@ export function DealCard({
             </p>
           </div>
 
-          {/* Risk Flag: Low EBITDA Margin */}
-          {(deal.ebitda ?? 0) < 0 && (
+          {/* Risk Flag: Low EBITDA Margin — drives off the same in-unit
+              ebitda as the metric grid so the badge can't disagree with
+              the value the user is looking at. */}
+          {(ebitdaForRiskFlag ?? 0) < 0 && (
             <div className="flex items-center gap-1.5 mt-3">
               <span className="material-symbols-outlined text-red-500 text-[14px]">warning</span>
               <span className="text-red-500 text-[11px] font-semibold">Low EBITDA margin</span>
             </div>
           )}
 
-          {/* Data Completeness Bar */}
+          {/* Data Completeness Bar — prefer the income-statement summary
+              for revenue/EBITDA so a deal with statements but a stale
+              null on the legacy columns still scores as "data present". */}
           {(() => {
             let filled = 0;
             const total = 6;
-            if (deal.revenue) filled++;
-            if (deal.ebitda) filled++;
+            const hasRevenue = summary?.revenue != null || (summary === undefined && deal.revenue != null);
+            const hasEbitda = summary?.ebitda != null || (summary === undefined && deal.ebitda != null);
+            if (hasRevenue) filled++;
+            if (hasEbitda) filled++;
             if (deal.dealSize) filled++;
             if (deal.aiThesis && deal.aiThesis !== "No AI analysis available yet.") filled++;
             if (deal.lastDocument) filled++;

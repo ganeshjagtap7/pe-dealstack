@@ -118,10 +118,33 @@ router.get('/financial-summaries', async (req, res) => {
       const candidates = historical.length > 0 ? historical : dealRows;
 
       // comparePeriodChronologically sorts ASC; reverse to get newest.
-      const sorted = [...candidates].sort((a, b) =>
+      const sortedDesc = [...candidates].sort((a, b) =>
         comparePeriodChronologically(b.period, a.period),
       );
-      const latest = sorted[0];
+
+      // Pick the latest period that actually carries the headline
+      // line items. Without this, a deal whose most-recent period is
+      // an unbacked PROJECTED row (or a stub with revenue/ebitda=null)
+      // would show "—" on the cards even though earlier periods have
+      // values — this matched the user-visible Website Speedy /
+      // PromptStash bug. We require BOTH revenue and ebitda to be
+      // present so the unitScale + currency stay consistent across
+      // both numbers (so the implied margin always makes sense).
+      const latestWithBoth = sortedDesc.find(
+        (r) =>
+          r.lineItems?.revenue != null && r.lineItems?.ebitda != null,
+      );
+      const latestWithRevenue = sortedDesc.find(
+        (r) => r.lineItems?.revenue != null,
+      );
+      const latestWithEbitda = sortedDesc.find(
+        (r) => r.lineItems?.ebitda != null,
+      );
+      const latest =
+        latestWithBoth ??
+        latestWithRevenue ??
+        latestWithEbitda ??
+        sortedDesc[0];
       if (!latest) continue;
 
       const li = latest.lineItems ?? {};

@@ -23,6 +23,7 @@ export function KanbanView({
   setDragOverStage,
   onDrop,
   summaries,
+  summariesLoading,
 }: {
   deals: Deal[];
   activeMetrics: MetricKey[];
@@ -34,6 +35,8 @@ export function KanbanView({
    * kanban renders before the bulk fetch resolves.
    */
   summaries?: FinancialSummariesMap;
+  /** True until the bulk summaries fetch resolves. */
+  summariesLoading?: boolean;
 }) {
   return (
     <div className="flex gap-4 overflow-x-auto pb-4">
@@ -72,6 +75,7 @@ export function KanbanView({
                     deal={deal}
                     activeMetrics={activeMetrics}
                     summary={summaries?.[deal.id]}
+                    summariesLoading={summariesLoading}
                   />
                 ))}
                 {stageDeals.length === 0 && (
