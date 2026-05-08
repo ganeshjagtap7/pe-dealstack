@@ -340,7 +340,12 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
     {
       key: "ebitdaMargin",
       label: "EBITDA Margin",
-      value: statementLoading ? "loading" : (hasMarginData ? ebitdaValue : null),
+      // Was: `hasMarginData ? ebitdaValue : null`. With Speedy hitting the
+      // legacy-margin fallthrough, marginPct = 50.1 but ebitdaValue is null
+      // (summary's ebitda was null); the downstream `value != null` filter
+      // then dropped the card entirely. Use marginPct as the truthy gate so
+      // the card renders whenever a usable margin exists.
+      value: statementLoading ? "loading" : marginPct,
       formatted: marginPct != null ? marginPct.toFixed(0) + "%" : "\u2014",
       loading: statementLoading,
     },

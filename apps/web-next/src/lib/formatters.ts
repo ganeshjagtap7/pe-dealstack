@@ -240,17 +240,26 @@ export interface HeadlineMetrics {
  * `(ebitda / revenue) * 100` from values that share an assumed scale.
  */
 
+/** Reject margins outside [-100, 1000]% — a margin that extreme is almost
+ * always a sign that two source fields were written at mismatched scales
+ * (the historical 11103% display bug from MILLIONS-vs-THOUSANDS legacy
+ * columns). Returns the margin if sane, otherwise null. Also rejects
+ * non-finite numbers so NaN/Infinity from `0 / 0` style arithmetic at the
+ * call site doesn't slip through. */
+function sanitizeMargin(n: number | null | undefined): number | null {
+  if (n == null) return null;
+  if (!Number.isFinite(n)) return null;
+  if (n < -100 || n > 1000) return null;
+  return n;
+}
+
 /** Compute a margin from legacy deal-level rev/ebitda, suppressing values
- * outside [-100, 1000]% — a margin that extreme is almost always a sign
- * the two legacy fields were written by different ingest paths at
- * mismatched scales (the historical 11103% display bug). */
+ * outside the sanity range via `sanitizeMargin`. */
 function legacyMargin(deal: DealLikeMetrics | null | undefined): number | null {
   if (!deal) return null;
   const { revenue: rev, ebitda: ebd } = deal;
   if (rev == null || ebd == null || rev === 0) return null;
-  const margin = (ebd / rev) * 100;
-  if (margin < -100 || margin > 1000) return null;
-  return margin;
+  return sanitizeMargin((ebd / rev) * 100);
 }
 
 export function pickHeadlineMetrics(
@@ -278,16 +287,19 @@ export function pickHeadlineMetrics(
   if (summary && (summary.revenue != null || summary.ebitda != null)) {
     const rev = summary.revenue ?? null;
     const ebd = summary.ebitda ?? null;
-    let margin =
-      summary.ebitdaMargin != null
-        ? summary.ebitdaMargin
-        : rev != null && ebd != null && rev !== 0
-          ? (ebd / rev) * 100
-          : null;
-    // Supplement margin from legacy fields when the picked summary row
-    // has revenue but no EBITDA (common for monthly rows where EBITDA is
-    // computed only at the year level). Sanity check rejects mismatched-
-    // scale legacy values that would otherwise render as 11103%.
+    // Try each source in precedence order, sanitizing every candidate so a
+    // mismatched-scale extraction (e.g. revenue MILLIONS / ebitda
+    // THOUSANDS on the same row) can't render as 11103%. Each source can
+    // independently fall through to the next when out of sanity range.
+    //   1. summary.ebitdaMargin (server-extracted)
+    //   2. (ebd / rev) * 100 from the same summary row
+    //   3. legacyMargin(deal) — supplements when the picked summary row
+    //      has revenue but no EBITDA (common for monthly rows where EBITDA
+    //      is computed only at the year level)
+    let margin = sanitizeMargin(summary.ebitdaMargin ?? null);
+    if (margin == null && rev != null && ebd != null && rev !== 0) {
+      margin = sanitizeMargin((ebd / rev) * 100);
+    }
     if (margin == null) margin = legacyMargin(deal);
     return {
       source: "summary",
