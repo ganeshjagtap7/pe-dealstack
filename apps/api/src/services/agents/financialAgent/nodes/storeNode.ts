@@ -44,6 +44,10 @@ function step(node: string, message: string, detail?: string): AgentStep {
  * "monthly wins over annual for the same year" rule here keeps the DB clean
  * intra-document. Cross-document reconciliation is a separate concern.
  *
+ * Rule C: when multiple monthly periods within a single statement resolve
+ *         to the same (year, month), keep one canonical-label period and
+ *         drop the rest. Runs FIRST so Rule A's overlap detection isn't
+ *         inflated by label-format duplicates of the same source row.
  * Rule A: when a year has both an annual period and any monthly period,
  *         drop the annual.
  * Rule B: when an annual period has revenue == 0 but the same year's
@@ -55,12 +59,79 @@ function step(node: string, message: string, detail?: string): AgentStep {
  */
 const ZERO_ANNUAL_REVENUE_THRESHOLD_USD = 1000;
 
-function dedupAnnualVsMonthly(statements: ClassifiedStatement[]): AgentStep[] {
+/** Rank a monthly period label for canonical-keep selection. Lower wins.
+ * Why: ISO `YYYY-MM` is unambiguous; long-form `Mon YYYY` survives any
+ * downstream UI that strips two-digit-year heuristics; short-form `Mon-YY`
+ * is the most likely to be re-parsed wrong by a dumb consumer. */
+function canonicalLabelRank(label: string): number {
+  const trimmed = label.trim();
+  if (/^\d{4}-\d{2}$/.test(trimmed)) return 0;
+  if (/^[A-Za-z]+\s+\d{4}$/.test(trimmed)) return 1;
+  if (/^[A-Za-z]+-\d{2}$/.test(trimmed)) return 2;
+  return 3;
+}
+
+export function dedupAnnualVsMonthly(statements: ClassifiedStatement[]): AgentStep[] {
   const logs: AgentStep[] = [];
 
   for (const stmt of statements) {
     if (stmt.periods.length === 0) continue;
 
+    // ─── Rule C — collapse same-(year,month) duplicates first ────────
+    type ParsedPeriod = { period: FinancialPeriod; year: number; month: number; idx: number };
+    const monthlyByKey = new Map<string, ParsedPeriod[]>();
+    stmt.periods.forEach((period, idx) => {
+      const parsed = parsePeriodToYearMonth(period.period);
+      if (!parsed || parsed.month == null) return;
+      const key = `${parsed.year}-${parsed.month}`;
+      const arr = monthlyByKey.get(key) ?? [];
+      arr.push({ period, year: parsed.year, month: parsed.month, idx });
+      monthlyByKey.set(key, arr);
+    });
+
+    const ruleCDrops = new Set<FinancialPeriod>();
+    for (const [, group] of monthlyByKey) {
+      if (group.length < 2) continue;
+      const sorted = [...group].sort((a, b) => {
+        const r = canonicalLabelRank(a.period.period) - canonicalLabelRank(b.period.period);
+        return r !== 0 ? r : a.idx - b.idx;
+      });
+      const keep = sorted[0];
+      const drops = sorted.slice(1);
+
+      // Warn (don't merge) when retained candidates disagree on any shared
+      // numeric line item — the equal-value case is the common one, so a
+      // mismatch means the upstream extractor is producing inconsistent
+      // numbers under different labels and a human should look.
+      for (const cand of drops) {
+        for (const [field, val] of Object.entries(cand.period.lineItems)) {
+          if (typeof val !== 'number' || !Number.isFinite(val)) continue;
+          const keepVal = keep.period.lineItems[field];
+          if (typeof keepVal !== 'number' || !Number.isFinite(keepVal)) continue;
+          if (keepVal !== val) {
+            logs.push(step(
+              'store',
+              `Same-month dedup mismatch on ${stmt.statementType} ${field} for ${cand.period.period} vs ${keep.period.period}: ${keepVal} vs ${val}`,
+              'Pre-write dedup (Rule C: divergent values; keeping canonical-label).',
+            ));
+          }
+        }
+      }
+
+      for (const cand of drops) {
+        ruleCDrops.add(cand.period);
+        logs.push(step(
+          'store',
+          `Dropped duplicate ${stmt.statementType} period "${cand.period.period}" — same (year, month) as kept "${keep.period.period}"`,
+          'Pre-write dedup (Rule C: same-month-different-label).',
+        ));
+      }
+    }
+    if (ruleCDrops.size > 0) {
+      stmt.periods = stmt.periods.filter(p => !ruleCDrops.has(p));
+    }
+
+    // ─── Rule A / Rule B — annual vs monthly ─────────────────────────
     // Bucket each period into annual / monthly by parsed shape.
     type Tagged = { period: FinancialPeriod; year: number; isMonthly: boolean };
     const tagged: Tagged[] = [];
