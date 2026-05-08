@@ -1,4 +1,8 @@
-import { formatCurrency, formatFinancialValue } from "@/lib/formatters";
+import {
+  formatCurrency,
+  formatHeadlineValue,
+  pickHeadlineMetrics,
+} from "@/lib/formatters";
 import { STAGE_LABELS } from "@/lib/constants";
 import type { Deal, FinancialSummariesMap } from "@/types";
 
@@ -6,11 +10,10 @@ import type { Deal, FinancialSummariesMap } from "@/types";
 // CSV Export — generates a CSV blob from selected deals and triggers a
 // browser download. Extracted from deals/page.tsx for file-size budget.
 //
-// Revenue / EBITDA columns render via the income-statement summary
-// (unitScale + currency) when present. We never call formatCurrency on
-// the legacy Deal.{revenue,ebitda} columns: those are unit-less and
-// formatCurrency assumes MILLIONS, which prints stored thousands as
-// millions in the export.
+// Revenue / EBITDA columns render via the canonical precedence
+// (cached → income-statement summary → legacy MILLIONS) so the exported
+// magnitudes match what the cards display. The legacy fallback is the
+// reason for the "11103% margin" display bug — keep it last-resort only.
 // ---------------------------------------------------------------------------
 
 export function exportDealsToCSV(
@@ -39,14 +42,11 @@ export function exportDealsToCSV(
 
   const rows = dealsToExport.map((deal) => {
     const summary = summaries?.[deal.id];
+    const headline = pickHeadlineMetrics(deal, summary ?? null);
     const revenueCell =
-      summary?.revenue != null
-        ? formatFinancialValue(summary.revenue, summary.unitScale, { currency: summary.currency })
-        : "";
+      headline.revenue != null ? formatHeadlineValue(headline.revenue, headline) : "";
     const ebitdaCell =
-      summary?.ebitda != null
-        ? formatFinancialValue(summary.ebitda, summary.unitScale, { currency: summary.currency })
-        : "";
+      headline.ebitda != null ? formatHeadlineValue(headline.ebitda, headline) : "";
     return [
       escapeCSV(deal.name),
       escapeCSV(deal.industry),

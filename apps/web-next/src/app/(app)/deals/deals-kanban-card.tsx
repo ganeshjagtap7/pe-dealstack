@@ -3,8 +3,9 @@
 import { type DragEvent } from "react";
 import {
   formatCurrency,
-  formatFinancialValue,
+  formatHeadlineValue,
   getDealDisplayName,
+  pickHeadlineMetrics,
 } from "@/lib/formatters";
 import { METRIC_CONFIG, type MetricKey } from "@/lib/constants";
 import { cn } from "@/lib/cn";
@@ -33,16 +34,19 @@ export function KanbanCard({
   /** True until the bulk summaries fetch resolves; see DealCard. */
   summariesLoading?: boolean;
 }) {
-  // Risk flag uses the in-unit summary EBITDA when available; otherwise
-  // falls through to deal.ebitda only after summaries finish loading
-  // and we know there's no statement (avoids the "$21.5M" mis-flag).
-  const summaryEbitda = summary?.ebitda;
-  const ebitdaForRiskFlag =
-    summaryEbitda != null
-      ? summaryEbitda
-      : !summariesLoading && summary === undefined
-        ? deal.ebitda
-        : null;
+  // Headline metrics via the canonical precedence (cached → summary →
+  // legacy). The risk-flag sign comparison stays meaningful because the
+  // helper preserves unitScale alongside the picked value.
+  const cacheHit =
+    deal.cachedRevenue != null ||
+    deal.cachedEbitda != null ||
+    deal.cachedEbitdaMargin != null;
+  const headline = pickHeadlineMetrics(
+    deal,
+    summary && (summary.revenue != null || summary.ebitda != null) ? summary : null,
+  );
+  const headlineLoading = !cacheHit && summariesLoading;
+  const ebitdaForRiskFlag = headlineLoading ? null : headline.ebitda;
   const hasRiskFlag = (ebitdaForRiskFlag ?? 0) < 0 || deal.stage === "PASSED";
   const kanbanMetrics = activeMetrics.slice(0, 3);
 
@@ -78,9 +82,8 @@ export function KanbanCard({
           </div>
         </div>
         {/* Dynamic compact metrics (first 3) \u2014 revenue/EBITDA route
-            EXCLUSIVELY through the income-statement summary so we never
-            render the unit-less Deal.{revenue,ebitda} columns through
-            formatCurrency (which assumes MILLIONS). */}
+            through pickHeadlineMetrics (cached \u2192 summary \u2192 legacy) so
+            the cards never render mismatched-scale legacy columns. */}
         <div className="flex gap-3 mb-2">
           {kanbanMetrics.map((key) => {
             const cfg = METRIC_CONFIG[key];
@@ -88,8 +91,8 @@ export function KanbanCard({
             const isStmtKey = key === "revenue" || key === "ebitda";
             const stmtValue = isStmtKey
               ? key === "revenue"
-                ? (summary?.revenue ?? null)
-                : (summary?.ebitda ?? null)
+                ? headline.revenue
+                : headline.ebitda
               : null;
             const dealValue = deal[key as keyof Deal] as number | undefined | null;
             const colorValue = isStmtKey ? stmtValue : dealValue;
@@ -101,9 +104,9 @@ export function KanbanCard({
                 return dealValue != null ? Number(dealValue).toFixed(1) + "x" : "\u2014";
               }
               if (isStmtKey) {
-                if (summariesLoading) return "\u2014";
-                if (!summary) return "\u2014";
-                return formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency });
+                if (headlineLoading) return "\u2014";
+                if (stmtValue == null) return "\u2014";
+                return formatHeadlineValue(stmtValue, headline);
               }
               return formatCurrency(dealValue as number | null | undefined, deal.currency);
             })();
@@ -115,7 +118,7 @@ export function KanbanCard({
                   key === "mom" && colorValue != null && colorValue >= 3 ? "text-secondary" : "",
                   key === "ebitda" && colorValue != null && colorValue < 0 ? "text-red-600" : "",
                   !(key === "mom" && colorValue != null && colorValue >= 3) && !(key === "ebitda" && colorValue != null && colorValue < 0) ? "text-text-main" : "",
-                  isStmtKey && summariesLoading ? "text-text-muted/60 animate-pulse" : "",
+                  isStmtKey && headlineLoading ? "text-text-muted/60 animate-pulse" : "",
                 )}>
                   {renderedValue}
                 </span>

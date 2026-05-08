@@ -1,6 +1,6 @@
 "use client";
 
-import { formatCurrency, formatFinancialValue } from "@/lib/formatters";
+import { formatHeadlineValue, pickHeadlineMetrics } from "@/lib/formatters";
 import type { FinancialSummary } from "@/types";
 import type { DealDetail } from "./components";
 
@@ -28,12 +28,13 @@ export function buildSuggestionPrompts(
 
   const name = deal.name || deal.companyName || "this company";
   const industry = deal.industry || null;
-  // Prefer the income-statement summary when present — its values come
-  // with a unitScale + currency, so formatFinancialValue renders the
-  // correct magnitude (e.g. "$6.7K" instead of formatCurrency()'s
-  // MILLIONS-assumed "$6.7M").
-  const revenue = summary?.revenue ?? deal.revenue ?? null;
-  const ebitda = summary?.ebitda ?? deal.ebitda ?? null;
+  // Resolve revenue / EBITDA via the canonical precedence (cached →
+  // summary → legacy). The helper preserves unitScale alongside the
+  // values so `formatHeadlineValue` renders at the right magnitude
+  // and the margin computation uses values that share a scale.
+  const headline = pickHeadlineMetrics(deal, summary ?? null);
+  const revenue = headline.revenue;
+  const ebitda = headline.ebitda;
   const hasDocs = (deal.documents?.length || 0) > 0;
 
   const prompts: SuggestionPrompt[] = [];
@@ -53,13 +54,18 @@ export function buildSuggestionPrompts(
 
   // 2. Financial deep-dive
   if (revenue != null && ebitda != null) {
-    const fmtRev = summary
-      ? formatFinancialValue(revenue, summary.unitScale, { currency: summary.currency })
-      : formatCurrency(revenue, deal.currency);
-    const fmtEbitda = summary
-      ? formatFinancialValue(ebitda, summary.unitScale, { currency: summary.currency })
-      : formatCurrency(ebitda, deal.currency);
-    const margin = revenue > 0 ? ((ebitda / revenue) * 100).toFixed(1) : null;
+    const fmtRev = formatHeadlineValue(revenue, headline);
+    const fmtEbitda = formatHeadlineValue(ebitda, headline);
+    // Prefer the helper's authoritative margin (cached → server-precomputed;
+    // summary → server-precomputed when present, else (ebitda / revenue) at
+    // the same unit scale; legacy → assumed MILLIONS-on-MILLIONS).
+    const marginNum =
+      headline.ebitdaMargin != null
+        ? headline.ebitdaMargin
+        : revenue > 0
+          ? (ebitda / revenue) * 100
+          : null;
+    const margin = marginNum != null ? marginNum.toFixed(1) : null;
     prompts.push({
       icon: "analytics",
       label: "Margin & valuation analysis",

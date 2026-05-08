@@ -3,9 +3,10 @@
 import { useEffect, useState, useRef } from "react";
 import {
   formatCurrency,
-  formatFinancialValue,
+  formatHeadlineValue,
   getDocIcon,
   getDealDisplayName,
+  pickHeadlineMetrics,
 } from "@/lib/formatters";
 import { useLiveTime } from "@/lib/useLiveTime";
 import {
@@ -57,17 +58,25 @@ export function DealCard({
   const menuRef = useRef<HTMLDivElement>(null);
   const style = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
   const isPassed = deal.status === "PASSED" || deal.stage === "PASSED";
-  // Risk flag prefers the in-unit summary EBITDA (already at the row's
-  // unitScale, so the sign comparison is meaningful) and only falls back
-  // to deal.ebitda once we know summaries finished loading and there
-  // simply isn't a statement for this deal.
-  const summaryEbitda = summary?.ebitda;
-  const ebitdaForRiskFlag =
-    summaryEbitda != null
-      ? summaryEbitda
-      : !summariesLoading && summary === undefined
-        ? deal.ebitda
-        : null;
+  // Headline metrics via the canonical precedence (cached → summary →
+  // legacy). Source determines the unit scale of `headline.ebitda` so
+  // the risk-flag sign comparison stays correct across all three modes
+  // and we never blend rev/ebitda from mismatched units.
+  const cacheHit =
+    deal.cachedRevenue != null ||
+    deal.cachedEbitda != null ||
+    deal.cachedEbitdaMargin != null;
+  const headline = pickHeadlineMetrics(
+    deal,
+    summary && (summary.revenue != null || summary.ebitda != null) ? summary : null,
+  );
+  // Hold revenue/EBITDA cells empty while summaries are still loading
+  // AND we don't yet have cached fields — avoids briefly showing the
+  // legacy MILLIONS-assumed values, then snapping to the in-unit summary.
+  const headlineLoading = !cacheHit && summariesLoading;
+  // Risk flag based on the resolved headline EBITDA. Null until we have
+  // either cached or summary data; the empty state below handles that.
+  const ebitdaForRiskFlag = headlineLoading ? null : headline.ebitda;
   const hasRiskFlag = (ebitdaForRiskFlag ?? 0) < 0 || deal.stage === "PASSED";
   const liveUpdated = useLiveTime(deal.lastDocumentUpdated || deal.updatedAt);
 
@@ -216,20 +225,15 @@ export function DealCard({
             {activeMetrics.map((key) => {
               const cfg = METRIC_CONFIG[key];
               if (!cfg) return null;
-              // Revenue / EBITDA are rendered EXCLUSIVELY through the
-              // income-statement summary (which carries unitScale +
-              // currency). We never fall through to formatCurrency on
-              // the legacy Deal.{revenue,ebitda} columns: those have
-              // no unit-scale tag, and formatCurrency assumes MILLIONS,
-              // which turns a stored 21.5 (intent: thousands) into
-              // "$21.5M" on the card. While summaries are loading we
-              // show an em-dash (and pulse it) so the card doesn't
-              // briefly lie about the magnitude.
+              // Revenue / EBITDA route through the canonical precedence
+              // helper (cached \u2192 summary \u2192 legacy). Never compute through
+              // raw deal.{revenue,ebitda} via formatCurrency \u2014 those are
+              // unit-less and the legacy formatter assumes MILLIONS.
               const isStmtKey = key === "revenue" || key === "ebitda";
               const stmtValue = isStmtKey
                 ? key === "revenue"
-                  ? (summary?.revenue ?? null)
-                  : (summary?.ebitda ?? null)
+                  ? headline.revenue
+                  : headline.ebitda
                 : null;
               const dealValue = deal[key as keyof Deal] as number | undefined | null;
               const colorValue = isStmtKey ? stmtValue : dealValue;
@@ -241,9 +245,12 @@ export function DealCard({
                   return dealValue != null ? Number(dealValue).toFixed(1) + "x" : "\u2014";
                 }
                 if (isStmtKey) {
-                  if (summariesLoading) return "\u2014";
-                  if (!summary) return "\u2014";
-                  return formatFinancialValue(stmtValue, summary.unitScale, { currency: summary.currency });
+                  // While the bulk summary fetch is in flight and we
+                  // don't have a cache hit, hold an em-dash to avoid
+                  // flashing legacy MILLIONS-assumed values.
+                  if (headlineLoading) return "\u2014";
+                  if (stmtValue == null) return "\u2014";
+                  return formatHeadlineValue(stmtValue, headline);
                 }
                 return formatCurrency(dealValue as number | null | undefined, deal.currency);
               })();
@@ -257,7 +264,7 @@ export function DealCard({
                     key === "mom" && colorValue != null && colorValue >= 3 ? "text-secondary" : "",
                     key === "ebitda" && colorValue != null && colorValue < 0 ? "text-red-600" : "",
                     !(key === "mom" && colorValue != null && colorValue >= 3) && !(key === "ebitda" && colorValue != null && colorValue < 0) ? "text-text-main" : "",
-                    isStmtKey && summariesLoading ? "text-text-muted/60 animate-pulse" : "",
+                    isStmtKey && headlineLoading ? "text-text-muted/60 animate-pulse" : "",
                   )}>
                     {renderedValue}
                   </span>
@@ -301,14 +308,15 @@ export function DealCard({
             </div>
           )}
 
-          {/* Data Completeness Bar — prefer the income-statement summary
-              for revenue/EBITDA so a deal with statements but a stale
-              null on the legacy columns still scores as "data present". */}
+          {/* Data Completeness Bar — drives off the same canonical
+              headline metrics as the cards above, so a deal with cached
+              fields or a statement still scores as "data present" even
+              when the legacy deal.{revenue,ebitda} columns are stale. */}
           {(() => {
             let filled = 0;
             const total = 6;
-            const hasRevenue = summary?.revenue != null || (summary === undefined && deal.revenue != null);
-            const hasEbitda = summary?.ebitda != null || (summary === undefined && deal.ebitda != null);
+            const hasRevenue = headline.revenue != null;
+            const hasEbitda = headline.ebitda != null;
             if (hasRevenue) filled++;
             if (hasEbitda) filled++;
             if (deal.dealSize) filled++;

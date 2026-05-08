@@ -4,8 +4,10 @@ import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/cn";
 import {
   formatCurrency,
-  formatFinancialValue,
+  formatHeadlineValue,
   formatRelativeTime,
+  pickHeadlineMetrics,
+  toActualDollars,
   type UnitScale,
 } from "@/lib/formatters";
 import { comparePeriodChronologically } from "./deal-financials-period-scope";
@@ -209,24 +211,42 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
 // ---------------------------------------------------------------------------
 
 export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
-  // Headline metrics on the deal page header. Two parallel sources for
-  // Revenue / EBITDA exist:
-  //   1) deal.revenue / deal.ebitda — legacy columns assumed by formatCurrency
-  //      to be in MILLIONS. Wrong when extraction stores at ACTUALS.
-  //   2) FinancialStatement (INCOME_STATEMENT) — carries unitScale + currency
-  //      per row, matching what the income-statement table on the same page
-  //      already renders. Treat this as the source of truth when present.
-  // Falling back to the deal-level columns keeps the legacy display behaviour
-  // for rows that don't yet have any extracted statements.
+  // Headline metrics on the deal page header. Read precedence
+  // (`pickHeadlineMetrics`):
+  //   1) deal.cachedRevenue / cachedEbitda / cachedEbitdaMargin — written
+  //      server-side by dealCacheWriteback. Both rev and ebitda come from
+  //      the SAME picked row in ACTUAL DOLLARS, so the margin is always
+  //      scale-correct. cachedEbitdaMargin is precomputed.
+  //   2) FinancialStatement (latest INCOME_STATEMENT) — carries unitScale +
+  //      currency. Used as fallback while the cache is empty.
+  //   3) Legacy deal.revenue / deal.ebitda (MILLIONS assumed). Last resort,
+  //      and only the source of the historical "11103% margin" display bug
+  //      because rev and ebitda were written by different paths at
+  //      different scales.
+  const cacheHit =
+    deal.cachedRevenue != null ||
+    deal.cachedEbitda != null ||
+    deal.cachedEbitdaMargin != null;
+
   const [latestIncome, setLatestIncome] = useState<IncomeStatementRow | null>(null);
   // True while the /deals/:id/financials request is in flight. Without this,
   // the legacy `deal.revenue` / `deal.ebitda` columns render first (with a
   // possibly-wrong margin computed from MILLIONS-assumed values), then snap
   // to the in-unit FinancialStatement values once the fetch returns — visible
-  // flicker on the EBITDA Margin card especially.
-  const [statementLoading, setStatementLoading] = useState<boolean>(Boolean(deal.id));
+  // flicker on the EBITDA Margin card especially. Suppressed entirely when
+  // the cache is populated since we don't need the fallback fetch.
+  const [statementLoading, setStatementLoading] = useState<boolean>(
+    Boolean(deal.id) && !cacheHit,
+  );
 
   useEffect(() => {
+    if (cacheHit) {
+      // Cached fields fully cover Revenue / EBITDA / Margin in actual
+      // dollars. Skip the fallback statement fetch entirely.
+      setStatementLoading(false);
+      setLatestIncome(null);
+      return;
+    }
     let cancelled = false;
     setStatementLoading(true);
     (async () => {
@@ -262,38 +282,35 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
     return () => {
       cancelled = true;
     };
-  }, [deal.id]);
+  }, [deal.id, cacheHit]);
 
-  // Pull authoritative revenue/EBITDA from the latest income statement row.
-  // Fall back to the legacy deal-level columns when no statement exists.
-  const stmtRevenue = latestIncome?.lineItems?.revenue ?? null;
-  const stmtEbitda = latestIncome?.lineItems?.ebitda ?? null;
-  const stmtUnit: UnitScale = (latestIncome?.unitScale as UnitScale | null) ?? "ACTUALS";
-  const stmtCurrency = latestIncome?.currency ?? deal.currency ?? null;
+  // Resolve revenue / EBITDA / margin via the canonical precedence helper.
+  // - cached: ACTUAL DOLLARS, margin precomputed by the server.
+  // - summary: latest INCOME_STATEMENT row at its native unitScale.
+  // - legacy: deal.revenue / deal.ebitda assumed MILLIONS.
+  const summaryShape = latestIncome
+    ? {
+        revenue: latestIncome.lineItems?.revenue ?? null,
+        ebitda: latestIncome.lineItems?.ebitda ?? null,
+        ebitdaMargin: null,
+        unitScale: (latestIncome.unitScale as UnitScale | null) ?? "ACTUALS",
+        currency: latestIncome.currency ?? deal.currency ?? null,
+      }
+    : null;
+  const headline = pickHeadlineMetrics(deal, summaryShape);
 
-  const revenueValue = stmtRevenue ?? deal.revenue ?? null;
-  const revenueFormatted =
-    stmtRevenue != null
-      ? formatFinancialValue(stmtRevenue, stmtUnit, { currency: stmtCurrency })
-      : formatCurrency(deal.revenue, deal.currency);
+  const revenueValue = headline.revenue;
+  const revenueFormatted = formatHeadlineValue(headline.revenue, headline);
 
-  const ebitdaValue = stmtEbitda ?? deal.ebitda ?? null;
-  const ebitdaFormatted =
-    stmtEbitda != null
-      ? formatFinancialValue(stmtEbitda, stmtUnit, { currency: stmtCurrency })
-      : formatCurrency(deal.ebitda, deal.currency);
+  const ebitdaValue = headline.ebitda;
+  const ebitdaFormatted = formatHeadlineValue(headline.ebitda, headline);
 
-  // Margin must be computed in the SAME unit so the ratio stays scale-free.
-  // When statement data is present, both values share unitScale; otherwise
-  // fall back to the legacy deal-level pair.
-  const stmtHasMargin = stmtRevenue != null && stmtEbitda != null && stmtRevenue !== 0;
-  const dealHasMargin = deal.ebitda != null && deal.revenue != null && deal.revenue !== 0;
-  const hasMarginData = stmtHasMargin || dealHasMargin;
-  const marginPct = stmtHasMargin
-    ? (stmtEbitda! / stmtRevenue!) * 100
-    : dealHasMargin
-      ? (deal.ebitda! / deal.revenue!) * 100
-      : null;
+  // Use the precomputed margin from the helper — when source === "cached"
+  // this is the server's authoritative percentage and bypasses the
+  // mismatched-units arithmetic that produced the historical 11103%
+  // display bug.
+  const marginPct = headline.ebitdaMargin;
+  const hasMarginData = marginPct != null;
 
   // The revenue / EBITDA / margin cards depend on the FinancialStatement
   // fetch. Mark them so the render block can swap in a skeleton placeholder
@@ -336,7 +353,16 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
       label: "Deal Size",
       value: deal.dealSize,
       formatted: formatCurrency(deal.dealSize, deal.currency),
-      extra: deal.dealSize && deal.ebitda ? `~${(deal.dealSize / deal.ebitda).toFixed(1)}x EBITDA Multiple` : undefined,
+      // EBITDA Multiple = dealSize / ebitda. Both must share a scale so the
+      // ratio is meaningful — `deal.dealSize` is MILLIONS by convention,
+      // while headline.ebitda may be ACTUALS (cached) or unitScale-tagged
+      // (summary). Normalise both to actual dollars before dividing.
+      extra: (() => {
+        const dealSizeActual = toActualDollars(deal.dealSize, "MILLIONS");
+        const ebitdaActual = toActualDollars(headline.ebitda, headline.unitScale);
+        if (!dealSizeActual || !ebitdaActual) return undefined;
+        return `~${(dealSizeActual / ebitdaActual).toFixed(1)}x EBITDA Multiple`;
+      })(),
     },
     {
       key: "irr",

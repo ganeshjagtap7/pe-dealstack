@@ -174,6 +174,155 @@ export function formatFinancialValue(
   );
 }
 
+// ---------------------------------------------------------------------------
+// Headline metric precedence helpers
+// ---------------------------------------------------------------------------
+// The deal record has TWO sets of revenue/EBITDA fields:
+//   1. cachedRevenue / cachedEbitda / cachedEbitdaMargin — written by the
+//      server-side dealCacheWriteback service. Both rev and ebitda come
+//      from the same statement row and are stored in ACTUAL DOLLARS, so
+//      the ratio is always scale-correct.
+//   2. revenue / ebitda — legacy columns. No unitScale tag; ingest paths
+//      disagree, so revenue can be in MILLIONS and ebitda in THOUSANDS for
+//      the same deal. Computing a margin from these mismatched legacies
+//      produced 11103% in production.
+// FinancialSummary (per-deal latest INCOME_STATEMENT row) sits between as
+// a fallback when the cache hasn't been populated yet.
+
+interface DealLikeMetrics {
+  revenue?: number | null;
+  ebitda?: number | null;
+  currency?: string | null;
+  cachedRevenue?: number | null;
+  cachedEbitda?: number | null;
+  cachedEbitdaMargin?: number | null;
+  cachedCurrency?: string | null;
+  cachedPeriod?: string | null;
+}
+
+interface SummaryLikeMetrics {
+  revenue?: number | null;
+  ebitda?: number | null;
+  ebitdaMargin?: number | null;
+  unitScale?: UnitScale | null;
+  currency?: string | null;
+}
+
+export type HeadlineSource = "cached" | "summary" | "legacy" | "none";
+
+export interface HeadlineMetrics {
+  source: HeadlineSource;
+  /** Stored revenue value at `unitScale`. */
+  revenue: number | null;
+  /** Stored EBITDA value at `unitScale`. */
+  ebitda: number | null;
+  /** Pre-computed EBITDA margin percentage (e.g. 11.1 for 11.1%). */
+  ebitdaMargin: number | null;
+  /** Unit scale of `revenue` and `ebitda`. ACTUALS for cached, summary's own scale otherwise. */
+  unitScale: UnitScale;
+  /** Currency code (USD, EUR, …). */
+  currency: string | null;
+}
+
+/**
+ * Resolve revenue / EBITDA / margin for a deal headline using the
+ * canonical precedence:
+ *
+ *   1. Server-cached fields (`cachedRevenue` etc) — ACTUAL DOLLARS,
+ *      already self-consistent. `cachedEbitdaMargin` is a precomputed
+ *      percentage.
+ *   2. The latest income-statement summary, when supplied.
+ *   3. The legacy `deal.revenue` / `deal.ebitda` columns, assumed to be
+ *      in MILLIONS (matches `formatCurrency`'s convention).
+ *
+ * Never compute margin from cached rev/ebitda yourself — `cachedEbitdaMargin`
+ * is the server's authoritative number. For the legacy fallback we compute
+ * `(ebitda / revenue) * 100` from values that share an assumed scale.
+ */
+export function pickHeadlineMetrics(
+  deal: DealLikeMetrics | null | undefined,
+  summary?: SummaryLikeMetrics | null,
+): HeadlineMetrics {
+  // 1. Cache hit — at least one of revenue/EBITDA/margin populated.
+  if (
+    deal &&
+    (deal.cachedRevenue != null ||
+      deal.cachedEbitda != null ||
+      deal.cachedEbitdaMargin != null)
+  ) {
+    return {
+      source: "cached",
+      revenue: deal.cachedRevenue ?? null,
+      ebitda: deal.cachedEbitda ?? null,
+      ebitdaMargin: deal.cachedEbitdaMargin ?? null,
+      unitScale: "ACTUALS",
+      currency: deal.cachedCurrency ?? deal.currency ?? null,
+    };
+  }
+
+  // 2. FinancialStatement summary fallback.
+  if (summary && (summary.revenue != null || summary.ebitda != null)) {
+    const rev = summary.revenue ?? null;
+    const ebd = summary.ebitda ?? null;
+    const margin =
+      summary.ebitdaMargin != null
+        ? summary.ebitdaMargin
+        : rev != null && ebd != null && rev !== 0
+          ? (ebd / rev) * 100
+          : null;
+    return {
+      source: "summary",
+      revenue: rev,
+      ebitda: ebd,
+      ebitdaMargin: margin,
+      unitScale: summary.unitScale ?? "ACTUALS",
+      currency: summary.currency ?? deal?.currency ?? null,
+    };
+  }
+
+  // 3. Legacy deal-level columns (assumed MILLIONS). Mismatched across
+  // ingest paths — last resort only.
+  if (deal && (deal.revenue != null || deal.ebitda != null)) {
+    const rev = deal.revenue ?? null;
+    const ebd = deal.ebitda ?? null;
+    const margin =
+      rev != null && ebd != null && rev !== 0 ? (ebd / rev) * 100 : null;
+    return {
+      source: "legacy",
+      revenue: rev,
+      ebitda: ebd,
+      ebitdaMargin: margin,
+      unitScale: "MILLIONS",
+      currency: deal?.currency ?? null,
+    };
+  }
+
+  return {
+    source: "none",
+    revenue: null,
+    ebitda: null,
+    ebitdaMargin: null,
+    unitScale: "ACTUALS",
+    currency: deal?.currency ?? null,
+  };
+}
+
+/** Format a HeadlineMetrics value at its native scale + currency. */
+export function formatHeadlineValue(
+  value: number | null | undefined,
+  metrics: HeadlineMetrics,
+): string {
+  if (value == null) return "—";
+  if (metrics.source === "legacy") {
+    // Legacy columns are MILLIONS — use the legacy formatter (which
+    // assumes MILLIONS) to preserve historical display semantics.
+    return formatCurrency(value, metrics.currency);
+  }
+  return formatFinancialValue(value, metrics.unitScale, {
+    currency: metrics.currency,
+  });
+}
+
 /**
  * Format a unitless ratio/percentage. Use this for fields like
  * `ebitda_margin_pct`, `gross_margin_pct`, growth rates, etc.
