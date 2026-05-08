@@ -239,6 +239,20 @@ export interface HeadlineMetrics {
  * is the server's authoritative number. For the legacy fallback we compute
  * `(ebitda / revenue) * 100` from values that share an assumed scale.
  */
+
+/** Compute a margin from legacy deal-level rev/ebitda, suppressing values
+ * outside [-100, 1000]% — a margin that extreme is almost always a sign
+ * the two legacy fields were written by different ingest paths at
+ * mismatched scales (the historical 11103% display bug). */
+function legacyMargin(deal: DealLikeMetrics | null | undefined): number | null {
+  if (!deal) return null;
+  const { revenue: rev, ebitda: ebd } = deal;
+  if (rev == null || ebd == null || rev === 0) return null;
+  const margin = (ebd / rev) * 100;
+  if (margin < -100 || margin > 1000) return null;
+  return margin;
+}
+
 export function pickHeadlineMetrics(
   deal: DealLikeMetrics | null | undefined,
   summary?: SummaryLikeMetrics | null,
@@ -264,12 +278,17 @@ export function pickHeadlineMetrics(
   if (summary && (summary.revenue != null || summary.ebitda != null)) {
     const rev = summary.revenue ?? null;
     const ebd = summary.ebitda ?? null;
-    const margin =
+    let margin =
       summary.ebitdaMargin != null
         ? summary.ebitdaMargin
         : rev != null && ebd != null && rev !== 0
           ? (ebd / rev) * 100
           : null;
+    // Supplement margin from legacy fields when the picked summary row
+    // has revenue but no EBITDA (common for monthly rows where EBITDA is
+    // computed only at the year level). Sanity check rejects mismatched-
+    // scale legacy values that would otherwise render as 11103%.
+    if (margin == null) margin = legacyMargin(deal);
     return {
       source: "summary",
       revenue: rev,
@@ -285,13 +304,11 @@ export function pickHeadlineMetrics(
   if (deal && (deal.revenue != null || deal.ebitda != null)) {
     const rev = deal.revenue ?? null;
     const ebd = deal.ebitda ?? null;
-    const margin =
-      rev != null && ebd != null && rev !== 0 ? (ebd / rev) * 100 : null;
     return {
       source: "legacy",
       revenue: rev,
       ebitda: ebd,
-      ebitdaMargin: margin,
+      ebitdaMargin: legacyMargin(deal),
       unitScale: "MILLIONS",
       currency: deal?.currency ?? null,
     };

@@ -292,7 +292,10 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
     ? {
         revenue: latestIncome.lineItems?.revenue ?? null,
         ebitda: latestIncome.lineItems?.ebitda ?? null,
-        ebitdaMargin: null,
+        // Use the row's own ebitda_margin_pct when extracted — many rows
+        // have it even when ebitda itself is null, which previously caused
+        // the margin card to disappear on cache-less deals.
+        ebitdaMargin: latestIncome.lineItems?.ebitda_margin_pct ?? null,
         unitScale: (latestIncome.unitScale as UnitScale | null) ?? "ACTUALS",
         currency: latestIncome.currency ?? deal.currency ?? null,
       }

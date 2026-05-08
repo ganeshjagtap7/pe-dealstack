@@ -20,12 +20,22 @@ export async function orgMiddleware(
       return next();
     }
 
-    // Look up the User record by authId to get organizationId
+    // Look up the User record by authId to get organizationId.
+    // Also pull `role` — the JWT's user_metadata.role defaults to 'MEMBER' for
+    // everyone (auth middleware sets it from Supabase user_metadata, which is
+    // rarely populated). The User.role column carries the canonical value
+    // (set by findOrCreateUser, updated by invitation/role-change flows).
+    // Override req.user.role here once so every downstream admin check sees
+    // the table value.
     const { data: userRecord, error } = await supabase
       .from('User')
-      .select('id, organizationId')
+      .select('id, organizationId, role')
       .eq('authId', req.user.id)
       .single();
+
+    if (userRecord?.role && req.user) {
+      req.user.role = String(userRecord.role);
+    }
 
     if (error && error.code === 'PGRST116') {
       // User record doesn't exist yet (first request after signup).

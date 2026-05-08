@@ -321,7 +321,7 @@ export default function SettingsPage() {
             markChanged={markChanged}
           />
 
-          <TeamSection />
+          <TeamSection onToast={showToast} />
 
           <FirmProfileSection />
 

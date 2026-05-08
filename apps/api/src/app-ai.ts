@@ -10,9 +10,10 @@ import financialsRouter from './routes/financials.js';
 import memosRouter from './routes/memos.js';
 import ingestRouter from './routes/ingest.js';
 import onboardingRouter from './routes/onboarding.js';
-import { authMiddleware } from './middleware/auth.js';
+import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { usageContextMiddleware } from './middleware/usageContext.js';
+import { staffAccessLogger } from './middleware/staffAccessLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { isAIEnabled } from './openai.js';
@@ -155,17 +156,17 @@ app.use(requestIdMiddleware);
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
-app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, chatRouter);
-app.use('/api/ingest', authMiddleware, orgMiddleware, usageContextMiddleware, ingestRouter);
-app.use('/api/memos', authMiddleware, orgMiddleware, usageContextMiddleware, memosRouter);
-app.use('/api/onboarding', authMiddleware, orgMiddleware, usageContextMiddleware, onboardingRouter);
-app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, financialsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, chatRouter);
+app.use('/api/ingest', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, ingestRouter);
+app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, memosRouter);
+app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, onboardingRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
 // ========================================
 // AI deal chat and analysis endpoints (require auth + org)
-app.use('/api', authMiddleware, orgMiddleware, usageContextMiddleware, aiRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, aiRouter);
 
 // AI status endpoint (public - no auth required)
 app.get('/api/ai/status', (_req, res) => {

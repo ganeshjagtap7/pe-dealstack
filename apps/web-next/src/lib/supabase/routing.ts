@@ -16,6 +16,7 @@ const AUTH_PAGE_PREFIXES = [
 const PUBLIC_PAGE_PREFIXES = [
   "/privacy-policy",
   "/terms-of-service",
+  "/security",
   "/pricing",
   "/documentation",
   "/api-reference",
