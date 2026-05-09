@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { CriteriaBuilder } from "../_components/CriteriaBuilder";
 import { DocumentDropzone } from "../_components/DocumentDropzone";
+import { useToast } from "@/providers/ToastProvider";
 
 const DECISION_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
   GO: { bg: "bg-green-50", text: "text-green-800", border: "border-green-300", label: "GO" },
@@ -28,10 +29,16 @@ const CRITERIA_PLACEHOLDER = `e.g.
 
 const TEASER_PLACEHOLDER = "Paste the teaser or short CIM text here…";
 
+interface Evidence {
+  quote: string;
+  location: string | null;
+}
+
 interface CriterionCheck {
   criterion: string;
   status: "pass" | "fail" | "unclear";
   finding: string;
+  evidence: Evidence | null;
 }
 
 interface ExtractedFacts {
@@ -57,6 +64,7 @@ interface TeaserFilterResult {
 }
 
 export default function TeaserFilterPage() {
+  const { showToast } = useToast();
   const [investmentCriteria, setInvestmentCriteria] = useState("");
   const [teaserText, setTeaserText] = useState("");
   const [teaserFilename, setTeaserFilename] = useState<string | null>(null);
@@ -64,6 +72,34 @@ export default function TeaserFilterPage() {
   const [result, setResult] = useState<TeaserFilterResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [builderOpen, setBuilderOpen] = useState(false);
+  const [saveForNextTime, setSaveForNextTime] = useState(false);
+  const [hasSavedCriteria, setHasSavedCriteria] = useState(false);
+
+  // Pre-fill from saved criteria on mount. If the user has saved criteria
+  // before, default the "save for next time" toggle to on so an edit gets
+  // persisted automatically; otherwise leave it off (opt-in first save).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<{ firmProfile: { investmentCriteria?: string } }>(
+          "/onboarding/firm-profile",
+        );
+        if (cancelled) return;
+        const saved = data?.firmProfile?.investmentCriteria;
+        if (saved && saved.trim().length > 0) {
+          setInvestmentCriteria(saved);
+          setHasSavedCriteria(true);
+          setSaveForNextTime(true);
+        }
+      } catch {
+        // No profile yet or fetch failed — start blank.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const canSubmit =
     !loading && investmentCriteria.trim().length >= 20 && teaserText.trim().length >= 100;
@@ -73,6 +109,21 @@ export default function TeaserFilterPage() {
     setError(null);
     setResult(null);
     try {
+      // Save to firm profile in parallel — fire-and-forget so a save failure
+      // doesn't block the actual screening result the user is waiting on.
+      if (saveForNextTime) {
+        api.post("/onboarding/firm-profile", { investmentCriteria }).then(
+          () => {
+            if (!hasSavedCriteria) {
+              showToast("Saved to your firm profile.", "success");
+              setHasSavedCriteria(true);
+            }
+          },
+          (err) => {
+            console.warn("[criteria/teaser] save criteria failed:", err);
+          },
+        );
+      }
       const res = await api.post<TeaserFilterResult>("/ai/filter-teaser", {
         investmentCriteria,
         teaserText,
@@ -121,9 +172,22 @@ export default function TeaserFilterPage() {
             className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             style={{ minHeight: 260 }}
           />
-          <p className="mt-1 text-right text-[10px] text-text-secondary">
-            {investmentCriteria.length.toLocaleString()} chars
-          </p>
+          <div className="mt-1 flex items-center justify-between text-[10px] text-text-secondary">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={saveForNextTime}
+                onChange={(e) => setSaveForNextTime(e.target.checked)}
+                className="size-3.5 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0"
+              />
+              <span>
+                {hasSavedCriteria
+                  ? "Update saved criteria on submit"
+                  : "Save these criteria to my firm profile"}
+              </span>
+            </label>
+            <span>{investmentCriteria.length.toLocaleString()} chars</span>
+          </div>
         </div>
         <div className="flex flex-col">
           <label className="text-sm font-medium text-text-primary">Teaser / short CIM</label>
@@ -318,9 +382,19 @@ function CheckRow({ check }: { check: CriterionCheck }) {
         >
           {check.status}
         </span>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-text-primary">{check.criterion}</p>
           <p className="mt-0.5 text-xs text-text-secondary">{check.finding}</p>
+          {check.evidence && check.evidence.quote && (
+            <blockquote className="mt-2 border-l-2 border-border pl-3 text-xs italic text-text-secondary">
+              &ldquo;{check.evidence.quote}&rdquo;
+              {check.evidence.location && (
+                <span className="ml-2 not-italic text-[10px] uppercase tracking-wider text-text-muted">
+                  · {check.evidence.location}
+                </span>
+              )}
+            </blockquote>
+          )}
         </div>
       </div>
     </li>

@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { DocumentDropzone } from "../_components/DocumentDropzone";
+import { useToast } from "@/providers/ToastProvider";
 
 const SEVERITY_STYLES: Record<string, string> = {
   critical: "bg-red-50 text-red-700 border-red-200",
@@ -47,6 +48,7 @@ interface NdaRedlineResult {
 }
 
 export default function NdaRedlinePage() {
+  const { showToast } = useToast();
   const [firmCriteria, setFirmCriteria] = useState("");
   const [firmFilename, setFirmFilename] = useState<string | null>(null);
   const [counterpartyNda, setCounterpartyNda] = useState("");
@@ -54,6 +56,31 @@ export default function NdaRedlinePage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<NdaRedlineResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [saveForNextTime, setSaveForNextTime] = useState(false);
+  const [hasSavedPolicy, setHasSavedPolicy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await api.get<{ firmProfile: { ndaCriteria?: string } }>(
+          "/onboarding/firm-profile",
+        );
+        if (cancelled) return;
+        const saved = data?.firmProfile?.ndaCriteria;
+        if (saved && saved.trim().length > 0) {
+          setFirmCriteria(saved);
+          setHasSavedPolicy(true);
+          setSaveForNextTime(true);
+        }
+      } catch {
+        // No profile yet — start blank.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const canSubmit =
     !loading && firmCriteria.trim().length >= 20 && counterpartyNda.trim().length >= 200;
@@ -63,6 +90,19 @@ export default function NdaRedlinePage() {
     setError(null);
     setResult(null);
     try {
+      if (saveForNextTime) {
+        api.post("/onboarding/firm-profile", { ndaCriteria: firmCriteria }).then(
+          () => {
+            if (!hasSavedPolicy) {
+              showToast("Saved to your firm profile.", "success");
+              setHasSavedPolicy(true);
+            }
+          },
+          (err) => {
+            console.warn("[criteria/nda] save policy failed:", err);
+          },
+        );
+      }
       const res = await api.post<NdaRedlineResult>("/ai/redline-nda", {
         firmCriteria,
         counterpartyNdaText: counterpartyNda,
@@ -118,9 +158,22 @@ export default function NdaRedlinePage() {
             className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
             style={{ minHeight: 200 }}
           />
-          <p className="mt-1 text-right text-[10px] text-text-secondary">
-            {firmCriteria.length.toLocaleString()} chars
-          </p>
+          <div className="mt-1 flex items-center justify-between text-[10px] text-text-secondary">
+            <label className="flex items-center gap-1.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={saveForNextTime}
+                onChange={(e) => setSaveForNextTime(e.target.checked)}
+                className="size-3.5 rounded border-gray-300 text-primary focus:ring-primary focus:ring-offset-0"
+              />
+              <span>
+                {hasSavedPolicy
+                  ? "Update saved policy on submit"
+                  : "Save this policy to my firm profile"}
+              </span>
+            </label>
+            <span>{firmCriteria.length.toLocaleString()} chars</span>
+          </div>
         </div>
         <div className="flex flex-col">
           <label className="text-sm font-medium text-text-primary">Counterparty NDA</label>

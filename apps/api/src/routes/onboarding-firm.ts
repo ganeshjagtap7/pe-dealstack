@@ -11,6 +11,11 @@ const firmProfileSchema = z.object({
   linkedinUrl: z.string().url().optional(),
   aum: z.string().optional(),
   sectors: z.array(z.string()).max(20).optional(),
+  // Saved criteria text from the Criteria Engine. Stored verbatim so the user
+  // sees exactly what they typed last time. Length cap matches the agent's
+  // input cap (20k) so we can't save something the agent will reject.
+  investmentCriteria: z.string().max(20000).optional(),
+  ndaCriteria: z.string().max(20000).optional(),
 });
 
 // GET /api/onboarding/firm-profile
@@ -50,12 +55,14 @@ router.post('/firm-profile', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
   }
 
-  const { websiteUrl, linkedinUrl, aum, sectors } = parsed.data;
+  const { websiteUrl, linkedinUrl, aum, sectors, investmentCriteria, ndaCriteria } = parsed.data;
   if (
     websiteUrl === undefined &&
     linkedinUrl === undefined &&
     aum === undefined &&
-    sectors === undefined
+    sectors === undefined &&
+    investmentCriteria === undefined &&
+    ndaCriteria === undefined
   ) {
     return res.status(400).json({ error: 'No fields provided' });
   }
@@ -86,6 +93,8 @@ router.post('/firm-profile', async (req: Request, res: Response) => {
     if (linkedinUrl !== undefined) mergedProfile.linkedinUrl = linkedinUrl;
     if (aum !== undefined) mergedProfile.aum = aum;
     if (sectors !== undefined) mergedProfile.sectors = sectors;
+    if (investmentCriteria !== undefined) mergedProfile.investmentCriteria = investmentCriteria;
+    if (ndaCriteria !== undefined) mergedProfile.ndaCriteria = ndaCriteria;
 
     const updatedSettings = { ...existingSettings, firmProfile: mergedProfile };
 

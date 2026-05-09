@@ -26,10 +26,16 @@ const ExtractedFactsSchema = z.object({
   notes: z.string().nullable().describe('One sentence of additional context worth capturing'),
 });
 
+const EvidenceSchema = z.object({
+  quote: z.string().describe('A short verbatim quote from the teaser (≤ 30 words) that supports this judgement. No paraphrasing — copy exact words.'),
+  location: z.string().nullable().describe('Where in the teaser this came from if discernible (e.g. "page 1, opening paragraph", "financial highlights section"). Null if unknown.'),
+});
+
 const CriterionCheckSchema = z.object({
   criterion: z.string().describe('Restate the criterion this check applies to'),
   status: z.enum(['pass', 'fail', 'unclear']).describe('pass = teaser matches; fail = teaser conflicts; unclear = teaser does not say'),
-  finding: z.string().describe('What the teaser says about this criterion (verbatim quote if possible)'),
+  finding: z.string().describe('Your one-line judgement on this criterion (no quote — that goes in evidence)'),
+  evidence: EvidenceSchema.nullable().describe('Quoted evidence from the teaser. Null only when status is "unclear" AND the teaser truly does not address this criterion at all.'),
 });
 
 const TeaserFilterSchema = z.object({
@@ -78,7 +84,7 @@ ${TOPIC_GUARDRAILS}
 How to work:
 1. Read the firm criteria. Every numbered or bulleted item is a hard constraint unless it says "preferred" or "ideally".
 2. Extract the facts you can from the teaser into extractedFacts. Use null when not stated. Quote units verbatim where possible.
-3. For every criterion in the firm policy, produce one entry in criteriaChecks with status pass/fail/unclear and a brief finding (quote the teaser when you can).
+3. For every criterion in the firm policy, produce one entry in criteriaChecks with status pass/fail/unclear, a brief finding (your judgement, one line), AND quoted evidence — a verbatim ≤30-word quote from the teaser that supports your judgement. Copy the exact words; do not paraphrase. Set evidence to null ONLY when status is "unclear" AND the teaser truly contains nothing relevant to that criterion. The principal needs to be able to point at the teaser and defend the call to IC.
 4. Decide:
    - NO_GO if any hard criterion is fail (e.g. wrong sector, outside size band, excluded situation like restructuring).
    - GO if all hard criteria are pass and at least one core criterion (sector + size) is a clear match.
