@@ -31,10 +31,10 @@ router.get('/oauth/:provider/callback', async (req: Request, res: Response, _nex
   if (!isProviderRegistered(provider)) return res.status(404).send('Provider not registered');
   try {
     await getProvider(provider).handleCallback({ code, state });
-    res.redirect(`/settings.html?integrations=connected&provider=${provider}`);
+    res.redirect(`/settings?integrations=connected&provider=${provider}#section-integrations`);
   } catch (err) {
     log.error('OAuth callback failed', err);
-    res.redirect(`/settings.html?integrations=error&provider=${provider}`);
+    res.redirect(`/settings?integrations=error&provider=${provider}#section-integrations`);
   }
 });
 

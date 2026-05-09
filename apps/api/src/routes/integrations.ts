@@ -60,8 +60,11 @@ router.post('/:provider/connect', async (req: Request, res: Response, next: Next
     const orgId = getOrgId(req);
     const userId = await resolveInternalUserId(req.user!.id);
     if (!userId) return res.status(404).json({ error: 'User not found' });
-    const { authUrl, state } = await getProvider(provider).initiateAuth(userId, orgId);
-    res.json({ authUrl, state });
+    const result = await getProvider(provider).initiateAuth(userId, orgId);
+    // Pass the full InitiateAuthResult through — frontend branches on
+    // `mode` to decide between OAuth redirect (authUrl) and api_key paste
+    // modal (instructions). Stripping fields here breaks the paste-key flow.
+    res.json(result);
   } catch (err) { next(err); }
 });
 
