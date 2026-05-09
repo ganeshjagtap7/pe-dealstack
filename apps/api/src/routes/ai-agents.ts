@@ -17,6 +17,11 @@ import { generateEmailDraft, getEmailTemplates } from '../services/agents/emailD
 import { runNdaRedlineAgent } from '../services/agents/ndaRedlineAgent/index.js';
 import { runTeaserFilterAgent } from '../services/agents/teaserFilterAgent/index.js';
 
+// Document text extraction (in-memory, no DB persist) for the Criteria Engine
+// dropzone. Reuses the same PDF + DOCX pipeline the deal-intake flow uses.
+import { upload, extractTextFromPDF } from './ingest-shared.js';
+import { extractTextFromWord } from '../services/documentParser.js';
+
 const router = Router();
 
 // ─── Contact Enrichment ───────────────────────────────────────────
@@ -293,6 +298,48 @@ router.post('/ai/filter-teaser', async (req, res) => {
     log.error('Teaser filter error', error);
     const { statusCode, userMessage } = classifyAIErrorObject(error);
     res.status(statusCode).json({ error: userMessage });
+  }
+});
+
+// ─── Document Text Extract (Criteria Engine dropzone) ─────────────
+// Stateless: extract text from a PDF/DOCX upload and return it. No
+// Document row is created. Used by /criteria/teaser-filter and
+// /criteria/nda-redline so users can drop a CIM/NDA instead of pasting.
+
+router.post('/ai/extract-document', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const PDF = 'application/pdf';
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const DOC = 'application/msword';
+
+    let text: string | null = null;
+    if (file.mimetype === PDF) {
+      const extraction = await extractTextFromPDF(file.buffer, file.originalname);
+      text = extraction?.text ?? null;
+    } else if (file.mimetype === DOCX || file.mimetype === DOC) {
+      text = await extractTextFromWord(file.buffer);
+    } else {
+      return res.status(400).json({ error: 'Only PDF and Word (.pdf, .docx, .doc) are supported here.' });
+    }
+
+    if (!text || text.trim().length < 20) {
+      return res.status(422).json({
+        error: 'We could not extract usable text from this file. It may be scanned or image-only — try pasting the text directly.',
+      });
+    }
+
+    res.json({
+      filename: file.originalname,
+      sizeBytes: file.size,
+      text,
+      chars: text.length,
+    });
+  } catch (error: any) {
+    log.error('extract-document error', error);
+    res.status(500).json({ error: 'Could not read the file — please try again or paste the text.' });
   }
 });
 

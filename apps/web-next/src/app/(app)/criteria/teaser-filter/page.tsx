@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { CriteriaBuilder } from "../_components/CriteriaBuilder";
+import { DocumentDropzone } from "../_components/DocumentDropzone";
 
 const DECISION_STYLES: Record<string, { bg: string; text: string; border: string; label: string }> = {
   GO: { bg: "bg-green-50", text: "text-green-800", border: "border-green-300", label: "GO" },
@@ -57,9 +59,11 @@ interface TeaserFilterResult {
 export default function TeaserFilterPage() {
   const [investmentCriteria, setInvestmentCriteria] = useState("");
   const [teaserText, setTeaserText] = useState("");
+  const [teaserFilename, setTeaserFilename] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<TeaserFilterResult | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [builderOpen, setBuilderOpen] = useState(false);
 
   const canSubmit =
     !loading && investmentCriteria.trim().length >= 20 && teaserText.trim().length >= 100;
@@ -96,23 +100,70 @@ export default function TeaserFilterPage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <CriteriaTextarea
-          label="Your investment criteria"
-          hint="Paste once. Sectors in / out, size band, geography, exclusions."
-          value={investmentCriteria}
-          onChange={setInvestmentCriteria}
-          placeholder={CRITERIA_PLACEHOLDER}
-          minHeight={260}
-        />
-        <CriteriaTextarea
-          label="Teaser / short CIM"
-          hint="Paste the full text. PDF / Word import coming soon."
-          value={teaserText}
-          onChange={setTeaserText}
-          placeholder={TEASER_PLACEHOLDER}
-          minHeight={260}
-        />
+        <div className="flex flex-col">
+          <div className="flex items-baseline justify-between">
+            <label className="text-sm font-medium text-text-primary">Your investment criteria</label>
+            <button
+              type="button"
+              onClick={() => setBuilderOpen(true)}
+              className="text-xs font-semibold text-primary hover:underline inline-flex items-center gap-1"
+            >
+              <span className="material-symbols-outlined text-[14px]">tune</span>
+              Build it for me
+            </button>
+          </div>
+          <p className="mt-0.5 text-xs text-text-secondary">Sectors in / out, size band, geography, exclusions. Or click &ldquo;Build it for me&rdquo; for a guided form.</p>
+          <textarea
+            value={investmentCriteria}
+            onChange={(e) => setInvestmentCriteria(e.target.value)}
+            placeholder={CRITERIA_PLACEHOLDER}
+            spellCheck={false}
+            className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            style={{ minHeight: 260 }}
+          />
+          <p className="mt-1 text-right text-[10px] text-text-secondary">
+            {investmentCriteria.length.toLocaleString()} chars
+          </p>
+        </div>
+        <div className="flex flex-col">
+          <label className="text-sm font-medium text-text-primary">Teaser / short CIM</label>
+          <p className="mt-0.5 text-xs text-text-secondary">Drop a PDF/Word doc, or paste the text below.</p>
+          <div className="mt-2">
+            <DocumentDropzone
+              hasText={!!teaserFilename && teaserText.length > 0}
+              onText={(text, filename) => {
+                setTeaserText(text);
+                setTeaserFilename(filename);
+              }}
+              onClear={() => {
+                setTeaserText("");
+                setTeaserFilename(null);
+              }}
+              hint="PDF, DOCX, up to 50MB"
+            />
+          </div>
+          <textarea
+            value={teaserText}
+            onChange={(e) => {
+              setTeaserText(e.target.value);
+              if (teaserFilename) setTeaserFilename(null);
+            }}
+            placeholder={TEASER_PLACEHOLDER}
+            spellCheck={false}
+            className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            style={{ minHeight: 200 }}
+          />
+          <p className="mt-1 text-right text-[10px] text-text-secondary">
+            {teaserText.length.toLocaleString()} chars
+          </p>
+        </div>
       </div>
+
+      <CriteriaBuilder
+        open={builderOpen}
+        onClose={() => setBuilderOpen(false)}
+        onApply={(text) => setInvestmentCriteria(text)}
+      />
 
       <div className="mt-5 flex items-center gap-3">
         <button
@@ -161,35 +212,6 @@ function Breadcrumbs() {
       <span className="mx-2">/</span>
       <span className="text-text-primary">Teaser Go / No-Go</span>
     </nav>
-  );
-}
-
-interface CriteriaTextareaProps {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  minHeight: number;
-}
-
-function CriteriaTextarea({ label, hint, value, onChange, placeholder, minHeight }: CriteriaTextareaProps) {
-  return (
-    <div className="flex flex-col">
-      <label className="text-sm font-medium text-text-primary">{label}</label>
-      <p className="mt-0.5 text-xs text-text-secondary">{hint}</p>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        spellCheck={false}
-        className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        style={{ minHeight }}
-      />
-      <p className="mt-1 text-right text-[10px] text-text-secondary">
-        {value.length.toLocaleString()} chars
-      </p>
-    </div>
   );
 }
 

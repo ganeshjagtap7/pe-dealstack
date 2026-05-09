@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { api, ApiError } from "@/lib/api";
+import { DocumentDropzone } from "../_components/DocumentDropzone";
 
 const SEVERITY_STYLES: Record<string, string> = {
   critical: "bg-red-50 text-red-700 border-red-200",
@@ -48,6 +49,7 @@ interface NdaRedlineResult {
 export default function NdaRedlinePage() {
   const [firmCriteria, setFirmCriteria] = useState("");
   const [counterpartyNda, setCounterpartyNda] = useState("");
+  const [ndaFilename, setNdaFilename] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<NdaRedlineResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -95,14 +97,38 @@ export default function NdaRedlinePage() {
           placeholder={CRITERIA_PLACEHOLDER}
           minHeight={260}
         />
-        <CriteriaTextarea
-          label="Counterparty NDA"
-          hint="Paste the full text. PDF / Word import coming soon."
-          value={counterpartyNda}
-          onChange={setCounterpartyNda}
-          placeholder={NDA_PLACEHOLDER}
-          minHeight={260}
-        />
+        <div className="flex flex-col">
+          <label className="text-sm font-medium text-text-primary">Counterparty NDA</label>
+          <p className="mt-0.5 text-xs text-text-secondary">Drop a PDF/Word doc, or paste the text below.</p>
+          <div className="mt-2">
+            <DocumentDropzone
+              hasText={!!ndaFilename && counterpartyNda.length > 0}
+              onText={(text, filename) => {
+                setCounterpartyNda(text);
+                setNdaFilename(filename);
+              }}
+              onClear={() => {
+                setCounterpartyNda("");
+                setNdaFilename(null);
+              }}
+              hint="PDF, DOCX, up to 50MB"
+            />
+          </div>
+          <textarea
+            value={counterpartyNda}
+            onChange={(e) => {
+              setCounterpartyNda(e.target.value);
+              if (ndaFilename) setNdaFilename(null);
+            }}
+            placeholder={NDA_PLACEHOLDER}
+            spellCheck={false}
+            className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            style={{ minHeight: 200 }}
+          />
+          <p className="mt-1 text-right text-[10px] text-text-secondary">
+            {counterpartyNda.length.toLocaleString()} chars
+          </p>
+        </div>
       </div>
 
       <div className="mt-5 flex items-center gap-3">

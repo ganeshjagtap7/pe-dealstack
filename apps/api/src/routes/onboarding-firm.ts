@@ -13,6 +13,35 @@ const firmProfileSchema = z.object({
   sectors: z.array(z.string()).max(20).optional(),
 });
 
+// GET /api/onboarding/firm-profile
+// Returns the saved firm profile so the Criteria Engine wizard can pre-fill
+// sectors / AUM / etc. from what the user entered during onboarding. Empty
+// object if nothing saved yet.
+router.get('/firm-profile', async (req: Request, res: Response) => {
+  let orgId: string;
+  try {
+    orgId = getOrgId(req);
+  } catch (err) {
+    log.warn('onboarding-firm GET: getOrgId failed', { error: err instanceof Error ? err.message : String(err) });
+    return res.json({ firmProfile: {} });
+  }
+
+  try {
+    const { data: org, error } = await supabase
+      .from('Organization')
+      .select('settings')
+      .eq('id', orgId)
+      .single();
+    if (error) throw error;
+    const settings = (org?.settings || {}) as Record<string, any>;
+    const firmProfile = (settings.firmProfile || {}) as Record<string, any>;
+    res.json({ firmProfile });
+  } catch (error: any) {
+    log.error('Onboarding firm-profile load failed', { error: error.message, orgId });
+    res.status(500).json({ error: 'Failed to load firm profile' });
+  }
+});
+
 // POST /api/onboarding/firm-profile
 // Persists firm-task fields (URL/LinkedIn/AUM/sectors) onto Organization.settings.firmProfile.
 router.post('/firm-profile', async (req: Request, res: Response) => {
