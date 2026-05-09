@@ -48,6 +48,7 @@ interface NdaRedlineResult {
 
 export default function NdaRedlinePage() {
   const [firmCriteria, setFirmCriteria] = useState("");
+  const [firmFilename, setFirmFilename] = useState<string | null>(null);
   const [counterpartyNda, setCounterpartyNda] = useState("");
   const [ndaFilename, setNdaFilename] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -89,14 +90,38 @@ export default function NdaRedlinePage() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <CriteriaTextarea
-          label="Your firm's NDA criteria"
-          hint="Paste once. We don't store this — it's only used for this red-line."
-          value={firmCriteria}
-          onChange={setFirmCriteria}
-          placeholder={CRITERIA_PLACEHOLDER}
-          minHeight={260}
-        />
+        <div className="flex flex-col">
+          <label className="text-sm font-medium text-text-primary">Your firm&apos;s NDA criteria</label>
+          <p className="mt-0.5 text-xs text-text-secondary">Drop your NDA template/policy doc, or paste the rules below. We don&apos;t store this — only used for this red-line.</p>
+          <div className="mt-2">
+            <DocumentDropzone
+              hasText={!!firmFilename && firmCriteria.length > 0}
+              onText={(text, filename) => {
+                setFirmCriteria(text);
+                setFirmFilename(filename);
+              }}
+              onClear={() => {
+                setFirmCriteria("");
+                setFirmFilename(null);
+              }}
+              hint="PDF, DOCX, up to 50MB"
+            />
+          </div>
+          <textarea
+            value={firmCriteria}
+            onChange={(e) => {
+              setFirmCriteria(e.target.value);
+              if (firmFilename) setFirmFilename(null);
+            }}
+            placeholder={CRITERIA_PLACEHOLDER}
+            spellCheck={false}
+            className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            style={{ minHeight: 200 }}
+          />
+          <p className="mt-1 text-right text-[10px] text-text-secondary">
+            {firmCriteria.length.toLocaleString()} chars
+          </p>
+        </div>
         <div className="flex flex-col">
           <label className="text-sm font-medium text-text-primary">Counterparty NDA</label>
           <p className="mt-0.5 text-xs text-text-secondary">Drop a PDF/Word doc, or paste the text below.</p>
@@ -178,35 +203,6 @@ function Breadcrumbs() {
       <span className="mx-2">/</span>
       <span className="text-text-primary">NDA Red-Line</span>
     </nav>
-  );
-}
-
-interface CriteriaTextareaProps {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder: string;
-  minHeight: number;
-}
-
-function CriteriaTextarea({ label, hint, value, onChange, placeholder, minHeight }: CriteriaTextareaProps) {
-  return (
-    <div className="flex flex-col">
-      <label className="text-sm font-medium text-text-primary">{label}</label>
-      <p className="mt-0.5 text-xs text-text-secondary">{hint}</p>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        spellCheck={false}
-        className="mt-2 w-full rounded-lg border border-border bg-white p-3 font-mono text-xs leading-relaxed text-text-primary shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-        style={{ minHeight }}
-      />
-      <p className="mt-1 text-right text-[10px] text-text-secondary">
-        {value.length.toLocaleString()} chars
-      </p>
-    </div>
   );
 }
 
