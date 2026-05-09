@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 
-// Ported from apps/web/js/widgets/watchlist-modal.js.
+// Ported from watchlist-modal.js.
 export function WatchlistAddModal({
   open,
   onClose,

@@ -117,7 +117,8 @@ export default function OtpCodeEntry({
       }
 
       onVerified();
-    } catch {
+    } catch (err) {
+      console.warn("[auth/verify-email] OTP verification failed:", err);
       setCodeError("An error occurred. Please try again.");
     } finally {
       setVerifying(false);
@@ -161,7 +162,8 @@ export default function OtpCodeEntry({
         setResendMessageType("success");
         setResendCooldown(RESEND_COOLDOWN);
       }
-    } catch {
+    } catch (err) {
+      console.warn("[auth/verify-email] resend failed:", err);
       setResendMessage("An error occurred. Please try again.");
       setResendMessageType("error");
     } finally {

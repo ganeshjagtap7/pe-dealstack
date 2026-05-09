@@ -62,8 +62,10 @@ export function DocumentHeaderBar({
         </div>
       </div>
       <div className="flex items-center gap-3">
-        {/* Generate All button — web-next addition, not in legacy but useful */}
-        {sections.length > 0 && (
+        {/* Generate All button — only shown when the memo has a deal attached.
+            Without dealId the backend 400s on /generate-all because it can't
+            pull deal-level financial / extraction context to feed the LLM. */}
+        {sections.length > 0 && memo.dealId && (
           <button
             onClick={onGenerateAll}
             disabled={generatingAll}
@@ -77,6 +79,15 @@ export function DocumentHeaderBar({
             )}
             <span>{generatingAll ? "Generating..." : "Generate All"}</span>
           </button>
+        )}
+        {sections.length > 0 && !memo.dealId && (
+          <span
+            className="flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1.5 rounded-lg"
+            title="AI generation requires a deal attached to this memo. Edit the memo to attach one."
+          >
+            <span className="material-symbols-outlined text-[14px]">info</span>
+            Attach a deal to enable AI generation
+          </span>
         )}
         {/* Share button — matches legacy */}
         <button

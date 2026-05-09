@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/cn";
 import { formatRelativeTime } from "@/lib/formatters";
 import Link from "next/link";
@@ -23,6 +23,17 @@ export function TasksModal({ tasks, onClose }: TasksModalProps) {
     if (aDone !== bDone) return aDone - bDone;
     return (PRIORITY_ORDER[a.priority || ""] ?? 1) - (PRIORITY_ORDER[b.priority || ""] ?? 1);
   });
+
+  // Lift Date.now() out of render: capture once at mount so overdue/due-today
+  // checks are stable while the modal is open. (Modals close in seconds; for
+  // long-lived sessions an interval refresh can be added later.)
+  const [now, setNow] = useState<number>(() => Date.now());
+  const todayString = new Date(now).toDateString();
+  // Re-snap "now" after mount so the SSR-rendered value (frozen at build /
+  // request time) is replaced with the client's actual clock. Lazy useState
+  // alone can't do this without a hydration mismatch.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setNow(Date.now()); }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -58,8 +69,8 @@ export function TasksModal({ tasks, onClose }: TasksModalProps) {
             <div className="space-y-2">
               {sorted.map((task) => {
                 const done = task.status === "COMPLETED";
-                const isOverdue = !done && task.dueDate && new Date(task.dueDate).getTime() < Date.now();
-                const isDueToday = !done && task.dueDate && new Date(task.dueDate).toDateString() === new Date().toDateString();
+                const isOverdue = !done && task.dueDate && new Date(task.dueDate).getTime() < now;
+                const isDueToday = !done && task.dueDate && new Date(task.dueDate).toDateString() === todayString;
                 const dueColor = done ? "text-text-secondary" : isOverdue ? "text-red-500" : isDueToday ? "text-orange-500" : "text-text-muted";
                 const dealName = task.deal?.name || task.dealName;
                 const dealId = task.deal?.id || task.dealId;

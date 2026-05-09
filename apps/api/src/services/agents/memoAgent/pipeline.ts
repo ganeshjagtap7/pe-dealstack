@@ -129,7 +129,7 @@ export async function generateSection(
   }
 
   try {
-    const model = getChatModel(0.7, 2000);
+    const model = getChatModel(0.7, 2000, 'memo_generation');
     const sectionPrompt = customPrompt ?? promptConfig.prompt;
     const contextText = formatContextForLLM(context);
 
@@ -166,9 +166,9 @@ export async function generateSection(
         content = parsed.content ?? rawText;
         if (parsed.tableData !== undefined) tableData = parsed.tableData;
         if (parsed.chartConfig !== undefined) chartConfig = parsed.chartConfig;
-      } catch {
+      } catch (err) {
         // JSON parse failed — use raw text as content
-        log.warn(`[memoAgent/pipeline] JSON parse failed for section ${sectionType}, using raw text`);
+        log.warn(`[memoAgent/pipeline] JSON parse failed for section ${sectionType}, using raw text`, { error: err instanceof Error ? err.message : String(err) });
         content = rawText;
       }
     }

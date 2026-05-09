@@ -6,7 +6,7 @@ import { CURRENCY_SYMBOLS, formatCurrency, getCurrencySymbol } from "@/lib/forma
 import { api } from "@/lib/api";
 import type { DealDetail } from "./components";
 
-// Ported from apps/web/deal-edit.js (showEditDealModal + saveDealChangesFromModal).
+// Ported from deal-edit.js (showEditDealModal + saveDealChangesFromModal).
 // Stored deal values are in millions of the original currency; the unit selector
 // lets the user enter values in $/K/M/B (or for INR, ₹/L/Cr) and we convert
 // back to millions on save.

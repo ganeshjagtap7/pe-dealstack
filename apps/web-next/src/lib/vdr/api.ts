@@ -1,7 +1,7 @@
-// VDR API — ported from apps/web/src/services/vdrApi.ts. Re-uses the web-next
+// VDR API — ported from vdrApi.ts. Re-uses the web-next
 // `api` helper for JSON calls; upload uses raw fetch since api is JSON-only.
 
-import { api } from "@/lib/api";
+import { api, NotFoundError } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
 import type {
   APIDocument,
@@ -147,8 +147,15 @@ export async function fetchFolderInsights(
 ): Promise<APIFolderInsight | null> {
   try {
     return await api.get<APIFolderInsight>(`/folders/${folderId}/insights`);
-  } catch {
-    return null; // 404 just means no insights yet — not an error
+  } catch (err) {
+    // 404 just means no insights yet — that's the normal state for folders
+    // that haven't had insights generated. Stay silent for those.
+    if (err instanceof NotFoundError) {
+      return null;
+    }
+    // Real errors (5xx, network, auth) still get logged.
+    console.warn("[vdr] folder insights fetch failed:", err);
+    return null;
   }
 }
 
@@ -290,7 +297,7 @@ export function transformDocument(apiDoc: APIDocument): VDRFile {
   }
 
   // Analysis — three-state: Pending → Ready for AI → Analyzed
-  // (ported from apps/web/src/services/vdrApi.ts transformDocument, 68ff3f8)
+  // (ported from vdrApi.ts transformDocument, 68ff3f8)
   let analysisType: VDRFile["analysis"]["type"] = "standard";
   let analysisLabel = "Pending Analysis";
   let analysisDescription = "Document awaiting text extraction.";

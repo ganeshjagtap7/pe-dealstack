@@ -5,7 +5,7 @@ import { DEFAULT_VISIBLE, WIDGETS, WidgetId, CoreWidgetId, CORE_WIDGETS } from "
 
 const STORAGE_KEY = "pe-dashboard-widget-visibility";
 // Separate key for user-chosen order (matches WIDGET_ORDER_KEY in
-// apps/web/dashboard-widgets.js). Order is independent of visibility.
+// dashboard-widgets.js). Order is independent of visibility.
 const ORDER_KEY = "pe-dashboard-widget-order";
 // Key for core widget visibility (stats-cards, active-priorities, etc.)
 const CORE_VISIBILITY_KEY = "pe-dashboard-core-widget-visibility";
@@ -21,7 +21,7 @@ const DEFAULT_CORE_VISIBLE: CoreWidgetId[] = CORE_WIDGETS
 const DEFAULT_CORE_ORDER: CoreWidgetId[] = DEFAULT_CORE_VISIBLE;
 
 // Persist the set of visible optional-widget IDs in localStorage, per-browser.
-// Matches the legacy key in apps/web/dashboard.js but stores a pure array of
+// Matches the legacy key in dashboard.js but stores a pure array of
 // widget IDs rather than the HTML-specific "order + visibility" map.
 export function useVisibleWidgets() {
   const [visible, setVisible] = useState<Set<WidgetId>>(() => new Set(DEFAULT_VISIBLE));
@@ -32,6 +32,10 @@ export function useVisibleWidgets() {
   const [coreOrder, setCoreOrder] = useState<CoreWidgetId[]>([]);
   const [loaded, setLoaded] = useState(false);
 
+  // Hydrate from localStorage after mount. Lazy useState initialisers
+  // would diverge between SSR (no localStorage) and client first paint —
+  // the eslint-disables document that this is intentional.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
@@ -42,8 +46,8 @@ export function useVisibleWidgets() {
           setVisible(new Set(valid));
         }
       }
-    } catch {
-      // ignore malformed / disabled localStorage
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to read widget visibility from localStorage:", err);
     }
     try {
       const rawCore = localStorage.getItem(CORE_VISIBILITY_KEY);
@@ -56,8 +60,8 @@ export function useVisibleWidgets() {
           setCoreVisible(new Set(valid));
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to read core widget visibility from localStorage:", err);
     }
     try {
       const rawOrder = localStorage.getItem(ORDER_KEY);
@@ -68,8 +72,8 @@ export function useVisibleWidgets() {
           setOrder(valid);
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to read widget order from localStorage:", err);
     }
     try {
       const rawCoreOrder = localStorage.getItem(CORE_ORDER_KEY);
@@ -82,41 +86,42 @@ export function useVisibleWidgets() {
           setCoreOrder(valid);
         }
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to read core widget order from localStorage:", err);
     }
     setLoaded(true);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const persistVisible = useCallback((set: Set<WidgetId>) => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify([...set]));
-    } catch {
-      // ignore quota / disabled
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to persist widget visibility:", err);
     }
   }, []);
 
   const persistCoreVisible = useCallback((set: Set<CoreWidgetId>) => {
     try {
       localStorage.setItem(CORE_VISIBILITY_KEY, JSON.stringify([...set]));
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to persist core widget visibility:", err);
     }
   }, []);
 
   const persistOrder = useCallback((ids: WidgetId[]) => {
     try {
       localStorage.setItem(ORDER_KEY, JSON.stringify(ids));
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to persist widget order:", err);
     }
   }, []);
 
   const persistCoreOrder = useCallback((ids: CoreWidgetId[]) => {
     try {
       localStorage.setItem(CORE_ORDER_KEY, JSON.stringify(ids));
-    } catch {
-      // ignore
+    } catch (err) {
+      console.warn("[dashboard/widgets] failed to persist core widget order:", err);
     }
   }, []);
 

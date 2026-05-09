@@ -16,6 +16,20 @@ export class NotFoundError extends Error {
   }
 }
 
+// Typed error for non-OK responses that preserves the API's `code` field so
+// callers can branch on intent (e.g. `INVITE_SELF`) without parsing message
+// strings.
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient();
   // Use getUser() — getSession() reads from local storage without server
@@ -56,8 +70,24 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!res.ok) {
-    const error = await res.json().catch(() => ({ message: res.statusText }));
-    throw new Error(error.message || `API error ${res.status}`);
+    const body = await res.json().catch(() => ({} as Record<string, unknown>));
+    const message =
+      (body as { error?: string; message?: string }).error ||
+      (body as { message?: string }).message ||
+      res.statusText ||
+      `API error ${res.status}`;
+    const code = (body as { code?: string }).code;
+
+    // Org has enforced 2FA but the user hasn't enrolled — bounce them to
+    // the security panel where the existing enrollment UI lives. The API
+    // bypasses /api/auth/, /api/users/me, and /api/organizations/me so the
+    // enrollment flow itself can still run after the redirect.
+    if (res.status === 403 && code === "MFA_REQUIRED" && typeof window !== "undefined") {
+      window.location.href = "/settings#section-security";
+      throw new ApiError(message, res.status, code);
+    }
+
+    throw new ApiError(message, res.status, code);
   }
 
   return res.json();

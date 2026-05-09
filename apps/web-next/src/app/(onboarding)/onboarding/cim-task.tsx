@@ -66,7 +66,7 @@ export function CimTaskModal({
       onComplete={onComplete}
       canComplete={canComplete}
       busy={busy}
-      busyLabel="Creating demo deal..."
+      busyLabel={sampleId ? "Creating demo deal..." : "Uploading..."}
     >
       <p className="text-[13.5px] text-text-secondary mb-4">
         Drop a CIM, teaser, or balance sheet. We&apos;ll parse every table and chart.

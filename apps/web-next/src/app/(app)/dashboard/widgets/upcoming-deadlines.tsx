@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/upcoming-deadlines.js.
+// Ported from upcoming-deadlines.js.
 type TaskRow = {
   id: string;
   title: string;
@@ -42,7 +42,8 @@ export function UpcomingDeadlinesWidget() {
           .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime())
           .slice(0, 8);
         setUpcoming(filtered);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/upcoming-deadlines] failed to load tasks:", err);
         if (!cancelled) setError(true);
       }
     })();

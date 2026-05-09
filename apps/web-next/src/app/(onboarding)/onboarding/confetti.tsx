@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 
 // CSS confetti animation fired when all 3 onboarding tasks are completed.
-// Ported from apps/web/js/onboarding/onboarding-celebrate.js (triggerOnboardingCelebration)
+// Ported from onboarding-celebrate.js (triggerOnboardingCelebration)
 // and onboarding-flow.js fireConfetti(). Uses the same colors, particle
 // count, and fall keyframe as legacy.
 

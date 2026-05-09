@@ -105,7 +105,21 @@ export async function findOrCreateUser(authUser: {
       .select('*, organization:Organization(id, name, slug, logo, plan)')
       .single();
 
-    if (createError) throw createError;
+    if (createError) {
+      // Race resolution: another concurrent request just inserted this User row.
+      if (createError.code === '23505') {
+        const { data: existing } = await supabase
+          .from('User')
+          .select('*, organization:Organization(id, name, slug, logo, plan)')
+          .eq('authId', authUser.id)
+          .single();
+        if (existing) {
+          log.info('User race resolved — using existing record', { authId: authUser.id });
+          return existing;
+        }
+      }
+      throw createError;
+    }
 
     // Set createdBy on Organization if this is the founding user
     if (organizationId) {

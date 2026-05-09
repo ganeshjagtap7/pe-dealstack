@@ -1,4 +1,5 @@
 import path from "node:path";
+import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
 // Dev-only proxy: forward /api/* to the local Express API on :3001 so client
@@ -76,4 +77,20 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+// Sentry's webpack plugin wraps the config to upload source maps and inject
+// release info at build time. Org/project/auth-token come from env so this
+// works locally (where the token isn't set, plugin no-ops the upload) and
+// in CI/Vercel (where it does upload). All existing config above is
+// preserved — withSentryConfig only adds; it never replaces.
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  widenClientFileUpload: true,
+  reactComponentAnnotation: { enabled: true },
+  // v9's `hideSourceMaps` became `sourcemaps.deleteSourcemapsAfterUpload`
+  // in v10 — same intent: upload maps to Sentry, then strip them from the
+  // public bundle so they aren't browsable from prod.
+  sourcemaps: { deleteSourcemapsAfterUpload: true },
+  disableLogger: true,
+});

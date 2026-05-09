@@ -202,8 +202,9 @@ router.post('/:dealId/chat', async (req, res) => {
       if (personProfile?.title) {
         contextParts.push(`\nYour Role: ${personProfile.title}${personProfile.bio ? ' — ' + personProfile.bio : ''}`);
       }
-    } catch {
+    } catch (err) {
       // Non-blocking — firm context is supplementary
+      log.warn('deals-chat-ai: firm context fetch failed', { error: err instanceof Error ? err.message : String(err) });
     }
 
     // ─── Financial Context Injection ─────────────────────────────────

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 
@@ -107,12 +108,12 @@ export default function ResetPasswordPage() {
       {/* Header */}
       <header className="w-full border-b border-gray-200 bg-white sticky top-0 z-50">
         <div className="max-w-[1280px] mx-auto px-6 h-16 flex items-center justify-between">
-          <a href="/" className="flex items-center gap-3 cursor-pointer select-none">
+          <Link href="/" className="flex items-center gap-3 cursor-pointer select-none">
             <div className="size-8 rounded bg-primary/10 flex items-center justify-center text-primary">
               <span className="material-symbols-outlined text-2xl">bar_chart</span>
             </div>
             <h2 className="text-xl font-bold leading-tight tracking-tight">PE OS</h2>
-          </a>
+          </Link>
         </div>
       </header>
 

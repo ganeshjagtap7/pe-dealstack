@@ -31,6 +31,19 @@ The server will exit on startup if these are missing.
 
 AI features gracefully degrade when keys are missing — the app works without them, but AI chat and document analysis will be disabled.
 
+### AI Usage Tracking (optional — pricing tuning)
+
+These four variables control the per-unit cost recorded for non-LLM AI providers. Defaults are hardcoded in source; set in Vercel project settings to override without a deploy.
+
+| Variable | Default | Controls |
+|----------|---------|---------|
+| `APIFY_PRICE_PER_SEARCH_USD` | `0.005` | Cost per Apify Google search call |
+| `APIFY_PRICE_PER_LINKEDIN_PROFILE_USD` | `0.02` | Cost per Apify LinkedIn scrape |
+| `AZURE_DOC_PRICE_PER_PAGE_USD` | `0.0015` | Cost per Azure Document Intelligence page |
+| `GEMINI_EMBED_PRICE_PER_1K_CHARS_USD` | `0.000025` | Cost per 1K chars embedded via Gemini |
+
+See [`docs/AI-USAGE-TRACKING.md`](AI-USAGE-TRACKING.md) for the full tracking architecture.
+
 ### Monitoring (optional)
 
 | Variable | Description | Where to get it |

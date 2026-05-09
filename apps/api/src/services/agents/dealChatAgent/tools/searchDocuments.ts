@@ -1,0 +1,63 @@
+// ─── search_documents tool ────────────────────────────────────────
+// RAG-backed semantic search over deal documents (with naive fallback
+// when RAG is disabled).
+
+import { tool } from '@langchain/core/tools';
+import { z } from 'zod';
+import { supabase } from '../../../../supabase.js';
+import { searchDocumentChunks, buildRAGContext, isRAGEnabled } from '../../../../rag.js';
+import { log } from '../../../../utils/logger.js';
+
+export function makeSearchDocumentsTool(dealId: string, _orgId: string) {
+  return tool(
+    async ({ query }) => {
+      try {
+        if (!isRAGEnabled()) {
+          const { data: docs } = await supabase
+            .from('Document')
+            .select('id, name, type, extractedText')
+            .eq('dealId', dealId)
+            .not('extractedText', 'is', null);
+
+          if (!docs || docs.length === 0) return 'No documents found for this deal.';
+
+          const queryLower = query.toLowerCase();
+          const relevant = docs.filter(d =>
+            d.extractedText?.toLowerCase().includes(queryLower) ||
+            d.name.toLowerCase().includes(queryLower)
+          );
+
+          if (relevant.length === 0) return 'No relevant content found in documents.';
+
+          return relevant.map(d => {
+            const text = d.extractedText || '';
+            const idx = text.toLowerCase().indexOf(queryLower);
+            const start = Math.max(0, idx - 200);
+            const end = Math.min(text.length, idx + queryLower.length + 500);
+            return `### ${d.name}\n${text.slice(start, end)}`;
+          }).join('\n\n');
+        }
+
+        const searchResults = await searchDocumentChunks(query, dealId, 8, 0.4);
+        if (searchResults.length === 0) return 'No relevant content found in documents.';
+
+        const { data: docs } = await supabase
+          .from('Document')
+          .select('id, name, type')
+          .eq('dealId', dealId);
+
+        return buildRAGContext(searchResults, docs || []);
+      } catch (error) {
+        log.error('searchDocuments tool error', error);
+        return 'Error searching documents.';
+      }
+    },
+    {
+      name: 'search_documents',
+      description: 'Search through all uploaded deal documents using semantic search. Use this when the user asks about specific information from documents, CIMs, financial reports, etc.',
+      schema: z.object({
+        query: z.string().describe('The search query — what information to find in the documents'),
+      }),
+    }
+  );
+}

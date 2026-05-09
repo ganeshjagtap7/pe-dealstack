@@ -138,6 +138,7 @@ interface DataRoomHeaderProps {
   onClearFolder: () => void;
   onUploadClick: () => void;
   onFilesSelected: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onManageTeam: () => void;
 }
 
 function getInitials(name: string): string {
@@ -156,6 +157,7 @@ export function DataRoomHeader({
   onClearFolder,
   onUploadClick,
   onFilesSelected,
+  onManageTeam,
 }: DataRoomHeaderProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -213,42 +215,43 @@ export function DataRoomHeader({
       </nav>
       <div className="flex items-center gap-3 shrink-0">
         {/* Team Members Avatar Group */}
-        <div className="flex -space-x-2" title="Team members with access">
-          {teamMembers.length > 0 ? (
-            <>
-              {teamMembers.slice(0, 3).map((member, idx) => {
-                const user = member.user;
-                return user?.avatar ? (
-                  <img
-                    key={member.id}
-                    src={user.avatar}
-                    alt={user.name || ""}
-                    title={`${user.name || "Unknown"} (${member.role})`}
-                    className="size-8 rounded-full border-2 border-white bg-slate-200 object-cover"
-                    style={{ zIndex: 3 - idx }}
-                  />
-                ) : (
-                  <div
-                    key={member.id}
-                    className="flex size-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold"
-                    style={{ backgroundColor: "#E6EEF5", color: "#003366", zIndex: 3 - idx }}
-                    title={`${user?.name || "Unknown"} (${member.role})`}
-                  >
-                    {getInitials(user?.name || "")}
-                  </div>
-                );
-              })}
-              {teamMembers.length > 3 && (
-                <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-xs font-bold text-slate-600">
-                  +{teamMembers.length - 3}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-slate-400 hover:bg-slate-200 transition-colors">
-              <span className="material-symbols-outlined text-[16px]">group_add</span>
+        <div className="flex items-center -space-x-2" title="Team members with access">
+          {teamMembers.slice(0, 3).map((member, idx) => {
+            const user = member.user;
+            return user?.avatar ? (
+              <img
+                key={member.id}
+                src={user.avatar}
+                alt={user.name || ""}
+                title={`${user.name || "Unknown"} (${member.role})`}
+                className="size-8 rounded-full border-2 border-white bg-slate-200 object-cover"
+                style={{ zIndex: 3 - idx }}
+              />
+            ) : (
+              <div
+                key={member.id}
+                className="flex size-8 items-center justify-center rounded-full border-2 border-white text-xs font-semibold"
+                style={{ backgroundColor: "#E6EEF5", color: "#003366", zIndex: 3 - idx }}
+                title={`${user?.name || "Unknown"} (${member.role})`}
+              >
+                {getInitials(user?.name || "")}
+              </div>
+            );
+          })}
+          {teamMembers.length > 3 && (
+            <div className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-xs font-bold text-slate-600">
+              +{teamMembers.length - 3}
             </div>
           )}
+          <button
+            type="button"
+            onClick={onManageTeam}
+            title="Manage deal team"
+            aria-label="Manage deal team"
+            className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-slate-100 text-slate-500 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            <span className="material-symbols-outlined text-[16px]">group_add</span>
+          </button>
         </div>
         <div className="h-4 w-px bg-slate-200 mx-2" />
         <button

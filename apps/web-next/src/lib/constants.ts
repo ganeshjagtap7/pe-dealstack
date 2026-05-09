@@ -95,7 +95,7 @@ export const PRIORITY_LABELS: Record<string, string> = {
 
 // ---------------------------------------------------------------------------
 // Deal Card Metrics -- maps metric keys to display info.
-// Port of METRIC_CONFIG from apps/web/crm.js
+// Port of METRIC_CONFIG from crm.js
 // ---------------------------------------------------------------------------
 export type MetricKey = "irrProjected" | "mom" | "ebitda" | "revenue" | "dealSize";
 

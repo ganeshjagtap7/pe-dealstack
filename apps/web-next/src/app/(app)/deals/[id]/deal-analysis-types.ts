@@ -242,7 +242,7 @@ export interface RiskFactor {
 }
 
 // ── Tabs ──────────────────────────────────────────────────────────────────
-// Mirrors legacy `TABS` in apps/web/js/analysis-styles.js — same id/label/icon
+// Mirrors legacy `TABS` in analysis-styles.js — same id/label/icon
 // and same order. DO NOT diverge from legacy without a corresponding update
 // there (the user-visible header copy must match across both apps).
 

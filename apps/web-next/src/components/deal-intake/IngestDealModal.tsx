@@ -3,7 +3,7 @@
 // ---------------------------------------------------------------------------
 // IngestDealModal — full-screen overlay wrapping IngestDealForm so the deal
 // intake flow no longer hijacks the user's current page. Mirrors the legacy
-// apps/web/js/deal-intake-modal.js behaviour: backdrop blur, centered card,
+// deal-intake-modal.js behaviour: backdrop blur, centered card,
 // Escape to close, click-outside to close, body scroll lock.
 //
 // Visual styling matches the existing edit-deal-modal pattern in

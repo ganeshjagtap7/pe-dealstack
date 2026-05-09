@@ -8,7 +8,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { NotificationCenter } from "./NotificationPanel";
 
-// Ported from apps/web/js/onboarding/onboarding-config.js (f23a61c).
+// Ported from onboarding-config.js (f23a61c).
 // Hardcoded here for now — web-next doesn't yet have a runtime config layer.
 const SUPPORT_CONFIG = {
   bookingUrl: "https://calendar.app.google/vRexQ5AmhivWx2PH6",
@@ -181,7 +181,7 @@ export function Header() {
 // HelpSupportModal
 // Two-option modal opened from the user dropdown (Book a Call / Written
 // Feedback), with urgent-contact mailto footer. Ported from
-// apps/web/js/layoutComponents.js generateHelpSupportModal (f23a61c).
+// layoutComponents.js generateHelpSupportModal (f23a61c).
 // ---------------------------------------------------------------------------
 
 export function HelpSupportModal({ open, onClose }: { open: boolean; onClose: () => void }) {

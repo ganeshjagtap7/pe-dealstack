@@ -7,7 +7,7 @@
  */
 
 import crypto from 'crypto';
-import { openai, isAIEnabled } from '../openai.js';
+import { openai, isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { MODEL_INSIGHTS } from '../utils/aiModels.js';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
@@ -66,7 +66,9 @@ export async function getCachedInsights(
       .single();
 
     return data?.insights as InsightsResult | null;
-  } catch {
+  } catch (err) {
+    // Cache miss / DB error — caller will regenerate. Log so persistent failures are visible.
+    log.warn('narrativeInsights: getCachedInsights failed', { error: err instanceof Error ? err.message : String(err), dealId });
     return null;
   }
 }
@@ -297,7 +299,7 @@ Return JSON:
 }`;
 
   try {
-    const response = await openai.chat.completions.create({
+    const response = await trackedChatCompletion('narrative_insights', {
       model: MODEL_INSIGHTS,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },

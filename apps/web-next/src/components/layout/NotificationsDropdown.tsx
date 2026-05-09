@@ -73,6 +73,9 @@ export function NotificationsDropdown() {
   // Initial load + polling
   useEffect(() => {
     if (!userId) return;
+    // load() is async + setInterval callback — both produce deferred
+    // setState, not sync state writes during this effect body.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
     const id = setInterval(load, POLL_INTERVAL_MS);
     return () => clearInterval(id);

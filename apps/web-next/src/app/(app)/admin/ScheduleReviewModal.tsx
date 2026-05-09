@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useNotificationCount } from "@/providers/NotificationCountProvider";
 import { Modal } from "./Modal";
 import { DealOptions, UserOptions, INPUT_CLS, LABEL_CLS, type SharedProps } from "./form-primitives";
 
@@ -13,6 +14,7 @@ export function ScheduleReviewModal({
   onToast,
   onScheduled,
 }: SharedProps & { onScheduled: () => void }) {
+  const { refresh: refreshNotifications } = useNotificationCount();
   const [title, setTitle] = useState("");
   const [dealId, setDealId] = useState("");
   const [userId, setUserId] = useState("");
@@ -57,6 +59,11 @@ export function ScheduleReviewModal({
         dueDate: date,
         priority,
         description: notes.trim() ? `Review Notes: ${notes.trim()}` : undefined,
+      });
+      // Refresh the bell immediately so the self-created TASK_ASSIGNED
+      // notification is visible without waiting for the 15s poll.
+      refreshNotifications().catch(() => {
+        // Polling will catch up on the next tick.
       });
       onToast("Review scheduled successfully", "success");
       onClose();

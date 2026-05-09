@@ -2,7 +2,7 @@
 
 import { WidgetShell } from "./shell";
 
-// Ported from apps/web/js/widgets/market-multiples-data.js + .js.
+// Ported from market-multiples-data.js + .js.
 // Static reference data — refresh quarterly by editing SECTORS/AS_OF.
 const AS_OF = "Q1 2026";
 const DISCLAIMER = "Illustrative ranges only. Verify with PitchBook / Capital IQ before use.";

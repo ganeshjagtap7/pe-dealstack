@@ -4,7 +4,7 @@ import { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 // Card shell + loading/error/empty renderers — ported from WidgetBase
-// (apps/web/js/widgets/widget-base.js, c9dcc6d).
+// (widget-base.js, c9dcc6d).
 export function WidgetShell({
   title,
   icon,

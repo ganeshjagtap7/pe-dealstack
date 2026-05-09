@@ -5,7 +5,7 @@ import { api } from "@/lib/api";
 import { formatRelativeTime, getInitials } from "@/lib/formatters";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/recent-activity.js +
+// Ported from recent-activity.js +
 // activity-formatters.js. Top 10 audit logs grouped by day with rich formatting.
 type AuditLog = {
   id: string;
@@ -81,7 +81,8 @@ export function RecentActivityWidget() {
         if (cancelled) return;
         const logs = data?.logs || [];
         setGroups(logs.length === 0 ? [] : groupByDay(logs));
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/recent-activity] failed to load audit logs:", err);
         if (!cancelled) setError(true);
       }
     })();
@@ -123,12 +124,13 @@ export function RecentActivityWidget() {
                         )}
                       </div>
                       <div
-                        className="absolute -bottom-0.5 -right-0.5 rounded-full w-4 h-4 flex items-center justify-center border-2 border-white overflow-hidden"
+                        className="absolute -bottom-0.5 -right-0.5 rounded-full w-[18px] h-[18px] flex items-center justify-center border-2 border-white overflow-hidden"
                         style={{ backgroundColor: "#003366" }}
                       >
+                        {/* opsz 20 is the lowest Material Symbols optical-size variant — pair with 12px font-size so glyphs render at their designed metrics. */}
                         <span
-                          className="material-symbols-outlined text-white"
-                          style={{ fontSize: "10px", fontVariationSettings: "'opsz' 20, 'wght' 400, 'FILL' 1, 'GRAD' 0", lineHeight: 1 }}
+                          className="material-symbols-outlined text-white leading-none"
+                          style={{ fontSize: "12px", fontVariationSettings: "'opsz' 20, 'wght' 400, 'FILL' 1, 'GRAD' 0", lineHeight: 1 }}
                         >{icon}</span>
                       </div>
                     </div>

@@ -25,8 +25,10 @@ function getCachedUser(): AppUser | null {
     const parsed = JSON.parse(cached) as Partial<AppUser>;
     // Minimum viable record: we need an id and a non-empty name/email to render.
     if (!parsed?.id || !parsed?.name) return null;
-    return parsed as AppUser;
-  } catch {
+    // Default isInternal to false for cache entries written before the field existed.
+    return { ...parsed, isInternal: parsed.isInternal ?? false } as AppUser;
+  } catch (err) {
+    console.warn("[UserProvider] failed to read cached user from sessionStorage:", err);
     return null;
   }
 }
@@ -54,6 +56,7 @@ export function UserProvider({ children }: { children: ReactNode }) {
         role?: string;
         avatar?: string;
         preferences?: Record<string, unknown>;
+        isInternal?: boolean;
       }>("/users/me");
 
       const appUser: AppUser = {
@@ -64,13 +67,15 @@ export function UserProvider({ children }: { children: ReactNode }) {
         systemRole: (data.role as AppUser["systemRole"]) || "MEMBER",
         avatar: data.avatar || "",
         preferences: data.preferences || {},
+        isInternal: data.isInternal ?? false,
       };
 
       setUser(appUser);
       try {
         sessionStorage.setItem(STORAGE_KEYS.userCache, JSON.stringify(appUser));
-      } catch {
-        // sessionStorage full or blocked — safe to skip
+      } catch (err) {
+        // sessionStorage full or blocked — safe to skip.
+        console.warn("[UserProvider] failed to cache user to sessionStorage:", err);
       }
     } catch (err) {
       console.warn("[UserProvider] /users/me failed:", err);

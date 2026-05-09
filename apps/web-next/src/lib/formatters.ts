@@ -1,5 +1,5 @@
 // ISO 4217 → display symbol. Port of CURRENCY_SYMBOLS in
-// apps/web/js/formatters.js. Unknown codes fall through to "<CODE> ".
+// formatters.js. Unknown codes fall through to "<CODE> ".
 export const CURRENCY_SYMBOLS: Record<string, string> = {
   USD: "$", INR: "₹", EUR: "€", GBP: "£", JPY: "¥", CNY: "¥",
   CAD: "C$", AUD: "A$", CHF: "CHF ", SGD: "S$", HKD: "HK$",
@@ -143,8 +143,9 @@ function cleanNameIfUrl(value: string): string {
       .split(/[.\-_]/)
       .map((seg) => seg.charAt(0).toUpperCase() + seg.slice(1))
       .join(" ");
-  } catch {
-    // Not a valid URL despite looking like one — return as-is
+  } catch (err) {
+    // Not a valid URL despite looking like one — return as-is.
+    console.warn("[formatters] derivedNameFromUrl failed:", err);
     return value;
   }
 }

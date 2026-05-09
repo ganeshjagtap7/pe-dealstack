@@ -15,7 +15,8 @@ export async function resolveUserId(authId: string): Promise<string | null> {
       .eq('authId', authId)
       .single();
     return data?.id || null;
-  } catch {
+  } catch (err) {
+    log.warn('notifications: resolveUserId failed', { error: err instanceof Error ? err.message : String(err) });
     return null;
   }
 }
@@ -177,6 +178,10 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
 });
 
 // POST /api/notifications - Create a notification
+// Used by the Admin "Send Reminder" modal (and any other client that needs to
+// fire an ad-hoc notification). Routes through createNotification so user
+// preferences are honoured; bypassing it caused reminders to silently
+// disappear for users who'd opted out of SYSTEM in their settings.
 router.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = getOrgId(req);
@@ -200,13 +205,12 @@ router.post('/', async (req: Request, res: Response, next: NextFunction) => {
       return res.status(403).json({ error: 'Cannot create notifications for users outside your organization' });
     }
 
-    const { data: notification, error } = await supabase
-      .from('Notification')
-      .insert(validation.data)
-      .select()
-      .single();
-
-    if (error) throw error;
+    const notification = await createNotification(validation.data);
+    if (!notification) {
+      // createNotification swallows DB errors and pref opt-outs alike — return
+      // a 202 so the client can show "sent" without leaking the distinction.
+      return res.status(202).json({ skipped: true });
+    }
 
     res.status(201).json(notification);
   } catch (error) {
@@ -387,7 +391,8 @@ async function isNotificationEnabled(userId: string, type: string): Promise<bool
 
     // Only skip if explicitly set to false
     return prefs?.notifications?.[type] !== false;
-  } catch {
+  } catch (err) {
+    log.warn('notifications: isNotificationEnabled failed, defaulting to enabled', { error: err instanceof Error ? err.message : String(err), userId, type });
     return true; // On error, default to enabled
   }
 }

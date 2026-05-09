@@ -64,7 +64,7 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
   }
 
   try {
-    const model = getChatModel(0.7, 2000);
+    const model = getChatModel(0.7, 2000, 'memo_generation');
     const tools = getMemoAgentTools(input.memoId, input.dealId, input.orgId);
 
     const agent = createReactAgent({ llm: model, tools });
@@ -154,8 +154,9 @@ export async function runMemoChatAgent(input: MemoChatInput): Promise<MemoChatRe
           if (parsed.sectionType) sectionType = parsed.sectionType;
           if (parsed.title) title = parsed.title;
         }
-      } catch {
-        // Not JSON tool output — skip
+      } catch (err) {
+        // Not JSON tool output — skip. Log at debug to avoid noise on every non-JSON tool.
+        log.debug('memoAgent: tool message JSON parse skipped', { error: err instanceof Error ? err.message : String(err) });
       }
     }
 

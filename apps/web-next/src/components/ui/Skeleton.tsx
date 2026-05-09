@@ -3,7 +3,7 @@
 /**
  * Reusable skeleton shimmer primitives.
  *
- * Mirrors apps/web/css/skeleton.css. The base `.skeleton` class (defined in
+ * Mirrors skeleton.css. The base `.skeleton` class (defined in
  * globals.css) provides the gradient + shimmer animation; this component just
  * adds ergonomic React props for sizing and shape.
  *
@@ -102,7 +102,7 @@ function Circle({ size = 32, className, ...rest }: CircleProps) {
   );
 }
 
-interface BadgeProps extends Omit<SkeletonBaseProps, "rounded"> {}
+type BadgeProps = Omit<SkeletonBaseProps, "rounded">;
 
 function Badge({ width = 64, height = 20, className, ...rest }: BadgeProps) {
   return (

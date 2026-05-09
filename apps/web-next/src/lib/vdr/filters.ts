@@ -1,5 +1,5 @@
-// Smart filter presets — ported from apps/web/src/data/vdrMockData.ts and
-// apps/web/src/components/FiltersBar.tsx. Same logic so behavior matches.
+// Smart filter presets — ported from vdrMockData.ts and
+// FiltersBar.tsx. Same logic so behavior matches.
 
 import type { SmartFilter, VDRFile } from "./types";
 

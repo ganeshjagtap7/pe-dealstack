@@ -169,7 +169,8 @@ function VerifyEmailContent() {
         setResendMessageType("success");
         setResendCooldown(RESEND_COOLDOWN);
       }
-    } catch {
+    } catch (err) {
+      console.warn("[auth/verify-email] resend failed:", err);
       setResendMessage("An error occurred. Please try again.");
       setResendMessageType("error");
     } finally {

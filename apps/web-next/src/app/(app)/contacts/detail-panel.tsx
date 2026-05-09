@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import { formatRelativeTime, getInitials } from "@/lib/formatters";
 import { cn } from "@/lib/cn";
+import { useToast } from "@/providers/ToastProvider";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   Contact, Interaction, LinkedDeal, TYPE_CONFIG, SCORE_CONFIG,
   ContactFormData, ContactModal, DeleteConfirmModal,
@@ -62,12 +64,17 @@ export function DetailPanel({
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [unlinkDealId, setUnlinkDealId] = useState<string | null>(null);
+  const [removeConnectionId, setRemoveConnectionId] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   const loadContact = useCallback(async () => {
     try {
       const data = await api.get<Contact>(`/contacts/${contactId}`);
       setContact(data);
-    } catch { /* silent */ }
+    } catch (err) {
+      console.warn("[contacts] loadContact failed:", err);
+    }
     setLoading(false);
   }, [contactId]);
 
@@ -75,7 +82,10 @@ export function DetailPanel({
     try {
       const data = await api.get<{ connections: Connection[] }>(`/contacts/${contactId}/connections`);
       setConnections(data.connections || []);
-    } catch { setConnections([]); }
+    } catch (err) {
+      console.warn("[contacts] loadConnections failed:", err);
+      setConnections([]);
+    }
   }, [contactId]);
 
   useEffect(() => { loadContact(); loadConnections(); }, [loadContact, loadConnections]);
@@ -90,7 +100,9 @@ export function DetailPanel({
       setEditModalOpen(false);
       await loadContact();
       onRefresh();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to save contact"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to save contact", "error");
+    }
     finally { setSaving(false); }
   }
 
@@ -100,24 +112,32 @@ export function DetailPanel({
       setDeleteConfirmOpen(false);
       onClose();
       onRefresh();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to delete contact"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to delete contact", "error");
+    }
   }
 
-  async function handleUnlinkDeal(dealId: string) {
-    if (!confirm("Remove this deal link?")) return;
+  async function performUnlinkDeal(dealId: string) {
     try {
       await api.delete(`/contacts/${contactId}/deals/${dealId}`);
       await loadContact();
       onRefresh();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to unlink deal"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to unlink deal", "error");
+    } finally {
+      setUnlinkDealId(null);
+    }
   }
 
-  async function handleDeleteConnection(connectionId: string) {
-    if (!confirm("Remove this connection?")) return;
+  async function performDeleteConnection(connectionId: string) {
     try {
       await api.delete(`/contacts/${contactId}/connections/${connectionId}`);
       await loadConnections();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to remove connection"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to remove connection", "error");
+    } finally {
+      setRemoveConnectionId(null);
+    }
   }
 
   if (loading) {
@@ -209,7 +229,7 @@ export function DetailPanel({
                       <p className="text-[10px] text-text-muted truncate">{c.company || ""}{c.title ? " \u00B7 " + c.title : ""}</p>
                     </div>
                     <span className={cn("px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shrink-0", rtc.bg, rtc.text)}>{rtc.label}</span>
-                    <button onClick={() => handleDeleteConnection(conn.id)} className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0" title="Remove">
+                    <button onClick={() => setRemoveConnectionId(conn.id)} className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0" title="Remove">
                       <span className="material-symbols-outlined text-[14px]">close</span>
                     </button>
                   </div>
@@ -244,7 +264,7 @@ export function DetailPanel({
                       </div>
                       <div className="flex items-center gap-2 shrink-0 ml-2">
                         {d.role && <span className="text-[10px] text-text-muted">{d.role}</span>}
-                        <button onClick={() => handleUnlinkDeal(dealId)} className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100" title="Unlink deal">
+                        <button onClick={() => setUnlinkDealId(dealId)} className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100" title="Unlink deal">
                           <span className="material-symbols-outlined text-[16px]">link_off</span>
                         </button>
                       </div>
@@ -314,6 +334,24 @@ export function DetailPanel({
       {connectionModalOpen && <ConnectionModal contactId={contactId} onClose={() => setConnectionModalOpen(false)} onCreated={() => { setConnectionModalOpen(false); loadConnections(); }} />}
       {editModalOpen && <ContactModal contact={contact} saving={saving} onSave={handleSaveContact} onClose={() => setEditModalOpen(false)} />}
       {deleteConfirmOpen && <DeleteConfirmModal onConfirm={handleDelete} onCancel={() => setDeleteConfirmOpen(false)} />}
+      <ConfirmDialog
+        open={unlinkDealId !== null}
+        title="Unlink Deal"
+        message="Remove this deal link?"
+        confirmLabel="Unlink"
+        variant="danger"
+        onConfirm={() => unlinkDealId && performUnlinkDeal(unlinkDealId)}
+        onCancel={() => setUnlinkDealId(null)}
+      />
+      <ConfirmDialog
+        open={removeConnectionId !== null}
+        title="Remove Connection"
+        message="Remove this connection?"
+        confirmLabel="Remove"
+        variant="danger"
+        onConfirm={() => removeConnectionId && performDeleteConnection(removeConnectionId)}
+        onCancel={() => setRemoveConnectionId(null)}
+      />
     </>
   );
 }
@@ -378,9 +416,15 @@ function AddInteractionForm({ contactId, onDone, onCancel }: { contactId: string
   const [description, setDescription] = useState("");
   const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
   const [submitting, setSubmitting] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const { showToast } = useToast();
 
   async function handleSubmit() {
-    if (!title.trim() && !description.trim()) { alert("Please enter a title or description."); return; }
+    if (!title.trim() && !description.trim()) {
+      setFormError("Please enter a title or description.");
+      return;
+    }
+    setFormError(null);
     setSubmitting(true);
     try {
       const body: Record<string, string> = { type };
@@ -389,7 +433,9 @@ function AddInteractionForm({ contactId, onDone, onCancel }: { contactId: string
       if (date) body.date = date;
       await api.post(`/contacts/${contactId}/interactions`, body);
       onDone();
-    } catch (err) { alert(err instanceof Error ? err.message : "Failed to add interaction"); }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to add interaction", "error");
+    }
     finally { setSubmitting(false); }
   }
 
@@ -424,6 +470,7 @@ function AddInteractionForm({ contactId, onDone, onCancel }: { contactId: string
           <label className="block text-xs font-medium text-text-secondary mb-1">Description</label>
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Details about this interaction..." className={cn(inputCls, "resize-none")} />
         </div>
+        {formError && <p className="text-xs text-red-600">{formError}</p>}
         <button onClick={handleSubmit} disabled={submitting} className="self-end px-4 py-1.5 rounded-md text-white text-sm font-medium hover:opacity-90 transition-colors flex items-center gap-1.5 disabled:opacity-50" style={{ backgroundColor: "#003366" }}>
           <span className="material-symbols-outlined text-[16px]">save</span>{submitting ? "Saving..." : "Save"}
         </button>

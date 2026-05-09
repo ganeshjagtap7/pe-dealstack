@@ -9,17 +9,16 @@
   "scripts": {
     "dev": "turbo run dev",
     "build": "turbo run build",
-    "build:web": "npm run build --workspace=@ai-crm/web",
     "build:api": "npm run build --workspace=@ai-crm/api",
-    "build:prod": "npm run build:web && npm run build:api",
     "start:prod": "NODE_ENV=production node apps/api/dist/index.js",
     "lint": "turbo run lint",
     "clean": "turbo run clean",
-    "dev:web": "npm run dev --workspace=@ai-crm/web",
     "dev:api": "npm run dev --workspace=@ai-crm/api",
     "dev:next": "npm run dev --workspace=@ai-crm/web-next"
   },
   "devDependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "turbo": "^2.0.0"
   },
   "engines": {

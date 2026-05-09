@@ -2,7 +2,7 @@
 import { z } from 'zod';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { FirmResearchStateType, AgentStep, FirmProfile, PersonProfile } from '../state.js';
-import { getExtractionModel } from '../../../llm.js';
+import { invokeStructured } from '../../../llm.js';
 import { log } from '../../../../utils/logger.js';
 
 function step(message: string, detail?: string): AgentStep {
@@ -86,9 +86,7 @@ export async function synthesizeNode(
     return { status: 'failed', error: 'Could not gather data — search may be temporarily unavailable. Please fill in manually and try "Refresh profile" later from Settings.', steps };
   }
 
-  steps.push(step('Starting GPT-4o structured extraction'));
-
-  const model = getExtractionModel(2000);
+  steps.push(step('Starting structured extraction (with Tier-2 fallback)'));
 
   // === Extract Firm Profile ===
   let firmProfile: FirmProfile | null = null;
@@ -98,11 +96,10 @@ export async function synthesizeNode(
       state.firmSearchResults ? `\n=== WEB SEARCH RESULTS ===\n${state.firmSearchResults}` : '',
     ].filter(Boolean).join('\n\n');
 
-    const firmModel = model.withStructuredOutput(FirmProfileSchema);
-    const firmResult = await firmModel.invoke([
+    const firmResult = await invokeStructured(FirmProfileSchema, [
       new SystemMessage(FIRM_SYSTEM_PROMPT),
       new HumanMessage(`Extract the firm profile for "${state.firmName}" from:\n\n${firmContext}`),
-    ]);
+    ], { maxTokens: 2000, label: 'synthesize.firm' });
 
     firmProfile = {
       ...(firmResult as z.infer<typeof FirmProfileSchema>),
@@ -126,11 +123,10 @@ export async function synthesizeNode(
         state.websiteText ? `\n=== FIRM WEBSITE (for context) ===\n${state.websiteText.slice(0, 4000)}` : '',
       ].filter(Boolean).join('\n\n');
 
-      const personModel = model.withStructuredOutput(PersonProfileSchema);
-      const personResult = await personModel.invoke([
+      const personResult = await invokeStructured(PersonProfileSchema, [
         new SystemMessage(PERSON_SYSTEM_PROMPT),
         new HumanMessage(`Extract the profile for the person at LinkedIn: ${state.linkedinUrl}\nFirm: ${state.firmName}\n\n${personContext}`),
-      ]);
+      ], { maxTokens: 2000, label: 'synthesize.person' });
 
       personProfile = {
         ...(personResult as z.infer<typeof PersonProfileSchema>),

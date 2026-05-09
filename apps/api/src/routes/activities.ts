@@ -3,6 +3,7 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { createNotification } from './notifications.js';
 
 const router = Router();
 
@@ -30,6 +31,12 @@ const createActivitySchema = z.object({
   title: z.string().min(1),
   description: z.string().optional(),
   metadata: z.record(z.any()).optional(),
+  // Emails the client picked from the @-mention dropdown. Server resolves
+  // them to User rows scoped to this org — avoids the multi-user-same-name
+  // ambiguity that text-based regex parsing can't resolve. Email is unique
+  // per User and shown in the picker, so the client can always send a
+  // canonical identifier without surfacing UUIDs in the UI.
+  mentionedEmails: z.array(z.string().email()).optional(),
 });
 
 // GET /api/deals/:dealId/activities - List activities for a deal
@@ -101,6 +108,54 @@ router.post('/deals/:dealId/activities', async (req, res) => {
       .single();
 
     if (error) throw error;
+
+    // @-mention notifications. Client sends emails picked from the
+    // @-dropdown (deal-overview.tsx tracks them in state). We resolve each
+    // to a User row scoped to this org — defense-in-depth so a crafted
+    // request can't notify users in another tenant. Awaited so the
+    // notifications actually land: Vercel's serverless runtime can freeze
+    // the function once the response is sent, dropping any pending
+    // post-response promises.
+    if (data.mentionedEmails && data.mentionedEmails.length > 0) {
+      try {
+        const { data: validUsers } = await supabase
+          .from('User')
+          .select('id, email')
+          .in('email', data.mentionedEmails)
+          .eq('organizationId', orgId);
+        const recipients = (validUsers || []).map((u) => ({
+          id: u.id as string,
+          email: u.email as string,
+        }));
+        log.info('Mention scan: explicit emails', {
+          dealId,
+          sent: data.mentionedEmails.length,
+          valid: recipients.length,
+          emails: recipients.map((r) => r.email),
+        });
+        if (recipients.length > 0) {
+          const snippet = (data.description || '').slice(0, 200);
+          const results = await Promise.all(
+            recipients.map((r) =>
+              createNotification({
+                userId: r.id,
+                type: 'MENTION',
+                title: `You were mentioned in "${deal.name}"`,
+                message: snippet,
+                dealId,
+              }).catch((err) => {
+                log.error('Mention notification failed', err);
+                return null;
+              }),
+            ),
+          );
+          const created = results.filter((r) => r !== null).length;
+          log.info('Mention scan: notifications created', { dealId, attempted: recipients.length, created });
+        }
+      } catch (err) {
+        log.error('Mention notification path failed', err);
+      }
+    }
 
     res.status(201).json(activity);
   } catch (error) {

@@ -197,7 +197,7 @@ export function MemoChat({
           accept=".pdf,.xlsx,.xls,.doc,.docx,.csv"
           multiple
           onChange={() => {
-            fileInputRef.current && (fileInputRef.current.value = "");
+            if (fileInputRef.current) fileInputRef.current.value = "";
           }}
         />
       </div>

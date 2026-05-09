@@ -175,7 +175,7 @@ body {
   animation: welcomeFadeInUp 0.3s ease-out;
 }
 
-/* Memo section content typography — ported from caef966 (apps/web/memo-builder.html)
+/* Memo section content typography — ported from caef966 (memo-builder.html)
    so AI-generated section HTML matches the legacy look (h3 with underline,
    tighter p line-height, positive/negative highlight spans). */
 .memo-section-content h3 {
@@ -242,7 +242,7 @@ body {
 
 /* ============================================================
    PE OS — Toast Notification System
-   Ported from apps/web/js/notifications.js. Stacked slide-in
+   Ported from notifications.js. Stacked slide-in
    toasts at top-right with progress timer bar.
    ============================================================ */
 
@@ -548,7 +548,7 @@ textarea:focus-visible {
 
 /* ============================================================
    AI Assistant — Floating chat drawer animations
-   Ported from apps/web/js/aiAssistant.js
+   Ported from aiAssistant.js
    ============================================================ */
 
 /* FAB pulse ring */

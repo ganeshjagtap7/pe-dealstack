@@ -10,8 +10,10 @@ import financialsRouter from './routes/financials.js';
 import memosRouter from './routes/memos.js';
 import ingestRouter from './routes/ingest.js';
 import onboardingRouter from './routes/onboarding.js';
-import { authMiddleware } from './middleware/auth.js';
+import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
+import { usageContextMiddleware } from './middleware/usageContext.js';
+import { staffAccessLogger } from './middleware/staffAccessLogger.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { requestIdMiddleware } from './middleware/requestId.js';
 import { isAIEnabled } from './openai.js';
@@ -49,6 +51,9 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
     dsn: process.env.SENTRY_DSN,
     environment: process.env.NODE_ENV,
     tracesSampleRate: 0.1,
+    // See app-lite.ts for the rationale — auto-HTTP instrumentation recurses
+    // when the underlying server is the proxyToExpress fake req/res adapter.
+    defaultIntegrations: false,
   });
   log.info('Sentry error tracking initialized (AI function)');
 }
@@ -76,10 +81,9 @@ app.use(helmet({
 // CORS - whitelist allowed origins (configurable via ALLOWED_ORIGINS env var)
 const extraOrigins = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
 const allowedOrigins = [
-  'https://pe-os.onrender.com',
-  'https://pe-dealstack.vercel.app',
   'https://lmmos.ai',
   'https://www.lmmos.ai',
+  'https://pe-dealstack.vercel.app',
   ...extraOrigins,
   ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:5173'] : []),
 ];
@@ -152,17 +156,17 @@ app.use(requestIdMiddleware);
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
-app.use('/api', authMiddleware, orgMiddleware, chatRouter);
-app.use('/api/ingest', authMiddleware, orgMiddleware, ingestRouter);
-app.use('/api/memos', authMiddleware, orgMiddleware, memosRouter);
-app.use('/api/onboarding', authMiddleware, orgMiddleware, onboardingRouter);
-app.use('/api', authMiddleware, orgMiddleware, financialsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, chatRouter);
+app.use('/api/ingest', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, ingestRouter);
+app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, memosRouter);
+app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, onboardingRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
 // ========================================
 // AI deal chat and analysis endpoints (require auth + org)
-app.use('/api', authMiddleware, orgMiddleware, aiRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, aiRouter);
 
 // AI status endpoint (public - no auth required)
 app.get('/api/ai/status', (_req, res) => {

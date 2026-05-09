@@ -190,7 +190,7 @@ export function DealMetadataRow({ deal }: { deal: DealDetail }) {
 
 export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
   // Dynamic financial metrics — only show cards with data, prioritized by
-  // relevance. Ported from apps/web/deal.js renderDynamicMetrics.
+  // relevance. Ported from deal.js renderDynamicMetrics.
   const hasMarginData = deal.ebitda != null && deal.revenue != null && deal.revenue !== 0;
 
   type MetricDef = { key: string; label: string; value: unknown; formatted: string; badge?: string; extra?: string };
@@ -315,8 +315,8 @@ export function FinancialMetricsRow({ deal }: { deal: DealDetail }) {
 
 import { FinancialStatementsPanel } from "./deal-financials";
 
-export function FinancialStatementsSection({ dealId }: { dealId: string }) {
-  return <FinancialStatementsPanel dealId={dealId} />;
+export function FinancialStatementsSection({ dealId, onFullscreen }: { dealId: string; onFullscreen?: () => void }) {
+  return <FinancialStatementsPanel dealId={dealId} onFullscreen={onFullscreen} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -395,7 +395,8 @@ export function FinancialStatusBadge({ dealId }: { dealId: string }) {
         if (confidences.length > 0) {
           setAvgConfidence(Math.round(confidences.reduce((a, b) => a + b, 0) / confidences.length));
         }
-      } catch {
+      } catch (err) {
+        console.warn("[deal-layout] financials status fetch failed:", err);
         if (!cancelled) setStatus("none");
       }
     })();

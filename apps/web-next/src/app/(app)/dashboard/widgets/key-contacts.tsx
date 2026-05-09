@@ -6,7 +6,7 @@ import { api } from "@/lib/api";
 import { getInitials } from "@/lib/formatters";
 import { WidgetShell, WidgetEmpty, WidgetError, WidgetLoading } from "./shell";
 
-// Ported from apps/web/js/widgets/key-contacts.js — top 5 contacts by
+// Ported from key-contacts.js — top 5 contacts by
 // relationship score. Two API calls (list + scores) merged; no avatar on
 // Contact so initials are used.
 type Contact = {
@@ -46,7 +46,8 @@ export function KeyContactsWidget() {
           .sort((a, b) => b.score - a.score)
           .slice(0, 5);
         setRows(enriched);
-      } catch {
+      } catch (err) {
+        console.warn("[dashboard/key-contacts] failed to load contacts:", err);
         if (!cancelled) setError(true);
       }
     })();

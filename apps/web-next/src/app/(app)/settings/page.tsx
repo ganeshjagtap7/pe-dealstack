@@ -12,6 +12,7 @@ import { ProfileSection, type UserProfile } from "./ProfileSection";
 import { NotificationsSection, DEFAULT_NOTIFICATION_PREFS } from "./NotificationsSection";
 import { TeamSection } from "./TeamSection";
 import { FirmProfileSection } from "./FirmProfileSection";
+import { AiUsageSection } from "./AiUsageSection";
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -21,6 +22,7 @@ const NAV_SECTIONS = [
   { id: "notifications", label: "Notifications", icon: "notifications" },
   { id: "team", label: "Team", icon: "group" },
   { id: "firm-profile", label: "Firm Profile", icon: "domain" },
+  { id: "ai-usage", label: "AI Usage", icon: "analytics" },
 ] as const;
 
 const DEFAULT_PREFS: PrefsState = {
@@ -40,7 +42,8 @@ function parsePrefs(raw: UserProfile["preferences"]): {
   if (typeof raw === "string") {
     try {
       obj = JSON.parse(raw);
-    } catch {
+    } catch (err) {
+      console.warn("[settings] failed to parse preferences JSON:", err);
       obj = {};
     }
   } else if (raw && typeof raw === "object") {
@@ -318,9 +321,11 @@ export default function SettingsPage() {
             markChanged={markChanged}
           />
 
-          <TeamSection />
+          <TeamSection onToast={showToast} />
 
           <FirmProfileSection />
+
+          <AiUsageSection />
 
           {/* Deactivate Account */}
           <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-// Welcome view — ported from apps/web/onboarding.html #view-welcome.
+// Welcome view — ported from onboarding.html #view-welcome.
 export function WelcomeView({
   onStart,
   onSample,

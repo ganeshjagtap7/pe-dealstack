@@ -8,7 +8,7 @@ import { WidgetId } from "./registry";
 // `editing` is true, the wrapper becomes draggable, shows a dashed outline
 // and a grab handle in the top-right, and fires `onReorder` with the new
 // sibling order on drop. Mirrors the native HTML5 drag-and-drop flow from
-// apps/web/js/widgets/layout-editor.js.
+// layout-editor.js.
 export function DraggableWidget({
   id,
   editing,
@@ -39,8 +39,9 @@ export function DraggableWidget({
         e.dataTransfer.effectAllowed = "move";
         try {
           e.dataTransfer.setData("text/plain", id);
-        } catch {
-          // Firefox quirk ignored
+        } catch (err) {
+          // Firefox quirk: dataTransfer.setData can throw — drag still works.
+          console.warn("[dashboard/draggable-widget] dataTransfer.setData failed:", err);
         }
         onDragStart(id);
       }}

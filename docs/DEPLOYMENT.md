@@ -207,12 +207,30 @@ git push origin main
 
 ---
 
+## AI Usage Tracking — Migration Steps
+
+If deploying to a fresh Supabase project or a project that doesn't yet have the usage tracking tables, run these two SQL files in order via the Supabase SQL Editor:
+
+1. `apps/api/usage-tracking-migration.sql` — creates all four tables (`UsageEvent`, `ModelPrice`, `OperationCredits`, `UsageAlert`), adds User flag columns, seeds model prices and canonical operations.
+2. `apps/api/usage-tracking-addendum.sql` — adds granular operation labels and Anthropic haiku pricing.
+
+Both are idempotent. Run addendum after migration. Verify with:
+
+```sql
+SELECT COUNT(*) FROM public."ModelPrice";        -- expect >= 15
+SELECT COUNT(*) FROM public."OperationCredits";  -- expect >= 29
+```
+
+See [`docs/AI-USAGE-TRACKING.md`](AI-USAGE-TRACKING.md) for the full migration reference.
+
+---
+
 ## Pre-Deployment Checklist
 
 - [ ] All tests passing (`cd apps/api && npm test`)
 - [ ] Build succeeds locally (`npm run build:prod`)
 - [ ] Environment variables set in Render
-- [ ] Database migrations applied (if any)
+- [ ] Database migrations applied (if any — including `usage-tracking-migration.sql` + `usage-tracking-addendum.sql` on new environments)
 - [ ] No secrets in committed code
 
 ## Post-Deployment Checklist
