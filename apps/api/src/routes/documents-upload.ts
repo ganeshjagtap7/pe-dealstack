@@ -65,10 +65,17 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     let fileUrl = null;
     let fileSize = null;
     let mimeType = null;
+    let fileSha256: string | null = null;
     let documentName = req.body.name;
 
     // If file is provided, validate and upload to Supabase Storage
     if (file) {
+      // SHA-256 fingerprint of the original uploaded bytes — stored at upload
+      // time so we (and customers) can verify the file hasn't been tampered
+      // with downstream, and so a leaked file can be matched to its origin.
+      const { createHash } = await import('node:crypto');
+      fileSha256 = createHash('sha256').update(file.buffer).digest('hex');
+
       // Deep file validation with magic bytes verification
       const validation = validateFile(file.buffer, file.originalname, file.mimetype);
       if (!validation.isValid) {
@@ -275,6 +282,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         fileUrl,
         fileSize,
         mimeType,
+        fileSha256,
         extractedData: extractedDataToSave,
         extractedText,
         status: extractionStatus,
