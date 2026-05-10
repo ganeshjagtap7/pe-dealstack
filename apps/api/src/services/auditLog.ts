@@ -352,11 +352,17 @@ export const AuditLog = {
       metadata: { dealId },
     }),
 
-  documentDownloaded: (req: Request, docId: string, docName: string) =>
+  documentDownloaded: (
+    req: Request,
+    docId: string,
+    docName: string,
+    extra?: Record<string, unknown>,
+  ) =>
     logFromRequest(req, AUDIT_ACTIONS.DOCUMENT_DOWNLOADED, {
       resourceType: RESOURCE_TYPES.DOCUMENT,
       resourceId: docId,
       resourceName: docName,
+      metadata: extra,
     }),
 
   documentDeleted: (req: Request, docId: string, docName: string) =>
