@@ -87,7 +87,10 @@ router.get('/', async (req, res) => {
           user:User(id, name, avatar, email)
         )
       `)
-      .eq('organizationId', orgId);
+      .eq('organizationId', orgId)
+      // Hide soft-deleted deals from the main list. They live in /trash until
+      // hard-deleted after the 30-day grace period.
+      .is('deletedAt', null);
 
     // Apply filters
     if (params.stage) query = query.eq('stage', params.stage);

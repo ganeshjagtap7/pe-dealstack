@@ -30,6 +30,7 @@ import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
 import dealAccessTimelineRouter from './routes/deal-access-timeline.js';
+import dealsTrashRouter from './routes/deals-trash.js';
 import organizationsRouter from './routes/organizations.js';
 import orgStaffWebhookRouter from './routes/org-staff-webhook.js';
 import authSessionsRouter from './routes/auth-sessions.js';
@@ -273,6 +274,8 @@ app.use('/api/deals/import', authMiddleware, orgMiddleware, enforceOrgMfaMiddlew
 // access-timeline mounted BEFORE the generic dealsRouter so /:dealId/access-timeline
 // matches first (Express picks the first matching route in registration order)
 app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealAccessTimelineRouter);
+// trash + restore endpoints — mounted before dealsRouter for the same path-precedence reason
+app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealsTrashRouter);
 app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealsRouter);
 app.use('/api/companies', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, companiesRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, activitiesRouter);
