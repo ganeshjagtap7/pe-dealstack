@@ -93,8 +93,31 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   return res.json();
 }
 
+/**
+ * Lower-level fetch that returns the raw Response with auth headers attached.
+ * Use when the response may not be JSON (e.g., binary downloads where the
+ * server may stream a file OR return a JSON URL pointer).
+ *
+ * 401 still triggers a /login redirect. Other status codes are the caller's
+ * problem to inspect.
+ */
+async function requestRaw(path: string, options: RequestInit = {}): Promise<Response> {
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    headers: { ...headers, ...options.headers },
+  });
+
+  if (res.status === 401) {
+    window.location.href = "/login";
+    throw new Error("Unauthorized");
+  }
+  return res;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
+  getRaw: (path: string) => requestRaw(path),
   post: <T>(path: string, body: unknown) =>
     request<T>(path, { method: "POST", body: JSON.stringify(body) }),
   patch: <T>(path: string, body: unknown) =>
