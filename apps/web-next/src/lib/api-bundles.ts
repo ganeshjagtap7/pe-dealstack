@@ -66,5 +66,7 @@ export function pickBundle(pathname: string): "ai" | "lite" {
     return "ai";
   if (pathname === "/api/onboarding" || pathname.startsWith("/api/onboarding/"))
     return "ai";
+  if (pathname === "/api/valuations" || pathname.startsWith("/api/valuations/"))
+    return "ai";
   return "lite";
 }

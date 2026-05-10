@@ -10,6 +10,7 @@ import financialsRouter from './routes/financials.js';
 import memosRouter from './routes/memos.js';
 import ingestRouter from './routes/ingest.js';
 import onboardingRouter from './routes/onboarding.js';
+import valuationsRouter from './routes/valuations.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { usageContextMiddleware } from './middleware/usageContext.js';
@@ -145,6 +146,7 @@ app.use('/api/', generalLimiter);
 app.use('/api/ai', aiLimiter);
 app.use('/api/memos/*/chat', aiLimiter);
 app.use('/api/memos/*/sections/*/generate', aiLimiter);
+app.use('/api/valuations/*/chat', aiLimiter);
 app.use('/api/ingest', writeLimiter);
 
 app.use(express.json({ limit: '50mb' }));
@@ -160,6 +162,7 @@ app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageCon
 app.use('/api/ingest', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, ingestRouter);
 app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, memosRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, onboardingRouter);
+app.use('/api/valuations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, valuationsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
 
 // ========================================
