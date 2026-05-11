@@ -400,6 +400,68 @@ export default function SecurityPage() {
         </div>
       </section>
 
+      {/* Founder pledge */}
+      <section id="founder-pledge" className="bg-[#f8fafc] rounded-xl p-8 border border-border-subtle">
+        <LegalH2>Founder pledge</LegalH2>
+        <LegalP>
+          I, Ganesh Jagtap, founder of Pocket Fund, commit to the following — in
+          plain language, signed and dated, with my name on it:
+        </LegalP>
+        <ul className="list-disc pl-6 space-y-2 my-4 text-text-secondary">
+          <li>
+            <strong>We will never sell, share, or repurpose your data.</strong>{" "}
+            Your deal pipeline, LOIs, valuation models, and contacts are yours.
+            We are a custodian, not an owner.
+          </li>
+          <li>
+            <strong>Your data is never used to train AI models</strong> — ours,
+            OpenAI&apos;s, Anthropic&apos;s, Google&apos;s, or any other
+            provider&apos;s. We use API tiers explicitly because they exclude
+            customer data from training.
+          </li>
+          <li>
+            <strong>Pocket Fund staff access is logged.</strong> Every time any
+            member of our team accesses your data, you see it in real-time in
+            Settings → Security &amp; Privacy. Today, the count is zero. We
+            intend to keep it there.
+          </li>
+          <li>
+            <strong>You will get 90 days notice</strong> before we add any new
+            sub-processor, with a clear opt-out path.
+          </li>
+          <li>
+            <strong>Breach notification within 72 hours.</strong> If your data
+            is ever exposed, you will hear from me directly — by phone or
+            email, not via a buried status page update.
+          </li>
+          <li>
+            <strong>You can leave at any time.</strong> Full data export on
+            request, complete deletion within 30 days of contract end, with a
+            signed deletion certificate.
+          </li>
+          <li>
+            <strong>The founder is personally accountable.</strong> If anything
+            goes sideways, you have a name to call:{" "}
+            <a
+              className="text-primary hover:underline"
+              href="mailto:ganesh@pocket-fund.com"
+            >
+              ganesh@pocket-fund.com
+            </a>
+            .
+          </li>
+        </ul>
+        <p className="mt-6 text-text-main">
+          <strong className="block text-lg" style={{ color: "#003366" }}>
+            Ganesh Jagtap
+          </strong>
+          <span className="text-sm text-text-muted">Founder, Pocket Fund</span>
+        </p>
+        <p className="text-xs text-text-muted mt-2">
+          Last signed: May 2026
+        </p>
+      </section>
+
       {/* Compliance roadmap */}
       <section id="compliance">
         <LegalH2>Compliance roadmap</LegalH2>

@@ -4,7 +4,8 @@ import { z } from 'zod';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess, verifyDocumentAccess, verifyFolderAccess } from '../middleware/orgScope.js';
-import { getSignedDownloadUrl, extractStoragePath } from '../utils/storage.js';
+import { getSignedDownloadUrl, extractStoragePath, downloadFileBuffer } from '../utils/storage.js';
+import { watermarkPdf } from '../services/pdfWatermark.js';
 import { extractTextFromPDF } from '../services/pdfExtractor.js';
 import { excelToMarkdown } from '../services/excelToMarkdown.js';
 import { isExcelFile } from '../services/excelFinancialExtractor.js';
@@ -292,6 +293,10 @@ router.delete('/documents/:id', async (req, res) => {
 
 // ─── GET /api/documents/:id/download — Get signed download URL ───
 
+// 25 MB cap on watermarking — beyond this, fall back to passthrough so the
+// serverless function doesn't OOM trying to load the whole PDF in memory.
+const WATERMARK_MAX_BYTES = 25 * 1024 * 1024;
+
 router.get('/documents/:id/download', async (req, res) => {
   try {
     const { id } = req.params;
@@ -303,7 +308,7 @@ router.get('/documents/:id/download', async (req, res) => {
 
     const { data: doc, error: fetchError } = await supabase
       .from('Document')
-      .select('fileUrl, name')
+      .select('fileUrl, name, mimeType, fileSize')
       .eq('id', id)
       .single();
 
@@ -315,22 +320,69 @@ router.get('/documents/:id/download', async (req, res) => {
       return res.status(404).json({ error: 'No file associated with this document' });
     }
 
-    // Generate a time-limited signed URL (1 hour expiry)
+    const isPdf = (doc.mimeType ?? '').toLowerCase() === 'application/pdf' ||
+      (doc.name ?? '').toLowerCase().endsWith('.pdf');
+    const sizeOk =
+      typeof doc.fileSize !== 'number' || doc.fileSize <= WATERMARK_MAX_BYTES;
+    const viewerEmail = req.user?.email ?? 'unknown@pocket-fund.com';
+    const viewerIp = req.ip ?? null;
+
+    if (isPdf && sizeOk) {
+      try {
+        const storagePath = extractStoragePath(doc.fileUrl);
+        const buffer = await downloadFileBuffer(storagePath);
+        if (!buffer) {
+          throw new Error('Storage download returned null');
+        }
+        const stamped = await watermarkPdf(buffer, {
+          email: viewerEmail,
+          ip: viewerIp,
+          timestamp: new Date(),
+        });
+
+        // Audit-log the download as watermarked
+        AuditLog.documentDownloaded(req, id, doc.name, {
+          watermarked: true,
+        }).catch(() => {});
+
+        const safeName = (doc.name ?? 'document.pdf').replace(/"/g, '');
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename="${safeName}"`);
+        res.setHeader('X-Watermarked', '1');
+        res.setHeader('Content-Length', String(stamped.length));
+        return res.end(stamped);
+      } catch (wmErr) {
+        // Fall through to the passthrough JSON response so the user still
+        // gets their file. Log so we can investigate failures.
+        log.warn('PDF watermark failed; falling back to passthrough', {
+          docId: id,
+          err: wmErr instanceof Error ? wmErr.message : String(wmErr),
+        });
+      }
+    }
+
+    // Passthrough: non-PDF, oversized PDF, or watermark error.
     const signedUrl = await getSignedDownloadUrl(doc.fileUrl);
     if (!signedUrl) {
       return res.status(500).json({ error: 'Failed to generate download URL' });
     }
 
-    // Audit log: track document access
-    AuditLog.documentDownloaded(req, id, doc.name).catch(() => {});
+    AuditLog.documentDownloaded(req, id, doc.name, {
+      watermarked: false,
+      watermarkSkipReason: !isPdf
+        ? 'not_pdf'
+        : !sizeOk
+          ? 'size_limit'
+          : 'fallback',
+    }).catch(() => {});
 
-    res.json({
+    return res.json({
       url: signedUrl,
       name: doc.name,
     });
   } catch (error) {
     log.error('Error getting download URL', error);
-    res.status(500).json({ error: 'Failed to get download URL' });
+    return res.status(500).json({ error: 'Failed to get download URL' });
   }
 });
 
