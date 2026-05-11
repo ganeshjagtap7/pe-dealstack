@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node';
-import express from 'express';
+import express, { type Request } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
@@ -29,6 +29,12 @@ import exportRouter from './routes/export.js';
 import financialsRouter from './routes/financials.js';
 import onboardingRouter from './routes/onboarding.js';
 import dealImportRouter from './routes/deal-import.js';
+import integrationsRouter from './routes/integrations.js';
+import integrationsPublicRouter from './routes/integrations-public.js';
+import { registerProvider } from './integrations/_platform/registry.js';
+import { granolaProvider } from './integrations/granola/index.js';
+import { gmailProvider } from './integrations/gmail/index.js';
+import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
 import dealAccessTimelineRouter from './routes/deal-access-timeline.js';
 import dealsTrashRouter from './routes/deals-trash.js';
 import organizationsRouter from './routes/organizations.js';
@@ -185,7 +191,14 @@ app.use('/api/memos/*/chat', aiLimiter);
 app.use('/api/memos/*/sections/*/generate', aiLimiter);
 app.use('/api/ingest', writeLimiter);
 
-app.use(express.json({ limit: '50mb' }));
+app.use(
+  express.json({
+    limit: '50mb',
+    verify: (req, _res, buf) => {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    },
+  })
+);
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request ID for error correlation
@@ -267,6 +280,13 @@ app.get('/api', (_req, res) => {
 // Invitation verify/accept must be public — invitees don't have accounts yet
 app.use('/api/public/invitations', invitationsAcceptRouter);
 
+// Integration webhooks + OAuth callbacks must be public — providers POST/GET
+// here without an auth header. Auth is enforced via signed state tokens
+// (callbacks) or per-provider signature verification (webhooks).
+// MUST be mounted BEFORE the authenticated /api/integrations router below,
+// since Express matches routes in registration order.
+app.use('/api/integrations', integrationsPublicRouter);
+
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
@@ -288,7 +308,6 @@ app.use('/api/notifications', authMiddleware, orgMiddleware, enforceOrgMfaMiddle
 app.use('/api/ingest', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, ingestRouter);
 app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, memosRouter);
 app.use('/api/templates', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, templatesRouter);
-// Authenticated invitation routes (list, create, revoke, resend)
 app.use('/api/invitations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, invitationsRouter);
 // Audit export must be mounted BEFORE the generic /api/audit router so /export.csv matches first
 app.use('/api/audit', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, auditExportRouter);
@@ -300,6 +319,7 @@ app.use('/api/organizations', authMiddleware, orgMiddleware, enforceOrgMfaMiddle
 app.use('/api/tasks', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, exportRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, onboardingRouter);
+app.use('/api/integrations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, integrationsRouter);
 // Dashboard mounted alongside the existing isolation-test router (different paths).
 app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, adminSecurityDashboardRouter);
 app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, adminSecurityRouter);
@@ -329,6 +349,11 @@ app.get('/api/ai/status', (_req, res) => {
     model: MODEL_REASONING,
   });
 });
+
+// Register integration providers (must execute before any request)
+registerProvider(granolaProvider);
+registerProvider(gmailProvider);
+registerProvider(googleCalendarProvider);
 
 // Sentry error handler (must be before custom error handler)
 if (process.env.SENTRY_DSN) {

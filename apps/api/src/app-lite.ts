@@ -1,5 +1,5 @@
 import * as Sentry from '@sentry/node';
-import express from 'express';
+import express, { type Request } from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -30,6 +30,12 @@ import authSessionsRouter from './routes/auth-sessions.js';
 import adminSecurityRouter from './routes/admin-security.js';
 import adminSecurityDashboardRouter from './routes/admin-security-dashboard.js';
 import dealAccessTimelineRouter from './routes/deal-access-timeline.js';
+import integrationsRouter from './routes/integrations.js';
+import integrationsPublicRouter from './routes/integrations-public.js';
+import { registerProvider } from './integrations/_platform/registry.js';
+import { granolaProvider } from './integrations/granola/index.js';
+import { gmailProvider } from './integrations/gmail/index.js';
+import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
 import dealsTrashRouter from './routes/deals-trash.js';
 import { supabase } from './supabase.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
@@ -150,7 +156,16 @@ const generalLimiter = rateLimit({
 
 app.use('/api/', generalLimiter);
 
-app.use(express.json({ limit: '50mb' }));
+app.use(
+  express.json({
+    limit: '50mb',
+    // Capture raw bytes for webhook HMAC verification — provider signatures
+    // are computed over the raw body, not parsed JSON.
+    verify: (req, _res, buf) => {
+      (req as Request & { rawBody?: Buffer }).rawBody = Buffer.from(buf);
+    },
+  }),
+);
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Request ID for error correlation
@@ -214,6 +229,13 @@ app.get('/api', (_req, res) => {
 // Invitation verify/accept must be public -- invitees don't have accounts yet
 app.use('/api/public/invitations', invitationsAcceptRouter);
 
+// Integration webhooks + OAuth callbacks + cron must be public — providers
+// POST/GET here without an auth header. Auth is enforced via signed state
+// tokens (callbacks), per-provider signature verification (webhooks), or
+// shared CRON_SECRET (cron). MUST be mounted BEFORE the authenticated
+// /api/integrations router below — Express matches routes in registration order.
+app.use('/api/integrations', integrationsPublicRouter);
+
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
@@ -242,6 +264,7 @@ app.use('/api/tasks', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, us
 app.use('/api/export', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, exportRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, watchlistRouter);
+app.use('/api/integrations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, integrationsRouter);
 
 // Admin security: dashboard router mounted BEFORE the isolation-test router (different paths but ordered for clarity)
 app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, adminSecurityDashboardRouter);
@@ -256,6 +279,11 @@ app.use('/api/usage', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, us
 // Internal admin (Pocket Fund team only — gate is inside the router via requireInternalAdmin)
 // Note: NO orgMiddleware — internal routes intentionally query across orgs.
 app.use('/api/internal', authMiddleware, internalRouter);
+
+// Register integration providers (must execute before any request)
+registerProvider(granolaProvider);
+registerProvider(gmailProvider);
+registerProvider(googleCalendarProvider);
 
 // Sentry error handler (must be before custom error handler)
 if (process.env.SENTRY_DSN) {

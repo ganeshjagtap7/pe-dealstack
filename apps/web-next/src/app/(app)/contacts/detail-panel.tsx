@@ -11,6 +11,7 @@ import {
   ContactFormData, ContactModal, DeleteConfirmModal,
 } from "./components";
 import { LinkDealModal, ConnectionModal } from "./detail-modals";
+import { IntegrationActivityFeed } from "@/components/integrations/IntegrationActivityFeed";
 
 // ─── Config ───────────────────────────────────────────────
 
@@ -280,6 +281,12 @@ export function DetailPanel({
 
           {/* Add Interaction Form */}
           {showInteractionForm && <AddInteractionForm contactId={contactId} onDone={() => { setShowInteractionForm(false); loadContact(); onRefresh(); }} onCancel={() => setShowInteractionForm(false)} />}
+
+          {/* Synced from connected tools (Granola / Gmail / Calendar) */}
+          <div className="mb-4">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Synced from your tools</h4>
+            <IntegrationActivityFeed contactId={contactId} />
+          </div>
 
           {/* Interaction Timeline */}
           <div className="mb-2">

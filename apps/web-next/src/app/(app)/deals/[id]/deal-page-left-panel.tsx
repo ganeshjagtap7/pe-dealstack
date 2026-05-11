@@ -184,7 +184,11 @@ export function DealPageLeftPanel({
             />
           )}
           {activeTab === "Activity" && (
-            <ActivityTab activities={activities} loading={activitiesLoading} />
+            <ActivityTab
+              activities={activities}
+              loading={activitiesLoading}
+              dealId={deal.id}
+            />
           )}
         </div>
       </div>
