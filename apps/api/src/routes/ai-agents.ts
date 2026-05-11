@@ -14,6 +14,13 @@ import { runContactEnrichment } from '../services/agents/contactEnrichment/index
 import { generateMeetingPrep } from '../services/agents/meetingPrep/index.js';
 import { runSignalMonitor } from '../services/agents/signalMonitor/index.js';
 import { generateEmailDraft, getEmailTemplates } from '../services/agents/emailDrafter/index.js';
+import { runNdaRedlineAgent } from '../services/agents/ndaRedlineAgent/index.js';
+import { runTeaserFilterAgent } from '../services/agents/teaserFilterAgent/index.js';
+
+// Document text extraction (in-memory, no DB persist) for the Criteria Engine
+// dropzone. Reuses the same PDF + DOCX pipeline the deal-intake flow uses.
+import { upload, extractTextFromPDF } from './ingest-shared.js';
+import { extractTextFromWord } from '../services/documentParser.js';
 
 const router = Router();
 
@@ -174,6 +181,165 @@ router.post('/ai/draft-email', async (req, res) => {
     log.error('Email draft error', error);
     const { statusCode, userMessage } = classifyAIErrorObject(error);
     res.status(statusCode).json({ error: userMessage });
+  }
+});
+
+// ─── NDA Red-Line ─────────────────────────────────────────────────
+
+const ndaRedlineSchema = z.object({
+  firmCriteria: z.string().min(20).max(20000),
+  counterpartyNdaText: z.string().max(200000).optional(),
+  documentId: z.string().uuid().optional(),
+  dealId: z.string().uuid().optional(),
+}).refine(d => !!d.counterpartyNdaText || !!d.documentId, {
+  message: 'Provide either counterpartyNdaText or documentId',
+});
+
+// POST /api/ai/redline-nda - Red-line a counterparty NDA against firm criteria
+router.post('/ai/redline-nda', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const input = ndaRedlineSchema.parse(req.body);
+
+    if (input.dealId) {
+      const deal = await verifyDealAccess(input.dealId, orgId);
+      if (!deal) return res.status(404).json({ error: 'Deal not found' });
+    }
+
+    let counterpartyNdaText = input.counterpartyNdaText || '';
+    if (input.documentId) {
+      const { data: doc, error } = await supabase
+        .from('Document')
+        .select('id, dealId, extractedText, name')
+        .eq('id', input.documentId)
+        .single();
+      if (error || !doc) return res.status(404).json({ error: 'Document not found' });
+      // org-scope through the deal
+      if (doc.dealId) {
+        const deal = await verifyDealAccess(doc.dealId, orgId);
+        if (!deal) return res.status(403).json({ error: 'Document not in your organization' });
+      }
+      if (!doc.extractedText) {
+        return res.status(400).json({ error: 'Document has no extracted text yet — try again in a moment or paste the NDA inline.' });
+      }
+      counterpartyNdaText = doc.extractedText;
+    }
+
+    log.info('Red-lining NDA', { orgId, dealId: input.dealId, documentId: input.documentId });
+
+    const result = await runNdaRedlineAgent({
+      organizationId: orgId,
+      firmCriteria: input.firmCriteria,
+      counterpartyNdaText,
+      dealId: input.dealId || null,
+      documentId: input.documentId || null,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    log.error('NDA red-line error', error);
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
+  }
+});
+
+// ─── Teaser Go/No-Go Filter ───────────────────────────────────────
+
+const teaserFilterSchema = z.object({
+  investmentCriteria: z.string().min(20).max(20000),
+  teaserText: z.string().max(200000).optional(),
+  documentId: z.string().uuid().optional(),
+  dealId: z.string().uuid().optional(),
+}).refine(d => !!d.teaserText || !!d.documentId, {
+  message: 'Provide either teaserText or documentId',
+});
+
+// POST /api/ai/filter-teaser - Triage a teaser/CIM against firm investment criteria
+router.post('/ai/filter-teaser', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const input = teaserFilterSchema.parse(req.body);
+
+    if (input.dealId) {
+      const deal = await verifyDealAccess(input.dealId, orgId);
+      if (!deal) return res.status(404).json({ error: 'Deal not found' });
+    }
+
+    let teaserText = input.teaserText || '';
+    if (input.documentId) {
+      const { data: doc, error } = await supabase
+        .from('Document')
+        .select('id, dealId, extractedText, name')
+        .eq('id', input.documentId)
+        .single();
+      if (error || !doc) return res.status(404).json({ error: 'Document not found' });
+      if (doc.dealId) {
+        const deal = await verifyDealAccess(doc.dealId, orgId);
+        if (!deal) return res.status(403).json({ error: 'Document not in your organization' });
+      }
+      if (!doc.extractedText) {
+        return res.status(400).json({ error: 'Document has no extracted text yet — try again in a moment or paste the teaser inline.' });
+      }
+      teaserText = doc.extractedText;
+    }
+
+    log.info('Filtering teaser', { orgId, dealId: input.dealId, documentId: input.documentId });
+
+    const result = await runTeaserFilterAgent({
+      organizationId: orgId,
+      investmentCriteria: input.investmentCriteria,
+      teaserText,
+      dealId: input.dealId || null,
+      documentId: input.documentId || null,
+    });
+
+    res.json(result);
+  } catch (error: any) {
+    log.error('Teaser filter error', error);
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
+  }
+});
+
+// ─── Document Text Extract (Criteria Engine dropzone) ─────────────
+// Stateless: extract text from a PDF/DOCX upload and return it. No
+// Document row is created. Used by /criteria/teaser-filter and
+// /criteria/nda-redline so users can drop a CIM/NDA instead of pasting.
+
+router.post('/ai/extract-document', upload.single('file'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'No file uploaded' });
+
+    const PDF = 'application/pdf';
+    const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    const DOC = 'application/msword';
+
+    let text: string | null = null;
+    if (file.mimetype === PDF) {
+      const extraction = await extractTextFromPDF(file.buffer, file.originalname);
+      text = extraction?.text ?? null;
+    } else if (file.mimetype === DOCX || file.mimetype === DOC) {
+      text = await extractTextFromWord(file.buffer);
+    } else {
+      return res.status(400).json({ error: 'Only PDF and Word (.pdf, .docx, .doc) are supported here.' });
+    }
+
+    if (!text || text.trim().length < 20) {
+      return res.status(422).json({
+        error: 'We could not extract usable text from this file. It may be scanned or image-only — try pasting the text directly.',
+      });
+    }
+
+    res.json({
+      filename: file.originalname,
+      sizeBytes: file.size,
+      text,
+      chars: text.length,
+    });
+  } catch (error: any) {
+    log.error('extract-document error', error);
+    res.status(500).json({ error: 'Could not read the file — please try again or paste the text.' });
   }
 });
 
