@@ -243,7 +243,7 @@ router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, re
 
     const { data: deal } = await supabase
       .from('Deal')
-      .select('name')
+      .select('name, "deletedAt"')
       .eq('id', id)
       .eq('organizationId', orgId)
       .single();
@@ -252,44 +252,15 @@ router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, re
       return res.status(404).json({ error: 'Deal not found' });
     }
 
-    // Delete child records in correct order (FK constraints don't have ON DELETE CASCADE)
-    await supabase.from('DocumentChunk').delete().eq('dealId', id);
-    await supabase.from('Document').delete().eq('dealId', id);
-
-    const { data: folders } = await supabase.from('Folder').select('id').eq('dealId', id);
-    if (folders && folders.length > 0) {
-      const folderIds = folders.map(f => f.id);
-      for (const fId of folderIds) {
-        await supabase.from('FolderInsight').delete().eq('folderId', fId);
-      }
-    }
-
-    await supabase.from('Folder').delete().eq('dealId', id);
-    await supabase.from('ChatMessage').delete().eq('dealId', id);
-    await supabase.from('Conversation').delete().eq('dealId', id);
-    await supabase.from('Activity').delete().eq('dealId', id);
-    await supabase.from('DealTeamMember').delete().eq('dealId', id);
-
-    const { data: memos } = await supabase.from('Memo').select('id').eq('dealId', id);
-    if (memos && memos.length > 0) {
-      for (const m of memos) {
-        await supabase.from('MemoSection').delete().eq('memoId', m.id);
-      }
-    }
-    await supabase.from('Memo').delete().eq('dealId', id);
-    await supabase.from('Notification').delete().eq('dealId', id);
-    // Task table was created out-of-band in Supabase Studio without
-    // ON DELETE CASCADE on its dealId FK (Task_dealId_fkey), so the manual
-    // delete is required until apps/api/task-cascade-migration.sql is run.
-    // Without this, deleting a deal with any associated tasks fails with
-    // "update or delete on table Deal violates foreign key constraint
-    // Task_dealId_fkey on table Task" (Postgres error code 23503).
-    await supabase.from('Task').delete().eq('dealId', id);
-
-    // Finally, delete the deal itself
+    // Soft-delete: set deletedAt instead of hard-deleting. Child records
+    // (Document, Folder, Memo, etc.) stay intact. After the 30-day window
+    // expires, a separate cleanup process can hard-delete them.
+    // The deals list query filters on deletedAt IS NULL so soft-deleted
+    // deals are hidden from the main UI but remain available in /trash.
+    const deletedAt = new Date().toISOString();
     const { error } = await supabase
       .from('Deal')
-      .delete()
+      .update({ deletedAt })
       .eq('id', id)
       .eq('organizationId', orgId);
 
@@ -297,7 +268,7 @@ router.delete('/:id', requirePermission(PERMISSIONS.DEAL_DELETE), async (req, re
 
     await AuditLog.dealDeleted(req, id, deal?.name || 'Unknown');
 
-    log.info('Deal deleted with cascade', { dealId: id, dealName: deal.name });
+    log.info('Deal soft-deleted', { dealId: id, dealName: deal.name });
     res.status(204).send();
   } catch (error) {
     log.error('Error deleting deal', error);

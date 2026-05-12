@@ -13,6 +13,7 @@ import { NotificationsSection, DEFAULT_NOTIFICATION_PREFS } from "./Notification
 import { TeamSection } from "./TeamSection";
 import { FirmProfileSection } from "./FirmProfileSection";
 import { AiUsageSection } from "./AiUsageSection";
+import { IntegrationsSection } from "./IntegrationsSection";
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -22,6 +23,7 @@ const NAV_SECTIONS = [
   { id: "notifications", label: "Notifications", icon: "notifications" },
   { id: "team", label: "Team", icon: "group" },
   { id: "firm-profile", label: "Firm Profile", icon: "domain" },
+  { id: "integrations", label: "Integrations", icon: "extension" },
   { id: "ai-usage", label: "AI Usage", icon: "analytics" },
 ] as const;
 
@@ -324,6 +326,8 @@ export default function SettingsPage() {
           <TeamSection onToast={showToast} />
 
           <FirmProfileSection />
+
+          <IntegrationsSection onToast={showToast} />
 
           <AiUsageSection />
 

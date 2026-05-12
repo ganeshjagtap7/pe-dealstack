@@ -4,7 +4,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';
 import { mergeIntoExistingDeal } from '../services/dealMerger.js';
-import { AuditLog } from '../services/auditLog.js';
+import { AuditLog, logFromRequest, AUDIT_ACTIONS, RESOURCE_TYPES, SEVERITY } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES } from '../services/fileValidator.js';
 import { embedDocument } from '../rag.js';
 import { AICache } from '../services/aiCache.js';
@@ -68,10 +68,17 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     let fileUrl = null;
     let fileSize = null;
     let mimeType = null;
+    let fileSha256: string | null = null;
     let documentName = req.body.name;
 
     // If file is provided, validate and upload to Supabase Storage
     if (file) {
+      // SHA-256 fingerprint of the original uploaded bytes — stored at upload
+      // time so we (and customers) can verify the file hasn't been tampered
+      // with downstream, and so a leaked file can be matched to its origin.
+      const { createHash } = await import('node:crypto');
+      fileSha256 = createHash('sha256').update(file.buffer).digest('hex');
+
       // Deep file validation with magic bytes verification
       const validation = validateFile(file.buffer, file.originalname, file.mimetype);
       if (!validation.isValid) {
@@ -122,15 +129,70 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     // exists for this deal, treat this as a no-op re-upload. Returns the
     // existing row so the client gets a 200-shaped response instead of an
     // error, but we skip extraction/embedding/activity to avoid doubling cost.
+    //
+    // Security: we ALWAYS recompute SHA-256 above (don't trust existing row's
+    // value) and require fingerprints to match before treating as a dedup.
+    // If (dealId, name, fileSize) collide but content differs, that's a
+    // security-relevant event — bypass dedup and emit an audit event so the
+    // collision is visible (e.g. someone trying to overwrite an audit-trail
+    // doc with a same-name/size impostor).
+    //
+    // Fingerprint logging uses only an 8-char prefix at INFO; the full hex
+    // lives in DB columns / audit metadata.
     const existingDuplicate = await findExistingDocument(dealId, documentName, fileSize, { requireFileUrl: true });
+    const sha256Prefix = fileSha256 ? fileSha256.slice(0, 8) : null;
     if (existingDuplicate) {
-      logDuplicateSkip(existingDuplicate, {
-        dealId,
-        name: documentName,
-        fileSize,
-        newFileUrl: fileUrl,
-      });
-      return res.status(200).json({ ...existingDuplicate, dealUpdated: false, updatedFields: [] });
+      const existingPrefix = existingDuplicate.fileSha256 ? existingDuplicate.fileSha256.slice(0, 8) : null;
+      // If we have both fingerprints AND they differ, this is a metadata
+      // collision (same name + size, different content). Do NOT dedup.
+      if (fileSha256 && existingDuplicate.fileSha256 && fileSha256 !== existingDuplicate.fileSha256) {
+        log.warn('Document upload metadata collision: same (dealId, name, fileSize) but different SHA-256', {
+          dealId,
+          existingDocId: existingDuplicate.id,
+          name: documentName,
+          fileSize,
+          newSha256Prefix: sha256Prefix,
+          existingSha256Prefix: existingPrefix,
+        });
+        await logFromRequest(req, 'DOCUMENT_UPLOADED' as any, {
+          resourceType: RESOURCE_TYPES.DOCUMENT,
+          resourceId: existingDuplicate.id,
+          resourceName: documentName,
+          description: 'upload_metadata_collision: same name+size, different content',
+          severity: SEVERITY.WARNING,
+          metadata: {
+            dealId,
+            collision: true,
+            newSha256Prefix: sha256Prefix,
+            existingSha256Prefix: existingPrefix,
+          },
+        });
+        // Fall through to normal insert path.
+      } else {
+        // Genuine dedup hit: either fingerprints match, or existing row
+        // pre-dates fingerprinting (null fileSha256) — treat as dedup but
+        // still emit an audit event so the upload attempt is recorded.
+        logDuplicateSkip(existingDuplicate, {
+          dealId,
+          name: documentName,
+          fileSize,
+          newFileUrl: fileUrl,
+        });
+        await logFromRequest(req, AUDIT_ACTIONS.DOCUMENT_UPLOADED, {
+          resourceType: RESOURCE_TYPES.DOCUMENT,
+          resourceId: existingDuplicate.id,
+          resourceName: documentName,
+          description: 'upload_deduped: matched existing document',
+          metadata: {
+            dealId,
+            deduped: true,
+            sha256Prefix,
+            fingerprintMatched: !!(fileSha256 && existingDuplicate.fileSha256 && fileSha256 === existingDuplicate.fileSha256),
+            existingFingerprintMissing: !existingDuplicate.fileSha256,
+          },
+        });
+        return res.status(200).json({ ...existingDuplicate, dealUpdated: false, updatedFields: [] });
+      }
     }
 
     // Determine document type from filename if not provided. Spreadsheets
@@ -341,6 +403,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         fileUrl,
         fileSize,
         mimeType,
+        fileSha256,
         extractedData: extractedDataToSave,
         extractedText,
         status: extractionStatus,

@@ -66,6 +66,7 @@ export const AUDIT_ACTIONS = {
   SECURITY_TEST_RUN: 'SECURITY_TEST_RUN',
   STAFF_ACCESS: 'STAFF_ACCESS',
   STAFF_WEBHOOK_TEST: 'STAFF_WEBHOOK_TEST',
+  AI_INFERENCE: 'AI_INFERENCE',
 } as const;
 
 export type AuditAction = typeof AUDIT_ACTIONS[keyof typeof AUDIT_ACTIONS];
@@ -352,11 +353,17 @@ export const AuditLog = {
       metadata: { dealId },
     }),
 
-  documentDownloaded: (req: Request, docId: string, docName: string) =>
+  documentDownloaded: (
+    req: Request,
+    docId: string,
+    docName: string,
+    extra?: Record<string, unknown>,
+  ) =>
     logFromRequest(req, AUDIT_ACTIONS.DOCUMENT_DOWNLOADED, {
       resourceType: RESOURCE_TYPES.DOCUMENT,
       resourceId: docId,
       resourceName: docName,
+      metadata: extra,
     }),
 
   documentDeleted: (req: Request, docId: string, docName: string) =>

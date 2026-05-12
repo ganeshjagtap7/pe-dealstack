@@ -30,6 +30,7 @@ export interface ExistingDocument {
   type: string | null;
   mimeType: string | null;
   fileSize: number | null;
+  fileSha256: string | null;
   createdAt: string;
 }
 
@@ -68,7 +69,7 @@ export async function findExistingDocument(
 
   let query = supabase
     .from('Document')
-    .select('id, fileUrl, name, type, mimeType, fileSize, createdAt')
+    .select('id, fileUrl, name, type, mimeType, fileSize, fileSha256, createdAt')
     .eq('dealId', dealId)
     .eq('name', name)
     .limit(1);
