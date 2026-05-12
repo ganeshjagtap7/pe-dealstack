@@ -17,6 +17,7 @@ import { isExcelFile } from '../services/excelFinancialExtractor.js';
 import { extractTextFromPDF } from '../services/pdfExtractor.js';
 import { runDeepPass } from '../services/financialExtractionOrchestrator.js';
 import { acquireExtractionSlot, releaseExtractionSlot } from '../services/agents/financialAgent/concurrency.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
 const router = Router();
 
@@ -115,6 +116,21 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         // Store the storage path (not full URL) — signed URLs generated on demand
         fileUrl = filePath;
       }
+    }
+
+    // Dedup: if a Document with the same (dealId, name, fileSize) already
+    // exists for this deal, treat this as a no-op re-upload. Returns the
+    // existing row so the client gets a 200-shaped response instead of an
+    // error, but we skip extraction/embedding/activity to avoid doubling cost.
+    const existingDuplicate = await findExistingDocument(dealId, documentName, fileSize, { requireFileUrl: true });
+    if (existingDuplicate) {
+      logDuplicateSkip(existingDuplicate, {
+        dealId,
+        name: documentName,
+        fileSize,
+        newFileUrl: fileUrl,
+      });
+      return res.status(200).json({ ...existingDuplicate, dealUpdated: false, updatedFields: [] });
     }
 
     // Determine document type from filename if not provided. Spreadsheets

@@ -11,6 +11,7 @@ import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { formatValueWithUnit } from './ingest-shared.js';
 import { resolveUserId } from './notifications.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
 const subRouter = Router();
 
@@ -223,45 +224,61 @@ subRouter.post('/url', async (req, res) => {
     overviewSections.push(`*${research.companyWebsite.scrapedPages.length} pages analyzed · ${aiData.overallConfidence}% confidence*`);
 
     const overviewText = overviewSections.join('\n');
+    const overviewDocName = `Deal Overview — ${companyName}.md`;
+    const overviewByteLength = Buffer.byteLength(overviewText, 'utf8');
 
-    const { data: document } = await supabase
-      .from('Document')
-      .insert({
+    // Dedup: if a Deal Overview with the same name+byte-length already exists
+    // for this deal (re-research of the same URL), reuse it.
+    const existingUrlDuplicate = await findExistingDocument(deal.id, overviewDocName, overviewByteLength);
+    let document: any;
+    if (existingUrlDuplicate) {
+      logDuplicateSkip(existingUrlDuplicate, {
         dealId: deal.id,
-        name: `Deal Overview — ${companyName}.md`,
-        type: 'OTHER',
-        fileSize: Buffer.byteLength(overviewText, 'utf8'),
-        extractedText: researchText,
-        extractedData: {
-          companyName: aiData.companyName,
-          industry: aiData.industry,
-          description: aiData.description,
-          revenue: aiData.revenue,
-          ebitda: aiData.ebitda,
-          ebitdaMargin: aiData.ebitdaMargin,
-          revenueGrowth: aiData.revenueGrowth,
-          employees: aiData.employees,
-          foundedYear: aiData.foundedYear,
-          headquarters: aiData.headquarters,
-          keyRisks: aiData.keyRisks,
-          investmentHighlights: aiData.investmentHighlights,
-          summary: aiData.summary,
-          overallConfidence: aiData.overallConfidence,
-          needsReview: aiData.needsReview,
-          reviewReasons: aiData.reviewReasons,
-        },
-        aiAnalysis: overviewText,
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
-        confidence: aiData.overallConfidence / 100,
-        aiAnalyzedAt: new Date().toISOString(),
-        mimeType: 'text/markdown',
-        metadata: {
-          sourceUrl: url,
-          pagesScraped: research.companyWebsite.scrapedPages,
-        },
-      })
-      .select()
-      .single();
+        name: overviewDocName,
+        fileSize: overviewByteLength,
+      });
+      document = existingUrlDuplicate;
+    } else {
+      const { data: insertedDoc } = await supabase
+        .from('Document')
+        .insert({
+          dealId: deal.id,
+          name: overviewDocName,
+          type: 'OTHER',
+          fileSize: overviewByteLength,
+          extractedText: researchText,
+          extractedData: {
+            companyName: aiData.companyName,
+            industry: aiData.industry,
+            description: aiData.description,
+            revenue: aiData.revenue,
+            ebitda: aiData.ebitda,
+            ebitdaMargin: aiData.ebitdaMargin,
+            revenueGrowth: aiData.revenueGrowth,
+            employees: aiData.employees,
+            foundedYear: aiData.foundedYear,
+            headquarters: aiData.headquarters,
+            keyRisks: aiData.keyRisks,
+            investmentHighlights: aiData.investmentHighlights,
+            summary: aiData.summary,
+            overallConfidence: aiData.overallConfidence,
+            needsReview: aiData.needsReview,
+            reviewReasons: aiData.reviewReasons,
+          },
+          aiAnalysis: overviewText,
+          status: aiData.needsReview ? 'pending_review' : 'analyzed',
+          confidence: aiData.overallConfidence / 100,
+          aiAnalyzedAt: new Date().toISOString(),
+          mimeType: 'text/markdown',
+          metadata: {
+            sourceUrl: url,
+            pagesScraped: research.companyWebsite.scrapedPages,
+          },
+        })
+        .select()
+        .single();
+      document = insertedDoc;
+    }
 
     // Log activity + assign team (only for new deals)
     if (!isUpdate) {

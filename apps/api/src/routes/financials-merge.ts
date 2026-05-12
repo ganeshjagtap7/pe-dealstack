@@ -214,4 +214,52 @@ router.post('/deals/:dealId/financials/resolve-all', async (req, res) => {
   }
 });
 
+// ─── 6d: DELETE /api/deals/:dealId/financials/by-document/:documentId ──
+// Soft-removes all FinancialStatement rows extracted from a specific
+// document. Used when a misclassified one-pager / marketing PDF pollutes
+// the deal's financials — caller wants to drop those rows without
+// deleting the underlying Document.
+router.delete('/deals/:dealId/financials/by-document/:documentId', async (req, res) => {
+  try {
+    const { dealId, documentId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) return res.status(404).json({ error: 'Deal not found' });
+
+    // Confirm doc belongs to deal — prevents cross-deal removal via guessed IDs.
+    const { data: doc } = await supabase
+      .from('Document')
+      .select('id')
+      .eq('id', documentId)
+      .eq('dealId', dealId)
+      .maybeSingle();
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    // Soft-delete FS rows. Schema has `isActive` (see financial-merge-migration.sql).
+    // Soft over hard so the rows can be restored from an audit log if needed.
+    const { data: removed, error } = await supabase
+      .from('FinancialStatement')
+      .update({ isActive: false, updatedAt: new Date().toISOString() })
+      .eq('dealId', dealId)
+      .eq('documentId', documentId)
+      .eq('isActive', true)
+      .select('id');
+    if (error) {
+      log.error('Error removing FS rows by document', error);
+      return res.status(500).json({ error: 'Failed' });
+    }
+
+    const removedCount = removed?.length ?? 0;
+
+    // Refresh headline cache so deal page updates immediately.
+    await refreshDealCache(dealId);
+
+    log.info('FinancialStatement rows removed by document', { dealId, documentId, removedCount });
+    return res.json({ success: true, removedCount });
+  } catch (err: any) {
+    log.error('DELETE financials/by-document error', err);
+    return res.status(500).json({ error: err?.message || 'Failed' });
+  }
+});
+
 export default router;

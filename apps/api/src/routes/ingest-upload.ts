@@ -12,6 +12,7 @@ import { mergeIntoExistingDeal, getIconForIndustry } from '../services/dealMerge
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
 import { resolveUserId } from './notifications.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
 const router = Router();
 
@@ -390,48 +391,65 @@ router.post('/', upload.single('file'), async (req, res) => {
       ingestFolderId = folders?.[0]?.id || null;
     }
 
-    const { data: document, error: docError } = await supabase
-      .from('Document')
-      .insert({
+    // Dedup: if a Document with the same (dealId, name, fileSize) already
+    // exists, reuse it instead of creating a duplicate row. Mostly relevant in
+    // the existing-deal (merge) path where users sometimes re-upload the same
+    // file by accident — we don't want a second ingest/extraction pass.
+    const existingDuplicate = await findExistingDocument(deal.id, documentName, file.size, { requireFileUrl: true });
+    let document: any;
+    if (existingDuplicate) {
+      logDuplicateSkip(existingDuplicate, {
         dealId: deal.id,
-        folderId: ingestFolderId,
         name: documentName,
-        type: docType,
-        fileUrl,
         fileSize: file.size,
-        mimeType,
-        extractedData: {
-          companyName: aiData.companyName,
-          industry: aiData.industry,
-          description: aiData.description,
-          revenue: aiData.revenue,
-          ebitda: aiData.ebitda,
-          ebitdaMargin: aiData.ebitdaMargin,
-          dealSize: aiData.dealSize,
-          revenueGrowth: aiData.revenueGrowth,
-          employees: aiData.employees,
-          foundedYear: aiData.foundedYear,
-          headquarters: aiData.headquarters,
-          keyRisks: aiData.keyRisks,
-          investmentHighlights: aiData.investmentHighlights,
-          summary: aiData.summary,
-          overallConfidence: aiData.overallConfidence,
-          needsReview: aiData.needsReview,
-          reviewReasons: aiData.reviewReasons,
-        },
-        extractedText,
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
-        confidence: aiData.overallConfidence / 100,
-        aiAnalyzedAt: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        newFileUrl: fileUrl,
+      });
+      document = existingDuplicate;
+    } else {
+      const { data: insertedDoc, error: docError } = await supabase
+        .from('Document')
+        .insert({
+          dealId: deal.id,
+          folderId: ingestFolderId,
+          name: documentName,
+          type: docType,
+          fileUrl,
+          fileSize: file.size,
+          mimeType,
+          extractedData: {
+            companyName: aiData.companyName,
+            industry: aiData.industry,
+            description: aiData.description,
+            revenue: aiData.revenue,
+            ebitda: aiData.ebitda,
+            ebitdaMargin: aiData.ebitdaMargin,
+            dealSize: aiData.dealSize,
+            revenueGrowth: aiData.revenueGrowth,
+            employees: aiData.employees,
+            foundedYear: aiData.foundedYear,
+            headquarters: aiData.headquarters,
+            keyRisks: aiData.keyRisks,
+            investmentHighlights: aiData.investmentHighlights,
+            summary: aiData.summary,
+            overallConfidence: aiData.overallConfidence,
+            needsReview: aiData.needsReview,
+            reviewReasons: aiData.reviewReasons,
+          },
+          extractedText,
+          status: aiData.needsReview ? 'pending_review' : 'analyzed',
+          confidence: aiData.overallConfidence / 100,
+          aiAnalyzedAt: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-    if (docError) {
-      log.error('Document creation error', docError);
-      throw docError;
+      if (docError) {
+        log.error('Document creation error', docError);
+        throw docError;
+      }
+      document = insertedDoc;
+      log.debug('Created document', { name: document.name, id: document.id });
     }
-    log.debug('Created document', { name: document.name, id: document.id });
 
     // Step 7: Trigger RAG embedding in background
     if (extractedText && extractedText.length > 0) {

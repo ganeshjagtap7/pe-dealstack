@@ -9,6 +9,7 @@ import { mergeIntoExistingDeal, getIconForIndustry } from '../services/dealMerge
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { resolveUserId } from './notifications.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
 const subRouter = Router();
 
@@ -138,39 +139,58 @@ subRouter.post('/text', async (req, res) => {
       deal = newDeal;
     }
 
-    // Create document record for text source
-    const { data: document } = await supabase
-      .from('Document')
-      .insert({
+    // Use the text's byte length as fileSize so re-pasting the exact same
+    // content matches the dedup triple. (Pasting a different snippet under
+    // the same name = different length = legitimately a new doc.)
+    const textByteLength = Buffer.byteLength(text, 'utf8');
+
+    // Dedup: if a Document with the same (dealId, name, fileSize) already
+    // exists, reuse it rather than inserting a duplicate.
+    const existingTextDuplicate = await findExistingDocument(deal.id, docName, textByteLength);
+    let document: any;
+    if (existingTextDuplicate) {
+      logDuplicateSkip(existingTextDuplicate, {
         dealId: deal.id,
         name: docName,
-        type: 'OTHER',
-        extractedText: text,
-        extractedData: {
-          companyName: aiData.companyName,
-          industry: aiData.industry,
-          description: aiData.description,
-          revenue: aiData.revenue,
-          ebitda: aiData.ebitda,
-          ebitdaMargin: aiData.ebitdaMargin,
-          revenueGrowth: aiData.revenueGrowth,
-          employees: aiData.employees,
-          foundedYear: aiData.foundedYear,
-          headquarters: aiData.headquarters,
-          keyRisks: aiData.keyRisks,
-          investmentHighlights: aiData.investmentHighlights,
-          summary: aiData.summary,
-          overallConfidence: aiData.overallConfidence,
-          needsReview: aiData.needsReview,
-          reviewReasons: aiData.reviewReasons,
-        },
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
-        confidence: aiData.overallConfidence / 100,
-        aiAnalyzedAt: new Date().toISOString(),
-        mimeType: 'text/plain',
-      })
-      .select()
-      .single();
+        fileSize: textByteLength,
+      });
+      document = existingTextDuplicate;
+    } else {
+      const { data: insertedDoc } = await supabase
+        .from('Document')
+        .insert({
+          dealId: deal.id,
+          name: docName,
+          type: 'OTHER',
+          fileSize: textByteLength,
+          extractedText: text,
+          extractedData: {
+            companyName: aiData.companyName,
+            industry: aiData.industry,
+            description: aiData.description,
+            revenue: aiData.revenue,
+            ebitda: aiData.ebitda,
+            ebitdaMargin: aiData.ebitdaMargin,
+            revenueGrowth: aiData.revenueGrowth,
+            employees: aiData.employees,
+            foundedYear: aiData.foundedYear,
+            headquarters: aiData.headquarters,
+            keyRisks: aiData.keyRisks,
+            investmentHighlights: aiData.investmentHighlights,
+            summary: aiData.summary,
+            overallConfidence: aiData.overallConfidence,
+            needsReview: aiData.needsReview,
+            reviewReasons: aiData.reviewReasons,
+          },
+          status: aiData.needsReview ? 'pending_review' : 'analyzed',
+          confidence: aiData.overallConfidence / 100,
+          aiAnalyzedAt: new Date().toISOString(),
+          mimeType: 'text/plain',
+        })
+        .select()
+        .single();
+      document = insertedDoc;
+    }
 
     // Log activity + assign team (only for new deals)
     if (!isUpdate) {

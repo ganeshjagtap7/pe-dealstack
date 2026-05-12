@@ -14,6 +14,7 @@ import { runFinancialAgent } from '../services/agents/financialAgent/index.js';
 import type { FileType } from '../services/agents/financialAgent/index.js';
 import { acquireExtractionSlot, releaseExtractionSlot } from '../services/agents/financialAgent/concurrency.js';
 import { downloadFileBuffer, extractStoragePath } from '../utils/storage.js';
+import { isFinancialDoc } from './financials-extraction-utils.js';
 
 const require = createRequire(import.meta.url);
 const pdfParse = require('pdf-parse');
@@ -25,31 +26,6 @@ const router = Router();
 /** Download a file from Supabase storage (supports both storage paths and legacy full URLs) */
 async function fetchBuffer(fileUrlOrPath: string): Promise<Buffer | null> {
   return downloadFileBuffer(fileUrlOrPath);
-}
-
-/**
- * "Financial-shaped" predicate for filtering Documents during re-extract.
- * Returns true if the doc is type-tagged as CIM/FINANCIALS/EXCEL OR if its
- * mimeType / filename indicate a spreadsheet. The predicate is permissive
- * on purpose — older XLSX uploads may have been auto-classified as OTHER
- * because the filename had no obvious keyword (e.g. "Master Sheet.xlsx").
- * Without this fallback, Re-extract silently skips them and the deal looks
- * like it has no financial data even when a 36-month spreadsheet sits on
- * the deal record.
- */
-function isFinancialDoc(d: { type: string | null; name: string | null; mimeType: string | null }): boolean {
-  const t = (d.type ?? '').toUpperCase();
-  if (t === 'CIM' || t === 'FINANCIALS' || t === 'EXCEL') return true;
-  const n = (d.name ?? '').toLowerCase();
-  if (n.endsWith('.xlsx') || n.endsWith('.xls') || n.endsWith('.csv')) return true;
-  const m = (d.mimeType ?? '').toLowerCase();
-  if (
-    m.includes('spreadsheet') ||
-    m.includes('excel') ||
-    m === 'text/csv' ||
-    m === 'application/csv'
-  ) return true;
-  return false;
 }
 
 /** Extract text from a PDF stored in Supabase */
@@ -201,17 +177,32 @@ router.post('/deals/:dealId/financials/extract', async (req, res) => {
       if (data) docs = [data];
     } else if (mode === 'all_financials') {
       // Pull every doc, then JS-filter for "looks-financial" (type-tagged
-      // OR spreadsheet-mimeType). The earlier `.in('type', [...])` filter
-      // skipped XLSX uploads classified as OTHER — common for files like
-      // "Master Sheet.xlsx" that have no obvious keyword in the name.
-      // This fix means the deep extraction loop now picks up spreadsheets
-      // even when their type tag is wrong.
+      // OR spreadsheet-mimeType OR PDF whose filename screams "P&L"). The
+      // earlier `.in('type', [...])` filter skipped uploads classified as
+      // OTHER — common for files like "Master Sheet.xlsx" or
+      // "Mind Movies 2024 Profit and Loss.pdf" that the classifier missed.
+      //
+      // Fallback: if the predicate matches NOTHING but the deal has docs
+      // with fileUrls, treat the request as `mode === 'all'` so we don't
+      // 404. Better to extract from a possibly-wrong doc and let the agent
+      // bail with a clear reason than to tell the user "no document found"
+      // when their P&L PDF is sitting right there.
       const { data } = await supabase
         .from('Document')
         .select('id, fileUrl, name, type, mimeType, createdAt')
         .eq('dealId', dealId)
         .order('createdAt', { ascending: false });
-      docs = (data ?? []).filter((d) => !!d.fileUrl && isFinancialDoc(d));
+      const withFileUrl = (data ?? []).filter((d) => !!d.fileUrl);
+      const filtered = withFileUrl.filter((d) => isFinancialDoc(d));
+      if (filtered.length > 0) {
+        docs = filtered;
+      } else if (withFileUrl.length > 0) {
+        log.warn('all_financials fallback: no financial-shaped docs, using all docs with fileUrl', {
+          dealId,
+          docCount: withFileUrl.length,
+        });
+        docs = withFileUrl;
+      }
     } else if (mode === 'all') {
       const { data } = await supabase
         .from('Document')

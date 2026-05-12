@@ -11,6 +11,7 @@ import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
 import { resolveUserId } from './notifications.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
 const subRouter = Router();
 
@@ -131,34 +132,52 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
     if (dealError) throw dealError;
 
     // Step 7: Create document record for email body
-    const { data: document } = await supabase
-      .from('Document')
-      .insert({
+    const emailDocName = `Email — ${emailData.subject}`;
+    const emailBodyByteLength = Buffer.byteLength(dealText, 'utf8');
+
+    // Dedup: same subject + identical body byte length on the same deal =
+    // re-ingest of the same email (e.g. forwarded twice).
+    const existingEmailDuplicate = await findExistingDocument(deal.id, emailDocName, emailBodyByteLength);
+    let document: any;
+    if (existingEmailDuplicate) {
+      logDuplicateSkip(existingEmailDuplicate, {
         dealId: deal.id,
-        name: `Email — ${emailData.subject}`,
-        type: 'OTHER',
-        extractedText: dealText,
-        extractedData: {
-          companyName: aiData.companyName,
-          industry: aiData.industry,
-          description: aiData.description,
-          revenue: aiData.revenue,
-          ebitda: aiData.ebitda,
-          ebitdaMargin: aiData.ebitdaMargin,
-          revenueGrowth: aiData.revenueGrowth,
-          employees: aiData.employees,
-          summary: aiData.summary,
-          overallConfidence: aiData.overallConfidence,
-          needsReview: aiData.needsReview,
-          reviewReasons: aiData.reviewReasons,
-        },
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
-        confidence: aiData.overallConfidence / 100,
-        aiAnalyzedAt: new Date().toISOString(),
-        mimeType: 'message/rfc822',
-      })
-      .select()
-      .single();
+        name: emailDocName,
+        fileSize: emailBodyByteLength,
+      });
+      document = existingEmailDuplicate;
+    } else {
+      const { data: insertedDoc } = await supabase
+        .from('Document')
+        .insert({
+          dealId: deal.id,
+          name: emailDocName,
+          type: 'OTHER',
+          fileSize: emailBodyByteLength,
+          extractedText: dealText,
+          extractedData: {
+            companyName: aiData.companyName,
+            industry: aiData.industry,
+            description: aiData.description,
+            revenue: aiData.revenue,
+            ebitda: aiData.ebitda,
+            ebitdaMargin: aiData.ebitdaMargin,
+            revenueGrowth: aiData.revenueGrowth,
+            employees: aiData.employees,
+            summary: aiData.summary,
+            overallConfidence: aiData.overallConfidence,
+            needsReview: aiData.needsReview,
+            reviewReasons: aiData.reviewReasons,
+          },
+          status: aiData.needsReview ? 'pending_review' : 'analyzed',
+          confidence: aiData.overallConfidence / 100,
+          aiAnalyzedAt: new Date().toISOString(),
+          mimeType: 'message/rfc822',
+        })
+        .select()
+        .single();
+      document = insertedDoc;
+    }
 
     // Step 8: Process PDF attachments
     const processedAttachments: string[] = [];
@@ -167,19 +186,31 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
         try {
           const pdfData = await extractTextFromPDF(att.content);
           if (pdfData?.text) {
-            await supabase.from('Document').insert({
-              dealId: deal.id,
-              name: att.filename,
-              type: 'OTHER',
-              extractedText: pdfData.text,
-              mimeType: 'application/pdf',
-              status: 'pending_analysis',
-            });
-            processedAttachments.push(att.filename);
+            // Dedup against (dealId, filename, attachment size) before
+            // inserting + re-embedding the same attachment.
+            const existingAttDuplicate = await findExistingDocument(deal.id, att.filename, att.size);
+            if (existingAttDuplicate) {
+              logDuplicateSkip(existingAttDuplicate, {
+                dealId: deal.id,
+                name: att.filename,
+                fileSize: att.size,
+              });
+            } else {
+              await supabase.from('Document').insert({
+                dealId: deal.id,
+                name: att.filename,
+                type: 'OTHER',
+                fileSize: att.size,
+                extractedText: pdfData.text,
+                mimeType: 'application/pdf',
+                status: 'pending_analysis',
+              });
 
-            // RAG embed the attachment in background
-            embedDocument(deal.id + '-' + att.filename, deal.id, pdfData.text)
-              .catch(err => log.error('Attachment RAG error', err));
+              // RAG embed the attachment in background
+              embedDocument(deal.id + '-' + att.filename, deal.id, pdfData.text)
+                .catch(err => log.error('Attachment RAG error', err));
+            }
+            processedAttachments.push(att.filename);
           }
         } catch (err) {
           log.warn('Attachment processing failed', { filename: att.filename, error: err });

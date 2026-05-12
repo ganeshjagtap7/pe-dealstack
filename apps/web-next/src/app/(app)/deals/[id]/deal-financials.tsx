@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { api, NotFoundError } from "@/lib/api";
 import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { useToast } from "@/providers/ToastProvider";
@@ -32,9 +32,9 @@ import {
 } from "./deal-financials-modal";
 import {
   DealFinancialsReextractList,
-  isFinancialShaped,
   type FinancialDocLite,
 } from "./deal-financials-reextract-list";
+import { useRemoveByDocument } from "./deal-financials-remove-by-document";
 import { DealFinancialsEmptyState } from "./deal-financials-empty-state";
 import { DealFinancialsToolbar } from "./deal-financials-toolbar";
 import {
@@ -220,6 +220,13 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
     }
   }, [dealId, extracting, loadFinancials, showToast]);
 
+  // Per-doc "remove all extracted statements" — see hook for details. Pulled
+  // into its own module so this component stays under the 500-line cap.
+  const { removingDocId, handleRemoveByDocument } = useRemoveByDocument(
+    dealId,
+    loadFinancials,
+  );
+
   // Shared download helper — both the extraction-debug and reconcile
   // endpoints stream JSON with Content-Disposition: attachment. Using
   // authFetchRaw lets us pull res.blob() and force a download; the
@@ -321,14 +328,6 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
   }, [dealId, fullAuditing, downloadJsonAttachment, showToast]);
 
   useEffect(() => { loadFinancials(); }, [loadFinancials]);
-
-  // Filter docs to financial-shaped only — same predicate the API uses for
-  // mode='all_financials'. Keeps the per-doc Re-extract list scoped to
-  // documents that actually feed the financial agent.
-  const financialDocs = useMemo(
-    () => dealDocs.filter(isFinancialShaped),
-    [dealDocs],
-  );
 
   // Derived state
   const hasData = statements.length > 0;
@@ -458,10 +457,13 @@ export function FinancialStatementsPanel({ dealId, onFullscreen }: { dealId: str
           onDownloadFullAudit={handleDownloadFullAudit}
         />
         <DealFinancialsReextractList
-          financialDocs={financialDocs}
+          dealId={dealId}
+          allDocs={dealDocs}
           extracting={extracting}
           extractingDocId={extractingDocId}
+          removingDocId={removingDocId}
           onReextract={(docId, docName) => handleExtract(docId, docName)}
+          onRemove={handleRemoveByDocument}
         />
         {/* Chart or Table */}
         {showChart ? (

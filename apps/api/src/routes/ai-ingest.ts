@@ -9,6 +9,7 @@ import { log } from '../utils/logger.js';
 import { createNotification, resolveUserId } from './notifications.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF } from './ingest-shared.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -226,25 +227,40 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
     const financialsFolder = createdFolders?.find((f: any) => /financ/i.test(f.name));
     const folderId = financialsFolder?.id || createdFolders?.[0]?.id || null;
 
-    // Create document record
-    const { data: document } = await supabase
-      .from('Document')
-      .insert({
+    // Dedup: this route always creates a new deal, so a true duplicate is
+    // unlikely (a re-submit produces a fresh deal). But guard anyway in case
+    // the caller wires it to an existing-deal flow later.
+    const existingAiDuplicate = await findExistingDocument(deal.id, safeName, file.size, { requireFileUrl: true });
+    let document: any;
+    if (existingAiDuplicate) {
+      logDuplicateSkip(existingAiDuplicate, {
         dealId: deal.id,
-        folderId,
         name: safeName,
-        type: 'CIM',
-        fileUrl,
         fileSize: file.size,
-        mimeType: file.mimetype,
-        extractedText,
-        extractedData,
-        status: extractedData.needsReview ? 'pending_review' : 'analyzed',
-        confidence: extractedData.overallConfidence / 100,
-        aiAnalyzedAt: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        newFileUrl: fileUrl,
+      });
+      document = existingAiDuplicate;
+    } else {
+      const { data: insertedDoc } = await supabase
+        .from('Document')
+        .insert({
+          dealId: deal.id,
+          folderId,
+          name: safeName,
+          type: 'CIM',
+          fileUrl,
+          fileSize: file.size,
+          mimeType: file.mimetype,
+          extractedText,
+          extractedData,
+          status: extractedData.needsReview ? 'pending_review' : 'analyzed',
+          confidence: extractedData.overallConfidence / 100,
+          aiAnalyzedAt: new Date().toISOString(),
+        })
+        .select()
+        .single();
+      document = insertedDoc;
+    }
 
     // Log activity
     await supabase.from('Activity').insert({
