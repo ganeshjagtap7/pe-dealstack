@@ -347,6 +347,50 @@ NEW: dealEmailClassifier (GPT-4.1-mini, ~$0.001/email)
 
 ---
 
+### Cross-cutting / data storage & retention (security-critical)
+
+Must be defined before Phase A merges. Founder + security review required.
+
+- [ ] Define exactly what gets stored from each email: full body? snippet only? subject+sender only? Spec the schema.
+- [ ] Encrypt email-body fields at rest (column-level via `DATA_ENCRYPTION_KEY`, matching V1 token storage)
+- [ ] Retention policy: default **90 days for raw email content**, indefinitely for AI-extracted structured data (Deal/Contact fields). Configurable per org for paid plans.
+- [ ] Cron job: purge `IntegrationActivity.rawBody` and similar fields older than retention window
+- [ ] User-facing data export endpoint includes all AI-derived records tagged `source = 'ai_email'`
+- [ ] Deletion request flow: user can request "purge all AI-extracted data from my email" — cascades to suggestions, AI-created deals (soft-deleted, recoverable for 30d per existing soft-delete pattern)
+- [ ] Privacy policy update covering all of the above
+
+### Cross-cutting / cross-user dedupe in same org
+
+A single firm has multiple users with Gmail connected. Same banker emails three of them. Three classifiers fire. Without dedupe → three Acme deals.
+
+- [ ] Dedupe key: normalized `companyName` + sender `domain` + 7-day window
+- [ ] On suggestion creation: check for existing pending suggestion in org with same dedupe key → merge, don't create new
+- [ ] On auto-create: check for existing Deal in org with same dedupe key → attach the new email/contacts to existing deal, don't create a duplicate Deal
+- [ ] Log a "consolidation" event for audit: "User A's Gmail surfaced Acme on Monday; User B's Gmail surfaced same on Tuesday; linked"
+
+### Cross-cutting / Deal ownership when AI creates
+
+- [ ] `Deal.ownerId` = the user whose Gmail triggered creation (default)
+- [ ] If dedupe merged across users (above), ownership stays with the original creator; co-owners listed as additional users
+- [ ] Deal detail header shows: *"Created by AI from {{user.name}}'s Gmail on {{date}}"*
+- [ ] One-click "Reassign owner" tooltip on first view
+
+### Cross-cutting / Backfill cost preview
+
+- [ ] Before user clicks "Scan 90 days", show estimate: *"~12,432 emails. ~$8 in AI processing. Proceed?"*
+- [ ] Calculation: `estimatedEmails × pre-filter pass-rate × per-LLM-call cost`
+- [ ] Hard stop if estimate exceeds 50% of monthly org budget — require explicit confirmation
+
+### Cross-cutting / Re-classification on config changes
+
+When user changes confidence threshold or allowlist/blocklist:
+
+- [ ] **Future-only by default.** Past pending suggestions and past auto-created deals are NOT re-evaluated automatically.
+- [ ] Optional "Re-run on past 7 days" button in Settings, with cost preview
+- [ ] Never retroactively delete an already-accepted deal because the user later raised their threshold
+
+---
+
 ### Cross-cutting / edge cases
 
 - [ ] **Forwarded emails** — extract original sender chain, don't treat the internal forwarder as deal source
@@ -421,10 +465,18 @@ All 8 decisions resolved. Developer can build to these as if they are requiremen
 
 ---
 
-## 8. What this feature is NOT
+## 8. What this feature is NOT (V1 non-goals)
 
-- ❌ Not **Phase 4 Outbound** (sending mail from CRM) — separate spec, separate risk profile
-- ❌ Not **document extraction** (financial agent on PDFs is a different feature)
-- ❌ Not **memo generation** (existing memo builder is the surface for that)
-- ❌ Not **LinkedIn enrichment** (firm research agent does that)
-- ❌ Not Outlook (same architecture in future when Outlook integration ships, but separate work)
+Explicitly out of scope for V1 so they don't sneak in. Each may become a V1.1+ feature.
+
+- ❌ **Phase 4 Outbound** — sending mail from the CRM. Separate spec, separate risk profile (write scopes).
+- ❌ **Document extraction** — financial agent on PDFs is a different existing feature.
+- ❌ **Memo generation** — existing memo builder is the surface for that.
+- ❌ **LinkedIn enrichment** — firm research agent does that.
+- ❌ **Outlook** — same architecture in future when Outlook integration ships, but separate work.
+- ❌ **Internationalization** — V1 classifier prompt is English-only. Non-English emails get processed (no crash) but extraction quality is undefined. Defer multilingual to V1.1.
+- ❌ **HTML signatures with contact info embedded as an image** — signature parser is text-only. If a banker's contact details are baked into a logo PNG, they're lost. Documented limitation, not a bug.
+- ❌ **Granola transcripts / Calendar events feeding the suggestion queue** — same suggestion-queue architecture would work for any synced activity surfacing new companies/contacts, but V1 is **Gmail-only**. Defer cross-source unification to V1.1.
+- ❌ **Subject-line-only privacy mode** — paranoid-mode toggle where AI only sees subject + sender, never body. Trade-off: meaningfully lower accuracy. Defer.
+- ❌ **Custom per-org classifier prompts** — every org gets the same prompt + golden set. Per-firm tuning is V1.1+.
+- ❌ **Auto-applied stage transitions** — AI never moves a deal between stages (e.g., "diligence → IC"). That always stays human. Out of scope forever, not just V1.
