@@ -1,8 +1,61 @@
-# Gmail → Auto Deal Creation & Update — Design + TODO
+# Gmail → Auto Deal Creation & Update — V1 Spec (LOCKED)
 
-**Status:** Proposed, not started
-**Date:** 2026-05-13
-**Depends on:** Integrations Platform V1 (PR #8, deployed). Gmail OAuth connection must already work end-to-end before any of this is useful.
+**Status:** 🔒 **LOCKED for V1 — ready for developer pickup**
+**Date locked:** 2026-05-13
+**Owner (product):** Ganesh
+**Owner (eng):** _assign on pickup_
+**Depends on:** Integrations Platform V1 (PR #8, deployed). Gmail OAuth + the 6h cron sync must already be live before Phase A can start.
+
+> All 8 open product decisions in §6 have been resolved to the default proposals. Scope is fixed. Effort is ~6 weeks for one focused dev. If a phase needs to slip or be cut, talk to the product owner before changing this doc.
+
+---
+
+## ⚡ Developer quick-start
+
+**Where to start:** Phase A (§5). It is the smallest shippable unit and unlocks every later phase. Do not start Phase B until Phase A has run in production for ≥2 weeks with real users.
+
+**Files to read first (in this order):**
+
+1. [docs/integrations-platform.md](../../integrations-platform.md) — the V1 engineering reference. Mental model + file map.
+2. [apps/api/src/integrations/gmail/index.ts](../../../apps/api/src/integrations/gmail/index.ts) — Gmail sync provider you'll plug the classifier into.
+3. [apps/api/src/integrations/gmail/mapper.ts](../../../apps/api/src/integrations/gmail/mapper.ts) — where the new classifier call slots in.
+4. [apps/api/src/integrations/_platform/matcher.ts](../../../apps/api/src/integrations/_platform/matcher.ts) — existing email → Contact → Deal matcher (you'll extend the contact side in Phase D).
+5. [apps/api/src/services/agents/meetingTranscriptAgent/](../../../apps/api/src/services/agents/meetingTranscriptAgent/) — pattern to copy for `dealEmailClassifier`. Same shape: `prompt.ts` + `schema.ts` + `index.ts`.
+6. [apps/api/src/services/agents/financialAgent/](../../../apps/api/src/services/agents/financialAgent/) — LangGraph pattern if you want a more elaborate multi-node agent (probably overkill for V1; single LLM call is fine).
+7. [apps/api/integration-activity-migration.sql](../../../apps/api/integration-activity-migration.sql) — pattern to copy for new migrations.
+
+**Patterns to reuse, not reinvent:**
+
+| Need | Existing thing to copy |
+|---|---|
+| New AI agent | Mirror `meetingTranscriptAgent/` structure |
+| New DB migration | Mirror `integration-activity-migration.sql` (idempotent, quoted camelCase) |
+| Org-scoped REST route | Mirror `apps/api/src/routes/integrations.ts` |
+| Frontend settings panel | Mirror `apps/web-next/src/app/(app)/settings/IntegrationsSection.tsx` |
+| AI inference audit log | Already exists — wire your calls to it (see security-trust work) |
+| AI usage cost attribution | Already exists per session 64 — use `authId` not `User.id` FK |
+| Feature flag | GrowthBook (per existing wiring) |
+
+**Definition of done per phase:**
+
+| Phase | Done when… |
+|---|---|
+| A | Gmail sync runs classifier on each new email; suggestions render in queue UI; user can accept/dismiss; consent flow works; precision dashboard shows >0.8 on golden set. |
+| B | Above-threshold suggestions auto-create Deal/Company/Contacts; in-app + digest notifications fire; bulk-delete safety valve works. |
+| C | New email on linked thread proposes field updates; sensitive fields queue, non-sensitive auto-apply; per-field audit log shows source email + confidence. |
+| D | Signatures parsed; new Contacts created with title/company/phone; dedupe queue surfaces obvious merge candidates. |
+| E | Settings panel ships with all 6 controls; user can configure, save, see "why was this surfaced?" for each suggestion. |
+| F | Backfill on enable scans up to 5000 past emails, surfaces single review queue, idempotent on re-run. |
+| G | Pub/Sub push verified for 2 weeks; 6h cron retired. |
+
+**When you ship a phase, do this:**
+
+1. Update PROGRESS.md (Sessions convention in this repo)
+2. Open a PR titled `feat(gmail-auto-deal): Phase X — <name>`
+3. Update this spec doc's §3 status column to ✅ shipped
+4. Add a one-paragraph entry to MEMORY.md key architecture section
+
+---
 
 ---
 
@@ -335,18 +388,20 @@ NEW: dealEmailClassifier (GPT-4.1-mini, ~$0.001/email)
 
 ---
 
-## 6. Open product decisions (block Phase A start)
+## 6. Product decisions (LOCKED for V1)
 
-| # | Question | Default proposal |
+All 8 decisions resolved. Developer can build to these as if they are requirements. If you find a reason to deviate during implementation, raise it in the PR before merging.
+
+| # | Question | **Decision** |
 |---|---|---|
-| 1 | Per-user or per-org config? | **Per-user** (their Gmail, their preferences); deals always written at org scope |
-| 2 | Opt-in or opt-out for AI scanning? | **Opt-in** (Phase A suggestions could be opt-out since no writes) |
-| 3 | What counts as "deal-related"? | Need a 30-example golden set agreed with founder before Phase A ships |
-| 4 | Cost ceiling per org/month? | Need a number from founder; default $50/org/month |
-| 5 | Conflict resolution on AI updates to human-edited fields? | **Never overwrite** — always queue for approval |
-| 6 | Sensitive fields list (always-queue, never-auto)? | `dealSize, stage, owner, askPrice` — confirm with founder |
-| 7 | Daily digest default ON or OFF? | **ON** for first 30 days then user can change |
-| 8 | Suggestion queue UI location? | New `/internal/deal-suggestions` page or new tab on CRM page |
+| 1 | Per-user or per-org config? | ✅ **Per-user.** Each user's Gmail is their own; their thresholds and preferences are their own. Deals are always written at org scope (so other team members see them). |
+| 2 | Opt-in or opt-out for AI scanning? | ✅ **Opt-in.** Master toggle defaults OFF. Privacy modal must be accepted before any classifier call runs. |
+| 3 | What counts as "deal-related"? | ✅ **Golden set required before Phase A ships.** Dev creates 30 example emails covering: cold pitch, banker intro, founder intro, LP intro, portfolio update, recruiter spam, calendar invite, newsletter, internal team, vendor invoice. Founder reviews and labels. Classifier must hit ≥80% precision on this set before going live. |
+| 4 | Cost ceiling per org/month? | ✅ **$50/org/month** for V1. Pre-LLM filter must cut ~70% of obvious noise. Warning notification at 80% of cap. Hard stop at 100% (defer remaining classifications to next billing cycle). |
+| 5 | Conflict on AI updates to human-edited fields? | ✅ **Never overwrite.** If AI proposes a change to a field a human edited <7 days ago, the proposal is always queued — never auto-applied even above threshold. |
+| 6 | Sensitive fields list (always-queue, never-auto)? | ✅ **`dealSize, stage, owner, askPrice, companyName, sector`.** All other fields (notes, contact list, mentioned numbers as `notes`) can auto-apply above threshold. |
+| 7 | Daily digest default? | ✅ **ON for first 30 days** after user enables the feature. Then they can keep, change to weekly, or turn off. |
+| 8 | Suggestion queue UI location? | ✅ **New page `/internal/deal-suggestions`** + a dashboard banner that links to it. NOT a tab on CRM — the CRM list should only show real deals, not suggestions. |
 
 ---
 
