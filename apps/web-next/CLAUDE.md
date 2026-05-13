@@ -64,7 +64,7 @@ apps/web-next/src/
 
 - **All API calls go through [`src/lib/api.ts`](src/lib/api.ts).** Use `api.get<T>(path)`, `api.post<T>(path, body)`, `api.patch<T>(path, body)`, `api.delete<T>(path)`. The wrapper:
   - Prefixes `/api` so the dev rewrite in `next.config.ts` (and the prod Route Handler) catches it.
-  - Calls `supabase.auth.getUser()` first (server-validated), then reads the access token from the session and forwards it as `Authorization: Bearer <jwt>`.
+  - Reads the access token from `supabase.auth.getSession()` (no network round-trip) and forwards it as `Authorization: Bearer <jwt>`. The API verifies the JWT signature on every request, so a client-side `getUser()` validation would be duplicate work. If the token is stale/expired, the API returns 401 and the wrapper redirects to `/login`.
   - Throws `NotFoundError` on 404 so callers can treat "endpoint not found" as an empty state instead of an error.
   - On 401 redirects to `/login`.
 - **For multipart uploads** (file ingest, document upload), use `authFetchRaw(path, options)` from `src/app/(app)/deal-intake/components.tsx`. It adds the same auth header but lets you pass `FormData` as the body. Do **not** set `Content-Type` — let the browser set the multipart boundary.
