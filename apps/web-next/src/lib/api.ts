@@ -48,7 +48,25 @@ async function getAuthHeaders(): Promise<HeadersInit> {
   };
 }
 
+// Once the org-level 2FA enforcement has fired, every protected endpoint will
+// keep returning 403 MFA_REQUIRED. Tracking a module-level flag lets us
+// short-circuit subsequent requests so we don't spam the network tab and
+// console with identical failures while the lockout screen is up.
+let mfaLockoutActive = false;
+
+function triggerMfaLockout(message: string): never {
+  mfaLockoutActive = true;
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("pf:mfa-required"));
+  }
+  throw new ApiError(message, 403, "MFA_REQUIRED");
+}
+
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  if (mfaLockoutActive) {
+    triggerMfaLockout("Two-factor authentication is required by your organization");
+  }
+
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
@@ -77,6 +95,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       res.statusText ||
       `API error ${res.status}`;
     const code = (body as { code?: string }).code;
+
+    // Org has enforced 2FA but the user hasn't enrolled. Surface a full-page
+    // lockout via MfaLockoutGate instead of letting individual sections fail
+    // — see apps/web-next/src/components/layout/MfaLockoutGate.tsx.
+    if (res.status === 403 && code === "MFA_REQUIRED") {
+      triggerMfaLockout(message);
+    }
+
     throw new ApiError(message, res.status, code);
   }
 
