@@ -4,7 +4,7 @@ import { z } from 'zod';
 import multer from 'multer';
 import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';
 import { mergeIntoExistingDeal } from '../services/dealMerger.js';
-import { AuditLog } from '../services/auditLog.js';
+import { AuditLog, logFromRequest, AUDIT_ACTIONS, RESOURCE_TYPES, SEVERITY } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES } from '../services/fileValidator.js';
 import { embedDocument } from '../rag.js';
 import { AICache } from '../services/aiCache.js';
@@ -15,6 +15,9 @@ import { tryCompleteOnboardingStep } from './onboarding.js';
 import { excelToMarkdown } from '../services/excelToMarkdown.js';
 import { isExcelFile } from '../services/excelFinancialExtractor.js';
 import { extractTextFromPDF } from '../services/pdfExtractor.js';
+import { runDeepPass } from '../services/financialExtractionOrchestrator.js';
+import { acquireExtractionSlot, releaseExtractionSlot } from '../services/agents/financialAgent/concurrency.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
 const router = Router();
 
@@ -122,13 +125,110 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       }
     }
 
-    // Determine document type from filename if not provided
+    // Dedup: if a Document with the same (dealId, name, fileSize) already
+    // exists for this deal, treat this as a no-op re-upload. Returns the
+    // existing row so the client gets a 200-shaped response instead of an
+    // error, but we skip extraction/embedding/activity to avoid doubling cost.
+    //
+    // Security: we ALWAYS recompute SHA-256 above (don't trust existing row's
+    // value) and require fingerprints to match before treating as a dedup.
+    // If (dealId, name, fileSize) collide but content differs, that's a
+    // security-relevant event — bypass dedup and emit an audit event so the
+    // collision is visible (e.g. someone trying to overwrite an audit-trail
+    // doc with a same-name/size impostor).
+    //
+    // Fingerprint logging uses only an 8-char prefix at INFO; the full hex
+    // lives in DB columns / audit metadata.
+    const existingDuplicate = await findExistingDocument(dealId, documentName, fileSize, { requireFileUrl: true });
+    const sha256Prefix = fileSha256 ? fileSha256.slice(0, 8) : null;
+    if (existingDuplicate) {
+      const existingPrefix = existingDuplicate.fileSha256 ? existingDuplicate.fileSha256.slice(0, 8) : null;
+      // If we have both fingerprints AND they differ, this is a metadata
+      // collision (same name + size, different content). Do NOT dedup.
+      if (fileSha256 && existingDuplicate.fileSha256 && fileSha256 !== existingDuplicate.fileSha256) {
+        log.warn('Document upload metadata collision: same (dealId, name, fileSize) but different SHA-256', {
+          dealId,
+          existingDocId: existingDuplicate.id,
+          name: documentName,
+          fileSize,
+          newSha256Prefix: sha256Prefix,
+          existingSha256Prefix: existingPrefix,
+        });
+        await logFromRequest(req, 'DOCUMENT_UPLOADED' as any, {
+          resourceType: RESOURCE_TYPES.DOCUMENT,
+          resourceId: existingDuplicate.id,
+          resourceName: documentName,
+          description: 'upload_metadata_collision: same name+size, different content',
+          severity: SEVERITY.WARNING,
+          metadata: {
+            dealId,
+            collision: true,
+            newSha256Prefix: sha256Prefix,
+            existingSha256Prefix: existingPrefix,
+          },
+        });
+        // Fall through to normal insert path.
+      } else {
+        // Genuine dedup hit: either fingerprints match, or existing row
+        // pre-dates fingerprinting (null fileSha256) — treat as dedup but
+        // still emit an audit event so the upload attempt is recorded.
+        logDuplicateSkip(existingDuplicate, {
+          dealId,
+          name: documentName,
+          fileSize,
+          newFileUrl: fileUrl,
+        });
+        await logFromRequest(req, AUDIT_ACTIONS.DOCUMENT_UPLOADED, {
+          resourceType: RESOURCE_TYPES.DOCUMENT,
+          resourceId: existingDuplicate.id,
+          resourceName: documentName,
+          description: 'upload_deduped: matched existing document',
+          metadata: {
+            dealId,
+            deduped: true,
+            sha256Prefix,
+            fingerprintMatched: !!(fileSha256 && existingDuplicate.fileSha256 && fileSha256 === existingDuplicate.fileSha256),
+            existingFingerprintMissing: !existingDuplicate.fileSha256,
+          },
+        });
+        return res.status(200).json({ ...existingDuplicate, dealUpdated: false, updatedFields: [] });
+      }
+    }
+
+    // Determine document type from filename if not provided. Spreadsheets
+    // (XLSX / XLS / CSV) default to FINANCIALS so the re-extract loop in
+    // financials-extraction.ts (which filters `type IN ('CIM','FINANCIALS')`)
+    // picks them up. Without this, a Master Sheet upload silently misses
+    // the deep extraction path and ends up as OTHER, never producing
+    // FinancialStatement rows even though the data is sitting in the DB.
     let docType = req.body.type || 'OTHER';
     if (docType === 'OTHER' && documentName) {
       const lowerName = documentName.toLowerCase();
+      const lowerMime = (mimeType ?? '').toLowerCase();
+      const looksLikeSpreadsheet =
+        lowerName.endsWith('.xlsx') ||
+        lowerName.endsWith('.xls') ||
+        lowerName.endsWith('.csv') ||
+        lowerMime.includes('spreadsheet') ||
+        lowerMime.includes('excel') ||
+        lowerMime === 'text/csv' ||
+        lowerMime === 'application/csv';
+
       if (lowerName.includes('cim') || lowerName.includes('confidential')) docType = 'CIM';
       else if (lowerName.includes('teaser')) docType = 'TEASER';
-      else if (lowerName.includes('financial') || lowerName.includes('model')) docType = 'FINANCIALS';
+      else if (
+        lowerName.includes('financial') ||
+        lowerName.includes('model') ||
+        lowerName.includes('p&l') ||
+        lowerName.includes('p_l') ||
+        lowerName.includes('income') ||
+        lowerName.includes('balance') ||
+        lowerName.includes('cashflow') ||
+        lowerName.includes('cash flow') ||
+        lowerName.includes('master sheet') ||
+        lowerName.includes('mastersheet') ||
+        looksLikeSpreadsheet
+      ) docType = 'FINANCIALS';
       else if (lowerName.includes('legal') || lowerName.includes('dd')) docType = 'LEGAL';
       else if (lowerName.includes('nda')) docType = 'NDA';
       else if (lowerName.includes('loi') || lowerName.includes('letter')) docType = 'LOI';
@@ -192,7 +292,12 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         log.warn('PDF extraction failed', { documentName });
       }
     } else if (file && isExcelFile(mimeType, documentName)) {
-      // Excel extraction — convert sheets to Markdown tables
+      // Excel extraction — convert sheets to Markdown tables for RAG / chat
+      // context, then run the same AI deal-level extraction the PDF branch
+      // does so company name / industry / revenue / EBITDA populate on the
+      // deal from financial models. FinancialStatement rows (per-period
+      // line items) are populated below via runDeepPass after the Document
+      // row exists.
       extractionStatus = 'processing';
       log.info('Starting Excel-to-Markdown extraction', { documentName });
       try {
@@ -200,10 +305,26 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
         if (markdownText) {
           extractedText = markdownText.replace(/\u0000/g, '');
           log.info('Excel extraction completed', { documentName, textLength: extractedText.length });
+
+          try {
+            log.info('Starting AI data extraction', { documentName });
+            const aiData = await extractDealDataFromText(extractedText);
+            if (aiData) {
+              aiExtractedData = aiData;
+              extractionStatus = 'analyzed';
+              log.info('AI extraction completed', { documentName, companyName: aiData.companyName, industry: aiData.industry });
+            } else {
+              extractionStatus = 'completed';
+              log.info('AI extraction returned no data', { documentName });
+            }
+          } catch (aiError) {
+            log.error('AI extraction failed', aiError, { documentName });
+            extractionStatus = 'completed';
+          }
         } else {
           log.info('Excel extraction: no meaningful content', { documentName });
+          extractionStatus = 'completed';
         }
-        extractionStatus = 'completed';
       } catch (excelError) {
         log.error('Excel extraction failed', excelError, { documentName });
         extractionStatus = 'completed'; // don't block upload
@@ -296,6 +417,55 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       .single();
 
     if (docError) throw docError;
+
+    // Excel-only follow-up: populate FinancialStatement rows so the
+    // Financial Analysis tab can show per-period revenue / EBITDA / line
+    // items extracted from the spreadsheet. Awaited (not fire-and-forget)
+    // because Vercel can freeze the function once res.json is sent — a
+    // background promise would silently drop. Typical wall time is 10-30s
+    // for a real financial model; failures are logged but never fail the
+    // upload (text + AI fields are already saved). Only fires for Excel
+    // because PDFs have a different financial extraction path.
+    if (file && isExcelFile(mimeType, documentName) && extractedText) {
+      // Concurrency-slot guard mirrors /api/deals/:id/financials/extract
+      // (financials-extraction.ts:173). Without it, parallel uploads from the
+      // same org both run runDeepPass concurrently and can blow Vercel's
+      // function memory on a multi-statement workbook. If the slot isn't
+      // available, log and skip — the user can re-extract manually via the
+      // Re-extract button on the deal page rather than the upload failing.
+      const slotAcquired = acquireExtractionSlot(orgId);
+      if (!slotAcquired) {
+        log.warn('Deep financial extraction skipped — org at concurrency cap', {
+          documentId: document.id,
+          dealId,
+          orgId,
+        });
+      } else {
+        try {
+          log.info('Running deep financial extraction', { documentId: document.id, dealId });
+          const deepResult = await runDeepPass({
+            text: extractedText,
+            dealId,
+            documentId: document.id,
+          });
+          if (deepResult) {
+            log.info('Deep financial extraction complete', {
+              documentId: document.id,
+              statementsStored: deepResult.statementsStored,
+              periodsStored: deepResult.periodsStored,
+              overallConfidence: deepResult.overallConfidence,
+              warnings: deepResult.warnings,
+            });
+          } else {
+            log.info('Deep financial extraction: no statements detected', { documentId: document.id });
+          }
+        } catch (deepErr) {
+          log.error('Deep financial extraction failed', deepErr, { documentId: document.id });
+        } finally {
+          releaseExtractionSlot(orgId);
+        }
+      }
+    }
 
     // Update deal's lastDocument field
     await supabase

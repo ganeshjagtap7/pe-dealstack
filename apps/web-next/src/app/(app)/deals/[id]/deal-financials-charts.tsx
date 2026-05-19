@@ -1,87 +1,28 @@
 "use client";
 
-import { useRef, useEffect } from "react";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  BarController,
-  LineElement,
-  LineController,
-  PointElement,
-  Filler,
-  Tooltip,
-  Legend,
-  Title,
-  type ChartOptions,
-  type ChartData,
-} from "chart.js";
+import { useRef, useState } from "react";
+import type { Chart as ChartJS, ChartOptions, ChartData } from "chart.js";
 import { Chart } from "react-chartjs-2";
 
-// Register Chart.js components once
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  BarController,
-  LineElement,
-  LineController,
-  PointElement,
-  Filler,
-  Tooltip,
-  Legend,
-  Title,
-);
+import { comparePeriodChronologically } from "./deal-financials-period-scope";
+import {
+  type ChartScopeFilter,
+  ChartToolbar,
+  ScopeEmptyState,
+  ScopeFilterPills,
+  filterRowsByScope,
+} from "./deal-financials-chart-controls";
+import {
+  type FinancialStatement,
+  CHART_TOOLTIP,
+  CHART_LEGEND,
+} from "./deal-financials-charts-shared";
+import { formatFinancialValue, toActualDollars } from "@/lib/formatters";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface FinancialStatement {
-  id: string;
-  statementType: "INCOME_STATEMENT" | "BALANCE_SHEET" | "CASH_FLOW";
-  period: string;
-  periodType?: "ACTUAL" | "PROJECTED";
-  currency?: string;
-  unitScale?: "ACTUALS" | "THOUSANDS" | "MILLIONS";
-  extractionConfidence?: number | null;
-  extractionSource?: string | null;
-  lineItems?: Record<string, number | null>;
-  Document?: { id: string; name: string } | null;
-}
-
-// ---------------------------------------------------------------------------
-// Shared chart config (ported from legacy CHART_TOOLTIP / CHART_LEGEND)
-// ---------------------------------------------------------------------------
-
-const CHART_TOOLTIP = {
-  backgroundColor: "rgba(255,255,255,0.98)",
-  titleColor: "#111827",
-  titleFont: { size: 12 as const, family: "Inter", weight: "bold" as const },
-  bodyColor: "#4b5563",
-  bodyFont: { size: 11 as const, family: "Inter" },
-  borderColor: "#e5e7eb",
-  borderWidth: 1,
-  padding: { top: 10, bottom: 10, left: 14, right: 14 },
-  cornerRadius: 10,
-  boxPadding: 4,
-  usePointStyle: true as const,
-  caretSize: 6,
-};
-
-const CHART_LEGEND = {
-  position: "bottom" as const,
-  labels: {
-    font: { size: 11 as const, family: "Inter", weight: "normal" as const },
-    boxWidth: 14,
-    boxHeight: 8,
-    padding: 18,
-    color: "#6b7280",
-    usePointStyle: true as const,
-    pointStyleWidth: 14,
-  },
-};
+// Re-export so existing consumers (deal-financials.tsx) don't have to change
+// their import paths after the file split.
+export type { FinancialStatement } from "./deal-financials-charts-shared";
+export { GrowthChart } from "./deal-financials-chart-growth";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -96,48 +37,60 @@ function filterConsistentPeriods(rows: FinancialStatement[]): FinancialStatement
   return rows;
 }
 
-function createGradient(
-  ctx: CanvasRenderingContext2D,
-  colorTop: string,
-  colorBottom: string,
-  height = 300,
-): CanvasGradient {
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, colorTop);
-  gradient.addColorStop(1, colorBottom);
-  return gradient;
-}
-
 // ---------------------------------------------------------------------------
 // Revenue + EBITDA + Margin chart
 // ---------------------------------------------------------------------------
 
 export function RevenueChart({ statements }: { statements: FinancialStatement[] }) {
   const canvasRef = useRef<ChartJS | null>(null);
-  const containerRef = useRef<HTMLCanvasElement | null>(null);
+  const [scopeFilter, setScopeFilter] = useState<ChartScopeFilter>("all");
 
-  let rows = statements
-    .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => a.period.localeCompare(b.period));
+  // Filter by scope BEFORE sort + chart construction so the empty-state check
+  // sees the post-filter row count.
+  let rows = statements.filter((s) => s.statementType === "INCOME_STATEMENT");
+  rows = filterRowsByScope(rows, scopeFilter);
+  rows = rows.sort((a, b) => comparePeriodChronologically(a.period, b.period));
 
-  rows = filterConsistentPeriods(rows);
+  // Only fall back to FY-vs-non-FY consistency filtering when the user hasn't
+  // already locked the scope down. With an explicit scope filter, all rows
+  // share a scope by definition.
+  if (scopeFilter === "all") {
+    rows = filterConsistentPeriods(rows);
+  }
+
+  const toolbar = (
+    <ChartToolbar>
+      <ScopeFilterPills value={scopeFilter} onChange={setScopeFilter} />
+    </ChartToolbar>
+  );
 
   if (rows.length === 0) {
-    return <p className="text-xs text-gray-400 text-center py-8">No income statement data available.</p>;
+    return (
+      <div className="w-full">
+        {toolbar}
+        {scopeFilter === "all" ? (
+          <p className="text-xs text-gray-400 text-center py-8">No income statement data available.</p>
+        ) : (
+          <ScopeEmptyState filter={scopeFilter} />
+        )}
+      </div>
+    );
   }
 
   const labels = rows.map((r) => r.period);
-  const revenues = rows.map((r) => r.lineItems?.revenue ?? null);
-  const ebitdas = rows.map((r) => r.lineItems?.ebitda ?? null);
+  // Convert each row's stored value into actual dollars using its own
+  // `unitScale` so the y-axis auto-scales correctly even when periods mix scales.
+  const revenues = rows.map((r) => toActualDollars(r.lineItems?.revenue ?? null, r.unitScale));
+  const ebitdas = rows.map((r) => toActualDollars(r.lineItems?.ebitda ?? null, r.unitScale));
   const margins = rows.map((r) => r.lineItems?.ebitda_margin_pct ?? null);
-  const unitLabel = rows[0]?.unitScale === "THOUSANDS" ? "$K" : "$M";
+  const currency = rows[0]?.currency ?? "USD";
 
   const data: ChartData<"bar" | "line", (number | null)[], string> = {
     labels,
     datasets: [
       {
         type: "bar" as const,
-        label: `Revenue (${unitLabel})`,
+        label: "Revenue",
         data: revenues,
         backgroundColor: "rgba(0,51,102,0.7)",
         borderColor: "transparent",
@@ -151,7 +104,7 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
       },
       {
         type: "bar" as const,
-        label: `EBITDA (${unitLabel})`,
+        label: "EBITDA",
         data: ebitdas,
         backgroundColor: "rgba(5,150,105,0.7)",
         borderColor: "transparent",
@@ -201,7 +154,7 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
             const v = ctx.raw as number | null;
             if (v === null || v === undefined) return "";
             if (ctx.dataset.yAxisID === "y1") return ` EBITDA Margin: ${Number(v).toFixed(1)}%`;
-            return ` ${ctx.dataset.label}: $${Number(v).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`;
+            return ` ${ctx.dataset.label}: ${formatFinancialValue(v, "ACTUALS", { currency })}`;
           },
         },
       },
@@ -215,11 +168,10 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
       y: {
         type: "linear",
         position: "left",
-        title: { display: true, text: unitLabel, font: { size: 11, family: "Inter", weight: "normal" }, color: "#9ca3af" },
         ticks: {
           font: { size: 10, family: "Inter" },
           color: "#9ca3af",
-          callback: (v) => "$" + Number(v).toLocaleString(),
+          callback: (v) => formatFinancialValue(Number(v), "ACTUALS", { currency }),
           padding: 8,
         },
         grid: { color: "rgba(0,0,0,0.04)" },
@@ -243,103 +195,12 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
   };
 
   return (
-    <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
-      {/* @ts-expect-error -- react-chartjs-2 mixed type chart has loose generics */}
-      <Chart ref={canvasRef} type="bar" data={data} options={options} />
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Revenue Growth chart
-// ---------------------------------------------------------------------------
-
-export function GrowthChart({ statements }: { statements: FinancialStatement[] }) {
-  let rows = statements
-    .filter((s) => s.statementType === "INCOME_STATEMENT")
-    .sort((a, b) => a.period.localeCompare(b.period));
-
-  rows = filterConsistentPeriods(rows);
-
-  if (rows.length < 2) {
-    return <p className="text-xs text-gray-400 text-center py-8">Need at least 2 periods to show growth.</p>;
-  }
-
-  const labels: string[] = [];
-  const growthData: number[] = [];
-
-  for (let i = 1; i < rows.length; i++) {
-    const prev = rows[i - 1].lineItems?.revenue;
-    const curr = rows[i].lineItems?.revenue;
-    if (prev != null && curr != null && prev !== 0) {
-      const pct = ((curr - prev) / Math.abs(prev)) * 100;
-      labels.push(rows[i].period);
-      growthData.push(parseFloat(pct.toFixed(1)));
-    }
-  }
-
-  if (labels.length === 0) {
-    return <p className="text-xs text-gray-400 text-center py-8">No revenue data available for growth calculation.</p>;
-  }
-
-  const bgColors = growthData.map((v) => (v >= 0 ? "rgba(5,150,105,0.7)" : "rgba(220,38,38,0.7)"));
-  const borderColors = growthData.map((v) => (v >= 0 ? "rgba(5,150,105,0.6)" : "rgba(220,38,38,0.6)"));
-
-  const data: ChartData<"bar", number[], string> = {
-    labels,
-    datasets: [
-      {
-        label: "Revenue Growth %",
-        data: growthData,
-        backgroundColor: bgColors,
-        borderColor: borderColors,
-        borderWidth: 1,
-        borderRadius: 6,
-        borderSkipped: false,
-        barPercentage: 0.65,
-      },
-    ],
-  };
-
-  const options: ChartOptions<"bar"> = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: false },
-      tooltip: {
-        ...CHART_TOOLTIP,
-        callbacks: {
-          title: (items) => items[0]?.label ?? "",
-          label: (ctx) => {
-            const v = Number(ctx.raw);
-            const sign = v >= 0 ? "+" : "";
-            return ` Revenue Growth: ${sign}${v.toFixed(1)}%`;
-          },
-        },
-      },
-    },
-    scales: {
-      x: {
-        grid: { display: false },
-        ticks: { font: { size: 11, family: "Inter" }, color: "#9ca3af", maxRotation: 45 },
-        border: { display: false },
-      },
-      y: {
-        ticks: {
-          font: { size: 10, family: "Inter" },
-          color: "#9ca3af",
-          callback: (v) => (Number(v) >= 0 ? "+" : "") + v + "%",
-          padding: 8,
-        },
-        grid: { color: "rgba(0,0,0,0.04)" },
-        border: { display: false },
-      },
-    },
-  };
-
-  return (
-    <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
-      <Chart type="bar" data={data} options={options} />
+    <div className="w-full">
+      {toolbar}
+      <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
+        {/* @ts-expect-error -- react-chartjs-2 mixed type chart has loose generics */}
+        <Chart ref={canvasRef} type="bar" data={data} options={options} />
+      </div>
     </div>
   );
 }
@@ -349,12 +210,32 @@ export function GrowthChart({ statements }: { statements: FinancialStatement[] }
 // ---------------------------------------------------------------------------
 
 export function BalanceSheetChart({ statements }: { statements: FinancialStatement[] }) {
-  const rows = statements
-    .filter((s) => s.statementType === "BALANCE_SHEET")
-    .sort((a, b) => a.period.localeCompare(b.period));
+  const [scopeFilter, setScopeFilter] = useState<ChartScopeFilter>("all");
+
+  // Filter by scope BEFORE sort so empty-state checks see the right count.
+  const filteredBaseRows = filterRowsByScope(
+    statements.filter((s) => s.statementType === "BALANCE_SHEET"),
+    scopeFilter,
+  );
+  const rows = filteredBaseRows.sort((a, b) => comparePeriodChronologically(a.period, b.period));
+
+  const toolbar = (
+    <ChartToolbar>
+      <ScopeFilterPills value={scopeFilter} onChange={setScopeFilter} />
+    </ChartToolbar>
+  );
 
   if (rows.length === 0) {
-    return <p className="text-xs text-gray-400 text-center py-8">No balance sheet data available.</p>;
+    return (
+      <div className="w-full">
+        {toolbar}
+        {scopeFilter !== "all" ? (
+          <ScopeEmptyState filter={scopeFilter} />
+        ) : (
+          <p className="text-xs text-gray-400 text-center py-8">No balance sheet data available.</p>
+        )}
+      </div>
+    );
   }
 
   const chartKeys = [
@@ -363,12 +244,18 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
   ];
   const hasChartData = rows.some((r) => chartKeys.some((k) => r.lineItems?.[k] != null && r.lineItems[k] !== 0));
   if (!hasChartData) {
-    return <p className="text-xs text-gray-400 text-center py-8">Balance sheet data exists but key values are not yet extracted.</p>;
+    return (
+      <div className="w-full">
+        {toolbar}
+        <p className="text-xs text-gray-400 text-center py-8">Balance sheet data exists but key values are not yet extracted.</p>
+      </div>
+    );
   }
 
   const labels = rows.map((r) => r.period);
-  const li = (row: FinancialStatement, key: string) => row.lineItems?.[key] ?? 0;
-  const unitLabel = rows[0]?.unitScale === "THOUSANDS" ? "$K" : "$M";
+  // Convert per-row to actual dollars so the y-axis auto-scales uniformly.
+  const li = (row: FinancialStatement, key: string) => toActualDollars(row.lineItems?.[key] ?? 0, row.unitScale) ?? 0;
+  const currency = rows[0]?.currency ?? "USD";
 
   const data: ChartData<"bar", number[], string> = {
     labels,
@@ -377,7 +264,7 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
       { label: "Receivables", data: rows.map((r) => li(r, "accounts_receivable")), backgroundColor: "#2563eb", stack: "assets", borderWidth: 0, borderRadius: 3 },
       { label: "Inventory", data: rows.map((r) => li(r, "inventory")), backgroundColor: "#60a5fa", stack: "assets", borderWidth: 0, borderRadius: 3 },
       { label: "PP&E", data: rows.map((r) => li(r, "ppe_net")), backgroundColor: "#93c5fd", stack: "assets", borderWidth: 0, borderRadius: 3 },
-      { label: "Goodwill + Intangibles", data: rows.map((r) => (li(r, "goodwill") || 0) + (li(r, "intangibles") || 0)), backgroundColor: "#bfdbfe", stack: "assets", borderWidth: 0, borderRadius: 3 },
+      { label: "Goodwill + Intangibles", data: rows.map((r) => li(r, "goodwill") + li(r, "intangibles")), backgroundColor: "#bfdbfe", stack: "assets", borderWidth: 0, borderRadius: 3 },
       { label: "Current Liab.", data: rows.map((r) => li(r, "total_current_liabilities")), backgroundColor: "#dc2626", stack: "liabilities", borderWidth: 0, borderRadius: 3 },
       { label: "LT Debt", data: rows.map((r) => li(r, "long_term_debt")), backgroundColor: "#f87171", stack: "liabilities", borderWidth: 0, borderRadius: 3 },
       { label: "Equity", data: rows.map((r) => li(r, "total_equity")), backgroundColor: "#059669", stack: "liabilities", borderWidth: 0, borderRadius: 3 },
@@ -399,7 +286,7 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
           label: (ctx) => {
             const v = ctx.raw as number;
             if (!v) return "";
-            return ` ${ctx.dataset.label}: $${Number(v).toLocaleString("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}${unitLabel.replace("$", "")}`;
+            return ` ${ctx.dataset.label}: ${formatFinancialValue(v, "ACTUALS", { currency })}`;
           },
         },
       },
@@ -420,11 +307,10 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
       },
       y: {
         stacked: true,
-        title: { display: true, text: unitLabel, font: { size: 11, family: "Inter", weight: "normal" }, color: "#9ca3af" },
         ticks: {
           font: { size: 10, family: "Inter" },
           color: "#9ca3af",
-          callback: (v) => "$" + Number(v).toLocaleString(),
+          callback: (v) => formatFinancialValue(Number(v), "ACTUALS", { currency }),
           padding: 8,
         },
         grid: { color: "rgba(0,0,0,0.04)" },
@@ -434,8 +320,11 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
   };
 
   return (
-    <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
-      <Chart type="bar" data={data} options={options} />
+    <div className="w-full">
+      {toolbar}
+      <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
+        <Chart type="bar" data={data} options={options} />
+      </div>
     </div>
   );
 }
