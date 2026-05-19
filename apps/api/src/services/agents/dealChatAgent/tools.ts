@@ -10,6 +10,8 @@ import { makeSearchDocumentsTool } from './tools/searchDocuments.js';
 import { makeGetDealFinancialsTool } from './tools/getDealFinancials.js';
 import { makeCompareDealsTool } from './tools/compareDeals.js';
 import { makeGetDealActivityTool } from './tools/getDealActivity.js';
+import { makeWebSearchTool } from './tools/webSearch.js';
+import { makeGenerateChartTool } from './tools/generateChart.js';
 import { makeUpdateDealFieldTool } from './tools/updateDealField.js';
 import { makeChangeDealStageTool } from './tools/changeDealStage.js';
 import { makeAddNoteTool } from './tools/addNote.js';
@@ -27,6 +29,8 @@ export function getDealChatTools(dealId: string, orgId: string) {
     makeGetDealFinancialsTool(dealId, orgId),
     makeCompareDealsTool(dealId, orgId),
     makeGetDealActivityTool(dealId, orgId),
+    makeWebSearchTool(),
+    makeGenerateChartTool(),
     makeUpdateDealFieldTool(dealId, orgId),
     makeChangeDealStageTool(dealId, orgId),
     makeAddNoteTool(dealId, orgId),
