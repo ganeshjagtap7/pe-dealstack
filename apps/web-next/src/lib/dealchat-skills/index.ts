@@ -440,6 +440,48 @@ export function filterSkills(query: string): Skill[] {
 }
 
 // ---------------------------------------------------------------------------
+// Skill-command parser — used by the chat submit path to detect when the
+// user typed a known command and may have appended free-form context after
+// it. Returns the matched skill and any trailing text (trimmed). The match
+// is anchored: the command must appear at the start of the input,
+// followed by either end-of-string OR whitespace. This lets us safely
+// distinguish `/ic-memo` from `/ic-memo-v2` (hypothetical future skill).
+// ---------------------------------------------------------------------------
+
+export function findSkillCommand(input: string): { skill: Skill; extra: string } | null {
+  const trimmed = input.trimStart();
+  for (const skill of SKILLS) {
+    if (trimmed === skill.command) {
+      return { skill, extra: "" };
+    }
+    if (
+      trimmed.startsWith(skill.command + " ") ||
+      trimmed.startsWith(skill.command + "\n") ||
+      trimmed.startsWith(skill.command + "\t")
+    ) {
+      return { skill, extra: trimmed.slice(skill.command.length).trim() };
+    }
+  }
+  return null;
+}
+
+/**
+ * Expand a chat input that begins with a known skill command into the full
+ * agent-facing prompt. If `extra` text follows the command, it's appended as
+ * an "Additional context from analyst" block so the agent treats it as a
+ * user steering signal on top of the skill's structured request.
+ * Returns the raw input unchanged when no command matches.
+ */
+export function expandChatInput(input: string, deal: Deal | null): string {
+  if (!deal) return input;
+  const match = findSkillCommand(input);
+  if (!match) return input;
+  const base = match.skill.buildPrompt(deal);
+  if (!match.extra) return base;
+  return `${base}\n\n---\n**Additional context from the analyst:**\n${match.extra}`;
+}
+
+// ---------------------------------------------------------------------------
 // Requirement check — used by the menu UI to show "needs financials" hints.
 // Returns the list of unmet requirement labels (empty if all satisfied).
 // ---------------------------------------------------------------------------

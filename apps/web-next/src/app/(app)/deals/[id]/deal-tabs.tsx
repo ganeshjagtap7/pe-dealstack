@@ -13,7 +13,7 @@ import { AIMessageActions } from "./deal-tabs-ai-message-actions";
 import { ArtifactActionButton } from "./deal-tabs-artifact-button";
 import { SlashMenu } from "./deal-tabs-slash-menu";
 import { AiMessageBody } from "./deal-tabs-ai-message-body";
-import { filterSkills, type Skill } from "@/lib/dealchat-skills";
+import { filterSkills, findSkillCommand, expandChatInput, type Skill } from "@/lib/dealchat-skills";
 
 // ---------------------------------------------------------------------------
 // Chat Tab
@@ -43,6 +43,12 @@ export function ChatTab({
   const [showClearModal, setShowClearModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  // When the user picks a skill from the slash menu we want the caret to
+  // land at the end of the freshly-inserted `/<command> ` so they can keep
+  // typing additional context immediately. Setting `pendingCaretToEnd`
+  // queues a focus + selection adjustment for the next render tick.
+  const [pendingCaretToEnd, setPendingCaretToEnd] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<Array<{ name: string; status: "uploading" | "done" | "error" }>>([]);
 
   // ---- Slash-command menu state -----------------------------------------
@@ -73,18 +79,51 @@ export function ChatTab({
 
   const pickSkill = useCallback(
     (skill: Skill) => {
-      if (!deal) return;
-      const prompt = skill.buildPrompt(deal);
-      // Mirror the SuggestionChips path: clear the input and fire the
-      // prompt straight through. The parent's onSendPrompt manages the
-      // optimistic message + API call.
-      setChatInput("");
+      // Insert `/<command> ` into the input and close the menu. We DO NOT
+      // submit here — the user may want to append free-form context (e.g.
+      // "/one-pager focus on cash conversion") before hitting Enter. The
+      // expansion to the full skill prompt happens at submit time in
+      // handleSubmit() so the user gets one final review beat.
+      setChatInput(skill.command + " ");
       setSlashDismissed(true);
       setSlashIdx(0);
-      onSendPrompt(prompt);
+      setPendingCaretToEnd(true);
     },
-    [deal, onSendPrompt, setChatInput],
+    [setChatInput],
   );
+
+  // Move the caret to the end of the textarea after a pickSkill insert.
+  // useEffect fires after React commits the new value, so .value.length
+  // reflects the inserted `/<command> ` and the user can keep typing.
+  useEffect(() => {
+    if (!pendingCaretToEnd) return;
+    const el = textareaRef.current;
+    if (el) {
+      const len = el.value.length;
+      el.focus();
+      el.setSelectionRange(len, len);
+    }
+    setPendingCaretToEnd(false);
+  }, [pendingCaretToEnd, chatInput]);
+
+  // Submit path — expands a `/<command> ...` input into the full skill
+  // prompt (with any trailing text appended as analyst context), then
+  // routes through onSendPrompt so we don't have to round-trip the
+  // expanded prompt back through chatInput state. Plain inputs (no
+  // matching command) fall through to the existing onSend path.
+  const handleSubmit = useCallback(() => {
+    if (chatSending) return;
+    const raw = chatInput;
+    if (!raw.trim()) return;
+    const match = findSkillCommand(raw);
+    if (match && deal) {
+      const expanded = expandChatInput(raw, deal);
+      setChatInput("");
+      onSendPrompt(expanded);
+      return;
+    }
+    onSend();
+  }, [chatInput, chatSending, deal, onSend, onSendPrompt, setChatInput]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     // While the slash menu is visible, ArrowUp/Down/Enter/Escape belong to
@@ -125,7 +164,7 @@ export function ChatTab({
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      handleSubmit();
     }
   };
 
@@ -334,12 +373,19 @@ export function ChatTab({
               />
             )}
             <textarea
+              ref={textareaRef}
               value={chatInput}
               onChange={(e) => {
                 setChatInput(e.target.value);
                 // Any edit re-arms the menu — Escape's "dismissed" flag
                 // only sticks until the user touches the field again.
-                if (slashDismissed) setSlashDismissed(false);
+                // EXCEPT when the input still starts with a known skill
+                // command (the user picked from the menu and is now
+                // typing extra context); in that case keep it dismissed
+                // so the menu doesn't pop back over their typing.
+                if (slashDismissed && !findSkillCommand(e.target.value)) {
+                  setSlashDismissed(false);
+                }
               }}
               onKeyDown={handleKeyDown}
               className="w-full bg-transparent border-none text-text-main placeholder:text-text-muted px-4 py-3 pr-24 focus:ring-0 resize-none min-h-[50px] max-h-32 text-sm leading-relaxed"
@@ -376,7 +422,7 @@ export function ChatTab({
                 <span className="material-symbols-outlined text-[20px]">attach_file</span>
               </button>
               <button
-                onClick={onSend}
+                onClick={handleSubmit}
                 disabled={!chatInput.trim() || chatSending}
                 className="p-1.5 bg-primary hover:bg-primary-hover text-white rounded-lg transition-colors shadow-md shadow-primary/30 disabled:opacity-40"
                 title="Send Message"
