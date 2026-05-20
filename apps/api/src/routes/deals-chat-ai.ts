@@ -10,6 +10,7 @@ import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
 import { generateFallbackResponse } from '../services/chatHelpers.js';
+import { getTodayIso } from '../utils/dates.js';
 
 const router = Router();
 
@@ -247,13 +248,17 @@ router.post('/:dealId/chat', async (req, res) => {
     const financialContext = buildFinancialMarkdown(financialStatements || []);
     contextParts.push(financialContext);
 
-    // Run the ReAct agent
+    // Run the ReAct agent. Pass today explicitly so the model anchors
+    // relative-period reasoning ("recent news", "last 90 days", "current
+    // quarter") against the request's wall-clock day — never a hardcoded or
+    // module-scope-cached date.
     const result = await runDealChatAgent({
       dealId,
       orgId: deal.organizationId,
       message,
       dealContext: contextParts.join('\n'),
       history: history.slice(-10),
+      today: getTodayIso(),
     });
 
     // Save messages to database

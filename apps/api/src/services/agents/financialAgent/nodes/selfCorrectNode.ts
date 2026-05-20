@@ -16,6 +16,7 @@ import { openai, isAIEnabled, trackedChatCompletion } from '../../../../openai.j
 import { MODEL_CLASSIFICATION } from '../../../../utils/aiModels.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { log } from '../../../../utils/logger.js';
+import { getTodayIso } from '../../../../utils/dates.js';
 import type { ClassifiedStatement, ClassificationResult } from '../../../financialClassifier.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep, FailedCheck } from '../state.js';
@@ -28,7 +29,7 @@ function step(node: string, message: string, detail?: string): AgentStep {
 /**
  * Build a targeted correction prompt that tells the model exactly what went wrong.
  */
-function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string): string {
+function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string, today: string): string {
   const issueDescriptions = failedChecks.map((fc, i) => {
     if (fc.check === 'low_confidence') {
       return `${i + 1}. ${fc.statementType} for period ${fc.period ?? 'unknown'}: ${fc.message}. Please re-extract this data more carefully.`;
@@ -39,7 +40,7 @@ function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string): st
   const targetStatements = [...new Set(failedChecks.map(fc => fc.statementType))];
   const targetPeriods = [...new Set(failedChecks.map(fc => fc.period).filter(Boolean))];
 
-  return `You are a senior financial analyst re-checking extracted financial data. The previous extraction had validation errors that need correction.
+  return `You are a senior financial analyst re-checking extracted financial data. Today's date is ${today}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days"). The previous extraction had validation errors that need correction.
 
 ISSUES FOUND:
 ${issueDescriptions}
@@ -163,7 +164,8 @@ export async function selfCorrectNode(
     if (rawText && rawText.trim().length >= 200 && isAIEnabled() && openai) {
       steps.push(step('self_correct', 'Re-extracting with targeted AI prompt'));
 
-      const prompt = buildCorrectionPrompt(failedChecks, rawText);
+      // Compute today fresh per call — never cached.
+      const prompt = buildCorrectionPrompt(failedChecks, rawText, getTodayIso());
 
       const response = await trackedChatCompletion('financial_extraction', {
         model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)

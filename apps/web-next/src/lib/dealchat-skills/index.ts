@@ -337,24 +337,29 @@ const competitorScan: Skill = {
 // Visual skills (Phase 3) — each invokes the `generate_chart` tool so the
 // chart renders inline in the chat bubble. Prompts are explicit about
 // which data source to read (get_deal_financials / compare_deals) and
-// when to skip the chart (fewer than 3 data points).
+// fall back to deal-record summary fields when extraction is empty so the
+// analyst always gets a chart instead of a refusal.
 // ---------------------------------------------------------------------------
 
 const chartRevenue: Skill = {
   id: "chart-revenue",
   command: "/chart-revenue",
   label: "Revenue trend chart",
-  description: "Line chart of revenue across all available periods.",
+  description: "Line/bar chart of revenue across all available periods.",
   category: "visual",
   requires: { financials: true },
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `Use \`get_deal_financials\` to retrieve revenue for ${name} across all available periods, then call \`generate_chart\` with a line chart titled "Revenue trend" showing period on X and revenue on Y in $M.`,
+      `Use \`get_deal_financials\` to retrieve revenue for ${name} across all available periods, then call \`generate_chart\` with a chart titled "Revenue trend" showing period on X and revenue on Y in $M. Prefer a line chart when 2+ periods are available; use a single-bar chart when only one data point exists.`,
       "",
-      "Below the chart, write a 2-sentence commentary on the trend (direction, magnitude, any inflection).",
+      "Render the chart with WHATEVER data is available — 1, 2, or 10 periods are all valid. The analyst wants the visual; do not skip the chart because the series is short.",
       "",
-      "If fewer than 3 periods are available, say so explicitly and skip the chart — a table or inline text is clearer for 1-2 values.",
+      `If \`get_deal_financials\` returns no statements, fall back to the deal record's summary fields (revenue / cachedRevenue) for ${name} and render a single-bar chart from that value. Label the source in the chart caption and your commentary as "Deal Record summary field — single LTM/snapshot value, not a time series" so the analyst knows it's a snapshot, not a multi-period series.`,
+      "",
+      "Below the chart, write a 2-sentence commentary on the trend (direction, magnitude, any inflection). If only one data point was available, prefix the commentary with `Limited data (1 period)` so the analyst sees the caveat.",
+      "",
+      "Only refuse if there is literally zero numeric revenue data anywhere — neither extracted financials nor any deal-record summary value.",
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -365,17 +370,21 @@ const chartMargin: Skill = {
   id: "chart-margin",
   command: "/chart-margin",
   label: "Margin trajectory chart",
-  description: "Line chart of gross and EBITDA margins over time.",
+  description: "Chart of gross and EBITDA margins over time (or snapshot).",
   category: "visual",
   requires: { financials: true },
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `Use \`get_deal_financials\` for ${name} to pull the latest 6+ periods. Call \`generate_chart\` with a line chart titled "Gross & EBITDA margins" with TWO series (gross_margin, ebitda_margin), period on X, % on Y.`,
+      `Use \`get_deal_financials\` for ${name} to pull all available periods (target 6+, but use whatever is returned). Call \`generate_chart\` with a chart titled "Gross & EBITDA margins". When 2+ periods are available, render a line chart with TWO series (gross_margin, ebitda_margin) on the Y axis (%) and period on X. When only one period (or only a single computed snapshot) is available, render a bar chart with one bar per metric.`,
       "",
-      "Below the chart, write a 2-3 sentence commentary on margin trajectory — flag any compression or expansion and tie it back to a specific period.",
+      "Render the chart with WHATEVER data is available — 1, 2, or more periods are all valid. Do not skip the chart because the series is short.",
       "",
-      "If fewer than 3 periods are available, say so explicitly and skip the chart.",
+      `If \`get_deal_financials\` returns no statements, fall back to the deal record's summary fields (revenue / cachedRevenue and ebitda / cachedEbitda) for ${name} to compute a snapshot EBITDA margin (ebitda / revenue) and render a single-bar chart from that value. Label the source in the chart caption and commentary as "Deal Record summary field — single LTM/snapshot value, not a time series".`,
+      "",
+      "Below the chart, write a 2-3 sentence commentary on margin trajectory — flag any compression or expansion and tie it back to a specific period. If only one data point was available, prefix the commentary with `Limited data (1 period)` so the analyst sees the caveat.",
+      "",
+      "Only refuse if there is literally zero numeric margin/revenue/EBITDA data anywhere.",
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -386,7 +395,7 @@ const chartCompMults: Skill = {
   id: "chart-comp-mults",
   command: "/chart-comp-mults",
   label: "Comparable EV/EBITDA chart",
-  description: "Bar chart of EV/EBITDA across the comparable set.",
+  description: "Bar chart of EV/EBITDA across the comparable set (or target snapshot).",
   category: "visual",
   requires: { financials: true },
   buildPrompt: (deal) => {
@@ -394,9 +403,13 @@ const chartCompMults: Skill = {
     return [
       `Use \`compare_deals\` to get comparable EV/EBITDA multiples for ${name} (if available). Call \`generate_chart\` with a bar chart titled "EV/EBITDA — comparable set" with company on X and multiple on Y.`,
       "",
-      `Highlight the target company (${name}) by name in your commentary below the chart — call out whether it trades at a premium, discount, or in line with the comp median.`,
+      "Render the chart with WHATEVER data is available — even 1 or 2 comparables (plus the target) is a valid visual. Do not skip the chart because the comp set is short.",
       "",
-      "If no comparables are available, say so explicitly and skip the chart — do not fabricate a comp set.",
+      `If \`compare_deals\` returns no comparables, still render a chart from the target itself: use the deal record's revenue / cachedRevenue and ebitda / cachedEbitda for ${name} as a 2-bar chart ("Revenue" and "EBITDA" in $M) so the analyst gets a visual snapshot of the target. Label the source as "Deal Record summary field — target only, no comparable set available".`,
+      "",
+      `Highlight the target company (${name}) by name in your commentary below the chart — call out whether it trades at a premium, discount, or in line with the comp median when comps exist, or note "Limited data (target only)" if no comps were available.`,
+      "",
+      "Only refuse if there is literally zero numeric data anywhere — neither comparables nor any target summary value. Do not fabricate a comp set.",
       "",
       CITATION_REMINDER,
     ].join("\n");

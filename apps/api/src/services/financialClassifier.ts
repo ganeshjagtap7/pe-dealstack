@@ -4,6 +4,7 @@ import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
 import { validateLineItems } from './financialSchema.js';
+import { getTodayIso } from '../utils/dates.js';
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -193,6 +194,8 @@ export async function classifyFinancials(
           role: 'system',
           content: buildExtractionPrompt({
             includeSourceCitations: true,
+            // Pass today fresh per call — never hardcode or cache.
+            todayIso: getTodayIso(),
             expectedPeriods: options?.expectedPeriods,
             lineItemHints: options?.lineItemHints,
           }),

@@ -18,6 +18,7 @@
 import { openai, isAIEnabled, trackedChatCompletion } from '../../../../openai.js';
 import { MODEL_FAST } from '../../../../utils/aiModels.js';
 import { log } from '../../../../utils/logger.js';
+import { getTodayIso } from '../../../../utils/dates.js';
 import type { FinancialAgentStateType } from '../state.js';
 import { VERIFY_SAMPLE_SIZE } from '../config.js';
 import type { AgentStep } from '../state.js';
@@ -159,7 +160,9 @@ function inferUniformMultiplier(
   return bestScale;
 }
 
-const VERIFY_SYSTEM_PROMPT = `You are a financial data QA analyst. You will receive:
+// Built per call so today's date reflects the real wall clock — never cached.
+function buildVerifySystemPrompt(today: string): string {
+  return `You are a financial data QA analyst. Today's date is ${today}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days"). You will receive:
 1. EXTRACTED VALUES — structured financial data that was extracted from a document. Each statement is labelled with its declared unitScale (MILLIONS, THOUSANDS, ACTUALS, or BILLIONS) and currency.
 2. SOURCE TEXT — a sample of the original document text
 
@@ -207,6 +210,7 @@ RESPOND WITH ONLY JSON:
 }
 
 If everything looks correct, return: { "verified": true, "corrections": [], "unitScaleIssue": null, "confidence": 95 }`;
+}
 
 /**
  * Build a concise summary of extracted values for verification.
@@ -271,7 +275,7 @@ export async function verifyNode(
     const response = await trackedChatCompletion('financial_extraction', {
       model: MODEL_FAST, // cheap + fast for verification
       messages: [
-        { role: 'system', content: VERIFY_SYSTEM_PROMPT },
+        { role: 'system', content: buildVerifySystemPrompt(getTodayIso()) },
         {
           role: 'user',
           content: `EXTRACTED VALUES (each statement header shows its declared unitScale — verify values AT THAT scale, do NOT assume MILLIONS):\n${extractionSummary}\n\n---\n\nSOURCE TEXT:\n${sourceTextSample}`,

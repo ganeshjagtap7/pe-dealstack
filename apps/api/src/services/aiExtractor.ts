@@ -3,6 +3,7 @@ import { getExtractionModel, getModel, isLLMAvailable } from './llm.js';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { AI_MODELS, isOpenRouterEnabled } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
+import { getTodayIso } from '../utils/dates.js';
 
 // Extract the actual provider error from an OpenAI-SDK APIError. OpenRouter
 // wraps upstream provider errors as `400 Provider returned error` and tucks
@@ -138,8 +139,17 @@ export interface LegacyExtractedDealData {
 }
 
 // ─── System Prompt ────────────────────────────────────────────────
+//
+// IMPORTANT: do NOT bind this to a module-scope constant. The prompt embeds
+// today's date so the model can correctly classify FY / LTM / "current
+// quarter" against the real wall clock. Module-scope evaluation would freeze
+// the date at process-boot time. Always build the prompt fresh per call via
+// buildExtractionSystemPrompt(getTodayIso()).
 
-const EXTRACTION_SYSTEM_PROMPT = `You are a senior private equity analyst with expertise in analyzing CIMs, teasers, and financial documents. Your task is to extract key business and financial data with HIGH ACCURACY.
+function buildExtractionSystemPrompt(today: string): string {
+  return `You are a senior private equity analyst with expertise in analyzing CIMs, teasers, and financial documents. Your task is to extract key business and financial data with HIGH ACCURACY.
+
+Today's date is ${today}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days"). Do NOT rely on your training cutoff to decide what "current" means — anchor every relative period against ${today}.
 
 CRITICAL INSTRUCTIONS:
 1. Only extract data that is EXPLICITLY stated in the document
@@ -234,6 +244,7 @@ DOCUMENT-LENGTH CALIBRATION:
 
 IMPORTANT: Small values are valid. Do NOT round small amounts to 0 or null.
 IMPORTANT: When in doubt about whether a number is current-actual vs. target/projection/valuation, return null with confidence 0 — it's far better to miss a value than to silently inflate the deal record with a target or valuation.`;
+}
 
 /**
  * Extract structured deal data from document text using AI
@@ -263,8 +274,10 @@ export async function extractDealDataFromText(text: string): Promise<ExtractedDe
       : `\n\nDOCUMENT-LENGTH CONTEXT: This document is ${sourceLen} characters (~${approxPages} pages) — a STANDARD-length document (CIM / IM / financial model). You may have full context to extract current financials with high confidence when explicitly stated.`;
     log.debug('AI extraction starting (structured output)', { textLength: truncatedText.length, fullLength: sourceLen, isShortDoc });
 
+    // Build the system prompt fresh per call so today's date reflects the
+    // real wall-clock — never cached at module load.
     const messages = [
-      new SystemMessage(EXTRACTION_SYSTEM_PROMPT),
+      new SystemMessage(buildExtractionSystemPrompt(getTodayIso())),
       new HumanMessage(`Analyze this document and extract business/financial data with confidence scores:${docLengthHint}\n\n${truncatedText}`),
     ];
 
