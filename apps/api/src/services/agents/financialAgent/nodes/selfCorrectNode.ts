@@ -18,6 +18,12 @@ import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { log } from '../../../../utils/logger.js';
 import { getTodayIso } from '../../../../utils/dates.js';
 import type { ClassifiedStatement, ClassificationResult } from '../../../financialClassifier.js';
+import {
+  applyExplicitUnitOverride,
+  applySmallDollarActualsOverride,
+  detectExplicitUnitInText,
+  hasExplicitSmallDollarAmounts,
+} from '../../../financialClassifier.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep, FailedCheck } from '../state.js';
 
@@ -97,6 +103,18 @@ ${rawText.slice(0, 30000)}`;
 /**
  * Merge corrected statements back into the original statements array.
  * Only replaces periods that were re-extracted — keeps everything else intact.
+ *
+ * Importantly, when any period is replaced by a correction whose parent
+ * statement carries a different `unitScale`, we propagate the corrected
+ * unitScale onto the existing statement. The previous implementation kept the
+ * original (often wrong) `unitScale` even when the re-extraction flipped
+ * it — every period got the new value but the storage tag stayed wrong,
+ * which is exactly the "values right, tag wrong" bug the user reported.
+ *
+ * If a correction REPLACES at least one period (i.e. higher-confidence
+ * correction won), we adopt the correction's `unitScale` + `currency` for
+ * the statement. New-period-only additions don't trigger the change (those
+ * are appends; we trust the original tag).
  */
 function mergeStatements(
   original: ClassifiedStatement[],
@@ -115,15 +133,35 @@ function mergeStatements(
 
     // Replace matching periods, keep the rest
     const existing = merged[existingIdx];
+    let replacedAny = false;
     for (const correctedPeriod of correction.periods) {
       const periodIdx = existing.periods.findIndex(p => p.period === correctedPeriod.period);
       if (periodIdx !== -1) {
         // Only replace if correction has higher confidence
         if (correctedPeriod.confidence >= existing.periods[periodIdx].confidence) {
           existing.periods[periodIdx] = correctedPeriod;
+          replacedAny = true;
         }
       } else {
         existing.periods.push(correctedPeriod);
+      }
+    }
+
+    // Propagate corrected unitScale/currency when the correction actually
+    // displaced an existing period. The values inside a period are stored at
+    // their parent statement's `unitScale`, so leaving the parent stale would
+    // mis-tag every replaced row.
+    if (replacedAny) {
+      if (correction.unitScale && correction.unitScale !== existing.unitScale) {
+        log.info('Self-correct merge: propagating corrected unitScale', {
+          statementType: existing.statementType,
+          oldScale: existing.unitScale,
+          newScale: correction.unitScale,
+        });
+        existing.unitScale = correction.unitScale;
+      }
+      if (correction.currency && correction.currency !== existing.currency) {
+        existing.currency = correction.currency;
       }
     }
   }
@@ -212,6 +250,24 @@ export async function selfCorrectNode(
 
     // ── Merge corrections into original statements ──
     const mergedStatements = mergeStatements(statements, correctedClassification.statements);
+
+    // Re-apply the same deterministic unit-scale guards the main classifier
+    // uses (financialClassifier.ts:applyExplicitUnitOverride /
+    // applySmallDollarActualsOverride). Without these, a self-correction
+    // round can re-emit MILLIONS for a source that the original pass had
+    // correctly downgraded to ACTUALS — the user-visible "values right,
+    // unit wrong" symptom this whole code path is supposed to prevent.
+    //
+    // Safe even when rawText is empty (the vision fallback path) — the
+    // text-scan helpers tolerate undefined/empty input and return null.
+    if (rawText && rawText.length > 0) {
+      const truncated = rawText.slice(0, 30_000);
+      const explicitUnit = detectExplicitUnitInText(truncated);
+      const hasSmallDollars = hasExplicitSmallDollarAmounts(truncated);
+      const synth = { statements: mergedStatements, overallConfidence: 0, warnings: [] };
+      applyExplicitUnitOverride(synth, explicitUnit);
+      applySmallDollarActualsOverride(synth, hasSmallDollars, explicitUnit);
+    }
 
     // Recalculate overall confidence from merged data
     const allConfidences: number[] = [];

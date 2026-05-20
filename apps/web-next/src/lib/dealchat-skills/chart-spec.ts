@@ -16,6 +16,27 @@
 
 export type ChartType = "line" | "bar" | "waterfall" | "pie";
 
+/**
+ * Display unit of the chart's y-values. The agent (or the frontend caller
+ * building a spec by hand) sets this to the unit the y-values are already
+ * scaled at, so the chart artifact's y-axis ticks honour the right suffix
+ * instead of guessing. Default is `"M"` for backward compatibility — every
+ * pre-unit spec was implicitly millions of the currency unit.
+ *
+ *   "K"     — y-values are in thousands  (e.g. 6.9 → "$6.9K")
+ *   "M"     — y-values are in millions   (e.g. 2.6 → "$2.6M")
+ *   "B"     — y-values are in billions   (e.g. 1.2 → "$1.2B")
+ *   "units" — y-values are raw (no scale suffix), e.g. headcount, slice %
+ */
+export type ChartUnit = "K" | "M" | "B" | "units";
+
+const ALLOWED_UNITS: ReadonlySet<ChartUnit> = new Set<ChartUnit>([
+  "K",
+  "M",
+  "B",
+  "units",
+]);
+
 export interface ChartPoint {
   x: string | number;
   y: number;
@@ -44,6 +65,14 @@ export interface ChartSpec {
    */
   series: ChartSeries[];
   annotations?: ChartAnnotation[];
+  /**
+   * Magnitude the y-values are already scaled at. Omit (or set to `"M"`)
+   * to preserve the legacy display behaviour. When the underlying data
+   * is stored in thousands (e.g. the financials pipeline now tags rows
+   * as THOUSANDS) the producer MUST set `unit: "K"` so the chart's tick
+   * labels render `$6.9K` instead of mis-rendering the value as `$6.9M`.
+   */
+  unit?: ChartUnit;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,6 +182,18 @@ export function parseChartSpec(raw: string): ChartSpec | null {
   const xLabel = typeof obj.xLabel === "string" ? obj.xLabel : undefined;
   const yLabel = typeof obj.yLabel === "string" ? obj.yLabel : undefined;
 
+  // optional unit — when the field is present it MUST be one of the
+  // allowed values, otherwise the entire spec is rejected. We intentionally
+  // do NOT silently fall back to "M" here: a typo'd unit ("MM", "USD") is
+  // almost certainly a producer bug worth surfacing rather than masking.
+  let unit: ChartUnit | undefined;
+  if (obj.unit !== undefined) {
+    if (typeof obj.unit !== "string" || !ALLOWED_UNITS.has(obj.unit as ChartUnit)) {
+      return null;
+    }
+    unit = obj.unit as ChartUnit;
+  }
+
   // optional annotations
   let annotations: ChartAnnotation[] | undefined;
   if (Array.isArray(obj.annotations)) {
@@ -172,6 +213,7 @@ export function parseChartSpec(raw: string): ChartSpec | null {
     ...(yLabel !== undefined ? { yLabel } : {}),
     series,
     ...(annotations !== undefined ? { annotations } : {}),
+    ...(unit !== undefined ? { unit } : {}),
   };
 }
 

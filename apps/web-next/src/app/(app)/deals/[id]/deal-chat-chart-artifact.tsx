@@ -41,7 +41,8 @@ import {
   CHART_TOOLTIP,
   CHART_LEGEND,
 } from "./deal-financials-charts-shared";
-import type { ChartSpec, ChartSeries } from "@/lib/dealchat-skills/chart-spec";
+import type { ChartSpec, ChartSeries, ChartUnit } from "@/lib/dealchat-skills/chart-spec";
+import { formatChartAxisValue } from "@/lib/formatters";
 
 // Register the primitives we need for chat-embedded charts. Chart.js
 // dedupes registration, so calling this here is safe even though the
@@ -120,6 +121,27 @@ function valueAt(series: ChartSeries, label: string): number | null {
   return null;
 }
 
+/**
+ * Resolve the display unit for a chart's y-axis ticks.
+ *
+ * Precedence:
+ *   1. Explicit `spec.unit` from the producer — always wins. This is the
+ *      path the backend `generate_chart` tool uses now that financial
+ *      values can land in K / M / B.
+ *   2. Default to "M" — matches the legacy display assumption that every
+ *      pre-unit spec was implicitly millions of the currency unit. We do
+ *      NOT guess from magnitude here because a y-value of `6.9` could
+ *      legitimately mean $6.9M (legacy producers) or $6.9 (raw counts),
+ *      and the wrong guess silently mislabels the axis. Explicit unit is
+ *      the only safe path.
+ *
+ * NOTE: this is for AXIS / TICK formatting only. The raw y-values in the
+ * spec stay untouched — Chart.js still plots them at face value.
+ */
+function resolveChartUnit(spec: ChartSpec): ChartUnit {
+  return spec.unit ?? "M";
+}
+
 // ---------------------------------------------------------------------------
 // Variant builders — each returns { data, options } for `<Chart type=... />`.
 // ---------------------------------------------------------------------------
@@ -128,6 +150,7 @@ function buildLine(
   spec: ChartSpec,
 ): { data: ChartData<"line", (number | null)[], string>; options: ChartOptions<"line"> } {
   const labels = unionLabels(spec.series);
+  const unit = resolveChartUnit(spec);
   const datasets = spec.series.map((s, idx) => {
     const c = SERIES_PALETTE[idx % SERIES_PALETTE.length];
     return {
@@ -147,7 +170,16 @@ function buildLine(
     maintainAspectRatio: false,
     plugins: {
       legend: spec.series.length > 1 ? CHART_LEGEND : { display: false },
-      tooltip: CHART_TOOLTIP,
+      tooltip: {
+        ...CHART_TOOLTIP,
+        callbacks: {
+          label: (ctx) => {
+            const v = ctx.raw as number | null;
+            if (v === null || v === undefined) return "";
+            return ` ${ctx.dataset.label}: ${formatChartAxisValue(Number(v), unit)}`;
+          },
+        },
+      },
     },
     scales: {
       x: {
@@ -158,7 +190,11 @@ function buildLine(
       y: {
         title: spec.yLabel ? { display: true, text: spec.yLabel, color: "#6b7280" } : { display: false },
         grid: { color: "rgba(0,0,0,0.05)" },
-        ticks: { color: "#6b7280", font: { size: 10 } },
+        ticks: {
+          color: "#6b7280",
+          font: { size: 10 },
+          callback: (v) => formatChartAxisValue(Number(v), unit),
+        },
       },
     },
   };
@@ -169,6 +205,7 @@ function buildBar(
   spec: ChartSpec,
 ): { data: ChartData<"bar", (number | null)[], string>; options: ChartOptions<"bar"> } {
   const labels = unionLabels(spec.series);
+  const unit = resolveChartUnit(spec);
   const datasets = spec.series.map((s, idx) => {
     const c = SERIES_PALETTE[idx % SERIES_PALETTE.length];
     return {
@@ -186,7 +223,16 @@ function buildBar(
     maintainAspectRatio: false,
     plugins: {
       legend: spec.series.length > 1 ? CHART_LEGEND : { display: false },
-      tooltip: CHART_TOOLTIP,
+      tooltip: {
+        ...CHART_TOOLTIP,
+        callbacks: {
+          label: (ctx) => {
+            const v = ctx.raw as number | null;
+            if (v === null || v === undefined) return "";
+            return ` ${ctx.dataset.label}: ${formatChartAxisValue(Number(v), unit)}`;
+          },
+        },
+      },
     },
     scales: {
       x: {
@@ -197,7 +243,11 @@ function buildBar(
       y: {
         title: spec.yLabel ? { display: true, text: spec.yLabel, color: "#6b7280" } : { display: false },
         grid: { color: "rgba(0,0,0,0.05)" },
-        ticks: { color: "#6b7280", font: { size: 10 } },
+        ticks: {
+          color: "#6b7280",
+          font: { size: 10 },
+          callback: (v) => formatChartAxisValue(Number(v), unit),
+        },
       },
     },
   };
@@ -217,12 +267,22 @@ function buildWaterfall(
   const values = series.data.map((p) => p.y);
   const bg = values.map((v) => (v < 0 ? AMBER : BANKER_BLUE_SOFT));
   const border = values.map((v) => (v < 0 ? AMBER_BORDER : BANKER_BLUE));
+  const unit = resolveChartUnit(spec);
   const options: ChartOptions<"bar"> = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       legend: { display: false },
-      tooltip: CHART_TOOLTIP,
+      tooltip: {
+        ...CHART_TOOLTIP,
+        callbacks: {
+          label: (ctx) => {
+            const v = ctx.raw as number | null;
+            if (v === null || v === undefined) return "";
+            return ` ${ctx.dataset.label}: ${formatChartAxisValue(Number(v), unit)}`;
+          },
+        },
+      },
     },
     scales: {
       x: {
@@ -233,7 +293,11 @@ function buildWaterfall(
       y: {
         title: spec.yLabel ? { display: true, text: spec.yLabel, color: "#6b7280" } : { display: false },
         grid: { color: "rgba(0,0,0,0.05)" },
-        ticks: { color: "#6b7280", font: { size: 10 } },
+        ticks: {
+          color: "#6b7280",
+          font: { size: 10 },
+          callback: (v) => formatChartAxisValue(Number(v), unit),
+        },
       },
     },
   };

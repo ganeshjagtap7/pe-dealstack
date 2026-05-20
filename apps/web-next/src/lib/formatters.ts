@@ -67,6 +67,72 @@ export function formatNumber(value: number | null | undefined, decimals = 1): st
   });
 }
 
+// ---------------------------------------------------------------------------
+// Display-unit helpers for chart axes
+//
+// Chart tick callbacks render every value at a SINGLE pre-picked unit, unlike
+// `formatFinancialValue` which auto-scales B/M/K per-value. The producer of
+// a chart spec sets the unit once; ticks then share a consistent suffix.
+// ---------------------------------------------------------------------------
+
+/** Value already-scaled at a known magnitude. "units" = raw, no suffix. */
+export type DisplayUnit = "K" | "M" | "B" | "units";
+
+const DISPLAY_UNIT_SUFFIX: Record<DisplayUnit, string> = {
+  K: "K", M: "M", B: "B", units: "",
+};
+
+/**
+ * Format a value already-scaled at `unit` for a chart axis/tick label.
+ * Honours the caller-supplied unit verbatim \u2014 no magnitude auto-pick.
+ *
+ *   formatChartAxisValue(6.9, "K")      -> "$6.9K"
+ *   formatChartAxisValue(6.9, "M")      -> "$6.9M"
+ *   formatChartAxisValue(6900, "units") -> "$6,900"
+ */
+export function formatChartAxisValue(
+  value: number | null | undefined,
+  unit: DisplayUnit = "M",
+  options?: { currency?: string | null; precision?: number },
+): string {
+  if (value === null || value === undefined) return "\u2014";
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "\u2014";
+
+  const sym = getCurrencySymbol(options?.currency);
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  const p = options?.precision ?? 1;
+
+  if (unit === "units") {
+    return sign + sym + abs.toLocaleString("en-US", { maximumFractionDigits: p });
+  }
+  // Keep the raw scalar, append suffix. Big ints lose trailing ".0".
+  const body =
+    abs >= 100 ? abs.toFixed(0)
+    : abs >= 10 ? abs.toFixed(Math.min(p, 1))
+    : abs.toFixed(p);
+  return sign + sym + body + DISPLAY_UNIT_SUFFIX[unit];
+}
+
+/**
+ * Last-resort guess of the display unit from a raw (actual-dollars) magnitude.
+ * Explicit unit always wins; callers should only fall through to this when
+ * the producer omitted a unit entirely. Returns "M" for null/NaN so chart
+ * axes stay stable rather than flipping between scales on an unloaded series.
+ */
+export function inferUnitFromMagnitude(
+  value: number | null | undefined,
+): DisplayUnit {
+  if (value === null || value === undefined) return "M";
+  const n = Math.abs(Number(value));
+  if (!Number.isFinite(n)) return "M";
+  if (n >= 1_000_000_000) return "B";
+  if (n >= 1_000_000) return "M";
+  if (n >= 1_000) return "K";
+  return "units";
+}
+
 /**
  * Convert any unit-scaled value to actual dollars.
  * Used by `formatFinancialValue` and any caller that needs raw magnitude.

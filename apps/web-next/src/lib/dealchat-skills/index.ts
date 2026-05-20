@@ -57,6 +57,14 @@ function industryOf(deal: Deal): string | null {
 const CITATION_REMINDER =
   "Every numeric claim must cite its source (tool name + period, e.g., `get_deal_financials FY2024`). If a data point is not available from the tools, state that explicitly — DO NOT fabricate numbers, ranges, or document references.";
 
+// Unit-handling reminder injected into every numeric skill. Financial values
+// returned by `get_deal_financials` can be stored at any scale (K/M/B/raw);
+// the row's `unit` field (or table header) is the source of truth. Assuming
+// millions when the row is actually in thousands shipped six bug reports —
+// A3, B2, B8, C1, C2 — so every numeric prompt now repeats this guardrail.
+const UNIT_REMINDER =
+  "When citing numerical values, ALWAYS use the unit that `get_deal_financials` returns (look for the `unit` field on each row or the table header — it may be K, M, or B). Do NOT assume millions. If a row's unit is `K`, render the value as `$6.9K`, not `$6.9M`. Preserve the row's currency too.";
+
 // ---------------------------------------------------------------------------
 // Skills
 // ---------------------------------------------------------------------------
@@ -97,6 +105,7 @@ const icMemo: Skill = {
       "A bulleted list of 5-8 concrete diligence actions, each tied to a specific gap identified above.",
       "",
       CITATION_REMINDER,
+      UNIT_REMINDER,
       `If \`get_deal_financials\` returns nothing, write the Financial Performance section as "Financial extraction has not completed for this deal — required inputs: [list]." and continue with the rest of the memo.`,
     ].join("\n");
   },
@@ -134,6 +143,7 @@ const qoeFlags: Skill = {
       `If a category has no flags, write "No flags identified in available data." under that header — do not invent issues.`,
       "",
       CITATION_REMINDER,
+      UNIT_REMINDER,
     ].join("\n");
   },
 };
@@ -167,6 +177,7 @@ const mgmtQa: Skill = {
       "Each question is numbered (1-5 within each bucket) and one paragraph, with the citation in backticks.",
       "",
       CITATION_REMINDER,
+      UNIT_REMINDER,
     ].join("\n");
   },
 };
@@ -196,6 +207,7 @@ const compBench: Skill = {
       `If \`compare_deals\` returns an empty set, state that no comparable deals were found in the firm's database, and suggest exactly 3 external search terms the analyst could use (industry + size band + geography) to source comps manually. Do not invent comparable companies.`,
       "",
       CITATION_REMINDER,
+      UNIT_REMINDER,
     ].join("\n");
   },
 };
@@ -230,6 +242,7 @@ const onePager: Skill = {
       "No rambling. No intro paragraph. No closing sign-off.",
       "",
       CITATION_REMINDER,
+      UNIT_REMINDER,
     ].join("\n");
   },
 };
@@ -266,6 +279,7 @@ const ddChecklist: Skill = {
       `Use \`get_deal_financials\`, \`search_documents\`, and \`get_deal_documents\` to seed each item with a specific deal fact, document name, or financial line. If a bucket has fewer than 5 deal-specific items available, include the most relevant ${industry}-standard items to reach 8 — but flag them with "[sector-standard]" so the analyst knows they're not driven by deal data.`,
       "",
       CITATION_REMINDER,
+      UNIT_REMINDER,
     ].join("\n");
   },
 };
@@ -341,6 +355,12 @@ const competitorScan: Skill = {
 // analyst always gets a chart instead of a refusal.
 // ---------------------------------------------------------------------------
 
+// Bug guard (DMpro): the agent was reading "Found N financial statements
+// (0 active, N pending review)" or single-period payloads as "empty" and
+// refusing to render. The prompts below now say explicitly that ANY
+// statement count > 0 — including 100% pending-review and including a
+// single period — IS available data and the agent must call
+// generate_chart instead of falling back to summary fields.
 const chartRevenue: Skill = {
   id: "chart-revenue",
   command: "/chart-revenue",
@@ -355,11 +375,16 @@ const chartRevenue: Skill = {
       "",
       "Render the chart with WHATEVER data is available — 1, 2, or 10 periods are all valid. The analyst wants the visual; do not skip the chart because the series is short.",
       "",
-      `If \`get_deal_financials\` returns no statements, fall back to the deal record's summary fields (revenue / cachedRevenue) for ${name} and render a single-bar chart from that value. Label the source in the chart caption and your commentary as "Deal Record summary field — single LTM/snapshot value, not a time series" so the analyst knows it's a snapshot, not a multi-period series.`,
+      `IMPORTANT — "available data" rules (do NOT misread these as empty):`,
+      `- If \`get_deal_financials\` returns any line that says "Found N financial statements" with N >= 1, the deal HAS extracted financials. Use them — even when the breakdown shows "0 active, N pending review" or "(pending merge review)". Pending-review statements are real, extracted data; they're just queued for a duplicate-resolution UI step.`,
+      `- A single period is still data. Render a single-bar chart from it. Do NOT say "no extracted financials" because the series is short.`,
+      `- Treat a monthly-only period set the same as an annual one. Aggregate monthly points into the chart as-is; do not require an FY rollup.`,
+      "",
+      `Only fall back to the deal record's summary fields (revenue / cachedRevenue) for ${name} when \`get_deal_financials\` returns LITERALLY one of: "No financial statements extracted for this deal yet.", "Error fetching financial data.", or an explicit backend-error message. In the fallback case, render a single-bar chart and label the source in the chart caption and commentary as "Deal Record summary field — single LTM/snapshot value, not a time series".`,
       "",
       "Below the chart, write a 2-sentence commentary on the trend (direction, magnitude, any inflection). If only one data point was available, prefix the commentary with `Limited data (1 period)` so the analyst sees the caveat.",
       "",
-      "Only refuse if there is literally zero numeric revenue data anywhere — neither extracted financials nor any deal-record summary value.",
+      "NEVER respond with 'financials are not extracted' unless `get_deal_financials` returned the literal empty-string sentinel above AND the deal record has no revenue/cachedRevenue value. In every other case, render the chart.",
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -380,11 +405,16 @@ const chartMargin: Skill = {
       "",
       "Render the chart with WHATEVER data is available — 1, 2, or more periods are all valid. Do not skip the chart because the series is short.",
       "",
-      `If \`get_deal_financials\` returns no statements, fall back to the deal record's summary fields (revenue / cachedRevenue and ebitda / cachedEbitda) for ${name} to compute a snapshot EBITDA margin (ebitda / revenue) and render a single-bar chart from that value. Label the source in the chart caption and commentary as "Deal Record summary field — single LTM/snapshot value, not a time series".`,
+      `IMPORTANT — "available data" rules (do NOT misread these as empty):`,
+      `- If \`get_deal_financials\` returns any line that says "Found N financial statements" with N >= 1, the deal HAS extracted financials. Use them — even when the breakdown shows "0 active, N pending review" or "(pending merge review)". Pending-review statements are real, extracted data; they're just queued for a duplicate-resolution UI step.`,
+      `- A single period is still data. Render a bar chart from it.`,
+      `- Monthly periods count too — chart them directly.`,
+      "",
+      `Only fall back to the deal record's summary fields (revenue / cachedRevenue and ebitda / cachedEbitda) for ${name} when \`get_deal_financials\` returns LITERALLY one of: "No financial statements extracted for this deal yet.", "Error fetching financial data.", or an explicit backend-error message. In the fallback case, compute snapshot EBITDA margin (ebitda / revenue) and render a single-bar chart. Label the source in the chart caption and commentary as "Deal Record summary field — single LTM/snapshot value, not a time series".`,
       "",
       "Below the chart, write a 2-3 sentence commentary on margin trajectory — flag any compression or expansion and tie it back to a specific period. If only one data point was available, prefix the commentary with `Limited data (1 period)` so the analyst sees the caveat.",
       "",
-      "Only refuse if there is literally zero numeric margin/revenue/EBITDA data anywhere.",
+      "NEVER respond with 'financials are not extracted' unless `get_deal_financials` returned the literal empty-string sentinel above AND the deal record has no revenue/ebitda values. In every other case, render the chart.",
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -409,7 +439,7 @@ const chartCompMults: Skill = {
       "",
       `Highlight the target company (${name}) by name in your commentary below the chart — call out whether it trades at a premium, discount, or in line with the comp median when comps exist, or note "Limited data (target only)" if no comps were available.`,
       "",
-      "Only refuse if there is literally zero numeric data anywhere — neither comparables nor any target summary value. Do not fabricate a comp set.",
+      "NEVER respond with 'financials are not extracted' for this command — it's a comp chart, not a financials check. Only refuse if there is literally zero numeric data anywhere (no comparables AND no target revenue/ebitda summary value). Do not fabricate a comp set.",
       "",
       CITATION_REMINDER,
     ].join("\n");

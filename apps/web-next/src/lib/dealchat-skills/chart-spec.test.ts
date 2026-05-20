@@ -198,6 +198,36 @@ describe("parseChartSpec — valid specs", () => {
     expect(out).not.toBeNull();
     expect(out?.series[0].data[0].y).toBe(-5);
   });
+
+  it("accepts the optional `unit` field when set to a valid value (K)", () => {
+    const spec = { ...validLineSpec, unit: "K" };
+    const out = parseChartSpec(JSON.stringify(spec));
+    expect(out).not.toBeNull();
+    expect(out?.unit).toBe("K");
+  });
+
+  it("accepts the optional `unit` field for every allowed value (K/M/B/units)", () => {
+    for (const u of ["K", "M", "B", "units"] as const) {
+      const out = parseChartSpec(JSON.stringify({ ...validBarSpec, unit: u }));
+      expect(out?.unit).toBe(u);
+    }
+  });
+
+  it("omits `unit` from the output when the field is absent on input", () => {
+    const out = parseChartSpec(JSON.stringify(validLineSpec));
+    expect(out).not.toBeNull();
+    expect(out).not.toHaveProperty("unit");
+  });
+
+  it("returns null when `unit` is present but not a string (defensive)", () => {
+    const spec = { ...validLineSpec, unit: 123 };
+    expect(parseChartSpec(JSON.stringify(spec))).toBeNull();
+  });
+
+  it("returns null when `unit` is a string but not one of the allowed values", () => {
+    const spec = { ...validLineSpec, unit: "MM" };
+    expect(parseChartSpec(JSON.stringify(spec))).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
