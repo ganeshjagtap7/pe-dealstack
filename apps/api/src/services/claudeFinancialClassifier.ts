@@ -32,10 +32,10 @@ import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
-import { getTodayIso } from '../utils/dates.js';
 import {
   applyExplicitUnitOverride,
   applySmallDollarActualsOverride,
+  applySourceTextDollarOverride,
   detectExplicitUnitInText,
   hasExplicitSmallDollarAmounts,
   normalizeClassificationResult,
@@ -122,12 +122,6 @@ export async function classifyFinancialsWithClaude(
 
   const systemPrompt = buildExtractionPrompt({
     includeSourceCitations: true,
-    // Pass today fresh per call. Note: this date is part of the
-    // cache_control'd prefix below — Anthropic ephemeral caches expire after
-    // 5 minutes, so the prompt rebuilds at most ~288 times/day. The cache
-    // key changes when the date rolls over at midnight UTC, which is the
-    // correct behavior (a stale "today" would silently mislabel periods).
-    todayIso: getTodayIso(),
     expectedPeriods: options?.expectedPeriods,
     lineItemHints: options?.lineItemHints,
   });
@@ -192,6 +186,11 @@ export async function classifyFinancialsWithClaude(
     const result = normalizeClassificationResult(raw);
     applyExplicitUnitOverride(result, explicitUnit);
     applySmallDollarActualsOverride(result, hasSmallDollars, explicitUnit);
+    // Third-tier: per-statement source-quote matching. Catches synthesized
+    // periods (LTM / Current Month) whose raw values are larger than the
+    // small-dollar magnitude threshold but whose source quotes literally
+    // cite "$1,473" / "~$15,600".
+    applySourceTextDollarOverride(result);
 
     // Pull the raw Anthropic Usage object from response_metadata so we
     // log the same uncached input_tokens the SDK reported (the

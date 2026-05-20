@@ -86,6 +86,7 @@ RESPONSE FORMAT:
 - If no results from a tool, say so clearly — never fabricate data.
 
 CHART USAGE:
+- When calling generate_chart, ALWAYS set the \`unit\` field on the spec to match the source unitScale (ACTUALS -> 'units', THOUSANDS -> 'K', MILLIONS -> 'M', BILLIONS -> 'B'). Skipping this defaults to millions and renders raw-dollar values as $0.0M.
 - All chart data MUST come from real tools (get_deal_financials, compare_deals) or the verified deal-record summary fields surfaced in the deal context. Never fabricate numbers to draw a chart.
 - Render a chart whenever the user asks for one. Use whatever data is available — 1 point, 2 points, or 10 points is all valid. Single-point charts are still useful as visual context; do not refuse just because the series is short.
 - "Empty" for get_deal_financials means the tool returned the LITERAL strings "No financial statements extracted for this deal yet." or "Error fetching financial data." (or an explicit "Error fetching financial statements..." backend message). Anything else — including "Found N financial statements (0 active, N pending review)", a single period, monthly-only periods, or "(pending merge review)" rows — IS extracted data. Render from it. Do NOT say "no financials are extracted" in those cases.

@@ -37,6 +37,7 @@ import {
   normalizeClassificationResult,
   applyExplicitUnitOverride,
   applySmallDollarActualsOverride,
+  applySourceTextDollarOverride,
   detectExplicitUnitInText,
   hasExplicitSmallDollarAmounts,
   type ClassificationResult,
@@ -50,7 +51,6 @@ import {
   isClaudeClassifierEnabled,
 } from './claudeFinancialClassifier.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
-import { getTodayIso } from '../utils/dates.js';
 
 // ─── Config ──────────────────────────────────────────────────
 
@@ -337,7 +337,7 @@ async function reconcileWithSonnet(
   const explicitUnit = detectExplicitUnitInText(truncatedSource);
   const hasSmallDollars = hasExplicitSmallDollarAmounts(truncatedSource);
 
-  const systemPrompt = buildReconcilePrompt(getTodayIso());
+  const systemPrompt = buildReconcilePrompt();
   const userMessage = formatReconcileUserMessage(truncatedSource, gpt, claude, diffs);
 
   try {
@@ -401,6 +401,7 @@ async function reconcileWithSonnet(
     // results — the reconciler is itself an LLM and can mis-tag units.
     applyExplicitUnitOverride(result, explicitUnit);
     applySmallDollarActualsOverride(result, hasSmallDollars, explicitUnit);
+    applySourceTextDollarOverride(result);
 
     // Decorate warnings so the UI / debug bundle can see this came from
     // the reconciliation pass rather than a single extractor.
@@ -434,14 +435,11 @@ async function reconcileWithSonnet(
   }
 }
 
-function buildReconcilePrompt(today: string): string {
-  // The body below (after the "Today's date" line) is intentionally frozen so
-  // the system-prompt cache hits across docs / chunks within a single day.
-  // The date prefix changes only at UTC midnight, so the cache is invalidated
-  // at most once per 24h — an acceptable tradeoff vs. stale period inference.
-  return `Today's date is ${today}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days").
-
-You are a senior private equity analyst reconciling two parallel financial extractions of the SAME document. Two LLMs (GPT and Claude) have already independently extracted statements from the source. They disagree on some fields. Your job: produce a SINGLE consolidated extraction by re-reading the source for every disputed field and choosing the value the source actually supports.
+function buildReconcilePrompt(): string {
+  // Frozen — kept identical across reconcile calls so the system-prompt
+  // cache hits across docs / chunks. Any byte change here invalidates
+  // the cache for every subsequent reconcile call.
+  return `You are a senior private equity analyst reconciling two parallel financial extractions of the SAME document. Two LLMs (GPT and Claude) have already independently extracted statements from the source. They disagree on some fields. Your job: produce a SINGLE consolidated extraction by re-reading the source for every disputed field and choosing the value the source actually supports.
 
 PROCEDURE:
 1. For every field where GPT and Claude AGREE within rounding (≤ 0.5% relative difference), use that agreed value verbatim. Do NOT re-derive — agreement is strong evidence both are right.

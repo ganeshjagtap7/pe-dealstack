@@ -65,6 +65,19 @@ const CITATION_REMINDER =
 const UNIT_REMINDER =
   "When citing numerical values, ALWAYS use the unit that `get_deal_financials` returns (look for the `unit` field on each row or the table header — it may be K, M, or B). Do NOT assume millions. If a row's unit is `K`, render the value as `$6.9K`, not `$6.9M`. Preserve the row's currency too.";
 
+// Unit-handling reminder specific to chart skills — the `generate_chart` tool
+// renders the y-axis with whatever unit suffix the producer sets (default M),
+// so emitting a chart without a `unit` field for raw-dollar values yields the
+// $0.0M-on-every-tick bug. Every chart skill repeats this so each prompt is
+// usable in isolation.
+const CHART_UNIT_REMINDER = [
+  "UNIT FIELD ON THE CHART SPEC (required):",
+  "- Read the unitScale from `get_deal_financials` output (look for `[scale: ACTUALS]`, `[scale: THOUSANDS]`, `[scale: MILLIONS]`, `[scale: BILLIONS]` in the markdown).",
+  "- When calling `generate_chart`, you MUST set the `unit` field to match: ACTUALS -> 'units', THOUSANDS -> 'K', MILLIONS -> 'M', BILLIONS -> 'B'. Do not omit it.",
+  "- Skipping `unit` defaults the y-axis to millions; raw-dollar series then render as $0.0M on every tick.",
+  "- For percentage / margin / growth-rate charts, set `unit: 'units'` (no currency suffix is applied — the axis is unitless).",
+].join("\n");
+
 // ---------------------------------------------------------------------------
 // Skills
 // ---------------------------------------------------------------------------
@@ -371,7 +384,7 @@ const chartRevenue: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `Use \`get_deal_financials\` to retrieve revenue for ${name} across all available periods, then call \`generate_chart\` with a chart titled "Revenue trend" showing period on X and revenue on Y in $M. Prefer a line chart when 2+ periods are available; use a single-bar chart when only one data point exists.`,
+      `Use \`get_deal_financials\` to retrieve revenue for ${name} across all available periods, then call \`generate_chart\` with a chart titled "Revenue trend" showing period on X and revenue on Y. Prefer a line chart when 2+ periods are available; use a single-bar chart when only one data point exists. Pass y-values at the SAME scale as the source row's unitScale (do not pre-convert) and set the spec's \`unit\` field to match — see the unit-field block below.`,
       "",
       "Render the chart with WHATEVER data is available — 1, 2, or 10 periods are all valid. The analyst wants the visual; do not skip the chart because the series is short.",
       "",
@@ -385,6 +398,8 @@ const chartRevenue: Skill = {
       "Below the chart, write a 2-sentence commentary on the trend (direction, magnitude, any inflection). If only one data point was available, prefix the commentary with `Limited data (1 period)` so the analyst sees the caveat.",
       "",
       "NEVER respond with 'financials are not extracted' unless `get_deal_financials` returned the literal empty-string sentinel above AND the deal record has no revenue/cachedRevenue value. In every other case, render the chart.",
+      "",
+      CHART_UNIT_REMINDER,
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -401,7 +416,7 @@ const chartMargin: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `Use \`get_deal_financials\` for ${name} to pull all available periods (target 6+, but use whatever is returned). Call \`generate_chart\` with a chart titled "Gross & EBITDA margins". When 2+ periods are available, render a line chart with TWO series (gross_margin, ebitda_margin) on the Y axis (%) and period on X. When only one period (or only a single computed snapshot) is available, render a bar chart with one bar per metric.`,
+      `Use \`get_deal_financials\` for ${name} to pull all available periods (target 6+, but use whatever is returned). Call \`generate_chart\` with a chart titled "Gross & EBITDA margins". When 2+ periods are available, render a line chart with TWO series (gross_margin, ebitda_margin) on the Y axis (%) and period on X. When only one period (or only a single computed snapshot) is available, render a bar chart with one bar per metric. Margins are unitless percentages — set the spec's \`unit\` field to \`"units"\` so the axis labels render as raw percentages rather than $-prefixed currency.`,
       "",
       "Render the chart with WHATEVER data is available — 1, 2, or more periods are all valid. Do not skip the chart because the series is short.",
       "",
@@ -415,6 +430,8 @@ const chartMargin: Skill = {
       "Below the chart, write a 2-3 sentence commentary on margin trajectory — flag any compression or expansion and tie it back to a specific period. If only one data point was available, prefix the commentary with `Limited data (1 period)` so the analyst sees the caveat.",
       "",
       "NEVER respond with 'financials are not extracted' unless `get_deal_financials` returned the literal empty-string sentinel above AND the deal record has no revenue/ebitda values. In every other case, render the chart.",
+      "",
+      CHART_UNIT_REMINDER,
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -431,15 +448,17 @@ const chartCompMults: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `Use \`compare_deals\` to get comparable EV/EBITDA multiples for ${name} (if available). Call \`generate_chart\` with a bar chart titled "EV/EBITDA — comparable set" with company on X and multiple on Y.`,
+      `Use \`compare_deals\` to get comparable EV/EBITDA multiples for ${name} (if available). Call \`generate_chart\` with a bar chart titled "EV/EBITDA — comparable set" with company on X and multiple on Y. EV/EBITDA multiples are unitless (e.g., 8.5x is just 8.5) — set the spec's \`unit\` field to \`"units"\` so the y-axis renders raw multiples rather than $-prefixed currency.`,
       "",
       "Render the chart with WHATEVER data is available — even 1 or 2 comparables (plus the target) is a valid visual. Do not skip the chart because the comp set is short.",
       "",
-      `If \`compare_deals\` returns no comparables, still render a chart from the target itself: use the deal record's revenue / cachedRevenue and ebitda / cachedEbitda for ${name} as a 2-bar chart ("Revenue" and "EBITDA" in $M) so the analyst gets a visual snapshot of the target. Label the source as "Deal Record summary field — target only, no comparable set available".`,
+      `If \`compare_deals\` returns no comparables, still render a chart from the target itself: use the deal record's revenue / cachedRevenue and ebitda / cachedEbitda for ${name} as a 2-bar chart ("Revenue" and "EBITDA") so the analyst gets a visual snapshot of the target. Cached revenue / EBITDA are in ACTUAL DOLLARS — set the spec's \`unit\` field to \`"units"\` when emitting that fallback chart. Label the source as "Deal Record summary field — target only, no comparable set available".`,
       "",
       `Highlight the target company (${name}) by name in your commentary below the chart — call out whether it trades at a premium, discount, or in line with the comp median when comps exist, or note "Limited data (target only)" if no comps were available.`,
       "",
       "NEVER respond with 'financials are not extracted' for this command — it's a comp chart, not a financials check. Only refuse if there is literally zero numeric data anywhere (no comparables AND no target revenue/ebitda summary value). Do not fabricate a comp set.",
+      "",
+      CHART_UNIT_REMINDER,
       "",
       CITATION_REMINDER,
     ].join("\n");

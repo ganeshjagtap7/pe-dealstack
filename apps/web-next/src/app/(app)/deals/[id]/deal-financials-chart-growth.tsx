@@ -29,6 +29,7 @@ import {
   CHART_TOOLTIP,
   CHART_LEGEND,
 } from "./deal-financials-charts-shared";
+import { toActualDollars } from "@/lib/formatters";
 
 // Per-group palette (distinct colors so the legend communicates scope).
 // Negative values get the corresponding red shade for that group's hue.
@@ -94,8 +95,18 @@ export function GrowthChart({ statements }: { statements: FinancialStatement[] }
     const labels: string[] = [];
     const growth: (number | null)[] = [];
     for (let i = 1; i < g.rows.length; i++) {
-      const prev = g.rows[i - 1].lineItems?.revenue;
-      const curr = g.rows[i].lineItems?.revenue;
+      // Convert BOTH sides of the growth math to actual dollars first so a
+      // row whose unitScale differs from its neighbour doesn't produce a
+      // 999,999% jump. With consistent extraction this is a no-op; with
+      // mixed scales it gives the analyst a true growth percentage.
+      const prev = toActualDollars(
+        g.rows[i - 1].lineItems?.revenue ?? null,
+        g.rows[i - 1].unitScale,
+      );
+      const curr = toActualDollars(
+        g.rows[i].lineItems?.revenue ?? null,
+        g.rows[i].unitScale,
+      );
       if (prev != null && curr != null && prev !== 0) {
         const pct = ((curr - prev) / Math.abs(prev)) * 100;
         labels.push(g.rows[i].period);

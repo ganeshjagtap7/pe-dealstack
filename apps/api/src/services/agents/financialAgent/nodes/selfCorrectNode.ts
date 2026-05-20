@@ -16,13 +16,15 @@ import { openai, isAIEnabled, trackedChatCompletion } from '../../../../openai.j
 import { MODEL_CLASSIFICATION } from '../../../../utils/aiModels.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { log } from '../../../../utils/logger.js';
-import { getTodayIso } from '../../../../utils/dates.js';
-import type { ClassifiedStatement, ClassificationResult } from '../../../financialClassifier.js';
 import {
+  normalizeClassificationResult,
   applyExplicitUnitOverride,
   applySmallDollarActualsOverride,
+  applySourceTextDollarOverride,
   detectExplicitUnitInText,
   hasExplicitSmallDollarAmounts,
+  type ClassifiedStatement,
+  type ClassificationResult,
 } from '../../../financialClassifier.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep, FailedCheck } from '../state.js';
@@ -35,7 +37,7 @@ function step(node: string, message: string, detail?: string): AgentStep {
 /**
  * Build a targeted correction prompt that tells the model exactly what went wrong.
  */
-function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string, today: string): string {
+function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string): string {
   const issueDescriptions = failedChecks.map((fc, i) => {
     if (fc.check === 'low_confidence') {
       return `${i + 1}. ${fc.statementType} for period ${fc.period ?? 'unknown'}: ${fc.message}. Please re-extract this data more carefully.`;
@@ -46,7 +48,7 @@ function buildCorrectionPrompt(failedChecks: FailedCheck[], rawText: string, tod
   const targetStatements = [...new Set(failedChecks.map(fc => fc.statementType))];
   const targetPeriods = [...new Set(failedChecks.map(fc => fc.period).filter(Boolean))];
 
-  return `You are a senior financial analyst re-checking extracted financial data. Today's date is ${today}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days"). The previous extraction had validation errors that need correction.
+  return `You are a senior financial analyst re-checking extracted financial data. The previous extraction had validation errors that need correction.
 
 ISSUES FOUND:
 ${issueDescriptions}
@@ -103,18 +105,6 @@ ${rawText.slice(0, 30000)}`;
 /**
  * Merge corrected statements back into the original statements array.
  * Only replaces periods that were re-extracted — keeps everything else intact.
- *
- * Importantly, when any period is replaced by a correction whose parent
- * statement carries a different `unitScale`, we propagate the corrected
- * unitScale onto the existing statement. The previous implementation kept the
- * original (often wrong) `unitScale` even when the re-extraction flipped
- * it — every period got the new value but the storage tag stayed wrong,
- * which is exactly the "values right, tag wrong" bug the user reported.
- *
- * If a correction REPLACES at least one period (i.e. higher-confidence
- * correction won), we adopt the correction's `unitScale` + `currency` for
- * the statement. New-period-only additions don't trigger the change (those
- * are appends; we trust the original tag).
  */
 function mergeStatements(
   original: ClassifiedStatement[],
@@ -133,35 +123,15 @@ function mergeStatements(
 
     // Replace matching periods, keep the rest
     const existing = merged[existingIdx];
-    let replacedAny = false;
     for (const correctedPeriod of correction.periods) {
       const periodIdx = existing.periods.findIndex(p => p.period === correctedPeriod.period);
       if (periodIdx !== -1) {
         // Only replace if correction has higher confidence
         if (correctedPeriod.confidence >= existing.periods[periodIdx].confidence) {
           existing.periods[periodIdx] = correctedPeriod;
-          replacedAny = true;
         }
       } else {
         existing.periods.push(correctedPeriod);
-      }
-    }
-
-    // Propagate corrected unitScale/currency when the correction actually
-    // displaced an existing period. The values inside a period are stored at
-    // their parent statement's `unitScale`, so leaving the parent stale would
-    // mis-tag every replaced row.
-    if (replacedAny) {
-      if (correction.unitScale && correction.unitScale !== existing.unitScale) {
-        log.info('Self-correct merge: propagating corrected unitScale', {
-          statementType: existing.statementType,
-          oldScale: existing.unitScale,
-          newScale: correction.unitScale,
-        });
-        existing.unitScale = correction.unitScale;
-      }
-      if (correction.currency && correction.currency !== existing.currency) {
-        existing.currency = correction.currency;
       }
     }
   }
@@ -202,8 +172,7 @@ export async function selfCorrectNode(
     if (rawText && rawText.trim().length >= 200 && isAIEnabled() && openai) {
       steps.push(step('self_correct', 'Re-extracting with targeted AI prompt'));
 
-      // Compute today fresh per call — never cached.
-      const prompt = buildCorrectionPrompt(failedChecks, rawText, getTodayIso());
+      const prompt = buildCorrectionPrompt(failedChecks, rawText);
 
       const response = await trackedChatCompletion('financial_extraction', {
         model: MODEL_CLASSIFICATION, // GPT-4.1 — requires response_format: json_object (incompatible with Claude)
@@ -217,7 +186,17 @@ export async function selfCorrectNode(
 
       const content = response.choices[0]?.message?.content;
       if (content) {
-        correctedClassification = JSON.parse(content) as ClassificationResult;
+        // The targeted-correction LLM call bypasses classifyFinancials() and
+        // hence its post-processing. Run the same normalize + override
+        // pipeline here so unit-scale classifications coming back from the
+        // correction model don't sneak past the deterministic guards.
+        const rawCorrection = JSON.parse(content) as unknown;
+        correctedClassification = normalizeClassificationResult(rawCorrection);
+        const explicitUnit = detectExplicitUnitInText(rawText);
+        const hasSmallDollars = hasExplicitSmallDollarAmounts(rawText);
+        applyExplicitUnitOverride(correctedClassification, explicitUnit);
+        applySmallDollarActualsOverride(correctedClassification, hasSmallDollars, explicitUnit);
+        applySourceTextDollarOverride(correctedClassification);
         steps.push(step(
           'self_correct',
           `AI returned ${correctedClassification.statements?.length ?? 0} corrected statement(s)`,
@@ -251,23 +230,28 @@ export async function selfCorrectNode(
     // ── Merge corrections into original statements ──
     const mergedStatements = mergeStatements(statements, correctedClassification.statements);
 
-    // Re-apply the same deterministic unit-scale guards the main classifier
-    // uses (financialClassifier.ts:applyExplicitUnitOverride /
-    // applySmallDollarActualsOverride). Without these, a self-correction
-    // round can re-emit MILLIONS for a source that the original pass had
-    // correctly downgraded to ACTUALS — the user-visible "values right,
-    // unit wrong" symptom this whole code path is supposed to prevent.
+    // Re-apply the deterministic unit guards across the MERGED statements.
+    // mergeStatements may have copied a corrected period into a statement
+    // whose unitScale (set at the original-extraction LLM stage) was wrong.
+    // The source-quote dollar override is cheap, idempotent on already-
+    // ACTUALS rows, and the canonical hook before storeNode — running it
+    // here catches mis-tagged synthesized periods (LTM / Current Month)
+    // that the initial extraction missed.
     //
-    // Safe even when rawText is empty (the vision fallback path) — the
-    // text-scan helpers tolerate undefined/empty input and return null.
-    if (rawText && rawText.length > 0) {
-      const truncated = rawText.slice(0, 30_000);
-      const explicitUnit = detectExplicitUnitInText(truncated);
-      const hasSmallDollars = hasExplicitSmallDollarAmounts(truncated);
-      const synth = { statements: mergedStatements, overallConfidence: 0, warnings: [] };
-      applyExplicitUnitOverride(synth, explicitUnit);
-      applySmallDollarActualsOverride(synth, hasSmallDollars, explicitUnit);
-    }
+    // RETRO-FIX (manual SQL for already-persisted bad rows on a deal):
+    //   UPDATE "FinancialStatement"
+    //   SET "unitScale" = 'ACTUALS'
+    //   WHERE "dealId" = '<dealId>'
+    //     AND "unitScale" IN ('MILLIONS','THOUSANDS','BILLIONS')
+    //     AND ("lineItems"::jsonb -> 'revenue_source')::text ~ '\$\s*\d{1,3}(,\d{3})*(\.\d+)?'
+    //     AND ABS(("lineItems"::jsonb ->> 'revenue')::numeric) < 100000;
+    // (Cast/regex tweaks may be needed; the JSONB column is at lineItems.)
+    const mergedClassification: ClassificationResult = {
+      statements: mergedStatements,
+      overallConfidence: state.overallConfidence,
+      warnings: state.warnings,
+    };
+    applySourceTextDollarOverride(mergedClassification);
 
     // Recalculate overall confidence from merged data
     const allConfidences: number[] = [];

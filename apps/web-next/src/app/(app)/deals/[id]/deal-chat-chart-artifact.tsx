@@ -42,7 +42,7 @@ import {
   CHART_LEGEND,
 } from "./deal-financials-charts-shared";
 import type { ChartSpec, ChartSeries, ChartUnit } from "@/lib/dealchat-skills/chart-spec";
-import { formatChartAxisValue } from "@/lib/formatters";
+import { formatChartAxisValue, inferUnitFromMagnitude } from "@/lib/formatters";
 
 // Register the primitives we need for chat-embedded charts. Chart.js
 // dedupes registration, so calling this here is safe even though the
@@ -128,18 +128,56 @@ function valueAt(series: ChartSeries, label: string): number | null {
  *   1. Explicit `spec.unit` from the producer — always wins. This is the
  *      path the backend `generate_chart` tool uses now that financial
  *      values can land in K / M / B.
- *   2. Default to "M" — matches the legacy display assumption that every
- *      pre-unit spec was implicitly millions of the currency unit. We do
- *      NOT guess from magnitude here because a y-value of `6.9` could
- *      legitimately mean $6.9M (legacy producers) or $6.9 (raw counts),
- *      and the wrong guess silently mislabels the axis. Explicit unit is
- *      the only safe path.
+ *   2. Defensive fallback when `unit` is omitted AND every y-value has
+ *      |y| < 1000 — infer from the maximum-magnitude data point. The
+ *      DMpro bug surfaced when the agent emitted a spec with raw-dollar
+ *      y-values (e.g., 1860 = $1,860) and no `unit`, so the default "M"
+ *      rendered every tick as $0.0M. Magnitude-based inference rescues
+ *      that case ($1,860 -> 'K') while still falling through to the
+ *      legacy "M" default for non-tiny values where the legacy semantics
+ *      ("values are already in millions") are the more likely intent.
+ *      The agent-side prompt remains the primary fix; this is a guard
+ *      against silent regressions if a future caller forgets `unit`.
+ *   3. Otherwise default to "M" — matches the legacy display assumption
+ *      that every pre-unit spec was implicitly millions of the currency
+ *      unit.
  *
  * NOTE: this is for AXIS / TICK formatting only. The raw y-values in the
  * spec stay untouched — Chart.js still plots them at face value.
  */
 function resolveChartUnit(spec: ChartSpec): ChartUnit {
-  return spec.unit ?? "M";
+  if (spec.unit) return spec.unit;
+
+  // Find max-magnitude y-value across all series so the heuristic is anchored
+  // to the dataset's scale rather than a single small point.
+  let maxAbs = 0;
+  let anyFinite = false;
+  for (const s of spec.series) {
+    for (const p of s.data) {
+      if (Number.isFinite(p.y)) {
+        anyFinite = true;
+        const a = Math.abs(p.y);
+        if (a > maxAbs) maxAbs = a;
+      }
+    }
+  }
+
+  // Only trigger the defensive fallback when EVERY data point is small
+  // (|y| < 1000). Larger values are more likely legacy "values in millions"
+  // producers and should keep the historical "M" default.
+  if (anyFinite && maxAbs < 1000) {
+    if (typeof console !== "undefined") {
+      // One-time-per-render warning so developers notice agent-side regressions.
+      console.warn(
+        "[deal-chat-chart-artifact] chart spec is missing `unit` on small y-values (max |y|=" +
+          maxAbs.toFixed(2) +
+          "). Inferring from magnitude to avoid $0.0M-on-every-tick. The agent should always set `unit` on the chart spec — fix the upstream prompt rather than relying on this fallback.",
+        { title: spec.title, maxAbs },
+      );
+    }
+    return inferUnitFromMagnitude(maxAbs);
+  }
+  return "M";
 }
 
 // ---------------------------------------------------------------------------
