@@ -183,6 +183,17 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
     // chat provider is OpenAI/OpenRouter, the cache_control field is silently
     // ignored downstream so this is safe to include unconditionally.
     const systemPromptText = buildDealAgentSystemPrompt(today) + '\n' + SHARED_GUARDRAILS;
+    const dealContextText = `Current Deal Context:\n${input.dealContext}\n\nDeal ID: ${input.dealId}\nOrganization ID: ${input.orgId}`;
+    // Anthropic only accepts ONE system message and it must be the first
+    // message in the conversation — passing two SystemMessages here triggered
+    // a 400 "System messages are only permitted as the first passed message"
+    // after we swapped tier-1 to Anthropic direct. The provider DOES accept
+    // multiple content blocks inside that single system message, so we keep
+    // the cached stable prompt and the per-call deal context as two text
+    // blocks. The cache_control marker stays on block 0 (the stable prefix);
+    // block 1 (deal context) drifts per call and is intentionally uncached.
+    // OpenAI / OpenRouter providers also accept array-form system content;
+    // LangChain's ChatOpenAI flattens it to a single string before sending.
     const messages: (SystemMessage | HumanMessage | AIMessage)[] = [
       new SystemMessage({
         content: [
@@ -191,9 +202,12 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
             text: systemPromptText,
             cache_control: { type: 'ephemeral' },
           },
+          {
+            type: 'text',
+            text: dealContextText,
+          },
         ],
       }),
-      new SystemMessage(`Current Deal Context:\n${input.dealContext}\n\nDeal ID: ${input.dealId}\nOrganization ID: ${input.orgId}`),
     ];
 
     // Add conversation history (last 10)
