@@ -305,19 +305,22 @@ const newsScan: Skill = {
   category: "research",
   buildPrompt: (deal) => {
     const name = nameOf(deal);
-    const industry = industryOf(deal);
-    const industryQuery = industry ? ` ${industry}` : "";
     return [
-      `Search for recent news on ${name} using the \`web_search\` tool. ${name} may be small or private, so a single query often returns generic marketing pages. Run UP TO 3 queries (the tool caps at 3/turn) in this order, stopping early if you have ≥4 real news hits:`,
+      // COST DISCIPLINE: this skill burns Tavily credits. Each web_search
+      // call = 1 credit. Default to ONE call. Only escalate to a second
+      // query if the first returns 0 results AND the target is a likely
+      // candidate for capital-event news. Never run 3 calls just to fill
+      // the per-turn cap.
+      `Search for recent news on ${name}. The \`web_search\` tool costs credits per call, so be economical: run ONE query first and only escalate if it returns zero results.`,
       "",
-      `1. \`web_search({ query: "${name}", recency_days: 90, topic: "news", max_results: 8 })\` — primary brand query, news-only index, advanced depth.`,
-      `2. \`web_search({ query: "${name} funding OR acquisition OR partnership", recency_days: 180, topic: "news", max_results: 8 })\` — capital-event variants over 6 months (PE-relevant signals are sparse and worth a wider window).`,
-      `3. \`web_search({ query: "${name}${industryQuery} CEO OR layoffs OR pricing", recency_days: 180, topic: "news", max_results: 8 })\` — personnel + commercial signals.`,
+      `PRIMARY QUERY: \`web_search({ query: "${name}", recency_days: 90, topic: "news" })\` — brand-only on the news index. This is usually enough.`,
       "",
-      "Filter the combined results. KEEP a result only if ALL of the following hold:",
+      `ESCALATION (only if PRIMARY returned zero results AND ${name} is plausibly a company with capital-event news — i.e., not a tiny consumer product): one additional call with \`query: "${name} funding OR acquisition OR partnership", recency_days: 180, topic: "news"\`. Do NOT escalate beyond this.`,
+      "",
+      "Filter results. KEEP a result only if ALL hold:",
       "- The title or snippet names the target directly (not a same-name competitor or unrelated product).",
-      "- It's a dated news article, press release, or substantive blog post — NOT product documentation, evergreen marketing pages, Trustpilot/G2 reviews, or directory listings.",
-      `- The content describes a discrete event or development (funding round, executive change, product launch, partnership, customer win, legal action, pricing change, layoffs, regulatory action) — not "what is X?" explainers.`,
+      "- It's a dated news article or press release — NOT product documentation, evergreen marketing pages, Trustpilot/G2 reviews, or directory listings.",
+      `- It describes a discrete event (funding, executive change, product launch, partnership, customer win, legal action, pricing change, layoffs, regulatory action) — not "what is X?" explainers.`,
       "",
       "Group surviving results under these exact headers, in this order:",
       "",
@@ -332,9 +335,9 @@ const newsScan: Skill = {
       "- Citation as `[Source — YYYY-MM-DD](URL)`.",
       `- One-line "so what" for the deal team.`,
       "",
-      `If across all 3 queries nothing material survives the filter, write exactly: "No material news identified — ${name} appears to have no recent press coverage in the 90/180-day windows searched. For private/small companies this is expected; recommend the deal team check LinkedIn, Crunchbase, and industry newsletters directly." Then list the 3 queries you ran so the analyst can see the search was thorough.`,
+      `If no material results survive the filter, write exactly: "No material news identified — ${name} appears to have no recent press coverage in the searched window. For private/small companies this is expected; recommend the deal team check LinkedIn, Crunchbase, and industry newsletters directly." Then list the queries you actually ran (1 or 2) so the analyst can verify.`,
       "",
-      `If the \`web_search\` tool returns "Web search is not configured" or "Search failed: ..." on the first call, do NOT keep retrying — say so explicitly and recommend a manual search. Do not fabricate headlines or URLs under any circumstances.`,
+      `If the \`web_search\` tool returns "Web search is not configured" or "Search failed: ..." on the first call, do NOT retry — say so explicitly and recommend a manual search. Do not fabricate headlines or URLs.`,
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -352,25 +355,28 @@ const competitorScan: Skill = {
     const name = nameOf(deal);
     const industry = industryOf(deal) || "the target's";
     return [
-      `Map ${name}'s competitive landscape using the \`web_search\` tool. Run UP TO 3 queries (the tool caps at 3/turn). Pass \`topic: "general"\` here — competitor landscape research benefits from broader sources (industry blogs, comparison pages, Reddit, listicles) than the news index.`,
+      // COST DISCIPLINE: each web_search costs 1 credit. Default to ONE
+      // query. Only escalate to a second if the first returned fewer than
+      // 3 distinct competitors. Never run 3 just to fill the cap.
+      `Map ${name}'s competitive landscape. The \`web_search\` tool costs credits per call — run ONE query first and only escalate if it returned fewer than 3 distinct competitors.`,
       "",
-      `1. \`web_search({ query: "best ${industry} companies competitors comparison", max_results: 10, topic: "general" })\` — comparison/listicle queries surface comp sets faster than vague "leading companies" queries.`,
-      `2. \`web_search({ query: "${name} vs alternatives", max_results: 10, topic: "general" })\` — direct-comparison content for the target.`,
-      `3. \`web_search({ query: "${industry} market leaders 2026", max_results: 10, topic: "general" })\` — fallback for broader landscape framing.`,
+      `PRIMARY QUERY: \`web_search({ query: "best ${industry} companies competitors comparison", topic: "general", max_results: 10 })\` — comparison/listicle phrasing surfaces comp sets fastest.`,
+      "",
+      `ESCALATION (only if PRIMARY returned <3 distinct competitor names): one additional call with \`query: "${name} vs alternatives", topic: "general", max_results: 10\`. Do NOT escalate beyond this.`,
       "",
       "## Top 5 Competitors",
-      "For EACH of the top 5 competitors:",
+      "For EACH (list however many surface — don't pad with weak names):",
       "- **Name** (with linked source `[Source — YYYY-MM-DD](URL)`)",
       "- **Positioning**: one sentence on how they compete (price, segment, geography, tech).",
-      "- **Scale**: revenue band or employee count, with the source cited.",
-      "- **Recent strategic move**: most recent newsworthy action in the last 12 months (call out if not findable).",
+      "- **Scale**: revenue band or employee count, with the source cited if known.",
+      "- **Recent strategic move**: most recent newsworthy action in the last 12 months (write \"not findable\" if you can't source one — don't fabricate).",
       "",
       "## Landscape Commentary",
       "Two paragraphs:",
       `1. **Structural dynamics** — fragmentation, consolidation, who's winning share and why. Tie back to specific competitors above.`,
-      `2. **Where ${name} fits** — based on what you know from \`search_documents\` / \`get_deal_documents\`, position ${name} against the comp set: differentiators, gaps, the most threatening competitor and why.`,
+      `2. **Where ${name} fits** — based on \`search_documents\` / \`get_deal_documents\`, position ${name} against the comp set: differentiators, gaps, the most threatening competitor and why.`,
       "",
-      `If the \`web_search\` tool is unavailable, say so explicitly and recommend the user run a manual search — do not fabricate competitors. If fewer than 5 credible competitors surface across all 3 queries, list only what you have, note the gap, and propose 3 source terms (e.g., G2 category page, Capterra alternatives, specific subreddit) the analyst can check manually.`,
+      `If the \`web_search\` tool is unavailable, say so explicitly and recommend a manual search — do not fabricate competitors. If fewer than 5 credible competitors surface, list only what you have and propose 3 manual sources (G2 category page, Capterra alternatives, specific subreddit) the analyst can check.`,
       "",
       CITATION_REMINDER,
     ].join("\n");

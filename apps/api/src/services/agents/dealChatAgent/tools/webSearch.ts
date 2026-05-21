@@ -81,22 +81,25 @@ async function tavilyOnce(apiKey: string, body: Omit<TavilyRequestBody, 'api_key
 
 export function makeWebSearchTool() {
   let callCount = 0;
+  // Remember which key is exhausted for the lifetime of this tool instance
+  // (one chat turn). Avoids the latency of bouncing off primary 432 → roll
+  // to fallback on every subsequent call in the same turn. Tavily docs say
+  // errors don't consume credits, but the extra round-trip still costs the
+  // user wall-clock time and adds noise to the logs.
+  let primaryExhausted = false;
 
   return tool(
-    async ({ query, max_results, recency_days, topic }) => {
+    async ({ query, max_results, recency_days, topic, search_depth }) => {
       const effectiveMaxResults = max_results ?? 5;
-      // Default to Tavily's news-index when the caller specifies a recency
-      // window, since the general index returns evergreen marketing pages
-      // and product docs that don't qualify as "news" — exactly the
-      // failure mode the user hit on Website Speedy. Caller can override
-      // by passing topic explicitly.
+      // News-index when caller asks (or specifies recency); general otherwise.
       const effectiveTopic: 'general' | 'news' =
         topic ?? (typeof recency_days === 'number' ? 'news' : 'general');
-      // News queries benefit a lot more from advanced search_depth (better
-      // recall on niche/small companies); general queries can stay basic
-      // to save credits.
-      const effectiveDepth: 'basic' | 'advanced' =
-        effectiveTopic === 'news' ? 'advanced' : 'basic';
+      // Default to BASIC depth (1 credit per Tavily). Advanced doubles the
+      // cost to 2 credits per call and only marginally improves recall on
+      // niche brands — empirically it didn't move the needle on the user's
+      // Website Speedy run. Callers can opt-in via search_depth: "advanced"
+      // when they're doing a deep dive on a known-active target.
+      const effectiveDepth: 'basic' | 'advanced' = search_depth ?? 'basic';
 
       log.info('[web_search] called', {
         query,
@@ -114,7 +117,7 @@ export function makeWebSearchTool() {
 
       callCount += 1;
       if (callCount > MAX_SEARCHES_PER_TURN) {
-        return 'Search limit (3 per turn) reached. Refine queries and try again next turn.';
+        return `Search limit (${MAX_SEARCHES_PER_TURN} per turn) reached. Refine queries and try again next turn.`;
       }
 
       const requestBody: Omit<TavilyRequestBody, 'api_key'> = {
@@ -128,11 +131,13 @@ export function makeWebSearchTool() {
         requestBody.days = recency_days;
       }
 
-      let attempt = await tavilyOnce(primaryKey, requestBody);
-      let keyTier: 'primary' | 'fallback' = 'primary';
+      // If primary already exhausted in this turn, skip straight to fallback.
+      let keyTier: 'primary' | 'fallback' = primaryExhausted && fallbackKey ? 'fallback' : 'primary';
+      let attempt = await tavilyOnce(keyTier === 'fallback' ? fallbackKey! : primaryKey, requestBody);
 
-      if (!attempt.ok && attempt.rateLimited && fallbackKey) {
-        log.warn('[web_search] primary key rate-limited, rolling to fallback', { query });
+      if (!attempt.ok && attempt.rateLimited && keyTier === 'primary' && fallbackKey) {
+        log.warn('[web_search] primary key rate-limited/credits-exhausted, rolling to fallback for the rest of this turn', { query });
+        primaryExhausted = true;
         attempt = await tavilyOnce(fallbackKey, requestBody);
         keyTier = 'fallback';
       }
@@ -190,7 +195,13 @@ export function makeWebSearchTool() {
           .enum(['general', 'news'])
           .optional()
           .describe(
-            "Search index to use. 'news' is filtered to news articles (better for recent company news, funding, acquisitions, personnel moves) and auto-uses advanced search_depth. 'general' (default) covers the open web. If recency_days is set without topic, topic defaults to 'news'.",
+            "Search index to use. 'news' is filtered to news articles (better for recent company news, funding, acquisitions, personnel moves). 'general' (default) covers the open web. If recency_days is set without topic, topic defaults to 'news'.",
+          ),
+        search_depth: z
+          .enum(['basic', 'advanced'])
+          .optional()
+          .describe(
+            "Search depth. 'basic' (default, 1 credit/call) is sufficient for ~95% of queries. 'advanced' (2 credits/call) yields slightly more thorough snippets — use ONLY for a deep dive on a known-active target where basic returned thin results.",
           ),
       }),
     },
