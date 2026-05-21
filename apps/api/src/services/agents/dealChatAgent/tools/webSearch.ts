@@ -35,6 +35,7 @@ interface TavilyRequestBody {
   max_results: number;
   include_answer: boolean;
   search_depth: 'basic' | 'advanced';
+  topic?: 'general' | 'news';
   days?: number;
 }
 
@@ -82,13 +83,27 @@ export function makeWebSearchTool() {
   let callCount = 0;
 
   return tool(
-    async ({ query, max_results, recency_days }) => {
+    async ({ query, max_results, recency_days, topic }) => {
       const effectiveMaxResults = max_results ?? 5;
+      // Default to Tavily's news-index when the caller specifies a recency
+      // window, since the general index returns evergreen marketing pages
+      // and product docs that don't qualify as "news" — exactly the
+      // failure mode the user hit on Website Speedy. Caller can override
+      // by passing topic explicitly.
+      const effectiveTopic: 'general' | 'news' =
+        topic ?? (typeof recency_days === 'number' ? 'news' : 'general');
+      // News queries benefit a lot more from advanced search_depth (better
+      // recall on niche/small companies); general queries can stay basic
+      // to save credits.
+      const effectiveDepth: 'basic' | 'advanced' =
+        effectiveTopic === 'news' ? 'advanced' : 'basic';
 
       log.info('[web_search] called', {
         query,
         max_results: effectiveMaxResults,
         recency_days,
+        topic: effectiveTopic,
+        depth: effectiveDepth,
       });
 
       const primaryKey = process.env.TAVILY_API_KEY;
@@ -106,7 +121,8 @@ export function makeWebSearchTool() {
         query,
         max_results: effectiveMaxResults,
         include_answer: false,
-        search_depth: 'basic',
+        search_depth: effectiveDepth,
+        topic: effectiveTopic,
       };
       if (typeof recency_days === 'number') {
         requestBody.days = recency_days;
@@ -170,6 +186,12 @@ export function makeWebSearchTool() {
           .max(365)
           .optional()
           .describe('Limit to results from the last N days'),
+        topic: z
+          .enum(['general', 'news'])
+          .optional()
+          .describe(
+            "Search index to use. 'news' is filtered to news articles (better for recent company news, funding, acquisitions, personnel moves) and auto-uses advanced search_depth. 'general' (default) covers the open web. If recency_days is set without topic, topic defaults to 'news'.",
+          ),
       }),
     },
   );
