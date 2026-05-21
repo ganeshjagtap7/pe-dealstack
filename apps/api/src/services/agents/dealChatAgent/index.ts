@@ -164,9 +164,35 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
     // against wall-clock, not its training cutoff.
     const today = input.today ?? getTodayIso();
 
-    // Build message history
+    // Build message history.
+    //
+    // Prompt caching (Anthropic): the system prompt + guardrails are large
+    // (~5-8k tokens) and STABLE across every turn within a session, so we
+    // attach `cache_control: { type: 'ephemeral' }` to that block. Anthropic
+    // caches the prefix up to and including this block for 5 minutes;
+    // subsequent turns within the agent's ReAct tool-call loop hit the cache.
+    //
+    // The deal context block is per-deal-per-call (currentDealContext drifts
+    // as financials change) so we leave it uncached — Anthropic only caches
+    // strict prefix matches and a stale deal-context block would invalidate
+    // everything after it anyway.
+    //
+    // ChatAnthropic forwards SystemMessage content arrays straight through as
+    // the underlying API's `system` field, preserving the cache_control marker
+    // (see services/financialCrossVerify.ts for the same pattern). When the
+    // chat provider is OpenAI/OpenRouter, the cache_control field is silently
+    // ignored downstream so this is safe to include unconditionally.
+    const systemPromptText = buildDealAgentSystemPrompt(today) + '\n' + SHARED_GUARDRAILS;
     const messages: (SystemMessage | HumanMessage | AIMessage)[] = [
-      new SystemMessage(buildDealAgentSystemPrompt(today) + '\n' + SHARED_GUARDRAILS),
+      new SystemMessage({
+        content: [
+          {
+            type: 'text',
+            text: systemPromptText,
+            cache_control: { type: 'ephemeral' },
+          },
+        ],
+      }),
       new SystemMessage(`Current Deal Context:\n${input.dealContext}\n\nDeal ID: ${input.dealId}\nOrganization ID: ${input.orgId}`),
     ];
 

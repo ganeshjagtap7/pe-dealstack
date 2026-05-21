@@ -1,9 +1,10 @@
 // ─── Unified LLM Abstraction Layer ─────────────────────────────────
-// Provides a single interface to swap between OpenAI / Gemini via config.
+// Provides a single interface to swap between Anthropic / OpenAI / Gemini.
 // Uses LangChain as the abstraction so all downstream code is model-agnostic.
 
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
+import { ChatAnthropic } from '@langchain/anthropic';
 import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
 import type { z } from 'zod';
@@ -13,6 +14,7 @@ import {
   OPENROUTER_BASE_URL,
   OPENROUTER_HEADERS,
   isOpenRouterEnabled,
+  isAnthropicEnabled,
 } from '../utils/aiModels.js';
 import { recordUsageEvent } from './usage/trackedLLM.js';
 import { enforceUserGate, UserBlockedError } from './usage/enforcement.js';
@@ -25,7 +27,7 @@ dotenv.config();
 
 // ─── Configuration ─────────────────────────────────────────────────
 
-export type LLMProvider = 'openai' | 'gemini';
+export type LLMProvider = 'openai' | 'gemini' | 'anthropic';
 
 interface LLMConfig {
   /** Primary provider for chat/analysis */
@@ -36,19 +38,31 @@ interface LLMConfig {
   embeddingProvider: 'gemini';
 }
 
-// Default: OpenAI for chat, OpenAI-mini for fast, Gemini for embeddings
+// Default chat provider cascade:
+//   1. LLM_CHAT_PROVIDER env override always wins.
+//   2. If ANTHROPIC_API_KEY is set → 'anthropic' (Claude direct).
+//   3. Otherwise fall back to 'openai' (which itself may route to OpenRouter
+//      or api.openai.com depending on OPENROUTER_API_KEY presence — see
+//      createOpenAIModel below).
+// The fast provider stays on 'openai' by default since Anthropic's haiku
+// pricing isn't economical for tier-3/4 traffic and the user only flagged
+// tier 1 routing.
 const config: LLMConfig = {
-  chatProvider: (process.env.LLM_CHAT_PROVIDER as LLMProvider) || 'openai',
+  chatProvider:
+    (process.env.LLM_CHAT_PROVIDER as LLMProvider) ||
+    (isAnthropicEnabled() ? 'anthropic' : 'openai'),
   fastProvider: (process.env.LLM_FAST_PROVIDER as LLMProvider) || 'openai',
   embeddingProvider: 'gemini',
 };
 
 // ─── Model Registry ────────────────────────────────────────────────
 
-// When OpenRouter is enabled, model strings are OpenRouter IDs
-// (e.g. "anthropic/claude-sonnet-4.5") routed through the OpenAI-compatible
-// ChatOpenAI client below. Otherwise we fall back to bare OpenAI model names.
+// When OpenRouter is enabled (and Anthropic direct is NOT), model strings are
+// OpenRouter IDs (e.g. "anthropic/claude-sonnet-4.5") routed through the
+// OpenAI-compatible ChatOpenAI client below. Otherwise we fall back to bare
+// OpenAI model names.
 const useOpenRouter = isOpenRouterEnabled();
+const useAnthropic = isAnthropicEnabled();
 
 // ─── Usage Tracking Adapter ────────────────────────────────────────
 
@@ -72,9 +86,12 @@ const useOpenRouter = isOpenRouterEnabled();
  *    acceptable because block enforcement at ingestion (HTTP middleware)
  *    already prevents the request from reaching the LLM service.
  *
- * Provider widening: includes 'gemini' so Gemini-backed models are tagged
- * correctly (previously always recorded as 'openai').
+ * Provider widening: includes 'gemini' and 'anthropic' so Gemini- and
+ * Anthropic-backed models are tagged correctly (previously always recorded
+ * as 'openai').
  */
+type UsageProviderTag = 'openrouter' | 'openai' | 'gemini' | 'anthropic';
+
 /**
  * Build a usage-tracking callback handler. Pass at construction time via
  * the model's `callbacks` config, NOT mutated after construction —
@@ -85,7 +102,7 @@ const useOpenRouter = isOpenRouterEnabled();
 function makeUsageHandler(
   operation: string,
   modelName: string,
-  provider: 'openrouter' | 'openai' | 'gemini',
+  provider: UsageProviderTag,
 ): Partial<BaseCallbackHandler> {
   return {
     name: 'usage-tracker',
@@ -130,8 +147,10 @@ function makeUsageHandler(
  * handled via construction-time callbacks (see makeUsageHandler).
  */
 function trackModel(model: BaseChatModel, operation: string, modelName: string): BaseChatModel {
-  const provider: 'openrouter' | 'openai' | 'gemini' =
-    (model as any).constructor?.name?.includes('Google') ? 'gemini' :
+  const ctorName = (model as any).constructor?.name ?? '';
+  const provider: UsageProviderTag =
+    ctorName.includes('Google') ? 'gemini' :
+    ctorName.includes('Anthropic') ? 'anthropic' :
     useOpenRouter ? 'openrouter' : 'openai';
 
   const originalInvoke = model.invoke.bind(model);
@@ -143,8 +162,9 @@ function trackModel(model: BaseChatModel, operation: string, modelName: string):
   return model;
 }
 
-function providerFor(provider: LLMProvider): 'openrouter' | 'openai' | 'gemini' {
+function providerFor(provider: LLMProvider): UsageProviderTag {
   if (provider === 'gemini') return 'gemini';
+  if (provider === 'anthropic') return 'anthropic';
   return useOpenRouter ? 'openrouter' : 'openai';
 }
 
@@ -158,6 +178,13 @@ const MODELS = {
     chat: 'gemini-1.5-pro',
     fast: 'gemini-1.5-flash',
     extraction: 'gemini-1.5-pro',
+  },
+  anthropic: {
+    // Claude Sonnet 4.5 — current tier-1 reasoning model (knowledge cutoff Jan 2026).
+    chat: process.env.LLM_CHAT_MODEL || 'claude-sonnet-4-5',
+    // Claude Haiku 4.5 — fast/cheap option. Use the dated alias for stability.
+    fast: process.env.LLM_FAST_MODEL || 'claude-haiku-4-5-20251001',
+    extraction: 'claude-sonnet-4-5',
   },
 } as const;
 
@@ -211,6 +238,26 @@ function createGeminiModel(
   });
 }
 
+function createAnthropicModel(
+  model: string,
+  temperature = 0.7,
+  maxTokens?: number,
+  callbacks?: Partial<BaseCallbackHandler>[],
+): ChatAnthropic {
+  // ChatAnthropic v1.x accepts both `anthropicApiKey` and `apiKey`; pass the
+  // modern `apiKey` plus the legacy alias to be safe across minor versions.
+  // maxTokens defaults to 1024 in ChatAnthropic if undefined; we surface it
+  // explicitly so callers' explicit value (e.g. 2500 for dealChat) is honoured.
+  return new ChatAnthropic({
+    model,
+    temperature,
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+    apiKey: process.env.ANTHROPIC_API_KEY,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    ...(callbacks && callbacks.length > 0 ? { callbacks } : {}),
+  });
+}
+
 function createModel(
   provider: LLMProvider,
   modelName: string,
@@ -223,14 +270,19 @@ function createModel(
       return createOpenAIModel(modelName, temperature, maxTokens, callbacks);
     case 'gemini':
       return createGeminiModel(modelName, temperature, maxTokens, callbacks);
-    default:
-      throw new Error(`Unknown LLM provider: ${provider}`);
+    case 'anthropic':
+      return createAnthropicModel(modelName, temperature, maxTokens, callbacks);
+    default: {
+      const _exhaustive: never = provider;
+      throw new Error(`Unknown LLM provider: ${String(_exhaustive)}`);
+    }
   }
 }
 
 // ─── Pre-built Model Instances ─────────────────────────────────────
 
-/** Primary chat model (Claude Sonnet 4.5 via OpenRouter, or GPT-4.1 direct) — for deal analysis, chat, memos */
+/** Primary chat model — Claude Sonnet 4.5 (Anthropic direct) by default,
+ *  with OpenAI/OpenRouter fallback for callsites that catch errors. */
 export function getChatModel(temperature = 0.7, maxTokens = 1500, operation?: string): BaseChatModel {
   const provider = config.chatProvider;
   const modelName = MODELS[provider].chat;
@@ -243,7 +295,7 @@ export function getChatModel(temperature = 0.7, maxTokens = 1500, operation?: st
   return trackModel(model, operation, modelName);
 }
 
-/** Fast/cheap model (GPT-4.1-mini via OpenRouter, or GPT-4.1-mini direct) — for sentiment, classification */
+/** Fast/cheap model — GPT-4.1-mini (OpenAI/OpenRouter) for sentiment, classification. */
 export function getFastModel(temperature = 0.7, maxTokens = 500, operation?: string): BaseChatModel {
   const provider = config.fastProvider;
   const modelName = MODELS[provider].fast;
@@ -280,13 +332,10 @@ export function getModel(
 }
 
 // ─── Structured Output with Fallback ───────────────────────────────
-// LangChain's withStructuredOutput emits an OpenAI tool-call schema. Anthropic
-// (Claude Sonnet 4.5 via OpenRouter, our Tier-1 default) sometimes rejects
-// that schema after OpenRouter's translation, returning a 400 "Provider
-// returned error" with no useful body. OpenAI-native models accept the same
-// schema as-is. invokeStructured wraps the call once with the primary
-// extraction model and retries with Tier 2 (gpt-4.1 via OpenRouter, or gpt-4o
-// direct) on any error so callers don't have to duplicate the fallback.
+// LangChain's withStructuredOutput emits a tool-call schema. invokeStructured
+// wraps the call once with the primary chat-provider model (now Anthropic
+// direct by default) and retries with OpenAI direct (gpt-4o) on any error so
+// callers don't have to duplicate the fallback.
 function describeAIError(err: any): Record<string, unknown> {
   return {
     message: err?.message,
@@ -311,8 +360,8 @@ export async function invokeStructured<T extends z.ZodTypeAny>(
   // briefs / signal analysis where higher variance is desirable.
   const primaryName = MODELS[config.chatProvider].extraction;
   // method: 'functionCalling' avoids OpenAI's strict json_schema response_format,
-  // which Claude via OpenRouter (our default Tier-1) rejects with 400. Tool use
-  // is supported by both OpenAI and Anthropic, so one method covers all providers.
+  // which Claude (via OpenRouter or direct) historically rejected. Tool use is
+  // supported by OpenAI, Anthropic, and Gemini, so one method covers all providers.
   const structuredOpts = { method: 'functionCalling' as const, name: label.replace(/[^a-zA-Z0-9_]/g, '_') };
   const invokeOpts = { runName: label, tags: ['structured', label] };
   try {
@@ -322,7 +371,14 @@ export async function invokeStructured<T extends z.ZodTypeAny>(
     return await tracked.withStructuredOutput(schema, structuredOpts).invoke(messages, invokeOpts);
   } catch (primaryErr: any) {
     log.warn(`${label}: primary model failed, retrying with fallback`, describeAIError(primaryErr));
-    const fallbackName = isOpenRouterEnabled() ? AI_MODELS.TIER2 : 'gpt-4o';
+    // Fallback to OpenAI direct (gpt-4o) when Anthropic is primary; otherwise
+    // preserve the legacy OpenRouter tier-2 fallback path.
+    const fallbackName =
+      config.chatProvider === 'anthropic'
+        ? 'gpt-4o'
+        : isOpenRouterEnabled()
+          ? AI_MODELS.TIER2
+          : 'gpt-4o';
     const fallbackCallbacks = [makeUsageHandler(label, fallbackName, providerFor('openai'))];
     const fallback = createModel('openai', fallbackName, temperature, maxTokens, fallbackCallbacks);
     const tracked = trackModel(fallback, label, fallbackName);
@@ -344,8 +400,12 @@ export function isGeminiAvailable(): boolean {
   return !!process.env.GEMINI_API_KEY;
 }
 
+export function isAnthropicAvailable(): boolean {
+  return isAnthropicEnabled();
+}
+
 export function isLLMAvailable(): boolean {
-  return isOpenAICompatibleAvailable() || isGeminiAvailable();
+  return isOpenAICompatibleAvailable() || isGeminiAvailable() || isAnthropicAvailable();
 }
 
 /** Get the currently configured chat provider name */
@@ -360,6 +420,9 @@ log.info('LLM abstraction initialized', {
   chatModel: MODELS[config.chatProvider].chat,
   fastProvider: config.fastProvider,
   fastModel: MODELS[config.fastProvider].fast,
+  tier1Model: AI_MODELS.TIER1,
+  anthropicAvailable: useAnthropic,
+  anthropicPrimary: config.chatProvider === 'anthropic',
   openaiCompatibleAvailable: isOpenAICompatibleAvailable(),
   geminiAvailable: isGeminiAvailable(),
   routedThroughOpenRouter: useOpenRouter,
