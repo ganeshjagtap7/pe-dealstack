@@ -19,6 +19,59 @@ import { supabase } from '../../../../supabase.js';
 import { log } from '../../../../utils/logger.js';
 import { formatDealHeadline, formatFinancialValue, type UnitScale } from '../../../../utils/financialFormat.js';
 
+// Chronological sort key for period strings the extractor emits:
+//   "Sep '25", "Sep 2025", "Sep-25", "May 2025", "Q1 2025", "FY2024",
+//   "LTM", "Current", "Current Month", "Total", "Apr-23", "May 2023".
+// Returns a sortable number (year*100 + month) for date-like labels,
+// or one of the synthetic-bucket sentinels for non-date labels so the
+// chronological output stays predictable. Higher numbers are more
+// recent. Synthetic buckets bucket AFTER the latest concrete date so
+// the agent sees them as the "latest" snapshots.
+const MONTHS: Record<string, number> = {
+  jan: 1, feb: 2, mar: 3, apr: 4, may: 5, jun: 6,
+  jul: 7, aug: 8, sep: 9, oct: 10, nov: 11, dec: 12,
+};
+const SYNTHETIC_PERIODS: Record<string, number> = {
+  ltm: 999900,
+  current: 999901,
+  'current month': 999902,
+  ttm: 999903,
+  total: 999999,
+};
+
+function periodSortKey(period: string | null | undefined): number {
+  if (!period) return -1;
+  const lower = period.toLowerCase().trim();
+  if (lower in SYNTHETIC_PERIODS) return SYNTHETIC_PERIODS[lower];
+
+  // FY YYYY / FYNN
+  const fy = lower.match(/^fy\s*'?(\d{2,4})$/);
+  if (fy) {
+    const yr = parseInt(fy[1], 10);
+    const fullYear = yr < 100 ? 2000 + yr : yr;
+    return fullYear * 100 + 12; // year-end
+  }
+  // Q1 2025 / Q1-25
+  const q = lower.match(/^q([1-4])[\s'-]*(\d{2,4})$/);
+  if (q) {
+    const fullYear = parseInt(q[2], 10) < 100 ? 2000 + parseInt(q[2], 10) : parseInt(q[2], 10);
+    return fullYear * 100 + parseInt(q[1], 10) * 3;
+  }
+  // "Sep '25", "Sep 2025", "Sep-25", "May 2023"
+  const m = lower.match(/^([a-z]{3,})[\s'-]+(\d{2,4})$/);
+  if (m && m[1].slice(0, 3) in MONTHS) {
+    const fullYear = parseInt(m[2], 10) < 100 ? 2000 + parseInt(m[2], 10) : parseInt(m[2], 10);
+    return fullYear * 100 + MONTHS[m[1].slice(0, 3)];
+  }
+  // YYYY-MM
+  const ym = lower.match(/^(\d{4})-(\d{1,2})$/);
+  if (ym) return parseInt(ym[1], 10) * 100 + parseInt(ym[2], 10);
+  // Bare year
+  const yr = lower.match(/^(\d{4})$/);
+  if (yr) return parseInt(yr[1], 10) * 100 + 12;
+  return 0;
+}
+
 export function makeGetDealFinancialsTool(dealId: string, _orgId: string) {
   return tool(
     async () => {
@@ -32,11 +85,14 @@ export function makeGetDealFinancialsTool(dealId: string, _orgId: string) {
         // magnitude (e.g. ACTUALS 6900 → "$6.9K", MILLIONS 6.9 → "$6.9M").
         // Before this fix, every value was rendered with a hardcoded "M"
         // suffix — a $6,900 deal showed as "$6,900M" in the agent's view.
+        // Note: Supabase orders `period` alphabetically (it's a TEXT column),
+        // which interleaves Sep/Oct/Nov years (e.g., "Apr '24" sorts before
+        // "Sep '23"). We re-sort chronologically in JS via periodSortKey
+        // below so the agent sees periods in real time order.
         const { data: statements, error } = await supabase
           .from('FinancialStatement')
           .select('statementType, period, lineItems, unitScale, currency, extractionConfidence, extractionSource, isActive')
-          .eq('dealId', dealId)
-          .order('period', { ascending: false });
+          .eq('dealId', dealId);
 
         if (error) {
           log.error('getDealFinancials tool: supabase select failed', { dealId, error });
@@ -54,7 +110,13 @@ export function makeGetDealFinancialsTool(dealId: string, _orgId: string) {
           `Found ${statements.length} financial statements (${activeStatements.length} active, ${inactiveStatements.length} pending review). Active + pending statements ALL count as extracted data — render charts from them.`,
         ];
 
-        // Group by type
+        // Group by type, then sort each group chronologically (newest first).
+        // Render ALL periods — the previous slice(0, 8) silently hid 72 of
+        // 80 statements on deals like Website Speedy, so the agent saw a
+        // random temporal slice and couldn't chart specific months the
+        // user asked about. Per-row format is one compact line (revenue
+        // + EBITDA inline), keeping the payload manageable for many-period
+        // deals (80 periods × ~120 chars ≈ 10KB — well within context).
         const byType: Record<string, typeof statements> = {};
         for (const s of statements) {
           byType[s.statementType] = byType[s.statementType] || [];
@@ -62,8 +124,9 @@ export function makeGetDealFinancialsTool(dealId: string, _orgId: string) {
         }
 
         for (const [type, stmts] of Object.entries(byType)) {
-          summary.push(`\n**${type}** (${stmts.length} periods):`);
-          for (const s of stmts.slice(0, 8)) {
+          stmts.sort((a, b) => periodSortKey(b.period) - periodSortKey(a.period));
+          summary.push(`\n**${type}** (${stmts.length} periods, newest first):`);
+          for (const s of stmts) {
             const items = s.lineItems && typeof s.lineItems === 'object'
               ? (s.lineItems as Record<string, number | null>)
               : {};
@@ -72,7 +135,7 @@ export function makeGetDealFinancialsTool(dealId: string, _orgId: string) {
               k.toLowerCase().includes('revenue') || k.toLowerCase().includes('net sales')
             );
             const ebitda = entries.find(([k]) => k.toLowerCase().includes('ebitda'));
-            const statusNote = s.isActive ? '' : ' (pending merge review)';
+            const statusNote = s.isActive ? '' : ' (pending)';
 
             // Render at the row's actual unitScale + currency. ACTUALS keeps
             // raw dollars, MILLIONS expands to $X.XM, etc — drops the
@@ -80,11 +143,13 @@ export function makeGetDealFinancialsTool(dealId: string, _orgId: string) {
             // statement in the agent's view.
             const rowScale = (s.unitScale ?? 'ACTUALS') as UnitScale;
             const rowCurrency = s.currency ?? 'USD';
+            const parts: string[] = [];
+            if (revenue) parts.push(`rev ${formatFinancialValue(revenue[1] as number, rowScale, { currency: rowCurrency })}`);
+            if (ebitda) parts.push(`ebitda ${formatFinancialValue(ebitda[1] as number, rowScale, { currency: rowCurrency })}`);
+            const dataPart = parts.length > 0 ? parts.join(', ') : `${entries.length} line items`;
             summary.push(
-              `  - ${s.period}: ${entries.length} line items, confidence ${s.extractionConfidence ?? 'N/A'}%, source: ${s.extractionSource}${statusNote} [scale: ${rowScale} ${rowCurrency}]`
+              `  - ${s.period}: ${dataPart} [${rowScale} ${rowCurrency}, ${s.extractionConfidence ?? '—'}%${statusNote}]`
             );
-            if (revenue) summary.push(`    ${revenue[0]}: ${formatFinancialValue(revenue[1] as number, rowScale, { currency: rowCurrency })}`);
-            if (ebitda) summary.push(`    ${ebitda[0]}: ${formatFinancialValue(ebitda[1] as number, rowScale, { currency: rowCurrency })}`);
           }
         }
 
