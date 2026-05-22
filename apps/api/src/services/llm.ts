@@ -435,9 +435,15 @@ function createModel(
 // ─── Pre-built Model Instances ─────────────────────────────────────
 
 /**
- * Build a tier-1 OpenAI fallback model. Used only when primary is Anthropic
- * AND OpenAI is configured. Mirrors temperature / maxTokens of the primary
- * so output shape stays consistent on retry.
+ * Build a tier-1 OpenAI fallback model. ALWAYS goes direct to api.openai.com
+ * via OPENAI_API_KEY, NEVER through OpenRouter — even when OPENROUTER_API_KEY
+ * is set in the environment. Reason: when an Anthropic primary fails (credit
+ * exhausted, rate limited, etc.) the user wants a direct OpenAI fallback,
+ * not another routed Anthropic call through OpenRouter that could hit the
+ * same credit problem on a different account.
+ *
+ * Mirrors temperature / maxTokens of the primary so output shape stays
+ * consistent on retry.
  */
 function buildTier1OpenAIFallback(
   operation: string,
@@ -446,9 +452,17 @@ function buildTier1OpenAIFallback(
 ): { model: BaseChatModel; modelName: string } | null {
   if (!process.env.OPENAI_API_KEY) return null;
   const fallbackName = 'gpt-4o';
-  const callbacks = [makeUsageHandler(operation, fallbackName, providerFor('openai'))];
-  const built = createModel('openai', fallbackName, temperature, maxTokens, callbacks);
-  return { model: trackModel(built, operation, fallbackName), modelName: fallbackName };
+  const callbacks = [makeUsageHandler(operation, fallbackName, 'openai')];
+  // Construct ChatOpenAI directly to bypass createOpenAIModel's OpenRouter
+  // auto-routing. The cost ledger still tags this as provider: 'openai'.
+  const raw = new ChatOpenAI({
+    model: fallbackName,
+    temperature,
+    ...(maxTokens !== undefined ? { maxTokens } : {}),
+    apiKey: process.env.OPENAI_API_KEY,
+    callbacks,
+  });
+  return { model: trackModel(raw, operation, fallbackName), modelName: fallbackName };
 }
 
 /**
@@ -623,19 +637,40 @@ export async function invokeStructured<T extends z.ZodTypeAny>(
       },
     });
   }
-  // OpenAI fallback — for non-Anthropic primaries, preserve legacy
-  // OpenRouter tier-2 path; otherwise direct gpt-4o.
-  const openaiFallbackName =
-    config.chatProvider === 'anthropic'
-      ? 'gpt-4o'
-      : isOpenRouterEnabled()
-        ? AI_MODELS.TIER2
-        : 'gpt-4o';
+  // OpenAI fallback. When primary is Anthropic, force OpenAI DIRECT
+  // (api.openai.com, OPENAI_API_KEY) — never through OpenRouter — to
+  // avoid silently routing back to another Anthropic account via
+  // OpenRouter that could hit the same credit problem (the original
+  // bug: user saw "402 Insufficient credits" from OpenRouter when
+  // Anthropic primary failed and OpenRouter was in env).
+  // For non-Anthropic primaries, preserve the legacy OpenRouter tier-2
+  // fallback shape.
+  const useOpenAIDirect = config.chatProvider === 'anthropic';
+  const openaiFallbackName = useOpenAIDirect
+    ? 'gpt-4o'
+    : isOpenRouterEnabled()
+      ? AI_MODELS.TIER2
+      : 'gpt-4o';
   fallbackChain.push({
-    name: `${openaiFallbackName}#openai-direct`,
+    name: `${openaiFallbackName}#openai-${useOpenAIDirect ? 'direct' : 'maybe-openrouter'}`,
     tags: ['openai-fallback'],
     build: () => {
-      const fbCallbacks = [makeUsageHandler(label, openaiFallbackName, providerFor('openai'))];
+      const fbCallbacks = [makeUsageHandler(label, openaiFallbackName, 'openai')];
+      if (useOpenAIDirect) {
+        // Construct ChatOpenAI directly to bypass createOpenAIModel's
+        // OpenRouter auto-routing when OPENROUTER_API_KEY is set.
+        if (!process.env.OPENAI_API_KEY) {
+          throw new Error('OpenAI direct fallback unavailable (OPENAI_API_KEY missing)');
+        }
+        const raw = new ChatOpenAI({
+          model: openaiFallbackName,
+          temperature,
+          ...(maxTokens !== undefined ? { maxTokens } : {}),
+          apiKey: process.env.OPENAI_API_KEY,
+          callbacks: fbCallbacks,
+        });
+        return trackModel(raw, label, openaiFallbackName);
+      }
       const built = createModel('openai', openaiFallbackName, temperature, maxTokens, fbCallbacks);
       return trackModel(built, label, openaiFallbackName);
     },
