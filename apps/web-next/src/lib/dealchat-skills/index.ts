@@ -300,42 +300,46 @@ const ddChecklist: Skill = {
 const newsScan: Skill = {
   id: "news-scan",
   command: "/news-scan",
-  label: "News scan (last 90 days)",
-  description: "Recent news grouped by theme; requires web_search tool.",
+  label: "News scan (target + industry)",
+  description: "Top news about the target plus recent industry-domain headlines.",
   category: "research",
   buildPrompt: (deal) => {
     const name = nameOf(deal);
+    const industry = industryOf(deal);
     return [
-      // COST DISCIPLINE: this skill burns Tavily credits. Each web_search
-      // call = 1 credit. Default to ONE call. Only escalate to a second
-      // query if the first returns 0 results AND the target is a likely
-      // candidate for capital-event news. Never run 3 calls just to fill
-      // the per-turn cap.
-      `Search for recent news on ${name}. The \`web_search\` tool costs credits per call, so be economical: run ONE query first and only escalate if it returns zero results.`,
+      // COST DISCIPLINE: each web_search costs 1 credit. Default to ONE
+      // target query. Only run the SECOND industry query when the deal has
+      // a usable industry tag (otherwise the second query reduces to noise).
+      // Never escalate beyond two calls.
+      `Surface news on ${name} AND the broader domain it operates in. The \`web_search\` tool costs credits per call, so run AT MOST 2 calls (one for target, one for industry).`,
       "",
-      `PRIMARY QUERY: \`web_search({ query: "${name}", recency_days: 90, topic: "news" })\` — brand-only on the news index. This is usually enough.`,
+      `QUERY 1 (target — always run): \`web_search({ query: "${name}", topic: "news", max_results: 8 })\` — brand-only on the news index, NO recency filter (small/private companies may not have anything in a 90-day window — we want the top news whatever its date).`,
       "",
-      `ESCALATION (only if PRIMARY returned zero results AND ${name} is plausibly a company with capital-event news — i.e., not a tiny consumer product): one additional call with \`query: "${name} funding OR acquisition OR partnership", recency_days: 180, topic: "news"\`. Do NOT escalate beyond this.`,
+      industry
+        ? `QUERY 2 (industry — run when QUERY 1 returns < 3 target-matched results, or always run if you have credit headroom): \`web_search({ query: "${industry} industry news", topic: "news", max_results: 8 })\` — broader market signal so the analyst sees what's moving the domain even when the target itself is quiet.`
+        : `QUERY 2 (industry): SKIP — this deal has no \`industry\` tag set, so a domain-news query would return generic noise. Note in your reply that the industry field is unset and recommend the user fill it in.`,
       "",
-      "Filter results. KEEP a result only if ALL hold:",
-      "- The title or snippet names the target directly (not a same-name competitor or unrelated product).",
-      "- It's a dated news article or press release — NOT product documentation, evergreen marketing pages, Trustpilot/G2 reviews, or directory listings.",
-      `- It describes a discrete event (funding, executive change, product launch, partnership, customer win, legal action, pricing change, layoffs, regulatory action) — not "what is X?" explainers.`,
+      "Filter results. KEEP a result only if it meets at least ONE of:",
+      "- (Target-news) Title or snippet names the target directly (not a same-name competitor or unrelated product).",
+      "- (Industry-news) Discusses the industry/domain in a way that's relevant to a PE deal team (funding climate, M&A activity, regulation, pricing dynamics, demand shifts, competitive moves).",
+      "DROP results that are: product documentation, evergreen marketing pages, Trustpilot/G2 reviews, directory listings, generic SEO content.",
       "",
       "Group surviving results under these exact headers, in this order:",
       "",
-      "## Financial",
-      "## Commercial",
-      "## Legal",
-      "## Personnel",
-      "## Strategic",
+      `## ${name} — direct news`,
+      "(Items where the title or snippet names the target directly. Most-recent first.)",
       "",
-      "For each item:",
+      `## ${industry ? `${industry} — domain news` : "Domain news"}`,
+      "(Items relevant to the target's market/industry, even if they don't mention the target. Most-recent first.)",
+      "",
+      "For EVERY item under either header:",
       "- One-sentence summary.",
-      "- Citation as `[Source — YYYY-MM-DD](URL)`.",
+      "- **Provide a clickable link.** Cite as `[Source — YYYY-MM-DD](URL)`. The URL is mandatory; never cite a source without its link.",
       `- One-line "so what" for the deal team.`,
       "",
-      `If no material results survive the filter, write exactly: "No material news identified — ${name} appears to have no recent press coverage in the searched window. For private/small companies this is expected; recommend the deal team check LinkedIn, Crunchbase, and industry newsletters directly." Then list the queries you actually ran (1 or 2) so the analyst can verify.`,
+      `If QUERY 1 returns nothing target-matched, say so explicitly under the target header ("No direct press coverage surfaced for ${name}"). Do NOT fabricate target headlines to fill the gap.`,
+      "",
+      `If both queries fail to surface anything usable, write: "No material news identified in either target or industry searches. For private/small companies this is common — recommend the deal team check LinkedIn, Crunchbase, and industry newsletters directly." Then list the queries you actually ran so the analyst can verify.`,
       "",
       `If the \`web_search\` tool returns "Web search is not configured" or "Search failed: ..." on the first call, do NOT retry — say so explicitly and recommend a manual search. Do not fabricate headlines or URLs.`,
       "",
