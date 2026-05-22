@@ -141,6 +141,128 @@ function makeUsageHandler(
   };
 }
 
+// ─── Automatic Anthropic → OpenAI fallback ─────────────────────────
+// When tier-1 is Anthropic direct and the API rejects a call due to credit
+// exhaustion, rate limiting, overload, or auth failure, swap to OpenAI
+// direct (gpt-4o) transparently so the user's request still completes.
+// Hooks at the BaseChatModel.invoke layer so it covers:
+//   - direct .invoke() callers (route handlers, signal analyzers, etc.),
+//   - LangGraph createReactAgent loops (dealChatAgent — each iteration
+//     hits the patched .invoke on the primary), and
+//   - withStructuredOutput() / .bindTools() chains, which ultimately call
+//     into the same .invoke under the hood.
+// invokeStructured() has its own explicit primary→fallback retry so we
+// don't apply the wrapper there (no double-fallback chain).
+
+const FALLBACK_TRIGGER_HTTP_STATUSES = new Set([401, 402, 403, 429, 529]);
+const FALLBACK_TRIGGER_MESSAGE_HINTS = [
+  'credit balance',
+  'credit_balance',
+  'quota exceeded',
+  'insufficient quota',
+  'insufficient_credit',
+  'billing',
+  'payment required',
+  'organization is restricted',
+];
+
+function shouldFallbackToOpenAI(err: any): boolean {
+  if (!err) return false;
+  // Anthropic SDK error envelopes vary — pull from multiple paths.
+  const status = err?.status ?? err?.statusCode ?? err?.error?.status;
+  const errType = err?.error?.type ?? err?.error?.error?.type ?? err?.type;
+  const message = String(
+    err?.message ?? err?.error?.message ?? err?.error?.error?.message ?? ''
+  ).toLowerCase();
+
+  // Typed Anthropic errors first (most reliable signal).
+  if (errType === 'rate_limit_error') return true;
+  if (errType === 'overloaded_error') return true;
+  if (errType === 'authentication_error') return true;
+  if (errType === 'permission_error') return true;
+
+  // HTTP status fallback.
+  if (typeof status === 'number' && FALLBACK_TRIGGER_HTTP_STATUSES.has(status)) {
+    return true;
+  }
+
+  // Anthropic's "credit balance too low" surfaces as a 400 with type
+  // invalid_request_error — only HTTP status can't catch it, so message-
+  // sniff. Cheap allowlist; if it ever drifts we add to the list.
+  if (FALLBACK_TRIGGER_MESSAGE_HINTS.some((hint) => message.includes(hint))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Wrap a primary chat model with lazy OpenAI fallback. Patches `.invoke`
+ * (which BaseChatModel's bindTools / withStructuredOutput / agent loops
+ * all bottom out into) so a shouldFallbackToOpenAI() error transparently
+ * retries against the fallback model with the same input + options.
+ * `buildFallback` is a thunk so we only pay the construction cost when an
+ * actual fallback is needed.
+ */
+function wrapWithFallback(
+  primary: BaseChatModel,
+  buildFallback: () => BaseChatModel,
+  label: string,
+  fallbackName: string,
+): BaseChatModel {
+  let fallback: BaseChatModel | null = null;
+  let pendingBoundTools: { tools: unknown; kwargs?: unknown } | null = null;
+
+  // bindTools (when present) returns a NEW RunnableBinding that wraps the
+  // primary — calls to that binding's .invoke eventually hit primary.invoke
+  // with the tools merged into options.tools, so the patched .invoke below
+  // sees them. We additionally remember the tools so a freshly-built
+  // fallback can be pre-bound symmetrically (some providers ignore tools
+  // passed in options and require an explicit bindTools call).
+  const origBindTools: ((tools: unknown, kwargs?: unknown) => unknown) | undefined =
+    typeof (primary as any).bindTools === 'function'
+      ? (primary as any).bindTools.bind(primary)
+      : undefined;
+  if (origBindTools) {
+    (primary as any).bindTools = (tools: unknown, kwargs?: unknown) => {
+      pendingBoundTools = { tools, kwargs };
+      // Reset so the next ensureFallback() call rebuilds with the new tools.
+      fallback = null;
+      return origBindTools(tools, kwargs);
+    };
+  }
+
+  const ensureFallback = (): BaseChatModel => {
+    if (fallback) return fallback;
+    let built = buildFallback();
+    if (pendingBoundTools && typeof (built as any).bindTools === 'function') {
+      built = (built as any).bindTools(
+        pendingBoundTools.tools,
+        pendingBoundTools.kwargs,
+      ) as BaseChatModel;
+    }
+    fallback = built;
+    return fallback;
+  };
+
+  const origInvoke = primary.invoke.bind(primary);
+  primary.invoke = async (input: any, options?: any) => {
+    try {
+      return await origInvoke(input, options);
+    } catch (err: any) {
+      if (!shouldFallbackToOpenAI(err)) throw err;
+      log.warn(
+        `${label}: primary model errored, transparent fallback to ${fallbackName}`,
+        describeAIError(err),
+      );
+      const fb = ensureFallback();
+      return await fb.invoke(input, options);
+    }
+  };
+
+  return primary;
+}
+
 /**
  * Add the synchronous block gate to a model. Patches `.invoke` so direct
  * `.invoke()` calls run `enforceUserGate` first. Tracking itself is now
@@ -281,8 +403,26 @@ function createModel(
 
 // ─── Pre-built Model Instances ─────────────────────────────────────
 
+/**
+ * Build a tier-1 OpenAI fallback model for `wrapWithFallback`. Used only
+ * when primary is Anthropic AND OpenAI is configured. Mirrors temperature
+ * / maxTokens of the primary so output shape stays consistent on retry.
+ */
+function buildTier1OpenAIFallback(
+  operation: string,
+  temperature: number,
+  maxTokens: number,
+): { model: BaseChatModel; modelName: string } | null {
+  if (!process.env.OPENAI_API_KEY) return null;
+  const fallbackName = 'gpt-4o';
+  const callbacks = [makeUsageHandler(operation, fallbackName, providerFor('openai'))];
+  const built = createModel('openai', fallbackName, temperature, maxTokens, callbacks);
+  return { model: trackModel(built, operation, fallbackName), modelName: fallbackName };
+}
+
 /** Primary chat model — Claude Sonnet 4.5 (Anthropic direct) by default,
- *  with OpenAI/OpenRouter fallback for callsites that catch errors. */
+ *  with transparent OpenAI fallback when Anthropic returns credit/rate/
+ *  auth/overload errors (see wrapWithFallback). */
 export function getChatModel(temperature = 0.7, maxTokens = 1500, operation?: string): BaseChatModel {
   const provider = config.chatProvider;
   const modelName = MODELS[provider].chat;
@@ -292,7 +432,24 @@ export function getChatModel(temperature = 0.7, maxTokens = 1500, operation?: st
   }
   const callbacks = [makeUsageHandler(operation, modelName, providerFor(provider))];
   const model = createModel(provider, modelName, temperature, maxTokens, callbacks);
-  return trackModel(model, operation, modelName);
+  const tracked = trackModel(model, operation, modelName);
+  // Only wrap when primary is Anthropic AND OpenAI is configured — the
+  // wrapper costs nothing when never triggered, but skipping it avoids
+  // patching .invoke on non-Anthropic primaries where the fallback would
+  // never apply anyway.
+  if (provider === 'anthropic' && process.env.OPENAI_API_KEY) {
+    return wrapWithFallback(
+      tracked,
+      () => {
+        const fb = buildTier1OpenAIFallback(operation, temperature, maxTokens);
+        if (!fb) throw new Error('OpenAI fallback unavailable (OPENAI_API_KEY missing at fallback time)');
+        return fb.model;
+      },
+      operation,
+      'gpt-4o',
+    );
+  }
+  return tracked;
 }
 
 /** Fast/cheap model — GPT-4.1-mini (OpenAI/OpenRouter) for sentiment, classification. */
@@ -308,7 +465,8 @@ export function getFastModel(temperature = 0.7, maxTokens = 500, operation?: str
   return trackModel(model, operation, modelName);
 }
 
-/** Extraction model — low temperature for consistent structured output */
+/** Extraction model — low temperature for consistent structured output.
+ *  Same transparent Anthropic → OpenAI fallback as getChatModel. */
 export function getExtractionModel(maxTokens = 3000, operation?: string): BaseChatModel {
   const provider = config.chatProvider;
   const modelName = MODELS[provider].extraction;
@@ -318,7 +476,20 @@ export function getExtractionModel(maxTokens = 3000, operation?: string): BaseCh
   }
   const callbacks = [makeUsageHandler(operation, modelName, providerFor(provider))];
   const model = createModel(provider, modelName, 0.1, maxTokens, callbacks);
-  return trackModel(model, operation, modelName);
+  const tracked = trackModel(model, operation, modelName);
+  if (provider === 'anthropic' && process.env.OPENAI_API_KEY) {
+    return wrapWithFallback(
+      tracked,
+      () => {
+        const fb = buildTier1OpenAIFallback(operation, 0.1, maxTokens);
+        if (!fb) throw new Error('OpenAI fallback unavailable (OPENAI_API_KEY missing at fallback time)');
+        return fb.model;
+      },
+      operation,
+      'gpt-4o',
+    );
+  }
+  return tracked;
 }
 
 /** Get a specific model by name (escape hatch) */
