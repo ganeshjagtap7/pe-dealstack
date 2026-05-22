@@ -81,6 +81,15 @@ export interface ChartSpec {
 
 export const CHART_FENCE_OPEN = "```chart";
 export const CHART_FENCE_CLOSE = "```";
+/**
+ * Fenced "no data" block. The agent emits this when a chart-style request
+ * is genuinely impossible because zero numeric data exists for the asked
+ * metric / period — the renderer shows it as a red banner so the analyst
+ * immediately sees the gap (instead of having to parse a prose apology).
+ * Content inside the fence is plain text (no JSON, no markdown).
+ */
+export const NODATA_FENCE_OPEN = "```nodata";
+export const NODATA_FENCE_CLOSE = "```";
 
 // ---------------------------------------------------------------------------
 // Defensive parser
@@ -218,14 +227,44 @@ export function parseChartSpec(raw: string): ChartSpec | null {
 }
 
 // ---------------------------------------------------------------------------
-// Splitter — walks the message body, extracts ```chart fenced blocks, and
-// returns ordered parts. Unparseable chart blocks fall through as `text`
-// so the user sees something rather than a silent gap.
+// Splitter — walks the message body, extracts ```chart and ```nodata
+// fenced blocks, and returns ordered parts. Unparseable chart blocks fall
+// through as `text` so the user sees something rather than a silent gap.
 // ---------------------------------------------------------------------------
 
 export type MessagePart =
   | { kind: "text"; content: string }
-  | { kind: "chart"; spec: ChartSpec; raw: string };
+  | { kind: "chart"; spec: ChartSpec; raw: string }
+  | { kind: "nodata"; text: string; raw: string };
+
+interface FenceMatch {
+  kind: "chart" | "nodata";
+  openerStart: number;
+  openerEnd: number;
+}
+
+/**
+ * Find the earliest of the supported fence openers from `from` onwards.
+ * Returns the match (and which kind) or null when none is left.
+ */
+function findNextFence(content: string, from: number): FenceMatch | null {
+  const chartIdx = content.indexOf(CHART_FENCE_OPEN, from);
+  const nodataIdx = content.indexOf(NODATA_FENCE_OPEN, from);
+  if (chartIdx === -1 && nodataIdx === -1) return null;
+  const useChart = nodataIdx === -1 || (chartIdx !== -1 && chartIdx < nodataIdx);
+  if (useChart) {
+    return {
+      kind: "chart",
+      openerStart: chartIdx,
+      openerEnd: chartIdx + CHART_FENCE_OPEN.length,
+    };
+  }
+  return {
+    kind: "nodata",
+    openerStart: nodataIdx,
+    openerEnd: nodataIdx + NODATA_FENCE_OPEN.length,
+  };
+}
 
 export function splitMessageWithCharts(content: string): MessagePart[] {
   if (!content) return [];
@@ -234,24 +273,22 @@ export function splitMessageWithCharts(content: string): MessagePart[] {
   let cursor = 0;
 
   while (cursor < content.length) {
-    const openIdx = content.indexOf(CHART_FENCE_OPEN, cursor);
-    if (openIdx === -1) {
-      // No more chart fences — emit the remainder as text.
+    const fence = findNextFence(content, cursor);
+    if (!fence) {
+      // No more fences — emit the remainder as text.
       const tail = content.slice(cursor);
       if (tail) parts.push({ kind: "text", content: tail });
       break;
     }
 
     // Push any text before the fence.
-    if (openIdx > cursor) {
-      parts.push({ kind: "text", content: content.slice(cursor, openIdx) });
+    if (fence.openerStart > cursor) {
+      parts.push({ kind: "text", content: content.slice(cursor, fence.openerStart) });
     }
 
-    // The opener may be `\`\`\`chart\n{...}` — find the close fence that
-    // follows the opener body. Skip past the opener line first.
-    const afterOpener = openIdx + CHART_FENCE_OPEN.length;
-    // Tolerate optional whitespace + a newline after `\`\`\`chart`.
-    let bodyStart = afterOpener;
+    // Skip past the opener line — tolerate optional whitespace + a newline
+    // after `\`\`\`chart` or `\`\`\`nodata`.
+    let bodyStart = fence.openerEnd;
     while (bodyStart < content.length && content[bodyStart] !== "\n") {
       bodyStart += 1;
     }
@@ -261,23 +298,33 @@ export function splitMessageWithCharts(content: string): MessagePart[] {
     if (closeIdx === -1) {
       // Unterminated fence — treat the whole remainder as text so we don't
       // swallow it silently.
-      parts.push({ kind: "text", content: content.slice(openIdx) });
+      parts.push({ kind: "text", content: content.slice(fence.openerStart) });
       break;
     }
 
     const rawBody = content.slice(bodyStart, closeIdx).trim();
-    const spec = parseChartSpec(rawBody);
-    if (spec) {
-      parts.push({ kind: "chart", spec, raw: rawBody });
+    if (fence.kind === "chart") {
+      const spec = parseChartSpec(rawBody);
+      if (spec) {
+        parts.push({ kind: "chart", spec, raw: rawBody });
+      } else {
+        // Bad JSON — preserve as text so the human can at least read it.
+        const full = content.slice(fence.openerStart, closeIdx + CHART_FENCE_CLOSE.length);
+        parts.push({ kind: "text", content: full });
+      }
     } else {
-      // Bad JSON — preserve as text so the human can at least read it.
-      const full = content.slice(openIdx, closeIdx + CHART_FENCE_CLOSE.length);
-      parts.push({ kind: "text", content: full });
+      // nodata: just plain text, never JSON. An empty body still emits the
+      // banner with a generic message so the analyst sees the visual cue.
+      parts.push({
+        kind: "nodata",
+        text: rawBody || "No data available for the requested chart.",
+        raw: rawBody,
+      });
     }
 
     cursor = closeIdx + CHART_FENCE_CLOSE.length;
     // Skip a single trailing newline so we don't leave an orphan blank line
-    // between the chart and the next paragraph.
+    // between the block and the next paragraph.
     if (content[cursor] === "\n") cursor += 1;
   }
 

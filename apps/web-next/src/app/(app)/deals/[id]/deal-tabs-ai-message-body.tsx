@@ -43,6 +43,27 @@ export function AiMessageBody({ content }: { content: string }) {
         if (part.kind === "chart") {
           return <DealChatChartArtifact key={idx} spec={part.spec} />;
         }
+        if (part.kind === "nodata") {
+          // Red-on-rose banner so a "no data available" response is
+          // instantly visually distinct from prose. Used when the agent
+          // is asked to render a chart but zero numeric data exists for
+          // the requested metric/period. Multi-line text preserved.
+          return (
+            <div
+              key={idx}
+              role="status"
+              className="my-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+            >
+              <div className="mb-1 flex items-center gap-1.5 font-semibold">
+                <span aria-hidden>⚠</span>
+                <span>Chart unavailable — no data</span>
+              </div>
+              <div className="whitespace-pre-wrap break-words text-red-700/90">
+                {part.text}
+              </div>
+            </div>
+          );
+        }
         return (
           <div
             key={idx}
