@@ -455,7 +455,7 @@ const chartMargin: Skill = {
     return [
       `**MANDATORY: This is a chart command. You MUST call the \`generate_chart\` tool. Substituting a prose answer is a bug.** The only exception is the no-data block path at the bottom.`,
       "",
-      `Use \`get_deal_financials\` for ${name} to pull all available periods (target 6+, but use whatever is returned). Call \`generate_chart\` with a chart titled "Gross & EBITDA margins". When 2+ periods are available, render a line chart with TWO series (gross_margin, ebitda_margin) on the Y axis (%) and period on X. When only one period (or only a single computed snapshot) is available, render a bar chart with one bar per metric. Margins are unitless percentages — set the spec's \`unit\` field to \`"units"\` so the axis labels render as raw percentages rather than $-prefixed currency.`,
+      `Use \`get_deal_financials\` for ${name} to pull all available periods (target 6+, but use whatever is returned). Call \`generate_chart\` with a chart titled "Gross & EBITDA margins". When 2+ periods are available, render a line chart with TWO series (gross_margin, ebitda_margin) on the Y axis (%) and period on X. When only one period (or only a single computed snapshot) is available, render a bar chart with one bar per metric. Margins are PERCENTAGES — set the spec's \`unit\` field to \`"%"\` (not \`"units"\`) so the axis labels render as \`12.5%\` / \`-30.6%\` instead of \`$12.5\` / \`-$30.6\`. Pass y-values as the percent number itself (e.g., 12.5 for 12.5%, NOT 0.125).`,
       "",
       "Render the chart with WHATEVER data is available — 1, 2, or more periods are all valid. Do not skip the chart because the series is short.",
       "",
@@ -497,7 +497,7 @@ const chartCompMults: Skill = {
     return [
       `**MANDATORY: This is a chart command. You MUST call the \`generate_chart\` tool. Substituting a prose answer is a bug.** The only exception is the no-data block path at the bottom.`,
       "",
-      `Use \`compare_deals\` to get comparable EV/EBITDA multiples for ${name} (if available). Call \`generate_chart\` with a bar chart titled "EV/EBITDA — comparable set" with company on X and multiple on Y. EV/EBITDA multiples are unitless (e.g., 8.5x is just 8.5) — set the spec's \`unit\` field to \`"units"\` so the y-axis renders raw multiples rather than $-prefixed currency.`,
+      `Use \`compare_deals\` to get comparable EV/EBITDA multiples for ${name} (if available). Call \`generate_chart\` with a bar chart titled "EV/EBITDA — comparable set" with company on X and multiple on Y. EV/EBITDA values are MULTIPLES (e.g., 8.5 = 8.5x) — set the spec's \`unit\` field to \`"x"\` (not \`"units"\`) so the y-axis renders \`8.5x\` instead of \`$8.5\`. Pass y-values as the multiple itself (e.g., 8.5 for 8.5x).`,
       "",
       "Render the chart with WHATEVER data is available — even 1 or 2 comparables (plus the target) is a valid visual.",
       "",

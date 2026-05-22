@@ -35,13 +35,15 @@ const chartAnnotationSchema = z.object({
 });
 
 const chartUnitSchema = z
-  .enum(['K', 'M', 'B', 'units'])
+  .enum(['K', 'M', 'B', 'units', '%', 'x'])
   .describe(
     [
-      "Display unit for y-axis ticks. REQUIRED when source data is from get_deal_financials.",
-      "Map from the row's unitScale: ACTUALS -> 'units', THOUSANDS -> 'K', MILLIONS -> 'M', BILLIONS -> 'B'.",
+      "Display unit for y-axis ticks. REQUIRED — picking the wrong one renders dollar prefixes on percentages, or vice versa.",
+      "Currency charts (revenue, EBITDA, dollars): map from the row's unitScale — ACTUALS -> 'units', THOUSANDS -> 'K', MILLIONS -> 'M', BILLIONS -> 'B'.",
+      "Percentage charts (margins, growth rates, ratios): USE '%' — axis ticks render as '20%' / '-30.6%' WITHOUT a $ prefix. DO NOT use 'units' for percentages — they will mis-render as '$20' / '-$30.6'.",
+      "Multiplier charts (EV/EBITDA, EV/Revenue, P/E, etc.): USE 'x' — axis ticks render as '8.5x' / '12x' WITHOUT a $ prefix. DO NOT use 'units' for multiples.",
+      "'units' is for raw scalars only: actual-dollar amounts shown as '$6,900', headcount, slice counts.",
       "Mismatch will mis-render the chart axis (e.g., raw-dollar y-values rendered with the default 'M' suffix display as $0.0M for every tick).",
-      "Use 'units' for raw counts, percentages, or any dataset whose y-values are already in actual dollars (not scaled).",
     ].join(' '),
   );
 

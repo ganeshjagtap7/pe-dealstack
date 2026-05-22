@@ -23,18 +23,27 @@ export type ChartType = "line" | "bar" | "waterfall" | "pie";
  * instead of guessing. Default is `"M"` for backward compatibility — every
  * pre-unit spec was implicitly millions of the currency unit.
  *
- *   "K"     — y-values are in thousands  (e.g. 6.9 → "$6.9K")
- *   "M"     — y-values are in millions   (e.g. 2.6 → "$2.6M")
- *   "B"     — y-values are in billions   (e.g. 1.2 → "$1.2B")
- *   "units" — y-values are raw (no scale suffix), e.g. headcount, slice %
+ *   "K"     — y-values are in thousands of currency (e.g. 6.9 → "$6.9K")
+ *   "M"     — y-values are in millions of currency  (e.g. 2.6 → "$2.6M")
+ *   "B"     — y-values are in billions of currency  (e.g. 1.2 → "$1.2B")
+ *   "units" — raw currency amount (e.g. 6900 → "$6,900"). Use for raw
+ *             dollar charts and integer scalars (headcount, slice counts).
+ *   "%"     — percentage (e.g. 12.5 → "12.5%", -30.6 → "-30.6%"). USE
+ *             THIS for margins, growth rates, ratios. NEVER use "units"
+ *             for a percentage — it will mis-render as "$12.5".
+ *   "x"     — multiplier (e.g. 8.5 → "8.5x", 12 → "12x"). USE THIS for
+ *             EV/EBITDA, EV/Revenue, P/E and other multiples. NEVER use
+ *             "units" for a multiple — it will mis-render as "$8.5".
  */
-export type ChartUnit = "K" | "M" | "B" | "units";
+export type ChartUnit = "K" | "M" | "B" | "units" | "%" | "x";
 
 const ALLOWED_UNITS: ReadonlySet<ChartUnit> = new Set<ChartUnit>([
   "K",
   "M",
   "B",
   "units",
+  "%",
+  "x",
 ]);
 
 export interface ChartPoint {

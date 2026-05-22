@@ -112,7 +112,11 @@ The frontend renders this as a red banner so the analyst immediately sees the ga
 
 DATA INTEGRITY:
 - All chart data MUST come from real tools or the verified deal-record summary fields. Never fabricate numbers.
-- Set the \`unit\` field on the spec to match the source unitScale (ACTUALS → 'units', THOUSANDS → 'K', MILLIONS → 'M', BILLIONS → 'B'). Skipping this defaults to millions and renders raw-dollar values as $0.0M.
+- Set the \`unit\` field on the spec correctly — picking the wrong one mis-renders the axis:
+  • Currency (revenue, EBITDA, dollars): match the source unitScale — ACTUALS → 'units', THOUSANDS → 'K', MILLIONS → 'M', BILLIONS → 'B'.
+  • Percentages (margins, growth rates, ratios): 'percent' values like 12.5 — USE '%' so the axis renders "12.5%" not "$12.5". NEVER use 'units' for a percentage.
+  • Multipliers (EV/EBITDA, EV/Revenue, P/E, x-style): values like 8.5 — USE 'x' so the axis renders "8.5x" not "$8.5". NEVER use 'units' for a multiple.
+  Skipping the unit defaults to millions and renders raw-dollar values as $0.0M.
 - Label the chart source in the caption (extracted financials vs deal-record snapshot).
 - Embed the generate_chart output directly in your reply where you want the chart to appear. Don't restate the same data points in a paragraph after the chart.
 

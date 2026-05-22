@@ -75,11 +75,22 @@ export function formatNumber(value: number | null | undefined, decimals = 1): st
 // a chart spec sets the unit once; ticks then share a consistent suffix.
 // ---------------------------------------------------------------------------
 
-/** Value already-scaled at a known magnitude. "units" = raw, no suffix. */
-export type DisplayUnit = "K" | "M" | "B" | "units";
+/**
+ * Value already-scaled at a known magnitude.
+ *
+ *   "K"     \u2014 currency in thousands  (e.g. 6.9 \u2192 "$6.9K")
+ *   "M"     \u2014 currency in millions   (e.g. 2.6 \u2192 "$2.6M")
+ *   "B"     \u2014 currency in billions   (e.g. 1.2 \u2192 "$1.2B")
+ *   "units" \u2014 raw currency amount    (e.g. 6900 \u2192 "$6,900")
+ *   "%"     \u2014 percentage, no $ prefix (e.g. 12.5 \u2192 "12.5%", -30.6 \u2192 "-30.6%")
+ *             Use for margins, growth rates, ratios.
+ *   "x"     \u2014 multiplier, no $ prefix (e.g. 8.5 \u2192 "8.5x", 12 \u2192 "12x")
+ *             Use for EV/EBITDA, EV/Revenue, P/E, and other multiples.
+ */
+export type DisplayUnit = "K" | "M" | "B" | "units" | "%" | "x";
 
 const DISPLAY_UNIT_SUFFIX: Record<DisplayUnit, string> = {
-  K: "K", M: "M", B: "B", units: "",
+  K: "K", M: "M", B: "B", units: "", "%": "%", x: "x",
 };
 
 /**
@@ -89,6 +100,8 @@ const DISPLAY_UNIT_SUFFIX: Record<DisplayUnit, string> = {
  *   formatChartAxisValue(6.9, "K")      -> "$6.9K"
  *   formatChartAxisValue(6.9, "M")      -> "$6.9M"
  *   formatChartAxisValue(6900, "units") -> "$6,900"
+ *   formatChartAxisValue(12.5, "%")     -> "12.5%"
+ *   formatChartAxisValue(-30.6, "%")    -> "-30.6%"
  */
 export function formatChartAxisValue(
   value: number | null | undefined,
@@ -99,10 +112,22 @@ export function formatChartAxisValue(
   const n = Number(value);
   if (!Number.isFinite(n)) return "\u2014";
 
-  const sym = getCurrencySymbol(options?.currency);
   const sign = n < 0 ? "-" : "";
   const abs = Math.abs(n);
   const p = options?.precision ?? 1;
+
+  // Percentages + multipliers skip the currency symbol entirely \u2014 they
+  // aren't money. Suffix differs ('%' vs 'x') but the numeric formatting
+  // is identical.
+  if (unit === "%" || unit === "x") {
+    const body =
+      abs >= 100 ? abs.toFixed(0)
+      : abs >= 10 ? abs.toFixed(Math.min(p, 1))
+      : abs.toFixed(p);
+    return sign + body + unit;
+  }
+
+  const sym = getCurrencySymbol(options?.currency);
 
   if (unit === "units") {
     return sign + sym + abs.toLocaleString("en-US", { maximumFractionDigits: p });
