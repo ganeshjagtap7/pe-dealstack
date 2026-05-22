@@ -145,8 +145,34 @@ function valueAt(series: ChartSeries, label: string): number | null {
  * NOTE: this is for AXIS / TICK formatting only. The raw y-values in the
  * spec stay untouched — Chart.js still plots them at face value.
  */
+/**
+ * Sniff the chart's title / yLabel / series names for language that
+ * indicates a percentage (or multiple) chart. Used as the first defensive
+ * branch when `spec.unit` is missing — agents occasionally omit the field
+ * on margin / growth charts and the resulting $-prefixed render is worse
+ * than a missing chart. Cheap regex; false positives are tolerable because
+ * the agent can still override with an explicit unit.
+ */
+function detectsPercentageChart(spec: ChartSpec): boolean {
+  const hint = `${spec.title} ${spec.yLabel ?? ""} ${spec.series.map((s) => s.name).join(" ")}`.toLowerCase();
+  return /margin|growth\s+rate|growth\s+\(/.test(hint) || /\bcagr\b/.test(hint) || /\bpercent/.test(hint) || /%/.test(hint) || /\bratio\b/.test(hint);
+}
+
+function detectsMultipleChart(spec: ChartSpec): boolean {
+  const hint = `${spec.title} ${spec.yLabel ?? ""} ${spec.series.map((s) => s.name).join(" ")}`.toLowerCase();
+  return /ev\s*\/\s*ebitda/.test(hint) || /ev\s*\/\s*revenue/.test(hint) || /p\s*\/\s*e\b/.test(hint) || /multiple/.test(hint);
+}
+
 function resolveChartUnit(spec: ChartSpec): ChartUnit {
   if (spec.unit) return spec.unit;
+
+  // Defensive: when the agent forgets `unit` on a chart whose title /
+  // yLabel / series-names look like a percentage or multiple chart, infer
+  // the right non-currency unit. Without this, margin charts (values like
+  // 12.5 / -30.6) fall through to the magnitude branch below and end up
+  // rendered as "$12.5" / "-$30.6" — exactly the bug the user reported.
+  if (detectsPercentageChart(spec)) return "%";
+  if (detectsMultipleChart(spec)) return "x";
 
   // Find max-magnitude y-value across all series so the heuristic is anchored
   // to the dataset's scale rather than a single small point.
