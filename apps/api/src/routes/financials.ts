@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { comparePeriodChronologically } from '../utils/periodChrono.js';
+import { refreshDealCache } from '../services/dealCacheWriteback.js';
 
 // Sub-routers
 import financialsExtractionRouter from './financials-extraction.js';
@@ -23,7 +25,7 @@ const patchStatementSchema = z.object({
   period: z.string().optional(),
   periodType: z.enum(['HISTORICAL', 'PROJECTED', 'LTM']).optional(),
   currency: z.string().optional(),
-  unitScale: z.enum(['MILLIONS', 'THOUSANDS', 'ACTUALS']).optional(),
+  unitScale: z.enum(['MILLIONS', 'THOUSANDS', 'ACTUALS', 'BILLIONS']).optional(),
 });
 
 // ─── 5a: GET /api/deals/:dealId/financials ────────────────────
@@ -77,10 +79,10 @@ router.get('/deals/:dealId/financials/summary', async (req, res) => {
       return res.json({ hasData: false, periods: [] });
     }
 
-    // Latest historical period for the headline numbers
+    // Latest historical period for the headline numbers (descending so [0] is newest)
     const historical = incomeRows
       .filter(r => r.periodType === 'HISTORICAL')
-      .sort((a, b) => b.period.localeCompare(a.period));
+      .sort((a, b) => comparePeriodChronologically(b.period, a.period));
 
     const latest = historical[0];
     const li = (row: any, key: string) =>
@@ -178,6 +180,9 @@ router.patch('/deals/:dealId/financials/:statementId', async (req, res) => {
       .single();
 
     if (updateError) throw updateError;
+
+    // Refresh cache so deal headline stays in sync with the row just edited.
+    await refreshDealCache(dealId);
 
     res.json(updated);
   } catch (err) {

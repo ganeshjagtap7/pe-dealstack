@@ -310,18 +310,27 @@ export async function invokeStructured<T extends z.ZodTypeAny>(
   // getExtractionModel would hardcode 0.1, which is wrong for emails / meeting
   // briefs / signal analysis where higher variance is desirable.
   const primaryName = MODELS[config.chatProvider].extraction;
+  // method: 'functionCalling' avoids OpenAI's strict json_schema response_format,
+  // which Claude via OpenRouter (our default Tier-1) rejects with 400. Tool use
+  // is supported by both OpenAI and Anthropic, so one method covers all providers.
+  const structuredOpts = { method: 'functionCalling' as const, name: label.replace(/[^a-zA-Z0-9_]/g, '_') };
+  const invokeOpts = { runName: label, tags: ['structured', label] };
   try {
     const primaryCallbacks = [makeUsageHandler(label, primaryName, providerFor(config.chatProvider))];
     const primary = createModel(config.chatProvider, primaryName, temperature, maxTokens, primaryCallbacks);
     const tracked = trackModel(primary, label, primaryName);
-    return await tracked.withStructuredOutput(schema).invoke(messages);
+    return await tracked.withStructuredOutput(schema, structuredOpts).invoke(messages, invokeOpts);
   } catch (primaryErr: any) {
     log.warn(`${label}: primary model failed, retrying with fallback`, describeAIError(primaryErr));
     const fallbackName = isOpenRouterEnabled() ? AI_MODELS.TIER2 : 'gpt-4o';
     const fallbackCallbacks = [makeUsageHandler(label, fallbackName, providerFor('openai'))];
     const fallback = createModel('openai', fallbackName, temperature, maxTokens, fallbackCallbacks);
     const tracked = trackModel(fallback, label, fallbackName);
-    return await tracked.withStructuredOutput(schema).invoke(messages);
+    return await tracked.withStructuredOutput(schema, structuredOpts).invoke(messages, {
+      ...invokeOpts,
+      runName: `${label}_fallback`,
+      tags: [...invokeOpts.tags, 'fallback', fallbackName],
+    });
   }
 }
 

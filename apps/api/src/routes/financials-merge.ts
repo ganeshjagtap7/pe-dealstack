@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { refreshDealCache } from '../services/dealCacheWriteback.js';
 
 const router = Router();
 
@@ -45,6 +46,11 @@ router.get('/deals/:dealId/financials/conflicts', async (req, res) => {
           documentName: (v as any).Document?.name ?? 'Unknown',
           isActive: v.isActive,
           lineItems: v.lineItems,
+          // Carry the source-document unit scale + currency through so the
+          // frontend can format each version correctly (one doc may be in
+          // ACTUALS, another in MILLIONS — the UI must not assume MILLIONS).
+          unitScale: v.unitScale,
+          currency: v.currency,
           extractionConfidence: v.extractionConfidence,
           extractionSource: v.extractionSource,
           extractedAt: v.extractedAt,
@@ -126,6 +132,9 @@ router.post('/deals/:dealId/financials/resolve', async (req, res) => {
         .eq('id', chosenVersionId);
     }
 
+    // Refresh cache so deal headline reflects the newly active version.
+    await refreshDealCache(dealId);
+
     res.json({ success: true });
   } catch (err) {
     log.error('POST financials resolve error', err);
@@ -193,10 +202,63 @@ router.post('/deals/:dealId/financials/resolve-all', async (req, res) => {
       resolved++;
     }
 
+    // Refresh cache once after bulk resolution flips isActive across groups.
+    if (resolved > 0) {
+      await refreshDealCache(dealId);
+    }
+
     res.json({ resolved });
   } catch (err) {
     log.error('POST financials resolve-all error', err);
     res.status(500).json({ error: 'Failed to auto-resolve conflicts' });
+  }
+});
+
+// ─── 6d: DELETE /api/deals/:dealId/financials/by-document/:documentId ──
+// Soft-removes all FinancialStatement rows extracted from a specific
+// document. Used when a misclassified one-pager / marketing PDF pollutes
+// the deal's financials — caller wants to drop those rows without
+// deleting the underlying Document.
+router.delete('/deals/:dealId/financials/by-document/:documentId', async (req, res) => {
+  try {
+    const { dealId, documentId } = req.params;
+    const orgId = getOrgId(req);
+    const dealAccess = await verifyDealAccess(dealId, orgId);
+    if (!dealAccess) return res.status(404).json({ error: 'Deal not found' });
+
+    // Confirm doc belongs to deal — prevents cross-deal removal via guessed IDs.
+    const { data: doc } = await supabase
+      .from('Document')
+      .select('id')
+      .eq('id', documentId)
+      .eq('dealId', dealId)
+      .maybeSingle();
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    // Soft-delete FS rows. Schema has `isActive` (see financial-merge-migration.sql).
+    // Soft over hard so the rows can be restored from an audit log if needed.
+    const { data: removed, error } = await supabase
+      .from('FinancialStatement')
+      .update({ isActive: false, updatedAt: new Date().toISOString() })
+      .eq('dealId', dealId)
+      .eq('documentId', documentId)
+      .eq('isActive', true)
+      .select('id');
+    if (error) {
+      log.error('Error removing FS rows by document', error);
+      return res.status(500).json({ error: 'Failed' });
+    }
+
+    const removedCount = removed?.length ?? 0;
+
+    // Refresh headline cache so deal page updates immediately.
+    await refreshDealCache(dealId);
+
+    log.info('FinancialStatement rows removed by document', { dealId, documentId, removedCount });
+    return res.json({ success: true, removedCount });
+  } catch (err: any) {
+    log.error('DELETE financials/by-document error', err);
+    return res.status(500).json({ error: err?.message || 'Failed' });
   }
 });
 

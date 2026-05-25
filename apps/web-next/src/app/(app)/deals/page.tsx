@@ -12,7 +12,11 @@ import {
 } from "@/lib/constants";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
-import type { Deal, DealFilters } from "@/types";
+import type {
+  Deal,
+  DealFilters,
+  FinancialSummariesMap,
+} from "@/types";
 import {
   DeleteModal,
   StageChangeModal,
@@ -29,6 +33,17 @@ import { exportDealsToCSV } from "./deals-csv-export";
 export default function DealsPage() {
   const { openDealIntake } = useIngestDealModal();
   const [deals, setDeals] = useState<Deal[]>([]);
+  // Latest INCOME_STATEMENT summary per deal — fetched in parallel with
+  // the deals list so cards can render revenue/EBITDA at the correct
+  // unitScale instead of falling through formatCurrency() (which assumes
+  // MILLIONS and turns extracted "$6.7K" data into "$6.7M").
+  const [summaries, setSummaries] = useState<FinancialSummariesMap>({});
+  // True until the bulk financial-summaries fetch resolves. While true,
+  // the cards render an em-dash for revenue/EBITDA instead of falling
+  // through to formatCurrency(deal.revenue / deal.ebitda) — which assumes
+  // MILLIONS and prints stale legacy column data at the wrong magnitude
+  // (e.g. deal.ebitda = 21.5 stored at thousands → "$21.5M").
+  const [summariesLoading, setSummariesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "kanban">("list");
@@ -93,6 +108,31 @@ export default function DealsPage() {
       }));
       setDeals(list);
       setIndustries([...new Set(list.map((d) => d.industry).filter(Boolean) as string[])].sort());
+
+      // Bulk financial summaries — does NOT block the initial cards
+      // render (names/stages/AI thesis appear immediately), but the
+      // cards hold revenue/EBITDA as em-dash skeletons until this
+      // resolves so we never paint stale legacy column data through
+      // formatCurrency() (which assumes MILLIONS).
+      setSummariesLoading(true);
+      void (async () => {
+        try {
+          const dealIds = list.map((d) => d.id).join(",");
+          if (!dealIds) {
+            setSummaries({});
+            return;
+          }
+          const resp = await api.get<{ summaries: FinancialSummariesMap }>(
+            `/deals/financial-summaries?dealIds=${encodeURIComponent(dealIds)}`,
+          );
+          setSummaries(resp?.summaries ?? {});
+        } catch (err) {
+          console.warn("[deals] financial summaries fetch failed:", err);
+          setSummaries({});
+        } finally {
+          setSummariesLoading(false);
+        }
+      })();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load deals");
     } finally {
@@ -188,8 +228,10 @@ export default function DealsPage() {
     await handleBulkStage("PASSED");
   };
 
-  // CSV Export
-  const exportSelectedToCSV = () => exportDealsToCSV(deals, selected);
+  // CSV Export — pass the in-memory summaries map so revenue/EBITDA
+  // columns render at the correct unitScale instead of through
+  // formatCurrency(deal.revenue) (which assumes MILLIONS).
+  const exportSelectedToCSV = () => exportDealsToCSV(deals, selected, summaries);
 
   // Save metrics preference to localStorage (and server if available)
   const handleMetricsApply = (metrics: MetricKey[]) => {
@@ -329,6 +371,8 @@ export default function DealsPage() {
               onDelete={(id, name) => setDeleteTarget({ id, name })}
               activeMetrics={activeMetrics}
               onRemoveSample={handleRemoveSample}
+              summary={summaries[deal.id]}
+              summariesLoading={summariesLoading}
             />
           ))}
           <UploadCard onClick={openDealIntake} />
@@ -341,6 +385,8 @@ export default function DealsPage() {
           dragOverStage={dragOverStage}
           setDragOverStage={setDragOverStage}
           onDrop={handleKanbanDrop}
+          summaries={summaries}
+          summariesLoading={summariesLoading}
         />
       )}
 

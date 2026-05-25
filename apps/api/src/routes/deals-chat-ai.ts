@@ -21,6 +21,8 @@ interface FinancialRow {
   statementType: string;
   period: string;
   lineItems: Record<string, number | null> | null;
+  unitScale?: string | null;
+  currency?: string | null;
 }
 
 const STATEMENT_LABELS: Record<string, string> = {
@@ -34,20 +36,41 @@ function buildFinancialMarkdown(statements: FinancialRow[]): string {
     return '\n=== VERIFIED FINANCIAL DATA ===\nNo extracted financial data available yet. Use get_deal_financials tool or ask the user to upload financial documents.';
   }
 
-  // Group by statement type
-  const grouped: Record<string, { period: string; data: Record<string, number | null> }[]> = {};
+  // Group by statement type. Track the unit scale + currency of each
+  // statement so the agent prompt tells the LLM what scale the numbers
+  // are stored in (formerly hard-coded as "$M USD" — wrong when the
+  // source was in actuals / thousands / billions).
+  const grouped: Record<string, { period: string; data: Record<string, number | null>; unitScale: string; currency: string }[]> = {};
   for (const stmt of statements) {
     if (!stmt.lineItems) continue;
     const data = stmt.lineItems as Record<string, number | null>;
     if (!grouped[stmt.statementType]) grouped[stmt.statementType] = [];
-    grouped[stmt.statementType].push({ period: stmt.period, data });
+    grouped[stmt.statementType].push({
+      period: stmt.period,
+      data,
+      unitScale: (stmt.unitScale ?? 'MILLIONS').toUpperCase(),
+      currency: stmt.currency ?? 'USD',
+    });
   }
 
-  const sections: string[] = ['\n=== VERIFIED FINANCIAL DATA (Source of Truth — All values in $M USD) ==='];
+  // Header reflects the actual scales present rather than assuming MILLIONS.
+  const allScales = new Set<string>();
+  for (const entries of Object.values(grouped)) {
+    for (const e of entries) allScales.add(`${e.unitScale} ${e.currency}`);
+  }
+  const scaleHeader = allScales.size === 1
+    ? [...allScales][0]
+    : 'mixed scales — see per-statement labels below';
+  const sections: string[] = [`\n=== VERIFIED FINANCIAL DATA (Source of Truth — values in ${scaleHeader}) ===`];
 
   for (const [type, entries] of Object.entries(grouped)) {
     const label = STATEMENT_LABELS[type] || type;
     const periods = entries.map(e => e.period);
+
+    // Per-statement scale label (covers the multi-statement case where one
+    // statement is in MILLIONS but another came from a doc in ACTUALS).
+    const stmtScales = new Set(entries.map(e => `${e.unitScale} ${e.currency}`));
+    const stmtScaleSuffix = stmtScales.size === 1 ? ` (values in ${[...stmtScales][0]})` : '';
 
     // Collect all unique metric keys across periods (preserving insertion order)
     const metricKeys: string[] = [];
@@ -72,7 +95,7 @@ function buildFinancialMarkdown(statements: FinancialRow[]): string {
       return `| ${key} | ${cells.join(' | ')} |`;
     });
 
-    sections.push(`\n### ${label}\n${header}\n${divider}\n${rows.join('\n')}`);
+    sections.push(`\n### ${label}${stmtScaleSuffix}\n${header}\n${divider}\n${rows.join('\n')}`);
   }
 
   return sections.join('\n');
@@ -212,7 +235,7 @@ router.post('/:dealId/chat', async (req, res) => {
     // Markdown tables so the agent can do math without tool calls.
     const { data: financialStatements, error: finError } = await supabase
       .from('FinancialStatement')
-      .select('statementType, period, lineItems')
+      .select('statementType, period, lineItems, unitScale, currency')
       .eq('dealId', dealId)
       .order('statementType')
       .order('period', { ascending: true });
