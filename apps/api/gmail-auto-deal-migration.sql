@@ -56,3 +56,11 @@ CREATE INDEX IF NOT EXISTS idx_deal_update_proposal_org_status
 
 CREATE INDEX IF NOT EXISTS idx_deal_update_proposal_deal
   ON public."DealUpdateProposal"("dealId", status, "createdAt" DESC);
+
+-- RLS — same pattern as IntegrationActivity (see rls-gap-migration.sql).
+-- Authentication-only at the DB layer; org-scoping enforced by the
+-- middleware (orgScope.ts) on the API routes. Service-role bypasses RLS.
+ALTER TABLE public."DealUpdateProposal" ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "auth_deal_update_proposal_all" ON public."DealUpdateProposal";
+CREATE POLICY "auth_deal_update_proposal_all" ON public."DealUpdateProposal"
+  FOR ALL USING (auth.uid() IS NOT NULL);
