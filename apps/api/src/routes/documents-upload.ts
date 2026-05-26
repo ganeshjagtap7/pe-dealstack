@@ -501,25 +501,43 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
       activityDescription = `${docType} document uploaded and processed (${numPages} pages extracted)`;
     }
 
-    await supabase.from('Activity').insert({
-      dealId,
-      type: 'DOCUMENT_UPLOADED',
-      title: `Document uploaded: ${documentName}`,
-      description: activityDescription,
-      metadata: {
-        documentId: document.id,
-        documentType: docType,
-        extractionStatus,
-        numPages,
-        textLength: extractedText?.length || 0,
-        aiExtracted: !!aiExtractedData,
-        extractedCompany: aiExtractedData?.companyName || null,
-        extractedIndustry: aiExtractedData?.industry || null,
-      },
-    });
+    // Activity row is a nice-to-have for the timeline — if its schema drifts
+    // or the insert fails for any other reason, we should NOT 500 the upload.
+    // The Document row is already persisted at this point, the file is in
+    // Supabase Storage, and the caller's UI expects a 201 with the document
+    // payload. Logging the failure preserves debuggability.
+    try {
+      const { error: activityErr } = await supabase.from('Activity').insert({
+        dealId,
+        type: 'DOCUMENT_UPLOADED',
+        title: `Document uploaded: ${documentName}`,
+        description: activityDescription,
+        metadata: {
+          documentId: document.id,
+          documentType: docType,
+          extractionStatus,
+          numPages,
+          textLength: extractedText?.length || 0,
+          aiExtracted: !!aiExtractedData,
+          extractedCompany: aiExtractedData?.companyName || null,
+          extractedIndustry: aiExtractedData?.industry || null,
+        },
+      });
+      if (activityErr) {
+        log.warn('Activity row insert failed (upload continues)', { dealId, documentId: document.id, err: activityErr });
+      }
+    } catch (activityThrow) {
+      log.warn('Activity row threw (upload continues)', { dealId, documentId: document.id, err: activityThrow });
+    }
 
-    // Audit log
-    await AuditLog.documentUploaded(req, document.id, documentName, dealId);
+    // Audit log — same logic: if the audit pipeline errors, don't 500 the
+    // upload. The Document row is already in the DB. Better to log a
+    // partial-audit warning than fail a successful upload.
+    try {
+      await AuditLog.documentUploaded(req, document.id, documentName, dealId);
+    } catch (auditErr) {
+      log.warn('Audit log threw (upload continues)', { dealId, documentId: document.id, err: auditErr });
+    }
 
     // Notify team: document uploaded (fire-and-forget)
     if (req.user?.id) {
@@ -564,8 +582,22 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
+    // Surface a short error detail to the client so the user can see what
+    // actually broke (was previously a useless "Failed to upload document").
+    // We deliberately don't leak the full stack — just the top-level
+    // message + the most-likely identifying fields. Full diagnostic stays
+    // in server logs.
     log.error('Error uploading document', error);
-    res.status(500).json({ error: 'Failed to upload document' });
+    const err = error as any;
+    const detail =
+      typeof err?.message === 'string'
+        ? err.message
+        : err?.error?.message ?? err?.code ?? 'unknown error';
+    res.status(500).json({
+      error: 'Failed to upload document',
+      detail,
+      ...(err?.code ? { code: err.code } : {}),
+    });
   }
 });
 
