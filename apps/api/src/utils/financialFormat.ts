@@ -205,3 +205,88 @@ export function formatDealHeadline(deal: DealHeadlineFields | null | undefined):
     cachedPeriod: null,
   };
 }
+
+// ───────────────────────────────────────────────────────────────────
+// Read-time unit-scale safety net
+//
+// Some legacy rows in the FinancialStatement table are still tagged as
+// MILLIONS even though their underlying value is raw dollars (the
+// "DMpro LTM / Current Month bug" — pre-applySourceTextDollarOverride
+// extractions that wrote the wrong scale). The backend classifier
+// override already prevents new bad rows from being written, but the
+// stale ones survive in the DB unless re-extracted or hit by the
+// retro-fix script (apps/api/scripts/fix-unit-scale-mistags.ts).
+//
+// This helper runs the SAME source-quote check at READ time on every
+// row that flows through the API → chart pipeline. If a row's
+// `*_source` quote contains a literal raw-dollar amount that matches
+// the corresponding numeric value within 1%, we override the unitScale
+// to ACTUALS before the value reaches the renderer. Belt-and-suspenders:
+// the bug never makes it onto the user's screen even with stale data.
+//
+// Mirrors `extractDollarAmountsFromQuote` + `applySourceTextDollarOverride`
+// in financialClassifier.ts; kept in sync via the same heuristics
+// (max-amount 100k, 1% tolerance, scale-suffix rejection).
+// ───────────────────────────────────────────────────────────────────
+
+const READ_TIME_DOLLAR_TOLERANCE_FRAC = 0.01;
+const READ_TIME_MAX_SMALL_DOLLAR_AMOUNT = 100_000;
+
+function extractRawDollarAmounts(quote: string): number[] {
+  if (!quote) return [];
+  const out: number[] = [];
+  const pattern = /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)/g;
+  const scaleSuffix = /^\s*(?:M\b|MM\b|MN\b|K\b|B\b|BN\b|million|thousand|billion)/i;
+  for (const m of quote.matchAll(pattern)) {
+    const numStr = m[1].replace(/,/g, '');
+    const val = Number(numStr);
+    if (!Number.isFinite(val)) continue;
+    if (val <= 0) continue;
+    if (val > READ_TIME_MAX_SMALL_DOLLAR_AMOUNT) continue;
+    const tail = quote.slice((m.index ?? 0) + m[0].length);
+    if (scaleSuffix.test(tail)) continue;
+    out.push(val);
+  }
+  return out;
+}
+
+/**
+ * Given a FinancialStatement row's `unitScale` + `lineItems`, return the
+ * corrected unitScale based on inspection of any `*_source` quotes
+ * inside lineItems. Returns the original unitScale when no override
+ * signal is found. ACTUALS rows pass through unchanged (no work needed).
+ *
+ * Safe to call on every row at API serving time — pure function, no I/O,
+ * O(line-items × source-strings).
+ */
+export function correctMistaggedUnitScale(
+  unitScale: UnitScale | string | null | undefined,
+  lineItems: Record<string, unknown> | null | undefined,
+): UnitScale {
+  const current = (unitScale ?? 'ACTUALS') as UnitScale;
+  if (current === 'ACTUALS') return current;
+  if (!lineItems || typeof lineItems !== 'object') return current;
+
+  for (const [key, val] of Object.entries(lineItems)) {
+    if (!key.endsWith('_source')) continue;
+    if (typeof val !== 'string') continue;
+    const baseKey = key.slice(0, -'_source'.length);
+    const baseVal = lineItems[baseKey];
+    if (typeof baseVal !== 'number' || !Number.isFinite(baseVal)) continue;
+
+    const lower = baseKey.toLowerCase();
+    if (lower.endsWith('_pct') || lower.endsWith('_percent') || lower.endsWith('_ratio')) continue;
+    if (lower.includes('margin')) continue;
+
+    const absVal = Math.abs(baseVal);
+    if (absVal < 1) continue;
+
+    for (const amt of extractRawDollarAmounts(val)) {
+      const diff = Math.abs(absVal - amt);
+      if (amt > 0 && diff / amt <= READ_TIME_DOLLAR_TOLERANCE_FRAC) {
+        return 'ACTUALS';
+      }
+    }
+  }
+  return current;
+}

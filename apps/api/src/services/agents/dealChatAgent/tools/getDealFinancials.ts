@@ -17,7 +17,7 @@ import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import { supabase } from '../../../../supabase.js';
 import { log } from '../../../../utils/logger.js';
-import { formatDealHeadline, formatFinancialValue, type UnitScale } from '../../../../utils/financialFormat.js';
+import { correctMistaggedUnitScale, formatDealHeadline, formatFinancialValue, type UnitScale } from '../../../../utils/financialFormat.js';
 
 // Chronological sort key for period strings the extractor emits:
 //   "Sep '25", "Sep 2025", "Sep-25", "May 2025", "Q1 2025", "FY2024",
@@ -141,7 +141,17 @@ export function makeGetDealFinancialsTool(dealId: string, _orgId: string) {
             // raw dollars, MILLIONS expands to $X.XM, etc — drops the
             // previous always-"M" suffix that mis-tagged every non-MILLIONS
             // statement in the agent's view.
-            const rowScale = (s.unitScale ?? 'ACTUALS') as UnitScale;
+            //
+            // Read-time safety net: if the stored unitScale is MILLIONS/
+            // THOUSANDS/BILLIONS but the row's _source quote contains a
+            // literal raw-dollar amount matching the value (the "DMpro
+            // LTM/Current Month" stale-row bug), flip to ACTUALS before
+            // formatting so the agent never quotes a mis-scaled number.
+            const rawScale = (s.unitScale ?? 'ACTUALS') as UnitScale;
+            const rowScale = correctMistaggedUnitScale(
+              rawScale,
+              s.lineItems as Record<string, unknown> | null,
+            );
             const rowCurrency = s.currency ?? 'USD';
             const parts: string[] = [];
             if (revenue) parts.push(`rev ${formatFinancialValue(revenue[1] as number, rowScale, { currency: rowCurrency })}`);

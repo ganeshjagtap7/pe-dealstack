@@ -5,6 +5,29 @@ import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { comparePeriodChronologically } from '../utils/periodChrono.js';
 import { refreshDealCache } from '../services/dealCacheWriteback.js';
+import { correctMistaggedUnitScale } from '../utils/financialFormat.js';
+
+/**
+ * Sweep an array of FinancialStatement rows in place, correcting any
+ * `unitScale` whose `lineItems._source` quotes indicate the value is
+ * actually raw dollars (the "DMpro LTM/Current Month" stale-row bug
+ * where pre-fix extractions tagged $1,473 / $15,600 as MILLIONS). Pure
+ * read-time safety net — does NOT touch the DB.
+ */
+function correctRowsUnitScale<
+  T extends { unitScale?: unknown; lineItems?: Record<string, unknown> | null },
+>(rows: T[] | null | undefined): void {
+  if (!rows) return;
+  for (const row of rows) {
+    const corrected = correctMistaggedUnitScale(
+      row.unitScale as string | null | undefined,
+      row.lineItems,
+    );
+    if (corrected !== row.unitScale) {
+      row.unitScale = corrected;
+    }
+  }
+}
 
 // Sub-routers
 import financialsExtractionRouter from './financials-extraction.js';
@@ -48,6 +71,10 @@ router.get('/deals/:dealId/financials', async (req, res) => {
 
     if (error) throw error;
 
+    // Read-time safety net: correct any stale rows whose unitScale doesn't
+    // match the raw-dollar amount in their _source quote before serving.
+    correctRowsUnitScale(statements);
+
     res.json(statements ?? []);
   } catch (err) {
     log.error('GET financials error', err);
@@ -74,6 +101,9 @@ router.get('/deals/:dealId/financials/summary', async (req, res) => {
       .order('period', { ascending: true });
 
     if (error) throw error;
+
+    // Read-time safety net (see GET /deals/:dealId/financials).
+    correctRowsUnitScale(incomeRows);
 
     if (!incomeRows || incomeRows.length === 0) {
       return res.json({ hasData: false, periods: [] });
