@@ -107,7 +107,7 @@ export function makeGenerateChartTool() {
     {
       name: 'generate_chart',
       description:
-        "Render a chart inline in the chat. Use when a visual would communicate more clearly than numbers in a table (trends, comparisons, distributions). The chart appears in the message text — DO NOT also describe the same data in a long paragraph after the chart. Chart data must come from get_deal_financials (or compare_deals for comp sets) — never fabricate. CRITICAL: set the `unit` field to match the source data's unitScale (ACTUALS -> 'units', THOUSANDS -> 'K', MILLIONS -> 'M', BILLIONS -> 'B'). Omitting `unit` defaults the y-axis to millions and renders raw-dollar values as $0.0M.",
+        "Render a chart inline in the chat. Returns a fenced ```chart...``` text block that you MUST copy VERBATIM into your final reply — opening fence, JSON line, and closing fence. The frontend chat renderer scans for that exact fence pair and draws Chart.js from the JSON inside; summarizing or paraphrasing the JSON means NO chart appears. Use for trends, comparisons, distributions. DO NOT also describe the same data in a long paragraph after the chart. Chart data must come from get_deal_financials (or compare_deals for comp sets) — never fabricate. CRITICAL: set the `unit` field — currency: ACTUALS -> 'units', THOUSANDS -> 'K', MILLIONS -> 'M', BILLIONS -> 'B'; percentages (margins, growth): '%'; multiples (EV/EBITDA, P/E): 'x'. Omitting `unit` defaults to millions and renders raw-dollar values as $0.0M.",
       schema: chartSpecSchema,
     },
   );

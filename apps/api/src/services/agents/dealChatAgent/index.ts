@@ -118,7 +118,25 @@ DATA INTEGRITY:
   • Multipliers (EV/EBITDA, EV/Revenue, P/E, x-style): values like 8.5 — USE 'x' so the axis renders "8.5x" not "$8.5". NEVER use 'units' for a multiple.
   Skipping the unit defaults to millions and renders raw-dollar values as $0.0M.
 - Label the chart source in the caption (extracted financials vs deal-record snapshot).
-- Embed the generate_chart output directly in your reply where you want the chart to appear. Don't restate the same data points in a paragraph after the chart.
+
+ECHO RULE (CRITICAL — READ TWICE):
+The \`generate_chart\` tool returns a fenced text block that looks like:
+  \`\`\`chart
+  {"type":"line","title":"...","series":[...],"unit":"%"}
+  \`\`\`
+You MUST copy that EXACT block — opening \`\`\`chart fence, the JSON line, AND the closing \`\`\` fence — VERBATIM into your final reply. The frontend renderer scans your message body for the literal \`\`\`chart...\`\`\` fence pair and renders Chart.js from the JSON inside. If you summarize the JSON, paraphrase it, or drop the fences, the chart NEVER appears — the user sees only your prose and reports it as a missing chart.
+
+Concretely:
+  ✓ CORRECT — final reply contains the unmodified fenced block, optionally with prose before and/or after:
+    "Here's the gross & EBITDA margin trend:
+    \`\`\`chart
+    {"type":"line","title":"Gross & EBITDA margins","unit":"%","series":[...]}
+    \`\`\`
+    The EBITDA line shows compression of ~5pp from Q1 to Q4..."
+  ✗ WRONG — agent summarized the chart instead of echoing the fence: "I generated a chart titled 'Gross & EBITDA margins' showing two series for the periods..."
+  ✗ WRONG — agent stripped the fences: "Here is the spec: {\"type\":\"line\",...}"
+
+Don't restate the same data points in a paragraph after the chart — just the chart fence + brief commentary.
 
 LINK FORMAT (STRICT):
 - The frontend is a Next.js App Router app. URLs MUST be clean paths.

@@ -413,7 +413,7 @@ const chartRevenue: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `**MANDATORY: This is a chart command. You MUST call the \`generate_chart\` tool. Substituting a prose answer is a bug.** The only exception is the no-data block path at the bottom of this prompt.`,
+      `**MANDATORY: (1) call \`generate_chart\` and (2) ECHO ITS FENCED OUTPUT VERBATIM into your final reply.** The tool returns a \`\`\`chart...\`\`\` block — copy it whole (opening fence, JSON line, closing fence) into your message. Paraphrasing or stripping the fences means NO chart renders.`,
       "",
       `Use \`get_deal_financials\` to retrieve revenue for ${name} across all available periods, then call \`generate_chart\` with a chart titled "Revenue trend" showing period on X and revenue on Y. Prefer a line chart when 2+ periods are available; use a single-bar chart when only one data point exists. Pass y-values at the SAME scale as the source row's unitScale (do not pre-convert) and set the spec's \`unit\` field to match — see the unit-field block below.`,
       "",
@@ -455,7 +455,7 @@ const chartMargin: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `**MANDATORY: This is a chart command. You MUST call the \`generate_chart\` tool. Substituting a prose answer is a bug.** The only exception is the no-data block path at the bottom.`,
+      `**MANDATORY: (1) call \`generate_chart\` and (2) ECHO ITS FENCED OUTPUT VERBATIM into your final reply.** The tool returns a \`\`\`chart...\`\`\` block — copy it whole (opening fence, JSON line, closing fence) into your message. Paraphrasing or stripping the fences means NO chart renders.`,
       "",
       `Use \`get_deal_financials\` for ${name} to pull all available periods (target 6+, but use whatever is returned). Call \`generate_chart\` with a chart titled "Gross & EBITDA margins". When 2+ periods are available, render a line chart with TWO series (gross_margin, ebitda_margin) on the Y axis (%) and period on X. When only one period (or only a single computed snapshot) is available, render a bar chart with one bar per metric. Margins are PERCENTAGES — set the spec's \`unit\` field to \`"%"\` (not \`"units"\`) so the axis labels render as \`12.5%\` / \`-30.6%\` instead of \`$12.5\` / \`-$30.6\`. Pass y-values as the percent number itself (e.g., 12.5 for 12.5%, NOT 0.125).`,
       "",
@@ -497,7 +497,7 @@ const chartCompMults: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
-      `**MANDATORY: This is a chart command. You MUST call the \`generate_chart\` tool. Substituting a prose answer is a bug.** The only exception is the no-data block path at the bottom.`,
+      `**MANDATORY: (1) call \`generate_chart\` and (2) ECHO ITS FENCED OUTPUT VERBATIM into your final reply.** The tool returns a \`\`\`chart...\`\`\` block — copy it whole (opening fence, JSON line, closing fence) into your message. Paraphrasing or stripping the fences means NO chart renders.`,
       "",
       `Use \`compare_deals\` to get comparable EV/EBITDA multiples for ${name} (if available). Call \`generate_chart\` with a bar chart titled "EV/EBITDA — comparable set" with company on X and multiple on Y. EV/EBITDA values are MULTIPLES (e.g., 8.5 = 8.5x) — set the spec's \`unit\` field to \`"x"\` (not \`"units"\`) so the y-axis renders \`8.5x\` instead of \`$8.5\`. Pass y-values as the multiple itself (e.g., 8.5 for 8.5x).`,
       "",
