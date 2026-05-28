@@ -176,14 +176,24 @@ async function addContacts(params: {
 
     let contactId = existing?.id as string | undefined;
     if (!contactId) {
+      // Contact has separate firstName/lastName (both NOT NULL), no single
+      // `name` column. Split the AI-supplied name on whitespace; fall back
+      // to the email local-part if the agent didn't extract a name.
+      const rawName = (c.name ?? '').trim();
+      const localPart = email.split('@')[0] ?? 'Unknown';
+      const nameSource = rawName.length > 0 ? rawName : localPart;
+      const parts = nameSource.split(/\s+/);
+      const firstName = parts[0] || nameSource;
+      const lastName = parts.slice(1).join(' ') || '(unknown)';
+
       const { data: newContact, error } = await supabase
         .from('Contact')
         .insert({
+          firstName,
+          lastName,
           email,
-          name: c.name ?? null,
-          role: c.role ?? null,
+          title: c.role ?? null,
           organizationId: params.organizationId,
-          source: 'ai_email_gmail',
         })
         .select('id')
         .single();
