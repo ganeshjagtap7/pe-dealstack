@@ -30,6 +30,31 @@ export interface SkillRequirements {
   financials?: boolean;
   documents?: boolean;
   sector?: boolean;
+  /**
+   * Skill needs at least one connected mail/calendar integration for the
+   * CURRENT user (Gmail, Google Calendar, and — when shipped — Outlook /
+   * Outlook Calendar). Set on skills like `/follow-ups` that pull live
+   * data from the user's own mailbox. The check is satisfaction-only —
+   * `unmetRequirements()` reads `ctx.hasMailIntegration` to decide. If
+   * the caller doesn't pass `ctx`, the requirement is treated as unmet
+   * (conservative — better to badge than to silently hide a missing-
+   * data condition).
+   */
+  mailIntegration?: boolean;
+}
+
+/**
+ * Optional runtime context for `unmetRequirements` — provides facts that
+ * can't be derived from the Deal alone (e.g., whether the current user has
+ * connected their Gmail / Calendar). Keeping this in one bag means new
+ * cross-entity requirement checks can be added without changing every
+ * caller's signature.
+ */
+export interface SkillRequirementContext {
+  /** True if the current user has at least one connected mail OR calendar
+   *  integration (Gmail / Google Calendar today; Outlook variants when
+   *  shipped). Used by skills with `requires.mailIntegration`. */
+  hasMailIntegration?: boolean;
 }
 
 export interface Skill {
@@ -530,6 +555,12 @@ const followUps: Skill = {
   label: "Action-item follow-ups",
   description: "Unified action-item checklist synthesized from deal activity, Gmail, and Google Calendar.",
   category: "workflow",
+  // The skill technically runs without a mail integration — it'll just return
+  // in-app activity rows. But that's the same surface as not running the
+  // skill, so we badge the menu entry to nudge the user to connect first.
+  // Invocation is NOT blocked — the badge is a hint, matching how
+  // `requires: { sector: true }` works for /dd-checklist.
+  requires: { mailIntegration: true },
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
@@ -1019,7 +1050,11 @@ export function expandChatInput(input: string, deal: Deal | null): string {
 // Returns the list of unmet requirement labels (empty if all satisfied).
 // ---------------------------------------------------------------------------
 
-export function unmetRequirements(skill: Skill, deal: Deal | null): string[] {
+export function unmetRequirements(
+  skill: Skill,
+  deal: Deal | null,
+  ctx?: SkillRequirementContext,
+): string[] {
   if (!skill.requires || !deal) return [];
   const unmet: string[] = [];
   const r = skill.requires;
@@ -1036,6 +1071,11 @@ export function unmetRequirements(skill: Skill, deal: Deal | null): string[] {
   }
   if (r.sector) {
     if (!deal.industry || !deal.industry.trim()) unmet.push("needs sector");
+  }
+  if (r.mailIntegration) {
+    // Conservative — if the caller didn't pass ctx, treat as unmet. Prevents
+    // a missing-context bug from silently hiding the "connect Gmail" badge.
+    if (!ctx?.hasMailIntegration) unmet.push("needs Gmail or Outlook");
   }
   return unmet;
 }

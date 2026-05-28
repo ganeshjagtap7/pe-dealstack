@@ -4,6 +4,7 @@ import {
   findSkillCommand,
   expandChatInput,
   filterSkills,
+  unmetRequirements,
   type Deal,
   type Skill,
 } from "./index";
@@ -284,6 +285,50 @@ describe("/follow-ups — registered and wired to live integrations", () => {
     // when the integration is unconfigured.
     const result = expandChatInput("/follow-ups", baseDeal);
     expect(result).toContain("Gmail not connected");
+  });
+
+  it("declares the mailIntegration requirement so the menu can badge it", () => {
+    const followUps = SKILLS.find((s) => s.command === "/follow-ups");
+    expect(followUps?.requires?.mailIntegration).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// unmetRequirements — mail integration gate
+//
+// `/follow-ups` (and any future skill that reads the user's mailbox) needs
+// a connected Gmail/Calendar/Outlook integration to be useful. The menu UI
+// calls `unmetRequirements(skill, deal, { hasMailIntegration })` so the row
+// shows a "needs Gmail or Outlook" badge when the current user hasn't
+// connected anything. The check is BADGE-ONLY — invocation isn't blocked,
+// matching how `requires: { sector: true }` works for /dd-checklist.
+// ---------------------------------------------------------------------------
+
+describe("unmetRequirements — mailIntegration", () => {
+  const followUps = SKILLS.find((s) => s.command === "/follow-ups")!;
+
+  it("returns the 'needs Gmail or Outlook' badge when ctx says false", () => {
+    expect(unmetRequirements(followUps, baseDeal, { hasMailIntegration: false }))
+      .toContain("needs Gmail or Outlook");
+  });
+
+  it("returns the same badge when ctx is omitted entirely (conservative default)", () => {
+    // Documented behavior — if a caller forgets to pass ctx, we treat the
+    // requirement as unmet so the badge still shows. Better than silently
+    // hiding the connect-to-enable hint.
+    expect(unmetRequirements(followUps, baseDeal))
+      .toContain("needs Gmail or Outlook");
+  });
+
+  it("omits the badge when ctx confirms a connected mail integration", () => {
+    expect(unmetRequirements(followUps, baseDeal, { hasMailIntegration: true }))
+      .not.toContain("needs Gmail or Outlook");
+  });
+
+  it("does NOT badge skills that don't declare the mailIntegration requirement", () => {
+    const icMemo = SKILLS.find((s) => s.command === "/ic-memo")!;
+    expect(unmetRequirements(icMemo, baseDeal, { hasMailIntegration: false }))
+      .not.toContain("needs Gmail or Outlook");
   });
 });
 

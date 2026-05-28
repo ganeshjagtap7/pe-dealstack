@@ -1,10 +1,67 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/cn";
 import type { Skill } from "@/lib/dealchat-skills";
 import { unmetRequirements } from "@/lib/dealchat-skills";
+import { api } from "@/lib/api";
+import { useUser } from "@/providers/UserProvider";
 import type { DealDetail } from "./components";
+
+// Provider IDs that satisfy the `mailIntegration` requirement on a skill.
+// When Outlook ships, add `outlook_mail` and `outlook_calendar` here — single
+// point of change for /follow-ups menu visibility.
+const MAIL_PROVIDERS = new Set(["gmail", "google_calendar"]);
+
+interface IntegrationRow {
+  provider: string;
+  status: string;
+  externalAccountEmail: string | null;
+}
+
+interface IntegrationsResponse {
+  integrations: IntegrationRow[];
+}
+
+/**
+ * Fetches once per slash-menu mount. The /api/integrations endpoint is
+ * org-scoped, so we filter to the current user's connected mail integrations
+ * by matching `externalAccountEmail` (each user connects their own mailbox;
+ * org-mate's tokens are off-limits — agent tools read by user, not org).
+ * If the fetch fails (network blip, 401), we leave `hasMailIntegration` as
+ * `undefined` so the conservative-default path in `unmetRequirements` shows
+ * the badge anyway. Better than a silent miss.
+ */
+function useHasMailIntegration(): boolean | undefined {
+  const { user } = useUser();
+  const [hasMail, setHasMail] = useState<boolean | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    const userEmail = user?.email?.toLowerCase().trim();
+    if (!userEmail) return;
+    api.get<IntegrationsResponse>("/integrations").then(
+      (res) => {
+        if (cancelled) return;
+        const match = res.integrations.some(
+          (i) =>
+            MAIL_PROVIDERS.has(i.provider) &&
+            i.status === "connected" &&
+            i.externalAccountEmail?.toLowerCase().trim() === userEmail,
+        );
+        setHasMail(match);
+      },
+      () => {
+        // Network / auth failure — leave undefined so the badge still shows.
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.email]);
+
+  return hasMail;
+}
 
 // ---------------------------------------------------------------------------
 // SlashMenu — popover rendered ABOVE the chat textarea when the user types
@@ -37,6 +94,8 @@ export function SlashMenu({
     if (el) el.scrollIntoView({ block: "nearest" });
   }, [selectedIdx]);
 
+  const hasMailIntegration = useHasMailIntegration();
+
   if (skills.length === 0) {
     return (
       <div className="absolute left-3 right-3 bottom-full mb-2 z-40 bg-white border border-border-subtle rounded-xl shadow-lg overflow-hidden">
@@ -55,7 +114,7 @@ export function SlashMenu({
       className="absolute left-3 right-3 bottom-full mb-2 z-40 bg-white border border-border-subtle rounded-xl shadow-lg overflow-hidden max-h-80 overflow-y-auto custom-scrollbar"
     >
       {skills.map((s, i) => {
-        const unmet = unmetRequirements(s, deal);
+        const unmet = unmetRequirements(s, deal, { hasMailIntegration });
         const selected = i === selectedIdx;
         return (
           <button
