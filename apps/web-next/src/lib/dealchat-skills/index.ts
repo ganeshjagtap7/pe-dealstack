@@ -24,7 +24,7 @@ import type { DealDetail } from "@/app/(app)/deals/[id]/components";
 // to know it lives next to the chat UI.
 export type Deal = DealDetail;
 
-export type SkillCategory = "memo" | "risk" | "research" | "analysis" | "visual";
+export type SkillCategory = "memo" | "risk" | "research" | "analysis" | "visual" | "workflow";
 
 export interface SkillRequirements {
   financials?: boolean;
@@ -434,6 +434,330 @@ const competitorScan: Skill = {
 };
 
 // ---------------------------------------------------------------------------
+// Workflow skills — daily-driver actions analysts run on a deal in flight.
+// Each one wraps an existing agent tool (`generate_meeting_prep`,
+// `draft_email`, `get_deal_activity`) with prompt structure tuned for the
+// PE deal-team context. These are intentionally lighter than the memo
+// skills — the analyst typically invokes them mid-flow.
+// ---------------------------------------------------------------------------
+
+const meetingPrep: Skill = {
+  id: "meeting-prep",
+  command: "/meeting-prep",
+  label: "Meeting prep brief",
+  description: "Pre-call brief for an upcoming mgmt / seller / banker meeting: last activity, open items, suggested questions.",
+  category: "workflow",
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    return [
+      TOP_ANCHOR,
+      "",
+      `Produce a call-prep brief for an upcoming meeting on ${name}. Use TWO tools, in this order:`,
+      `1. \`generate_meeting_prep\` — pass through any attendee/topic context from the analyst's additional-context block (see bottom). The tool returns a headline, summary, talking points, suggested questions, risks, and agenda.`,
+      `2. \`get_deal_activity\` with limit 20 — pull the most recent activity timeline so the brief reflects what's actually happened on this deal recently.`,
+      "",
+      "Combine the two into ONE markdown brief with these EXACT section headers in this order:",
+      "",
+      "## Headline",
+      "(One line — meeting framing. Lift from `generate_meeting_prep` headline.)",
+      "",
+      "## Last activity",
+      "(3-6 bullets, most-recent first. Format: `[YYYY-MM-DD] **type** — title`. Drop pure system-noise rows (cache refreshes, auto-ingest pings) — keep substantive touchpoints. If the timeline is empty, write \"No activity recorded — this is the first touchpoint.\")",
+      "",
+      "## Open items",
+      `(Bullets — explicit follow-ups, asks, or unresolved threads inferred from the activity log AND any open commitments mentioned in \`search_documents\`. Each item: \`- **<owner>** — <what's owed> _(from <activity date or doc name>)_\`. If ownership is ambiguous, write \"unassigned\". If nothing is open, write \"No open items identified in the activity log.\" — do NOT invent items to fill the section.)`,
+      "",
+      "## Talking points",
+      "(4-6 bullets — pull from `generate_meeting_prep`. Tighten each to one line.)",
+      "",
+      "## Questions to ask",
+      "(6-10 numbered questions — pull from `generate_meeting_prep`. CRITICAL: each question must reference a specific deal fact (financial line, doc quote, recent activity). Generic questions waste a call slot — drop them.)",
+      "",
+      "## Risks to address",
+      "(Bullets — pull from `generate_meeting_prep` risks. Each: one-line description + the diligence ask that would close it. Omit this section entirely if the tool returns none — do NOT pad.)",
+      "",
+      "Keep total length under 500 words. The analyst will skim this on the way to the call.",
+      "",
+      CITATION_REMINDER,
+      UNIT_REMINDER,
+    ].join("\n");
+  },
+};
+
+const emailDraft: Skill = {
+  id: "email-draft",
+  command: "/email-draft",
+  label: "Email draft",
+  description: "Draft a deal-related email — to mgmt, broker, legal, LP — with subject, body, and compliance check.",
+  category: "workflow",
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    return [
+      TOP_ANCHOR,
+      "",
+      `Draft a deal-related email for ${name}. Call the \`draft_email\` tool — it returns subject + body + a compliance check. ECHO that output verbatim in your reply (do not paraphrase the body — the analyst will copy-paste it).`,
+      "",
+      "Parse the analyst's additional-context block (below) for two fields the tool requires:",
+      "- **recipient** — who the email is for (e.g., \"management team\", \"sell-side broker\", \"outside counsel\", \"LP advisory committee\"). Infer when phrased indirectly — \"to broker about Q3 financials\" → recipient: \"sell-side broker\".",
+      "- **purpose** — what the email is asking for (e.g., \"request additional financials\", \"schedule site visit\", \"follow up on LOI\", \"flag a diligence concern\").",
+      "",
+      "If EITHER field cannot be inferred from the analyst's context (or no context was provided), do NOT call the tool. Instead, reply with ONLY this single prompt and nothing else:",
+      "",
+      `> To draft this email I need two things: **recipient** (who it's to) and **purpose** (what it should accomplish). Re-run as e.g. \`/email-draft to broker, requesting Q3 financials and YTD pipeline\`.`,
+      "",
+      "Default tone is `formal`. Switch to `direct` if the analyst's context contains words like \"firm\", \"push back\", \"escalate\", \"chase\". Switch to `casual` only when explicitly asked.",
+      "",
+      "After echoing the tool's output, add ONE short \"why this framing\" line (≤ 25 words) so the analyst knows the tradeoff you made on tone or emphasis. If the compliance check flagged anything, surface those notes prominently — analysts will edit before sending.",
+      "",
+      CITATION_REMINDER,
+    ].join("\n");
+  },
+};
+
+// ---------------------------------------------------------------------------
+// /follow-ups — DEFERRED. The skill object is defined so the prompt logic
+// is captured and reviewable, but it is intentionally NOT included in the
+// `SKILLS` registry below — `findSkillCommand` and `filterSkills` will not
+// see it, so analysts can't invoke it from the chat. To enable later:
+// add `followUps` to the SKILLS array and (optionally) extend the test
+// fixture. Deferral is pending sharper heuristics for "what counts as an
+// action item vs. routine activity" — the current rules below are a first
+// pass and will mis-classify until tuned against real activity logs.
+// ---------------------------------------------------------------------------
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- deliberately unregistered; see comment above.
+const followUps: Skill = {
+  id: "follow-ups",
+  command: "/follow-ups",
+  label: "Action-item follow-ups",
+  description: "Extract action items from the last N activity-log entries and render as a checklist.",
+  category: "workflow",
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    return [
+      TOP_ANCHOR,
+      "",
+      `Extract outstanding action items for ${name} from the deal's recent activity log. Call \`get_deal_activity\` with limit 25 first. If the analyst appended a number in the additional-context block (e.g., "last 50"), use that limit instead — cap at 100.`,
+      "",
+      "From the returned timeline, infer action items using these rules:",
+      "- An action item is something a named (or implied) person OWES — a data ask, deliverable, meeting to schedule, document to review, decision to make.",
+      "- Pure status/system rows (cache refreshes, stage changes without a commitment, automated ingest) are NOT action items — skip them.",
+      "- A commitment that was later marked done in a subsequent activity is CLOSED — exclude it from the checklist.",
+      "- When ownership is ambiguous, write \"unassigned\" rather than guessing a name.",
+      "",
+      "Render as a single markdown checklist, ordered by inferred urgency (deal-blocking → soft follow-up):",
+      "",
+      "- [ ] **<owner>** — <action> _(source: <activity type> on <YYYY-MM-DD>)_",
+      "",
+      "If zero open items remain after filtering, write \"No outstanding action items in the last <N> activity entries.\" Do NOT fabricate items to fill the list.",
+      "",
+      "Below the checklist, summarize in 1-2 sentences: how many items are open, who carries the most, and which item is most likely to block the deal advancing.",
+      "",
+      CITATION_REMINDER,
+    ].join("\n");
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Risk skills (web-backed) — surface external regulatory / legal signals
+// that aren't in the deal's own documents. Sector-required so the search
+// has enough signal to be useful; hard-stop on missing industry matches
+// the ddChecklist pattern.
+// ---------------------------------------------------------------------------
+
+const regulatoryRisk: Skill = {
+  id: "regulatory-risk",
+  command: "/regulatory-risk",
+  label: "Regulatory risk scan",
+  description: "Recent regulatory actions and pending legislation affecting the deal's sector.",
+  category: "risk",
+  requires: { sector: true },
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    const industry = industryOf(deal);
+    if (!industry) {
+      return [
+        `A regulatory-risk scan needs the deal's industry. ${name} has no industry on file.`,
+        "",
+        "HARD STOP: reply with ONLY this single question and NOTHING else: \"What sector should the regulatory scan target?\". Do NOT run a generic regulatory query, do NOT list possible sectors, do NOT propose a template. A generic regulatory scan is worse than none — it gives false comfort.",
+      ].join("\n");
+    }
+    return [
+      TOP_ANCHOR,
+      "",
+      // COST DISCIPLINE: each web_search costs 1 credit. Default to ONE
+      // sector-wide query; escalate ONCE to a jurisdiction-specific query
+      // only if the primary surfaced nothing or the analyst named a
+      // jurisdiction in additional context. Never run 3.
+      `Scan recent regulatory actions and pending legislation affecting ${name} as a ${industry} business. The \`web_search\` tool costs credits per call — run AT MOST 2 calls.`,
+      "",
+      `QUERY 1 (sector-wide — always run): \`web_search({ query: "${industry} regulation 2026 enforcement legislation", topic: "news", recency_days: 365, max_results: 10 })\`. The 365-day window catches the regulatory cycle without missing items from earlier in the year.`,
+      "",
+      `QUERY 2 (jurisdiction-specific — ONLY run if QUERY 1 returned FEWER THAN 3 substantive items, OR if the analyst's additional context names a jurisdiction): \`web_search({ query: "<jurisdiction> ${industry} rulemaking 2026", topic: "news", max_results: 6 })\`. If QUERY 1 already produced enough material, SKIP this call.`,
+      "",
+      "Filtering (apply BEFORE writing the output):",
+      "- Each item must describe a concrete regulatory event: rule proposal, final rule, enforcement action, settlement, statute, court ruling, agency guidance. Drop op-eds, analyst commentary, marketing blogs, evergreen explainers.",
+      `- Each item must plausibly touch ${industry} businesses — not an adjacent sector that happens to share a keyword.`,
+      "- Dated within the last 18 months unless it's a still-pending bill or rulemaking.",
+      "",
+      "Output structure — group items under these EXACT headers (OMIT a header entirely if it has no items; do NOT write \"no items\" placeholders):",
+      "",
+      "## Final rules / enforcement actions",
+      "(In force or already settled. Highest priority — direct cost or compliance implications today.)",
+      "",
+      "## Pending rulemaking / proposed rules",
+      "(Open comment periods, NPRMs, draft regs. Affects the deal's forward-looking compliance burden.)",
+      "",
+      "## Pending legislation",
+      "(Bills in committee or under debate. Lower probability, larger blast radius if passed.)",
+      "",
+      "## Litigation / case law",
+      "(Court rulings or active cases that re-interpret existing rules.)",
+      "",
+      "For EACH item:",
+      "- **One-line headline** with severity prefix: 🔴 deal-material (could change valuation, contract terms, or close-ability), 🟡 diligence (worth a workstream / Q for management), 🟢 monitor (note for the file).",
+      "- Jurisdiction tag in brackets: `[US-Federal]`, `[US-CA]`, `[EU]`, `[UK]`, etc.",
+      "- **Clickable source link** — cite as `[Source — YYYY-MM-DD](URL)`. The URL is mandatory.",
+      `- One-line "deal implication" tied to ${name}: what it means for the thesis, the close, or post-close ops.`,
+      "",
+      `If QUERY 1 returns nothing material after filtering, write: "No discrete regulatory events surfaced in the public news index for ${industry} in the last 18 months. Recommend the deal team check the relevant agency feeds (Federal Register, SEC EDGAR, state AG offices, equivalent foreign regulators) directly." Do NOT fabricate rule names, agency citations, or bill numbers.`,
+      "",
+      `If the \`web_search\` tool returns "Web search is not configured" or "Search failed: ...", do NOT retry — say so explicitly and recommend a manual search.`,
+      "",
+      CITATION_REMINDER,
+    ].join("\n");
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Research skills (web-backed) — outside-in market context for the deal.
+// Both require a sector for the search to be useful.
+// ---------------------------------------------------------------------------
+
+const precedentTransactions: Skill = {
+  id: "precedent-transactions",
+  command: "/precedent-transactions",
+  label: "Precedent transactions",
+  description: "Recent M&A in the deal's industry, with multiples where available.",
+  category: "research",
+  requires: { sector: true },
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    const industry = industryOf(deal);
+    if (!industry) {
+      return [
+        `Precedent-transactions research needs the deal's industry. ${name} has no industry on file.`,
+        "",
+        "HARD STOP: reply with ONLY this single question and NOTHING else: \"What sector should the precedent-transaction search target?\". Do NOT propose generic M&A categories — the result would be useless.",
+      ].join("\n");
+    }
+    return [
+      TOP_ANCHOR,
+      "",
+      // COST DISCIPLINE: each web_search costs 1 credit. Default to ONE
+      // M&A query. Escalate to a multiples-specific query only if the
+      // primary returned <3 announced transactions with disclosed values.
+      `Surface recent precedent M&A transactions in ${industry} relevant to ${name}. The \`web_search\` tool costs credits per call — run AT MOST 2 calls.`,
+      "",
+      `QUERY 1 (M&A activity — always run): \`web_search({ query: "${industry} acquisition merger announced 2025 2026", topic: "news", recency_days: 540, max_results: 10 })\`. The ~18-month window captures both the last full year and YTD.`,
+      "",
+      `QUERY 2 (multiples-specific — ONLY run if QUERY 1 returned FEWER THAN 3 transactions with disclosed values/multiples): \`web_search({ query: "${industry} acquisition EV/EBITDA multiple revenue multiple", topic: "general", max_results: 6 })\`. If QUERY 1 already surfaced enough deals with valuations, SKIP this call.`,
+      "",
+      "Filtering (apply BEFORE writing the output):",
+      "- Each transaction must be a real, announced or closed M&A deal — drop rumor pieces, op-eds, generic industry reports, and SEO listicles.",
+      `- The target must plausibly be in ${industry} (same sub-segment ideally — not just an adjacent vertical that shares a keyword).`,
+      "- Announced or closed within the last ~18 months. Older landmark deals can be included ONLY if they're still the dominant reference comp for the sector — flag those clearly.",
+      "",
+      "Output structure:",
+      "",
+      "## Precedent transactions",
+      "Render a markdown table with these columns: `Target | Acquirer | Date (YYYY-MM) | Deal value | EV/Revenue | EV/EBITDA | Source`. Use `n/d` (not disclosed) for any cell the source did not report — NEVER fabricate a multiple. Sort by date, most recent first.",
+      "",
+      "## Multiple ranges",
+      "Below the table, if you have at least 3 deals with disclosed multiples, compute and quote the EV/Revenue range and EV/EBITDA range (low — median — high). If fewer than 3, write `Insufficient disclosed multiples (N=<x>) to compute a range — flag for a CapIQ / PitchBook pull.`",
+      "",
+      `## What this implies for ${name}`,
+      `Two-sentence read on what the comp set implies for ${name}'s valuation framing — premium-to-median, discount-to-median, or in-line. Tie back to the target's size band and growth profile (use \`get_deal_financials\` for the target's revenue / margin context if available).`,
+      "",
+      "For EVERY row in the table, the Source column must contain a clickable link in the form `[Source — YYYY-MM-DD](URL)`. The URL is mandatory.",
+      "",
+      `If QUERY 1 returns nothing usable, write: "No public precedent transactions surfaced for ${industry} in the search window. Recommend the deal team pull from CapIQ, PitchBook, or Mergermarket directly." Do NOT fabricate target names, acquirer names, or multiples.`,
+      "",
+      `If the \`web_search\` tool is unavailable or fails on the first call, say so explicitly and recommend a manual paid-database pull — do not retry, do not fabricate transactions.`,
+      "",
+      CITATION_REMINDER,
+      UNIT_REMINDER,
+    ].join("\n");
+  },
+};
+
+const sectorThesis: Skill = {
+  id: "sector-thesis",
+  command: "/sector-thesis",
+  label: "Sector thesis brief",
+  description: "Sector landscape — tailwinds, headwinds, regulatory shifts, M&A activity — grounded in the deal's docs.",
+  category: "research",
+  requires: { sector: true },
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    const industry = industryOf(deal);
+    if (!industry) {
+      return [
+        `A sector-thesis brief needs the deal's industry. ${name} has no industry on file.`,
+        "",
+        "HARD STOP: reply with ONLY this single question and NOTHING else: \"What sector should the thesis target?\". Do NOT propose a generic sector landscape.",
+      ].join("\n");
+    }
+    return [
+      TOP_ANCHOR,
+      "",
+      // COST DISCIPLINE: web_search costs credits per call AND we layer in
+      // search_documents (free) to ground the brief in the target's own
+      // materials. Cap web calls at 2.
+      `Build a sector thesis for ${industry}, grounded in the deal context for ${name}. Use TWO data sources:`,
+      `1. \`web_search\` — AT MOST 2 calls for current sector context.`,
+      "2. `search_documents` — pull the deal's own CIM / mgmt deck / market section to anchor the brief in what the seller is already claiming about the sector.",
+      "",
+      `WEB QUERY 1 (always run): \`web_search({ query: "${industry} market trends outlook 2026", topic: "news", recency_days: 365, max_results: 10 })\` — captures current tailwinds/headwinds, demand inflections, recent industry shifts.`,
+      "",
+      `WEB QUERY 2 (ONLY run if QUERY 1 returned thin or off-topic results): \`web_search({ query: "${industry} consolidation M&A deal activity", topic: "news", recency_days: 365, max_results: 6 })\` — fills the M&A activity section if QUERY 1 skewed too far toward macro.`,
+      "",
+      "DOC SEARCHES (free — run 1-2): `search_documents` for terms like \"market size\", \"competitive landscape\", \"growth drivers\", \"regulatory environment\" to pull what the seller's materials say about the sector.",
+      "",
+      "Filtering:",
+      "- Web items must describe a discrete trend, event, or data point. Drop SEO/AI fluff, evergreen marketing pages, vendor blogs.",
+      "- Doc items must be from THIS deal's materials (cite the document name + section).",
+      "",
+      "Output — 400-600 words total. Use these EXACT section headers in this order:",
+      "",
+      `## ${industry} — at a glance`,
+      "(2-3 sentences — what the sector is, current state, the one thing a generalist needs to know before reading further.)",
+      "",
+      "## Tailwinds",
+      "(3-5 bullets. Each: one-line driver + a specific data point or event + cited source link. Prefer quantified claims — \"market growing 12% CAGR per [Source]\" beats \"strong growth.\")",
+      "",
+      "## Headwinds",
+      "(3-5 bullets, same structure. Be honest — every sector has them.)",
+      "",
+      "## Regulatory shifts",
+      "(Bullets — rules, bills, enforcement actions affecting the sector. Lift relevant items from web search; tag jurisdiction. If nothing material, write \"No material regulatory shifts surfaced in the last 12 months\" — do NOT pad.)",
+      "",
+      "## M&A activity",
+      "(Bullets — most material recent transactions or consolidation themes. Each: target + acquirer + date + one-line significance. If thin, write \"Limited public M&A activity surfaced — recommend a CapIQ pull\" rather than padding.)",
+      "",
+      `## Implication for ${name}'s thesis`,
+      `(Two paragraphs — tie the sector context back to THIS deal. Where does ${name} sit relative to the tailwinds? Which headwinds bite the hardest? What does the seller's own framing (from \`search_documents\`) miss or over-emphasize? This is the section the deal team actually reads — make it specific.)`,
+      "",
+      "Cite EVERY external claim with `[Source — YYYY-MM-DD](URL)`. Cite document claims with the document name + page/section if available.",
+      "",
+      `If \`web_search\` returns "Web search is not configured" or fails, build the brief from \`search_documents\` ALONE and flag at the top: "Sector context drawn only from the deal's own materials — external sector signals unavailable in this turn." Do NOT fabricate sector data.`,
+      "",
+      CITATION_REMINDER,
+      UNIT_REMINDER,
+    ].join("\n");
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Visual skills (Phase 3) — each invokes the `generate_chart` tool so the
 // chart renders inline in the chat bubble. Prompts are explicit about
 // which data source to read (get_deal_financials / compare_deals) and
@@ -587,6 +911,16 @@ export const SKILLS: Skill[] = [
   ddChecklist,
   newsScan,
   competitorScan,
+  meetingPrep,
+  emailDraft,
+  // followUps — INTENTIONALLY NOT REGISTERED. The skill is defined above
+  // so its prompt logic is in the codebase, but it is gated off until the
+  // activity-log action-item heuristics are tuned. To enable: insert
+  // `followUps,` on this line. See the comment block above the followUps
+  // definition for rationale.
+  regulatoryRisk,
+  precedentTransactions,
+  sectorThesis,
   chartRevenue,
   chartMargin,
   chartCompMults,

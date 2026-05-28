@@ -244,6 +244,38 @@ describe("expandChatInput", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Deferred-skill guard
+//
+// `/follow-ups` has its prompt/buildPrompt defined in dealchat-skills/index.ts
+// but is intentionally NOT added to the SKILLS array — it ships gated off
+// until the activity-log heuristics are tuned. This block locks that in so
+// nobody accidentally enables it without updating the gating decision and
+// adding the appropriate coverage.
+// ---------------------------------------------------------------------------
+
+describe("/follow-ups — deferred (must stay unregistered)", () => {
+  it("is not present in the SKILLS registry", () => {
+    expect(SKILLS.some((s) => s.command === "/follow-ups")).toBe(false);
+    expect(SKILLS.some((s) => s.id === "follow-ups")).toBe(false);
+  });
+
+  it("is not findable via findSkillCommand", () => {
+    expect(findSkillCommand("/follow-ups")).toBeNull();
+    expect(findSkillCommand("/follow-ups last 50")).toBeNull();
+  });
+
+  it("is not surfaced by filterSkills (menu UI must hide it)", () => {
+    expect(filterSkills("follow").some((s) => s.id === "follow-ups")).toBe(false);
+    expect(filterSkills("/follow-ups").some((s) => s.id === "follow-ups")).toBe(false);
+  });
+
+  it("leaves the input untouched when expandChatInput sees /follow-ups", () => {
+    // Same fallthrough as any unknown command — the raw text reaches the agent.
+    expect(expandChatInput("/follow-ups", baseDeal)).toBe("/follow-ups");
+  });
+});
+
 describe("filterSkills", () => {
   it("returns all skills for an empty query", () => {
     expect(filterSkills("").length).toBe(SKILLS.length);
