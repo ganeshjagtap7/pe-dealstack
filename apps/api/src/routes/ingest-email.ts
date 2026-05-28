@@ -1,17 +1,14 @@
 import { Router } from 'express';
 import { supabase } from '../supabase.js';
-import { extractDealDataFromText } from '../services/aiExtractor.js';
 import { embedDocument } from '../rag.js';
 import { log } from '../utils/logger.js';
-import { validateFinancials } from '../services/financialValidator.js';
-import { parseEmailFile, buildDealTextFromEmail } from '../services/emailParser.js';
+import { parseEmailFile } from '../services/emailParser.js';
 import { parseExcelToDealRows } from '../services/excelParser.js';
 import { getIconForIndustry } from '../services/dealMerger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
-import { resolveUserId } from './notifications.js';
-import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
+import { createDealFromEmail } from '../integrations/gmail/autoCreateDeal.js';
 
 const subRouter = Router();
 
@@ -30,187 +27,60 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
 
     log.info('Email ingest starting', { filename: file.originalname });
 
-    // Step 1: Parse email
+    // 1. Parse the .eml.
     const emailData = await parseEmailFile(file.buffer);
     if (!emailData) {
       return res.status(400).json({ error: 'Failed to parse email file' });
     }
 
-    // Step 2: Build text for AI extraction
-    const dealText = buildDealTextFromEmail(emailData);
-    if (dealText.length < 100) {
-      return res.status(400).json({ error: 'Email has insufficient content for deal extraction' });
-    }
-
-    // Step 3: AI extraction
-    const aiData = await extractDealDataFromText(dealText);
-    if (!aiData) {
-      return res.status(400).json({ error: 'Could not extract deal data from email' });
-    }
-
-    // Step 4: Financial validation — sourceLength enables short-doc bounds
-    const financialCheck = validateFinancials({
-      revenue: aiData.revenue.value,
-      ebitda: aiData.ebitda.value,
-      ebitdaMargin: aiData.ebitdaMargin?.value,
-      revenueGrowth: aiData.revenueGrowth?.value,
-      employees: aiData.employees?.value,
-      dealSize: aiData.dealSize?.value,
-      sourceLength: dealText.length,
+    // 2. Delegate deal creation to the shared helper (same path used by Gmail
+    //    cron sync). The route layer keeps responsibility for attachments,
+    //    audit logging (needs `req`), and the HTTP response shape.
+    const result = await createDealFromEmail({
+      organizationId: orgId,
+      userId: req.user?.id ?? null,
+      source: 'manual_eml',
+      email: {
+        subject: emailData.subject,
+        from: emailData.from,
+        date: emailData.date,
+        bodyText: emailData.bodyText,
+      },
     });
-    if (!financialCheck.isValid) {
-      aiData.needsReview = true;
-      aiData.reviewReasons = [...(aiData.reviewReasons || []), ...financialCheck.warnings];
+
+    if (!result.created) {
+      const msg =
+        result.reason === 'duplicate'
+          ? 'A deal already exists for this email'
+          : result.reason === 'insufficient_content'
+            ? 'Email has insufficient content for deal extraction'
+            : result.reason === 'extraction_failed'
+              ? 'Could not extract deal data from email'
+              : 'Could not create a deal from this email';
+      return res.status(400).json({ error: msg, reason: result.reason, existingDealId: result.dealId });
     }
 
-    // Step 5: Create or find company
-    const companyName = aiData.companyName.value || emailData.subject;
-    const { data: existingCompany } = await supabase
-      .from('Company')
-      .select('id, name')
-      .ilike('name', companyName)
-      .eq('organizationId', orgId)
-      .single();
+    const dealId = result.dealId!;
 
-    let company;
-    if (existingCompany) {
-      company = existingCompany;
-    } else {
-      const { data: newCompany, error: companyError } = await supabase
-        .from('Company')
-        .insert({
-          name: companyName,
-          industry: aiData.industry.value,
-          description: aiData.description.value,
-          organizationId: orgId,
-        })
-        .select()
-        .single();
-      if (companyError) throw companyError;
-      company = newCompany;
-    }
-
-    // Step 6: Create deal
-    const dealIcon = getIconForIndustry(aiData.industry.value);
-    const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
-
-    // Per-field confidence floor — see ingest-text.ts for rationale.
-    // Email-bodies are typically very short, so this gate is critical here.
-    const FIELD_FLOOR = 60;
-    const safeRevenue = aiData.revenue.value != null && aiData.revenue.confidence >= FIELD_FLOOR
-      ? aiData.revenue.value : null;
-    const safeEbitda = aiData.ebitda.value != null && aiData.ebitda.confidence >= FIELD_FLOOR
-      ? aiData.ebitda.value : null;
-    // dealSize is the EV/transaction value of the deal, NOT revenue.
-    const safeDealSize = aiData.dealSize?.value != null && aiData.dealSize.confidence >= FIELD_FLOOR
-      ? aiData.dealSize.value : null;
-
-    const { data: deal, error: dealError } = await supabase
-      .from('Deal')
-      .insert({
-        name: companyName,
-        companyId: company.id,
-        organizationId: orgId,
-        stage: 'INITIAL_REVIEW',
-        status: dealStatus,
-        industry: aiData.industry.value,
-        description: aiData.description.value,
-        revenue: safeRevenue,
-        ebitda: safeEbitda,
-        dealSize: safeDealSize,
-        aiThesis: aiData.summary,
-        icon: dealIcon,
-        extractionConfidence: aiData.overallConfidence,
-        needsReview: aiData.needsReview,
-        reviewReasons: aiData.reviewReasons,
-        aiRisks: { keyRisks: aiData.keyRisks || [], investmentHighlights: aiData.investmentHighlights || [] },
-        source: 'email',
-      })
-      .select()
-      .single();
-
-    if (dealError) throw dealError;
-
-    // Step 7: Create document record for email body
-    const emailDocName = `Email — ${emailData.subject}`;
-    const emailBodyByteLength = Buffer.byteLength(dealText, 'utf8');
-
-    // Dedup: same subject + identical body byte length on the same deal =
-    // re-ingest of the same email (e.g. forwarded twice).
-    const existingEmailDuplicate = await findExistingDocument(deal.id, emailDocName, emailBodyByteLength);
-    let document: any;
-    if (existingEmailDuplicate) {
-      logDuplicateSkip(existingEmailDuplicate, {
-        dealId: deal.id,
-        name: emailDocName,
-        fileSize: emailBodyByteLength,
-      });
-      document = existingEmailDuplicate;
-    } else {
-      const { data: insertedDoc } = await supabase
-        .from('Document')
-        .insert({
-          dealId: deal.id,
-          name: emailDocName,
-          type: 'OTHER',
-          fileSize: emailBodyByteLength,
-          extractedText: dealText,
-          extractedData: {
-            companyName: aiData.companyName,
-            industry: aiData.industry,
-            description: aiData.description,
-            revenue: aiData.revenue,
-            ebitda: aiData.ebitda,
-            ebitdaMargin: aiData.ebitdaMargin,
-            revenueGrowth: aiData.revenueGrowth,
-            employees: aiData.employees,
-            summary: aiData.summary,
-            overallConfidence: aiData.overallConfidence,
-            needsReview: aiData.needsReview,
-            reviewReasons: aiData.reviewReasons,
-          },
-          status: aiData.needsReview ? 'pending_review' : 'analyzed',
-          confidence: aiData.overallConfidence / 100,
-          aiAnalyzedAt: new Date().toISOString(),
-          mimeType: 'message/rfc822',
-        })
-        .select()
-        .single();
-      document = insertedDoc;
-    }
-
-    // Step 8: Process PDF attachments
+    // 3. Process PDF attachments (kept route-side; cron path doesn't fetch them).
     const processedAttachments: string[] = [];
     for (const att of emailData.attachments) {
       if (att.contentType === 'application/pdf' && att.size < 50 * 1024 * 1024) {
         try {
           const pdfData = await extractTextFromPDF(att.content);
           if (pdfData?.text) {
-            // Dedup against (dealId, filename, attachment size) before
-            // inserting + re-embedding the same attachment.
-            const existingAttDuplicate = await findExistingDocument(deal.id, att.filename, att.size);
-            if (existingAttDuplicate) {
-              logDuplicateSkip(existingAttDuplicate, {
-                dealId: deal.id,
-                name: att.filename,
-                fileSize: att.size,
-              });
-            } else {
-              await supabase.from('Document').insert({
-                dealId: deal.id,
-                name: att.filename,
-                type: 'OTHER',
-                fileSize: att.size,
-                extractedText: pdfData.text,
-                mimeType: 'application/pdf',
-                status: 'pending_analysis',
-              });
-
-              // RAG embed the attachment in background
-              embedDocument(deal.id + '-' + att.filename, deal.id, pdfData.text)
-                .catch(err => log.error('Attachment RAG error', err));
-            }
+            await supabase.from('Document').insert({
+              dealId,
+              name: att.filename,
+              type: 'OTHER',
+              extractedText: pdfData.text,
+              mimeType: 'application/pdf',
+              status: 'pending_analysis',
+            });
             processedAttachments.push(att.filename);
+
+            embedDocument(dealId + '-' + att.filename, dealId, pdfData.text)
+              .catch(err => log.error('Attachment RAG error', err));
           }
         } catch (err) {
           log.warn('Attachment processing failed', { filename: att.filename, error: err });
@@ -218,57 +88,20 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
       }
     }
 
-    // Step 9: Log activity
-    await supabase.from('Activity').insert({
-      dealId: deal.id,
-      type: 'DEAL_CREATED',
-      title: 'Deal created from email',
-      description: `From: ${emailData.from}\nSubject: ${emailData.subject}`,
-      metadata: {
-        emailFrom: emailData.from,
-        emailSubject: emailData.subject,
-        emailDate: emailData.date,
-        attachmentsProcessed: processedAttachments,
-      },
-    });
-
-    // Step 10: Auto-assign creator as analyst.
-    // DealTeamMember.userId is the internal User.id FK, NOT the Supabase
-    // auth UUID. resolveUserId() maps the JWT subject to the internal row.
-    // Skipping the mapping silently drops the team assignment via FK violation
-    // (matches the watchlist fix in 774f9f2 and the pattern already used by
-    // ingest-upload / ingest-text / ingest-url below).
-    if (req.user?.id) {
-      const internalUserId = await resolveUserId(req.user.id);
-      if (internalUserId) {
-        await supabase.from('DealTeamMember').insert({
-          dealId: deal.id,
-          userId: internalUserId,
-          role: 'MEMBER',
-        }).then(({ error }) => { if (error) log.warn('Auto-assign analyst failed', error); });
-      }
-    }
-
-    // Step 11: RAG embed email body in background
-    if (dealText.length > 100) {
-      embedDocument(document?.id || deal.id, deal.id, dealText)
-        .catch(err => log.error('Email RAG embedding error', err));
-    }
-
-    // Step 11: Audit log
-    await AuditLog.aiIngest(req, `Email — ${emailData.subject}`, deal.id);
+    // 4. Audit log (route layer holds `req`).
+    await AuditLog.aiIngest(req, `Email — ${emailData.subject}`, dealId);
 
     log.info('Email ingest complete', {
-      dealId: deal.id,
-      companyName,
-      confidence: aiData.overallConfidence,
+      dealId,
+      companyName: result.companyName,
+      confidence: result.extraction?.overallConfidence,
       attachments: processedAttachments.length,
     });
 
     res.status(201).json({
       success: true,
-      deal,
-      extraction: aiData,
+      deal: { id: dealId, name: result.companyName },
+      extraction: result.extraction,
       email: {
         subject: emailData.subject,
         from: emailData.from,

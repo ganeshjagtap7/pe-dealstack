@@ -148,3 +148,20 @@ export async function getMessage(accessToken: string, messageId: string): Promis
   }
   return (await res.json()) as GmailMessage;
 }
+
+// format=full returns the message payload with body parts (base64url-encoded).
+// Used by the auto-deal flow when the classifier needs to read the body.
+// Costs ~5x more bytes than format=metadata, so we only call this when the
+// pre-filter has already decided the message is worth classifying.
+export async function getMessageFull(accessToken: string, messageId: string): Promise<GmailMessage> {
+  const url = `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}?format=full`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gmail getMessageFull failed: ${res.status} ${text}`);
+  }
+  return (await res.json()) as GmailMessage;
+}
