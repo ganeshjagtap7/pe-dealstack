@@ -291,6 +291,17 @@ describe("/follow-ups — registered and wired to live integrations", () => {
     const followUps = SKILLS.find((s) => s.command === "/follow-ups");
     expect(followUps?.requires?.mailIntegration).toBe(true);
   });
+
+  it("mandates a data-source provenance header so the analyst can verify Gmail/Calendar were queried", () => {
+    // Without this header, the agent's reply hides whether the integration
+    // tools were called, returned empty, or were skipped. The whole point of
+    // this skill is trust-but-verify — provenance is non-negotiable.
+    const result = expandChatInput("/follow-ups", baseDeal);
+    expect(result).toContain("Pulled from: in-app activity");
+    expect(result).toContain("Gmail (M emails)");
+    expect(result).toContain("Calendar (K events)");
+    expect(result).toContain("MANDATORY"); // hammered both at output spec + final reminder
+  });
 });
 
 // ---------------------------------------------------------------------------

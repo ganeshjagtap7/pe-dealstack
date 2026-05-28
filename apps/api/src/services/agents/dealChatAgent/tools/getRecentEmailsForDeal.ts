@@ -168,13 +168,25 @@ export function makeGetRecentEmailsForDealTool(
       const limit = Math.min(Math.max(rawArgs.limit ?? 25, 1), 50);
       const args = { lookback_days: lookbackDays, limit };
 
+      // Entry-point log — answers the "was this tool actually called?" question
+      // when the agent's reply seems thin. `cached: true/false` on the second
+      // log line tells you whether Gmail was actually hit or served from cache.
+      log.info('[get_recent_emails_for_deal] called', {
+        dealId,
+        userId: userId ?? null,
+        args,
+      });
+
       if (!userId) {
         return 'User context not available. Cannot read Gmail for this request.';
       }
 
       const cacheKey = `get_recent_emails_for_deal:${userId}:${dealId}:${JSON.stringify(args)}`;
       const cached = getCached(cacheKey);
-      if (cached) return cached;
+      if (cached) {
+        log.info('[get_recent_emails_for_deal] served from cache', { dealId });
+        return cached;
+      }
 
       try {
         const internalUserId = await resolveInternalUserId(userId);
