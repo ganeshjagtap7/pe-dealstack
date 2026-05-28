@@ -3,6 +3,7 @@ import {
   SKILLS,
   findSkillCommand,
   expandChatInput,
+  filterSkills,
   type Deal,
   type Skill,
 } from "./index";
@@ -240,5 +241,50 @@ describe("expandChatInput", () => {
   it("returns input verbatim for an unknown command (no expansion attempted)", () => {
     const input = "/totally-made-up extra stuff";
     expect(expandChatInput(input, baseDeal)).toBe(input);
+  });
+});
+
+describe("filterSkills", () => {
+  it("returns all skills for an empty query", () => {
+    expect(filterSkills("").length).toBe(SKILLS.length);
+    expect(filterSkills("   ").length).toBe(SKILLS.length);
+  });
+
+  it("matches against command (with leading slash)", () => {
+    const hits = filterSkills("/ic-memo");
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.some((s) => s.id === "ic-memo")).toBe(true);
+  });
+
+  it("matches against command (without leading slash) — the menu-input convention", () => {
+    const hits = filterSkills("qoe");
+    expect(hits.some((s) => s.id === "qoe-flags")).toBe(true);
+  });
+
+  it("matches against the label so analysts searching by name find it", () => {
+    const hits = filterSkills("Investment Committee");
+    expect(hits.some((s) => s.id === "ic-memo")).toBe(true);
+  });
+
+  it("matches against the description so intent-based searches work — 'red flags' finds qoeFlags", () => {
+    // qoeFlags description: "Quality of Earnings red flags grouped by category with severity."
+    // The phrase "red flags" appears in NO command or label, only the description.
+    const hits = filterSkills("red flags");
+    expect(hits.some((s) => s.id === "qoe-flags")).toBe(true);
+  });
+
+  it("matches against the description for other intent phrases ('memo', 'chart', 'comp')", () => {
+    expect(filterSkills("memo").some((s) => s.category === "memo")).toBe(true);
+    expect(filterSkills("chart").some((s) => s.category === "visual")).toBe(true);
+    expect(filterSkills("comparable").some((s) => s.id === "comp-bench")).toBe(true);
+  });
+
+  it("returns empty array for a query that matches nothing", () => {
+    expect(filterSkills("xyznosuchthing").length).toBe(0);
+  });
+
+  it("is case-insensitive", () => {
+    expect(filterSkills("IC-MEMO").some((s) => s.id === "ic-memo")).toBe(true);
+    expect(filterSkills("RED FLAGS").some((s) => s.id === "qoe-flags")).toBe(true);
   });
 });

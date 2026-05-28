@@ -78,6 +78,33 @@ const CHART_UNIT_REMINDER = [
   "- For percentage / margin / growth-rate charts, set `unit: 'units'` (no currency suffix is applied — the axis is unitless).",
 ].join("\n");
 
+// Top-of-prompt anchor injected as the FIRST line of every buildPrompt to
+// keep the highest-priority guardrails in the model's recency window. In
+// long prompts (~40+ lines like ic-memo) the LLM's attention to tail-of-
+// prompt instructions degrades; the same rules repeated up front anchor
+// behaviour throughout the generation. Detailed CITATION/UNIT reminders
+// still ship at the bottom of each prompt for completeness.
+const TOP_ANCHOR =
+  "GROUND RULES: cite every numeric claim (tool name + period), use the unit each row reports (K/M/B/units/%/x — never assume), never fabricate numbers or document references.";
+
+// Shared "available data" rules used by every chart skill. Extracted so a
+// rule change lands in one place (was previously copy-pasted 3× across
+// chartRevenue/chartMargin/chartCompMults — drift risk on rule updates).
+const CHART_DATA_RULES = [
+  `"Available data" rules (do NOT misread these as empty):`,
+  `- If \`get_deal_financials\` returns any line that says "Found N financial statements" with N >= 1, the deal HAS extracted financials. Use them — even when the breakdown shows "0 active, N pending review" or "(pending merge review)". Pending-review statements are real, extracted data; they're just queued for a duplicate-resolution UI step.`,
+  `- A single period is still data. Render a single-bar / bar chart from it.`,
+  `- Treat a monthly-only period set the same as an annual one. Chart the monthly points directly; do not require an FY rollup.`,
+].join("\n");
+
+// Final echo reminder appended at the END of every chart-skill prompt.
+// Counterweight to the MANDATORY top-of-prompt line: long chart prompts
+// run ~30 lines, so models occasionally "forget" the echo rule by the
+// time they generate output. Bracketing the reminder at top AND bottom
+// of the prompt is the cheapest reliability fix.
+const CHART_ECHO_REMINDER =
+  "FINAL REMINDER: your reply MUST contain the raw ```chart...``` block from generate_chart — verbatim, fences included. If you summarize, paraphrase, or strip the fences, the chart does NOT render.";
+
 // ---------------------------------------------------------------------------
 // Skills
 // ---------------------------------------------------------------------------
@@ -94,7 +121,9 @@ const icMemo: Skill = {
     const industry = industryOf(deal);
     const industryClause = industry ? ` in the ${industry} sector` : "";
     return [
-      `Draft a full Investment Committee memo for ${name}${industryClause}. Minimum 600 words. Use the exact section headers below, in this order:`,
+      TOP_ANCHOR,
+      "",
+      `Draft a full Investment Committee memo for ${name}${industryClause}. Target 600-900 words total — if you exceed 900, you're over-explaining; tighten. Use the exact section headers below, in this order:`,
       "",
       "## Executive Summary",
       "A 4-6 sentence overview: what the company does, deal size/structure if known, headline financials, and a one-line recommendation.",
@@ -134,6 +163,8 @@ const qoeFlags: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
+      TOP_ANCHOR,
+      "",
       `Identify Quality of Earnings (QoE) red flags for ${name}. Pull data from \`get_analysis_summary\` AND \`get_deal_financials\`. Cross-reference \`search_documents\` for any narrative that supports or contradicts the numbers.`,
       "",
       "Format as a bulleted list, grouped by these EXACT category headers (in this order):",
@@ -174,6 +205,8 @@ const mgmtQa: Skill = {
       ? `Tailor every question to the ${industry} sector — generic questions are not useful here.`
       : "Use whatever sector signal you can extract from `search_documents` and `get_deal_documents` to keep questions specific. If sector is truly unknown, note that at the top and proceed with the best inference.";
     return [
+      TOP_ANCHOR,
+      "",
       `Generate 20 management-call questions for ${name}. Exactly 5 questions per bucket, in this order:`,
       "",
       "## Strategy & Vision",
@@ -206,6 +239,8 @@ const compBench: Skill = {
     const name = nameOf(deal);
     const industry = industryOf(deal);
     return [
+      TOP_ANCHOR,
+      "",
       `Build a comparables benchmark for ${name}${industry ? ` (${industry})` : ""}. Use the \`compare_deals\` tool to pull a comp set.`,
       "",
       "## Comp Table",
@@ -235,6 +270,8 @@ const onePager: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
+      TOP_ANCHOR,
+      "",
       `Produce a strict ~250-word one-pager for ${name}. Total length MUST be between 220 and 280 words. Use these exact section headers and formats:`,
       "",
       "## Snapshot",
@@ -274,10 +311,12 @@ const ddChecklist: Skill = {
       return [
         `A sector-specific DD checklist needs the deal's industry. ${name} has no industry on file.`,
         "",
-        "First, ask the user: 'What sector should this checklist be tailored to?' and stop. Do not produce a generic checklist — that defeats the purpose of this command.",
+        "HARD STOP: reply with ONLY this single question and NOTHING else: \"What sector should this checklist be tailored to?\". Do NOT produce any checklist items, do NOT list possible sectors, do NOT propose a generic template. A generic checklist is strictly worse than no checklist; the user will tell you the sector and you'll re-run the skill with that input.",
       ].join("\n");
     }
     return [
+      TOP_ANCHOR,
+      "",
       `Generate a due diligence checklist for ${name} tailored to the ${industry} sector. Use these four bucket headers in this order:`,
       "",
       "## Commercial",
@@ -307,6 +346,8 @@ const newsScan: Skill = {
     const name = nameOf(deal);
     const industry = industryOf(deal);
     return [
+      TOP_ANCHOR,
+      "",
       // COST DISCIPLINE: each web_search costs 1 credit. Default to ONE
       // target query. Only run the SECOND domain query when the target
       // signal is too thin to fill the brief on its own. Never run a
@@ -361,6 +402,8 @@ const competitorScan: Skill = {
     const name = nameOf(deal);
     const industry = industryOf(deal) || "the target's";
     return [
+      TOP_ANCHOR,
+      "",
       // COST DISCIPLINE: each web_search costs 1 credit. Default to ONE
       // query. Only escalate to a second if the first returned fewer than
       // 3 distinct competitors. Never run 3 just to fill the cap.
@@ -385,6 +428,7 @@ const competitorScan: Skill = {
       `If the \`web_search\` tool is unavailable, say so explicitly and recommend a manual search — do not fabricate competitors. If fewer than 5 credible competitors surface, list only what you have and propose 3 manual sources (G2 category page, Capterra alternatives, specific subreddit) the analyst can check.`,
       "",
       CITATION_REMINDER,
+      UNIT_REMINDER,
     ].join("\n");
   },
 };
@@ -413,16 +457,15 @@ const chartRevenue: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
+      TOP_ANCHOR,
+      "",
       `**MANDATORY: (1) call \`generate_chart\` and (2) ECHO ITS FENCED OUTPUT VERBATIM into your final reply.** The tool returns a \`\`\`chart...\`\`\` block — copy it whole (opening fence, JSON line, closing fence) into your message. Paraphrasing or stripping the fences means NO chart renders.`,
       "",
       `Use \`get_deal_financials\` to retrieve revenue for ${name} across all available periods, then call \`generate_chart\` with a chart titled "Revenue trend" showing period on X and revenue on Y. Prefer a line chart when 2+ periods are available; use a single-bar chart when only one data point exists. Pass y-values at the SAME scale as the source row's unitScale (do not pre-convert) and set the spec's \`unit\` field to match — see the unit-field block below.`,
       "",
       "Render the chart with WHATEVER data is available — 1, 2, or 10 periods are all valid. The analyst wants the visual; do not skip the chart because the series is short.",
       "",
-      `"Available data" rules (do NOT misread these as empty):`,
-      `- If \`get_deal_financials\` returns any line that says "Found N financial statements" with N >= 1, the deal HAS extracted financials. Use them — even when the breakdown shows "0 active, N pending review" or "(pending merge review)". Pending-review statements are real, extracted data; they're just queued for a duplicate-resolution UI step.`,
-      `- A single period is still data. Render a single-bar chart from it.`,
-      `- Treat a monthly-only period set the same as an annual one. Chart the monthly points directly; do not require an FY rollup.`,
+      CHART_DATA_RULES,
       "",
       `If \`get_deal_financials\` returns LITERALLY "No financial statements extracted for this deal yet." or "Error fetching financial data.", check the deal record's summary fields (revenue / cachedRevenue) for ${name}. If those have values, render a single-bar chart from them and label the chart caption as "Deal Record summary field — single LTM/snapshot value, not a time series".`,
       "",
@@ -441,6 +484,8 @@ const chartRevenue: Skill = {
       CHART_UNIT_REMINDER,
       "",
       CITATION_REMINDER,
+      "",
+      CHART_ECHO_REMINDER,
     ].join("\n");
   },
 };
@@ -455,16 +500,15 @@ const chartMargin: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
+      TOP_ANCHOR,
+      "",
       `**MANDATORY: (1) call \`generate_chart\` and (2) ECHO ITS FENCED OUTPUT VERBATIM into your final reply.** The tool returns a \`\`\`chart...\`\`\` block — copy it whole (opening fence, JSON line, closing fence) into your message. Paraphrasing or stripping the fences means NO chart renders.`,
       "",
       `Use \`get_deal_financials\` for ${name} to pull all available periods (target 6+, but use whatever is returned). Call \`generate_chart\` with a chart titled "Gross & EBITDA margins". When 2+ periods are available, render a line chart with TWO series (gross_margin, ebitda_margin) on the Y axis (%) and period on X. When only one period (or only a single computed snapshot) is available, render a bar chart with one bar per metric. Margins are PERCENTAGES — set the spec's \`unit\` field to \`"%"\` (not \`"units"\`) so the axis labels render as \`12.5%\` / \`-30.6%\` instead of \`$12.5\` / \`-$30.6\`. Pass y-values as the percent number itself (e.g., 12.5 for 12.5%, NOT 0.125).`,
       "",
       "Render the chart with WHATEVER data is available — 1, 2, or more periods are all valid. Do not skip the chart because the series is short.",
       "",
-      `"Available data" rules (do NOT misread these as empty):`,
-      `- If \`get_deal_financials\` returns any line that says "Found N financial statements" with N >= 1, the deal HAS extracted financials. Use them — even when the breakdown shows "0 active, N pending review" or "(pending merge review)".`,
-      `- A single period is still data. Render a bar chart from it.`,
-      `- Monthly periods count too — chart them directly.`,
+      CHART_DATA_RULES,
       "",
       `If \`get_deal_financials\` returns LITERALLY "No financial statements extracted for this deal yet." or "Error fetching financial data.", check the deal record's summary fields (revenue / cachedRevenue, ebitda / cachedEbitda) for ${name}. If those exist, compute snapshot EBITDA margin (ebitda / revenue) and render a single-bar chart. Label the caption as "Deal Record summary field — single LTM/snapshot value, not a time series".`,
       "",
@@ -483,6 +527,8 @@ const chartMargin: Skill = {
       CHART_UNIT_REMINDER,
       "",
       CITATION_REMINDER,
+      "",
+      CHART_ECHO_REMINDER,
     ].join("\n");
   },
 };
@@ -497,6 +543,8 @@ const chartCompMults: Skill = {
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
+      TOP_ANCHOR,
+      "",
       `**MANDATORY: (1) call \`generate_chart\` and (2) ECHO ITS FENCED OUTPUT VERBATIM into your final reply.** The tool returns a \`\`\`chart...\`\`\` block — copy it whole (opening fence, JSON line, closing fence) into your message. Paraphrasing or stripping the fences means NO chart renders.`,
       "",
       `Use \`compare_deals\` to get comparable EV/EBITDA multiples for ${name} (if available). Call \`generate_chart\` with a bar chart titled "EV/EBITDA — comparable set" with company on X and multiple on Y. EV/EBITDA values are MULTIPLES (e.g., 8.5 = 8.5x) — set the spec's \`unit\` field to \`"x"\` (not \`"units"\`) so the y-axis renders \`8.5x\` instead of \`$8.5\`. Pass y-values as the multiple itself (e.g., 8.5 for 8.5x).`,
@@ -520,6 +568,8 @@ const chartCompMults: Skill = {
       CHART_UNIT_REMINDER,
       "",
       CITATION_REMINDER,
+      "",
+      CHART_ECHO_REMINDER,
     ].join("\n");
   },
 };
@@ -552,10 +602,15 @@ export function filterSkills(query: string): Skill[] {
     // forms makes filterSkills robust to either caller convention.
     const cmd = s.command.toLowerCase();
     const cmdNoSlash = cmd.startsWith("/") ? cmd.slice(1) : cmd;
+    // Also matches against the description so analysts searching by intent
+    // ("red flags", "memo", "valuation") land on the right skill even when
+    // those words aren't in the command or label. e.g. "red flags" hits
+    // qoeFlags whose description reads "...red flags grouped by category".
     return (
       cmd.includes(q) ||
       cmdNoSlash.includes(q) ||
-      s.label.toLowerCase().includes(q)
+      s.label.toLowerCase().includes(q) ||
+      s.description.toLowerCase().includes(q)
     );
   });
 }
