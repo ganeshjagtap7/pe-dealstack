@@ -515,42 +515,69 @@ const emailDraft: Skill = {
 };
 
 // ---------------------------------------------------------------------------
-// /follow-ups — DEFERRED. The skill object is defined so the prompt logic
-// is captured and reviewable, but it is intentionally NOT included in the
-// `SKILLS` registry below — `findSkillCommand` and `filterSkills` will not
-// see it, so analysts can't invoke it from the chat. To enable later:
-// add `followUps` to the SKILLS array and (optionally) extend the test
-// fixture. Deferral is pending sharper heuristics for "what counts as an
-// action item vs. routine activity" — the current rules below are a first
-// pass and will mis-classify until tuned against real activity logs.
+// /follow-ups — unified action-item synthesis across THREE data sources:
+// in-app activity (`get_deal_activity`), live Gmail (`get_recent_emails_for_deal`),
+// and Google Calendar (`get_upcoming_meetings_for_deal`). The two integration
+// tools sit behind a 5-min per-(dealId, userId, args) cache so re-running this
+// skill is cheap; error strings (not-connected / token-expired) always re-eval.
+// The prompt handles each tool's failure modes explicitly — surfaced as
+// callouts at the top of the reply — so a missing integration degrades
+// gracefully rather than refusing the whole task.
 // ---------------------------------------------------------------------------
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- deliberately unregistered; see comment above.
 const followUps: Skill = {
   id: "follow-ups",
   command: "/follow-ups",
   label: "Action-item follow-ups",
-  description: "Extract action items from the last N activity-log entries and render as a checklist.",
+  description: "Unified action-item checklist synthesized from deal activity, Gmail, and Google Calendar.",
   category: "workflow",
   buildPrompt: (deal) => {
     const name = nameOf(deal);
     return [
       TOP_ANCHOR,
       "",
-      `Extract outstanding action items for ${name} from the deal's recent activity log. Call \`get_deal_activity\` with limit 25 first. If the analyst appended a number in the additional-context block (e.g., "last 50"), use that limit instead — cap at 100.`,
+      `Synthesize ONE unified action-item checklist for ${name} by pulling from THREE data sources. Call ALL THREE tools (in this order, then merge — do NOT skip a tool because another returned data):`,
       "",
-      "From the returned timeline, infer action items using these rules:",
-      "- An action item is something a named (or implied) person OWES — a data ask, deliverable, meeting to schedule, document to review, decision to make.",
-      "- Pure status/system rows (cache refreshes, stage changes without a commitment, automated ingest) are NOT action items — skip them.",
-      "- A commitment that was later marked done in a subsequent activity is CLOSED — exclude it from the checklist.",
-      "- When ownership is ambiguous, write \"unassigned\" rather than guessing a name.",
+      `1. \`get_deal_activity\` with \`limit: 25\` — in-app activity timeline (notes, doc uploads, stage changes, commitments logged by the deal team).`,
+      `2. \`get_recent_emails_for_deal\` with DEFAULT args — live Gmail search scoped to the deal's contacts + company name. If the analyst's additional-context block names a different lookback (e.g., "last 60 days") or limit, pass it through as \`lookback_days\` / \`limit\` (caps: 90 / 50). Otherwise call it with NO args and let the tool use its defaults (30 days, 25 messages).`,
+      `3. \`get_upcoming_meetings_for_deal\` with DEFAULT args — live Google Calendar (past 7 days + next 14 days).`,
       "",
-      "Render as a single markdown checklist, ordered by inferred urgency (deal-blocking → soft follow-up):",
+      "Once all three responses are in, merge into ONE checklist ordered by inferred urgency (deal-blocking → soft follow-up). Use ONLY the rules below to decide what counts as an action item.",
       "",
-      "- [ ] **<owner>** — <action> _(source: <activity type> on <YYYY-MM-DD>)_",
+      "## What counts as an action item",
+      "- Something a named (or implied) person OWES — a data ask, deliverable, meeting to schedule, document to review, decision to make.",
+      "- Pure status/system rows (cache refreshes, automated ingest, stage changes without a commitment) are NOT action items — skip them.",
+      "- A commitment that was later marked done in a subsequent activity / email / meeting note is CLOSED — exclude.",
+      "- When ownership is ambiguous, write `\"unassigned\"` rather than guessing a name.",
       "",
-      "If zero open items remain after filtering, write \"No outstanding action items in the last <N> activity entries.\" Do NOT fabricate items to fill the list.",
+      "## Email-derived rules (`get_recent_emails_for_deal`)",
+      "- Scan each message for explicit asks (\"can you send X\", \"please confirm Y\", \"could you review Z by [date]\"), reply-by dates, and self-commitments (\"I'll send you the model on Monday\" → owner: the sender's side, typically the deal team).",
+      "- Read `From` and `To` from the formatted message lines. SENDER = the person making the ask; RECIPIENT = the one who owes the deliverable.",
+      "- For self-commitments by the deal team (sender = deal team), owner is the deal team member by name (or `\"deal team\"` if no name is in the From line).",
+      "- Source format: `_(source: email \"<Subject>\" on YYYY-MM-DD)_`.",
       "",
-      "Below the checklist, summarize in 1-2 sentences: how many items are open, who carries the most, and which item is most likely to block the deal advancing.",
+      "## Calendar-derived rules (`get_upcoming_meetings_for_deal`)",
+      "- FUTURE meeting (start date > today): if NO diligence pack / agenda / pre-read is referenced in `get_deal_activity` for the same date, emit an action item `\"Pre-read owed before <Title>\"` with owner = deal team.",
+      "- PAST meeting (start date > 24h ago): if NO post-meeting note appears in `get_deal_activity` referencing that meeting, emit `\"Follow-up notes owed from <Title>\"` with owner = deal team.",
+      "- Source format: `_(source: meeting \"<Title>\" on YYYY-MM-DD)_`.",
+      "",
+      "## Failure-mode handling (CRITICAL — read carefully)",
+      "Each integration tool may return an error string instead of data. Surface each one as a one-line callout at the TOP of the reply (ABOVE the checklist), then proceed with whatever the other tools returned:",
+      "",
+      "- If `get_recent_emails_for_deal` returns `\"Gmail not connected for this user. To enable email-based follow-ups, connect Gmail in Settings → Integrations.\"` OR `\"Gmail connection expired. Please reconnect Gmail in Settings → Integrations.\"` OR `\"Failed to read Gmail. Please try again.\"` — surface verbatim as: `> ⚠️ <verbatim message from tool>`",
+      "- If `get_recent_emails_for_deal` returns `\"No contacts or company name available to scope Gmail search for this deal. Add at least one contact to the deal first.\"` — surface as: `> ℹ️ Gmail search skipped: no contacts on this deal yet. Add a contact in the Contacts tab to enable email-based follow-ups.`",
+      "- If `get_upcoming_meetings_for_deal` returns `\"Google Calendar not connected for this user. To enable meeting-based follow-ups, connect Google Calendar in Settings → Integrations.\"` OR `\"Google Calendar connection expired. Please reconnect Google Calendar in Settings → Integrations.\"` OR `\"Failed to read Google Calendar. Please try again.\"` — surface verbatim as: `> ⚠️ <verbatim message from tool>`",
+      "- If ALL THREE tools return empty / error states, the reply is just the callouts — NO checklist, NO padding, NO \"no items\" placeholder.",
+      "",
+      "## Output format",
+      "Callouts (zero or more, one per failed/skipped integration) on their own lines first, then ONE markdown checklist ordered by urgency:",
+      "",
+      "- [ ] **<owner>** — <action> _(source: <activity type> on YYYY-MM-DD)_",
+      "- [ ] **<owner>** — <action> _(source: email \"<Subject>\" on YYYY-MM-DD)_",
+      "- [ ] **<owner>** — <action> _(source: meeting \"<Title>\" on YYYY-MM-DD)_",
+      "",
+      "Below the checklist, write a 1-2 sentence summary: how many items are open, who carries the most, and which item is most likely to block the deal advancing. Skip the summary entirely if there are zero items.",
+      "",
+      "Do NOT fabricate action items to fill the list. Do NOT re-state the failure callouts inside the checklist. Do NOT include duplicate items if the same commitment surfaces in two sources — pick the most recent source and cite that one.",
       "",
       CITATION_REMINDER,
     ].join("\n");
@@ -913,11 +940,7 @@ export const SKILLS: Skill[] = [
   competitorScan,
   meetingPrep,
   emailDraft,
-  // followUps — INTENTIONALLY NOT REGISTERED. The skill is defined above
-  // so its prompt logic is in the codebase, but it is gated off until the
-  // activity-log action-item heuristics are tuned. To enable: insert
-  // `followUps,` on this line. See the comment block above the followUps
-  // definition for rationale.
+  followUps,
   regulatoryRisk,
   precedentTransactions,
   sectorThesis,

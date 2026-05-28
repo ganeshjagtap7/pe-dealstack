@@ -245,34 +245,45 @@ describe("expandChatInput", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Deferred-skill guard
+// /follow-ups — registered and wired to live integrations
 //
-// `/follow-ups` has its prompt/buildPrompt defined in dealchat-skills/index.ts
-// but is intentionally NOT added to the SKILLS array — it ships gated off
-// until the activity-log heuristics are tuned. This block locks that in so
-// nobody accidentally enables it without updating the gating decision and
-// adding the appropriate coverage.
+// `/follow-ups` was previously gated off; it is now registered and calls
+// THREE tools: `get_deal_activity` (in-app), `get_recent_emails_for_deal`
+// (live Gmail), and `get_upcoming_meetings_for_deal` (live Google Calendar).
+// These tests lock in the registration AND verify the prompt names all
+// three tools + handles their failure modes (so the agent knows what to do
+// when Gmail/Calendar isn't connected).
 // ---------------------------------------------------------------------------
 
-describe("/follow-ups — deferred (must stay unregistered)", () => {
-  it("is not present in the SKILLS registry", () => {
-    expect(SKILLS.some((s) => s.command === "/follow-ups")).toBe(false);
-    expect(SKILLS.some((s) => s.id === "follow-ups")).toBe(false);
+describe("/follow-ups — registered and wired to live integrations", () => {
+  it("is present in the SKILLS registry", () => {
+    expect(SKILLS.some((s) => s.command === "/follow-ups")).toBe(true);
+    expect(SKILLS.some((s) => s.id === "follow-ups")).toBe(true);
   });
 
-  it("is not findable via findSkillCommand", () => {
-    expect(findSkillCommand("/follow-ups")).toBeNull();
-    expect(findSkillCommand("/follow-ups last 50")).toBeNull();
+  it("is findable via findSkillCommand", () => {
+    const result = findSkillCommand("/follow-ups");
+    expect(result).not.toBeNull();
+    expect(result?.skill.command).toBe("/follow-ups");
   });
 
-  it("is not surfaced by filterSkills (menu UI must hide it)", () => {
-    expect(filterSkills("follow").some((s) => s.id === "follow-ups")).toBe(false);
-    expect(filterSkills("/follow-ups").some((s) => s.id === "follow-ups")).toBe(false);
+  it("is surfaced by filterSkills", () => {
+    expect(filterSkills("follow").some((s) => s.id === "follow-ups")).toBe(true);
   });
 
-  it("leaves the input untouched when expandChatInput sees /follow-ups", () => {
-    // Same fallthrough as any unknown command — the raw text reaches the agent.
-    expect(expandChatInput("/follow-ups", baseDeal)).toBe("/follow-ups");
+  it("expands /follow-ups to a prompt that calls all three required tools", () => {
+    const result = expandChatInput("/follow-ups", baseDeal);
+    expect(result).toContain("get_deal_activity");
+    expect(result).toContain("get_recent_emails_for_deal");
+    expect(result).toContain("get_upcoming_meetings_for_deal");
+  });
+
+  it("handles the 'Gmail not connected' tool response in its prompt", () => {
+    // The prompt must explicitly reference the not-connected fallback string
+    // (or a verbatim instruction to surface it) so the agent knows what to do
+    // when the integration is unconfigured.
+    const result = expandChatInput("/follow-ups", baseDeal);
+    expect(result).toContain("Gmail not connected");
   });
 });
 
