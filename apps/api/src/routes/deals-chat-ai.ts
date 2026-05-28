@@ -285,6 +285,10 @@ router.post('/:dealId/chat', async (req, res) => {
     const financialContext = buildFinancialMarkdown(financialStatements || []);
     contextParts.push(financialContext);
 
+    // Read userId once up-front — needed by the agent (Gmail/Calendar tools
+    // for /follow-ups) AND by ChatMessage inserts below.
+    const userId = req.user?.id || null;
+
     // Run the ReAct agent. Pass today explicitly so the model anchors
     // relative-period reasoning ("recent news", "last 90 days", "current
     // quarter") against the request's wall-clock day — never a hardcoded or
@@ -296,10 +300,8 @@ router.post('/:dealId/chat', async (req, res) => {
       dealContext: contextParts.join('\n'),
       history: history.slice(-10),
       today: getTodayIso(),
+      userId: userId ?? undefined,
     });
-
-    // Save messages to database
-    const userId = req.user?.id || null;
 
     await supabase.from('ChatMessage').insert({
       dealId,

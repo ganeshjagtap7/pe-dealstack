@@ -49,3 +49,20 @@ export interface GmailTokenResponse {
   token_type?: string;
   id_token?: string;
 }
+
+/** Parsed full Gmail message — body extracted from MIME parts. */
+export interface GmailMessageFull {
+  id: string;
+  threadId: string;
+  snippet: string;
+  body: string;
+  headers: {
+    Subject: string;
+    From: string;
+    To: string;
+    Cc: string;
+    Date: string;
+    MessageId: string;
+    InReplyTo: string;
+  };
+}

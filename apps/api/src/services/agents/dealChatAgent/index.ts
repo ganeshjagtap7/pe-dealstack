@@ -173,6 +173,12 @@ export interface DealChatInput {
    *  Callers (e.g. the chat route) MAY pass it to keep prompt-build and
    *  request-handling time-aligned, but it must NEVER be hardcoded. */
   today?: string;
+  /**
+   * Auth UUID of the current user (req.user?.id). Required by tools that
+   * read the user's own integration tokens (Gmail / Calendar for /follow-ups).
+   * Optional for backward compat — those tools degrade gracefully if absent.
+   */
+  userId?: string;
 }
 
 export interface DealChatResult {
@@ -196,7 +202,7 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
 
   try {
     const model = getChatModel(0.7, 2500, 'deal_chat');
-    const tools = getDealChatTools(input.dealId, input.orgId);
+    const tools = getDealChatTools(input.dealId, input.orgId, input.userId);
 
     const agent = createReactAgent({
       llm: model,
