@@ -387,3 +387,160 @@ describe("filterSkills", () => {
     expect(filterSkills("RED FLAGS").some((s) => s.id === "qoe-flags")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Phase 2 skills — /regulatory-scan, /ma-precedents, /customer-concentration
+//
+// These ship alongside (not replacing) /regulatory-risk and
+// /precedent-transactions. The tests below assert both the new skills exist
+// AND the old ones still resolve, so an accidental rename in either skill
+// breaks the suite immediately.
+// ---------------------------------------------------------------------------
+
+describe("/regulatory-scan — registered alongside /regulatory-risk", () => {
+  it("is present in the SKILLS registry", () => {
+    expect(SKILLS.some((s) => s.command === "/regulatory-scan")).toBe(true);
+    expect(SKILLS.some((s) => s.id === "regulatory-scan")).toBe(true);
+  });
+
+  it("coexists with the original /regulatory-risk", () => {
+    expect(SKILLS.some((s) => s.command === "/regulatory-risk")).toBe(true);
+    expect(SKILLS.some((s) => s.command === "/regulatory-scan")).toBe(true);
+  });
+
+  it("is findable via findSkillCommand without colliding with /regulatory-risk", () => {
+    expect(findSkillCommand("/regulatory-scan")?.skill.command).toBe("/regulatory-scan");
+    expect(findSkillCommand("/regulatory-risk")?.skill.command).toBe("/regulatory-risk");
+  });
+
+  it("filterSkills('regulatory') surfaces BOTH the scan and the risk skill", () => {
+    const hits = filterSkills("regulatory");
+    expect(hits.some((s) => s.id === "regulatory-scan")).toBe(true);
+    expect(hits.some((s) => s.id === "regulatory-risk")).toBe(true);
+  });
+
+  it("expands to a prompt that calls the documented tool combo", () => {
+    const result = expandChatInput("/regulatory-scan", baseDeal);
+    expect(result).toContain("search_documents");
+    expect(result).toContain("get_deal_documents");
+    expect(result).toContain("web_search");
+  });
+
+  it("declares the sector requirement so the menu can badge it", () => {
+    const skill = findSkillByCommand("/regulatory-scan");
+    expect(skill.requires?.sector).toBe(true);
+  });
+
+  it("hard-stops with a single question when the deal has no industry", () => {
+    const noIndustry: Deal = { ...baseDeal, industry: undefined };
+    const result = expandChatInput("/regulatory-scan", noIndustry);
+    expect(result).toContain("no industry on file");
+    expect(result).toContain("STOP");
+    // Sanity: the full output spec MUST NOT appear in the hard-stop branch —
+    // a leaked section header here means the guard regressed.
+    expect(result).not.toContain("### Current Regulatory Framework");
+  });
+});
+
+describe("/ma-precedents — registered alongside /precedent-transactions", () => {
+  it("is present in the SKILLS registry", () => {
+    expect(SKILLS.some((s) => s.command === "/ma-precedents")).toBe(true);
+    expect(SKILLS.some((s) => s.id === "ma-precedents")).toBe(true);
+  });
+
+  it("coexists with the original /precedent-transactions", () => {
+    expect(SKILLS.some((s) => s.command === "/precedent-transactions")).toBe(true);
+    expect(SKILLS.some((s) => s.command === "/ma-precedents")).toBe(true);
+  });
+
+  it("is findable via findSkillCommand", () => {
+    expect(findSkillCommand("/ma-precedents")?.skill.command).toBe("/ma-precedents");
+  });
+
+  it("filterSkills('precedent') surfaces BOTH skills", () => {
+    const hits = filterSkills("precedent");
+    expect(hits.some((s) => s.id === "ma-precedents")).toBe(true);
+    expect(hits.some((s) => s.id === "precedent-transactions")).toBe(true);
+  });
+
+  it("expands to a prompt that pulls internal + external comps and target financials", () => {
+    const result = expandChatInput("/ma-precedents", baseDeal);
+    expect(result).toContain("compare_deals");
+    expect(result).toContain("web_search");
+    expect(result).toContain("get_deal_financials");
+  });
+
+  it("declares the sector requirement", () => {
+    const skill = findSkillByCommand("/ma-precedents");
+    expect(skill.requires?.sector).toBe(true);
+  });
+
+  it("hard-stops when the deal has no industry", () => {
+    const noIndustry: Deal = { ...baseDeal, industry: undefined };
+    const result = expandChatInput("/ma-precedents", noIndustry);
+    expect(result).toContain("no industry on file");
+    expect(result).toContain("STOP");
+    expect(result).not.toContain("### Precedent Transactions Table");
+  });
+});
+
+describe("/customer-concentration — documents-driven analysis skill", () => {
+  it("is present in the SKILLS registry", () => {
+    expect(SKILLS.some((s) => s.command === "/customer-concentration")).toBe(true);
+    expect(SKILLS.some((s) => s.id === "customer-concentration")).toBe(true);
+  });
+
+  it("is findable via findSkillCommand", () => {
+    expect(findSkillCommand("/customer-concentration")?.skill.command).toBe(
+      "/customer-concentration",
+    );
+  });
+
+  it("is surfaced by filterSkills('customer') and 'concentration'", () => {
+    expect(filterSkills("customer").some((s) => s.id === "customer-concentration")).toBe(true);
+    expect(
+      filterSkills("concentration").some((s) => s.id === "customer-concentration"),
+    ).toBe(true);
+  });
+
+  it("expands to a prompt that hits every internal data source", () => {
+    const result = expandChatInput("/customer-concentration", baseDeal);
+    expect(result).toContain("get_deal_financials");
+    expect(result).toContain("search_documents");
+    expect(result).toContain("get_deal_documents");
+    expect(result).toContain("get_analysis_summary");
+  });
+
+  it("declares the documents requirement so the menu can badge it", () => {
+    const skill = findSkillByCommand("/customer-concentration");
+    expect(skill.requires?.documents).toBe(true);
+  });
+
+  it("badges 'needs documents' when the deal has no uploaded docs", () => {
+    const skill = findSkillByCommand("/customer-concentration");
+    expect(unmetRequirements(skill, baseDeal)).toContain("needs documents");
+    const withDocs: Deal = {
+      ...baseDeal,
+      documents: [
+        {
+          id: "doc-1",
+          fileName: "CIM.pdf",
+          documentType: "cim",
+          dealId: baseDeal.id,
+          uploadedById: "user-1",
+          aiSummary: null,
+          tags: [],
+          isProcessed: true,
+          createdAt: "2026-01-01T00:00:00.000Z",
+          updatedAt: "2026-01-01T00:00:00.000Z",
+        } as unknown as Deal["documents"] extends (infer T)[] | undefined ? T : never,
+      ],
+    };
+    expect(unmetRequirements(skill, withDocs)).not.toContain("needs documents");
+  });
+
+  it("does NOT require a sector (analysis works on any deal with docs)", () => {
+    const skill = findSkillByCommand("/customer-concentration");
+    expect(skill.requires?.sector).toBeUndefined();
+  });
+});

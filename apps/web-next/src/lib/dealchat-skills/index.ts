@@ -830,6 +830,298 @@ const sectorThesis: Skill = {
 };
 
 // ---------------------------------------------------------------------------
+// Phase 2 research/analysis skills — deeper-cut variants of the Phase 0/1
+// research workstreams, plus a documents-first concentration analysis.
+//
+// Naming overlap callout (coexisting on purpose):
+//   - `/regulatory-scan` complements `/regulatory-risk`. The risk skill is
+//     enforcement-event-driven (🔴/🟡/🟢 per item) for IC discussion; the
+//     scan is landscape-shaped (framework + pending + target-specific +
+//     diligence checklist) for upstream sector orientation.
+//   - `/ma-precedents` complements `/precedent-transactions`. The latter is
+//     a table-first quick comp pull; ma-precedents layers in size-band
+//     filtering, valuation context, and explicit gaps/caveats.
+// ---------------------------------------------------------------------------
+
+const regulatoryScan: Skill = {
+  id: "regulatory-scan",
+  command: "/regulatory-scan",
+  label: "Regulatory & compliance scan",
+  description:
+    "Regulatory landscape, pending legislation, and compliance risks for the target's sector.",
+  category: "research",
+  requires: { sector: true },
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    const industry = industryOf(deal);
+    const searchYears = `${new Date().getFullYear() - 1} ${new Date().getFullYear()}`;
+
+    if (!industry) {
+      return [
+        `A regulatory scan needs the deal's industry to be useful. ${name} has no industry on file.`,
+        "",
+        "Reply with ONLY this question: 'What sector/industry is this company in?' — then STOP. Do not produce a generic regulatory overview. A sector-blind regulatory scan is noise, not signal.",
+      ].join("\n");
+    }
+
+    return [
+      TOP_ANCHOR,
+      "",
+      `Map the regulatory and compliance landscape for ${name} in the ${industry} sector. Combine internal deal documents (\`search_documents\`, \`get_deal_documents\`) with external web research (\`web_search\`) to build a complete picture.`,
+      "",
+      "## Step 1 — Internal document scan (always run first)",
+      `Run exactly 4 \`search_documents\` calls with these queries:`,
+      `1. \`search_documents("regulatory compliance license permit")\``,
+      `2. \`search_documents("litigation lawsuit enforcement penalty")\``,
+      `3. \`search_documents("${industry} regulation")\``,
+      `4. \`search_documents("insurance coverage indemnification")\``,
+      `Also call \`get_deal_documents\` once and scan document titles for anything suggesting legal, regulatory, or compliance content.`,
+      "",
+      "## Step 2 — External web research",
+      `The \`web_search\` tool costs credits per call — run AT MOST 3 calls total, in this priority order:`,
+      "",
+      `QUERY 1 (always run): \`web_search({ query: "${industry} regulation compliance ${searchYears}", topic: "news", max_results: 10 })\` — surfaces recent regulatory changes, proposed rules, and enforcement trends.`,
+      "",
+      `QUERY 2 (always run): \`web_search({ query: "${name} regulatory compliance lawsuit", topic: "news", max_results: 10 })\` — surfaces target-specific regulatory events (fines, audits, lawsuits, certifications).`,
+      "",
+      `QUERY 3 (ONLY if the first two returned <3 usable results combined): \`web_search({ query: "${industry} pending legislation proposed rules", topic: "general", max_results: 10 })\`. If QUERY 1+2 produced 3+ usable items, SKIP this query.`,
+      "",
+      `If the \`web_search\` tool returns "Web search is not configured" or errors on the first call, do NOT retry — note that web search is unavailable, skip Step 2, and proceed with internal results only. Flag in your output that the external regulatory scan is incomplete.`,
+      "",
+      "## TOTAL NO-DATA PATH",
+      `If Step 1 (all 4 \`search_documents\` calls + \`get_deal_documents\`) returned zero regulatory, compliance, legal, or insurance content AND Step 2 (web search) returned zero usable results or was unavailable, do NOT produce the section-by-section output below. Instead write:`,
+      `"Regulatory scan for ${name} found no regulatory, compliance, or legal content in deal documents and no material results from web search. This likely means regulatory documents have not been uploaded. Request from the target: (1) regulatory correspondence file, (2) current licenses and permits, (3) pending or recent litigation summary, (4) insurance certificate of coverage, (5) compliance audit reports (SOC 2, ISO 27001, etc.)."`,
+      `Then STOP — do not produce ANY of the sections below. An empty skeleton with "nothing found" under every header is worse than no output.`,
+      "",
+      "## Output structure (only if Step 1 or Step 2 produced usable results)",
+      "",
+      `### Current Regulatory Framework`,
+      `List ONLY regulations that surfaced from Step 1 or Step 2 results. For each:`,
+      "- **Regulation name** (e.g., GDPR, HIPAA, SOX Section 404)",
+      "- One-sentence scope: what it requires and who it applies to.",
+      `- **Relevance to ${name}**: one sentence connecting it to something specific in the deal docs or financials. If a regulation is common knowledge for ${industry} but did NOT appear in any tool result, you may include it — but mark it \`[general knowledge — not found in deal data]\` and do NOT cite a source you didn't actually retrieve.`,
+      "",
+      `Cap at 5 regulations. If Step 1 and Step 2 surfaced fewer than 3, list only what you found — do NOT pad with regulations from your training data.`,
+      "",
+      `### Pending / Proposed Changes`,
+      `Regulations or legislation currently in draft, proposed, or comment period that could affect ${name}. ONLY include items that appeared in web search results. For each:`,
+      "- **Name/bill number** with source link `[Source — YYYY-MM-DD](URL)`.",
+      "- Expected timeline (effective date or next legislative milestone).",
+      `- **Impact assessment**: one sentence on how it would affect ${name}'s business model, cost structure, or market access.`,
+      "",
+      `If web search was unavailable or nothing material surfaced, write: "No pending legislation identified in web search results. This does not mean none exists — recommend checking congress.gov, Federal Register, and ${industry}-specific regulatory trackers directly." Do NOT invent upcoming regulations.`,
+      "",
+      `### Target-Specific Compliance Risks`,
+      `Risks specific to ${name} — drawn from deal documents, financials, and web results. For EACH:`,
+      "- Severity emoji: 🔴 critical (could block or unwind the deal), 🟡 diligence (needs confirmatory work pre-close), 🟢 standard (monitor post-close).",
+      "- One-sentence risk description.",
+      "- Source citation (document name + section, or web link).",
+      "- Proposed mitigant or diligence action.",
+      "",
+      "Examples of what NOT to list:",
+      `- ❌ "The company may face regulatory risk." (too vague — which regulation? what risk?)`,
+      `- ✅ "🟡 ${name}'s SOC 2 Type II report expires in Q3 2025 (board deck, p.14). If the audit lapses, enterprise clients with compliance mandates may churn. Mitigant: confirm renewal timeline with CTO."`,
+      "",
+      `If no target-specific risks surface from documents or web, write: "No target-specific compliance risks identified in available data. Recommend requesting: (1) most recent SOC 2 / ISO 27001 report, (2) regulatory correspondence file, (3) insurance certificate of coverage."`,
+      "",
+      `### Regulatory Diligence Checklist`,
+      `5-8 concrete diligence items as checkboxes (\`- [ ] ...\`). Each must name a specific document to request, person to interview, or verification to perform:`,
+      `- ❌ "Review regulatory compliance." (generic — which regulation? which document?)`,
+      `- ✅ "- [ ] Request ${name}'s current business license and verify expiry date with CFO."`,
+      "",
+      CITATION_REMINDER,
+      UNIT_REMINDER,
+    ].join("\n");
+  },
+};
+
+const maPrecedents: Skill = {
+  id: "ma-precedents",
+  command: "/ma-precedents",
+  label: "M&A precedent transactions",
+  description:
+    "Recent M&A transactions in the target's space with multiples and deal rationale.",
+  category: "research",
+  requires: { sector: true },
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+    const industry = industryOf(deal);
+    const searchYears = `${new Date().getFullYear() - 1} ${new Date().getFullYear()}`;
+
+    if (!industry) {
+      return [
+        `An M&A precedents scan needs the deal's industry. ${name} has no industry on file.`,
+        "",
+        "Reply with ONLY this question: 'What sector/industry should I search for precedent transactions in?' — then STOP. Do not produce a generic M&A overview.",
+      ].join("\n");
+    }
+
+    return [
+      TOP_ANCHOR,
+      "",
+      `Surface recent M&A precedent transactions relevant to ${name} in the ${industry} sector. Combine the firm's internal comparable data (\`compare_deals\`) with external web research (\`web_search\`).`,
+      "",
+      "## Step 1 — Determine target size band",
+      `Call \`get_deal_financials\` or check the deal record's revenue / cachedRevenue for ${name}. Use this to set the relevant transaction size range: look for precedent deals within roughly 0.3x–5x the target's revenue. If \`get_deal_financials\` returns no revenue data and the deal record has no cachedRevenue, skip size-band filtering entirely — note "target revenue unknown, no size filter applied" in Gaps & Caveats and include all transaction sizes from Steps 2-3.`,
+      "",
+      "## Step 2 — Internal precedents",
+      `Call \`compare_deals\` to pull any comparable transactions the firm has tracked. These are the highest-quality data points — they come with verified financials.`,
+      "",
+      "## Step 3 — External precedents",
+      `The \`web_search\` tool costs credits per call — run AT MOST 3 calls total, in this priority order:`,
+      "",
+      `QUERY 1 (always run): \`web_search({ query: "${industry} acquisition M&A deal ${searchYears}", topic: "news", max_results: 10 })\` — surfaces recent transactions in the space.`,
+      "",
+      `QUERY 2 (always run): \`web_search({ query: "${industry} private equity buyout valuation multiple", topic: "general", max_results: 10 })\` — surfaces valuation context and PE activity.`,
+      "",
+      `QUERY 3 (ONLY if QUERY 1+2 returned <3 distinct transactions): \`web_search({ query: "${name} competitors acquired merger", topic: "news", max_results: 10 })\`. Skip if you already have 3+ transactions.`,
+      "",
+      `If the \`web_search\` tool returns "Web search is not configured" or errors on the first call, do NOT retry — skip Step 3, proceed with internal precedents only, and note that external research could not be performed.`,
+      "",
+      "## Filtering (apply BEFORE writing output)",
+      "- Only include transactions where the TARGET operates in the same or adjacent sector.",
+      "- Apply the size band from Step 1 if available. If the target's revenue is ~$20M, a $15B mega-deal is not a useful comp — exclude it.",
+      "- DROP any result that is a rumor without a credible source, a press release about a \"strategic partnership\" (not an acquisition), or an AI-generated listicle with no primary sources.",
+      "",
+      "## TOTAL NO-DATA PATH",
+      `If \`compare_deals\` returned no comparable transactions AND \`web_search\` was unavailable or returned zero usable transactions after filtering, do NOT produce an empty table. Instead write:`,
+      `"No precedent transactions found for ${name} (${industry}). compare_deals returned no internal comps and web search returned no usable results (or was unavailable). Recommend sourcing precedents from:"`,
+      "Then list: (1) PitchBook — filter by sector + size band + geography, (2) Capital IQ — M&A screener with same filters, (3) Mergermarket — deal intelligence for sector-specific coverage.",
+      `Then STOP — do not produce ANY of the sections below. An empty precedent table is misleading, not helpful.`,
+      "",
+      "## Output structure (only if Step 2 or Step 3 produced usable transactions)",
+      "",
+      "### Precedent Transactions Table",
+      "Render a markdown table with these columns:",
+      "| Date | Target | Acquirer | Deal Value | EV/Revenue | EV/EBITDA | Source |",
+      "",
+      "Rules:",
+      "- Sort ALL rows by date, most recent first — regardless of whether the source is internal or external.",
+      "- Mark internal precedents (from `compare_deals`) with `[internal]` in the Source column.",
+      "- If a multiple is not disclosed, write `n/d` — do NOT estimate or back-calculate from partial data.",
+      "- Source column: clickable link `[Source](URL)` for web results, `[internal]` for `compare_deals` results.",
+      "- Include the target deal's own metrics as the LAST row (bolded name), pulled from `get_deal_financials` / `get_analysis_summary`, so the analyst can visually compare.",
+      "",
+      "Example of what NOT to include:",
+      `- ❌ A $50M "strategic partnership" press release with no acquisition or equity stake — this is not an M&A precedent.`,
+      `- ✅ A $120M acquisition of a ${industry} company by a PE firm, with disclosed EV/EBITDA of 9.2x, sourced from a credible news outlet.`,
+      "",
+      "### Valuation Context",
+      "Two paragraphs (always include both):",
+      `1. **Multiple ranges** — what EV/Revenue and EV/EBITDA ranges do these precedents imply? State the median and range explicitly. If fewer than 3 data points have disclosed multiples, write: "Sample too small (N disclosed multiples) to compute a reliable median — treat as directional only."`,
+      `2. **Where ${name} would sit** — based on the target's financials (from \`get_deal_financials\`), where does it fall in the precedent range? Above median, below, in line? Why — growth rate, margin profile, scale?`,
+      "",
+      `Optional third paragraph — ONLY include if 3+ transactions share a visible structural trait (e.g., all PE buyouts, all included earn-outs, all cross-border). If the data is too heterogeneous, OMIT this paragraph entirely — do NOT force a narrative from sparse data:`,
+      `3. **Deal structure trends** — describe the shared trait and its implication for ${name}'s deal.`,
+      "",
+      "### Gaps & Caveats",
+      "Bullet list of what's missing:",
+      "- Transactions that were likely excluded by the search (e.g., unreported private deals).",
+      "- Data quality warnings (e.g., 'Only 2 of 6 transactions had disclosed EBITDA multiples').",
+      "- Size band used for filtering and any transactions excluded because of it (or 'target revenue unknown, no size filter applied').",
+      "- Suggest 2-3 specific paid databases (PitchBook, Capital IQ, Mergermarket) the analyst should check for fuller coverage.",
+      "",
+      CITATION_REMINDER,
+      UNIT_REMINDER,
+    ].join("\n");
+  },
+};
+
+const customerConcentration: Skill = {
+  id: "customer-concentration",
+  command: "/customer-concentration",
+  label: "Customer concentration analysis",
+  description:
+    "Revenue concentration, top-customer dependency, churn signals, and contract renewal risk.",
+  category: "analysis",
+  requires: { documents: true },
+  buildPrompt: (deal) => {
+    const name = nameOf(deal);
+
+    return [
+      TOP_ANCHOR,
+      "",
+      `Analyze customer concentration and revenue dependency risk for ${name}. Pull data from ALL available internal sources: \`get_deal_financials\`, \`get_analysis_summary\`, \`search_documents\`, and \`get_deal_documents\`. Use ONLY the thresholds defined in this prompt for severity ratings — do NOT override them with claimed industry norms or benchmarks.`,
+      "",
+      "## Data Gathering (do all of these before writing output)",
+      `1. \`get_deal_financials\` — look for revenue breakdowns by customer, segment, geography, or product line. Check multiple periods to identify trends.`,
+      `2. \`search_documents\` — run exactly 4 searches:`,
+      `   - \`search_documents("customer concentration top account")\``,
+      `   - \`search_documents("churn retention attrition")\``,
+      `   - \`search_documents("contract renewal backlog")\``,
+      `   - \`search_documents("revenue breakdown segment geography")\``,
+      `3. \`get_deal_documents\` — scan document titles for CIM, management presentation, customer list, or revenue bridge documents.`,
+      `4. \`get_analysis_summary\` — check if the AI analysis has already flagged concentration risk.`,
+      "",
+      "## TOTAL NO-DATA PATH",
+      `If ALL four data sources return no customer, revenue, segment, or contract information whatsoever, do NOT produce the section-by-section skeleton with empty findings. Instead write:`,
+      `"Customer concentration analysis cannot be performed for ${name} — no customer, revenue, or contract data found in financials or documents. Request these from the target before re-running:"`,
+      "Then list as a numbered list: (1) revenue-by-customer schedule for last 3 fiscal years, (2) contract summary with renewal dates and terms, (3) retention/churn metrics by cohort, (4) revenue breakdown by segment/geography, (5) aged AR report.",
+      `Then STOP — do not produce ANY of the sections below. An empty skeleton with "Cannot assess" under every dimension is worse than no output.`,
+      "",
+      "## Output structure (only if at least one data source returned usable information)",
+      "",
+      "### Revenue Concentration Profile",
+      "If customer-level revenue data is available (from financials or documents), render a table:",
+      "| Customer | Revenue | % of Total | Trend (YoY) | Contract Status |",
+      "",
+      "Rules:",
+      "- Sort by revenue share, largest first.",
+      "- Include as many customers as the data supports — do NOT cap at an arbitrary number.",
+      "- If exact revenue per customer isn't available but the documents mention 'top 5 customers represent X% of revenue', cite that directly.",
+      "- Trend column: ↑ growing share, ↓ shrinking share, → stable, `n/a` if single period.",
+      "- Contract Status: pull from documents if available (e.g., 'renews Q3 2025', 'month-to-month', 'master agreement through 2027'). Write `not disclosed` if not found.",
+      "",
+      "If NO customer-level data exists but other aggregate data does (e.g., segment splits, retention rates), write:",
+      `"No customer-level revenue breakdown found in financials or documents for ${name}. This is itself a diligence flag — request a revenue-by-customer schedule from the target."`,
+      "Then proceed with whatever aggregate signals you CAN extract in the sections below.",
+      "",
+      "### Concentration Risk Assessment",
+      "Score and explain each of these four dimensions. For each, state the finding, cite the source, and assign a severity (🔴 / 🟡 / 🟢):",
+      "",
+      "1. **Top-customer dependency** — Does any single customer represent >15% of revenue? Do the top 3 represent >40%? Top 10 >70%?",
+      "   - 🔴 if any single customer >25% or top 3 >50%",
+      "   - 🟡 if any single customer 15-25% or top 3 40-50%",
+      "   - 🟢 if no single customer >15% and top 3 <40%",
+      "   - If the data doesn't exist to calculate this, flag it as 🟡 with 'Cannot assess — customer-level data not available'.",
+      "",
+      "2. **Revenue type mix** — What portion is recurring (subscription, contract) vs. transactional (one-time, project-based)? Cite the source.",
+      "   - 🔴 if >60% non-recurring with no backlog visibility",
+      "   - 🟡 if 30-60% non-recurring or unclear mix",
+      "   - 🟢 if >70% recurring/contracted",
+      "",
+      "3. **Churn / retention signals** — Any evidence of customer losses, declining retention rates, or shrinking account values?",
+      "   - 🔴 if named customer losses or declining NRR/GRR documented",
+      "   - 🟡 if retention metrics are absent (can't confirm either way)",
+      "   - 🟢 if documented high retention (>90% GRR or >110% NRR)",
+      "",
+      "4. **Contract renewal risk** — Any major contracts expiring within 12 months of expected close? Any month-to-month arrangements with top customers?",
+      "   - 🔴 if a top-3 customer contract expires within 6 months with no renewal evidence",
+      "   - 🟡 if renewal timelines are undisclosed for top customers",
+      "   - 🟢 if top customers are locked in through 12+ months post-close",
+      "",
+      "### Trend Analysis",
+      "If multi-period data is available, write 2-3 sentences on how concentration has changed over time:",
+      "- Is the customer base diversifying or consolidating?",
+      "- Are the largest accounts growing faster or slower than the total?",
+      "- Any new logos appearing that could become material?",
+      "",
+      "If only single-period data exists, write: `Single-period data — trend analysis not possible. Request 3-year revenue-by-customer schedule.`",
+      "",
+      "### Diligence Actions",
+      "Bullet list of 5-8 concrete next steps as checkboxes (`- [ ] ...`). Each must be specific:",
+      `- ❌ "Assess customer concentration." (generic — what specifically should the analyst do?)`,
+      `- ✅ "- [ ] Request revenue-by-customer schedule for FY22-FY24 with contract end dates, billing terms, and auto-renewal clauses."`,
+      "",
+      "Prioritize actions that fill the specific gaps identified above.",
+      "",
+      CITATION_REMINDER,
+      UNIT_REMINDER,
+    ].join("\n");
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Visual skills (Phase 3) — each invokes the `generate_chart` tool so the
 // chart renders inline in the chat bubble. Prompts are explicit about
 // which data source to read (get_deal_financials / compare_deals) and
@@ -989,6 +1281,9 @@ export const SKILLS: Skill[] = [
   regulatoryRisk,
   precedentTransactions,
   sectorThesis,
+  regulatoryScan,
+  maPrecedents,
+  customerConcentration,
   chartRevenue,
   chartMargin,
   chartCompMults,
