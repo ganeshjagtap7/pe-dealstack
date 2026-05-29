@@ -76,12 +76,12 @@ router.get('/graphs', async (req, res) => {
     const orgId = getOrgId(req);
 
     // Join Deal so the cross-deal cards can show deal/company labels
-    // without an extra round-trip. Deal exposes `name` (project name)
-    // and `companyName` (the underlying portfolio company name added
-    // by a later migration); industry is handy for badge display.
+    // without an extra round-trip. Alias `name -> projectName` and
+    // `companyName -> target` so the wire shape matches the frontend
+    // contract (GraphWithDeal.deal in apps/web-next).
     const { data, error } = await supabase
       .from('CustomGraph')
-      .select('*, deal:Deal(id, name, companyName, industry)')
+      .select('*, deal:Deal(id, projectName:name, target:companyName)')
       .eq('organizationId', orgId)
       .order('updatedAt', { ascending: false });
 
