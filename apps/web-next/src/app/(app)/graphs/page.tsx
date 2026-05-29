@@ -1,100 +1,169 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { api } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { useToast } from "@/providers/ToastProvider";
 import { Builder } from "./Builder";
+import { DealPicker, type PickableDeal } from "./DealPicker";
 import { Gallery } from "./Gallery";
-import { SEED_GRAPHS } from "./constants";
-import { buildFinancials } from "./mockData";
-import type { Graph, GraphDraft } from "./types";
+import type { Graph, GraphWithDeal } from "./types";
 
-type View = { mode: "gallery" } | { mode: "builder"; editing: Graph | null };
+// The page is a simple state machine:
+//   - "gallery": showing the firm-wide list (default)
+//   - "picker":  a modal is open over the gallery so the user can choose
+//                which deal a new graph should belong to
+//   - "builder": the deal context is locked in and we're editing/creating
+//
+// Edits skip the picker entirely (the deal is already known on the graph row).
+type View =
+  | { mode: "gallery" }
+  | { mode: "picker" }
+  | { mode: "builder"; dealId: string; dealLabel: string; editing: Graph | null };
 
 export default function GraphsPage() {
-  const data = useMemo(() => buildFinancials(), []);
   const { showToast } = useToast();
-  const [graphs, setGraphs] = useState<Graph[]>(SEED_GRAPHS);
-  const [hydrated, setHydrated] = useState(false);
-  const [view, setView] = useState<View>({ mode: "gallery" });
-  const [deleteTarget, setDeleteTarget] = useState<Graph | null>(null);
 
-  // Hydrate from localStorage on mount; seeds remain only on a fresh load.
-  useEffect(() => {
+  const [graphs, setGraphs] = useState<GraphWithDeal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [view, setView] = useState<View>({ mode: "gallery" });
+  const [deleteTarget, setDeleteTarget] = useState<GraphWithDeal | null>(null);
+
+  const loadGraphs = useCallback(async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const raw = localStorage.getItem(STORAGE_KEYS.customGraphs);
-      if (raw) {
-        const parsed: unknown = JSON.parse(raw);
-        if (Array.isArray(parsed)) setGraphs(parsed as Graph[]);
-      }
+      const data = await api.get<GraphWithDeal[]>("/graphs");
+      setGraphs(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.warn("Failed to hydrate custom graphs", err);
+      const message =
+        err instanceof Error ? err.message : "Failed to load graphs";
+      console.warn("[graphs] load failed:", err);
+      setError(message);
     } finally {
-      setHydrated(true);
+      setLoading(false);
     }
   }, []);
 
-  // Persist whenever the library changes — but only after hydration so we don't
-  // overwrite stored data with the initial seed array on first render.
   useEffect(() => {
-    if (!hydrated) return;
-    try {
-      localStorage.setItem(STORAGE_KEYS.customGraphs, JSON.stringify(graphs));
-    } catch (err) {
-      console.warn("Failed to persist custom graphs", err);
-    }
-  }, [graphs, hydrated]);
+    loadGraphs();
+  }, [loadGraphs]);
+
+  /* -------------------- Gallery callbacks -------------------- */
 
   function handleCreate() {
-    setView({ mode: "builder", editing: null });
+    setView({ mode: "picker" });
   }
 
-  function handleEdit(graph: Graph) {
-    setView({ mode: "builder", editing: graph });
+  function handleEdit(graph: GraphWithDeal) {
+    // Reuse the same label shape DealPicker builds so the Builder subheader
+    // is consistent between create and edit flows.
+    const company = graph.deal.target ?? "";
+    const project = graph.deal.projectName ?? "";
+    const dealLabel =
+      company && project && company !== project
+        ? `${company} · ${project}`
+        : company || project || "Untitled deal";
+    setView({
+      mode: "builder",
+      dealId: graph.dealId,
+      dealLabel,
+      editing: graph,
+    });
   }
 
-  function handleDeleteRequest(graph: Graph) {
+  function handleDeleteRequest(graph: GraphWithDeal) {
     setDeleteTarget(graph);
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!deleteTarget) return;
-    setGraphs((gs) => gs.filter((g) => g.id !== deleteTarget.id));
-    showToast(`Deleted "${deleteTarget.title}"`, "success");
+    const target = deleteTarget;
+    // Optimistic remove — restore on failure so the user can retry.
+    setGraphs((gs) => gs.filter((g) => g.id !== target.id));
     setDeleteTarget(null);
+    try {
+      await api.delete(`/graphs/${target.id}`);
+      showToast(`Deleted "${target.title}"`, "success");
+    } catch (err) {
+      console.warn("[graphs] delete failed:", err);
+      // Refetch instead of restoring inline — fewer footguns if the failure
+      // happened *after* the server-side delete.
+      const message =
+        err instanceof Error ? err.message : "Failed to delete graph";
+      showToast(message, "error", { title: "Delete failed" });
+      loadGraphs();
+    }
   }
 
-  function handleSave(draft: GraphDraft) {
-    const editing = view.mode === "builder" ? view.editing : null;
-    setGraphs((gs) => {
-      if (editing) {
-        return gs.map((g) => (g.id === editing.id ? { ...g, ...draft } : g));
-      }
-      return [...gs, { id: `g-${Date.now()}`, ...draft }];
+  /* -------------------- Picker callbacks -------------------- */
+
+  function handlePickerSelect(deal: PickableDeal) {
+    setView({
+      mode: "builder",
+      dealId: deal.id,
+      dealLabel: deal.label,
+      editing: null,
     });
-    showToast(editing ? "Graph updated" : "Graph saved", "success");
-    setView({ mode: "gallery" });
   }
+
+  /* -------------------- Builder callbacks -------------------- */
+
+  function handleSaved(saved: Graph) {
+    const wasEditing = view.mode === "builder" ? view.editing : null;
+    // Merge the saved row back into the gallery state so the user sees their
+    // change without a full refetch. The list endpoint embeds `deal`; on
+    // create we synthesise it from the deal label we already had on screen.
+    setGraphs((gs) => {
+      if (wasEditing) {
+        return gs.map((g) =>
+          g.id === saved.id ? { ...g, ...saved, deal: g.deal } : g,
+        );
+      }
+      const dealCtx = view.mode === "builder"
+        ? { id: view.dealId, target: view.dealLabel.split(" · ")[0] || null, projectName: null }
+        : { id: saved.dealId, target: null, projectName: null };
+      const withDeal: GraphWithDeal = { ...saved, deal: { ...dealCtx, id: saved.dealId } };
+      return [withDeal, ...gs];
+    });
+    showToast(wasEditing ? "Graph updated" : "Graph saved", "success");
+    setView({ mode: "gallery" });
+    // Refetch in the background to pick up the canonical `deal` summary the
+    // backend resolves (joined `target` / `projectName`). The optimistic row
+    // above keeps the UI fast; this just reconciles drift.
+    loadGraphs();
+  }
+
+  /* -------------------- Render -------------------- */
 
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 text-slate-900">
-      {view.mode === "gallery" ? (
+      {view.mode === "builder" ? (
+        <Builder
+          dealId={view.dealId}
+          dealLabel={view.dealLabel}
+          initial={view.editing}
+          onCancel={() => setView({ mode: "gallery" })}
+          onSaved={handleSaved}
+        />
+      ) : (
         <Gallery
           graphs={graphs}
-          data={data}
+          loading={loading}
+          error={error}
           onCreate={handleCreate}
           onEdit={handleEdit}
           onDelete={handleDeleteRequest}
-        />
-      ) : (
-        <Builder
-          data={data}
-          initial={view.editing}
-          onCancel={() => setView({ mode: "gallery" })}
-          onSave={handleSave}
+          onDismissError={() => setError(null)}
         />
       )}
+
+      <DealPicker
+        open={view.mode === "picker"}
+        onCancel={() => setView({ mode: "gallery" })}
+        onSelect={handlePickerSelect}
+      />
 
       <ConfirmDialog
         open={deleteTarget !== null}

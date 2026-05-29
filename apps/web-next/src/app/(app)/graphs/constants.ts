@@ -1,6 +1,10 @@
-import type { ChartType, Graph, MetricDef } from "./types";
+import type { ChartType, MetricDef } from "./types";
 
-export const CURRENCY_LABEL = "₹ Cr";
+// TODO(currency): hardcoded for now. Future work: derive the currency symbol
+// and unit scale from the deal's FinancialStatement rows (each row carries
+// `currency` and `unitScale`) and thread it through Builder → ChartRenderer
+// so a USD-thousands deal renders "$ K" while an INR-crore deal renders "₹ Cr".
+export const CURRENCY_LABEL = "$ M";
 
 export const METRIC_CATALOG: MetricDef[] = [
   { key: "revenue",      label: "Revenue",            kind: "absolute", source: "P&L" },
@@ -24,35 +28,4 @@ export const CHART_TYPES: { key: ChartType; label: string }[] = [
   { key: "line",  label: "Line" },
   { key: "area",  label: "Area" },
   { key: "combo", label: "Combo" },
-];
-
-export const SEED_GRAPHS: Graph[] = [
-  {
-    id: "g-001",
-    title: "Revenue vs Bottom Line + EBITDA Margin",
-    chartType: "combo",
-    series: [
-      { metricKey: "revenue",      seriesType: "bar",  color: "#1e3a8a" },
-      { metricKey: "netIncome",    seriesType: "bar",  color: "#0d9488" },
-      { metricKey: "ebitdaMargin", seriesType: "line", color: "#ea580c" },
-    ],
-  },
-  {
-    id: "g-002",
-    title: "Quarterly Revenue Trend",
-    chartType: "area",
-    series: [
-      { metricKey: "revenue", seriesType: "area", color: "#1e3a8a" },
-    ],
-  },
-  {
-    id: "g-003",
-    title: "Margin Profile",
-    chartType: "line",
-    series: [
-      { metricKey: "grossMargin",  seriesType: "line", color: "#1e3a8a" },
-      { metricKey: "ebitdaMargin", seriesType: "line", color: "#0d9488" },
-      { metricKey: "netMargin",    seriesType: "line", color: "#ea580c" },
-    ],
-  },
 ];
