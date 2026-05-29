@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/providers/ToastProvider";
@@ -23,12 +24,30 @@ type View =
 
 export default function GraphsPage() {
   const { showToast } = useToast();
+  const searchParams = useSearchParams();
 
   const [graphs, setGraphs] = useState<GraphWithDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ mode: "gallery" });
   const [deleteTarget, setDeleteTarget] = useState<GraphWithDeal | null>(null);
+
+  // Deep-link handoff from the deal page's "Add a Graph" action:
+  // /graphs?dealId=...&dealLabel=... opens the Builder directly so the
+  // analyst doesn't have to re-pick a deal they were already viewing.
+  // Run once on first render — react-strict-mode-safe via the ref guard.
+  const deepLinkHandled = useRef(false);
+  useEffect(() => {
+    if (deepLinkHandled.current) return;
+    const dealId = searchParams.get("dealId");
+    if (!dealId) {
+      deepLinkHandled.current = true;
+      return;
+    }
+    const dealLabel = searchParams.get("dealLabel") || "Untitled deal";
+    setView({ mode: "builder", dealId, dealLabel, editing: null });
+    deepLinkHandled.current = true;
+  }, [searchParams]);
 
   const loadGraphs = useCallback(async () => {
     setLoading(true);

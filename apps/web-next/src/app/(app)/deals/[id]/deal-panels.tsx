@@ -58,6 +58,20 @@ export function DealActionsMenu({
               <span className="material-symbols-outlined text-[18px]">edit_note</span>
               Draft Email
             </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                // Hand off to the /graphs page with the deal context pre-filled
+                // so the Builder opens directly instead of forcing the user
+                // through the DealPicker modal — they're already on this deal.
+                const qs = new URLSearchParams({ dealId, dealLabel: dealName });
+                window.location.href = `/graphs?${qs.toString()}`;
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">monitoring</span>
+              Add a Graph
+            </button>
             <div className="border-t border-border-subtle my-1" />
             <button
               onClick={() => {
