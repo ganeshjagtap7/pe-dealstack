@@ -55,17 +55,3 @@ export function AxisHint({ series }: AxisHintProps) {
   );
 }
 
-export function EmptyPreview() {
-  return (
-    <div className="h-full w-full flex flex-col items-center justify-center text-center">
-      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
-        <span className="material-symbols-outlined text-[24px]">add</span>
-      </div>
-      <div className="text-sm text-slate-600 font-medium">Pick metrics to start</div>
-      <div className="text-[11px] text-slate-400 max-w-xs mt-1">
-        Absolute values render on the left axis; percentage metrics get their own
-        right-hand axis automatically.
-      </div>
-    </div>
-  );
-}

@@ -1,9 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { ChartRenderer } from "./ChartRenderer";
-import { AxisHint, EmptyPreview, Panel } from "./components";
+import { AxisHint, Panel } from "./components";
 import {
   CHART_TYPES,
   CURRENCY_LABEL,
@@ -20,19 +21,61 @@ import type {
 } from "./types";
 
 interface BuilderProps {
-  data: FinancialRow[];
+  dealId: string;
+  // Friendly subheader label (e.g. "Aurelia Foods · Project Lighthouse").
+  // Optional because edit-mode reuses the saved graph's deal context — the
+  // page passes whatever it has.
+  dealLabel?: string;
+  // When `null`, Builder is in create mode. When a Graph is passed, it's the
+  // edit form and Save will PATCH that record.
   initial: Graph | null;
   onCancel: () => void;
-  onSave: (draft: GraphDraft) => void;
+  // Called *after* the API write succeeds with the persisted row. The parent
+  // is responsible for showing the success toast / returning to the gallery.
+  onSaved: (saved: Graph) => void;
 }
 
-export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
+export function Builder({ dealId, dealLabel, initial, onCancel, onSaved }: BuilderProps) {
   const [title, setTitle] = useState(initial?.title || "");
   const [chartType, setChartType] = useState<ChartType>(initial?.chartType || "combo");
   const [series, setSeries] = useState<GraphSeries[]>(initial?.series || []);
 
+  // Financial timeseries for this deal. We fetch on mount (and re-fetch if
+  // the dealId changes, e.g. user navigates from edit-of-deal-A → create-on-deal-B
+  // without unmounting). `null` = loading, `[]` = loaded-but-empty, otherwise
+  // we have rows.
+  const [data, setData] = useState<FinancialRow[] | null>(null);
+  const [dataError, setDataError] = useState<string | null>(null);
+
+  // Save submission state — disables the save button + flips its label.
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setData(null);
+    setDataError(null);
+    (async () => {
+      try {
+        const rows = await api.get<FinancialRow[]>(
+          `/deals/${dealId}/financials/timeseries`,
+        );
+        if (cancelled) return;
+        setData(Array.isArray(rows) ? rows : []);
+      } catch (err) {
+        if (cancelled) return;
+        console.warn("[graphs] failed to load financials timeseries", err);
+        setDataError(err instanceof Error ? err.message : "Failed to load financials");
+        setData([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dealId]);
+
   const draft = useMemo<GraphDraft>(
-    () => ({ title: title || "Untitled graph", chartType, series }),
+    () => ({ title: title.trim() || "Untitled graph", chartType, series }),
     [title, chartType, series],
   );
 
@@ -67,7 +110,27 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
     setSeries(next);
   }
 
-  const canSave = title.trim().length > 0 && series.length > 0;
+  async function handleSave() {
+    if (saving) return;
+    if (!(title.trim().length > 0 && series.length > 0)) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const saved = initial
+        ? await api.patch<Graph>(`/graphs/${initial.id}`, draft)
+        : await api.post<Graph>(`/deals/${dealId}/graphs`, draft);
+      onSaved(saved);
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to save graph";
+      setSaveError(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const canSave =
+    title.trim().length > 0 && series.length > 0 && !saving;
 
   const grouped: Record<string, typeof METRIC_CATALOG> = {
     "P&L line items": METRIC_CATALOG.filter((m) => m.source === "P&L"),
@@ -77,23 +140,23 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
   return (
     <div className="max-w-[1280px] mx-auto px-8 py-7">
       <div className="flex items-center justify-between mb-5">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onCancel}
-            className="w-8 h-8 rounded-md border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300 flex items-center justify-center"
+            className="w-8 h-8 rounded-md border border-slate-200 bg-white text-slate-600 hover:text-slate-900 hover:border-slate-300 flex items-center justify-center shrink-0"
           >
             <span className="material-symbols-outlined text-[18px]">arrow_back</span>
           </button>
-          <div>
-            <h1 className="text-lg font-semibold text-slate-900">
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold text-slate-900 truncate">
               {initial ? "Edit graph" : "New graph"}
             </h1>
-            <p className="text-xs text-slate-500">
-              Compose a chart from P&amp;L and analysis metrics
+            <p className="text-xs text-slate-500 truncate">
+              {dealLabel ?? "Compose a chart from P&L and analysis metrics"}
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={onCancel}
             className="px-3.5 py-2 rounded-md text-sm border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
@@ -101,7 +164,7 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
             Cancel
           </button>
           <button
-            onClick={() => canSave && onSave(draft)}
+            onClick={handleSave}
             disabled={!canSave}
             className={cn(
               "px-3.5 py-2 rounded-md text-sm font-medium inline-flex items-center gap-1.5",
@@ -111,11 +174,27 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
             )}
             style={canSave ? { backgroundColor: "#003366" } : undefined}
           >
-            <span className="material-symbols-outlined text-[18px]">check</span>
-            Save graph
+            <span className="material-symbols-outlined text-[18px]">
+              {saving ? "hourglass_top" : "check"}
+            </span>
+            {saving ? "Saving…" : "Save graph"}
           </button>
         </div>
       </div>
+
+      {saveError && (
+        <div className="mb-4 flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+          <span className="material-symbols-outlined text-[18px]">error</span>
+          {saveError}
+          <button
+            onClick={() => setSaveError(null)}
+            className="ml-auto text-red-400 hover:text-red-600"
+            aria-label="Dismiss error"
+          >
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-12 gap-5">
         {/* Config panel */}
@@ -209,7 +288,7 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
                           </span>
                           {m.label}
                           <span className="text-[9px] uppercase text-slate-400 ml-0.5">
-                            {m.kind === "percent" ? "%" : "₹"}
+                            {m.kind === "percent" ? "%" : "$"}
                           </span>
                         </button>
                       );
@@ -238,7 +317,7 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
                           className="text-slate-400 hover:text-slate-700 disabled:opacity-30 text-[10px] leading-none"
                           title="Move up"
                         >
-                          ▲
+                          &#9650;
                         </button>
                         <button
                           onClick={() => moveSeries(idx, 1)}
@@ -246,7 +325,7 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
                           className="text-slate-400 hover:text-slate-700 disabled:opacity-30 text-[10px] leading-none"
                           title="Move down"
                         >
-                          ▼
+                          &#9660;
                         </button>
                       </div>
                       <label className="relative cursor-pointer">
@@ -320,11 +399,12 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
               <AxisHint series={series} />
             </div>
             <div className="h-[440px] px-3 pt-3 pb-2">
-              {series.length === 0 ? (
-                <EmptyPreview />
-              ) : (
-                <ChartRenderer graph={draft} data={data} />
-              )}
+              <PreviewBody
+                data={data}
+                dataError={dataError}
+                series={series}
+                draft={draft}
+              />
             </div>
           </div>
 
@@ -336,6 +416,67 @@ export function Builder({ data, initial, onCancel, onSave }: BuilderProps) {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+interface PreviewBodyProps {
+  data: FinancialRow[] | null;
+  dataError: string | null;
+  series: GraphSeries[];
+  draft: GraphDraft;
+}
+
+function PreviewBody({ data, dataError, series, draft }: PreviewBodyProps) {
+  // Order matters: loading first (data === null) so we don't flash "no data"
+  // before the request resolves.
+  if (data === null) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center text-slate-500">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#003366] mb-3" />
+        <div className="text-xs">Loading financials…</div>
+      </div>
+    );
+  }
+
+  // Treat a hard fetch error like "no data" — we still let the user configure
+  // series; the inline banner up top will surface the error message on save.
+  if (data.length === 0) {
+    return <EmptyFinancials hint={dataError} />;
+  }
+
+  if (series.length === 0) {
+    return (
+      <div className="h-full w-full flex flex-col items-center justify-center text-center">
+        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+          <span className="material-symbols-outlined text-[24px]">add</span>
+        </div>
+        <div className="text-sm text-slate-600 font-medium">Pick metrics to start</div>
+        <div className="text-[11px] text-slate-400 max-w-xs mt-1">
+          Absolute values render on the left axis; percentage metrics get their
+          own right-hand axis automatically.
+        </div>
+      </div>
+    );
+  }
+
+  return <ChartRenderer graph={draft} data={data} />;
+}
+
+function EmptyFinancials({ hint }: { hint?: string | null }) {
+  return (
+    <div className="h-full w-full flex flex-col items-center justify-center text-center px-6">
+      <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 mb-3">
+        <span className="material-symbols-outlined text-[22px]">insights</span>
+      </div>
+      <div className="text-sm text-slate-700 font-medium">No financials yet</div>
+      <div className="text-[12px] text-slate-500 max-w-md mt-1">
+        This deal has no financial statements yet. Upload financials on the deal
+        page to start building graphs.
+      </div>
+      {hint && (
+        <div className="text-[11px] text-rose-500 mt-2">{hint}</div>
+      )}
     </div>
   );
 }
