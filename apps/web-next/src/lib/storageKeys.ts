@@ -11,4 +11,5 @@ export const STORAGE_KEYS = {
   dealsView: "pe-deals-view",
   dealCardMetrics: "pe-deal-card-metrics",
   aiAssistantHistory: "pe-ai-assistant-history",
+  customGraphs: "pe-custom-graphs",
 } as const;
