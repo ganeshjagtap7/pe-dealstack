@@ -10,6 +10,8 @@ import financialsRouter from './routes/financials.js';
 import memosRouter from './routes/memos.js';
 import ingestRouter from './routes/ingest.js';
 import onboardingRouter from './routes/onboarding.js';
+import graphsRouter from './routes/graphs.js';
+import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { usageContextMiddleware } from './middleware/usageContext.js';
@@ -160,6 +162,10 @@ app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageCon
 app.use('/api/ingest', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, ingestRouter);
 app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, memosRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, onboardingRouter);
+// CustomGraph CRUD — /api/graphs and /api/deals/:dealId/graphs
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, graphsRouter);
+// financials timeseries — /api/deals/:dealId/financials/timeseries
+app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealsFinancialsTimeseriesRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
 
 // ========================================
