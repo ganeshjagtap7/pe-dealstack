@@ -36,6 +36,9 @@ import { registerProvider } from './integrations/_platform/registry.js';
 import { granolaProvider } from './integrations/granola/index.js';
 import { gmailProvider } from './integrations/gmail/index.js';
 import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
+import { googleDriveProvider } from './integrations/googleDrive/index.js';
+import legalDocumentsRouter from './routes/legal-documents.js';
+import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
 import dealsTrashRouter from './routes/deals-trash.js';
 import graphsRouter from './routes/graphs.js';
 import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
@@ -271,6 +274,8 @@ app.use('/api/export', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, u
 app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, watchlistRouter);
 app.use('/api/integrations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, integrationsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
 
 // Admin security: dashboard router mounted BEFORE the isolation-test router (different paths but ordered for clarity)
 app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, adminSecurityDashboardRouter);
@@ -290,6 +295,7 @@ app.use('/api/internal', authMiddleware, internalRouter);
 registerProvider(granolaProvider);
 registerProvider(gmailProvider);
 registerProvider(googleCalendarProvider);
+registerProvider(googleDriveProvider);
 
 // Sentry error handler (must be before custom error handler)
 if (process.env.SENTRY_DSN) {

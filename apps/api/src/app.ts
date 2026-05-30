@@ -35,6 +35,9 @@ import { registerProvider } from './integrations/_platform/registry.js';
 import { granolaProvider } from './integrations/granola/index.js';
 import { gmailProvider } from './integrations/gmail/index.js';
 import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
+import { googleDriveProvider } from './integrations/googleDrive/index.js';
+import legalDocumentsRouter from './routes/legal-documents.js';
+import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
 import dealAccessTimelineRouter from './routes/deal-access-timeline.js';
 import dealsTrashRouter from './routes/deals-trash.js';
 import organizationsRouter from './routes/organizations.js';
@@ -337,6 +340,8 @@ app.use('/api/auth', authMiddleware, authSessionsRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
 app.use('/api/usage', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, usageRouter);
 
 // ========================================
@@ -363,6 +368,7 @@ app.get('/api/ai/status', (_req, res) => {
 registerProvider(granolaProvider);
 registerProvider(gmailProvider);
 registerProvider(googleCalendarProvider);
+registerProvider(googleDriveProvider);
 
 // Sentry error handler (must be before custom error handler)
 if (process.env.SENTRY_DSN) {

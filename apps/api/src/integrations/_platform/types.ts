@@ -5,6 +5,7 @@ export type ProviderId =
   | 'granola'
   | 'gmail'
   | 'google_calendar'
+  | 'google_drive'
   | 'fireflies'
   | 'otter'
   | '_mock';

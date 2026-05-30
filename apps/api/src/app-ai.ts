@@ -12,6 +12,10 @@ import ingestRouter from './routes/ingest.js';
 import onboardingRouter from './routes/onboarding.js';
 import graphsRouter from './routes/graphs.js';
 import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
+import legalDocumentsRouter from './routes/legal-documents.js';
+import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
+import { registerProvider } from './integrations/_platform/registry.js';
+import { googleDriveProvider } from './integrations/googleDrive/index.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { usageContextMiddleware } from './middleware/usageContext.js';
@@ -167,6 +171,12 @@ app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageCon
 // financials timeseries — /api/deals/:dealId/financials/timeseries
 app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealsFinancialsTimeseriesRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
+
+// Register Drive provider so legalDocService can pull a fresh token
+// from the Integration table on this variant.
+registerProvider(googleDriveProvider);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
