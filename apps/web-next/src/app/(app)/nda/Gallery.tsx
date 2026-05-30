@@ -56,6 +56,10 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
   const effective = formatDateShort(doc.effectiveDate);
   const expires = formatDateShort(doc.expiresAt);
   const counterparty = doc.counterpartyName?.trim();
+  // Sent docs with a live Google Doc get a subtle emerald badge in the
+  // bottom corner — signals that edits there are the source of truth, even
+  // though the card itself still routes to the in-app editor (audit trail).
+  const hasGoogleDoc = doc.status === "SENT" && !!doc.googleDocUrl;
 
   return (
     <div className="group relative aspect-[4/3] rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
@@ -68,6 +72,16 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
       >
         <span className="sr-only">Open NDA</span>
       </button>
+
+      {hasGoogleDoc && (
+        <div
+          className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 pointer-events-none"
+          title="Lives in Google Docs — counterparty has edit access"
+        >
+          <span className="material-symbols-outlined text-[12px]">cloud_done</span>
+          Google Docs
+        </div>
+      )}
 
       <div className="relative px-4 pt-3 pb-1 pointer-events-none">
         <div className="text-[10px] uppercase tracking-wider text-[#003366] font-medium truncate">

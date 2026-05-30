@@ -50,6 +50,11 @@ export interface LegalDocument {
   expiresAt: string | null;
   sentAt: string | null;
   sentToEmail: string | null;
+  // Populated by the backend on send: the Google Doc copy created in the
+  // user's Drive that the counterparty gets edit access to. Null until the
+  // first successful /send call.
+  googleDocId: string | null;
+  googleDocUrl: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -152,4 +157,9 @@ export interface SendDocResponse {
   ok: true;
   messageId: string;
   sentAt: string;
+  googleDocId: string;
+  googleDocUrl: string;
+  // Server returns `alreadySent: true` on idempotent re-sends so the client
+  // can soften its success toast ("Already sent" vs "Sent").
+  alreadySent?: boolean;
 }
