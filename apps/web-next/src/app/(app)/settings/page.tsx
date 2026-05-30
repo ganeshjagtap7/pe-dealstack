@@ -14,6 +14,7 @@ import { TeamSection } from "./TeamSection";
 import { FirmProfileSection } from "./FirmProfileSection";
 import { AiUsageSection } from "./AiUsageSection";
 import { IntegrationsSection } from "./IntegrationsSection";
+import { NDATemplatesSection } from "./NDATemplatesSection";
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -328,6 +329,8 @@ export default function SettingsPage() {
           <FirmProfileSection />
 
           <IntegrationsSection onToast={showToast} />
+
+          <NDATemplatesSection />
 
           <AiUsageSection />
 

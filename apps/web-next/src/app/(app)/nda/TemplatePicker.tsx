@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -9,15 +10,14 @@ interface TemplatePickerProps {
   open: boolean;
   dealLabel: string;
   onCancel: () => void;
-  // `null` means "blank document" — caller knows to dispatch the blank-mode
-  // path on the next step.
-  onSelect: (template: LegalDocTemplate | null) => void;
+  onSelect: (template: LegalDocTemplate) => void;
 }
 
-// Second-step modal in the NDA-create flow. Sits between DealPicker and
-// CreateDocModal: the user picks an NDA template (or "Blank document") and
-// the page transitions to the create form with the chosen template id (or
-// "blank") locked in.
+/**
+ * Step 2 of the create flow. Only `verifiedAt !== null` templates show up;
+ * unverified drafts live in Settings → NDA Templates until someone signs off.
+ * No more "blank document" tile — every NDA must come from a template.
+ */
 export function TemplatePicker({
   open,
   dealLabel,
@@ -33,7 +33,7 @@ export function TemplatePicker({
     setError(null);
     try {
       const data = await api.get<LegalDocTemplate[]>(
-        "/legal-document-templates?docType=NDA",
+        "/legal-document-templates",
       );
       setTemplates(Array.isArray(data) ? data : []);
     } catch (err) {
@@ -61,13 +61,14 @@ export function TemplatePicker({
 
   if (!open) return null;
 
-  // Pin the default template first so the most common choice shows up where
-  // the eye lands. Stable sort within each bucket keeps order predictable
-  // for users with several templates.
-  const ordered = [...templates].sort((a, b) => {
-    if (a.isDefault === b.isDefault) return a.name.localeCompare(b.name);
-    return a.isDefault ? -1 : 1;
-  });
+  // Verified only — drafts never appear in the create flow. Default first,
+  // then alphabetical, so the most common pick is where the eye lands.
+  const verified = templates
+    .filter((t) => t.verifiedAt !== null)
+    .sort((a, b) => {
+      if (a.isDefault === b.isDefault) return a.name.localeCompare(b.name);
+      return a.isDefault ? -1 : 1;
+    });
 
   return (
     <div
@@ -83,7 +84,7 @@ export function TemplatePicker({
             </h2>
             <p className="text-xs text-slate-500 mt-0.5 truncate">
               For <span className="text-[#003366] font-medium">{dealLabel}</span>{" "}
-              · placeholders are substituted server-side
+              · only verified templates are shown
             </p>
           </div>
           <button
@@ -109,19 +110,17 @@ export function TemplatePicker({
               <div className="animate-spin rounded-full h-7 w-7 border-b-2 border-[#003366] mb-3" />
               <span className="text-xs">Loading templates…</span>
             </div>
+          ) : verified.length === 0 ? (
+            <EmptyNoTemplates />
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {ordered.map((t) => (
+              {verified.map((t) => (
                 <TemplateTile
                   key={t.id}
                   template={t}
                   onClick={() => onSelect(t)}
                 />
               ))}
-              <BlankTile
-                noTemplates={ordered.length === 0}
-                onClick={() => onSelect(null)}
-              />
             </div>
           )}
         </div>
@@ -135,8 +134,19 @@ interface TemplateTileProps {
   onClick: () => void;
 }
 
+function formatTs(ts: string | null): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 function TemplateTile({ template, onClick }: TemplateTileProps) {
-  const placeholderCount = Object.keys(template.placeholderMap ?? {}).length;
+  const lastModified = formatTs(template.updatedAt);
   return (
     <button
       type="button"
@@ -164,49 +174,36 @@ function TemplateTile({ template, onClick }: TemplateTileProps) {
               </span>
             )}
           </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">
-            {placeholderCount} placeholder{placeholderCount === 1 ? "" : "s"} will
-            be substituted
-          </div>
+          {lastModified && (
+            <div className="text-[11px] text-slate-500 mt-0.5">
+              Last modified {lastModified}
+            </div>
+          )}
         </div>
       </div>
     </button>
   );
 }
 
-interface BlankTileProps {
-  noTemplates: boolean;
-  onClick: () => void;
-}
-
-function BlankTile({ noTemplates, onClick }: BlankTileProps) {
-  // When the firm has zero templates the tooltip becomes the primary message,
-  // not a footnote. We still let users start a blank doc — they can paste
-  // their own boilerplate into Google Docs after the fact.
-  const tooltip = noTemplates
-    ? "No templates yet. Admins can register one in Settings → Templates."
-    : "Start with an empty Google Doc you can paste boilerplate into.";
+function EmptyNoTemplates() {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={tooltip}
-      className={cn(
-        "group text-left rounded-lg border-2 border-dashed bg-slate-50/40 p-4 transition",
-        "border-slate-300 hover:border-[#003366] hover:bg-[#E6EEF5]/40",
-      )}
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-md flex items-center justify-center shrink-0 bg-white border border-slate-200 text-slate-500 group-hover:border-[#003366] group-hover:text-[#003366]">
-          <span className="material-symbols-outlined text-[20px]">add</span>
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-semibold text-slate-900">
-            Blank document
-          </div>
-          <div className="text-[11px] text-slate-500 mt-0.5">{tooltip}</div>
-        </div>
+    <div className="py-10 flex flex-col items-center justify-center text-center">
+      <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+        <span className="material-symbols-outlined text-[24px]">article</span>
       </div>
-    </button>
+      <div className="text-sm font-medium text-slate-700">No verified templates yet</div>
+      <div className="text-xs text-slate-500 max-w-xs mt-1 mb-4">
+        Upload one in Settings → NDA Templates and verify it before drafting
+        your first NDA.
+      </div>
+      <Link
+        href="/settings#nda-templates"
+        className="px-3.5 py-2 rounded-md text-sm font-medium text-white hover:opacity-90 inline-flex items-center gap-1.5"
+        style={{ backgroundColor: "#003366" }}
+      >
+        <span className="material-symbols-outlined text-[16px]">upload</span>
+        Go to Settings
+      </Link>
+    </div>
   );
 }

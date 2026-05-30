@@ -353,6 +353,7 @@ function MemoBuilderPageInner() {
                 activeSection={activeSection}
                 setActiveSection={setActiveSection}
                 onAddSection={() => setShowAddSection(true)}
+                dealId={selectedMemo.dealId}
               />
               <MemoEditor
                 memo={selectedMemo}

@@ -14,6 +14,19 @@ export type DocType =
 
 export type DocStatus = "DRAFT" | "SENT" | "SIGNED" | "EXPIRED";
 
+// The known placeholder tokens the editor lets users insert. The backend
+// substitutes these on send. Adding a new one? Add to TOKEN_KEYS / TOKEN_LABELS
+// / TOKEN_DESCRIPTIONS in constants.ts and to the backend's substitution map.
+export type TokenKey =
+  | "COUNTERPARTY_NAME"
+  | "COUNTERPARTY_ADDRESS"
+  | "COUNTERPARTY_EMAIL"
+  | "EFFECTIVE_DATE"
+  | "JURISDICTION"
+  | "DEAL_NAME"
+  | "FIRM_NAME"
+  | "TODAY";
+
 export interface LegalDocument {
   id: string;
   organizationId: string;
@@ -23,15 +36,20 @@ export interface LegalDocument {
   title: string;
   counterpartyName: string | null;
   counterpartyEmail: string | null;
+  counterpartyAddress: string | null;
+  jurisdiction: string | null;
   status: DocStatus;
-  googleDocId: string;
-  googleDocUrl: string;
-  googleDriveFolderId: string | null;
+  // Current editable HTML payload — what the user sees in the in-app editor.
+  content: string | null;
+  // Frozen-at-send-time copy. Lets us show the exact wording that went out
+  // even after the live draft has been edited again.
+  contentSnapshot: string | null;
   templateId: string | null;
   effectiveDate: string | null; // YYYY-MM-DD
   signedAt: string | null;
   expiresAt: string | null;
-  lastSyncedAt: string | null;
+  sentAt: string | null;
+  sentToEmail: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -39,7 +57,7 @@ export interface LegalDocument {
 
 // The cross-deal `GET /legal-documents` endpoint embeds a small `deal` summary
 // on each row so the firm-wide gallery can show which deal a document belongs
-// to without a second round-trip. Mirrors `GraphWithDeal`.
+// to without a second round-trip.
 export interface LegalDocumentWithDeal extends LegalDocument {
   deal: {
     id: string;
@@ -48,51 +66,90 @@ export interface LegalDocumentWithDeal extends LegalDocument {
   };
 }
 
-// Template a user can pick when creating a new document. The backend stores the
-// source Google Doc id and a placeholder map; substitution itself happens
-// server-side so the frontend never touches Google Docs' API directly.
+// A reusable HTML template, uploaded once and reused per NDA. The
+// `verifiedAt` field is null between parse-time and the user clicking "Save
+// Template" in the verifier — only verified rows are surfaced as picker
+// options on the create flow.
 export interface LegalDocTemplate {
   id: string;
   organizationId: string;
   name: string;
   docType: DocType;
-  googleDocId: string;
-  placeholderMap: Record<string, string>;
+  bodyHtml: string | null;
+  originalFileName: string | null;
+  uploadedAt: string | null;
+  verifiedAt: string | null;
+  placeholderKeys: TokenKey[];
   isDefault: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-// Payload for `POST /deals/:dealId/legal-documents`. Discriminated by `mode`
-// — "fromTemplate" copies a stored template Doc, "blank" creates an empty Doc
-// in the firm's legal-docs folder.
-export type CreateDocBody =
-  | {
-      mode: "fromTemplate";
-      templateId: string;
-      title: string;
-      counterpartyName?: string;
-      counterpartyEmail?: string;
-      effectiveDate?: string;
-    }
-  | {
-      mode: "blank";
-      title: string;
-      docType?: DocType;
-      counterpartyName?: string;
-      counterpartyEmail?: string;
-      effectiveDate?: string;
-    };
+// Returned by POST /legal-document-templates/parse — a parsed-but-unsaved
+// draft the verifier UI can render and let the user mark up.
+export interface ParsedTemplateDraft {
+  bodyHtml: string;
+  originalFileName: string | null;
+  suggestedName: string;
+}
 
-// Payload for `PATCH /legal-documents/:id`. All fields optional — server only
-// applies what's supplied. Doc *content* lives in Google Docs and is edited
-// there directly; the API only owns metadata.
+// Payload for POST /deals/:dealId/legal-documents. A templateId is always
+// required now — the "blank document" path is gone.
+export interface CreateDocBody {
+  templateId: string;
+  title: string;
+  counterpartyName?: string;
+  counterpartyEmail?: string;
+  counterpartyAddress?: string;
+  effectiveDate?: string;
+  jurisdiction?: string;
+}
+
+// Payload for PATCH /legal-documents/:id. All fields optional — server only
+// applies what's supplied. Content lives here too now (not in Google Docs).
 export interface UpdateDocBody {
   title?: string;
   status?: DocStatus;
+  content?: string;
   counterpartyName?: string | null;
   counterpartyEmail?: string | null;
+  counterpartyAddress?: string | null;
   effectiveDate?: string | null;
+  jurisdiction?: string | null;
   signedAt?: string | null;
   expiresAt?: string | null;
+}
+
+// Payload for POST /legal-document-templates (the "Save Template" action).
+export interface CreateTemplateBody {
+  name: string;
+  docType?: DocType;
+  bodyHtml: string;
+  originalFileName?: string;
+  placeholderKeys: TokenKey[];
+  isDefault?: boolean;
+}
+
+// Payload for PATCH /legal-document-templates/:id. `verifiedAt` is bumped to
+// "now" when the user re-saves a draft template — the server may accept null
+// to revert, but the UI doesn't expose that path.
+export interface UpdateTemplateBody {
+  name?: string;
+  bodyHtml?: string;
+  placeholderKeys?: TokenKey[];
+  isDefault?: boolean;
+  verifiedAt?: string | null;
+}
+
+// Payload for POST /legal-documents/:id/send.
+export interface SendDocBody {
+  toEmail?: string;
+  subject?: string;
+  message?: string;
+}
+
+export interface SendDocResponse {
+  ok: true;
+  messageId: string;
+  sentAt: string;
 }
