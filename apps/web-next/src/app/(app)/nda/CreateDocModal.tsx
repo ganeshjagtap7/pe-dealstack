@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
@@ -10,30 +9,28 @@ interface CreateDocModalProps {
   open: boolean;
   dealId: string;
   dealLabel: string;
-  template: LegalDocTemplate | null; // null = blank document
+  template: LegalDocTemplate | null;
   onCancel: () => void;
   onCreated: (doc: LegalDocument) => void;
 }
 
-// Banner type so the catch block can pick the right CTA without parsing
-// `error.code` from JSX. Each branch is wired to a specific backend error
-// code defined in the task brief — keep them in sync if the API adds more.
 type Banner =
   | { kind: "none" }
-  | { kind: "driveNotConnected"; message: string }
-  | { kind: "driveFolderNotConfigured"; message: string }
-  | { kind: "templateMissing"; message: string }
-  | { kind: "driveApi"; message: string }
+  | { kind: "templateMissing" }
+  | { kind: "templateNotVerified" }
   | { kind: "generic"; message: string };
 
-// Default title pattern matches the convention legal teams already use in
-// shared drives — saves a keystroke for the common case while still allowing
-// the analyst to override.
 function defaultTitle(counterpartyName: string): string {
   const cp = counterpartyName.trim();
   return cp ? `NDA — ${cp}` : "NDA";
 }
 
+/**
+ * Step 3 of the create flow — counterparty form. The template is locked in
+ * by the time we get here; there's no "blank document" branch anymore (every
+ * NDA must come from a verified template). On submit we POST and hand the
+ * resulting row back so the parent can drop straight into the full editor.
+ */
 export function CreateDocModal({
   open,
   dealId,
@@ -44,24 +41,26 @@ export function CreateDocModal({
 }: CreateDocModalProps) {
   const [counterpartyName, setCounterpartyName] = useState("");
   const [counterpartyEmail, setCounterpartyEmail] = useState("");
+  const [counterpartyAddress, setCounterpartyAddress] = useState("");
   // titleDirty tracks whether the user has hand-edited the title; until then
   // we keep it in lockstep with the auto-pattern "NDA — {counterparty}" so the
   // friendly default updates as they type the counterparty name.
   const [title, setTitle] = useState("NDA");
   const [titleDirty, setTitleDirty] = useState(false);
   const [effectiveDate, setEffectiveDate] = useState("");
+  const [jurisdiction, setJurisdiction] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [banner, setBanner] = useState<Banner>({ kind: "none" });
 
-  // Reset every time the modal re-opens so a previous session's banner /
-  // partial input doesn't leak into the next NDA.
   useEffect(() => {
     if (!open) return;
     setCounterpartyName("");
     setCounterpartyEmail("");
+    setCounterpartyAddress("");
     setTitle(defaultTitle(""));
     setTitleDirty(false);
     setEffectiveDate("");
+    setJurisdiction("");
     setBanner({ kind: "none" });
     setSubmitting(false);
   }, [open]);
@@ -86,25 +85,25 @@ export function CreateDocModal({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
+    if (!template) {
+      setBanner({ kind: "templateMissing" });
+      return;
+    }
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       setBanner({ kind: "generic", message: "Title is required." });
       return;
     }
 
-    // Build the discriminated payload — `mode: "fromTemplate"` when a
-    // template was picked, `mode: "blank"` otherwise. Optional fields are
-    // omitted when empty so the API doesn't have to special-case "" vs
-    // undefined.
-    const shared = {
+    const body: CreateDocBody = {
+      templateId: template.id,
       title: trimmedTitle,
       counterpartyName: counterpartyName.trim() || undefined,
       counterpartyEmail: counterpartyEmail.trim() || undefined,
+      counterpartyAddress: counterpartyAddress.trim() || undefined,
       effectiveDate: effectiveDate || undefined,
+      jurisdiction: jurisdiction.trim() || undefined,
     };
-    const body: CreateDocBody = template
-      ? { mode: "fromTemplate", templateId: template.id, ...shared }
-      : { mode: "blank", docType: "NDA", ...shared };
 
     setSubmitting(true);
     setBanner({ kind: "none" });
@@ -113,13 +112,6 @@ export function CreateDocModal({
         `/deals/${dealId}/legal-documents`,
         body,
       );
-      // Open the live Google Doc immediately — that's the analyst's next
-      // action 100% of the time, and we'd rather pop it before the modal
-      // animates closed than after (browsers block window.open when too far
-      // from the original click).
-      if (doc.googleDocUrl) {
-        window.open(doc.googleDocUrl, "_blank", "noopener,noreferrer");
-      }
       onCreated(doc);
     } catch (err) {
       console.warn("[nda] create failed:", err);
@@ -144,8 +136,8 @@ export function CreateDocModal({
             <h2 className="text-base font-bold text-slate-900">New NDA</h2>
             <p className="text-xs text-slate-500 mt-0.5 truncate">
               For{" "}
-              <span className="text-[#003366] font-medium">{dealLabel}</span> ·{" "}
-              {template ? `Template: ${template.name}` : "Blank document"}
+              <span className="text-[#003366] font-medium">{dealLabel}</span>{" "}
+              · Template: <span className="font-medium">{template?.name ?? "—"}</span>
             </p>
           </div>
           <button
@@ -195,19 +187,40 @@ export function CreateDocModal({
             />
           </Field>
 
-          <Field label="Effective date">
-            <input
-              type="date"
-              value={effectiveDate}
-              onChange={(e) => setEffectiveDate(e.target.value)}
-              className={inputCls}
+          <Field label="Counterparty address">
+            <textarea
+              value={counterpartyAddress}
+              onChange={(e) => setCounterpartyAddress(e.target.value)}
+              rows={3}
+              placeholder="100 Main St, Suite 500, Wilmington, DE 19801"
+              className={cn(inputCls, "resize-y")}
             />
           </Field>
 
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Effective date">
+              <input
+                type="date"
+                value={effectiveDate}
+                onChange={(e) => setEffectiveDate(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Jurisdiction">
+              <input
+                value={jurisdiction}
+                onChange={(e) => setJurisdiction(e.target.value)}
+                placeholder="State of Delaware"
+                className={inputCls}
+              />
+            </Field>
+          </div>
+
           <p className="text-[11px] text-slate-500">
-            We&rsquo;ll create a fresh Google Doc in your firm&rsquo;s legal-docs
-            folder and open it in a new tab. Substitution of template
-            placeholders happens server-side.
+            Placeholder tokens in the template (e.g.{" "}
+            <span className="font-mono">[COUNTERPARTY_NAME]</span>) get
+            substituted as soon as the NDA is created. You can tweak the
+            wording in the editor before sending.
           </p>
         </div>
 
@@ -243,35 +256,15 @@ export function CreateDocModal({
   );
 }
 
-// ----------------------------- error mapping ------------------------------ //
+// --------------------------- error mapping --------------------------- //
 
 function bannerForError(err: unknown): Banner {
   if (err instanceof ApiError) {
     switch (err.code) {
-      case "DRIVE_NOT_CONNECTED":
-        return {
-          kind: "driveNotConnected",
-          message:
-            "We can't reach Google Drive yet. Connect it in Settings to create NDAs.",
-        };
-      case "DRIVE_FOLDER_NOT_CONFIGURED":
-        return {
-          kind: "driveFolderNotConfigured",
-          message:
-            "Your firm's legal-docs folder isn't configured. Ask an admin to set it up.",
-        };
       case "TEMPLATE_NOT_FOUND":
-        return {
-          kind: "templateMissing",
-          message:
-            "That template no longer exists. Close this dialog and pick another.",
-        };
-      case "DRIVE_API_ERROR":
-        return {
-          kind: "driveApi",
-          message:
-            "Google Drive returned an error. Try again in a moment — if it persists, contact support.",
-        };
+        return { kind: "templateMissing" };
+      case "TEMPLATE_NOT_VERIFIED":
+        return { kind: "templateNotVerified" };
       default:
         return { kind: "generic", message: err.message };
     }
@@ -282,7 +275,7 @@ function bannerForError(err: unknown): Banner {
   };
 }
 
-// ----------------------------- small UI bits ------------------------------ //
+// --------------------------- small UI bits --------------------------- //
 
 const inputCls =
   "w-full px-3 py-2 text-sm rounded-md border border-slate-200 focus:border-[#003366] focus:ring-2 focus:ring-[#003366]/15 outline-none";
@@ -309,47 +302,18 @@ function Field({
 
 function ErrorBanner({ banner }: { banner: Banner }) {
   if (banner.kind === "none") return null;
-  const isInfo =
-    banner.kind === "driveNotConnected" ||
-    banner.kind === "driveFolderNotConfigured" ||
-    banner.kind === "templateMissing";
+  const message =
+    banner.kind === "templateMissing"
+      ? "Template no longer exists; pick another."
+      : banner.kind === "templateNotVerified"
+        ? "Template hasn't been verified yet."
+        : banner.kind === "generic"
+          ? banner.message
+          : "";
   return (
-    <div
-      className={cn(
-        "rounded-lg px-3 py-3 text-sm border flex items-start gap-2",
-        isInfo
-          ? "bg-amber-50 border-amber-200 text-amber-800"
-          : "bg-red-50 border-red-200 text-red-700",
-      )}
-    >
-      <span className="material-symbols-outlined text-[18px] mt-0.5 shrink-0">
-        {isInfo ? "info" : "error"}
-      </span>
-      <div className="flex-1 min-w-0">
-        <div className="leading-snug">{banner.message}</div>
-        {banner.kind === "driveNotConnected" && (
-          <Link
-            href="/settings#section-integrations"
-            className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-[#003366] hover:underline"
-          >
-            <span className="material-symbols-outlined text-[14px]">
-              open_in_new
-            </span>
-            Connect Google Drive
-          </Link>
-        )}
-        {banner.kind === "driveFolderNotConfigured" && (
-          <Link
-            href="/settings#section-integrations"
-            className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-[#003366] hover:underline"
-          >
-            <span className="material-symbols-outlined text-[14px]">
-              open_in_new
-            </span>
-            Open Settings → Integrations
-          </Link>
-        )}
-      </div>
+    <div className="rounded-lg px-3 py-3 text-sm border flex items-start gap-2 bg-red-50 border-red-200 text-red-700">
+      <span className="material-symbols-outlined text-[18px] mt-0.5 shrink-0">error</span>
+      <div className="flex-1 min-w-0 leading-snug">{message}</div>
     </div>
   );
 }

@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/providers/ToastProvider";
 import { CreateDocModal } from "./CreateDocModal";
 import { DealPicker, type PickableDeal } from "./DealPicker";
-import { EditDocModal } from "./EditDocModal";
+import { FullEditPage } from "./FullEditPage";
 import { Gallery } from "./Gallery";
 import { TemplatePicker } from "./TemplatePicker";
 import type {
@@ -16,26 +16,27 @@ import type {
   LegalDocumentWithDeal,
 } from "./types";
 
-// The NDA page is a state machine, same shape as /graphs:
-//   - "gallery":  the firm-wide list (default)
-//   - "picker":   modal asking which deal the new NDA belongs to
-//   - "template": modal asking which template (or blank) to use
-//   - "create":   create-doc form, deal + template both locked in
-//   - "edit":     edit-doc form for an existing row (no deal/template step)
+// State machine:
+//   - "gallery":         the firm-wide list (default)
+//   - "picker":          deal picker modal
+//   - "templatePicker":  verified-template picker modal
+//   - "create":          counterparty form (template + deal locked in)
+//   - "edit":            full-screen editor for an existing row
 type View =
   | { mode: "gallery" }
   | { mode: "picker" }
-  | { mode: "template"; dealId: string; dealLabel: string }
+  | { mode: "templatePicker"; dealId: string; dealLabel: string }
   | {
       mode: "create";
       dealId: string;
       dealLabel: string;
-      template: LegalDocTemplate | null;
+      template: LegalDocTemplate;
     }
   | { mode: "edit"; doc: LegalDocumentWithDeal };
 
 export default function NdaPage() {
   const { showToast } = useToast();
+  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [docs, setDocs] = useState<LegalDocumentWithDeal[]>([]);
@@ -45,10 +46,36 @@ export default function NdaPage() {
   const [deleteTarget, setDeleteTarget] =
     useState<LegalDocumentWithDeal | null>(null);
 
+  // Whenever we transition into the template-picker step, ensure at least
+  // one verified template exists. Done once per deep-link hop to avoid
+  // re-fetching on every click.
+  async function ensureVerifiedTemplatesOrRedirect(): Promise<boolean> {
+    try {
+      const templates = await api.get<LegalDocTemplate[]>(
+        "/legal-document-templates",
+      );
+      const hasVerified = Array.isArray(templates)
+        && templates.some((t) => t.verifiedAt !== null);
+      if (!hasVerified) {
+        showToast("Upload a template first.", "info", {
+          title: "No NDA templates yet",
+        });
+        router.push("/settings#nda-templates");
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.warn("[nda] template gate failed:", err);
+      // Don't block on a transient error — let the picker render its own
+      // error state so the user can see what happened.
+      return true;
+    }
+  }
+
   // Deep-link handoff from the deal page's "New NDA" button:
   //   /nda?dealId=...&dealLabel=...&create=1
-  // Skip both pickers and drop straight into the template-picker step (the
-  // deal context is already known on the source page). Ref-guarded so React
+  // Skip the deal picker (deal context is already known on the source page)
+  // and drop straight into the template-picker step. Ref-guarded so React
   // strict-mode's double-mount doesn't fire this twice.
   const deepLinkHandled = useRef(false);
   useEffect(() => {
@@ -60,8 +87,12 @@ export default function NdaPage() {
       return;
     }
     const dealLabel = searchParams.get("dealLabel") || "Untitled deal";
-    setView({ mode: "template", dealId, dealLabel });
     deepLinkHandled.current = true;
+    (async () => {
+      const ok = await ensureVerifiedTemplatesOrRedirect();
+      if (ok) setView({ mode: "templatePicker", dealId, dealLabel });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
   const loadDocs = useCallback(async () => {
@@ -88,8 +119,9 @@ export default function NdaPage() {
 
   /* -------------------- Gallery callbacks -------------------- */
 
-  function handleCreate() {
-    setView({ mode: "picker" });
+  async function handleCreate() {
+    const ok = await ensureVerifiedTemplatesOrRedirect();
+    if (ok) setView({ mode: "picker" });
   }
 
   function handleEdit(doc: LegalDocumentWithDeal) {
@@ -122,11 +154,11 @@ export default function NdaPage() {
   /* -------------------- Picker / Template / Create callbacks -------------------- */
 
   function handlePickerSelect(deal: PickableDeal) {
-    setView({ mode: "template", dealId: deal.id, dealLabel: deal.label });
+    setView({ mode: "templatePicker", dealId: deal.id, dealLabel: deal.label });
   }
 
-  function handleTemplateSelect(template: LegalDocTemplate | null) {
-    if (view.mode !== "template") return;
+  function handleTemplateSelect(template: LegalDocTemplate) {
+    if (view.mode !== "templatePicker") return;
     setView({
       mode: "create",
       dealId: view.dealId,
@@ -136,10 +168,9 @@ export default function NdaPage() {
   }
 
   function handleCreated(doc: LegalDocument) {
-    // Optimistic prepend — the API list response embeds a `deal` summary
-    // which the POST response doesn't, so we synthesise one from the deal
-    // label we already have on screen. The trailing refetch swaps in the
-    // canonical row.
+    // Synthesize a `deal` summary so we can transition straight into the
+    // editor without a second round-trip. The trailing refetch swaps in the
+    // canonical row (which carries the real projectName/target).
     const dealCtx =
       view.mode === "create"
         ? {
@@ -154,7 +185,7 @@ export default function NdaPage() {
     };
     setDocs((ds) => [withDeal, ...ds]);
     showToast(`Created "${doc.title}"`, "success");
-    setView({ mode: "gallery" });
+    setView({ mode: "edit", doc: withDeal });
     loadDocs();
   }
 
@@ -162,14 +193,28 @@ export default function NdaPage() {
     setDocs((ds) =>
       ds.map((d) => (d.id === updated.id ? { ...d, ...updated, deal: d.deal } : d)),
     );
-    showToast("NDA updated", "success");
-    setView({ mode: "gallery" });
+    // Keep the editor open with the freshest data so the user can keep
+    // working. The toast that signals success fires inside FullEditPage.
+    setView((v) => {
+      if (v.mode !== "edit") return v;
+      return { mode: "edit", doc: { ...v.doc, ...updated, deal: v.doc.deal } };
+    });
   }
 
   /* -------------------- Render -------------------- */
 
-  // The gallery is always rendered underneath so the page never goes blank
-  // when a modal is open — same UX choice /graphs makes.
+  // The full-screen editor takes over the page when active. Otherwise the
+  // gallery is rendered underneath any modal so the page never goes blank.
+  if (view.mode === "edit") {
+    return (
+      <FullEditPage
+        doc={view.doc}
+        onBack={() => setView({ mode: "gallery" })}
+        onSaved={handleSaved}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 text-slate-900">
       <Gallery
@@ -189,8 +234,8 @@ export default function NdaPage() {
       />
 
       <TemplatePicker
-        open={view.mode === "template"}
-        dealLabel={view.mode === "template" ? view.dealLabel : ""}
+        open={view.mode === "templatePicker"}
+        dealLabel={view.mode === "templatePicker" ? view.dealLabel : ""}
         onCancel={() => setView({ mode: "gallery" })}
         onSelect={handleTemplateSelect}
       />
@@ -204,19 +249,12 @@ export default function NdaPage() {
         onCreated={handleCreated}
       />
 
-      <EditDocModal
-        open={view.mode === "edit"}
-        doc={view.mode === "edit" ? view.doc : null}
-        onCancel={() => setView({ mode: "gallery" })}
-        onSaved={handleSaved}
-      />
-
       <ConfirmDialog
         open={deleteTarget !== null}
         title="Delete NDA?"
         message={
           deleteTarget
-            ? `"${deleteTarget.title}" will be removed from your library. The Google Doc itself stays in your Drive — this only deletes the record here.`
+            ? `"${deleteTarget.title}" will be removed from your library. This is a soft delete — admins can recover it for 30 days.`
             : ""
         }
         confirmLabel="Delete"

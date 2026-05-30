@@ -1,4 +1,4 @@
-import type { DocStatus, DocType } from "./types";
+import type { DocStatus, DocType, TokenKey } from "./types";
 
 // Human labels for the doc-type enum. Used in dropdowns + the status pill
 // subtitle when we eventually expand to LOI / Term Sheet / etc.
@@ -32,19 +32,64 @@ export const STATUS_COLOR_CLASSES: Record<
   EXPIRED: { bg: "bg-rose-50", text: "text-rose-700", border: "border-rose-200" },
 };
 
-// All four statuses in render order — used by the EditDocModal dropdown so the
-// progression reads left-to-right, draft -> signed -> expired.
+// All four statuses in render order — used by the edit-side status dropdown
+// so the progression reads left-to-right, draft -> signed -> expired.
 export const STATUS_ORDER: DocStatus[] = ["DRAFT", "SENT", "SIGNED", "EXPIRED"];
 
-// Documentation-only — the backend owns placeholder substitution. We surface
-// these in the create-modal hover help so analysts know which strings will be
-// rewritten by the template-copy step. Keep in sync with
-// `apps/api/src/services/legalDocs/placeholders.ts` (the peer agent's file).
-export const DEFAULT_PLACEHOLDERS: Record<string, string> = {
-  "{{counterpartyName}}": "Counterparty's legal name",
-  "{{counterpartyEmail}}": "Counterparty's notice email",
-  "{{effectiveDate}}": "Effective date of the agreement",
-  "{{dealName}}": "Deal codename / target",
-  "{{firmName}}": "Your firm's legal name",
-  "{{today}}": "Today's date when the doc is created",
+// Tokens the user can drop into a template. Backend substitutes these on
+// send. Order in TOKEN_KEYS = order they appear in the palette UI.
+export const TOKEN_KEYS: TokenKey[] = [
+  "COUNTERPARTY_NAME",
+  "COUNTERPARTY_ADDRESS",
+  "COUNTERPARTY_EMAIL",
+  "EFFECTIVE_DATE",
+  "JURISDICTION",
+  "DEAL_NAME",
+  "FIRM_NAME",
+  "TODAY",
+];
+
+export const TOKEN_LABELS: Record<TokenKey, string> = {
+  COUNTERPARTY_NAME: "Counterparty name",
+  COUNTERPARTY_ADDRESS: "Counterparty address",
+  COUNTERPARTY_EMAIL: "Counterparty email",
+  EFFECTIVE_DATE: "Effective date",
+  JURISDICTION: "Jurisdiction",
+  DEAL_NAME: "Deal name",
+  FIRM_NAME: "Firm name",
+  TODAY: "Today's date",
 };
+
+// Single-line hover descriptions shown when the user mouses over a token pill
+// in the palette. Kept literal so reviewers can scan what each one does.
+export const TOKEN_DESCRIPTIONS: Record<TokenKey, string> = {
+  COUNTERPARTY_NAME:
+    "Replaced with the counterparty's legal name when an NDA is created.",
+  COUNTERPARTY_ADDRESS:
+    "Replaced with the counterparty's mailing address from the create form.",
+  COUNTERPARTY_EMAIL:
+    "Replaced with the counterparty's notice email from the create form.",
+  EFFECTIVE_DATE:
+    "Replaced with the effective date chosen on the create form.",
+  JURISDICTION:
+    "Replaced with the governing-law jurisdiction (e.g. 'State of Delaware').",
+  DEAL_NAME:
+    "Replaced with the deal's project name or target on the create form.",
+  FIRM_NAME:
+    "Replaced with your firm's legal name from settings.",
+  TODAY:
+    "Replaced with today's date when the NDA is generated.",
+};
+
+// Wrap a token key in the `[TOKEN_KEY]` syntax the backend looks for.
+export function tokenLiteral(key: TokenKey): string {
+  return `[${key}]`;
+}
+
+// Returns the subset of TOKEN_KEYS present in the given HTML body, in the
+// same order as TOKEN_KEYS. The template verifier uses this both to compute
+// `placeholderKeys` on save and to render the "tokens present" checklist.
+export function detectTokens(html: string | null | undefined): TokenKey[] {
+  if (!html) return [];
+  return TOKEN_KEYS.filter((k) => html.includes(tokenLiteral(k)));
+}

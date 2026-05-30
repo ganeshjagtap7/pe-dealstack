@@ -22,7 +22,7 @@ function CreateTile({ onClick }: CreateTileProps) {
           New NDA
         </div>
         <div className="text-[11px] text-slate-400 -mt-1.5">
-          Draft a fresh NDA from a template or blank Google Doc
+          Draft a fresh NDA from one of your verified templates
         </div>
       </div>
     </button>
@@ -31,7 +31,6 @@ function CreateTile({ onClick }: CreateTileProps) {
 
 interface DocCardProps {
   doc: LegalDocumentWithDeal;
-  onOpen: (doc: LegalDocumentWithDeal) => void;
   onEdit: (doc: LegalDocumentWithDeal) => void;
   onDelete: (doc: LegalDocumentWithDeal) => void;
 }
@@ -51,7 +50,7 @@ function formatDateShort(d: string | null): string | null {
   });
 }
 
-function DocCard({ doc, onOpen, onEdit, onDelete }: DocCardProps) {
+function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
   const dealLabel = doc.deal.target || doc.deal.projectName || "Unknown deal";
   const statusCls = STATUS_COLOR_CLASSES[doc.status];
   const effective = formatDateShort(doc.effectiveDate);
@@ -60,14 +59,14 @@ function DocCard({ doc, onOpen, onEdit, onDelete }: DocCardProps) {
 
   return (
     <div className="group relative aspect-[4/3] rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
-      {/* Card body — clicking opens the Google Doc in a new tab. That's the
-          primary action; pencil/trash are hover-only affordances. */}
+      {/* Card body — clicking drops the user into the full in-app editor.
+          Pencil/trash are hover-only affordances. */}
       <button
-        onClick={() => onOpen(doc)}
+        onClick={() => onEdit(doc)}
         className="absolute inset-0 text-left"
-        aria-label={`Open ${doc.title} in Google Docs`}
+        aria-label={`Open ${doc.title}`}
       >
-        <span className="sr-only">Open in Google Docs</span>
+        <span className="sr-only">Open NDA</span>
       </button>
 
       <div className="relative px-4 pt-3 pb-1 pointer-events-none">
@@ -128,7 +127,7 @@ function DocCard({ doc, onOpen, onEdit, onDelete }: DocCardProps) {
             onEdit(doc);
           }}
           className="w-7 h-7 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-[#003366] hover:border-[#003366] shadow-sm flex items-center justify-center"
-          title="Edit metadata"
+          title="Open editor"
         >
           <span className="material-symbols-outlined text-[14px]">edit</span>
         </button>
@@ -186,20 +185,14 @@ export function Gallery({
   onDelete,
   onDismissError,
 }: GalleryProps) {
-  function handleOpen(doc: LegalDocumentWithDeal) {
-    // Direct hand-off to Google Docs. The doc lives there — the gallery card
-    // is a launcher, not a viewer. noopener/noreferrer for the usual reasons.
-    window.open(doc.googleDocUrl, "_blank", "noopener,noreferrer");
-  }
-
   return (
     <div className="max-w-[1280px] mx-auto px-8 py-7">
       <div className="flex items-end justify-between mb-5">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">NDAs</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Live NDAs stored as Google Docs. Click a card to open the doc;
-            metadata edits stay here so dashboards and reports can read them.
+            Draft, edit, and send NDAs in-app. Click a card to open the
+            editor; metadata feeds dashboards and reports.
           </p>
         </div>
         <div className="text-xs text-slate-400">
@@ -237,7 +230,6 @@ export function Gallery({
             <DocCard
               key={d.id}
               doc={d}
-              onOpen={handleOpen}
               onEdit={onEdit}
               onDelete={onDelete}
             />
