@@ -1,25 +1,37 @@
-// Renders a LegalDocument.content (HTML) into a .docx, snapshots the
-// HTML at send-time, and ships the result via Resend as an attachment.
-// Mirrors the Resend init pattern from routes/documents-sharing.ts:11.
+// Creates a real Google Doc from the LegalDocument HTML using the user's
+// Google Workspace token (stored under the `google_calendar` provider —
+// scopes were expanded to include drive.file + documents), grants the
+// counterparty `writer` access by email, then emails the Doc link via
+// Resend. Persists googleDocId + googleDocUrl on the LegalDocument row.
 //
 // Failure modes the route layer maps onto frontend error codes:
-//   * RESEND_NOT_CONFIGURED — RESEND_API_KEY missing (status 409)
-//   * NO_RECIPIENT          — neither override email nor row email   (status 409)
-//   * EMAIL_SEND_FAILED     — Resend upstream error (status 502)
+//   * GOOGLE_NOT_CONNECTED  — no Workspace integration for this user  (409)
+//   * GOOGLE_SCOPES_MISSING — connected before Drive scope was added  (409)
+//   * RESEND_NOT_CONFIGURED — RESEND_API_KEY env missing              (409)
+//   * NO_RECIPIENT          — neither override email nor row email    (409)
+//   * NO_CONTENT            — content null/empty                      (409)
+//   * DOCUMENT_NOT_FOUND    — row missing                             (404)
+//   * DRIVE_API_ERROR       — Drive call failed (non-auth)            (502)
+//   * EMAIL_SEND_FAILED     — Resend upstream error                   (502)
 
 import { Resend } from 'resend';
-// html-to-docx is a CJS module; this import works because tsconfig has
-// esModuleInterop enabled. Returns a Buffer when given a Node-side call.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-import htmlToDocx from 'html-to-docx';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
+import { getProviderAccessToken } from '../integrations/_platform/tokenStore.js';
+import {
+  createDocFromHtml,
+  setDocPermission,
+} from '../integrations/googleDrive/client.js';
+import { GoogleDriveError } from '../integrations/googleDrive/types.js';
 
 export type LegalDocSendErrorCode =
+  | 'GOOGLE_NOT_CONNECTED'
+  | 'GOOGLE_SCOPES_MISSING'
   | 'RESEND_NOT_CONFIGURED'
   | 'NO_RECIPIENT'
   | 'NO_CONTENT'
   | 'DOCUMENT_NOT_FOUND'
+  | 'DRIVE_API_ERROR'
   | 'EMAIL_SEND_FAILED';
 
 export class LegalDocSendError extends Error {
@@ -37,13 +49,17 @@ export class LegalDocSendError extends Error {
 export interface SendLegalDocumentInput {
   documentId: string;
   organizationId: string;
+  userId: string;            // internal User.id — needed to look up the Workspace token
   toEmail?: string;
   subject?: string;
-  message?: string; // cover message body (HTML or plain — passed through)
+  message?: string;          // cover message body (HTML, passed through verbatim)
 }
 
 export interface SendLegalDocumentResult {
   ok: true;
+  alreadySent?: boolean;
+  googleDocId: string;
+  googleDocUrl: string;
   messageId: string | null;
   sentAt: string;
 }
@@ -57,21 +73,16 @@ interface DocRow {
   counterpartyName: string | null;
   counterpartyEmail: string | null;
   status: string;
+  googleDocId: string | null;
+  googleDocUrl: string | null;
+  sentAt: string | null;
+  sentToEmail: string | null;
 }
 
 interface DealRow {
   id: string;
   name: string | null;
   companyName: string | null;
-}
-
-function safeFilenameFragment(value: string): string {
-  // Trim to a sane length, swap path/Drive-unfriendly chars for spaces.
-  return value
-    .replace(/[\\/:*?"<>|]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 80) || 'Document';
 }
 
 function resolveDealLabel(deal: DealRow | null, fallbackTitle: string): string {
@@ -82,7 +93,9 @@ function resolveDealLabel(deal: DealRow | null, fallbackTitle: string): string {
 async function loadDocument(id: string, orgId: string): Promise<DocRow> {
   const { data, error } = await supabase
     .from('LegalDocument')
-    .select('id, organizationId, dealId, title, content, counterpartyName, counterpartyEmail, status')
+    .select(
+      'id, organizationId, dealId, title, content, counterpartyName, counterpartyEmail, status, googleDocId, googleDocUrl, sentAt, sentToEmail',
+    )
     .eq('id', id)
     .eq('organizationId', orgId)
     .maybeSingle();
@@ -105,20 +118,78 @@ async function loadDeal(dealId: string): Promise<DealRow | null> {
 }
 
 const DEFAULT_COVER_HTML =
-  '<p>Please find the NDA attached. Reply with any redlines.</p>';
+  '<p>Please review the attached NDA. You\'ve been granted edit access in Google Docs.</p>';
+
+function buildEmailHtml(coverHtml: string, docUrl: string): string {
+  // Plain inline-styled "button" — Resend renders the HTML as-is, and we
+  // want this to look acceptable in Gmail/Outlook without external CSS.
+  const button =
+    `<p style="margin:24px 0;">` +
+    `<a href="${docUrl}" ` +
+    `style="display:inline-block;padding:12px 24px;background:#1a73e8;` +
+    `color:#ffffff;text-decoration:none;border-radius:4px;font-weight:600;` +
+    `font-family:Arial,Helvetica,sans-serif;">Open the NDA in Google Docs</a>` +
+    `</p>` +
+    `<p style="color:#6b7280;font-size:13px;font-family:Arial,Helvetica,sans-serif;">` +
+    `Or paste this link into your browser: <a href="${docUrl}">${docUrl}</a>` +
+    `</p>`;
+  return `${coverHtml}\n${button}`;
+}
+
+function mapDriveErrorToSendError(
+  err: unknown,
+  stage: 'create' | 'permission',
+): LegalDocSendError {
+  if (err instanceof GoogleDriveError) {
+    if (err.code === 'INVALID_TOKEN' || err.code === 'INSUFFICIENT_SCOPE') {
+      return new LegalDocSendError(
+        'GOOGLE_SCOPES_MISSING',
+        'Google connection lacks Drive/Docs scope — please reconnect Google Workspace',
+        409,
+        err.details ?? err.message,
+      );
+    }
+    return new LegalDocSendError(
+      'DRIVE_API_ERROR',
+      `Drive ${stage} call failed: ${err.message}`,
+      502,
+      err.details ?? err.message,
+    );
+  }
+  const message = err instanceof Error ? err.message : String(err);
+  return new LegalDocSendError(
+    'DRIVE_API_ERROR',
+    `Drive ${stage} call failed`,
+    502,
+    message,
+  );
+}
 
 export async function sendLegalDocument(
   input: SendLegalDocumentInput,
 ): Promise<SendLegalDocumentResult> {
-  if (!process.env.RESEND_API_KEY) {
+  // ── Load + validate inputs ──────────────────────────────────────────
+  const doc = await loadDocument(input.documentId, input.organizationId);
+
+  // Idempotency: if already sent AND we have a googleDocId, return it.
+  if (doc.status === 'SENT' && doc.googleDocId && doc.googleDocUrl) {
+    return {
+      ok: true,
+      alreadySent: true,
+      googleDocId: doc.googleDocId,
+      googleDocUrl: doc.googleDocUrl,
+      messageId: null,
+      sentAt: doc.sentAt ?? new Date().toISOString(),
+    };
+  }
+
+  if (!doc.content || !doc.content.trim()) {
     throw new LegalDocSendError(
-      'RESEND_NOT_CONFIGURED',
-      'RESEND_API_KEY is not configured on this server',
+      'NO_CONTENT',
+      'Document has no HTML content to send',
       409,
     );
   }
-
-  const doc = await loadDocument(input.documentId, input.organizationId);
   const recipient = (input.toEmail ?? doc.counterpartyEmail ?? '').trim();
   if (!recipient) {
     throw new LegalDocSendError(
@@ -127,10 +198,27 @@ export async function sendLegalDocument(
       409,
     );
   }
-  if (!doc.content || !doc.content.trim()) {
+
+  if (!process.env.RESEND_API_KEY) {
     throw new LegalDocSendError(
-      'NO_CONTENT',
-      'Document has no HTML content to send',
+      'RESEND_NOT_CONFIGURED',
+      'RESEND_API_KEY is not configured on this server',
+      409,
+    );
+  }
+
+  // ── Resolve the user's Google Workspace access token ────────────────
+  // Provider id stays `google_calendar` (display name was relabeled to
+  // "Google Workspace" — the id is the storage key).
+  const accessToken = await getProviderAccessToken({
+    userId: input.userId,
+    organizationId: input.organizationId,
+    providerId: 'google_calendar',
+  });
+  if (!accessToken) {
+    throw new LegalDocSendError(
+      'GOOGLE_NOT_CONNECTED',
+      'Google Workspace is not connected for this user — open Settings → Integrations',
       409,
     );
   }
@@ -138,43 +226,32 @@ export async function sendLegalDocument(
   const deal = await loadDeal(doc.dealId);
   const dealLabel = resolveDealLabel(deal, doc.title);
 
-  // Render HTML → .docx. html-to-docx returns a Buffer in Node.
-  let docxBuffer: Buffer;
+  // ── Create the Google Doc ───────────────────────────────────────────
+  let createdDoc: { id: string; webViewLink: string };
   try {
-    const result = await htmlToDocx(doc.content, undefined, {
-      table: { row: { cantSplit: true } },
-      footer: false,
-      pageNumber: false,
-    });
-    // The lib returns Buffer in Node but Blob in the browser; coerce
-    // both to Buffer so the Resend SDK is happy.
-    if (Buffer.isBuffer(result)) {
-      docxBuffer = result;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } else if (typeof (result as any)?.arrayBuffer === 'function') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      docxBuffer = Buffer.from(await (result as any).arrayBuffer());
-    } else {
-      docxBuffer = Buffer.from(result as unknown as ArrayBuffer);
-    }
+    createdDoc = await createDocFromHtml(accessToken, doc.title, doc.content);
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    log.error('legalDocSendService: html-to-docx failed', err, {
+    log.error('legalDocSendService: createDocFromHtml failed', err, {
       documentId: doc.id,
     });
-    throw new LegalDocSendError(
-      'EMAIL_SEND_FAILED',
-      'Failed to render document to .docx',
-      502,
-      message,
-    );
+    throw mapDriveErrorToSendError(err, 'create');
   }
 
-  const counterpartyLabel = safeFilenameFragment(doc.counterpartyName ?? 'Counterparty');
-  const dealFragment = safeFilenameFragment(dealLabel);
-  const filename = `${dealFragment} - NDA - ${counterpartyLabel}.docx`;
+  // ── Grant the counterparty writer access ────────────────────────────
+  try {
+    await setDocPermission(accessToken, createdDoc.id, recipient, 'writer');
+  } catch (err) {
+    log.error('legalDocSendService: setDocPermission failed', err, {
+      documentId: doc.id,
+      googleDocId: createdDoc.id,
+    });
+    throw mapDriveErrorToSendError(err, 'permission');
+  }
+
+  // ── Email the Doc link via Resend ───────────────────────────────────
   const subject = input.subject?.trim() || `${dealLabel} — NDA`;
   const coverHtml = (input.message && input.message.trim()) || DEFAULT_COVER_HTML;
+  const html = buildEmailHtml(coverHtml, createdDoc.webViewLink);
   const from = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
   const resend = new Resend(process.env.RESEND_API_KEY);
@@ -184,13 +261,7 @@ export async function sendLegalDocument(
       from,
       to: recipient,
       subject,
-      html: coverHtml,
-      attachments: [
-        {
-          filename,
-          content: docxBuffer,
-        },
-      ],
+      html,
     });
     if (send.error) {
       throw new LegalDocSendError(
@@ -206,6 +277,7 @@ export async function sendLegalDocument(
     const message = err instanceof Error ? err.message : String(err);
     log.error('legalDocSendService: resend send failed', err, {
       documentId: doc.id,
+      googleDocId: createdDoc.id,
     });
     throw new LegalDocSendError(
       'EMAIL_SEND_FAILED',
@@ -215,6 +287,7 @@ export async function sendLegalDocument(
     );
   }
 
+  // ── Persist final state ─────────────────────────────────────────────
   const sentAt = new Date().toISOString();
   const { error: updateErr } = await supabase
     .from('LegalDocument')
@@ -223,18 +296,27 @@ export async function sendLegalDocument(
       sentAt,
       sentToEmail: recipient,
       contentSnapshot: doc.content,
+      googleDocId: createdDoc.id,
+      googleDocUrl: createdDoc.webViewLink,
       updatedAt: sentAt,
     })
     .eq('id', doc.id)
     .eq('organizationId', input.organizationId);
   if (updateErr) {
-    // Email already sent — log loudly but don't throw. The frontend
-    // will still see ok:true; the row will refresh on next list fetch.
+    // The Doc was created + the email went out — log loudly but don't
+    // throw. Next list-fetch will resolve eventual consistency.
     log.error('legalDocSendService: failed to update status after send', updateErr, {
       documentId: doc.id,
+      googleDocId: createdDoc.id,
       messageId,
     });
   }
 
-  return { ok: true, messageId, sentAt };
+  return {
+    ok: true,
+    googleDocId: createdDoc.id,
+    googleDocUrl: createdDoc.webViewLink,
+    messageId,
+    sentAt,
+  };
 }
