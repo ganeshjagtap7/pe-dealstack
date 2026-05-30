@@ -1,0 +1,200 @@
+// Google Drive REST client. NOT a registered provider — these functions are
+// invoked directly from services (legalDocSendService) using the access token
+// stored under the `google_calendar` (Workspace) integration row.
+//
+// Scopes required (already in CALENDAR_SCOPES):
+//   - https://www.googleapis.com/auth/drive.file    (create + manage app's own files)
+//   - https://www.googleapis.com/auth/documents     (reserved for batchUpdate in v2)
+//
+// HTML → Google Doc conversion: the multipart upload sets the file's
+// mimeType to `application/vnd.google-apps.document`, which makes Drive
+// auto-convert the `text/html` body part into a native Google Doc.
+
+import { log } from '../../utils/logger.js';
+import {
+  GoogleDriveError,
+  type CreateDocResult,
+  type DocMetadataResult,
+} from './types.js';
+
+const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
+const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+
+const UPLOAD_TIMEOUT_MS = 30_000;
+const REQUEST_TIMEOUT_MS = 15_000;
+
+function mapDriveError(
+  status: number,
+  bodyText: string,
+  fallbackMessage: string,
+): GoogleDriveError {
+  // Google returns 401 for an expired/invalid token, 403 for missing scope
+  // OR permission denied. Sniff the body for "insufficient" / "scope" to
+  // distinguish INSUFFICIENT_SCOPE from PERMISSION_DENIED.
+  const lower = bodyText.toLowerCase();
+  if (status === 401) {
+    return new GoogleDriveError(
+      'INVALID_TOKEN',
+      'Google access token rejected (expired or revoked)',
+      status,
+      bodyText.slice(0, 500),
+    );
+  }
+  if (status === 403) {
+    if (lower.includes('insufficient') || lower.includes('scope')) {
+      return new GoogleDriveError(
+        'INSUFFICIENT_SCOPE',
+        'Token lacks required Drive/Docs scope — user must re-authorize',
+        status,
+        bodyText.slice(0, 500),
+      );
+    }
+    return new GoogleDriveError(
+      'PERMISSION_DENIED',
+      'Google Drive denied this request',
+      status,
+      bodyText.slice(0, 500),
+    );
+  }
+  return new GoogleDriveError(
+    'DRIVE_API_ERROR',
+    fallbackMessage,
+    status,
+    bodyText.slice(0, 500),
+  );
+}
+
+/**
+ * Create a Google Doc by uploading HTML and asking Drive to convert it.
+ * Uses a hand-rolled multipart/related body (Drive accepts both
+ * multipart/related and multipart/form-data; related is the canonical form
+ * documented in the v3 upload guide).
+ */
+export async function createDocFromHtml(
+  accessToken: string,
+  name: string,
+  html: string,
+  folderId?: string,
+): Promise<CreateDocResult> {
+  const metadata: Record<string, unknown> = {
+    name,
+    mimeType: 'application/vnd.google-apps.document',
+  };
+  if (folderId) metadata.parents = [folderId];
+
+  const boundary = `boundary_${Date.now().toString(36)}_${Math.random()
+    .toString(36)
+    .slice(2)}`;
+  const CRLF = '\r\n';
+  const body =
+    `--${boundary}${CRLF}` +
+    `Content-Type: application/json; charset=UTF-8${CRLF}${CRLF}` +
+    `${JSON.stringify(metadata)}${CRLF}` +
+    `--${boundary}${CRLF}` +
+    `Content-Type: text/html; charset=UTF-8${CRLF}${CRLF}` +
+    `${html}${CRLF}` +
+    `--${boundary}--`;
+
+  const url = `${DRIVE_UPLOAD_URL}?uploadType=multipart&fields=id,webViewLink`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body,
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    log.warn('googleDrive.createDocFromHtml: non-2xx', {
+      status: res.status,
+      bodyPreview: text.slice(0, 200),
+    });
+    throw mapDriveError(res.status, text, 'Drive file create failed');
+  }
+
+  const json = (await res.json()) as { id?: string; webViewLink?: string };
+  if (!json.id || !json.webViewLink) {
+    throw new GoogleDriveError(
+      'DRIVE_API_ERROR',
+      'Drive create response missing id/webViewLink',
+      res.status,
+      JSON.stringify(json).slice(0, 500),
+    );
+  }
+  return { id: json.id, webViewLink: json.webViewLink };
+}
+
+/**
+ * Grant a user permission on a file. We pass `sendNotificationEmail=false`
+ * because the send service sends its own cover email via Resend.
+ */
+export async function setDocPermission(
+  accessToken: string,
+  fileId: string,
+  emailAddress: string,
+  role: 'writer' | 'commenter' | 'reader',
+): Promise<void> {
+  const url = `${DRIVE_FILES_URL}/${encodeURIComponent(
+    fileId,
+  )}/permissions?sendNotificationEmail=false`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ type: 'user', role, emailAddress }),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    log.warn('googleDrive.setDocPermission: non-2xx', {
+      status: res.status,
+      bodyPreview: text.slice(0, 200),
+    });
+    throw mapDriveError(res.status, text, 'Drive permission grant failed');
+  }
+}
+
+/**
+ * Fetch lightweight metadata for a Doc. Reserved for future re-sync work
+ * (we don't call it from the send path in v1).
+ */
+export async function getDocMetadata(
+  accessToken: string,
+  fileId: string,
+): Promise<DocMetadataResult> {
+  const fields = 'id,name,modifiedTime,webViewLink';
+  const url = `${DRIVE_FILES_URL}/${encodeURIComponent(
+    fileId,
+  )}?fields=${encodeURIComponent(fields)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw mapDriveError(res.status, text, 'Drive metadata fetch failed');
+  }
+
+  const json = (await res.json()) as Partial<DocMetadataResult>;
+  if (!json.id || !json.name || !json.modifiedTime || !json.webViewLink) {
+    throw new GoogleDriveError(
+      'DRIVE_API_ERROR',
+      'Drive metadata response missing required fields',
+      res.status,
+      JSON.stringify(json).slice(0, 500),
+    );
+  }
+  return {
+    id: json.id,
+    name: json.name,
+    modifiedTime: json.modifiedTime,
+    webViewLink: json.webViewLink,
+  };
+}
