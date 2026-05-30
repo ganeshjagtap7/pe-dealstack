@@ -49,6 +49,8 @@ const nextConfig: NextConfig = {
     "csv-parse",
     "mailparser",
     "mammoth",
+    "marked",
+    "isomorphic-dompurify",
     "pdf-parse",
     "pino",
     "pino-pretty",
