@@ -9,7 +9,7 @@
 
 import mammoth from 'mammoth';
 import { marked } from 'marked';
-import DOMPurify from 'isomorphic-dompurify';
+import sanitizeHtml from 'sanitize-html';
 import { log } from '../utils/logger.js';
 
 export type TemplateFileKind = 'docx' | 'html' | 'md';
@@ -42,12 +42,24 @@ const ALLOWED_ATTR = [
 ];
 
 export function sanitiseLegalDocHtml(html: string): string {
-  // isomorphic-dompurify ships with jsdom on the server side so this
-  // call works in Node without us booting our own jsdom instance.
-  return DOMPurify.sanitize(html, {
-    ALLOWED_TAGS,
-    ALLOWED_ATTR,
-  }) as string;
+  // sanitize-html is pure JS — no jsdom dep — so we sidestep the ESM/CJS
+  // require interop bomb that isomorphic-dompurify hit on Vercel's Node 24
+  // runtime ("require() of ES Module ...encoding-lite.js not supported"
+  // via jsdom → html-encoding-sniffer → @exodus/bytes). Same allowlist
+  // semantics; frontend DOMPurify still re-sanitises on render.
+  return sanitizeHtml(html, {
+    allowedTags: ALLOWED_TAGS,
+    allowedAttributes: ALLOWED_ATTR.reduce<Record<string, string[]>>(
+      (acc, attr) => {
+        acc['*'] = (acc['*'] ?? []).concat(attr);
+        return acc;
+      },
+      {},
+    ),
+    // Preserve placeholder tokens like [COUNTERPARTY_NAME] inside text nodes
+    // (sanitize-html default already does this — explicit for clarity).
+    disallowedTagsMode: 'discard',
+  });
 }
 
 export interface ParseTemplateInput {

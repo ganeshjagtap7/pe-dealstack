@@ -50,7 +50,7 @@ const nextConfig: NextConfig = {
     "mailparser",
     "mammoth",
     "marked",
-    "isomorphic-dompurify",
+    "sanitize-html",
     "pdf-parse",
     "pino",
     "pino-pretty",
