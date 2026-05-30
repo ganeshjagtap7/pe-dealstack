@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, KeyboardEvent, ClipboardEvent } from "react";
+import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 // Order, icons, copy mirror login.html on main (commit 37a3392).
@@ -21,122 +20,49 @@ const STATS = [
   { value: "SOC 2", label: "Enterprise ready" },
 ];
 
-const MFA_DIGIT_COUNT = 6;
+// Scopes the backend needs to (a) create a Drive file in the user's My Drive
+// and (b) edit it as a Google Doc. `drive.file` is the minimum permission —
+// it scopes the app to files it created, not the user's whole Drive.
+const GOOGLE_OAUTH_SCOPES =
+  "email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/documents";
+
+function appOrigin(): string {
+  if (typeof window !== "undefined") return window.location.origin;
+  return process.env.NEXT_PUBLIC_APP_URL ?? "";
+}
 
 export default function LoginPage() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
-  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [mfaFactorId, setMfaFactorId] = useState<string | null>(null);
-  const [mfaDigits, setMfaDigits] = useState<string[]>(Array(MFA_DIGIT_COUNT).fill(""));
-  const [mfaError, setMfaError] = useState("");
-  const [mfaVerifying, setMfaVerifying] = useState(false);
-  const mfaInputRefs = useRef<Array<HTMLInputElement | null>>([]);
-
-  const router = useRouter();
-
-  const showMfa = mfaFactorId !== null;
-  const mfaCode = mfaDigits.join("");
-  const mfaReady = mfaCode.length === MFA_DIGIT_COUNT;
-
-  useEffect(() => {
-    if (showMfa) mfaInputRefs.current[0]?.focus();
-  }, [showMfa]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  async function handleGoogleSignIn() {
     setError("");
     setLoading(true);
-
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-    if (authError) {
-      setError(mapAuthError(authError.message));
-      setLoading(false);
-      return;
-    }
-
-    // After password auth, check if the user has a verified TOTP factor.
-    const { data: factorsData } = await supabase.auth.mfa.listFactors();
-    const verified = factorsData?.totp.filter((f) => f.status === "verified") ?? [];
-    if (verified.length > 0) {
-      setMfaFactorId(verified[0].id);
-      setLoading(false);
-      return;
-    }
-
-    router.push("/dashboard");
-  };
-
-  const handleMfaDigitChange = (index: number, raw: string) => {
-    const val = raw.replace(/[^0-9]/g, "").slice(0, 1);
-    setMfaDigits((prev) => {
-      const next = [...prev];
-      next[index] = val;
-      return next;
-    });
-    if (val && index < MFA_DIGIT_COUNT - 1) mfaInputRefs.current[index + 1]?.focus();
-  };
-
-  const handleMfaDigitKeyDown = (index: number, e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Backspace" && !mfaDigits[index] && index > 0) {
-      mfaInputRefs.current[index - 1]?.focus();
-      setMfaDigits((prev) => {
-        const next = [...prev];
-        next[index - 1] = "";
-        return next;
+    try {
+      const supabase = createClient();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          scopes: GOOGLE_OAUTH_SCOPES,
+          // `prompt=consent` + `access_type=offline` are required to get a
+          // refresh token back from Google — without it the backend can't
+          // create Drive files after the access token expires.
+          queryParams: { access_type: "offline", prompt: "consent" },
+          redirectTo: `${appOrigin()}/callback`,
+        },
       });
+      if (oauthError) {
+        setError(oauthError.message);
+        setLoading(false);
+      }
+      // On success the browser is redirected away to Google, so we don't
+      // reset `loading` — the page is about to unmount.
+    } catch (err) {
+      console.warn("[auth] google sign-in failed:", err);
+      setError(err instanceof Error ? err.message : "Sign-in failed");
+      setLoading(false);
     }
-  };
-
-  const handleMfaPaste = (e: ClipboardEvent<HTMLInputElement>) => {
-    e.preventDefault();
-    const pasted = (e.clipboardData.getData("text") || "").replace(/[^0-9]/g, "").slice(0, MFA_DIGIT_COUNT);
-    if (!pasted) return;
-    const next = Array(MFA_DIGIT_COUNT).fill("").map((_, i) => pasted[i] ?? "");
-    setMfaDigits(next);
-    if (pasted.length === MFA_DIGIT_COUNT) mfaInputRefs.current[MFA_DIGIT_COUNT - 1]?.focus();
-  };
-
-  const handleMfaVerify = async () => {
-    if (!mfaReady || !mfaFactorId) return;
-    setMfaVerifying(true);
-    setMfaError("");
-
-    const supabase = createClient();
-    const { error: verifyError } = await supabase.auth.mfa.challengeAndVerify({
-      factorId: mfaFactorId,
-      code: mfaCode,
-    });
-
-    if (verifyError) {
-      setMfaError("Invalid code. Please try again.");
-      setMfaDigits(Array(MFA_DIGIT_COUNT).fill(""));
-      mfaInputRefs.current[0]?.focus();
-      setMfaVerifying(false);
-      return;
-    }
-
-    router.push("/dashboard");
-  };
-
-  const handleMfaBack = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setMfaFactorId(null);
-    setMfaDigits(Array(MFA_DIGIT_COUNT).fill(""));
-    setMfaError("");
-    setMfaVerifying(false);
-  };
-
-  const handleSso = () => {
-    // Placeholder — real IdP wiring (Okta, Azure AD, etc.) lands later.
-    // No user-facing message yet; the button click is a no-op until then.
-  };
+  }
 
   return (
     <div className="flex h-screen w-full overflow-hidden">
@@ -205,7 +131,7 @@ export default function LoginPage() {
         </div>
       </div>
 
-      {/* Right Panel — Login Form / MFA */}
+      {/* Right Panel — Google Workspace sign-in */}
       <div className="w-full lg:w-1/2 flex flex-col justify-center items-center bg-white px-6 md:px-12 lg:px-24 relative">
         <div className="absolute inset-0 lg:hidden pointer-events-none opacity-5 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary via-transparent to-transparent" />
 
@@ -217,198 +143,69 @@ export default function LoginPage() {
             <span className="text-xl font-bold tracking-tight" style={{ color: "#003366" }}>PE<span className="font-light opacity-80">OS</span></span>
           </div>
 
-          {!showMfa ? (
-            <>
-              <div className="mb-8">
-                <h1 className="text-[#121417] tracking-tight text-[28px] font-bold leading-tight mb-2">
-                  Sign in to your account
-                </h1>
-                <p className="text-slate-500 text-sm">Welcome back! Please enter your details.</p>
-              </div>
+          <div className="mb-8">
+            <h1 className="text-[#121417] tracking-tight text-[28px] font-bold leading-tight mb-2">
+              Sign in to PE OS
+            </h1>
+            <p className="text-slate-500 text-sm">
+              Continue with your Google Workspace account to access deals,
+              NDAs, and the AI agent suite.
+            </p>
+          </div>
 
-              <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-                <label className="flex flex-col gap-1.5">
-                  <p className="text-[#121417] text-sm font-medium">Business Email</p>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    autoComplete="email"
-                    className="form-input w-full rounded-lg text-[#121417] border border-gray-200 bg-white h-12 placeholder:text-gray-400 px-4 text-sm transition-all focus:outline-0 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                    placeholder="name@firm.com"
-                    required
-                  />
-                </label>
+          <button
+            type="button"
+            onClick={handleGoogleSignIn}
+            disabled={loading}
+            className="w-full h-12 rounded-lg text-white font-medium text-sm shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#15304a] flex items-center justify-center gap-3"
+            style={{ backgroundColor: "#003366" }}
+          >
+            {loading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                Redirecting to Google…
+              </>
+            ) : (
+              <>
+                <GoogleGlyph />
+                Sign in with Google Workspace
+              </>
+            )}
+          </button>
 
-                <label className="flex flex-col gap-1.5">
-                  <p className="text-[#121417] text-sm font-medium">Password</p>
-                  <div className="relative flex w-full rounded-lg group focus-within:ring-2 focus-within:ring-primary/20 focus-within:border-primary border border-gray-200 bg-white transition-all">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="form-input flex-1 min-w-0 border-none bg-transparent h-12 text-[#121417] placeholder:text-gray-400 px-4 text-sm focus:ring-0"
-                      placeholder="••••••••"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="pr-3 flex items-center justify-center text-gray-400 hover:text-primary transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        {showPassword ? "visibility" : "visibility_off"}
-                      </span>
-                    </button>
-                  </div>
-                </label>
-
-                <div className="flex justify-between items-center">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMe(e.target.checked)}
-                      className="rounded border-gray-300 text-primary focus:ring-primary/20 w-4 h-4"
-                    />
-                    <span className="text-sm text-slate-600 group-hover:text-slate-800 transition-colors">
-                      Remember me
-                    </span>
-                  </label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-primary hover:text-blue-700 text-sm font-medium transition-colors"
-                  >
-                    Forgot password?
-                  </Link>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full h-12 rounded-lg text-white font-medium text-sm shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#15304a] flex items-center justify-center gap-2 mt-2"
-                  style={{ backgroundColor: "#003366" }}
-                >
-                  {loading ? (
-                    <span className="flex items-center justify-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Signing in...
-                    </span>
-                  ) : (
-                    <>
-                      Sign In
-                      <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
-                    </>
-                  )}
-                </button>
-
-                {error && (
-                  <div className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg">
-                    {error}
-                  </div>
-                )}
-              </form>
-
-              {/* Divider, SSO, and Sign Up — outside form, matches legacy loginExtras */}
-              <div className="flex flex-col gap-5 mt-5">
-                <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-gray-200" />
-                  <span className="flex-shrink-0 mx-4 text-xs text-gray-400 font-medium uppercase tracking-wider">Or continue with</span>
-                  <div className="flex-grow border-t border-gray-200" />
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleSso}
-                  className="w-full h-12 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-[#121417] font-medium text-sm transition-all duration-200 flex items-center justify-center gap-3"
-                >
-                  <span className="material-symbols-outlined text-[20px] text-primary">lock_person</span>
-                  Single Sign-On (SSO)
-                </button>
-
-                <div className="text-center mt-2">
-                  <p className="text-sm text-slate-500">
-                    Don&apos;t have an account?{" "}
-                    <Link href="/signup" className="text-primary font-medium hover:text-blue-700 transition-colors">
-                      Sign up
-                    </Link>
-                  </p>
-                  <p className="text-xs text-slate-400 mt-3">
-                    <Link href="/security" className="hover:text-primary transition-colors inline-flex items-center gap-1">
-                      Your data is secured
-                      <span className="material-symbols-outlined text-[14px]">arrow_forward</span>
-                    </Link>
-                  </p>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col gap-5">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-blue-50 rounded-lg">
-                  <span className="material-symbols-outlined text-primary text-[24px]">security</span>
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold text-[#121417]">Two-Factor Authentication</h2>
-                  <p className="text-sm text-slate-500">Enter the 6-digit code from your authenticator app</p>
-                </div>
-              </div>
-
-              <div className="flex justify-center gap-2">
-                {mfaDigits.map((digit, i) => (
-                  <div key={i} className="flex items-center">
-                    <input
-                      ref={(el) => { mfaInputRefs.current[i] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete={i === 0 ? "one-time-code" : undefined}
-                      maxLength={1}
-                      value={digit}
-                      onChange={(e) => handleMfaDigitChange(i, e.target.value)}
-                      onKeyDown={(e) => handleMfaDigitKeyDown(i, e)}
-                      onPaste={handleMfaPaste}
-                      className="w-12 h-14 text-center text-xl font-bold border border-gray-200 rounded-lg focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
-                    />
-                    {i === 2 && <span className="ml-2 flex items-center text-gray-300 text-xl">-</span>}
-                  </div>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                onClick={handleMfaVerify}
-                disabled={!mfaReady || mfaVerifying}
-                className="w-full h-12 rounded-lg text-white font-medium text-sm shadow-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[#15304a] flex items-center justify-center gap-2"
-                style={{ backgroundColor: "#003366" }}
-              >
-                {mfaVerifying ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Verifying...
-                  </span>
-                ) : (
-                  "Verify Code"
-                )}
-              </button>
-
-              {mfaError && (
-                <div className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg">
-                  {mfaError}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={handleMfaBack}
-                className="text-sm text-slate-500 hover:text-primary transition-colors text-center"
-              >
-                Back to sign in
-              </button>
+          {error && (
+            <div className="text-red-500 text-sm text-center bg-red-50 p-3 rounded-lg mt-4">
+              {error}
             </div>
           )}
 
-          {/* Footer */}
-          <div className="mt-10 pt-6 border-t border-gray-100 flex items-center justify-center text-xs text-slate-400">
+          {/* Workspace-required notice */}
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-[12px] text-slate-600 leading-relaxed flex items-start gap-2">
+            <span className="material-symbols-outlined text-[18px] text-slate-400 mt-0.5 shrink-0">
+              info
+            </span>
+            <span>
+              This app requires a <strong className="font-semibold text-slate-700">Google Workspace</strong> account.
+              Personal Gmail accounts can sign in but NDA features won&rsquo;t
+              work. See your IT admin to get a Workspace seat.
+            </span>
+          </div>
+
+          {/* Footer links */}
+          <div className="mt-10 pt-6 border-t border-gray-100 flex items-center justify-between text-xs text-slate-400">
+            <div className="flex items-center gap-3">
+              <Link href="/terms-of-service" className="hover:text-primary transition-colors">
+                Terms
+              </Link>
+              <span aria-hidden>·</span>
+              <Link href="/privacy-policy" className="hover:text-primary transition-colors">
+                Privacy
+              </Link>
+              <span aria-hidden>·</span>
+              <Link href="/security" className="hover:text-primary transition-colors">
+                Security
+              </Link>
+            </div>
             <p>&copy; 2026 PE OS.</p>
           </div>
         </div>
@@ -417,8 +214,33 @@ export default function LoginPage() {
   );
 }
 
-function mapAuthError(raw: string): string {
-  if (raw.includes("Invalid login credentials")) return "Invalid email or password. Please try again.";
-  if (raw.includes("Email not confirmed")) return "Please verify your email address before signing in.";
-  return raw;
+// Inline Google "G" glyph. Embedded rather than depending on Material Symbols
+// 'login' so the multicolour brand mark stays recognisable on the button.
+function GoogleGlyph() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 48 48"
+      width="20"
+      height="20"
+      className="shrink-0"
+    >
+      <path
+        fill="#FFC107"
+        d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
+      />
+      <path
+        fill="#FF3D00"
+        d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
+      />
+    </svg>
+  );
 }
