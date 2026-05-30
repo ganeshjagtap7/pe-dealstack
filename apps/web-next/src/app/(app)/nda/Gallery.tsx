@@ -56,11 +56,6 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
   const effective = formatDateShort(doc.effectiveDate);
   const expires = formatDateShort(doc.expiresAt);
   const counterparty = doc.counterpartyName?.trim();
-  // Sent NDAs now live as Google Docs in Drive — surface a subtle G-doc
-  // badge so users can tell at a glance which cards have an external doc.
-  // Click still routes to the in-app FullEditPage (keeps the audit trail);
-  // the "Open in Google Docs" button lives inside that page.
-  const hasGoogleDoc = doc.status === "SENT" && !!doc.googleDocUrl;
 
   return (
     <div className="group relative aspect-[4/3] rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
@@ -123,18 +118,6 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
           )}
         </div>
       </div>
-
-      {/* Google Doc badge — always visible (not hover-gated) so users can
-          scan which sent NDAs are live in Drive. */}
-      {hasGoogleDoc && (
-        <div
-          className="absolute bottom-2 right-2 w-6 h-6 rounded-md bg-white border border-emerald-200 text-emerald-700 shadow-sm flex items-center justify-center pointer-events-none"
-          title="Lives in Google Docs"
-          aria-label="Lives in Google Docs"
-        >
-          <span className="material-symbols-outlined text-[14px]">description</span>
-        </div>
-      )}
 
       {/* Hover affordances */}
       <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition flex gap-1 z-10">

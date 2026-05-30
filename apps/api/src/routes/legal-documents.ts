@@ -409,13 +409,9 @@ router.post('/legal-documents/:id/send', async (req, res) => {
       return res.status(400).json({ error: 'Invalid data', details: parsed.error.errors });
     }
 
-    if (!req.user?.id) {
-      return res.status(401).json({ error: 'Authentication required' });
-    }
     const result = await sendLegalDocument({
       documentId: id,
       organizationId: orgId,
-      userId: req.user.id,
       toEmail: parsed.data.toEmail,
       subject: parsed.data.subject,
       message: parsed.data.message,

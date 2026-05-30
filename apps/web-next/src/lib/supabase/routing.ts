@@ -8,10 +8,6 @@ const AUTH_PAGE_PREFIXES = [
   "/reset-password",
   "/verify-email",
   "/accept-invite",
-  // OAuth round-trip lands on /callback to read the Supabase session, exchange
-  // the provider tokens with our API, then redirect to /dashboard. The user
-  // is mid-auth here, so middleware must not bounce them to /login.
-  "/callback",
 ];
 
 // Public marketing/legal pages that anonymous users must be able to reach

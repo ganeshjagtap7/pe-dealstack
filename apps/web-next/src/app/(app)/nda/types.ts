@@ -50,9 +50,6 @@ export interface LegalDocument {
   expiresAt: string | null;
   sentAt: string | null;
   sentToEmail: string | null;
-  // URL of the Google Doc created at send time. Counterparty has edit
-  // access; live edits happen there, not in our in-app editor.
-  googleDocUrl: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;
@@ -155,7 +152,4 @@ export interface SendDocResponse {
   ok: true;
   messageId: string;
   sentAt: string;
-  // URL of the Google Doc the API created in Drive. The counterparty has
-  // edit access; the email body links to this URL.
-  googleDocUrl: string;
 }

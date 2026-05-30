@@ -55,9 +55,8 @@ function initialForm(doc: LegalDocumentWithDeal): FormState {
  * big to fit a centered popup comfortably.
  *
  * `status === "SENT"` switches the left pane to a read-only view of
- * `contentSnapshot` (the frozen copy that went out the door) with a yellow
- * banner telling the user that live edits live in Google Docs now. A
- * prominent action bar above the editor surfaces the doc URL + recipient.
+ * `contentSnapshot` with a "Revert to current draft" toggle so users can
+ * always check what actually went out the door.
  */
 export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const { showToast } = useToast();
@@ -86,9 +85,6 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const dealLabel = doc.deal.target || doc.deal.projectName || "Unknown deal";
   const isSent = form.status === "SENT";
   const hasSnapshot = !!doc.contentSnapshot;
-  // Snapshot view is the default-on for SENT docs; we hide the Save button in
-  // this view because edits don't go anywhere (Google Docs owns the live copy).
-  const inSnapshotView = isSent && showSnapshot && hasSnapshot;
 
   async function handleSave() {
     if (saving) return;
@@ -128,22 +124,20 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
 
   function handleSent(resp: SendDocResponse) {
     setSendOpen(false);
-    // After a successful send the server has flipped the status to SENT,
-    // frozen a snapshot, AND minted a Google Doc + URL. Reflect all three
-    // locally + bubble up so the gallery updates without a full refetch.
+    // After a successful send the server has flipped the status to SENT and
+    // frozen a snapshot. Reflect that locally + bubble up so the gallery
+    // updates without a full refetch.
     const updated: LegalDocument = {
       ...doc,
       status: "SENT",
       sentAt: resp.sentAt,
       sentToEmail: form.counterpartyEmail.trim() || doc.sentToEmail,
-      googleDocUrl: resp.googleDocUrl,
       // Snapshot will be the content we just sent.
       contentSnapshot: form.content,
       content: form.content,
     };
     onSaved(updated);
-    const recipient = form.counterpartyEmail.trim() || "the counterparty";
-    showToast(`NDA sent — Google Doc shared with ${recipient}`, "success");
+    showToast(`Sent — message id ${resp.messageId.slice(0, 8)}…`, "success");
     setForm((prev) => ({ ...prev, status: "SENT" }));
     setShowSnapshot(true);
   }
@@ -183,34 +177,38 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
               {showSnapshot ? "View current draft" : "View sent snapshot"}
             </button>
           )}
-          {!isSent && (
-            <button
-              type="button"
-              onClick={() => setSendOpen(true)}
-              className="px-3 py-1.5 rounded-md text-xs font-semibold text-[#003366] border border-[#003366]/30 hover:bg-[#E6EEF5]/50"
-            >
-              Send NDA
-            </button>
-          )}
-          {!inSnapshotView && (
-            <button
-              type="button"
-              onClick={handleSave}
-              disabled={saving}
-              className={cn(
-                "px-3 py-1.5 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1.5",
-                saving ? "opacity-70 cursor-not-allowed" : "hover:opacity-90",
-              )}
-              style={{ backgroundColor: "#003366" }}
-            >
-              {saving && (
-                <span className="material-symbols-outlined text-[14px] animate-spin">
-                  progress_activity
-                </span>
-              )}
-              Save
-            </button>
-          )}
+          <button
+            type="button"
+            disabled
+            title="Coming soon"
+            className="px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-200 text-slate-400 cursor-not-allowed"
+          >
+            Download .docx
+          </button>
+          <button
+            type="button"
+            onClick={() => setSendOpen(true)}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold text-[#003366] border border-[#003366]/30 hover:bg-[#E6EEF5]/50"
+          >
+            Send via email
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            className={cn(
+              "px-3 py-1.5 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1.5",
+              saving ? "opacity-70 cursor-not-allowed" : "hover:opacity-90",
+            )}
+            style={{ backgroundColor: "#003366" }}
+          >
+            {saving && (
+              <span className="material-symbols-outlined text-[14px] animate-spin">
+                progress_activity
+              </span>
+            )}
+            Save
+          </button>
         </div>
       </div>
 
@@ -224,29 +222,18 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
               <div className="flex-1 min-w-0">{error}</div>
             </div>
           )}
-
-          {isSent && doc.googleDocUrl && (
-            <SentActionBar
-              googleDocUrl={doc.googleDocUrl}
-              sentToEmail={doc.sentToEmail}
-              sentAt={doc.sentAt}
-              snapshotView={showSnapshot && hasSnapshot}
-              hasSnapshot={hasSnapshot}
-              onToggleSnapshot={() => setShowSnapshot((s) => !s)}
-            />
-          )}
-
           {showSnapshot && hasSnapshot && (
-            <div className="mb-3 rounded-lg px-3 py-2.5 text-xs border bg-amber-50 border-amber-200 text-amber-800 flex items-start gap-2">
-              <span className="material-symbols-outlined text-[16px] mt-0.5">lock</span>
-              <div className="leading-snug">
-                This is the version that was sent. Edits here won&rsquo;t
-                propagate to the counterparty — switch to Google Docs for
-                live edits.
-              </div>
+            <div className="mb-3 rounded-lg px-3 py-2 text-xs border bg-amber-50 border-amber-200 text-amber-800 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px]">lock</span>
+              Read-only — this is the exact version that was sent
+              {doc.sentAt && (
+                <span className="opacity-75">
+                  on {new Date(doc.sentAt).toLocaleString()}
+                </span>
+              )}
+              .
             </div>
           )}
-
           <div className="max-w-[820px] mx-auto bg-white shadow-sm rounded-md border border-slate-200">
             <Editor
               ref={editorRef}
@@ -360,19 +347,6 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
                   {doc.sentToEmail}
                 </div>
               )}
-              {doc.googleDocUrl && (
-                <div className="truncate">
-                  <span className="font-medium text-slate-700">Doc:</span>{" "}
-                  <a
-                    href={doc.googleDocUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[#003366] hover:underline"
-                  >
-                    Open in Google Docs
-                  </a>
-                </div>
-              )}
             </div>
           )}
         </aside>
@@ -384,62 +358,6 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
         onCancel={() => setSendOpen(false)}
         onSent={handleSent}
       />
-    </div>
-  );
-}
-
-interface SentActionBarProps {
-  googleDocUrl: string;
-  sentToEmail: string | null;
-  sentAt: string | null;
-  snapshotView: boolean;
-  hasSnapshot: boolean;
-  onToggleSnapshot: () => void;
-}
-
-function SentActionBar({
-  googleDocUrl,
-  sentToEmail,
-  sentAt,
-  snapshotView,
-  hasSnapshot,
-  onToggleSnapshot,
-}: SentActionBarProps) {
-  const recipient = sentToEmail ?? "the counterparty";
-  const when = sentAt ? new Date(sentAt).toLocaleString() : "earlier";
-  return (
-    <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 flex items-start gap-3">
-      <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-        <span className="material-symbols-outlined text-[18px]">check</span>
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-sm font-semibold text-emerald-900">
-          Sent to {recipient} on {when}.
-        </div>
-        <div className="text-xs text-emerald-700/90 mt-0.5">
-          Counterparty has edit access in Google Docs.
-        </div>
-      </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          type="button"
-          onClick={() => window.open(googleDocUrl, "_blank", "noopener,noreferrer")}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold text-white hover:opacity-90"
-          style={{ backgroundColor: "#003366" }}
-        >
-          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-          Open in Google Docs
-        </button>
-        {hasSnapshot && (
-          <button
-            type="button"
-            onClick={onToggleSnapshot}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-emerald-300 text-emerald-800 bg-white hover:bg-emerald-50"
-          >
-            {snapshotView ? "View current draft" : "View snapshot here"}
-          </button>
-        )}
-      </div>
     </div>
   );
 }
