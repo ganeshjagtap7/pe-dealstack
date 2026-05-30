@@ -4,7 +4,19 @@ import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useAuth } from "@/providers/AuthProvider";
+import { createClient } from "@/lib/supabase/client";
 import { PasteKeyModal, type PasteKeyInstructions } from "./IntegrationsSection.PasteKeyModal";
+
+// Keep this in lockstep with /login and /callback so the consent re-prompt
+// keeps the existing Drive/Docs grant.
+const GOOGLE_OAUTH_SCOPES =
+  "email profile https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/documents";
+
+function appOrigin(): string {
+  if (typeof window !== "undefined") return window.location.origin;
+  return process.env.NEXT_PUBLIC_APP_URL ?? "";
+}
 
 interface ProviderCatalogEntry {
   id: string;
@@ -53,11 +65,13 @@ interface Props {
 
 export function IntegrationsSection({ onToast }: Props) {
   const search = useSearchParams();
+  const { user } = useAuth();
   const [integrations, setIntegrations] = useState<Integration[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyProvider, setBusyProvider] = useState<string | null>(null);
   const [pasteModal, setPasteModal] = useState<{ provider: string; instructions: PasteKeyInstructions } | null>(null);
   const [confirmDisconnect, setConfirmDisconnect] = useState<Integration | null>(null);
+  const [reAuthing, setReAuthing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -125,6 +139,35 @@ export function IntegrationsSection({ onToast }: Props) {
     }
   }
 
+  async function handleReAuthorize() {
+    if (reAuthing) return;
+    setReAuthing(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          scopes: GOOGLE_OAUTH_SCOPES,
+          queryParams: { access_type: "offline", prompt: "consent" },
+          redirectTo: `${appOrigin()}/callback`,
+        },
+      });
+      if (oauthError) {
+        onToast(`Couldn't re-authorize: ${oauthError.message}`, "error");
+        setReAuthing(false);
+      }
+      // On success the page is redirecting; no further state changes.
+    } catch (err) {
+      console.warn("[settings/integrations] re-auth failed:", err);
+      onToast(
+        err instanceof Error ? err.message : "Couldn't re-authorize",
+        "error",
+      );
+      setReAuthing(false);
+    }
+  }
+
   async function handleSyncNow(integration: Integration) {
     setBusyProvider(integration.provider);
     try {
@@ -165,6 +208,38 @@ export function IntegrationsSection({ onToast }: Props) {
       </div>
 
       <div className="p-6">
+        {/* Signed-in identity card — Google Workspace OAuth is the only sign-in
+            path, so we expose the current account + a re-authorize affordance
+            in case Drive/Docs scopes drift after an account-level change. */}
+        <div className="mb-5 rounded-lg border border-border-subtle bg-white p-4 flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0">
+            <div
+              className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+              style={{ backgroundColor: "#E6EEF5", color: "#003366" }}
+            >
+              <span className="material-symbols-outlined">account_circle</span>
+            </div>
+            <div className="min-w-0">
+              <div className="text-xs text-text-muted">Signed in as</div>
+              <div className="text-sm font-semibold text-text-main truncate">
+                {user?.email ?? "Unknown account"}
+              </div>
+              <div className="text-[11px] text-text-muted mt-0.5">
+                via Google Workspace
+              </div>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleReAuthorize}
+            disabled={reAuthing}
+            className="shrink-0 text-xs font-semibold rounded-md px-3 py-1.5 border border-border-subtle bg-white text-text-secondary hover:bg-gray-50 disabled:opacity-50"
+            title="Sign out and re-grant Google scopes — useful if Drive access expired"
+          >
+            {reAuthing ? "Redirecting…" : "Re-authorize"}
+          </button>
+        </div>
+
         {loading ? (
           <p className="text-sm text-text-muted">Loading integrations...</p>
         ) : (
