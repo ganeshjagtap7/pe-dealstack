@@ -1,43 +1,66 @@
-// ─── /api/legal-document-templates router ───────────────────────
-// Admin-managed library of Google-Doc-backed templates used to
-// scaffold new LegalDocuments. v1 ships unseeded — admins paste a
-// Google Doc URL (or ID) and we store the docId for later copy.
+// ─── /api/legal-document-templates router (Phase 2) ─────────
+// Templates live in-app: admins upload .docx / .html / .md, the
+// /parse endpoint returns sanitized HTML, the admin marks up
+// placeholders manually, then POSTs the verified template body.
 //
-// Read is open to any org member; write is gated to org admins via
-// requireMinimumRole(ADMIN). The underlying Google Doc is NOT deleted
-// when a template row is deleted — admins can clean up Drive manually.
+// Read is open to any org member (so the create-NDA modal can show
+// the template picker). Write — parse / create / update / delete —
+// is gated to ADMIN via requireMinimumRole.
 
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { requireMinimumRole, ROLES } from '../middleware/rbac.js';
-import { extractGoogleDocId } from '../services/legalDocService.js';
+import {
+  parseTemplateFile,
+  sanitiseLegalDocHtml,
+  LegalDocParseError,
+  type TemplateFileKind,
+} from '../services/legalDocParseService.js';
+import { LEGAL_DOC_TOKEN_KEYS } from '../services/legalDocSubstituteService.js';
 
 const router = Router();
 
-const DOC_TYPES = ['NDA', 'LOI', 'TERM_SHEET', 'DEFINITIVE_AGREEMENT', 'SIDE_LETTER', 'OTHER'] as const;
+// 25 MB upload cap is generous for a Word doc; we still defer to
+// the parser to throw INVALID_FILE_FORMAT if the bytes aren't real.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 1 },
+});
+
+const DOC_TYPES = [
+  'NDA', 'LOI', 'TERM_SHEET', 'DEFINITIVE_AGREEMENT', 'SIDE_LETTER', 'OTHER',
+] as const;
+const TOKEN_KEY_ENUM = z.enum(LEGAL_DOC_TOKEN_KEYS as readonly [string, ...string[]]);
+const KIND_VALUES = ['docx', 'html', 'md'] as const;
 
 const listQuerySchema = z.object({
   docType: z.enum(DOC_TYPES).optional(),
 });
 
+const parseBodySchema = z.object({
+  kind: z.enum(KIND_VALUES),
+});
+
 const createBodySchema = z.object({
   name: z.string().min(1).max(200),
   docType: z.enum(DOC_TYPES).optional(),
-  googleDocUrlOrId: z.string().min(8).max(2048),
-  placeholderMap: z.record(z.string(), z.string()).optional(),
+  bodyHtml: z.string().min(1).max(2_000_000),
+  originalFileName: z.string().max(500).optional(),
+  placeholderKeys: z.array(TOKEN_KEY_ENUM).default([]),
   isDefault: z.boolean().optional(),
 });
 
 const patchBodySchema = z
   .object({
     name: z.string().min(1).max(200).optional(),
-    docType: z.enum(DOC_TYPES).optional(),
-    googleDocUrlOrId: z.string().min(8).max(2048).optional(),
-    placeholderMap: z.record(z.string(), z.string()).optional(),
+    bodyHtml: z.string().min(1).max(2_000_000).optional(),
+    placeholderKeys: z.array(TOKEN_KEY_ENUM).optional(),
     isDefault: z.boolean().optional(),
+    verifiedAt: z.string().datetime().nullable().optional(),
   })
   .refine(v => Object.keys(v).length > 0, { message: 'At least one field required' });
 
@@ -46,8 +69,41 @@ function isMissingTableError(error: { code?: string } | null): boolean {
   return error.code === '42P01' || error.code === 'PGRST205';
 }
 
+function suggestNameFromFile(filename: string | undefined): string {
+  if (!filename) return 'Untitled Template';
+  return filename
+    .replace(/\.(docx|html|htm|md|markdown)$/i, '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 200) || 'Untitled Template';
+}
+
+// Defensive: if the admin marks isDefault on this template, flip any
+// other default for the same (org, docType) tuple to false so the
+// "default template" picker stays unambiguous.
+async function clearOtherDefaults(
+  orgId: string,
+  docType: string,
+  exceptId: string | null,
+): Promise<void> {
+  let q = supabase
+    .from('LegalDocTemplate')
+    .update({ isDefault: false, updatedAt: new Date().toISOString() })
+    .eq('organizationId', orgId)
+    .eq('docType', docType)
+    .eq('isDefault', true);
+  if (exceptId) q = q.neq('id', exceptId);
+  const { error } = await q;
+  if (error) {
+    log.warn('legal-document-templates: failed to clear other defaults', {
+      orgId, docType, exceptId, message: error.message,
+    });
+  }
+}
+
 // ============================================================
-// GET /legal-document-templates — org-scoped read
+// GET /legal-document-templates — org-scoped read (any member)
 // ============================================================
 
 router.get('/legal-document-templates', async (req, res) => {
@@ -77,7 +133,59 @@ router.get('/legal-document-templates', async (req, res) => {
 });
 
 // ============================================================
-// POST /legal-document-templates — admin only
+// POST /legal-document-templates/parse — admin only, multipart
+// ============================================================
+
+router.post(
+  '/legal-document-templates/parse',
+  requireMinimumRole(ROLES.ADMIN),
+  upload.single('file'),
+  async (req, res) => {
+    try {
+      const file = (req as unknown as { file?: Express.Multer.File }).file;
+      if (!file) {
+        return res.status(400).json({
+          error: 'Missing file upload',
+          code: 'INVALID_FILE_FORMAT',
+        });
+      }
+      const parsed = parseBodySchema.safeParse({ kind: req.body?.kind });
+      if (!parsed.success) {
+        return res.status(400).json({
+          error: 'Invalid kind — expected docx | html | md',
+          code: 'INVALID_FILE_FORMAT',
+          details: parsed.error.errors,
+        });
+      }
+
+      const result = await parseTemplateFile({
+        buffer: file.buffer,
+        kind: parsed.data.kind as TemplateFileKind,
+      });
+
+      res.json({
+        draft: {
+          bodyHtml: result.bodyHtml,
+          originalFileName: file.originalname,
+          suggestedName: suggestNameFromFile(file.originalname),
+        },
+      });
+    } catch (err) {
+      if (err instanceof LegalDocParseError) {
+        return res.status(err.status).json({
+          error: err.message,
+          code: err.code,
+          details: err.details,
+        });
+      }
+      log.error('POST /api/legal-document-templates/parse error', err);
+      res.status(500).json({ error: 'Failed to parse template' });
+    }
+  },
+);
+
+// ============================================================
+// POST /legal-document-templates — admin only (save verified)
 // ============================================================
 
 router.post(
@@ -91,21 +199,24 @@ router.post(
         return res.status(400).json({ error: 'Invalid data', details: parsed.error.errors });
       }
 
-      const googleDocId = extractGoogleDocId(parsed.data.googleDocUrlOrId);
-      if (!googleDocId) {
-        return res.status(400).json({
-          error: 'Invalid Google Doc URL or ID',
-          code: 'INVALID_DOC_ID',
-        });
+      const docType = parsed.data.docType ?? 'NDA';
+      const now = new Date().toISOString();
+      const sanitisedBody = sanitiseLegalDocHtml(parsed.data.bodyHtml);
+
+      if (parsed.data.isDefault === true) {
+        await clearOtherDefaults(orgId, docType, null);
       }
 
       const insertRow = {
         organizationId: orgId,
         name: parsed.data.name,
-        docType: parsed.data.docType ?? 'NDA',
-        googleDocId,
-        placeholderMap: parsed.data.placeholderMap ?? {},
+        docType,
+        bodyHtml: sanitisedBody,
+        originalFileName: parsed.data.originalFileName ?? null,
+        placeholderKeys: parsed.data.placeholderKeys,
         isDefault: parsed.data.isDefault ?? false,
+        uploadedAt: now,
+        verifiedAt: now,
       };
 
       const { data, error } = await supabase
@@ -141,30 +252,29 @@ router.patch(
 
       const { data: existing, error: existsErr } = await supabase
         .from('LegalDocTemplate')
-        .select('id, organizationId')
+        .select('id, organizationId, docType')
         .eq('id', id)
         .maybeSingle();
       if (existsErr) throw existsErr;
       if (!existing || existing.organizationId !== orgId) {
-        return res.status(404).json({ error: 'Template not found' });
+        return res.status(404).json({ error: 'Template not found', code: 'TEMPLATE_NOT_FOUND' });
+      }
+
+      if (parsed.data.isDefault === true) {
+        await clearOtherDefaults(orgId, existing.docType as string, id);
       }
 
       const updatePayload: Record<string, unknown> = {};
       if (parsed.data.name !== undefined) updatePayload.name = parsed.data.name;
-      if (parsed.data.docType !== undefined) updatePayload.docType = parsed.data.docType;
-      if (parsed.data.placeholderMap !== undefined) {
-        updatePayload.placeholderMap = parsed.data.placeholderMap;
+      if (parsed.data.bodyHtml !== undefined) {
+        updatePayload.bodyHtml = sanitiseLegalDocHtml(parsed.data.bodyHtml);
+      }
+      if (parsed.data.placeholderKeys !== undefined) {
+        updatePayload.placeholderKeys = parsed.data.placeholderKeys;
       }
       if (parsed.data.isDefault !== undefined) updatePayload.isDefault = parsed.data.isDefault;
-      if (parsed.data.googleDocUrlOrId !== undefined) {
-        const next = extractGoogleDocId(parsed.data.googleDocUrlOrId);
-        if (!next) {
-          return res.status(400).json({
-            error: 'Invalid Google Doc URL or ID',
-            code: 'INVALID_DOC_ID',
-          });
-        }
-        updatePayload.googleDocId = next;
+      if (parsed.data.verifiedAt !== undefined) {
+        updatePayload.verifiedAt = parsed.data.verifiedAt;
       }
       updatePayload.updatedAt = new Date().toISOString();
 
@@ -186,7 +296,7 @@ router.patch(
 );
 
 // ============================================================
-// DELETE /legal-document-templates/:id — admin only
+// DELETE /legal-document-templates/:id — admin only (hard delete)
 // ============================================================
 
 router.delete(
@@ -204,7 +314,7 @@ router.delete(
         .maybeSingle();
       if (existsErr) throw existsErr;
       if (!existing || existing.organizationId !== orgId) {
-        return res.status(404).json({ error: 'Template not found' });
+        return res.status(404).json({ error: 'Template not found', code: 'TEMPLATE_NOT_FOUND' });
       }
 
       const { error } = await supabase
