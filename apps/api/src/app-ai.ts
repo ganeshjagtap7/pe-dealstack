@@ -14,6 +14,7 @@ import graphsRouter from './routes/graphs.js';
 import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
 import legalDocumentsRouter from './routes/legal-documents.js';
 import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
+import authGoogleTokensRouter from './routes/auth-google-tokens.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { usageContextMiddleware } from './middleware/usageContext.js';
@@ -171,6 +172,8 @@ app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, us
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
+// Auth helper for Supabase Google sign-in — auth only, no org context yet.
+app.use('/api/auth', authMiddleware, authGoogleTokensRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)
