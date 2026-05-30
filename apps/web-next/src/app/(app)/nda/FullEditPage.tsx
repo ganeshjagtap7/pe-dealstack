@@ -85,6 +85,12 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const dealLabel = doc.deal.target || doc.deal.projectName || "Unknown deal";
   const isSent = form.status === "SENT";
   const hasSnapshot = !!doc.contentSnapshot;
+  // When the backend has stamped a googleDocUrl on a SENT doc, the
+  // counterparty has live edit access in Drive — surface the link + the
+  // "snapshot vs current draft" toggle in a prominent emerald action bar.
+  const hasGoogleDoc = isSent && !!doc.googleDocUrl;
+  // Save is only meaningful when we're editing — hide it in snapshot view.
+  const showSaveButton = !(showSnapshot && hasSnapshot);
 
   async function handleSave() {
     if (saving) return;
@@ -122,22 +128,27 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
     }
   }
 
-  function handleSent(resp: SendDocResponse) {
+  function handleSent(resp: SendDocResponse, toEmail: string) {
     setSendOpen(false);
-    // After a successful send the server has flipped the status to SENT and
-    // frozen a snapshot. Reflect that locally + bubble up so the gallery
-    // updates without a full refetch.
+    // After a successful send the server has flipped the status to SENT,
+    // frozen a snapshot, and created the Google Doc copy. Reflect all of
+    // that locally + bubble up so the gallery updates without a full refetch.
     const updated: LegalDocument = {
       ...doc,
       status: "SENT",
       sentAt: resp.sentAt,
-      sentToEmail: form.counterpartyEmail.trim() || doc.sentToEmail,
+      sentToEmail: toEmail || form.counterpartyEmail.trim() || doc.sentToEmail,
       // Snapshot will be the content we just sent.
       contentSnapshot: form.content,
       content: form.content,
+      googleDocId: resp.googleDocId,
+      googleDocUrl: resp.googleDocUrl,
     };
     onSaved(updated);
-    showToast(`Sent — message id ${resp.messageId.slice(0, 8)}…`, "success");
+    const successMsg = resp.alreadySent
+      ? `Already sent — Google Doc shared with ${toEmail}`
+      : `NDA sent — Google Doc shared with ${toEmail}`;
+    showToast(successMsg, "success");
     setForm((prev) => ({ ...prev, status: "SENT" }));
     setShowSnapshot(true);
   }
@@ -168,7 +179,10 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {isSent && hasSnapshot && (
+          {/* When we have a Google Doc the snapshot toggle lives in the
+              emerald action bar below. Keep the toolbar toggle as a fallback
+              for SENT docs that pre-date Drive integration. */}
+          {isSent && hasSnapshot && !hasGoogleDoc && (
             <button
               type="button"
               onClick={() => setShowSnapshot((s) => !s)}
@@ -190,25 +204,27 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
             onClick={() => setSendOpen(true)}
             className="px-3 py-1.5 rounded-md text-xs font-semibold text-[#003366] border border-[#003366]/30 hover:bg-[#E6EEF5]/50"
           >
-            Send via email
+            {hasGoogleDoc ? "Re-send via email" : "Send via email"}
           </button>
-          <button
-            type="button"
-            onClick={handleSave}
-            disabled={saving}
-            className={cn(
-              "px-3 py-1.5 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1.5",
-              saving ? "opacity-70 cursor-not-allowed" : "hover:opacity-90",
-            )}
-            style={{ backgroundColor: "#003366" }}
-          >
-            {saving && (
-              <span className="material-symbols-outlined text-[14px] animate-spin">
-                progress_activity
-              </span>
-            )}
-            Save
-          </button>
+          {showSaveButton && (
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className={cn(
+                "px-3 py-1.5 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1.5",
+                saving ? "opacity-70 cursor-not-allowed" : "hover:opacity-90",
+              )}
+              style={{ backgroundColor: "#003366" }}
+            >
+              {saving && (
+                <span className="material-symbols-outlined text-[14px] animate-spin">
+                  progress_activity
+                </span>
+              )}
+              Save
+            </button>
+          )}
         </div>
       </div>
 
@@ -216,13 +232,32 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
       <div className="flex-1 overflow-hidden flex">
         {/* Left pane — editor */}
         <div className="flex-1 overflow-y-auto px-8 py-6 min-w-0">
+          {hasGoogleDoc && doc.googleDocUrl && (
+            <SentActionBar
+              sentToEmail={doc.sentToEmail}
+              sentAt={doc.sentAt}
+              googleDocUrl={doc.googleDocUrl}
+              showSnapshot={showSnapshot}
+              onToggleView={() => setShowSnapshot((s) => !s)}
+            />
+          )}
           {error && (
             <div className="mb-4 rounded-lg px-3 py-2.5 text-sm border bg-red-50 border-red-200 text-red-700 flex items-start gap-2">
               <span className="material-symbols-outlined text-[18px] mt-0.5">error</span>
               <div className="flex-1 min-w-0">{error}</div>
             </div>
           )}
-          {showSnapshot && hasSnapshot && (
+          {showSnapshot && hasSnapshot && hasGoogleDoc && (
+            <div className="mb-3 rounded-lg px-3 py-2.5 text-xs border bg-amber-50 border-amber-200 text-amber-800 flex items-start gap-2">
+              <span className="material-symbols-outlined text-[16px] mt-0.5">warning</span>
+              <div className="flex-1 min-w-0 leading-snug">
+                This is the version that was sent. Edits here won&rsquo;t
+                propagate to the counterparty — open Google Docs for live
+                edits.
+              </div>
+            </div>
+          )}
+          {showSnapshot && hasSnapshot && !hasGoogleDoc && (
             <div className="mb-3 rounded-lg px-3 py-2 text-xs border bg-amber-50 border-amber-200 text-amber-800 flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px]">lock</span>
               Read-only — this is the exact version that was sent
@@ -394,5 +429,65 @@ function Field({
       </div>
       {children}
     </label>
+  );
+}
+
+interface SentActionBarProps {
+  sentToEmail: string | null;
+  sentAt: string | null;
+  googleDocUrl: string;
+  showSnapshot: boolean;
+  onToggleView: () => void;
+}
+
+/**
+ * Emerald banner shown above the editor for SENT docs that have a live
+ * Google Doc. Surfaces the canonical "Open in Google Docs" link plus the
+ * snapshot/current-draft toggle so users always know which copy they're
+ * looking at.
+ */
+function SentActionBar({
+  sentToEmail,
+  sentAt,
+  googleDocUrl,
+  showSnapshot,
+  onToggleView,
+}: SentActionBarProps) {
+  const recipientLabel = sentToEmail || "the counterparty";
+  const dateLabel = sentAt ? new Date(sentAt).toLocaleString() : "—";
+  return (
+    <div className="mb-4 rounded-lg px-4 py-3 border border-emerald-200 bg-emerald-50 text-emerald-900 flex flex-wrap items-center justify-between gap-3">
+      <div className="flex items-start gap-2 min-w-0">
+        <span className="material-symbols-outlined text-[18px] mt-0.5 text-emerald-700">
+          check_circle
+        </span>
+        <div className="text-xs leading-snug min-w-0">
+          <span className="font-semibold">
+            Sent to {recipientLabel} on {dateLabel}.
+          </span>{" "}
+          <span className="text-emerald-800/80">
+            Counterparty has edit access in Google Docs.
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <button
+          type="button"
+          onClick={onToggleView}
+          className="px-3 py-1.5 rounded-md text-xs font-semibold bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100"
+        >
+          {showSnapshot ? "View current draft" : "View snapshot"}
+        </button>
+        <button
+          type="button"
+          onClick={() => window.open(googleDocUrl, "_blank")}
+          className="px-3 py-1.5 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1.5 hover:opacity-90"
+          style={{ backgroundColor: "#047857" }}
+        >
+          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
+          Open in Google Docs
+        </button>
+      </div>
+    </div>
   );
 }

@@ -9,13 +9,20 @@ interface SendModalProps {
   open: boolean;
   doc: LegalDocumentWithDeal | null;
   onCancel: () => void;
-  onSent: (resp: SendDocResponse) => void;
+  onSent: (resp: SendDocResponse, toEmail: string) => void;
 }
 
+// Discriminated union for all banner states the modal can render. Adding a
+// new error code? Add a variant here, map it in `bannerForError`, and add the
+// render branch in `ErrorBanner`.
 type Banner =
   | { kind: "none" }
+  | { kind: "googleNotConnected" }
+  | { kind: "googleScopesMissing" }
   | { kind: "resendNotConfigured" }
   | { kind: "noRecipient" }
+  | { kind: "noContent" }
+  | { kind: "driveError"; details: string }
   | { kind: "sendFailed"; details: string }
   | { kind: "generic"; message: string };
 
@@ -26,9 +33,14 @@ function defaultSubject(doc: LegalDocumentWithDeal | null): string {
 }
 
 /**
- * Modal that ships the current document via Resend. Pre-fills To from
- * `counterpartyEmail`; the user can override. On success we surface the
- * messageId via toast in the parent.
+ * Modal that ships the current document by:
+ *   1. Creating a Google Doc copy in the sender's Drive,
+ *   2. Granting the counterparty edit access,
+ *   3. Emailing them the link via Resend.
+ *
+ * The whole chain requires the firm's `google_calendar` integration to be
+ * connected AND re-authorized for the Drive scope — error codes from the
+ * backend map to actionable yellow/red banners below.
  */
 export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
   const [toEmail, setToEmail] = useState("");
@@ -75,7 +87,7 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
           message: message.trim() || undefined,
         },
       );
-      onSent(resp);
+      onSent(resp, trimmed);
     } catch (err) {
       console.warn("[nda] send failed:", err);
       setBanner(bannerForError(err));
@@ -84,7 +96,8 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
     }
   }
 
-  const isFailed = banner.kind === "sendFailed";
+  const isFailed =
+    banner.kind === "sendFailed" || banner.kind === "driveError";
 
   return (
     <div
@@ -102,9 +115,9 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
         <div className="px-5 py-4 border-b border-slate-100 flex items-start justify-between shrink-0">
           <div className="min-w-0">
             <h2 className="text-base font-bold text-slate-900">Send NDA via email</h2>
-            <p className="text-xs text-slate-500 mt-0.5 truncate">
-              The current draft will be sent as a <span className="font-mono">.docx</span>{" "}
-              attachment through your firm&rsquo;s Resend integration.
+            <p className="text-xs text-slate-500 mt-0.5">
+              Creates a Google Doc, grants edit access to the counterparty,
+              and emails them the link.
             </p>
           </div>
           <button
@@ -146,7 +159,7 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={5}
-              placeholder="Optional note that appears in the email body above the attachment."
+              placeholder="Optional note that appears in the email body above the Google Doc link."
               className={cn(inputCls, "resize-y")}
             />
           </Field>
@@ -189,10 +202,18 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
 function bannerForError(err: unknown): Banner {
   if (err instanceof ApiError) {
     switch (err.code) {
+      case "GOOGLE_NOT_CONNECTED":
+        return { kind: "googleNotConnected" };
+      case "GOOGLE_SCOPES_MISSING":
+        return { kind: "googleScopesMissing" };
       case "RESEND_NOT_CONFIGURED":
         return { kind: "resendNotConfigured" };
       case "NO_RECIPIENT":
         return { kind: "noRecipient" };
+      case "NO_CONTENT":
+        return { kind: "noContent" };
+      case "DRIVE_API_ERROR":
+        return { kind: "driveError", details: err.message };
       case "EMAIL_SEND_FAILED":
         return { kind: "sendFailed", details: err.message };
       default:
@@ -232,18 +253,46 @@ function Field({
 
 function ErrorBanner({ banner }: { banner: Banner }) {
   if (banner.kind === "none") return null;
+
+  // "Info"-style yellow banners are for fixable configuration issues (Google
+  // not connected / scopes missing / no recipient / no content / Resend env).
+  // Hard failures from Google or Resend are red.
   const isInfo =
-    banner.kind === "resendNotConfigured" || banner.kind === "noRecipient";
-  const message =
-    banner.kind === "resendNotConfigured"
-      ? "Email isn't configured for this firm yet. Talk to your admin."
-      : banner.kind === "noRecipient"
-        ? "No email address — fill in the To field first."
-        : banner.kind === "sendFailed"
-          ? `Email send failed: ${banner.details}`
-          : banner.kind === "generic"
-            ? banner.message
-            : "";
+    banner.kind === "googleNotConnected" ||
+    banner.kind === "googleScopesMissing" ||
+    banner.kind === "resendNotConfigured" ||
+    banner.kind === "noRecipient" ||
+    banner.kind === "noContent";
+
+  const message = (() => {
+    switch (banner.kind) {
+      case "googleNotConnected":
+        return "Google Workspace isn't connected yet. Connect it in Settings to send NDAs.";
+      case "googleScopesMissing":
+        return "Google Workspace is connected but needs to be re-authorized for NDA features. Reconnect in Settings.";
+      case "resendNotConfigured":
+        return "Email isn't configured for this firm yet. Talk to your admin.";
+      case "noRecipient":
+        return "Fill in counterparty email first";
+      case "noContent":
+        return "Add some content to the NDA before sending";
+      case "driveError":
+        return `Google Drive error: ${banner.details}`;
+      case "sendFailed":
+        return `Email send failed: ${banner.details}`;
+      case "generic":
+        return banner.message;
+      default:
+        return "";
+    }
+  })();
+
+  // The two "Google needs setup" banners get a CTA that drops the user into
+  // the Integrations card in Settings; the rest are message-only.
+  const showSettingsCta =
+    banner.kind === "googleNotConnected" ||
+    banner.kind === "googleScopesMissing";
+
   return (
     <div
       className={cn(
@@ -256,7 +305,23 @@ function ErrorBanner({ banner }: { banner: Banner }) {
       <span className="material-symbols-outlined text-[18px] mt-0.5 shrink-0">
         {isInfo ? "info" : "error"}
       </span>
-      <div className="flex-1 min-w-0 leading-snug">{message}</div>
+      <div className="flex-1 min-w-0 leading-snug">
+        {message}
+        {showSettingsCta && (
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = "/settings#section-integrations";
+              }}
+              className="text-xs font-semibold rounded-md px-3 py-1.5 text-white hover:opacity-90"
+              style={{ backgroundColor: "#003366" }}
+            >
+              Open Settings
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -17,7 +17,7 @@ interface ProviderCatalogEntry {
 const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
   { id: "granola",         name: "Granola",         desc: "Auto-import meeting transcripts",        icon: "mic",         available: true },
   { id: "gmail",           name: "Gmail",           desc: "Sync deal-related emails",               icon: "mail",        available: true },
-  { id: "google_calendar", name: "Google Calendar", desc: "Pre-meeting briefs & timeline",          icon: "event",       available: true },
+  { id: "google_calendar", name: "Google Workspace", desc: "Calendar events + NDA Google Docs",     icon: "workspaces",  available: true },
   { id: "fireflies",       name: "Fireflies",       desc: "Auto-import meeting transcripts",        icon: "mic",         available: false },
   { id: "otter",           name: "Otter",           desc: "Auto-import meeting transcripts",        icon: "graphic_eq",  available: false },
 ];
@@ -159,7 +159,7 @@ export function IntegrationsSection({ onToast }: Props) {
         <div>
           <h2 className="text-base font-bold text-text-main">Integrations</h2>
           <p className="text-xs text-text-muted">
-            Connect Granola, Gmail, and Google Calendar so meetings, emails, and events auto-link to deals and contacts.
+            Connect Granola, Gmail, and Google Workspace so meetings, emails, events, and NDA Google Docs auto-link to deals and contacts.
           </p>
         </div>
       </div>
