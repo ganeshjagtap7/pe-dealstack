@@ -155,10 +155,18 @@ export interface SendDocBody {
 
 export interface SendDocResponse {
   ok: true;
-  messageId: string;
-  sentAt: string;
   googleDocId: string;
   googleDocUrl: string;
+  // Gmail message id of the email that just went out from the sender's
+  // Workspace inbox. Replaces the old Resend `messageId` field — kept under
+  // the new name to make the multi-tenant Gmail flow explicit at the boundary.
+  gmailMessageId: string;
+  sentAt: string;
+  // The Gmail address the message went from — i.e. the current user's
+  // Workspace email. Surfaced to the user as provenance in the success toast
+  // and in the post-send action bar so they know which inbox to check for
+  // the thread.
+  senderEmail: string;
   // Server returns `alreadySent: true` on idempotent re-sends so the client
   // can soften its success toast ("Already sent" vs "Sent").
   alreadySent?: boolean;
