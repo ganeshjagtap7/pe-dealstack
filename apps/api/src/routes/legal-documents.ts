@@ -80,15 +80,20 @@ const createBodySchema = z.object({
 // Import-an-existing-Google-Doc body. `url` accepts a full Doc URL or a bare
 // file id (parsing/validation of the id happens in the import service so the
 // 400 INVALID_GDOC_URL code is owned in one place).
-const importGdocBodySchema = z.object({
-  url: z.string().min(1).max(2000),
-  title: z.string().min(1).max(500).optional(),
-  counterpartyName: z.string().max(500).optional(),
-  counterpartyEmail: z.string().email().max(500).optional(),
-  counterpartyAddress: z.string().max(2000).optional(),
-  jurisdiction: z.string().max(500).optional(),
-  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-});
+const importGdocBodySchema = z
+  .object({
+    url: z.string().min(1).max(2000).optional(),
+    fileId: z.string().min(10).max(256).optional(),
+    title: z.string().min(1).max(500).optional(),
+    counterpartyName: z.string().max(500).optional(),
+    counterpartyEmail: z.string().email().max(500).optional(),
+    counterpartyAddress: z.string().max(2000).optional(),
+    jurisdiction: z.string().max(500).optional(),
+    effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  })
+  .refine(v => Boolean(v.fileId || v.url), {
+    message: 'Provide a Google Doc fileId or url',
+  });
 
 const patchBodySchema = z
   .object({
@@ -386,6 +391,7 @@ router.post('/deals/:dealId/legal-documents/import-gdoc', async (req, res) => {
       organizationId: orgId,
       userId: internalUserId,
       url: parsed.data.url,
+      fileId: parsed.data.fileId,
       title: parsed.data.title,
       counterpartyName: parsed.data.counterpartyName,
       counterpartyEmail: parsed.data.counterpartyEmail,
