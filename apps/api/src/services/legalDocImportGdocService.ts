@@ -61,7 +61,8 @@ export interface ImportGoogleDocInput {
   dealId: string;
   organizationId: string;
   userId: string; // internal User.id — needed to look up the Workspace token
-  url: string;
+  url?: string;
+  fileId?: string; // concrete Drive file id from the Google Picker (preferred over url)
   title?: string;
   counterpartyName?: string;
   counterpartyEmail?: string;
@@ -114,7 +115,8 @@ function mapDriveErrorToImportError(err: unknown): LegalDocImportGdocError {
  */
 export async function importGoogleDoc(input: ImportGoogleDocInput) {
   // ── Parse the file id from the pasted URL / bare id ─────────────────
-  const googleDocId = extractGoogleDocId(input.url);
+  const googleDocId =
+    input.fileId?.trim() || (input.url ? extractGoogleDocId(input.url) : null);
   if (!googleDocId) {
     throw new LegalDocImportGdocError(
       'INVALID_GDOC_URL',
