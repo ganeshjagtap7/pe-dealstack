@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { api } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { useToast } from "@/providers/ToastProvider";
@@ -10,6 +10,7 @@ import { DealPicker, type PickableDeal } from "./DealPicker";
 import { FullEditPage } from "./FullEditPage";
 import { Gallery } from "./Gallery";
 import { TemplatePicker } from "./TemplatePicker";
+import { TemplateUploadFlow } from "./TemplateUploadFlow";
 import type {
   LegalDocTemplate,
   LegalDocument,
@@ -20,12 +21,14 @@ import type {
 //   - "gallery":         the firm-wide list (default)
 //   - "picker":          deal picker modal
 //   - "templatePicker":  verified-template picker modal
+//   - "uploadTemplate":  inline template upload + verifier (no settings detour)
 //   - "create":          counterparty form (template + deal locked in)
 //   - "edit":            full-screen editor for an existing row
 type View =
   | { mode: "gallery" }
   | { mode: "picker" }
   | { mode: "templatePicker"; dealId: string; dealLabel: string }
+  | { mode: "uploadTemplate"; resumeTo?: { dealId: string; dealLabel: string } }
   | {
       mode: "create";
       dealId: string;
@@ -36,7 +39,6 @@ type View =
 
 export default function NdaPage() {
   const { showToast } = useToast();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const [docs, setDocs] = useState<LegalDocumentWithDeal[]>([]);
@@ -47,9 +49,13 @@ export default function NdaPage() {
     useState<LegalDocumentWithDeal | null>(null);
 
   // Whenever we transition into the template-picker step, ensure at least
-  // one verified template exists. Done once per deep-link hop to avoid
-  // re-fetching on every click.
-  async function ensureVerifiedTemplatesOrRedirect(): Promise<boolean> {
+  // one verified template exists. If none, drop the user into the inline
+  // template-upload flow on this page (no Settings detour — bad UX).
+  // resumeTo lets the upload flow remember where the user was headed so we
+  // can hop straight back into templatePicker once they finish saving.
+  async function ensureVerifiedTemplatesOrPromptUpload(
+    resumeTo?: { dealId: string; dealLabel: string },
+  ): Promise<boolean> {
     try {
       const templates = await api.get<LegalDocTemplate[]>(
         "/legal-document-templates",
@@ -57,10 +63,10 @@ export default function NdaPage() {
       const hasVerified = Array.isArray(templates)
         && templates.some((t) => t.verifiedAt !== null);
       if (!hasVerified) {
-        showToast("Upload a template first.", "info", {
+        showToast("Upload a template to get started.", "info", {
           title: "No NDA templates yet",
         });
-        router.push("/settings#nda-templates");
+        setView({ mode: "uploadTemplate", resumeTo });
         return false;
       }
       return true;
@@ -89,7 +95,13 @@ export default function NdaPage() {
     const dealLabel = searchParams.get("dealLabel") || "Untitled deal";
     deepLinkHandled.current = true;
     (async () => {
-      const ok = await ensureVerifiedTemplatesOrRedirect();
+      // Pass resumeTo so if templates are missing, the upload flow knows
+      // to drop the user straight into the template-picker for THIS deal
+      // after they save — instead of dumping them back on the gallery.
+      const ok = await ensureVerifiedTemplatesOrPromptUpload({
+        dealId,
+        dealLabel,
+      });
       if (ok) setView({ mode: "templatePicker", dealId, dealLabel });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -120,7 +132,7 @@ export default function NdaPage() {
   /* -------------------- Gallery callbacks -------------------- */
 
   async function handleCreate() {
-    const ok = await ensureVerifiedTemplatesOrRedirect();
+    const ok = await ensureVerifiedTemplatesOrPromptUpload();
     if (ok) setView({ mode: "picker" });
   }
 
@@ -239,6 +251,29 @@ export default function NdaPage() {
         onCancel={() => setView({ mode: "gallery" })}
         onSelect={handleTemplateSelect}
       />
+
+      {view.mode === "uploadTemplate" && (
+        <TemplateUploadFlow
+          onCancel={() => setView({ mode: "gallery" })}
+          onSaved={() => {
+            // If the user was mid-flow (clicked "New NDA" → got gated →
+            // uploaded a template), hop straight into the template picker
+            // for the deal they were headed to. Otherwise just land back
+            // on the gallery so they can see the new template took.
+            const resumeTo =
+              view.mode === "uploadTemplate" ? view.resumeTo : undefined;
+            if (resumeTo) {
+              setView({
+                mode: "templatePicker",
+                dealId: resumeTo.dealId,
+                dealLabel: resumeTo.dealLabel,
+              });
+            } else {
+              setView({ mode: "gallery" });
+            }
+          }}
+        />
+      )}
 
       <CreateDocModal
         open={view.mode === "create"}

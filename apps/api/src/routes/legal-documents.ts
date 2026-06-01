@@ -100,7 +100,10 @@ interface TemplateRow {
 interface DealRow {
   id: string;
   name: string | null;
-  companyName: string | null;
+  // Company name lives on the separate Company table joined via Deal's FK
+  // — Deal itself has no companyName column (same gotcha that broke the
+  // cross-deal GET join earlier).
+  company: { name: string | null } | null;
   organizationId: string;
 }
 
@@ -123,7 +126,7 @@ async function loadTemplate(templateId: string, orgId: string): Promise<Template
 async function loadDeal(dealId: string, orgId: string): Promise<DealRow | null> {
   const { data, error } = await supabase
     .from('Deal')
-    .select('id, name, companyName, organizationId')
+    .select('id, name, organizationId, company:Company(name)')
     .eq('id', dealId)
     .eq('organizationId', orgId)
     .maybeSingle();
@@ -290,7 +293,7 @@ router.post('/deals/:dealId/legal-documents', async (req, res) => {
       COUNTERPARTY_EMAIL: parsed.data.counterpartyEmail,
       EFFECTIVE_DATE: parsed.data.effectiveDate,
       JURISDICTION: parsed.data.jurisdiction,
-      DEAL_NAME: deal.name ?? deal.companyName ?? '',
+      DEAL_NAME: deal.name ?? deal.company?.name ?? '',
       FIRM_NAME: org?.name ?? '',
       TODAY: todayIso,
     };

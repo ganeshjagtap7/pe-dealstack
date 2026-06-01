@@ -10,47 +10,33 @@ import {
 } from "react";
 import { cn } from "@/lib/cn";
 
-// Mirrors the allowlist in memo-builder/editor.tsx — same tags / attrs so
-// pasted Word output and our DOCX → HTML conversion stay consistent across
-// the app. If you broaden this, broaden the memo editor too.
+// Mirrors the broader allowlist in apps/api/src/services/legalDocParseService.ts
+// — legal docs need fuller Word-formatting fidelity than memos (highlights,
+// underlines, alignment, colors). If you broaden either side, broaden the
+// other together.
 const ALLOWED_TAGS = [
   "p",
-  "h1",
-  "h2",
-  "h3",
-  "h4",
-  "h5",
-  "h6",
-  "ul",
-  "ol",
-  "li",
-  "strong",
-  "em",
-  "b",
-  "i",
-  "br",
-  "div",
-  "span",
-  "table",
-  "thead",
-  "tbody",
-  "tr",
-  "th",
-  "td",
-  "a",
-  "blockquote",
-  "code",
-  "pre",
-  "button",
+  "h1", "h2", "h3", "h4", "h5", "h6",
+  "ul", "ol", "li",
+  "strong", "em", "b", "i", "u", "s", "strike", "mark",
+  "sup", "sub",
+  "br", "hr",
+  "div", "span",
+  "table", "thead", "tbody", "tr", "th", "td",
+  "a", "blockquote", "code", "pre", "button",
 ];
 const ALLOWED_ATTR = [
   "class",
+  "style",
   "href",
   "target",
   "rel",
   "data-source",
   "data-page",
+  "data-gap",
   "title",
+  "colspan",
+  "rowspan",
 ];
 
 export function sanitizeLegalHtml(html: string): string {
@@ -190,6 +176,60 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         // Spell-check is more annoying than helpful for legal boilerplate.
         spellCheck={false}
       />
+      {/* Render the legal-doc formatting that contentEditable would
+          otherwise show flat. Scoped to .legal-editor so the rules don't
+          leak into the rest of the app. */}
+      <style>{`
+        .legal-editor h1 { font-size: 1.5rem; font-weight: 700; margin: 1.25rem 0 0.75rem; color: #0f172a; }
+        .legal-editor h2 { font-size: 1.25rem; font-weight: 700; margin: 1.1rem 0 0.6rem; color: #0f172a; }
+        .legal-editor h3 { font-size: 1.05rem; font-weight: 700; margin: 1rem 0 0.5rem; color: #0f172a; }
+        .legal-editor h4, .legal-editor h5, .legal-editor h6 { font-weight: 700; margin: 0.9rem 0 0.4rem; color: #0f172a; }
+        .legal-editor h1.doc-title { font-size: 1.75rem; text-align: center; }
+        .legal-editor h2.doc-subtitle { font-size: 1.15rem; text-align: center; color: #475569; font-weight: 500; }
+        .legal-editor p { margin: 0.65rem 0; }
+        .legal-editor p.doc-caption { font-size: 0.85em; color: #64748b; font-style: italic; }
+        .legal-editor ul, .legal-editor ol { margin: 0.65rem 0; padding-left: 1.5rem; }
+        .legal-editor ul { list-style: disc; }
+        .legal-editor ol { list-style: decimal; }
+        .legal-editor li { margin: 0.2rem 0; }
+        .legal-editor strong, .legal-editor b { font-weight: 700; }
+        .legal-editor em, .legal-editor i { font-style: italic; }
+        .legal-editor u { text-decoration: underline; }
+        .legal-editor s, .legal-editor strike { text-decoration: line-through; }
+        .legal-editor sup { vertical-align: super; font-size: 0.75em; }
+        .legal-editor sub { vertical-align: sub; font-size: 0.75em; }
+        .legal-editor mark { background: #fef08a; padding: 0 0.1em; border-radius: 2px; }
+        .legal-editor mark.hl-yellow { background: #fef08a; }
+        .legal-editor mark.hl-green { background: #bbf7d0; }
+        .legal-editor mark.hl-cyan { background: #a5f3fc; }
+        .legal-editor mark.hl-magenta { background: #fbcfe8; }
+        .legal-editor mark.hl-blue { background: #bfdbfe; }
+        .legal-editor mark.hl-red { background: #fecaca; }
+        .legal-editor mark.hl-yellow-dark { background: #fde047; }
+        .legal-editor mark.hl-green-dark { background: #86efac; }
+        .legal-editor blockquote { border-left: 3px solid #cbd5e1; padding-left: 0.85rem; margin: 0.85rem 0; color: #475569; font-style: italic; }
+        .legal-editor blockquote.intense { border-left-color: #003366; color: #0f172a; font-style: normal; font-weight: 500; }
+        .legal-editor table { border-collapse: collapse; margin: 0.85rem 0; }
+        .legal-editor th, .legal-editor td { border: 1px solid #cbd5e1; padding: 0.4rem 0.6rem; }
+        .legal-editor th { background: #f1f5f9; font-weight: 600; text-align: left; }
+        .legal-editor hr { border: 0; border-top: 1px solid #cbd5e1; margin: 1rem 0; }
+        .legal-editor a { color: #003366; text-decoration: underline; }
+        .legal-editor pre, .legal-editor code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f1f5f9; padding: 0 0.3em; border-radius: 2px; }
+        /* Visible "fill this in" placeholder for empty paragraphs (PF-style
+           gaps where the counterparty name / address / date go) — yellow
+           underline + dotted treatment makes them obviously clickable. */
+        .legal-editor p.nda-gap {
+          color: #b45309;
+          background: #fef3c7;
+          padding: 0.35rem 0.6rem;
+          border: 1px dashed #f59e0b;
+          border-radius: 4px;
+          text-align: center;
+          font-style: italic;
+          margin: 0.5rem 0;
+          cursor: text;
+        }
+      `}</style>
     </div>
   );
 });
