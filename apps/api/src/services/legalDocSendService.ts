@@ -36,6 +36,7 @@ import {
   loadDealForLegalDoc,
   loadOrgForLegalDoc,
 } from './legalDocLookups.js';
+import { registerSignatureWatch } from './legalDocSignatureWatchService.js';
 
 export type LegalDocSendErrorCode =
   | 'GOOGLE_NOT_CONNECTED'
@@ -374,6 +375,18 @@ export async function sendLegalDocument(
       documentId: doc.id,
       googleDocId: createdDoc.id,
       gmailMessageId,
+    });
+  }
+
+  // Register a Drive watch so we can auto-detect when the counterparty signs.
+  // Best-effort: registerSignatureWatch reloads the row itself (so it sees the
+  // just-saved googleDocId) and never throws — it must not affect the send.
+  try {
+    await registerSignatureWatch({ documentId: doc.id, userId: input.userId, organizationId: input.organizationId });
+  } catch (watchErr) {
+    log.warn('legalDocSendService: registerSignatureWatch failed (non-fatal)', {
+      documentId: doc.id,
+      message: watchErr instanceof Error ? watchErr.message : String(watchErr),
     });
   }
 

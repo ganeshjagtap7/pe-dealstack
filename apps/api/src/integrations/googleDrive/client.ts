@@ -18,12 +18,21 @@ import {
 } from './types.js';
 
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
-const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+export const DRIVE_FILES_URL = 'https://www.googleapis.com/drive/v3/files';
+
+// Native Google Doc export MIME types. files.export converts the Doc into
+// these binary formats server-side — same renderer the counterparty sees.
+const DRIVE_EXPORT_MIME = {
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  pdf: 'application/pdf',
+} as const;
+
+export type DriveExportFormat = keyof typeof DRIVE_EXPORT_MIME;
 
 const UPLOAD_TIMEOUT_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 
-function mapDriveError(
+export function mapDriveError(
   status: number,
   bodyText: string,
   fallbackMessage: string,
@@ -197,4 +206,61 @@ export async function getDocMetadata(
     modifiedTime: json.modifiedTime,
     webViewLink: json.webViewLink,
   };
+}
+
+/**
+ * Export a Google Doc to a binary format (docx or pdf) via files.export.
+ * Returns the raw bytes as a Buffer.
+ *
+ * files.export caps at 10 MB — NDAs are far under that, so we don't
+ * implement the large-file export-link fallback.
+ */
+export async function exportDocAs(
+  accessToken: string,
+  fileId: string,
+  format: DriveExportFormat,
+): Promise<Buffer> {
+  const mimeType = DRIVE_EXPORT_MIME[format];
+  const url = `${DRIVE_FILES_URL}/${encodeURIComponent(
+    fileId,
+  )}/export?mimeType=${encodeURIComponent(mimeType)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    log.warn('googleDrive.exportDocAs: non-2xx', {
+      status: res.status,
+      format,
+      bodyPreview: text.slice(0, 200),
+    });
+    throw mapDriveError(res.status, text, 'Drive export failed');
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Permanently delete a Drive file. Used to clean up the throwaway Doc we
+ * spin up when exporting a draft that has no persistent googleDocId yet.
+ * A 404 means it's already gone — treat that as success.
+ */
+export async function deleteFile(
+  accessToken: string,
+  fileId: string,
+): Promise<void> {
+  const url = `${DRIVE_FILES_URL}/${encodeURIComponent(fileId)}`;
+  const res = await fetch(url, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!res.ok && res.status !== 404) {
+    const text = await res.text().catch(() => '');
+    throw mapDriveError(res.status, text, 'Drive file delete failed');
+  }
 }

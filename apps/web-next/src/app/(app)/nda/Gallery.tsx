@@ -88,6 +88,13 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
   // bottom corner — signals that edits there are the source of truth, even
   // though the card itself still routes to the in-app editor (audit trail).
   const hasGoogleDoc = doc.status === "SENT" && !!doc.googleDocUrl;
+  // Signatures the backend auto-detected via the Drive watch webhook flip the
+  // doc to SIGNED with metadata.signatureDetectedVia === 'drive-watch'. Surface
+  // that provenance so operators know it wasn't marked Signed by hand.
+  const autoDetectedSignature =
+    doc.status === "SIGNED" &&
+    (doc.metadata as { signatureDetectedVia?: string } | undefined)
+      ?.signatureDetectedVia === "drive-watch";
 
   return (
     <div className="group relative aspect-[4/3] rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
@@ -108,6 +115,16 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
         >
           <span className="material-symbols-outlined text-[12px]">cloud_done</span>
           Google Docs
+        </div>
+      )}
+
+      {autoDetectedSignature && (
+        <div
+          className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 pointer-events-none"
+          title="Signature auto-detected from the Google Doc lock — not marked Signed by hand"
+        >
+          <span className="material-symbols-outlined text-[12px]">verified</span>
+          Signed · auto-detected
         </div>
       )}
 

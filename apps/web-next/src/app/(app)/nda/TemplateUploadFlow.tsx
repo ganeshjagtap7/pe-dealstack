@@ -16,13 +16,15 @@ type Step =
   | { kind: "parsing"; fileName: string }
   | { kind: "verify"; draft: ParsedTemplateDraft };
 
-const ACCEPTED_EXT = ["docx", "html", "md"] as const;
+const ACCEPTED_EXT = ["docx", "html", "md", "pdf"] as const;
 type AcceptedExt = (typeof ACCEPTED_EXT)[number];
 
 function fileKind(name: string): AcceptedExt | null {
   const dot = name.lastIndexOf(".");
   if (dot === -1) return null;
   const ext = name.slice(dot + 1).toLowerCase();
+  // .htm aliases to .html for the kind enum (mirrors UploadExistingFlow).
+  if (ext === "htm") return "html";
   return (ACCEPTED_EXT as readonly string[]).includes(ext)
     ? (ext as AcceptedExt)
     : null;
@@ -46,7 +48,7 @@ export function TemplateUploadFlow({
   async function handleFile(file: File) {
     const kind = fileKind(file.name);
     if (!kind) {
-      setError("Unsupported file type. Drop a .docx, .html, or .md file.");
+      setError("Unsupported file type. Drop a .docx, .html, .md, or .pdf file.");
       return;
     }
     setError(null);
@@ -70,7 +72,7 @@ export function TemplateUploadFlow({
           ?? `Parse failed (${res.status})`;
         if (code === "INVALID_FILE_FORMAT") {
           throw new Error(
-            "We couldn't read that file. Try a different .docx, .html, or .md",
+            "We couldn't read that file. Try a different .docx, .html, .md, or .pdf",
           );
         }
         throw new Error(msg);
@@ -132,8 +134,8 @@ export function TemplateUploadFlow({
             Upload NDA template
           </h2>
           <p className="text-xs text-slate-500">
-            Drop a Word doc, HTML, or markdown file. We&rsquo;ll parse it so
-            you can mark up placeholder tokens on the next screen.
+            Drop a Word doc, HTML, markdown, or PDF file. We&rsquo;ll parse it
+            so you can mark up placeholder tokens on the next screen.
           </p>
         </div>
       </div>
@@ -164,7 +166,7 @@ export function TemplateUploadFlow({
           >
             <input
               type="file"
-              accept=".docx,.html,.htm,.md"
+              accept=".docx,.html,.htm,.md,.pdf"
               onChange={handleBrowse}
               className="hidden"
               disabled={isParsing}
@@ -195,8 +197,14 @@ export function TemplateUploadFlow({
                 </div>
                 <div className="text-[12px] text-slate-500 mt-1">
                   Accepts <span className="font-mono">.docx</span>,{" "}
-                  <span className="font-mono">.html</span>, or{" "}
-                  <span className="font-mono">.md</span>
+                  <span className="font-mono">.html</span>,{" "}
+                  <span className="font-mono">.md</span>, or{" "}
+                  <span className="font-mono">.pdf</span>
+                </div>
+                <div className="text-[11px] text-slate-400 mt-3">
+                  PDF text is extracted as plain paragraphs — headings, bold,
+                  and lists won&rsquo;t carry over. You can re-format in the
+                  verifier.
                 </div>
               </>
             )}

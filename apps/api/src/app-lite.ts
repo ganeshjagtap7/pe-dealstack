@@ -39,6 +39,7 @@ import { gmailProvider } from './integrations/gmail/index.js';
 import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
 import legalDocumentsRouter from './routes/legal-documents.js';
 import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
+import legalDocWebhooksRouter from './routes/legal-doc-webhooks.js';
 import dealsTrashRouter from './routes/deals-trash.js';
 import graphsRouter from './routes/graphs.js';
 import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
@@ -240,6 +241,10 @@ app.use('/api/public/invitations', invitationsAcceptRouter);
 // shared CRON_SECRET (cron). MUST be mounted BEFORE the authenticated
 // /api/integrations router below — Express matches routes in registration order.
 app.use('/api/integrations', integrationsPublicRouter);
+
+// Public: Google Drive POSTs NDA-signature notifications here with no auth header.
+// Identity = signed channel token (X-Goog-Channel-Token) + resourceId match.
+app.use('/api/webhooks/legal-docs', legalDocWebhooksRouter);
 
 // ========================================
 // Protected Routes (require authentication + org resolution)

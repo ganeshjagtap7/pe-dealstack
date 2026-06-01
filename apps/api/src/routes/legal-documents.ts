@@ -35,6 +35,10 @@ import {
   requestLegalDocSignature,
   LegalDocSignatureError,
 } from '../services/legalDocSignatureService.js';
+import {
+  exportLegalDocument,
+  LegalDocExportError,
+} from '../services/legalDocExportService.js';
 
 // 25 MB cap mirrors the template-parse upload — the underlying parser is
 // shared and rejects anything it can't decode with INVALID_FILE_FORMAT.
@@ -490,6 +494,51 @@ router.post('/legal-documents/:id/request-signature', async (req, res) => {
     }
     log.error('POST /api/legal-documents/:id/request-signature error', err);
     res.status(500).json({ error: 'Failed to request signature' });
+  }
+});
+
+// ============================================================
+// GET /legal-documents/:id/export?format=docx|pdf — binary download
+// ============================================================
+// Streams a .docx or .pdf rendered via Google Drive's native Doc export.
+// Sent docs export their persistent Google Doc; drafts get a throwaway Doc
+// created → exported → deleted inside the service.
+router.get('/legal-documents/:id/export', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const { id } = req.params;
+    const format = req.query.format === 'pdf' ? 'pdf' : 'docx';
+
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const internalUserId = await resolveInternalUserId(req.user.id);
+    if (!internalUserId) return res.status(404).json({ error: 'User not found' });
+
+    const result = await exportLegalDocument({
+      documentId: id,
+      organizationId: orgId,
+      userId: internalUserId,
+      format,
+    });
+
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="${result.filename}"`,
+    );
+    res.setHeader('Content-Length', String(result.bytes.length));
+    res.send(result.bytes);
+  } catch (err) {
+    if (err instanceof LegalDocExportError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        details: err.details,
+      });
+    }
+    log.error('GET /api/legal-documents/:id/export error', err);
+    res.status(500).json({ error: 'Failed to export legal document' });
   }
 });
 

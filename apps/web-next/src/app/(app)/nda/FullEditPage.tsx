@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/providers/ToastProvider";
 import { useUser } from "@/providers/UserProvider";
+import { DownloadMenu, DraftEsignHint } from "./DownloadMenu";
 import { Editor, type EditorHandle } from "./Editor";
 import { SendModal } from "./SendModal";
 import { SentActionBar } from "./SentActionBar";
@@ -241,14 +242,12 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
               {showSnapshot ? "View current draft" : "View sent snapshot"}
             </button>
           )}
-          <button
-            type="button"
-            disabled
-            title="Coming soon"
-            className="px-3 py-1.5 rounded-md text-xs font-semibold border border-slate-200 text-slate-400 cursor-not-allowed"
-          >
-            Download .docx
-          </button>
+          <DownloadMenu
+            docId={doc.id}
+            title={form.title}
+            disabled={!form.content.trim()}
+          />
+          {!isSent && <DraftEsignHint />}
           <button
             type="button"
             onClick={() => setSendOpen(true)}

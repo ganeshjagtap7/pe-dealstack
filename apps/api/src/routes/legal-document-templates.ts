@@ -35,7 +35,7 @@ const DOC_TYPES = [
   'NDA', 'LOI', 'TERM_SHEET', 'DEFINITIVE_AGREEMENT', 'SIDE_LETTER', 'OTHER',
 ] as const;
 const TOKEN_KEY_ENUM = z.enum(LEGAL_DOC_TOKEN_KEYS as readonly [string, ...string[]]);
-const KIND_VALUES = ['docx', 'html', 'md'] as const;
+const KIND_VALUES = ['docx', 'html', 'md', 'pdf'] as const;
 
 const listQuerySchema = z.object({
   docType: z.enum(DOC_TYPES).optional(),
@@ -72,7 +72,7 @@ function isMissingTableError(error: { code?: string } | null): boolean {
 function suggestNameFromFile(filename: string | undefined): string {
   if (!filename) return 'Untitled Template';
   return filename
-    .replace(/\.(docx|html|htm|md|markdown)$/i, '')
+    .replace(/\.(docx|html|htm|md|markdown|pdf)$/i, '')
     .replace(/[_-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
@@ -152,7 +152,7 @@ router.post(
       const parsed = parseBodySchema.safeParse({ kind: req.body?.kind });
       if (!parsed.success) {
         return res.status(400).json({
-          error: 'Invalid kind — expected docx | html | md',
+          error: 'Invalid kind — expected docx | html | md | pdf',
           code: 'INVALID_FILE_FORMAT',
           details: parsed.error.errors,
         });

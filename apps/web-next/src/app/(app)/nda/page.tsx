@@ -110,6 +110,11 @@ export default function NdaPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  // In-flight guard for refetches. A plain ref (not a `loading` state dep) so
+  // loadDocs can stay deps-free — it never closes over this, the focus/visibility
+  // effect reads it directly.
+  const fetchingRef = useRef(false);
+
   const loadDocs = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -128,9 +133,39 @@ export default function NdaPage() {
     }
   }, []);
 
+  // Refetch wrapper that drops overlapping calls. Used by the focus/visibility
+  // listeners so the in-flight guard is honored without touching loadDocs.
+  const refetch = useCallback(async () => {
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
+    try {
+      await loadDocs();
+    } finally {
+      fetchingRef.current = false;
+    }
+  }, [loadDocs]);
+
   useEffect(() => {
     loadDocs();
   }, [loadDocs]);
+
+  // Auto-detected signatures get flipped to SIGNED server-side (Drive watch
+  // webhook). Refetch when the tab regains focus / becomes visible so those
+  // server-side changes surface without a manual reload.
+  useEffect(() => {
+    function handleFocus() {
+      refetch();
+    }
+    function handleVisibility() {
+      if (document.visibilityState === "visible") refetch();
+    }
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [refetch]);
 
   /* -------------------- Gallery callbacks -------------------- */
 
