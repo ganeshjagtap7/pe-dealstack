@@ -61,6 +61,13 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || "",
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "",
+    // Google Picker intake (NDA "bring your own Google Doc" flow). These power
+    // the browser-side Picker + GIS token client in app/(app)/nda/googlePicker.ts.
+    // All three must be set for the "Choose from Google Drive" button to enable;
+    // see .env.example for what each value is.
+    NEXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "",
+    NEXT_PUBLIC_GOOGLE_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "",
+    NEXT_PUBLIC_GOOGLE_APP_ID: process.env.NEXT_PUBLIC_GOOGLE_APP_ID || "",
   },
   async headers() {
     return [
