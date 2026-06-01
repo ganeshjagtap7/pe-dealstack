@@ -1,27 +1,110 @@
 -- ============================================================
--- Foreign-key constraints for LegalDocument, LegalDocTemplate, CustomGraph
+-- UUID column types + foreign-key constraints for
+-- LegalDocument, LegalDocTemplate, CustomGraph
 --
--- Phase 1/2 migrations created these tables with raw TEXT columns for
--- organizationId / dealId / createdById, no explicit FOREIGN KEY
--- constraints. PostgREST needs FKs to infer relationships for the
--- embedded-join syntax we use throughout the routes, e.g.:
+-- Two-part migration:
 --
---   supabase.from('LegalDocument')
---     .select('*, deal:Deal(id, projectName:name, target:companyName)')
+-- 1) Convert TEXT id / foreign-key columns to native UUID
+--    Phase 1/2 migrations defined these as `TEXT ... DEFAULT
+--    gen_random_uuid()::text`, but Deal / Organization / User use
+--    native UUID. Postgres rejects FKs across incompatible types:
+--      ERROR 42804: foreign key constraint cannot be implemented
+--      DETAIL: columns are of incompatible types: text and uuid
+--    Casting to UUID via `USING col::uuid` succeeds because every
+--    row we've inserted so far already holds a valid UUID string.
 --
--- Without the FK, PostgREST returns:
---   PGRST200: Could not find a relationship between 'LegalDocument' and 'Deal'
+-- 2) Add FOREIGN KEY constraints so PostgREST can resolve the
+--    embedded-join syntax we use throughout the routes:
+--      .select('*, deal:Deal(id, projectName:name, target:companyName)')
+--    Without these, PostgREST returns PGRST200 the moment a row
+--    exists to join.
 --
--- Same risk lurks on CustomGraph (same join shape, same missing FK).
--- This migration adds NOT VALID FKs so it succeeds even if existing
--- rows have dangling dealIds from before deals had soft-delete cascade
--- (NOT VALID skips the initial scan — PostgREST treats them as real
--- FKs for relationship inference either way).
+-- All steps are wrapped in column/constraint existence guards so
+-- the migration is idempotent — safe to re-run.
 --
--- After ALTER, NOTIFY PostgREST to drop its schema cache and rebuild.
+-- Final NOTIFY tells PostgREST to drop its schema cache and rebuild,
+-- so the new FKs are visible to the API within seconds (no restart).
 --
--- Run in Supabase SQL Editor. Idempotent — safe to re-run.
+-- Run in Supabase SQL Editor.
 -- ============================================================
+
+-- ───────────────────────────────────────────────────────────
+-- 1) TEXT → UUID column type conversions
+-- ───────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+  -- LegalDocument
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'LegalDocument' AND column_name = 'id') = 'text' THEN
+    ALTER TABLE "LegalDocument" ALTER COLUMN "id" DROP DEFAULT;
+    ALTER TABLE "LegalDocument" ALTER COLUMN "id" TYPE UUID USING "id"::uuid;
+    ALTER TABLE "LegalDocument" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'LegalDocument' AND column_name = 'organizationId') = 'text' THEN
+    ALTER TABLE "LegalDocument" ALTER COLUMN "organizationId" TYPE UUID USING "organizationId"::uuid;
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'LegalDocument' AND column_name = 'dealId') = 'text' THEN
+    ALTER TABLE "LegalDocument" ALTER COLUMN "dealId" TYPE UUID USING "dealId"::uuid;
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'LegalDocument' AND column_name = 'createdById') = 'text' THEN
+    ALTER TABLE "LegalDocument" ALTER COLUMN "createdById" TYPE UUID USING "createdById"::uuid;
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'LegalDocument' AND column_name = 'templateId') = 'text' THEN
+    ALTER TABLE "LegalDocument" ALTER COLUMN "templateId" TYPE UUID USING "templateId"::uuid;
+  END IF;
+
+  -- LegalDocTemplate
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'LegalDocTemplate' AND column_name = 'id') = 'text' THEN
+    ALTER TABLE "LegalDocTemplate" ALTER COLUMN "id" DROP DEFAULT;
+    ALTER TABLE "LegalDocTemplate" ALTER COLUMN "id" TYPE UUID USING "id"::uuid;
+    ALTER TABLE "LegalDocTemplate" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'LegalDocTemplate' AND column_name = 'organizationId') = 'text' THEN
+    ALTER TABLE "LegalDocTemplate" ALTER COLUMN "organizationId" TYPE UUID USING "organizationId"::uuid;
+  END IF;
+
+  -- CustomGraph
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'CustomGraph' AND column_name = 'id') = 'text' THEN
+    ALTER TABLE "CustomGraph" ALTER COLUMN "id" DROP DEFAULT;
+    ALTER TABLE "CustomGraph" ALTER COLUMN "id" TYPE UUID USING "id"::uuid;
+    ALTER TABLE "CustomGraph" ALTER COLUMN "id" SET DEFAULT gen_random_uuid();
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'CustomGraph' AND column_name = 'organizationId') = 'text' THEN
+    ALTER TABLE "CustomGraph" ALTER COLUMN "organizationId" TYPE UUID USING "organizationId"::uuid;
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'CustomGraph' AND column_name = 'dealId') = 'text' THEN
+    ALTER TABLE "CustomGraph" ALTER COLUMN "dealId" TYPE UUID USING "dealId"::uuid;
+  END IF;
+
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'CustomGraph' AND column_name = 'createdById') = 'text' THEN
+    ALTER TABLE "CustomGraph" ALTER COLUMN "createdById" TYPE UUID USING "createdById"::uuid;
+  END IF;
+END
+$$;
+
+-- ───────────────────────────────────────────────────────────
+-- 2) Foreign-key constraints (NOT VALID so older rows with
+--    dangling refs don't block; PostgREST still treats them
+--    as real FKs for relationship inference)
+-- ───────────────────────────────────────────────────────────
 
 DO $$
 BEGIN
@@ -63,7 +146,8 @@ BEGIN
 END
 $$;
 
--- Force PostgREST to rebuild its relationship cache so the new FKs are
--- visible without restarting the API. Without this NOTIFY, joins keep
--- failing for up to ~10 min until PostgREST's next cache refresh.
+-- ───────────────────────────────────────────────────────────
+-- 3) Force PostgREST to rebuild its relationship cache
+-- ───────────────────────────────────────────────────────────
+
 NOTIFY pgrst, 'reload schema';
