@@ -32,6 +32,25 @@ export type DriveExportFormat = keyof typeof DRIVE_EXPORT_MIME;
 const UPLOAD_TIMEOUT_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 15_000;
 
+/**
+ * Parse a Google Doc file id out of a user-supplied string. Accepts either
+ * a full Doc URL (…/d/<id>/edit, /document/d/<id>, etc.) or a bare file id.
+ * Returns null when no plausible id can be extracted.
+ *
+ * Used by the "import an existing Google Doc" path (legalDocImportGdocService)
+ * where the user pastes the URL of a Doc they prepared in their own Drive.
+ */
+export function extractGoogleDocId(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  // URL form: capture the id after the canonical `/d/<id>` segment.
+  const urlMatch = trimmed.match(/\/d\/([a-zA-Z0-9_-]+)/);
+  if (urlMatch) return urlMatch[1];
+  // Bare-id fallback: Drive file ids are long base64url-ish strings.
+  if (/^[A-Za-z0-9_-]{20,}$/.test(trimmed)) return trimmed;
+  return null;
+}
+
 export function mapDriveError(
   status: number,
   bodyText: string,

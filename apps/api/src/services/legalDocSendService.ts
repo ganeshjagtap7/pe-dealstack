@@ -25,9 +25,14 @@ import {
   createDocFromHtml,
   setDocPermission,
 } from '../integrations/googleDrive/client.js';
-import { GoogleDriveError } from '../integrations/googleDrive/types.js';
 import { sendMail, getMyProfile } from '../integrations/googleGmail/client.js';
-import { GoogleGmailError } from '../integrations/googleGmail/types.js';
+import {
+  LegalDocSendError,
+  DEFAULT_COVER_HTML,
+  buildEmailHtml,
+  mapDriveErrorToSendError,
+  mapGmailErrorToSendError,
+} from './legalDocSendHelpers.js';
 import {
   substituteTokens,
   type LegalDocTokenValues,
@@ -39,26 +44,13 @@ import {
 // (disabled — see banner below)
 // import { registerSignatureWatch } from './legalDocSignatureWatchService.js';
 
-export type LegalDocSendErrorCode =
-  | 'GOOGLE_NOT_CONNECTED'
-  | 'GOOGLE_SCOPES_MISSING'
-  | 'NO_RECIPIENT'
-  | 'NO_CONTENT'
-  | 'DOCUMENT_NOT_FOUND'
-  | 'DRIVE_API_ERROR'
-  | 'EMAIL_SEND_FAILED';
-
-export class LegalDocSendError extends Error {
-  code: LegalDocSendErrorCode;
-  status: number;
-  details?: string;
-  constructor(code: LegalDocSendErrorCode, message: string, status: number, details?: string) {
-    super(message);
-    this.code = code;
-    this.status = status;
-    this.details = details;
-  }
-}
+// Re-exported from legalDocSendHelpers so the public import surface (routes/
+// legal-documents.ts imports LegalDocSendError from here) is unchanged after
+// the helper extraction.
+export {
+  LegalDocSendError,
+  type LegalDocSendErrorCode,
+} from './legalDocSendHelpers.js';
 
 export interface SendLegalDocumentInput {
   documentId: string;
@@ -98,6 +90,7 @@ interface DocRow {
   googleDocUrl: string | null;
   sentAt: string | null;
   sentToEmail: string | null;
+  metadata: Record<string, unknown> | null;
 }
 
 function resolveDealLabel(
@@ -112,7 +105,7 @@ async function loadDocument(id: string, orgId: string): Promise<DocRow> {
   const { data, error } = await supabase
     .from('LegalDocument')
     .select(
-      'id, organizationId, dealId, title, content, counterpartyName, counterpartyEmail, counterpartyAddress, jurisdiction, effectiveDate, status, googleDocId, googleDocUrl, sentAt, sentToEmail',
+      'id, organizationId, dealId, title, content, counterpartyName, counterpartyEmail, counterpartyAddress, jurisdiction, effectiveDate, status, googleDocId, googleDocUrl, sentAt, sentToEmail, metadata',
     )
     .eq('id', id)
     .eq('organizationId', orgId)
@@ -126,78 +119,143 @@ async function loadDocument(id: string, orgId: string): Promise<DocRow> {
   return data as DocRow;
 }
 
-const DEFAULT_COVER_HTML =
-  '<p>Please review the attached NDA. You\'ve been granted edit access in Google Docs.</p>';
+// metadata.source value written by legalDocImportGdocService for a "bring your
+// own Google Doc" import. Kept in sync with IMPORTED_GDOC_SOURCE there; an
+// imported doc reuses its existing googleDocId instead of creating a new Doc.
+const IMPORTED_GDOC_SOURCE = 'imported-gdoc';
 
-function buildEmailHtml(coverHtml: string, docUrl: string): string {
-  // Plain inline-styled "button" — Gmail renders the HTML as-is, and we
-  // want this to look acceptable in Gmail/Outlook without external CSS.
-  const button =
-    `<p style="margin:24px 0;">` +
-    `<a href="${docUrl}" ` +
-    `style="display:inline-block;padding:12px 24px;background:#1a73e8;` +
-    `color:#ffffff;text-decoration:none;border-radius:4px;font-weight:600;` +
-    `font-family:Arial,Helvetica,sans-serif;">Open the NDA in Google Docs</a>` +
-    `</p>` +
-    `<p style="color:#6b7280;font-size:13px;font-family:Arial,Helvetica,sans-serif;">` +
-    `Or paste this link into your browser: <a href="${docUrl}">${docUrl}</a>` +
-    `</p>`;
-  return `${coverHtml}\n${button}`;
+interface ShareAndEmailArgs {
+  doc: DocRow;
+  organizationId: string;
+  accessToken: string;
+  recipient: string;
+  dealLabel: string;
+  senderEmailHint?: string;
+  subject?: string;
+  message?: string;
+  // The Doc the counterparty edits + the link we email. For a composed NDA
+  // this is the just-created Doc; for an imported one it's the user's own Doc.
+  googleDocId: string;
+  googleDocUrl: string;
+  // Substituted HTML to snapshot, or null for an imported doc (no in-app HTML
+  // exists, so there is nothing to snapshot and we must not touch the column).
+  contentSnapshot: string | null;
+  // When true, persist googleDocId/googleDocUrl on the row (composed path,
+  // where the Doc was just created). Imported docs already have these saved
+  // at import time, so we leave them untouched.
+  persistDocIds: boolean;
 }
 
-function mapDriveErrorToSendError(
-  err: unknown,
-  stage: 'create' | 'permission',
-): LegalDocSendError {
-  if (err instanceof GoogleDriveError) {
-    if (err.code === 'INVALID_TOKEN' || err.code === 'INSUFFICIENT_SCOPE') {
-      return new LegalDocSendError(
-        'GOOGLE_SCOPES_MISSING',
-        'Google connection lacks Drive/Docs scope — please reconnect Google Workspace',
-        409,
-        err.details ?? err.message,
-      );
-    }
-    return new LegalDocSendError(
-      'DRIVE_API_ERROR',
-      `Drive ${stage} call failed: ${err.message}`,
-      502,
-      err.details ?? err.message,
-    );
-  }
-  const message = err instanceof Error ? err.message : String(err);
-  return new LegalDocSendError(
-    'DRIVE_API_ERROR',
-    `Drive ${stage} call failed`,
-    502,
-    message,
-  );
-}
+/**
+ * Shared "share + resolve sender + email + persist" tail used by both the
+ * composed-NDA and imported-Google-Doc send paths. Grants the recipient
+ * writer access, resolves the sender mailbox, emails the Doc link via Gmail,
+ * then flips the row to SENT. Keeps sendLegalDocument under the 500-line cap.
+ */
+async function shareResolveEmailAndPersist(
+  args: ShareAndEmailArgs,
+): Promise<{ gmailMessageId: string | null; senderEmail: string | null; sentAt: string }> {
+  const {
+    doc,
+    organizationId,
+    accessToken,
+    recipient,
+    dealLabel,
+    googleDocId,
+    googleDocUrl,
+    contentSnapshot,
+    persistDocIds,
+  } = args;
 
-function mapGmailErrorToSendError(err: unknown): LegalDocSendError {
-  if (err instanceof GoogleGmailError) {
-    if (err.code === 'INVALID_TOKEN' || err.code === 'INSUFFICIENT_SCOPE') {
-      return new LegalDocSendError(
-        'GOOGLE_SCOPES_MISSING',
-        'Google connection lacks Gmail send scope — please reconnect Google Workspace',
-        409,
-        err.details ?? err.message,
-      );
-    }
-    return new LegalDocSendError(
-      'EMAIL_SEND_FAILED',
-      `Gmail send failed: ${err.message}`,
-      502,
-      err.details ?? err.message,
-    );
+  // ── Grant the counterparty writer access ────────────────────────────
+  try {
+    await setDocPermission(accessToken, googleDocId, recipient, 'writer');
+  } catch (err) {
+    log.error('legalDocSendService: setDocPermission failed', err, {
+      documentId: doc.id,
+      googleDocId,
+    });
+    throw mapDriveErrorToSendError(err, 'permission');
   }
-  const message = err instanceof Error ? err.message : String(err);
-  return new LegalDocSendError(
-    'EMAIL_SEND_FAILED',
-    'Gmail send failed',
-    502,
-    message,
-  );
+
+  // ── Resolve sender's mailbox address ────────────────────────────────
+  // Prefer the JWT-supplied email (free); only round-trip to Gmail's
+  // profile endpoint if it's missing.
+  let senderEmail: string | null = args.senderEmailHint?.trim() || null;
+  if (!senderEmail) {
+    try {
+      const profile = await getMyProfile(accessToken);
+      senderEmail = profile.emailAddress;
+    } catch (err) {
+      // Profile fetch is best-effort — log and continue so a transient
+      // failure here doesn't block the send.
+      log.warn('legalDocSendService: getMyProfile failed (continuing)', {
+        documentId: doc.id,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // ── Email the Doc link via Gmail (from the user's own mailbox) ──────
+  // `From:` is set by Gmail automatically to the authenticated user.
+  // `Reply-To:` is omitted — replies naturally go to From, which is
+  // already the sender's address.
+  const subject = args.subject?.trim() || `${dealLabel} — NDA`;
+  const coverHtml = (args.message && args.message.trim()) || DEFAULT_COVER_HTML;
+  const html = buildEmailHtml(coverHtml, googleDocUrl);
+
+  let gmailMessageId: string | null = null;
+  try {
+    const sent = await sendMail(accessToken, { to: recipient, subject, html });
+    gmailMessageId = sent.id;
+    log.info('legalDocSendService: gmail send ok', {
+      documentId: doc.id,
+      googleDocId,
+      gmailMessageId,
+      senderEmail,
+    });
+  } catch (err) {
+    log.error('legalDocSendService: gmail send failed', err, {
+      documentId: doc.id,
+      googleDocId,
+    });
+    throw mapGmailErrorToSendError(err);
+  }
+
+  // ── Persist final state ─────────────────────────────────────────────
+  const sentAt = new Date().toISOString();
+  const update: Record<string, unknown> = {
+    status: 'SENT',
+    sentAt,
+    sentToEmail: recipient,
+    updatedAt: sentAt,
+  };
+  if (persistDocIds) {
+    // Snapshot the SUBSTITUTED output (what we actually pushed to the
+    // Google Doc), not the raw editable draft. This is the wording the
+    // counterparty sees — any later "view sent snapshot" must reflect
+    // that exact text, including the resolved token values. Imported docs
+    // have no in-app HTML, so contentSnapshot stays null + we skip both.
+    update.contentSnapshot = contentSnapshot;
+    update.googleDocId = googleDocId;
+    update.googleDocUrl = googleDocUrl;
+  }
+  const { error: updateErr } = await supabase
+    .from('LegalDocument')
+    .update(update)
+    .eq('id', doc.id)
+    .eq('organizationId', organizationId);
+  if (updateErr) {
+    // The Doc was shared + the email went out — log loudly but don't
+    // throw. Next list-fetch will resolve eventual consistency.
+    log.error('legalDocSendService: failed to update status after send', updateErr, {
+      documentId: doc.id,
+      googleDocId,
+      gmailMessageId,
+    });
+  }
+
+  return { gmailMessageId, senderEmail, sentAt };
 }
 
 export async function sendLegalDocument(
@@ -220,7 +278,15 @@ export async function sendLegalDocument(
     };
   }
 
-  if (!doc.content || !doc.content.trim()) {
+  // Imported-Google-Doc rows have NO in-app HTML — they reuse a Doc the user
+  // already prepared in their own Drive (metadata.source === 'imported-gdoc',
+  // written by legalDocImportGdocService). For those we skip the NO_CONTENT
+  // check + the createDocFromHtml call entirely and reuse the saved Doc.
+  const isImportedGdoc =
+    !!doc.googleDocId &&
+    (doc.metadata as { source?: string } | null)?.source === IMPORTED_GDOC_SOURCE;
+
+  if (!isImportedGdoc && (!doc.content || !doc.content.trim())) {
     throw new LegalDocSendError(
       'NO_CONTENT',
       'Document has no HTML content to send',
@@ -256,6 +322,38 @@ export async function sendLegalDocument(
   const org = await loadOrgForLegalDoc(input.organizationId);
   const dealLabel = resolveDealLabel(deal, doc.title);
 
+  // ── Imported-Google-Doc path ────────────────────────────────────────
+  // Reuse the user's own Doc (already saved on the row at import time). No
+  // HTML, no createDocFromHtml, no token substitution, no snapshot — just
+  // share + email + flip to SENT via the shared tail.
+  if (isImportedGdoc) {
+    const googleDocId = doc.googleDocId as string;
+    const googleDocUrl = (doc.googleDocUrl ?? '') || googleDocId;
+    const tail = await shareResolveEmailAndPersist({
+      doc,
+      organizationId: input.organizationId,
+      accessToken,
+      recipient,
+      dealLabel,
+      senderEmailHint: input.senderEmailHint,
+      subject: input.subject,
+      message: input.message,
+      googleDocId,
+      googleDocUrl,
+      contentSnapshot: null,
+      persistDocIds: false,
+    });
+    return {
+      ok: true,
+      googleDocId,
+      googleDocUrl,
+      messageId: tail.gmailMessageId,
+      gmailMessageId: tail.gmailMessageId,
+      senderEmail: tail.senderEmail,
+      sentAt: tail.sentAt,
+    };
+  }
+
   // ── Two-stage token substitution ────────────────────────────────────
   // Tokens are also substituted at CREATE time (see
   // routes/legal-documents.ts POST handler) against the create-form
@@ -282,7 +380,9 @@ export async function sendLegalDocument(
     FIRM_NAME: org?.name ?? '',
     TODAY: todayIso,
   };
-  const substitutedContent = substituteTokens(doc.content, tokenValues);
+  // `doc.content` is guaranteed non-null here — the NO_CONTENT check above
+  // only skips for the imported path, which already returned.
+  const substitutedContent = substituteTokens(doc.content as string, tokenValues);
 
   // ── Create the Google Doc ───────────────────────────────────────────
   let createdDoc: { id: string; webViewLink: string };
@@ -295,89 +395,21 @@ export async function sendLegalDocument(
     throw mapDriveErrorToSendError(err, 'create');
   }
 
-  // ── Grant the counterparty writer access ────────────────────────────
-  try {
-    await setDocPermission(accessToken, createdDoc.id, recipient, 'writer');
-  } catch (err) {
-    log.error('legalDocSendService: setDocPermission failed', err, {
-      documentId: doc.id,
-      googleDocId: createdDoc.id,
-    });
-    throw mapDriveErrorToSendError(err, 'permission');
-  }
-
-  // ── Resolve sender's mailbox address ────────────────────────────────
-  // Prefer the JWT-supplied email (free); only round-trip to Gmail's
-  // profile endpoint if it's missing.
-  let senderEmail: string | null = input.senderEmailHint?.trim() || null;
-  if (!senderEmail) {
-    try {
-      const profile = await getMyProfile(accessToken);
-      senderEmail = profile.emailAddress;
-    } catch (err) {
-      // Profile fetch is best-effort — log and continue so a transient
-      // failure here doesn't block the send.
-      log.warn('legalDocSendService: getMyProfile failed (continuing)', {
-        documentId: doc.id,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  // ── Email the Doc link via Gmail (from the user's own mailbox) ──────
-  // `From:` is set by Gmail automatically to the authenticated user.
-  // `Reply-To:` is omitted — replies naturally go to From, which is
-  // already the sender's address.
-  const subject = input.subject?.trim() || `${dealLabel} — NDA`;
-  const coverHtml = (input.message && input.message.trim()) || DEFAULT_COVER_HTML;
-  const html = buildEmailHtml(coverHtml, createdDoc.webViewLink);
-
-  let gmailMessageId: string | null = null;
-  try {
-    const sent = await sendMail(accessToken, { to: recipient, subject, html });
-    gmailMessageId = sent.id;
-    log.info('legalDocSendService: gmail send ok', {
-      documentId: doc.id,
-      googleDocId: createdDoc.id,
-      gmailMessageId,
-      senderEmail,
-    });
-  } catch (err) {
-    log.error('legalDocSendService: gmail send failed', err, {
-      documentId: doc.id,
-      googleDocId: createdDoc.id,
-    });
-    throw mapGmailErrorToSendError(err);
-  }
-
-  // ── Persist final state ─────────────────────────────────────────────
-  const sentAt = new Date().toISOString();
-  const { error: updateErr } = await supabase
-    .from('LegalDocument')
-    .update({
-      status: 'SENT',
-      sentAt,
-      sentToEmail: recipient,
-      // Snapshot the SUBSTITUTED output (what we actually pushed to the
-      // Google Doc), not the raw editable draft. This is the wording the
-      // counterparty sees — any later "view sent snapshot" must reflect
-      // that exact text, including the resolved token values.
-      contentSnapshot: substitutedContent,
-      googleDocId: createdDoc.id,
-      googleDocUrl: createdDoc.webViewLink,
-      updatedAt: sentAt,
-    })
-    .eq('id', doc.id)
-    .eq('organizationId', input.organizationId);
-  if (updateErr) {
-    // The Doc was created + the email went out — log loudly but don't
-    // throw. Next list-fetch will resolve eventual consistency.
-    log.error('legalDocSendService: failed to update status after send', updateErr, {
-      documentId: doc.id,
-      googleDocId: createdDoc.id,
-      gmailMessageId,
-    });
-  }
+  // ── Share + resolve sender + email + persist (shared tail) ──────────
+  const tail = await shareResolveEmailAndPersist({
+    doc,
+    organizationId: input.organizationId,
+    accessToken,
+    recipient,
+    dealLabel,
+    senderEmailHint: input.senderEmailHint,
+    subject: input.subject,
+    message: input.message,
+    googleDocId: createdDoc.id,
+    googleDocUrl: createdDoc.webViewLink,
+    contentSnapshot: substitutedContent,
+    persistDocIds: true,
+  });
 
   // ─── DISABLED UNTIL PROD (Drive push signature detection) ───────────────
   // files.watch push needs a GCP-domain-verified HTTPS callback; *.vercel.app
@@ -402,9 +434,9 @@ export async function sendLegalDocument(
     ok: true,
     googleDocId: createdDoc.id,
     googleDocUrl: createdDoc.webViewLink,
-    messageId: gmailMessageId,
-    gmailMessageId,
-    senderEmail,
-    sentAt,
+    messageId: tail.gmailMessageId,
+    gmailMessageId: tail.gmailMessageId,
+    senderEmail: tail.senderEmail,
+    sentAt: tail.sentAt,
   };
 }

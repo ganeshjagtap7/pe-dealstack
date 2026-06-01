@@ -30,6 +30,10 @@ import {
   LegalDocSendError,
 } from '../services/legalDocSendService.js';
 import { makeUploadLegalDocumentHandler } from '../services/legalDocImportService.js';
+import {
+  importGoogleDoc,
+  LegalDocImportGdocError,
+} from '../services/legalDocImportGdocService.js';
 import { loadDealForLegalDoc, loadOrgForLegalDoc } from '../services/legalDocLookups.js';
 import {
   requestLegalDocSignature,
@@ -71,6 +75,19 @@ const createBodySchema = z.object({
   counterpartyAddress: z.string().max(2000).optional(),
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   jurisdiction: z.string().max(500).optional(),
+});
+
+// Import-an-existing-Google-Doc body. `url` accepts a full Doc URL or a bare
+// file id (parsing/validation of the id happens in the import service so the
+// 400 INVALID_GDOC_URL code is owned in one place).
+const importGdocBodySchema = z.object({
+  url: z.string().min(1).max(2000),
+  title: z.string().min(1).max(500).optional(),
+  counterpartyName: z.string().max(500).optional(),
+  counterpartyEmail: z.string().email().max(500).optional(),
+  counterpartyAddress: z.string().max(2000).optional(),
+  jurisdiction: z.string().max(500).optional(),
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 const patchBodySchema = z
@@ -335,6 +352,61 @@ router.post(
   upload.single('file'),
   makeUploadLegalDocumentHandler({ resolveInternalUserId }),
 );
+
+// ============================================================
+// POST /deals/:dealId/legal-documents/import-gdoc — import existing Google Doc
+// ============================================================
+//
+// "Bring your own Google Doc": the user pastes the URL of a Doc they already
+// prepared in their own Drive (with an eSignature field added manually in the
+// Docs UI). We import a reference to it; /send later shares + emails THAT doc
+// instead of creating a new one. Signature polling works on any row with a
+// googleDocId, so detection comes for free. Mounted here (before the literal
+// `/legal-documents/:id...` routes) so the path segment isn't matched as `:id`.
+router.post('/deals/:dealId/legal-documents/import-gdoc', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const { dealId } = req.params;
+    const deal = await loadDealForLegalDoc(dealId, orgId);
+    if (!deal) return res.status(404).json({ error: 'Deal not found' });
+
+    const parsed = importGdocBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'Invalid data', details: parsed.error.errors });
+    }
+
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const internalUserId = await resolveInternalUserId(req.user.id);
+    if (!internalUserId) return res.status(404).json({ error: 'User not found' });
+
+    const inserted = await importGoogleDoc({
+      dealId,
+      organizationId: orgId,
+      userId: internalUserId,
+      url: parsed.data.url,
+      title: parsed.data.title,
+      counterpartyName: parsed.data.counterpartyName,
+      counterpartyEmail: parsed.data.counterpartyEmail,
+      counterpartyAddress: parsed.data.counterpartyAddress,
+      jurisdiction: parsed.data.jurisdiction,
+      effectiveDate: parsed.data.effectiveDate,
+    });
+
+    res.status(201).json(inserted);
+  } catch (err) {
+    if (err instanceof LegalDocImportGdocError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        details: err.details,
+      });
+    }
+    log.error('POST /api/deals/:dealId/legal-documents/import-gdoc error', err);
+    res.status(500).json({ error: 'Failed to import Google Doc' });
+  }
+});
 
 // ============================================================
 // POST /legal-documents/check-signatures — on-demand poll

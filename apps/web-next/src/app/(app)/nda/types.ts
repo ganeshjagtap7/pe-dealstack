@@ -71,6 +71,25 @@ export interface LegalDocumentWithDeal extends LegalDocument {
   };
 }
 
+// Marker stamped on `metadata.source` by the import-gdoc flow. Docs the user
+// brought in by pasting a Google Doc URL (vs. drafted from a template or
+// uploaded as a file). These have `content: null` and render in
+// GoogleDocImportView (embedded preview + open-externally) instead of the HTML
+// editor, which doesn't apply to a doc that lives entirely in Google Docs.
+export const IMPORTED_GDOC_SOURCE = "imported-gdoc" as const;
+
+// True when a document was imported via the "bring your own Google Doc" flow.
+// Use this everywhere instead of inlining the metadata.source string so the
+// magic value stays in one place (and stays in sync with the backend marker).
+export function isImportedGdoc(
+  doc: Pick<LegalDocument, "metadata">,
+): boolean {
+  return (
+    (doc.metadata as { source?: string } | undefined)?.source ===
+    IMPORTED_GDOC_SOURCE
+  );
+}
+
 // A reusable HTML template, uploaded once and reused per NDA. The
 // `verifiedAt` field is null between parse-time and the user clicking "Save
 // Template" in the verifier — only verified rows are surfaced as picker

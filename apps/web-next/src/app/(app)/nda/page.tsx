@@ -9,13 +9,16 @@ import { CreateDocModal } from "./CreateDocModal";
 import { DealPicker, type PickableDeal } from "./DealPicker";
 import { FullEditPage } from "./FullEditPage";
 import { Gallery } from "./Gallery";
+import { GoogleDocImportView } from "./GoogleDocImportView";
+import { ImportGoogleDocFlow } from "./ImportGoogleDocFlow";
 import { TemplatePicker } from "./TemplatePicker";
 import { TemplateUploadFlow } from "./TemplateUploadFlow";
 import { UploadExistingFlow } from "./UploadExistingFlow";
-import type {
-  LegalDocTemplate,
-  LegalDocument,
-  LegalDocumentWithDeal,
+import {
+  isImportedGdoc,
+  type LegalDocTemplate,
+  type LegalDocument,
+  type LegalDocumentWithDeal,
 } from "./types";
 
 // State machine:
@@ -25,7 +28,11 @@ import type {
 //   - "uploadTemplate":  inline template upload + verifier (no settings detour)
 //   - "create":          counterparty form (template + deal locked in)
 //   - "uploadExisting":  3-step import flow for an NDA done outside this app
-//   - "edit":            full-screen editor for an existing row
+//   - "importGdoc":      2-step "bring your own Google Doc" import flow
+//   - "edit":            full-screen editor for an existing (template/file) row
+//   - "gdocView":        post-import view for an imported-gdoc row (preview +
+//                        open-externally + send) — used instead of "edit"
+//                        because imported docs have content: null
 type View =
   | { mode: "gallery" }
   | { mode: "picker" }
@@ -38,7 +45,9 @@ type View =
       template: LegalDocTemplate;
     }
   | { mode: "uploadExisting" }
-  | { mode: "edit"; doc: LegalDocumentWithDeal };
+  | { mode: "importGdoc" }
+  | { mode: "edit"; doc: LegalDocumentWithDeal }
+  | { mode: "gdocView"; doc: LegalDocumentWithDeal };
 
 export default function NdaPage() {
   const { showToast } = useToast();
@@ -199,7 +208,19 @@ export default function NdaPage() {
     setView({ mode: "uploadExisting" });
   }
 
+  function handleImportGdoc() {
+    // Bring-your-own-Google-Doc also skips the template gate — the linked Doc
+    // is the source of truth.
+    setView({ mode: "importGdoc" });
+  }
+
   function handleEdit(doc: LegalDocumentWithDeal) {
+    // Imported Google Docs have content: null and live entirely in Drive, so
+    // the HTML editor doesn't apply — route them to the preview/send view.
+    if (isImportedGdoc(doc)) {
+      setView({ mode: "gdocView", doc });
+      return;
+    }
     setView({ mode: "edit", doc });
   }
 
@@ -280,6 +301,41 @@ export default function NdaPage() {
     loadDocs();
   }
 
+  function handleGdocImported(doc: LegalDocument) {
+    // Mirrors handleImported but routes into the gdocView (preview + send)
+    // instead of the HTML editor — imported Google Docs have content: null.
+    // Deal label isn't on hand here (the flow owns it); loadDocs refreshes
+    // with the canonical deal join shortly after.
+    const withDeal: LegalDocumentWithDeal = {
+      ...doc,
+      deal: { id: doc.dealId, target: null, projectName: null },
+    };
+    setDocs((ds) => [withDeal, ...ds]);
+    showToast(`Imported "${doc.title}"`, "success");
+    setView({ mode: "gdocView", doc: withDeal });
+    loadDocs();
+  }
+
+  function handleGdocSent(updated: LegalDocumentWithDeal) {
+    // Echo the post-send row into the list + keep the gdocView open with the
+    // freshest data (status now SENT). Preserve the existing deal join.
+    setDocs((ds) =>
+      ds.map((d) =>
+        d.id === updated.id ? { ...d, ...updated, deal: d.deal } : d,
+      ),
+    );
+    setView((v) => {
+      if (v.mode !== "gdocView") return v;
+      return {
+        mode: "gdocView",
+        doc: { ...v.doc, ...updated, deal: v.doc.deal },
+      };
+    });
+    // Refresh so the canonical row (sentAt, googleDoc*) replaces our optimistic
+    // copy; the signature poll also runs via the existing focus/visibility path.
+    loadDocs();
+  }
+
   function handleSaved(updated: LegalDocument) {
     setDocs((ds) =>
       ds.map((d) => (d.id === updated.id ? { ...d, ...updated, deal: d.deal } : d)),
@@ -306,6 +362,18 @@ export default function NdaPage() {
     );
   }
 
+  // Imported Google Docs get their own full-screen view (embedded preview +
+  // open-externally + send) instead of the HTML editor.
+  if (view.mode === "gdocView") {
+    return (
+      <GoogleDocImportView
+        doc={view.doc}
+        onBack={() => setView({ mode: "gallery" })}
+        onSent={handleGdocSent}
+      />
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto bg-slate-50 text-slate-900">
       <Gallery
@@ -314,6 +382,7 @@ export default function NdaPage() {
         error={error}
         onCreate={handleCreate}
         onUploadExisting={handleUploadExisting}
+        onImportGdoc={handleImportGdoc}
         onEdit={handleEdit}
         onDelete={handleDeleteRequest}
         onDismissError={() => setError(null)}
@@ -359,6 +428,13 @@ export default function NdaPage() {
         <UploadExistingFlow
           onCancel={() => setView({ mode: "gallery" })}
           onCreated={handleImported}
+        />
+      )}
+
+      {view.mode === "importGdoc" && (
+        <ImportGoogleDocFlow
+          onCancel={() => setView({ mode: "gallery" })}
+          onImported={handleGdocImported}
         />
       )}
 

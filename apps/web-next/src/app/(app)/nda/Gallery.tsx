@@ -3,59 +3,8 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { DOC_TYPE_LABELS, STATUS_COLOR_CLASSES, STATUS_LABELS } from "./constants";
-import type { DocStatus, LegalDocumentWithDeal } from "./types";
-
-interface CreateTileProps {
-  onClick: () => void;
-}
-
-function CreateTile({ onClick }: CreateTileProps) {
-  return (
-    <button
-      onClick={onClick}
-      className="group relative aspect-[4/3] rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/40 hover:border-[#003366] hover:bg-[#E6EEF5]/60 transition flex items-center justify-center"
-    >
-      <div className="flex flex-col items-center justify-center gap-3 px-6 py-6 rounded-lg border-2 border-dashed border-slate-300 group-hover:border-[#003366] transition">
-        <div className="w-11 h-11 rounded-full bg-white border border-slate-200 group-hover:border-[#003366] flex items-center justify-center text-slate-500 group-hover:text-[#003366] shadow-sm">
-          <span className="material-symbols-outlined text-[24px]">add</span>
-        </div>
-        <div className="text-sm font-medium text-slate-700 group-hover:text-[#003366]">
-          New NDA
-        </div>
-        <div className="text-[11px] text-slate-400 -mt-1.5">
-          Draft a fresh NDA from one of your verified templates
-        </div>
-      </div>
-    </button>
-  );
-}
-
-interface UploadExistingTileProps {
-  status: "SENT" | "SIGNED";
-  onClick: () => void;
-}
-
-function UploadExistingTile({ status, onClick }: UploadExistingTileProps) {
-  const verb = status === "SENT" ? "sent" : "signed";
-  return (
-    <button
-      onClick={onClick}
-      className="group relative aspect-[4/3] rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/40 hover:border-[#003366] hover:bg-[#E6EEF5]/60 transition flex items-center justify-center"
-    >
-      <div className="flex flex-col items-center justify-center gap-3 px-6 py-6 rounded-lg border-2 border-dashed border-slate-300 group-hover:border-[#003366] transition">
-        <div className="w-11 h-11 rounded-full bg-white border border-slate-200 group-hover:border-[#003366] flex items-center justify-center text-slate-500 group-hover:text-[#003366] shadow-sm">
-          <span className="material-symbols-outlined text-[24px]">upload_file</span>
-        </div>
-        <div className="text-sm font-medium text-slate-700 group-hover:text-[#003366]">
-          Upload Existing NDA
-        </div>
-        <div className="text-[11px] text-slate-400 -mt-1.5 px-4 text-center leading-snug">
-          Import an NDA already {verb} outside this app
-        </div>
-      </div>
-    </button>
-  );
-}
+import { CreateTile, ImportGdocTile, UploadExistingTile } from "./GalleryTiles";
+import { isImportedGdoc, type DocStatus, type LegalDocumentWithDeal } from "./types";
 
 interface DocCardProps {
   doc: LegalDocumentWithDeal;
@@ -98,6 +47,13 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
       (doc.metadata as { signatureDetectedVia?: string } | undefined)
         ?.signatureDetectedVia,
     );
+  // "Bring your own Google Doc" rows get a slate chip so the user can tell at a
+  // glance the NDA lives in Drive (and clicking opens the preview view, not the
+  // HTML editor). Only show it when the two emerald badges above aren't already
+  // claiming the bottom-left corner — they're more specific signals.
+  const importedGdoc = isImportedGdoc(doc);
+  const showImportedChip =
+    importedGdoc && !hasGoogleDoc && !autoDetectedSignature;
 
   return (
     <div className="group relative aspect-[4/3] rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">
@@ -128,6 +84,16 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
         >
           <span className="material-symbols-outlined text-[12px]">verified</span>
           Signed · auto-detected
+        </div>
+      )}
+
+      {showImportedChip && (
+        <div
+          className="absolute bottom-2 left-2 z-10 inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 pointer-events-none"
+          title="Imported from a Google Doc — opens an embedded preview, not the HTML editor"
+        >
+          <span className="material-symbols-outlined text-[12px]">cloud_done</span>
+          Google Doc
         </div>
       )}
 
@@ -255,6 +221,7 @@ interface GalleryProps {
   error: string | null;
   onCreate: () => void;
   onUploadExisting: () => void;
+  onImportGdoc: () => void;
   onEdit: (doc: LegalDocumentWithDeal) => void;
   onDelete: (doc: LegalDocumentWithDeal) => void;
   onDismissError: () => void;
@@ -266,6 +233,7 @@ export function Gallery({
   error,
   onCreate,
   onUploadExisting,
+  onImportGdoc,
   onEdit,
   onDelete,
   onDismissError,
@@ -358,6 +326,10 @@ export function Gallery({
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         {showCreateTile && <CreateTile onClick={onCreate} />}
+        {/* The import-gdoc entry sits with the New NDA tile (drafts/all) since
+            importing then sending is a draft-creation path, not an archive of
+            something already done. */}
+        {showCreateTile && <ImportGdocTile onClick={onImportGdoc} />}
         {uploadCtaStatus && (
           <UploadExistingTile status={uploadCtaStatus} onClick={onUploadExisting} />
         )}
