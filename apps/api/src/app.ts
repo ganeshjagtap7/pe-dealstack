@@ -42,6 +42,7 @@ import dealsTrashRouter from './routes/deals-trash.js';
 import organizationsRouter from './routes/organizations.js';
 import orgStaffWebhookRouter from './routes/org-staff-webhook.js';
 import authSessionsRouter from './routes/auth-sessions.js';
+import authWorkspaceEmailRouter from './routes/auth-workspace-email.js';
 import adminSecurityRouter from './routes/admin-security.js';
 import adminSecurityDashboardRouter from './routes/admin-security-dashboard.js';
 import internalRouter from './routes/internal-usage.js';
@@ -336,6 +337,7 @@ app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddl
 app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, adminSecurityRouter);
 // Auth-scoped self-service routes (MFA bypass active for /api/auth/* in middleware)
 app.use('/api/auth', authMiddleware, authSessionsRouter);
+app.use('/api/auth', authMiddleware, authWorkspaceEmailRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
