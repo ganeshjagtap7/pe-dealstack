@@ -28,6 +28,14 @@ import {
 import { GoogleDriveError } from '../integrations/googleDrive/types.js';
 import { sendMail, getMyProfile } from '../integrations/googleGmail/client.js';
 import { GoogleGmailError } from '../integrations/googleGmail/types.js';
+import {
+  substituteTokens,
+  type LegalDocTokenValues,
+} from './legalDocSubstituteService.js';
+import {
+  loadDealForLegalDoc,
+  loadOrgForLegalDoc,
+} from './legalDocLookups.js';
 
 export type LegalDocSendErrorCode =
   | 'GOOGLE_NOT_CONNECTED'
@@ -80,6 +88,9 @@ interface DocRow {
   content: string | null;
   counterpartyName: string | null;
   counterpartyEmail: string | null;
+  counterpartyAddress: string | null;
+  jurisdiction: string | null;
+  effectiveDate: string | null;
   status: string;
   googleDocId: string | null;
   googleDocUrl: string | null;
@@ -87,22 +98,19 @@ interface DocRow {
   sentToEmail: string | null;
 }
 
-interface DealRow {
-  id: string;
-  name: string | null;
-  companyName: string | null;
-}
-
-function resolveDealLabel(deal: DealRow | null, fallbackTitle: string): string {
+function resolveDealLabel(
+  deal: { name: string | null; company: { name: string | null } | null } | null,
+  fallbackTitle: string,
+): string {
   if (!deal) return fallbackTitle;
-  return deal.name ?? deal.companyName ?? fallbackTitle;
+  return deal.name ?? deal.company?.name ?? fallbackTitle;
 }
 
 async function loadDocument(id: string, orgId: string): Promise<DocRow> {
   const { data, error } = await supabase
     .from('LegalDocument')
     .select(
-      'id, organizationId, dealId, title, content, counterpartyName, counterpartyEmail, status, googleDocId, googleDocUrl, sentAt, sentToEmail',
+      'id, organizationId, dealId, title, content, counterpartyName, counterpartyEmail, counterpartyAddress, jurisdiction, effectiveDate, status, googleDocId, googleDocUrl, sentAt, sentToEmail',
     )
     .eq('id', id)
     .eq('organizationId', orgId)
@@ -114,15 +122,6 @@ async function loadDocument(id: string, orgId: string): Promise<DocRow> {
     throw new LegalDocSendError('DOCUMENT_NOT_FOUND', 'Legal document not found', 404);
   }
   return data as DocRow;
-}
-
-async function loadDeal(dealId: string): Promise<DealRow | null> {
-  const { data } = await supabase
-    .from('Deal')
-    .select('id, name, companyName')
-    .eq('id', dealId)
-    .maybeSingle();
-  return (data as DealRow | null) ?? null;
 }
 
 const DEFAULT_COVER_HTML =
@@ -251,13 +250,42 @@ export async function sendLegalDocument(
     );
   }
 
-  const deal = await loadDeal(doc.dealId);
+  const deal = await loadDealForLegalDoc(doc.dealId, input.organizationId);
+  const org = await loadOrgForLegalDoc(input.organizationId);
   const dealLabel = resolveDealLabel(deal, doc.title);
+
+  // ── Two-stage token substitution ────────────────────────────────────
+  // Tokens are also substituted at CREATE time (see
+  // routes/legal-documents.ts POST handler) against the create-form
+  // values. We re-substitute here against the LIVE LegalDocument row +
+  // current deal/org metadata so that:
+  //   (a) tokens the user typed into the editor AFTER create
+  //       (e.g. they hand-inserted "[COUNTERPARTY_NAME]" themselves)
+  //       get replaced.
+  //   (b) tokens whose values were blank at create time but filled in
+  //       later via PATCH (e.g. counterparty email was unknown initially)
+  //       get the current value.
+  //   (c) TODAY always reflects the send date, not the create date.
+  // The live `content` column is left untouched — the user keeps their
+  // tokens visible in the editor for repeated sends. Only the snapshot
+  // + the Google Doc body see the substituted output.
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const tokenValues: LegalDocTokenValues = {
+    COUNTERPARTY_NAME: doc.counterpartyName ?? '',
+    COUNTERPARTY_ADDRESS: doc.counterpartyAddress ?? '',
+    COUNTERPARTY_EMAIL: doc.counterpartyEmail ?? '',
+    EFFECTIVE_DATE: doc.effectiveDate ?? '',
+    JURISDICTION: doc.jurisdiction ?? '',
+    DEAL_NAME: deal?.name ?? deal?.company?.name ?? '',
+    FIRM_NAME: org?.name ?? '',
+    TODAY: todayIso,
+  };
+  const substitutedContent = substituteTokens(doc.content, tokenValues);
 
   // ── Create the Google Doc ───────────────────────────────────────────
   let createdDoc: { id: string; webViewLink: string };
   try {
-    createdDoc = await createDocFromHtml(accessToken, doc.title, doc.content);
+    createdDoc = await createDocFromHtml(accessToken, doc.title, substitutedContent);
   } catch (err) {
     log.error('legalDocSendService: createDocFromHtml failed', err, {
       documentId: doc.id,
@@ -328,7 +356,11 @@ export async function sendLegalDocument(
       status: 'SENT',
       sentAt,
       sentToEmail: recipient,
-      contentSnapshot: doc.content,
+      // Snapshot the SUBSTITUTED output (what we actually pushed to the
+      // Google Doc), not the raw editable draft. This is the wording the
+      // counterparty sees — any later "view sent snapshot" must reflect
+      // that exact text, including the resolved token values.
+      contentSnapshot: substitutedContent,
       googleDocId: createdDoc.id,
       googleDocUrl: createdDoc.webViewLink,
       updatedAt: sentAt,

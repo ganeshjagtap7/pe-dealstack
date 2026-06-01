@@ -29,9 +29,12 @@ import {
   sendLegalDocument,
   LegalDocSendError,
 } from '../services/legalDocSendService.js';
+import { makeUploadLegalDocumentHandler } from '../services/legalDocImportService.js';
+import { loadDealForLegalDoc, loadOrgForLegalDoc } from '../services/legalDocLookups.js';
 import {
-  makeUploadLegalDocumentHandler,
-} from '../services/legalDocImportService.js';
+  requestLegalDocSignature,
+  LegalDocSignatureError,
+} from '../services/legalDocSignatureService.js';
 
 // 25 MB cap mirrors the template-parse upload — the underlying parser is
 // shared and rejects anything it can't decode with INVALID_FILE_FORMAT.
@@ -112,21 +115,6 @@ interface TemplateRow {
   verifiedAt: string | null;
 }
 
-interface DealRow {
-  id: string;
-  name: string | null;
-  // Company name lives on the separate Company table joined via Deal's FK
-  // — Deal itself has no companyName column (same gotcha that broke the
-  // cross-deal GET join earlier).
-  company: { name: string | null } | null;
-  organizationId: string;
-}
-
-interface OrgRow {
-  id: string;
-  name: string | null;
-}
-
 async function loadTemplate(templateId: string, orgId: string): Promise<TemplateRow | null> {
   const { data, error } = await supabase
     .from('LegalDocTemplate')
@@ -138,26 +126,8 @@ async function loadTemplate(templateId: string, orgId: string): Promise<Template
   return (data as TemplateRow | null) ?? null;
 }
 
-async function loadDeal(dealId: string, orgId: string): Promise<DealRow | null> {
-  const { data, error } = await supabase
-    .from('Deal')
-    .select('id, name, organizationId, company:Company(name)')
-    .eq('id', dealId)
-    .eq('organizationId', orgId)
-    .maybeSingle();
-  if (error) throw error;
-  return (data as DealRow | null) ?? null;
-}
-
-async function loadOrg(orgId: string): Promise<OrgRow | null> {
-  const { data, error } = await supabase
-    .from('Organization')
-    .select('id, name')
-    .eq('id', orgId)
-    .maybeSingle();
-  if (error) throw error;
-  return (data as OrgRow | null) ?? null;
-}
+// Deal + Org loaders are shared with the send/signature service paths via
+// ../services/legalDocLookups.js (token-substitution row shape).
 
 // ============================================================
 // GET /legal-documents — cross-deal list, org-scoped
@@ -265,7 +235,7 @@ router.post('/deals/:dealId/legal-documents', async (req, res) => {
   try {
     const orgId = getOrgId(req);
     const { dealId } = req.params;
-    const deal = await loadDeal(dealId, orgId);
+    const deal = await loadDealForLegalDoc(dealId, orgId);
     if (!deal) return res.status(404).json({ error: 'Deal not found' });
 
     const parsed = createBodySchema.safeParse(req.body);
@@ -299,7 +269,7 @@ router.post('/deals/:dealId/legal-documents', async (req, res) => {
       });
     }
 
-    const org = await loadOrg(orgId);
+    const org = await loadOrgForLegalDoc(orgId);
     const todayIso = new Date().toISOString().slice(0, 10);
 
     const tokens: LegalDocTokenValues = {
@@ -485,6 +455,41 @@ router.post('/legal-documents/:id/send', async (req, res) => {
     }
     log.error('POST /api/legal-documents/:id/send error', err);
     res.status(500).json({ error: 'Failed to send legal document' });
+  }
+});
+
+// ============================================================
+// POST /legal-documents/:id/request-signature — eSignature deep-link
+// ============================================================
+// See legalDocSignatureService.ts for the "no programmatic API" rationale
+// + forward-compat path for the eventual Google Workspace eSignature API.
+router.post('/legal-documents/:id/request-signature', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const { id } = req.params;
+
+    if (!req.user?.id) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+    const internalUserId = await resolveInternalUserId(req.user.id);
+    if (!internalUserId) return res.status(404).json({ error: 'User not found' });
+
+    const result = await requestLegalDocSignature({
+      documentId: id,
+      organizationId: orgId,
+      userId: internalUserId,
+    });
+    res.json(result);
+  } catch (err) {
+    if (err instanceof LegalDocSignatureError) {
+      return res.status(err.status).json({
+        error: err.message,
+        code: err.code,
+        details: err.details,
+      });
+    }
+    log.error('POST /api/legal-documents/:id/request-signature error', err);
+    res.status(500).json({ error: 'Failed to request signature' });
   }
 });
 
