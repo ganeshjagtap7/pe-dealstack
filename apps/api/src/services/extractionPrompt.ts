@@ -4,6 +4,8 @@
  * Single source of truth — prevents prompt drift between extraction paths.
  */
 
+import { getTodayIso } from '../utils/dates.js';
+
 /** Known line item keys per statement type, for prompt guidance */
 export const LINE_ITEM_KEYS = {
   INCOME_STATEMENT: 'revenue, cogs, gross_profit, gross_margin_pct, sga, rd, other_opex, total_opex, ebitda, ebitda_margin_pct, da, ebit, interest_expense, ebt, tax, net_income, sde',
@@ -40,7 +42,9 @@ export function buildExtractionPrompt(options?: {
   const {
     includeSourceCitations = true,
     currencyHint,
-    todayIso = new Date().toISOString().split('T')[0],
+    // Default is computed fresh per call via getTodayIso() — do NOT bind to a
+    // module-scope constant or the date freezes at process boot.
+    todayIso = getTodayIso(),
     expectedPeriods,
     lineItemHints,
   } = options ?? {};
@@ -83,6 +87,8 @@ export function buildExtractionPrompt(options?: {
     : `\nIMPORTANT: margins/percentages as numbers (e.g. 25.5 means 25.5%), NOT decimals.`;
 
   return `You are a senior private equity analyst extracting structured financial data from deal documents (CIMs, teasers, standalone financials).
+
+Today's date is ${todayIso}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days").
 
 Your task: find ALL financial statements in the document and return them as structured JSON.
 ${currencyHintLine}${dateContextLine}${hintsBlock}

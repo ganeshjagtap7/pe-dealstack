@@ -16,7 +16,16 @@ import { openai, isAIEnabled, trackedChatCompletion } from '../../../../openai.j
 import { MODEL_CLASSIFICATION } from '../../../../utils/aiModels.js';
 import { classifyFinancialsVision } from '../../../visionExtractor.js';
 import { log } from '../../../../utils/logger.js';
-import type { ClassifiedStatement, ClassificationResult } from '../../../financialClassifier.js';
+import {
+  normalizeClassificationResult,
+  applyExplicitUnitOverride,
+  applySmallDollarActualsOverride,
+  applySourceTextDollarOverride,
+  detectExplicitUnitInText,
+  hasExplicitSmallDollarAmounts,
+  type ClassifiedStatement,
+  type ClassificationResult,
+} from '../../../financialClassifier.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep, FailedCheck } from '../state.js';
 
@@ -177,7 +186,17 @@ export async function selfCorrectNode(
 
       const content = response.choices[0]?.message?.content;
       if (content) {
-        correctedClassification = JSON.parse(content) as ClassificationResult;
+        // The targeted-correction LLM call bypasses classifyFinancials() and
+        // hence its post-processing. Run the same normalize + override
+        // pipeline here so unit-scale classifications coming back from the
+        // correction model don't sneak past the deterministic guards.
+        const rawCorrection = JSON.parse(content) as unknown;
+        correctedClassification = normalizeClassificationResult(rawCorrection);
+        const explicitUnit = detectExplicitUnitInText(rawText);
+        const hasSmallDollars = hasExplicitSmallDollarAmounts(rawText);
+        applyExplicitUnitOverride(correctedClassification, explicitUnit);
+        applySmallDollarActualsOverride(correctedClassification, hasSmallDollars, explicitUnit);
+        applySourceTextDollarOverride(correctedClassification);
         steps.push(step(
           'self_correct',
           `AI returned ${correctedClassification.statements?.length ?? 0} corrected statement(s)`,
@@ -210,6 +229,29 @@ export async function selfCorrectNode(
 
     // ── Merge corrections into original statements ──
     const mergedStatements = mergeStatements(statements, correctedClassification.statements);
+
+    // Re-apply the deterministic unit guards across the MERGED statements.
+    // mergeStatements may have copied a corrected period into a statement
+    // whose unitScale (set at the original-extraction LLM stage) was wrong.
+    // The source-quote dollar override is cheap, idempotent on already-
+    // ACTUALS rows, and the canonical hook before storeNode — running it
+    // here catches mis-tagged synthesized periods (LTM / Current Month)
+    // that the initial extraction missed.
+    //
+    // RETRO-FIX (manual SQL for already-persisted bad rows on a deal):
+    //   UPDATE "FinancialStatement"
+    //   SET "unitScale" = 'ACTUALS'
+    //   WHERE "dealId" = '<dealId>'
+    //     AND "unitScale" IN ('MILLIONS','THOUSANDS','BILLIONS')
+    //     AND ("lineItems"::jsonb -> 'revenue_source')::text ~ '\$\s*\d{1,3}(,\d{3})*(\.\d+)?'
+    //     AND ABS(("lineItems"::jsonb ->> 'revenue')::numeric) < 100000;
+    // (Cast/regex tweaks may be needed; the JSONB column is at lineItems.)
+    const mergedClassification: ClassificationResult = {
+      statements: mergedStatements,
+      overallConfidence: state.overallConfidence,
+      warnings: state.warnings,
+    };
+    applySourceTextDollarOverride(mergedClassification);
 
     // Recalculate overall confidence from merged data
     const allConfidences: number[] = [];

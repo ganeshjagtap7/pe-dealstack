@@ -35,6 +35,7 @@ import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
 import {
   applyExplicitUnitOverride,
   applySmallDollarActualsOverride,
+  applySourceTextDollarOverride,
   detectExplicitUnitInText,
   hasExplicitSmallDollarAmounts,
   normalizeClassificationResult,
@@ -185,6 +186,11 @@ export async function classifyFinancialsWithClaude(
     const result = normalizeClassificationResult(raw);
     applyExplicitUnitOverride(result, explicitUnit);
     applySmallDollarActualsOverride(result, hasSmallDollars, explicitUnit);
+    // Third-tier: per-statement source-quote matching. Catches synthesized
+    // periods (LTM / Current Month) whose raw values are larger than the
+    // small-dollar magnitude threshold but whose source quotes literally
+    // cite "$1,473" / "~$15,600".
+    applySourceTextDollarOverride(result);
 
     // Pull the raw Anthropic Usage object from response_metadata so we
     // log the same uncached input_tokens the SDK reported (the

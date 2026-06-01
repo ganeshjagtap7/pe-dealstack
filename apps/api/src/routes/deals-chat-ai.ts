@@ -10,6 +10,8 @@ import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
 import { generateFallbackResponse } from '../services/chatHelpers.js';
+import { getTodayIso } from '../utils/dates.js';
+import { formatDealHeadline } from '../utils/financialFormat.js';
 
 const router = Router();
 
@@ -40,6 +42,11 @@ function buildFinancialMarkdown(statements: FinancialRow[]): string {
   // statement so the agent prompt tells the LLM what scale the numbers
   // are stored in (formerly hard-coded as "$M USD" — wrong when the
   // source was in actuals / thousands / billions).
+  //
+  // Default unitScale is ACTUALS (matches `normalizeUnitScale` in
+  // financialClassifier.ts — the safest fallback because it means "do
+  // not multiply"). Defaulting to MILLIONS would silently inflate values
+  // 1,000,000× whenever a row was inserted without a unitScale set.
   const grouped: Record<string, { period: string; data: Record<string, number | null>; unitScale: string; currency: string }[]> = {};
   for (const stmt of statements) {
     if (!stmt.lineItems) continue;
@@ -48,18 +55,30 @@ function buildFinancialMarkdown(statements: FinancialRow[]): string {
     grouped[stmt.statementType].push({
       period: stmt.period,
       data,
-      unitScale: (stmt.unitScale ?? 'MILLIONS').toUpperCase(),
+      unitScale: (stmt.unitScale ?? 'ACTUALS').toUpperCase(),
       currency: stmt.currency ?? 'USD',
     });
   }
 
   // Header reflects the actual scales present rather than assuming MILLIONS.
+  // Spell out the multiplier so the LLM can convert correctly when echoing
+  // values to the user — e.g. "ACTUALS USD (raw dollars)" makes it unambiguous
+  // that "6900" means $6,900, not $6,900M.
+  const scaleGloss = (label: string): string => {
+    switch (label.split(' ')[0]) {
+      case 'ACTUALS':  return ' (raw dollars — multiply by 1)';
+      case 'THOUSANDS': return ' (each unit = 1,000)';
+      case 'MILLIONS':  return ' (each unit = 1,000,000)';
+      case 'BILLIONS':  return ' (each unit = 1,000,000,000)';
+      default:          return '';
+    }
+  };
   const allScales = new Set<string>();
   for (const entries of Object.values(grouped)) {
     for (const e of entries) allScales.add(`${e.unitScale} ${e.currency}`);
   }
   const scaleHeader = allScales.size === 1
-    ? [...allScales][0]
+    ? [...allScales][0] + scaleGloss([...allScales][0])
     : 'mixed scales — see per-statement labels below';
   const sections: string[] = [`\n=== VERIFIED FINANCIAL DATA (Source of Truth — values in ${scaleHeader}) ===`];
 
@@ -70,7 +89,9 @@ function buildFinancialMarkdown(statements: FinancialRow[]): string {
     // Per-statement scale label (covers the multi-statement case where one
     // statement is in MILLIONS but another came from a doc in ACTUALS).
     const stmtScales = new Set(entries.map(e => `${e.unitScale} ${e.currency}`));
-    const stmtScaleSuffix = stmtScales.size === 1 ? ` (values in ${[...stmtScales][0]})` : '';
+    const stmtScaleSuffix = stmtScales.size === 1
+      ? ` (values in ${[...stmtScales][0]}${scaleGloss([...stmtScales][0])})`
+      : '';
 
     // Collect all unique metric keys across periods (preserving insertion order)
     const metricKeys: string[] = [];
@@ -120,11 +141,16 @@ router.post('/:dealId/chat', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
-    // Get deal with basic context (agent fetches details on demand via tools)
+    // Get deal with basic context (agent fetches details on demand via tools).
+    // Pull the cached* columns alongside the legacy ones so formatDealHeadline
+    // can render at the right unit (cached fields are ACTUAL DOLLARS, legacy
+    // are MILLIONS by convention — see dealCacheWriteback.ts).
     const { data: deal, error: dealError } = await supabase
       .from('Deal')
       .select(`
         id, name, stage, status, industry, dealSize, revenue, ebitda,
+        currency, cachedRevenue, cachedEbitda, cachedEbitdaMargin,
+        cachedPeriod, cachedCurrency,
         irrProjected, mom, aiThesis, description, source, organizationId,
         company:Company(id, name, description),
         teamMembers:DealTeamMember(role, user:User(id, name, email, title))
@@ -147,13 +173,25 @@ router.post('/:dealId/chat', async (req, res) => {
       });
     }
 
-    // Build lightweight deal context (agent tools fetch details on demand)
+    // Build lightweight deal context (agent tools fetch details on demand).
+    // Headline metrics are formatted via formatDealHeadline so the rendered
+    // string honours the actual stored scale: $6,900 ACTUALS renders as
+    // "$6.9K", not "$6,900M". The previous code hardcoded "M" which silently
+    // misrepresented every non-MILLIONS deal in the agent's context.
     const contextParts = [`Deal: ${deal.name}`];
     contextParts.push(`Stage: ${deal.stage}, Status: ${deal.status}`);
     if (deal.industry) contextParts.push(`Industry: ${deal.industry}`);
-    if (deal.dealSize) contextParts.push(`Deal Size: $${deal.dealSize}M`);
-    if (deal.revenue) contextParts.push(`Revenue: $${deal.revenue}M`);
-    if (deal.ebitda) contextParts.push(`EBITDA: $${deal.ebitda}M`);
+    const headline = formatDealHeadline(deal);
+    if (headline.dealSize) contextParts.push(`Deal Size: ${headline.dealSize}`);
+    if (headline.revenue) {
+      const periodNote = headline.cachedPeriod ? ` (${headline.cachedPeriod})` : '';
+      contextParts.push(`Revenue: ${headline.revenue}${periodNote}`);
+    }
+    if (headline.ebitda) {
+      const periodNote = headline.cachedPeriod ? ` (${headline.cachedPeriod})` : '';
+      contextParts.push(`EBITDA: ${headline.ebitda}${periodNote}`);
+    }
+    if (headline.ebitdaMargin) contextParts.push(`EBITDA Margin: ${headline.ebitdaMargin}`);
     if (deal.irrProjected) contextParts.push(`Projected IRR: ${deal.irrProjected}%`);
     if (deal.mom) contextParts.push(`MoM: ${deal.mom}x`);
     if (deal.source) contextParts.push(`Deal Source: ${deal.source}`);
@@ -247,17 +285,23 @@ router.post('/:dealId/chat', async (req, res) => {
     const financialContext = buildFinancialMarkdown(financialStatements || []);
     contextParts.push(financialContext);
 
-    // Run the ReAct agent
+    // Read userId once up-front — needed by the agent (Gmail/Calendar tools
+    // for /follow-ups) AND by ChatMessage inserts below.
+    const userId = req.user?.id || null;
+
+    // Run the ReAct agent. Pass today explicitly so the model anchors
+    // relative-period reasoning ("recent news", "last 90 days", "current
+    // quarter") against the request's wall-clock day — never a hardcoded or
+    // module-scope-cached date.
     const result = await runDealChatAgent({
       dealId,
       orgId: deal.organizationId,
       message,
       dealContext: contextParts.join('\n'),
       history: history.slice(-10),
+      today: getTodayIso(),
+      userId: userId ?? undefined,
     });
-
-    // Save messages to database
-    const userId = req.user?.id || null;
 
     await supabase.from('ChatMessage').insert({
       dealId,

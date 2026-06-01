@@ -37,6 +37,7 @@ import {
   normalizeClassificationResult,
   applyExplicitUnitOverride,
   applySmallDollarActualsOverride,
+  applySourceTextDollarOverride,
   detectExplicitUnitInText,
   hasExplicitSmallDollarAmounts,
   type ClassificationResult,
@@ -400,6 +401,7 @@ async function reconcileWithSonnet(
     // results — the reconciler is itself an LLM and can mis-tag units.
     applyExplicitUnitOverride(result, explicitUnit);
     applySmallDollarActualsOverride(result, hasSmallDollars, explicitUnit);
+    applySourceTextDollarOverride(result);
 
     // Decorate warnings so the UI / debug bundle can see this came from
     // the reconciliation pass rather than a single extractor.

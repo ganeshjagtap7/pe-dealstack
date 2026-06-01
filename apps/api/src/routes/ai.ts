@@ -74,6 +74,7 @@ router.post('/deals/:dealId/chat', async (req, res) => {
       message,
       dealContext,
       history,
+      userId: req.user?.id ?? undefined,
     });
 
     // Log activity (fire-and-forget)

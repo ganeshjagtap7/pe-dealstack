@@ -238,6 +238,14 @@ export async function classifyFinancials(
     // "MILLIONS with values > 1000 → ACTUALS" guard.
     applySmallDollarActualsOverride(result, hasSmallDollars, explicitUnitFromText);
 
+    // Third-tier guard: per-statement source-quote matching. The first two
+    // guards have document-level + magnitude-level filters; this one inspects
+    // each period's `_source` quotes for literal "$N,NNN" amounts that match
+    // the parsed numeric value. Catches synthesized periods (LTM, "Current
+    // Month") and rows where the value is a few thousand — both miss the
+    // <100 magnitude threshold of the small-dollar guard.
+    applySourceTextDollarOverride(result);
+
     log.debug('Financial classifier completed', {
       statementsFound: result.statements.length,
       overallConfidence: result.overallConfidence,
@@ -549,6 +557,148 @@ export function applySmallDollarActualsOverride(
         maxValue,
         valueSample,
         smallValueThreshold: SMALL_VALUE_OVERRIDE_THRESHOLD,
+      },
+    );
+  }
+}
+
+// ─── Per-Statement Source-Quote Dollar Override ─────────────────────
+//
+// Third-tier guard: walks each period's `*_source` citation strings and
+// checks whether they contain literal "$N,NNN" or "$N" dollar amounts that
+// match the corresponding numeric value within tolerance. When they do, the
+// row's unit MUST be ACTUALS regardless of what the LLM tagged.
+//
+// This is the override that catches the LTM / Current Month rows the prior
+// two guards miss:
+//   - `applyExplicitUnitOverride` only fires when the whole document has no
+//     scale marker OR values exceed implausibility thresholds.
+//   - `applySmallDollarActualsOverride` only fires when the row's MAX value
+//     is < 100 (so a 4-digit revenue like 1473 slips past).
+//   - This helper checks the per-row `_source` quote and uses it as ground
+//     truth. If the source literally says "$1,473" and the parsed value is
+//     1473, ACTUALS is the ONLY consistent interpretation.
+//
+// Tolerance: the parsed value must equal the dollar-amount in the source
+// within 1% (rounding / floating-point only) — NOT 1000×, NOT 1,000,000×.
+//
+// Safety: we only flip when the source has a small-dollar pattern AND the
+// numeric value matches. A real $50M company writing "$1,234 dues" in
+// narrative prose alongside a MILLIONS table won't trip this — the parsed
+// revenue value (50) won't match the $1,234 dollar amount in the source.
+const DOLLAR_TOLERANCE_FRAC = 0.01;
+/** Largest plausible "small-dollar" amount we accept as an ACTUALS signal.
+ * Source quotes citing "$10,000,000+" (10M+) are likely TAM-style figures,
+ * not table cells; capping the regex match at 100k keeps us in raw-dollar
+ * territory. */
+const MAX_SMALL_DOLLAR_AMOUNT = 100_000;
+
+/** Pull every "$N,NNN" / "$N" dollar amount out of a source-quote string.
+ * Returns parsed numeric values; never returns NaN. Only counts amounts
+ * <= MAX_SMALL_DOLLAR_AMOUNT — large amounts ($1M+) are likely narrative.
+ *
+ * CRITICAL: skips any amount immediately followed by a scale-suffix
+ * (M / MM / B / K / bn / mn / thousand / million / billion). Without that
+ * filter, a legitimate MILLIONS row whose source quote says "$50.3M"
+ * would extract 50.3, match the parsed value 50.3, and incorrectly
+ * trigger the ACTUALS override. */
+function extractDollarAmountsFromQuote(quote: string): number[] {
+  if (!quote) return [];
+  const out: number[] = [];
+  // Match "$1,473", "$15,600", "$974", "$1,250,000" — optional decimal.
+  // The bare "$N" case (e.g. "$974") catches sources without thousands-
+  // separator commas. We INTENTIONALLY do NOT match values written without
+  // a dollar sign — that would over-match into year numbers like "2024".
+  const pattern = /\$\s*(\d{1,3}(?:,\d{3})*(?:\.\d+)?|\d+(?:\.\d+)?)/g;
+  // Suffix immediately after the amount that means the amount is at a
+  // larger scale than ACTUALS. We treat any match with such a suffix as
+  // NON-evidence — even one is enough to disqualify the quote because we
+  // can't safely tell which dollar mention is the "real" one.
+  const SCALE_SUFFIX = /^\s*(?:M\b|MM\b|MN\b|K\b|B\b|BN\b|million|thousand|billion)/i;
+  for (const match of quote.matchAll(pattern)) {
+    const numStr = match[1].replace(/,/g, '');
+    const val = Number(numStr);
+    if (!Number.isFinite(val)) continue;
+    if (val <= 0) continue;
+    if (val > MAX_SMALL_DOLLAR_AMOUNT) continue;
+    // Reject amounts followed by a scale suffix: "$50.3M", "$1.2B",
+    // "$500K", "$50 million", etc. The number after the dollar sign is
+    // already at a larger scale, so its raw integer value is NOT what
+    // the table cell holds.
+    const tail = quote.slice((match.index ?? 0) + match[0].length);
+    if (SCALE_SUFFIX.test(tail)) continue;
+    out.push(val);
+  }
+  return out;
+}
+
+/**
+ * Per-statement source-quote override. Inspects each period's `_source`
+ * citation strings for literal dollar amounts; when any of them match the
+ * corresponding numeric line-item value within DOLLAR_TOLERANCE_FRAC, the
+ * statement is reclassified to ACTUALS.
+ *
+ * Runs across ALL statements (no period-name filter — LTM, "Current Month",
+ * "Apr-26", etc. are all eligible). Mutates `result.statements` in-place.
+ *
+ * Exported so the parallel Claude classifier and the self-correct node can
+ * apply the same deterministic guard.
+ */
+export function applySourceTextDollarOverride(result: ClassificationResult): void {
+  for (const stmt of result.statements) {
+    if (stmt.unitScale === 'ACTUALS') continue; // already correct
+
+    let matchCount = 0;
+    let matchSamples: Array<{ field: string; value: number; quote: string }> = [];
+
+    for (const period of stmt.periods) {
+      for (const [key, val] of Object.entries(period.lineItems)) {
+        if (!key.endsWith('_source')) continue;
+        if (typeof val !== 'string') continue;
+        const baseKey = key.slice(0, -'_source'.length);
+        const baseVal = period.lineItems[baseKey];
+        if (typeof baseVal !== 'number' || !Number.isFinite(baseVal)) continue;
+        // Percentages / ratios aren't dollars — skip.
+        const lower = baseKey.toLowerCase();
+        if (lower.endsWith('_pct') || lower.endsWith('_percent') || lower.endsWith('_ratio')) continue;
+        if (lower.includes('margin')) continue;
+
+        const absVal = Math.abs(baseVal);
+        // Empty / zero values give no signal.
+        if (absVal < 1) continue;
+
+        const dollarAmounts = extractDollarAmountsFromQuote(val);
+        for (const amt of dollarAmounts) {
+          // Match within tolerance: |parsed - source| / source <= 1%.
+          // Also allow exact integer match (covers the no-decimal case
+          // where tolerance math may underflow on small numbers).
+          const diff = Math.abs(absVal - amt);
+          const within = amt > 0 && (diff / amt) <= DOLLAR_TOLERANCE_FRAC;
+          if (within) {
+            matchCount++;
+            if (matchSamples.length < 3) {
+              matchSamples.push({ field: baseKey, value: baseVal, quote: val });
+            }
+            break; // one match per field is enough
+          }
+        }
+      }
+    }
+
+    if (matchCount === 0) continue; // no per-row evidence
+
+    const originalScale = stmt.unitScale;
+    stmt.unitScale = 'ACTUALS';
+    result.warnings.push(
+      `Overrode ${originalScale} → ACTUALS for ${stmt.statementType}: ${matchCount} source quote(s) contain literal dollar amounts matching the parsed values.`,
+    );
+    log.warn(
+      `Financial classifier: source-quote dollar guard — overriding LLM-inferred ${originalScale} to ACTUALS`,
+      {
+        statementType: stmt.statementType,
+        originalScale,
+        matchCount,
+        matchSamples,
       },
     );
   }
