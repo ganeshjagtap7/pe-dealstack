@@ -155,9 +155,14 @@ router.get('/legal-documents', async (req, res) => {
 
     // Aliased Deal join so the wire shape matches the frontend contract
     // (LegalDocumentWithDeal.deal in apps/web-next, mirrors GraphWithDeal).
+    // The "target" the frontend cards display is actually Company.name,
+    // joined through the Deal -> Company FK that other routes also use
+    // (see memos-list.ts:60 for the same pattern). We flatten the nested
+    // company.name back into target before responding so the frontend
+    // doesn't have to know about the second table.
     let query = supabase
       .from('LegalDocument')
-      .select('*, deal:Deal(id, projectName:name, target:companyName)')
+      .select('*, deal:Deal(id, projectName:name, company:Company(name))')
       .eq('organizationId', orgId)
       .is('metadata->>deletedAt', null)
       .order('updatedAt', { ascending: false });
@@ -172,7 +177,21 @@ router.get('/legal-documents', async (req, res) => {
       throw error;
     }
 
-    res.json(data ?? []);
+    const rows = (data ?? []).map((row: Record<string, unknown>) => {
+      const dealRaw = row.deal as
+        | { id: string; projectName: string | null; company?: { name: string | null } | null }
+        | null;
+      if (!dealRaw) return { ...row, deal: null };
+      return {
+        ...row,
+        deal: {
+          id: dealRaw.id,
+          projectName: dealRaw.projectName ?? null,
+          target: dealRaw.company?.name ?? null,
+        },
+      };
+    });
+    res.json(rows);
   } catch (err) {
     log.error('GET /api/legal-documents error', err);
     res.status(500).json({ error: 'Failed to fetch legal documents' });

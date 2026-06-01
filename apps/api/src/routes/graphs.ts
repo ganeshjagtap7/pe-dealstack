@@ -76,12 +76,14 @@ router.get('/graphs', async (req, res) => {
     const orgId = getOrgId(req);
 
     // Join Deal so the cross-deal cards can show deal/company labels
-    // without an extra round-trip. Alias `name -> projectName` and
-    // `companyName -> target` so the wire shape matches the frontend
-    // contract (GraphWithDeal.deal in apps/web-next).
+    // without an extra round-trip. `target` on the wire is actually
+    // Company.name (lives on a separate table joined via Deal's FK —
+    // mirrors memos-list.ts:60). We flatten company.name back into a
+    // top-level `target` field before responding so the frontend
+    // contract (GraphWithDeal.deal) stays unchanged.
     const { data, error } = await supabase
       .from('CustomGraph')
-      .select('*, deal:Deal(id, projectName:name, target:companyName)')
+      .select('*, deal:Deal(id, projectName:name, company:Company(name))')
       .eq('organizationId', orgId)
       .order('updatedAt', { ascending: false });
 
@@ -92,7 +94,21 @@ router.get('/graphs', async (req, res) => {
       throw error;
     }
 
-    res.json(data ?? []);
+    const rows = (data ?? []).map((row: Record<string, unknown>) => {
+      const dealRaw = row.deal as
+        | { id: string; projectName: string | null; company?: { name: string | null } | null }
+        | null;
+      if (!dealRaw) return { ...row, deal: null };
+      return {
+        ...row,
+        deal: {
+          id: dealRaw.id,
+          projectName: dealRaw.projectName ?? null,
+          target: dealRaw.company?.name ?? null,
+        },
+      };
+    });
+    res.json(rows);
   } catch (err) {
     log.error('GET /api/graphs error', err);
     res.status(500).json({ error: 'Failed to fetch graphs' });
