@@ -24,6 +24,10 @@ import {
 export { LegalDocParseError } from './legalDocParseService.js';
 
 export class LegalDocImportError extends Error {
+  // PDF_NOT_SUPPORTED retained for backwards compatibility — no longer
+  // thrown by the import path (PDFs are accepted now), but keeping the
+  // string literal avoids breaking any external consumer importing the
+  // type. New rejects use INVALID_FILE_FORMAT.
   code: 'PDF_NOT_SUPPORTED' | 'INVALID_FILE_FORMAT' | 'INVALID_METADATA' | 'DEAL_NOT_FOUND';
   status: number;
   details?: unknown;
@@ -41,7 +45,7 @@ export class LegalDocImportError extends Error {
   }
 }
 
-const UPLOAD_KIND_VALUES = ['docx', 'html', 'md'] as const;
+const UPLOAD_KIND_VALUES = ['docx', 'html', 'md', 'pdf'] as const;
 
 export const uploadKindSchema = z.object({
   kind: z.enum(UPLOAD_KIND_VALUES),
@@ -182,21 +186,14 @@ export function makeUploadLegalDocumentHandler(deps: UploadHandlerDeps) {
         });
       }
 
-      // Soft-reject PDF up front with a friendlier message than letting
-      // the parser fail later — the underlying service genuinely doesn't
-      // support PDF yet, and INVALID_FILE_FORMAT would obscure that.
-      const filenameLower = (file.originalname || '').toLowerCase();
-      if (filenameLower.endsWith('.pdf') || req.body?.kind === 'pdf') {
-        return res.status(400).json({
-          error: 'PDF support coming soon — for now, please upload a .docx, .html, or .md file.',
-          code: 'PDF_NOT_SUPPORTED',
-        });
-      }
-
+      // PDFs are accepted now — parsed via pdf-parse in legalDocParseService.
+      // Text extraction is structureless (no headings/bold) so the imported
+      // body is plain paragraphs; the user can edit in the in-app editor
+      // afterwards if they want to add structure.
       const kindParsed = uploadKindSchema.safeParse({ kind: req.body?.kind });
       if (!kindParsed.success) {
         return res.status(400).json({
-          error: 'Invalid kind — expected docx | html | md',
+          error: 'Invalid kind — expected docx | html | md | pdf',
           code: 'INVALID_FILE_FORMAT',
           details: kindParsed.error.errors,
         });

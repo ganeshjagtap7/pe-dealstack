@@ -3,8 +3,24 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
-import { useUser } from "@/providers/UserProvider";
+import {
+  SenderLine,
+  SendingFromPill,
+  type WorkspaceEmailState,
+} from "./SendModalSender";
 import type { LegalDocumentWithDeal, SendDocResponse } from "./types";
+
+/**
+ * Response from GET /api/auth/workspace-email — see the route file for
+ * the full contract. `connected: false` is *always* a 200, with `email:
+ * null` and an optional error code explaining why (token absent, Gmail
+ * profile fetch failed, user not provisioned).
+ */
+interface WorkspaceEmailResponse {
+  email: string | null;
+  connected: boolean;
+  error?: "not_connected" | "profile_fetch_failed" | "user_not_provisioned";
+}
 
 interface SendModalProps {
   open: boolean;
@@ -51,12 +67,19 @@ function defaultSubject(doc: LegalDocumentWithDeal | null): string {
  * verification needed).
  */
 export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
-  const { user } = useUser();
+  // Note: we used to call useUser() here to read the Supabase auth email
+  // for the "From:" line. That was misleading — Supabase auth identity
+  // and the connected Workspace Gmail can differ (sign-in with personal
+  // Google account, Workspace connected under work account). The real
+  // sender comes from /auth/workspace-email below, populated on mount.
   const [toEmail, setToEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [banner, setBanner] = useState<Banner>({ kind: "none" });
+  const [workspaceEmail, setWorkspaceEmail] = useState<WorkspaceEmailState>({
+    kind: "loading",
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -66,6 +89,36 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
     setBanner({ kind: "none" });
     setSubmitting(false);
   }, [open, doc]);
+
+  // Fetch the connected Workspace Gmail address on modal open. The endpoint
+  // returns 200 with `connected: false` in every "you can't send right now"
+  // branch (no token, profile fetch failed, user-not-provisioned race) so
+  // a single try/catch covers genuine network/server errors only.
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setWorkspaceEmail({ kind: "loading" });
+    (async () => {
+      try {
+        const resp = await api.get<WorkspaceEmailResponse>(
+          "/auth/workspace-email",
+        );
+        if (cancelled) return;
+        if (resp.connected && resp.email) {
+          setWorkspaceEmail({ kind: "connected", email: resp.email });
+        } else {
+          setWorkspaceEmail({ kind: "notConnected" });
+        }
+      } catch (err) {
+        if (cancelled) return;
+        console.warn("[nda] workspace-email fetch failed:", err);
+        setWorkspaceEmail({ kind: "error" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -140,6 +193,12 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
           </button>
         </div>
 
+        {/* Sending-from pill — sits between header and body so the user
+            can't miss WHICH Gmail account the message will leave from.
+            Important because Supabase auth identity and connected Workspace
+            account often differ for users on a personal Google login. */}
+        <SendingFromPill state={workspaceEmail} />
+
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-5 py-5 space-y-4">
           {banner.kind !== "none" && <ErrorBanner banner={banner} />}
@@ -156,11 +215,12 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
           </Field>
 
           {/* Provenance line: shows the user *which* Workspace inbox the
-              email will appear to come from. Rendered up here (before the
-              API call returns) using the cached UserProvider record so users
-              can sanity-check their identity before hitting Send. Falls back
-              to a generic label if `useUser` hasn't hydrated yet. */}
-          <SenderLine email={user?.email} />
+              email will appear to come from. Uses the actual connected
+              Gmail address from /auth/workspace-email (NOT the cached
+              Supabase auth email — the two can differ when a user signs in
+              with one Google account but connected Workspace under a
+              different work account). */}
+          <SenderLine state={workspaceEmail} />
 
           <Field label="Subject">
             <input
@@ -267,36 +327,9 @@ function Field({
   );
 }
 
-/**
- * Muted "From: <user.email>" line displayed under the To field. Surfaces
- * which Workspace address the email will appear to come from — important
- * because the multi-tenant Gmail flow means there's no firm-wide From; the
- * sender's personal work address is on the message.
- *
- * Renders a generic fallback while `useUser()` is hydrating so the layout
- * doesn't pop in.
- */
-function SenderLine({ email }: { email?: string }) {
-  return (
-    <div className="flex items-start gap-1.5 -mt-1 text-xs text-slate-500 leading-snug">
-      <span className="material-symbols-outlined text-[14px] mt-0.5 text-slate-400">
-        outgoing_mail
-      </span>
-      <div className="min-w-0">
-        {email ? (
-          <>
-            From: <span className="font-medium text-slate-700">{email}</span>{" "}
-            <span className="text-slate-400">
-              (sent via your Google Workspace Gmail)
-            </span>
-          </>
-        ) : (
-          <>From: your Google Workspace Gmail</>
-        )}
-      </div>
-    </div>
-  );
-}
+// SenderLine + SendingFromPill moved to ./SendModalSender to keep this
+// file under the 500-line cap. They read the same WorkspaceEmailState
+// the parent populates above.
 
 function ErrorBanner({ banner }: { banner: Banner }) {
   if (banner.kind === "none") return null;

@@ -10,12 +10,43 @@
 // Sanitization is strict-allowlist for tags + attribute-value regexps
 // on inline styles to keep XSS surface tight.
 
+import { createRequire } from 'module';
 import mammoth from 'mammoth';
 import { marked } from 'marked';
 import sanitizeHtml from 'sanitize-html';
 import { log } from '../utils/logger.js';
 
-export type TemplateFileKind = 'docx' | 'html' | 'md';
+// pdf-parse is CJS-only and ships no types — use createRequire so the
+// rest of the file can stay ESM. This mirrors the pattern in
+// services/pdfExtractor.ts so we don't introduce a new style.
+const requireCjs = createRequire(import.meta.url);
+type PdfParseFn = (buffer: Buffer) => Promise<{ text: string }>;
+let pdfParseFn: PdfParseFn | null = null;
+function loadPdfParse(): PdfParseFn {
+  if (!pdfParseFn) {
+    pdfParseFn = requireCjs('pdf-parse') as PdfParseFn;
+  }
+  return pdfParseFn;
+}
+
+export type TemplateFileKind = 'docx' | 'html' | 'md' | 'pdf';
+
+/**
+ * Escape a string for safe insertion as text inside HTML. PDF text
+ * extraction yields raw characters that may include `<`, `>`, `&`,
+ * and quotes — without escaping these we'd produce broken markup the
+ * sanitiser drops and, worse, give an attacker an HTML-injection
+ * surface via a maliciously crafted PDF. The replacement set covers
+ * everything `sanitiseLegalDocHtml`'s allowlist would otherwise eat.
+ */
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 export class LegalDocParseError extends Error {
   code: 'INVALID_FILE_FORMAT';
@@ -175,6 +206,22 @@ export async function parseTemplateFile(
       // we always await to normalise.
       const parsed = await Promise.resolve(marked.parse(buffer.toString('utf-8')));
       rawHtml = typeof parsed === 'string' ? parsed : String(parsed);
+    } else if (kind === 'pdf') {
+      const pdfParse = loadPdfParse();
+      const result = await pdfParse(buffer);
+      // PDF text extraction is structureless — no headings, no bold, no
+      // lists. We get plain text with paragraph-style line breaks. Split
+      // on blank-line boundaries (>=2 consecutive newlines) so paragraphs
+      // survive, escape each segment, and wrap in <p>. Skip the empty-gap
+      // marker that's docx-specific: PDF text has no `<p></p>` shells, and
+      // PF-style placeholder gaps don't survive PDF export anyway.
+      const paragraphs = (result.text ?? '')
+        .split(/\n{2,}/)
+        .map((p: string) => p.replace(/\s+$/g, '').replace(/^\s+/g, ''))
+        .filter(Boolean);
+      rawHtml = paragraphs
+        .map((p: string) => `<p>${escapeHtml(p)}</p>`)
+        .join('\n');
     } else {
       throw new LegalDocParseError(`Unsupported file kind: ${kind as string}`);
     }

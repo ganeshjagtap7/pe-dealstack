@@ -165,7 +165,7 @@ export interface UploadExistingMetadata {
   sentToEmail?: string;
 }
 
-export type UploadExistingKind = "docx" | "html" | "md";
+export type UploadExistingKind = "docx" | "html" | "md" | "pdf";
 
 // Payload for POST /legal-documents/:id/send.
 export interface SendDocBody {
