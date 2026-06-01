@@ -36,7 +36,8 @@ import {
   loadDealForLegalDoc,
   loadOrgForLegalDoc,
 } from './legalDocLookups.js';
-import { registerSignatureWatch } from './legalDocSignatureWatchService.js';
+// (disabled — see banner below)
+// import { registerSignatureWatch } from './legalDocSignatureWatchService.js';
 
 export type LegalDocSendErrorCode =
   | 'GOOGLE_NOT_CONNECTED'
@@ -378,17 +379,24 @@ export async function sendLegalDocument(
     });
   }
 
+  // ─── DISABLED UNTIL PROD (Drive push signature detection) ───────────────
+  // files.watch push needs a GCP-domain-verified HTTPS callback; *.vercel.app
+  // cannot be verified, so push never fires on preview/Vercel. Active detection
+  // now runs via on-demand polling (legalDocSignaturePollService +
+  // POST /legal-documents/check-signatures). RE-ENABLE before prod — see
+  // docs/nda-signature-detection-setup.md "Enabling push in production".
+  // ────────────────────────────────────────────────────────────────────────
   // Register a Drive watch so we can auto-detect when the counterparty signs.
   // Best-effort: registerSignatureWatch reloads the row itself (so it sees the
   // just-saved googleDocId) and never throws — it must not affect the send.
-  try {
-    await registerSignatureWatch({ documentId: doc.id, userId: input.userId, organizationId: input.organizationId });
-  } catch (watchErr) {
-    log.warn('legalDocSendService: registerSignatureWatch failed (non-fatal)', {
-      documentId: doc.id,
-      message: watchErr instanceof Error ? watchErr.message : String(watchErr),
-    });
-  }
+  // try {
+  //   await registerSignatureWatch({ documentId: doc.id, userId: input.userId, organizationId: input.organizationId });
+  // } catch (watchErr) {
+  //   log.warn('legalDocSendService: registerSignatureWatch failed (non-fatal)', {
+  //     documentId: doc.id,
+  //     message: watchErr instanceof Error ? watchErr.message : String(watchErr),
+  //   });
+  // }
 
   return {
     ok: true,

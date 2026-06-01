@@ -9,6 +9,7 @@ import { DownloadMenu, DraftEsignHint } from "./DownloadMenu";
 import { Editor, type EditorHandle } from "./Editor";
 import { SendModal } from "./SendModal";
 import { SentActionBar } from "./SentActionBar";
+import { TokenInsertPanel } from "./TokenInsertPanel";
 import { STATUS_LABELS, STATUS_ORDER } from "./constants";
 import { substituteTokens } from "./tokens";
 import { ViewModeToggle, type ViewMode } from "./ViewModeToggle";
@@ -70,9 +71,8 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const [sendOpen, setSendOpen] = useState(false);
   // When viewing a SENT doc we default to the snapshot; user can toggle.
   const [showSnapshot, setShowSnapshot] = useState(doc.status === "SENT");
-  // Edit/Preview toggle — orthogonal to the snapshot toggle. Edit shows the
-  // raw token literals like `[COUNTERPARTY_NAME]`; Preview substitutes them
-  // with the current metadata so the user sees what the recipient gets.
+  // Edit shows raw `[TOKEN]` literals; Preview substitutes them with current
+  // metadata so the user sees what the recipient gets.
   const [viewMode, setViewMode] = useState<ViewMode>("edit");
   // Sender Gmail from the most recent /send response (session-only — not persisted).
   const [lastSenderEmail, setLastSenderEmail] = useState<string | null>(null);
@@ -169,10 +169,9 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const displayedContent = useMemo(() => {
     if (showSnapshot && hasSnapshot) return doc.contentSnapshot ?? "";
     if (isPreview) {
-      // AppUser doesn't currently surface firmName (org-name lives on the
-      // /users/profile endpoint, not /users/me) — pass undefined so the
-      // helper renders the muted "__firm name__" placeholder. When AppUser
-      // grows a firmName field, this will pick it up automatically.
+      // AppUser doesn't surface firmName yet (org-name lives on
+      // /users/profile, not /users/me) — undefined renders the muted
+      // "__firm name__" placeholder; picks up a real value once AppUser has it.
       const firmName = (user as { firmName?: string } | null)?.firmName;
       return substituteTokens(form.content, {
         counterpartyName: form.counterpartyName,
@@ -221,18 +220,14 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* Edit / Preview segmented toggle. Always available — lets the
-              user see the doc with current metadata substituted in.
-              Orthogonal to the snapshot toggle below: snapshot reads
-              `contentSnapshot` (frozen at send), preview reads the live
-              `content` with tokens replaced via the client-side helper.
-              Suppressed while viewing a frozen snapshot to avoid
-              presenting two "view modes" at once. */}
+          {/* Edit / Preview segmented toggle. Orthogonal to the snapshot
+              toggle: snapshot reads frozen `contentSnapshot`, preview reads
+              live `content` with tokens replaced client-side. Hidden while
+              viewing a frozen snapshot. */}
           {!(showSnapshot && hasSnapshot) && (
             <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
           )}
-          {/* Toolbar snapshot toggle: fallback for SENT docs that pre-date
-              Drive integration; otherwise it lives in the emerald action bar. */}
+          {/* Snapshot toggle: fallback for SENT docs that pre-date Drive. */}
           {isSent && hasSnapshot && !hasGoogleDoc && (
             <button
               type="button"
@@ -433,6 +428,14 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
               />
             </Field>
           )}
+
+          {/* Insertable `[TOKEN_KEY]` placeholders (backend substitutes on
+              send). Disabled in snapshot/preview — editor is read-only. */}
+          <TokenInsertPanel
+            bodyHtml={form.content}
+            editorRef={editorRef}
+            disabled={(showSnapshot && hasSnapshot) || isPreview}
+          />
 
           {doc.sentAt && (
             <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 space-y-0.5">

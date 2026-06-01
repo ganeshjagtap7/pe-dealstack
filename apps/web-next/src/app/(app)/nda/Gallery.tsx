@@ -88,13 +88,16 @@ function DocCard({ doc, onEdit, onDelete }: DocCardProps) {
   // bottom corner — signals that edits there are the source of truth, even
   // though the card itself still routes to the in-app editor (audit trail).
   const hasGoogleDoc = doc.status === "SENT" && !!doc.googleDocUrl;
-  // Signatures the backend auto-detected via the Drive watch webhook flip the
-  // doc to SIGNED with metadata.signatureDetectedVia === 'drive-watch'. Surface
-  // that provenance so operators know it wasn't marked Signed by hand.
+  // Signatures the backend auto-detected flip the doc to SIGNED and stamp
+  // metadata.signatureDetectedVia — 'drive-poll' (on-demand polling, the active
+  // path) or 'drive-watch' (the dormant push path). Either provenance surfaces
+  // the badge so operators know it wasn't marked Signed by hand.
   const autoDetectedSignature =
     doc.status === "SIGNED" &&
-    (doc.metadata as { signatureDetectedVia?: string } | undefined)
-      ?.signatureDetectedVia === "drive-watch";
+    Boolean(
+      (doc.metadata as { signatureDetectedVia?: string } | undefined)
+        ?.signatureDetectedVia,
+    );
 
   return (
     <div className="group relative aspect-[4/3] rounded-xl border border-slate-200 bg-white shadow-sm hover:shadow-md transition overflow-hidden">

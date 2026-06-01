@@ -39,6 +39,7 @@ import {
   exportLegalDocument,
   LegalDocExportError,
 } from '../services/legalDocExportService.js';
+import { pollOrgSignatures } from '../services/legalDocSignaturePollService.js';
 
 // 25 MB cap mirrors the template-parse upload — the underlying parser is
 // shared and rejects anything it can't decode with INVALID_FILE_FORMAT.
@@ -334,6 +335,25 @@ router.post(
   upload.single('file'),
   makeUploadLegalDocumentHandler({ resolveInternalUserId }),
 );
+
+// ============================================================
+// POST /legal-documents/check-signatures — on-demand poll
+// ============================================================
+// ACTIVE signature-detection path: polls every SENT-but-unsigned NDA in the
+// org against Google Drive and flips any that look signed to SIGNED. (The Drive
+// push webhook is disabled until prod — *.vercel.app can't be GCP-verified.)
+// MUST be registered BEFORE any `/legal-documents/:id...` route so Express
+// doesn't match `check-signatures` as an `:id`.
+router.post('/legal-documents/check-signatures', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const result = await pollOrgSignatures({ organizationId: orgId });
+    res.json(result);
+  } catch (err) {
+    log.error('POST /api/legal-documents/check-signatures error', err);
+    res.status(500).json({ error: 'Failed to check signatures' });
+  }
+});
 
 // ============================================================
 // PATCH /legal-documents/:id — update fields incl. content

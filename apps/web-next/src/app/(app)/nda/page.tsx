@@ -133,24 +133,44 @@ export default function NdaPage() {
     }
   }, []);
 
+  // Ask the backend to poll Drive for counterparty signatures (the active
+  // detection path while push webhooks are disabled on Vercel). Best-effort —
+  // if it fails we still refresh the list below.
+  const checkSignatures = useCallback(async () => {
+    try {
+      await api.post("/legal-documents/check-signatures", {});
+    } catch (err) {
+      console.warn("[nda] signature check failed:", err);
+    }
+  }, []);
+
   // Refetch wrapper that drops overlapping calls. Used by the focus/visibility
   // listeners so the in-flight guard is honored without touching loadDocs.
   const refetch = useCallback(async () => {
     if (fetchingRef.current) return;
     fetchingRef.current = true;
     try {
+      await checkSignatures();
       await loadDocs();
     } finally {
       fetchingRef.current = false;
     }
-  }, [loadDocs]);
+  }, [checkSignatures, loadDocs]);
 
   useEffect(() => {
     loadDocs();
   }, [loadDocs]);
 
-  // Auto-detected signatures get flipped to SIGNED server-side (Drive watch
-  // webhook). Refetch when the tab regains focus / becomes visible so those
+  // Poll once on mount so a signature completed while away surfaces without
+  // needing a tab blur/focus. Best-effort; refreshes the list when done.
+  useEffect(() => {
+    void refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-detected signatures get flipped to SIGNED server-side (the active path
+  // is on-demand Drive polling; the Drive watch webhook is dormant outside
+  // prod). Refetch when the tab regains focus / becomes visible so those
   // server-side changes surface without a manual reload.
   useEffect(() => {
     function handleFocus() {
