@@ -7,6 +7,7 @@ import {
   useEffect,
   useImperativeHandle,
   useRef,
+  useState,
 } from "react";
 import { cn } from "@/lib/cn";
 
@@ -64,6 +65,16 @@ interface EditorProps {
   readOnly?: boolean;
 }
 
+// Tracks which inline-format commands the current browser selection falls
+// inside (bold / italic / underline) so the toolbar can highlight the
+// matching button. Block-level commands (H2/H3/lists) aren't reflected in
+// queryCommandState reliably across browsers — we leave those un-highlighted.
+interface ToolbarActiveState {
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+}
+
 /**
  * ContentEditable rich-text editor for legal documents.
  *
@@ -88,6 +99,11 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   // is "ours" (echoed back from our onChange) vs. "theirs" (parent reset,
   // template swap, etc.). Without this every keystroke flickers the cursor.
   const lastWrittenRef = useRef<string>("");
+  const [active, setActive] = useState<ToolbarActiveState>({
+    bold: false,
+    italic: false,
+    underline: false,
+  });
 
   // Sync `value` → DOM only when the incoming value differs from what's
   // already on screen. Compare against `innerHTML` so re-renders with the
@@ -100,6 +116,37 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     el.innerHTML = sanitized;
     lastWrittenRef.current = sanitized;
   }, [value]);
+
+  // Poll queryCommandState on every selection change while the caret lives
+  // inside the editor — feeds the toolbar's active-button highlight. Skipped
+  // entirely in readOnly mode since the toolbar isn't rendered.
+  useEffect(() => {
+    if (readOnly) return;
+    const handleSelectionChange = () => {
+      const el = elRef.current;
+      if (!el) return;
+      const sel = window.getSelection();
+      if (!sel || sel.rangeCount === 0) return;
+      // Bail unless the selection is actually anchored inside the editor —
+      // otherwise we'd be reading state for a totally different field.
+      if (!el.contains(sel.anchorNode)) return;
+      try {
+        setActive({
+          bold: document.queryCommandState("bold"),
+          italic: document.queryCommandState("italic"),
+          underline: document.queryCommandState("underline"),
+        });
+      } catch (err) {
+        // queryCommandState can throw on detached selections in older
+        // Safari — don't let a transient quirk crash the editor.
+        console.warn("[nda/Editor] queryCommandState failed:", err);
+      }
+    };
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      document.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [readOnly]);
 
   const handleInput = useCallback(() => {
     const el = elRef.current;
@@ -186,9 +233,37 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
   // `:empty::before` (defined inline below).
   const showPlaceholder = !value || value.trim() === "" || value === "<p></p>";
 
+  // Run an execCommand, then trigger handleInput so onChange fires and the
+  // active-state highlight refreshes. The arg parameter passes the block tag
+  // for formatBlock (H2/H3) — undefined for inline commands.
+  const runCommand = useCallback(
+    (command: string, arg?: string) => {
+      const el = elRef.current;
+      if (!el) return;
+      try {
+        document.execCommand(command, false, arg);
+      } catch (err) {
+        console.warn(`[nda/Editor] execCommand("${command}") failed:`, err);
+        return;
+      }
+      // execCommand fires `input` on most browsers but not always — call
+      // handleInput unconditionally so onChange always sees the new HTML.
+      handleInput();
+    },
+    [handleInput],
+  );
+
   return (
     <div className={cn("relative w-full", className)}>
+      {!readOnly && (
+        <EditorToolbar active={active} runCommand={runCommand} />
+      )}
       {placeholder && showPlaceholder && !readOnly && (
+        <div className="absolute left-4 pointer-events-none select-none text-sm text-slate-400 top-[48px]">
+          {placeholder}
+        </div>
+      )}
+      {placeholder && showPlaceholder && readOnly && (
         <div className="absolute top-3 left-4 text-sm text-slate-400 pointer-events-none select-none">
           {placeholder}
         </div>
@@ -201,9 +276,12 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         onBlur={handleInput}
         onClick={handleClick}
         className={cn(
-          "legal-editor min-h-[300px] w-full rounded-md border border-slate-200 bg-white",
+          "legal-editor min-h-[300px] w-full border border-slate-200 bg-white",
           "px-4 py-3 text-sm leading-[1.7] text-slate-800 outline-none",
           "focus:border-[#003366] focus:ring-2 focus:ring-[#003366]/15",
+          // When the toolbar's above us, drop the top corners so they meet
+          // cleanly with the toolbar's rounded-top edge.
+          readOnly ? "rounded-md" : "rounded-b-md border-t-0",
           readOnly && "bg-slate-50 text-slate-700 cursor-default",
         )}
         // Spell-check is more annoying than helpful for legal boilerplate.
@@ -279,3 +357,126 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     </div>
   );
 });
+
+// ─── Toolbar ────────────────────────────────────────────────────────
+// Small formatting bar above the contentEditable: B / I / U /
+// H2 / H3 / bullets / numbered / clear. Each button calls
+// document.execCommand which still fires `input` events in every browser
+// so the parent Editor's onChange picks the change up automatically.
+//
+// CRITICAL: `e.preventDefault()` on `onMouseDown` keeps the editor's
+// selection alive. Without it, mousedown moves focus to the button before
+// execCommand runs, and the command has no selection to act on.
+
+interface ToolbarButtonProps {
+  onClick: () => void;
+  title: string;
+  active?: boolean;
+  children: React.ReactNode;
+  /** When set, renders a chunkier monospaced label (B/I/U). */
+  monoLabel?: boolean;
+}
+
+function ToolbarButton({
+  onClick,
+  title,
+  active,
+  children,
+  monoLabel,
+}: ToolbarButtonProps) {
+  return (
+    <button
+      type="button"
+      title={title}
+      aria-pressed={active ? "true" : "false"}
+      onMouseDown={(e) => {
+        // Critical — see Toolbar comment above. Without this the editor
+        // loses focus before execCommand fires and the command no-ops.
+        e.preventDefault();
+      }}
+      onClick={onClick}
+      className={cn(
+        "h-8 min-w-[32px] px-2 inline-flex items-center justify-center rounded text-xs font-semibold text-slate-600 transition-colors",
+        "hover:bg-slate-100",
+        active && "bg-slate-200 text-[#003366]",
+        monoLabel && "font-serif text-[15px]",
+      )}
+    >
+      {children}
+    </button>
+  );
+}
+
+function ToolbarDivider() {
+  return <span className="h-5 w-px bg-slate-300 mx-1" aria-hidden="true" />;
+}
+
+interface EditorToolbarProps {
+  active: ToolbarActiveState;
+  runCommand: (command: string, arg?: string) => void;
+}
+
+function EditorToolbar({ active, runCommand }: EditorToolbarProps) {
+  return (
+    <div className="flex items-center gap-0.5 h-9 px-2 rounded-t-md border border-slate-200 bg-slate-50">
+      <ToolbarButton
+        title="Bold (Ctrl+B)"
+        active={active.bold}
+        monoLabel
+        onClick={() => runCommand("bold")}
+      >
+        <strong>B</strong>
+      </ToolbarButton>
+      <ToolbarButton
+        title="Italic (Ctrl+I)"
+        active={active.italic}
+        monoLabel
+        onClick={() => runCommand("italic")}
+      >
+        <em>I</em>
+      </ToolbarButton>
+      <ToolbarButton
+        title="Underline (Ctrl+U)"
+        active={active.underline}
+        monoLabel
+        onClick={() => runCommand("underline")}
+      >
+        <span className="underline">U</span>
+      </ToolbarButton>
+      <ToolbarDivider />
+      <ToolbarButton
+        title="Heading 2"
+        onClick={() => runCommand("formatBlock", "h2")}
+      >
+        H2
+      </ToolbarButton>
+      <ToolbarButton
+        title="Heading 3"
+        onClick={() => runCommand("formatBlock", "h3")}
+      >
+        H3
+      </ToolbarButton>
+      <ToolbarButton
+        title="Bullet list"
+        onClick={() => runCommand("insertUnorderedList")}
+      >
+        • List
+      </ToolbarButton>
+      <ToolbarButton
+        title="Numbered list"
+        onClick={() => runCommand("insertOrderedList")}
+      >
+        1. List
+      </ToolbarButton>
+      <ToolbarDivider />
+      <ToolbarButton
+        title="Clear formatting"
+        onClick={() => runCommand("removeFormat")}
+      >
+        <span className="material-symbols-outlined text-[16px]">
+          format_clear
+        </span>
+      </ToolbarButton>
+    </div>
+  );
+}

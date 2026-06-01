@@ -4,10 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { useToast } from "@/providers/ToastProvider";
+import { useUser } from "@/providers/UserProvider";
 import { Editor, type EditorHandle } from "./Editor";
 import { SendModal } from "./SendModal";
 import { SentActionBar } from "./SentActionBar";
 import { STATUS_LABELS, STATUS_ORDER } from "./constants";
+import { substituteTokens } from "./tokens";
+import { ViewModeToggle, type ViewMode } from "./ViewModeToggle";
 import type {
   DocStatus,
   LegalDocument,
@@ -58,6 +61,7 @@ function initialForm(doc: LegalDocumentWithDeal): FormState {
  */
 export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const { showToast } = useToast();
+  const { user } = useUser();
   const editorRef = useRef<EditorHandle | null>(null);
   const [form, setForm] = useState<FormState>(() => initialForm(doc));
   const [saving, setSaving] = useState(false);
@@ -65,6 +69,10 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const [sendOpen, setSendOpen] = useState(false);
   // When viewing a SENT doc we default to the snapshot; user can toggle.
   const [showSnapshot, setShowSnapshot] = useState(doc.status === "SENT");
+  // Edit/Preview toggle — orthogonal to the snapshot toggle. Edit shows the
+  // raw token literals like `[COUNTERPARTY_NAME]`; Preview substitutes them
+  // with the current metadata so the user sees what the recipient gets.
+  const [viewMode, setViewMode] = useState<ViewMode>("edit");
   // Sender Gmail from the most recent /send response (session-only — not persisted).
   const [lastSenderEmail, setLastSenderEmail] = useState<string | null>(null);
 
@@ -73,6 +81,7 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   useEffect(() => {
     setForm(initialForm(doc));
     setShowSnapshot(doc.status === "SENT");
+    setViewMode("edit");
     setError(null);
     setLastSenderEmail(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -88,8 +97,10 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   // googleDocUrl on a SENT doc => counterparty has live edit access in
   // Drive; surface the link + snapshot toggle in the emerald action bar.
   const hasGoogleDoc = isSent && !!doc.googleDocUrl;
-  // Save is only meaningful when we're editing — hide it in snapshot view.
-  const showSaveButton = !(showSnapshot && hasSnapshot);
+  const isPreview = viewMode === "preview";
+  // Save is only meaningful when we're editing — hide it in snapshot view
+  // OR preview view (preview is read-only, no edits to persist).
+  const showSaveButton = !(showSnapshot && hasSnapshot) && !isPreview;
 
   async function handleSave() {
     if (saving) return;
@@ -156,8 +167,37 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
 
   const displayedContent = useMemo(() => {
     if (showSnapshot && hasSnapshot) return doc.contentSnapshot ?? "";
+    if (isPreview) {
+      // AppUser doesn't currently surface firmName (org-name lives on the
+      // /users/profile endpoint, not /users/me) — pass undefined so the
+      // helper renders the muted "__firm name__" placeholder. When AppUser
+      // grows a firmName field, this will pick it up automatically.
+      const firmName = (user as { firmName?: string } | null)?.firmName;
+      return substituteTokens(form.content, {
+        counterpartyName: form.counterpartyName,
+        counterpartyAddress: form.counterpartyAddress,
+        counterpartyEmail: form.counterpartyEmail,
+        effectiveDate: form.effectiveDate,
+        jurisdiction: form.jurisdiction,
+        dealName: doc.deal?.target || doc.deal?.projectName,
+        firmName,
+      });
+    }
     return form.content;
-  }, [showSnapshot, hasSnapshot, doc.contentSnapshot, form.content]);
+  }, [
+    showSnapshot,
+    hasSnapshot,
+    doc.contentSnapshot,
+    doc.deal,
+    isPreview,
+    form.content,
+    form.counterpartyName,
+    form.counterpartyAddress,
+    form.counterpartyEmail,
+    form.effectiveDate,
+    form.jurisdiction,
+    user,
+  ]);
 
   return (
     <div className="fixed inset-0 z-40 bg-slate-50 flex flex-col">
@@ -180,6 +220,16 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Edit / Preview segmented toggle. Always available — lets the
+              user see the doc with current metadata substituted in.
+              Orthogonal to the snapshot toggle below: snapshot reads
+              `contentSnapshot` (frozen at send), preview reads the live
+              `content` with tokens replaced via the client-side helper.
+              Suppressed while viewing a frozen snapshot to avoid
+              presenting two "view modes" at once. */}
+          {!(showSnapshot && hasSnapshot) && (
+            <ViewModeToggle viewMode={viewMode} onChange={setViewMode} />
+          )}
           {/* Toolbar snapshot toggle: fallback for SENT docs that pre-date
               Drive integration; otherwise it lives in the emerald action bar. */}
           {isSent && hasSnapshot && !hasGoogleDoc && (
@@ -271,13 +321,26 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
               .
             </div>
           )}
+          {isPreview && !(showSnapshot && hasSnapshot) && (
+            <div className="mb-3 rounded-lg px-3 py-2.5 text-xs border bg-amber-50 border-amber-200 text-amber-800 flex items-start gap-2">
+              <span className="material-symbols-outlined text-[16px] mt-0.5">
+                visibility
+              </span>
+              <div className="flex-1 min-w-0 leading-snug">
+                <span className="font-semibold">Preview mode</span> — this is
+                what the recipient will see. Tokens are filled with the
+                current counterparty info; switch back to{" "}
+                <strong>Edit</strong> to change them.
+              </div>
+            </div>
+          )}
           <div className="max-w-[820px] mx-auto bg-white shadow-sm rounded-md border border-slate-200">
             <Editor
               ref={editorRef}
               value={displayedContent}
               onChange={(html) => patch("content", html)}
               placeholder="Document body…"
-              readOnly={showSnapshot && hasSnapshot}
+              readOnly={(showSnapshot && hasSnapshot) || isPreview}
             />
           </div>
         </div>
