@@ -149,6 +149,38 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
     [handleInput],
   );
 
+  // Clicking an .nda-gap placeholder acts like clicking into an input: clear
+  // its "insert a token here" stub text + position the cursor inside, so the
+  // next TokenPalette click drops the token cleanly (not mixed in with the
+  // placeholder string). Looked button-like in v1 but did nothing — this
+  // is the actual button behavior.
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (readOnly) return;
+      const target = e.target as HTMLElement;
+      const gap = target.closest?.(".nda-gap") as HTMLElement | null;
+      if (!gap || !elRef.current?.contains(gap)) return;
+      // Clear the placeholder text on first interaction. Subsequent clicks
+      // (after a token's been inserted) are no-ops since textContent != the
+      // canonical stub.
+      const stub = "click here to insert a token";
+      if (gap.textContent && gap.textContent.includes(stub)) {
+        gap.textContent = "";
+      }
+      // Drop the cursor inside the now-empty gap so the next token insertion
+      // lands in it.
+      const range = document.createRange();
+      range.selectNodeContents(gap);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      elRef.current?.focus({ preventScroll: true });
+      handleInput();
+    },
+    [handleInput, readOnly],
+  );
+
   // Show the placeholder when the editor is empty. CSS-only — we can't use
   // `::placeholder` on a contentEditable, so we paint it via a data attr +
   // `:empty::before` (defined inline below).
@@ -167,6 +199,7 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         suppressContentEditableWarning
         onInput={handleInput}
         onBlur={handleInput}
+        onClick={handleClick}
         className={cn(
           "legal-editor min-h-[300px] w-full rounded-md border border-slate-200 bg-white",
           "px-4 py-3 text-sm leading-[1.7] text-slate-800 outline-none",
@@ -215,9 +248,10 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
         .legal-editor hr { border: 0; border-top: 1px solid #cbd5e1; margin: 1rem 0; }
         .legal-editor a { color: #003366; text-decoration: underline; }
         .legal-editor pre, .legal-editor code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; background: #f1f5f9; padding: 0 0.3em; border-radius: 2px; }
-        /* Visible "fill this in" placeholder for empty paragraphs (PF-style
-           gaps where the counterparty name / address / date go) — yellow
-           underline + dotted treatment makes them obviously clickable. */
+        /* Clickable "fill this in" placeholder for empty paragraphs (PF-style
+           gaps where the counterparty name / address / date go). Clicking
+           clears the stub text + positions cursor — handled in the React
+           onClick above. */
         .legal-editor p.nda-gap {
           color: #b45309;
           background: #fef3c7;
@@ -227,7 +261,19 @@ export const Editor = forwardRef<EditorHandle, EditorProps>(function Editor(
           text-align: center;
           font-style: italic;
           margin: 0.5rem 0;
-          cursor: text;
+          cursor: pointer;
+          transition: background 120ms, border-color 120ms;
+        }
+        .legal-editor p.nda-gap:hover {
+          background: #fde68a;
+          border-color: #d97706;
+        }
+        /* Once cleared (post-click) the gap stays styled until a token is
+           actually inserted, so the user can see where their cursor lives. */
+        .legal-editor p.nda-gap:empty::before {
+          content: "▎ pick a token from the right →";
+          color: #92400e;
+          opacity: 0.6;
         }
       `}</style>
     </div>
