@@ -14,6 +14,7 @@ import graphsRouter from './routes/graphs.js';
 import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
 import legalDocumentsRouter from './routes/legal-documents.js';
 import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
+import authWorkspaceEmailRouter from './routes/auth-workspace-email.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { usageContextMiddleware } from './middleware/usageContext.js';
@@ -171,6 +172,10 @@ app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, us
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
+
+// Auth-scoped self-service routes (MFA bypass active for /api/auth/* in
+// middleware). No orgMiddleware — handler resolves the User row itself.
+app.use('/api/auth', authMiddleware, authWorkspaceEmailRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)

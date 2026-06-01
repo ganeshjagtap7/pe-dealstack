@@ -34,7 +34,7 @@ type Step =
       suggestedTitle: string;
     };
 
-const ACCEPTED_EXT = ["docx", "html", "md"] as const;
+const ACCEPTED_EXT = ["docx", "html", "md", "pdf"] as const;
 type AcceptedExt = (typeof ACCEPTED_EXT)[number];
 
 function detectFileKind(name: string): AcceptedExt | null {
@@ -49,7 +49,7 @@ function detectFileKind(name: string): AcceptedExt | null {
 }
 
 function stripExtension(name: string): string {
-  return name.replace(/\.(docx|html|htm|md|markdown)$/i, "");
+  return name.replace(/\.(docx|html|htm|md|markdown|pdf)$/i, "");
 }
 
 /**
@@ -89,7 +89,7 @@ export function UploadExistingFlow({
     const detected = detectFileKind(file.name);
     if (!detected) {
       setPickError(
-        "Unsupported file type. Drop a .docx, .html, or .md file. PDF support is coming soon.",
+        "Unsupported file type. Drop a .docx, .html, .md, or .pdf file.",
       );
       return;
     }
@@ -149,12 +149,9 @@ export function UploadExistingFlow({
           (body as { error?: string; message?: string }).error ??
           (body as { message?: string }).message ??
           `Import failed (${res.status})`;
-        if (code === "PDF_NOT_SUPPORTED") {
-          throw new Error(msg);
-        }
         if (code === "INVALID_FILE_FORMAT") {
           throw new Error(
-            "We couldn't read that file. Try a different .docx, .html, or .md.",
+            "We couldn't read that file. Try a different .docx, .html, .md, or .pdf.",
           );
         }
         throw new Error(msg);
@@ -226,7 +223,7 @@ export function UploadExistingFlow({
             >
               <input
                 type="file"
-                accept=".docx,.html,.htm,.md"
+                accept=".docx,.html,.htm,.md,.pdf"
                 onChange={handleBrowse}
                 className="hidden"
               />
@@ -240,11 +237,13 @@ export function UploadExistingFlow({
               </div>
               <div className="text-[12px] text-slate-500 mt-1">
                 Accepts <span className="font-mono">.docx</span>,{" "}
-                <span className="font-mono">.html</span>, or{" "}
-                <span className="font-mono">.md</span>
+                <span className="font-mono">.html</span>,{" "}
+                <span className="font-mono">.md</span>, or{" "}
+                <span className="font-mono">.pdf</span>
               </div>
               <div className="text-[11px] text-slate-400 mt-3">
-                PDF support coming soon. For now, export to .docx first.
+                PDF text is extracted as plain paragraphs — you can edit
+                the structure in the in-app editor after import.
               </div>
             </label>
           </div>
