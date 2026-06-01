@@ -419,7 +419,7 @@ router.delete('/legal-documents/:id', async (req, res) => {
 });
 
 // ============================================================
-// POST /legal-documents/:id/send — Resend .docx delivery
+// POST /legal-documents/:id/send — Gmail send via Workspace OAuth
 // ============================================================
 
 router.post('/legal-documents/:id/send', async (req, res) => {
@@ -441,6 +441,7 @@ router.post('/legal-documents/:id/send', async (req, res) => {
       documentId: id,
       organizationId: orgId,
       userId: internalUserId,
+      senderEmailHint: req.user.email,
       toEmail: parsed.data.toEmail,
       subject: parsed.data.subject,
       message: parsed.data.message,
