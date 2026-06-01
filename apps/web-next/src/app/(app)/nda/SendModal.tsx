@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
+import { useUser } from "@/providers/UserProvider";
 import type { LegalDocumentWithDeal, SendDocResponse } from "./types";
 
 interface SendModalProps {
@@ -15,11 +16,15 @@ interface SendModalProps {
 // Discriminated union for all banner states the modal can render. Adding a
 // new error code? Add a variant here, map it in `bannerForError`, and add the
 // render branch in `ErrorBanner`.
+//
+// Note: there is no `resendNotConfigured` variant — NDA sends now go through
+// the user's own Workspace Gmail, not the firm-wide Resend account. The
+// equivalent failure modes are now `googleNotConnected` /
+// `googleScopesMissing` (account-level) or `sendFailed` (Gmail API blew up).
 type Banner =
   | { kind: "none" }
   | { kind: "googleNotConnected" }
   | { kind: "googleScopesMissing" }
-  | { kind: "resendNotConfigured" }
   | { kind: "noRecipient" }
   | { kind: "noContent" }
   | { kind: "driveError"; details: string }
@@ -36,13 +41,17 @@ function defaultSubject(doc: LegalDocumentWithDeal | null): string {
  * Modal that ships the current document by:
  *   1. Creating a Google Doc copy in the sender's Drive,
  *   2. Granting the counterparty edit access,
- *   3. Emailing them the link via Resend.
+ *   3. Emailing them the link via the sender's own Workspace Gmail.
  *
- * The whole chain requires the firm's `google_calendar` integration to be
- * connected AND re-authorized for the Drive scope — error codes from the
- * backend map to actionable yellow/red banners below.
+ * The whole chain requires the user's Google Workspace OAuth connection to be
+ * present AND scoped for both Drive (file creation/share) and `gmail.send`
+ * (compose+send) — error codes from the backend map to actionable yellow/red
+ * banners below. Each user sends as themselves, so the recipient sees the
+ * sender's actual work address in the From header (no firm-wide domain
+ * verification needed).
  */
 export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
+  const { user } = useUser();
   const [toEmail, setToEmail] = useState("");
   const [subject, setSubject] = useState("");
   const [message, setMessage] = useState("");
@@ -117,7 +126,7 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
             <h2 className="text-base font-bold text-slate-900">Send NDA via email</h2>
             <p className="text-xs text-slate-500 mt-0.5">
               Creates a Google Doc, grants edit access to the counterparty,
-              and emails them the link.
+              and emails them the link from your Gmail.
             </p>
           </div>
           <button
@@ -145,6 +154,13 @@ export function SendModal({ open, doc, onCancel, onSent }: SendModalProps) {
               className={inputCls}
             />
           </Field>
+
+          {/* Provenance line: shows the user *which* Workspace inbox the
+              email will appear to come from. Rendered up here (before the
+              API call returns) using the cached UserProvider record so users
+              can sanity-check their identity before hitting Send. Falls back
+              to a generic label if `useUser` hasn't hydrated yet. */}
+          <SenderLine email={user?.email} />
 
           <Field label="Subject">
             <input
@@ -206,8 +222,6 @@ function bannerForError(err: unknown): Banner {
         return { kind: "googleNotConnected" };
       case "GOOGLE_SCOPES_MISSING":
         return { kind: "googleScopesMissing" };
-      case "RESEND_NOT_CONFIGURED":
-        return { kind: "resendNotConfigured" };
       case "NO_RECIPIENT":
         return { kind: "noRecipient" };
       case "NO_CONTENT":
@@ -215,6 +229,8 @@ function bannerForError(err: unknown): Banner {
       case "DRIVE_API_ERROR":
         return { kind: "driveError", details: err.message };
       case "EMAIL_SEND_FAILED":
+        // Backend reuses the EMAIL_SEND_FAILED code for Gmail API failures
+        // (network blip, quota, transient 5xx). Copy below reflects Gmail.
         return { kind: "sendFailed", details: err.message };
       default:
         return { kind: "generic", message: err.message };
@@ -251,16 +267,46 @@ function Field({
   );
 }
 
+/**
+ * Muted "From: <user.email>" line displayed under the To field. Surfaces
+ * which Workspace address the email will appear to come from — important
+ * because the multi-tenant Gmail flow means there's no firm-wide From; the
+ * sender's personal work address is on the message.
+ *
+ * Renders a generic fallback while `useUser()` is hydrating so the layout
+ * doesn't pop in.
+ */
+function SenderLine({ email }: { email?: string }) {
+  return (
+    <div className="flex items-start gap-1.5 -mt-1 text-xs text-slate-500 leading-snug">
+      <span className="material-symbols-outlined text-[14px] mt-0.5 text-slate-400">
+        outgoing_mail
+      </span>
+      <div className="min-w-0">
+        {email ? (
+          <>
+            From: <span className="font-medium text-slate-700">{email}</span>{" "}
+            <span className="text-slate-400">
+              (sent via your Google Workspace Gmail)
+            </span>
+          </>
+        ) : (
+          <>From: your Google Workspace Gmail</>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ErrorBanner({ banner }: { banner: Banner }) {
   if (banner.kind === "none") return null;
 
   // "Info"-style yellow banners are for fixable configuration issues (Google
-  // not connected / scopes missing / no recipient / no content / Resend env).
-  // Hard failures from Google or Resend are red.
+  // not connected / scopes missing / no recipient / no content). Hard
+  // failures from Google Drive or Gmail are red.
   const isInfo =
     banner.kind === "googleNotConnected" ||
     banner.kind === "googleScopesMissing" ||
-    banner.kind === "resendNotConfigured" ||
     banner.kind === "noRecipient" ||
     banner.kind === "noContent";
 
@@ -269,9 +315,7 @@ function ErrorBanner({ banner }: { banner: Banner }) {
       case "googleNotConnected":
         return "Google Workspace isn't connected yet. Connect it in Settings to send NDAs.";
       case "googleScopesMissing":
-        return "Google Workspace is connected but needs to be re-authorized for NDA features. Reconnect in Settings.";
-      case "resendNotConfigured":
-        return "Email isn't configured for this firm yet. Talk to your admin.";
+        return "Google Workspace is connected but needs a re-authorize to send mail. Reconnect in Settings.";
       case "noRecipient":
         return "Fill in counterparty email first";
       case "noContent":
@@ -279,7 +323,7 @@ function ErrorBanner({ banner }: { banner: Banner }) {
       case "driveError":
         return `Google Drive error: ${banner.details}`;
       case "sendFailed":
-        return `Email send failed: ${banner.details}`;
+        return `Gmail send failed: ${banner.details}`;
       case "generic":
         return banner.message;
       default:

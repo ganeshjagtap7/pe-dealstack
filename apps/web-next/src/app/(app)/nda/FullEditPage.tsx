@@ -50,13 +50,10 @@ function initialForm(doc: LegalDocumentWithDeal): FormState {
 }
 
 /**
- * Full-screen NDA editor: left = HTML body, right = metadata sidebar. Lives
- * inline in the /nda route — not a modal — because legal documents are too
- * big to fit a centered popup comfortably.
- *
- * `status === "SENT"` switches the left pane to a read-only view of
- * `contentSnapshot` with a "Revert to current draft" toggle so users can
- * always check what actually went out the door.
+ * Full-screen NDA editor (left = HTML body, right = metadata sidebar) —
+ * inline in /nda, not a modal, because legal docs don't fit in a popup.
+ * `status === "SENT"` defaults the left pane to read-only `contentSnapshot`
+ * with a toggle back to the live draft.
  */
 export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const { showToast } = useToast();
@@ -67,14 +64,16 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const [sendOpen, setSendOpen] = useState(false);
   // When viewing a SENT doc we default to the snapshot; user can toggle.
   const [showSnapshot, setShowSnapshot] = useState(doc.status === "SENT");
+  // Sender Gmail from the most recent /send response (session-only — not persisted).
+  const [lastSenderEmail, setLastSenderEmail] = useState<string | null>(null);
 
-  // If the user navigates to a different doc inside the same mount, reset.
-  // We intentionally watch `doc.id` / `doc.status` rather than `doc` so that
-  // a parent state echo on every `handleSaved` doesn't wipe the form mid-typing.
+  // Reset on doc change. Watch `doc.id` / `doc.status` (not `doc`) so
+  // parent state echoes on `handleSaved` don't wipe the form mid-typing.
   useEffect(() => {
     setForm(initialForm(doc));
     setShowSnapshot(doc.status === "SENT");
     setError(null);
+    setLastSenderEmail(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [doc.id, doc.status]);
 
@@ -85,9 +84,8 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const dealLabel = doc.deal.target || doc.deal.projectName || "Unknown deal";
   const isSent = form.status === "SENT";
   const hasSnapshot = !!doc.contentSnapshot;
-  // When the backend has stamped a googleDocUrl on a SENT doc, the
-  // counterparty has live edit access in Drive — surface the link + the
-  // "snapshot vs current draft" toggle in a prominent emerald action bar.
+  // googleDocUrl on a SENT doc => counterparty has live edit access in
+  // Drive; surface the link + snapshot toggle in the emerald action bar.
   const hasGoogleDoc = isSent && !!doc.googleDocUrl;
   // Save is only meaningful when we're editing — hide it in snapshot view.
   const showSaveButton = !(showSnapshot && hasSnapshot);
@@ -130,9 +128,8 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
 
   function handleSent(resp: SendDocResponse, toEmail: string) {
     setSendOpen(false);
-    // After a successful send the server has flipped the status to SENT,
-    // frozen a snapshot, and created the Google Doc copy. Reflect all of
-    // that locally + bubble up so the gallery updates without a full refetch.
+    // Server has flipped status → SENT, frozen a snapshot, and made the
+    // Google Doc copy. Mirror locally + bubble up so the gallery updates.
     const updated: LegalDocument = {
       ...doc,
       status: "SENT",
@@ -145,9 +142,12 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
       googleDocUrl: resp.googleDocUrl,
     };
     onSaved(updated);
+    setLastSenderEmail(resp.senderEmail);
+    // Include sender Gmail in the toast — multi-tenant flow means From is
+    // the user's own Workspace address, not a firm-wide domain.
     const successMsg = resp.alreadySent
-      ? `Already sent — Google Doc shared with ${toEmail}`
-      : `NDA sent — Google Doc shared with ${toEmail}`;
+      ? `Already sent — NDA delivered to ${toEmail} from ${resp.senderEmail}`
+      : `NDA sent to ${toEmail} from ${resp.senderEmail}`;
     showToast(successMsg, "success");
     setForm((prev) => ({ ...prev, status: "SENT" }));
     setShowSnapshot(true);
@@ -179,9 +179,8 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {/* When we have a Google Doc the snapshot toggle lives in the
-              emerald action bar below. Keep the toolbar toggle as a fallback
-              for SENT docs that pre-date Drive integration. */}
+          {/* Toolbar snapshot toggle: fallback for SENT docs that pre-date
+              Drive integration; otherwise it lives in the emerald action bar. */}
           {isSent && hasSnapshot && !hasGoogleDoc && (
             <button
               type="button"
@@ -237,6 +236,7 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
               sentToEmail={doc.sentToEmail}
               sentAt={doc.sentAt}
               googleDocUrl={doc.googleDocUrl}
+              senderEmail={lastSenderEmail}
               showSnapshot={showSnapshot}
               onToggleView={() => setShowSnapshot((s) => !s)}
             />
@@ -397,9 +397,8 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   );
 }
 
-// Convert an ISO timestamp into "YYYY-MM-DDTHH:MM" that <input
-// type="datetime-local"> expects. Bare `.toISOString().slice(0, 16)` would
-// render in UTC; we want the user's wall clock to match.
+// ISO → "YYYY-MM-DDTHH:MM" in local time for <input type="datetime-local">.
+// `.toISOString().slice(0, 16)` would render UTC; we want wall clock.
 function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
@@ -436,20 +435,23 @@ interface SentActionBarProps {
   sentToEmail: string | null;
   sentAt: string | null;
   googleDocUrl: string;
+  // Sender's Gmail from the most recent /send response; null on a
+  // server-loaded SENT doc (not persisted). Omits provenance line when null.
+  senderEmail: string | null;
   showSnapshot: boolean;
   onToggleView: () => void;
 }
 
 /**
- * Emerald banner shown above the editor for SENT docs that have a live
- * Google Doc. Surfaces the canonical "Open in Google Docs" link plus the
- * snapshot/current-draft toggle so users always know which copy they're
- * looking at.
+ * Emerald banner shown above the editor for SENT docs with a live Google
+ * Doc. Surfaces the Open-in-Docs link, snapshot/current-draft toggle, and
+ * (when known) a muted "Email sent from <addr>" provenance line.
  */
 function SentActionBar({
   sentToEmail,
   sentAt,
   googleDocUrl,
+  senderEmail,
   showSnapshot,
   onToggleView,
 }: SentActionBarProps) {
@@ -468,6 +470,11 @@ function SentActionBar({
           <span className="text-emerald-800/80">
             Counterparty has edit access in Google Docs.
           </span>
+          {senderEmail && (
+            <div className="mt-0.5 text-[11px] text-emerald-800/70">
+              Email sent from {senderEmail}
+            </div>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-2 shrink-0">
