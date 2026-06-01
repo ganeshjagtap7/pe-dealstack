@@ -1,8 +1,9 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { DOC_TYPE_LABELS, STATUS_COLOR_CLASSES, STATUS_LABELS } from "./constants";
-import type { LegalDocumentWithDeal } from "./types";
+import type { DocStatus, LegalDocumentWithDeal } from "./types";
 
 interface CreateTileProps {
   onClick: () => void;
@@ -23,6 +24,33 @@ function CreateTile({ onClick }: CreateTileProps) {
         </div>
         <div className="text-[11px] text-slate-400 -mt-1.5">
           Draft a fresh NDA from one of your verified templates
+        </div>
+      </div>
+    </button>
+  );
+}
+
+interface UploadExistingTileProps {
+  status: "SENT" | "SIGNED";
+  onClick: () => void;
+}
+
+function UploadExistingTile({ status, onClick }: UploadExistingTileProps) {
+  const verb = status === "SENT" ? "sent" : "signed";
+  return (
+    <button
+      onClick={onClick}
+      className="group relative aspect-[4/3] rounded-xl border-2 border-dashed border-slate-300 bg-slate-50/40 hover:border-[#003366] hover:bg-[#E6EEF5]/60 transition flex items-center justify-center"
+    >
+      <div className="flex flex-col items-center justify-center gap-3 px-6 py-6 rounded-lg border-2 border-dashed border-slate-300 group-hover:border-[#003366] transition">
+        <div className="w-11 h-11 rounded-full bg-white border border-slate-200 group-hover:border-[#003366] flex items-center justify-center text-slate-500 group-hover:text-[#003366] shadow-sm">
+          <span className="material-symbols-outlined text-[24px]">upload_file</span>
+        </div>
+        <div className="text-sm font-medium text-slate-700 group-hover:text-[#003366]">
+          Upload Existing NDA
+        </div>
+        <div className="text-[11px] text-slate-400 -mt-1.5 px-4 text-center leading-snug">
+          Import an NDA already {verb} outside this app
         </div>
       </div>
     </button>
@@ -180,11 +208,33 @@ function DateRow({
   );
 }
 
+// ─── Tabs ────────────────────────────────────────────────────────────────
+// Status-bucketed tabs sit just above the card grid. Drafts is the default
+// view on first paint — the user's most common reason to open /nda is to
+// finish drafting something. Sent / Signed surface the import CTA instead
+// of the New NDA tile since "uploading something already done" is the only
+// reasonable action on those tabs.
+type TabKey = "drafts" | "sent" | "signed" | "all";
+
+const TABS: ReadonlyArray<{ key: TabKey; label: string; status: DocStatus | null }> = [
+  { key: "drafts", label: "Drafts", status: "DRAFT" },
+  { key: "sent", label: "Sent", status: "SENT" },
+  { key: "signed", label: "Signed", status: "SIGNED" },
+  { key: "all", label: "All", status: null },
+] as const;
+
+function filterByTab(docs: LegalDocumentWithDeal[], tab: TabKey): LegalDocumentWithDeal[] {
+  const def = TABS.find((t) => t.key === tab);
+  if (!def?.status) return docs;
+  return docs.filter((d) => d.status === def.status);
+}
+
 interface GalleryProps {
   docs: LegalDocumentWithDeal[];
   loading: boolean;
   error: string | null;
   onCreate: () => void;
+  onUploadExisting: () => void;
   onEdit: (doc: LegalDocumentWithDeal) => void;
   onDelete: (doc: LegalDocumentWithDeal) => void;
   onDismissError: () => void;
@@ -195,10 +245,34 @@ export function Gallery({
   loading,
   error,
   onCreate,
+  onUploadExisting,
   onEdit,
   onDelete,
   onDismissError,
 }: GalleryProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>("drafts");
+
+  // Per-tab counts feed the badge next to each tab label. Precomputed in a
+  // single pass so we don't rescan the array four times on every render.
+  const counts = useMemo(() => {
+    const c: Record<TabKey, number> = { drafts: 0, sent: 0, signed: 0, all: docs.length };
+    for (const d of docs) {
+      if (d.status === "DRAFT") c.drafts += 1;
+      else if (d.status === "SENT") c.sent += 1;
+      else if (d.status === "SIGNED") c.signed += 1;
+    }
+    return c;
+  }, [docs]);
+
+  const visible = useMemo(() => filterByTab(docs, activeTab), [docs, activeTab]);
+
+  // Drafts + All show the New NDA tile; Sent + Signed show the Upload
+  // Existing tile instead. Keeps the primary action on every tab obviously
+  // bucket-appropriate.
+  const showCreateTile = activeTab === "drafts" || activeTab === "all";
+  const uploadCtaStatus: "SENT" | "SIGNED" | null =
+    activeTab === "sent" ? "SENT" : activeTab === "signed" ? "SIGNED" : null;
+
   return (
     <div className="max-w-[1280px] mx-auto px-8 py-7">
       <div className="flex items-end justify-between mb-5">
@@ -228,8 +302,45 @@ export function Gallery({
         </div>
       )}
 
+      {/* Tab strip — Banker Blue underline on active, muted slate on rest.
+          Border-bottom on the container so the active tab visually "owns"
+          the divider line. */}
+      <div className="border-b border-slate-200 mb-5">
+        <div className="flex gap-6">
+          {TABS.map((tab) => {
+            const isActive = activeTab === tab.key;
+            const count = counts[tab.key];
+            return (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  "pb-2.5 px-1 -mb-px border-b-2 text-sm transition-colors",
+                  isActive
+                    ? "border-[#003366] text-[#003366] font-semibold"
+                    : "border-transparent text-slate-500 hover:text-slate-700 font-medium",
+                )}
+              >
+                {tab.label}
+                <span
+                  className={cn(
+                    "ml-1.5 text-[11px] font-normal",
+                    isActive ? "text-[#003366]/70" : "text-slate-400",
+                  )}
+                >
+                  ({count})
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        <CreateTile onClick={onCreate} />
+        {showCreateTile && <CreateTile onClick={onCreate} />}
+        {uploadCtaStatus && (
+          <UploadExistingTile status={uploadCtaStatus} onClick={onUploadExisting} />
+        )}
 
         {loading ? (
           <>
@@ -237,10 +348,10 @@ export function Gallery({
             <SkeletonCard />
             <SkeletonCard />
           </>
-        ) : docs.length === 0 ? (
-          <EmptyCard />
+        ) : visible.length === 0 ? (
+          <EmptyCard activeTab={activeTab} />
         ) : (
-          docs.map((d) => (
+          visible.map((d) => (
             <DocCard
               key={d.id}
               doc={d}
@@ -269,20 +380,69 @@ function SkeletonCard() {
   );
 }
 
-function EmptyCard() {
+interface EmptyCardProps {
+  activeTab: TabKey;
+}
+
+function EmptyCard({ activeTab }: EmptyCardProps) {
+  const copy: Record<TabKey, { title: string; hint: React.ReactNode }> = {
+    drafts: {
+      title: "No drafts yet",
+      hint: (
+        <>
+          Click{" "}
+          <span className="inline-flex items-center gap-0.5 text-[#003366] font-medium">
+            New NDA
+          </span>{" "}
+          above to start drafting one from a verified template.
+        </>
+      ),
+    },
+    sent: {
+      title: "No sent NDAs yet",
+      hint: (
+        <>
+          Drafts you send appear here. You can also{" "}
+          <span className="inline-flex items-center gap-0.5 text-[#003366] font-medium">
+            Upload Existing
+          </span>{" "}
+          NDAs that were sent outside the app.
+        </>
+      ),
+    },
+    signed: {
+      title: "No signed NDAs yet",
+      hint: (
+        <>
+          Once an NDA is countersigned, mark it Signed in the editor — or use{" "}
+          <span className="inline-flex items-center gap-0.5 text-[#003366] font-medium">
+            Upload Existing
+          </span>{" "}
+          to import a signed copy.
+        </>
+      ),
+    },
+    all: {
+      title: "No NDAs yet",
+      hint: (
+        <>
+          Open a deal and click{" "}
+          <span className="inline-flex items-center gap-0.5 text-[#003366] font-medium">
+            New NDA
+          </span>
+          , or pick a deal here to start one.
+        </>
+      ),
+    },
+  };
+  const { title, hint } = copy[activeTab];
   return (
     <div className="aspect-[4/3] rounded-xl border border-slate-200 bg-white shadow-sm flex flex-col items-center justify-center text-center px-6">
       <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
         <span className="material-symbols-outlined text-[24px]">gavel</span>
       </div>
-      <div className="text-sm font-medium text-slate-700">No NDAs yet</div>
-      <div className="text-[12px] text-slate-500 max-w-xs mt-1">
-        Open a deal and click{" "}
-        <span className="inline-flex items-center gap-0.5 text-[#003366] font-medium">
-          New NDA
-        </span>
-        , or pick a deal here to start one.
-      </div>
+      <div className="text-sm font-medium text-slate-700">{title}</div>
+      <div className="text-[12px] text-slate-500 max-w-xs mt-1">{hint}</div>
     </div>
   );
 }

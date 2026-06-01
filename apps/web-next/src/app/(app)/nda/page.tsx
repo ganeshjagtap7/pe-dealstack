@@ -11,6 +11,7 @@ import { FullEditPage } from "./FullEditPage";
 import { Gallery } from "./Gallery";
 import { TemplatePicker } from "./TemplatePicker";
 import { TemplateUploadFlow } from "./TemplateUploadFlow";
+import { UploadExistingFlow } from "./UploadExistingFlow";
 import type {
   LegalDocTemplate,
   LegalDocument,
@@ -19,10 +20,11 @@ import type {
 
 // State machine:
 //   - "gallery":         the firm-wide list (default)
-//   - "picker":          deal picker modal
+//   - "picker":          deal picker modal (create-from-template flow)
 //   - "templatePicker":  verified-template picker modal
 //   - "uploadTemplate":  inline template upload + verifier (no settings detour)
 //   - "create":          counterparty form (template + deal locked in)
+//   - "uploadExisting":  3-step import flow for an NDA done outside this app
 //   - "edit":            full-screen editor for an existing row
 type View =
   | { mode: "gallery" }
@@ -35,6 +37,7 @@ type View =
       dealLabel: string;
       template: LegalDocTemplate;
     }
+  | { mode: "uploadExisting" }
   | { mode: "edit"; doc: LegalDocumentWithDeal };
 
 export default function NdaPage() {
@@ -136,6 +139,11 @@ export default function NdaPage() {
     if (ok) setView({ mode: "picker" });
   }
 
+  function handleUploadExisting() {
+    // Imports skip the template gate — the file IS the source of truth.
+    setView({ mode: "uploadExisting" });
+  }
+
   function handleEdit(doc: LegalDocumentWithDeal) {
     setView({ mode: "edit", doc });
   }
@@ -201,6 +209,22 @@ export default function NdaPage() {
     loadDocs();
   }
 
+  function handleImported(doc: LegalDocument) {
+    // Same shape as handleCreated but with an "Imported" toast instead of
+    // "Created" so the user knows the row came from upload-existing, not
+    // template-substitution. We don't have the deal label on hand here
+    // (the flow owns it internally), so fall back to null; loadDocs will
+    // refresh with the canonical deal join shortly.
+    const withDeal: LegalDocumentWithDeal = {
+      ...doc,
+      deal: { id: doc.dealId, target: null, projectName: null },
+    };
+    setDocs((ds) => [withDeal, ...ds]);
+    showToast(`Imported "${doc.title}"`, "success");
+    setView({ mode: "edit", doc: withDeal });
+    loadDocs();
+  }
+
   function handleSaved(updated: LegalDocument) {
     setDocs((ds) =>
       ds.map((d) => (d.id === updated.id ? { ...d, ...updated, deal: d.deal } : d)),
@@ -234,6 +258,7 @@ export default function NdaPage() {
         loading={loading}
         error={error}
         onCreate={handleCreate}
+        onUploadExisting={handleUploadExisting}
         onEdit={handleEdit}
         onDelete={handleDeleteRequest}
         onDismissError={() => setError(null)}
@@ -272,6 +297,13 @@ export default function NdaPage() {
               setView({ mode: "gallery" });
             }
           }}
+        />
+      )}
+
+      {view.mode === "uploadExisting" && (
+        <UploadExistingFlow
+          onCancel={() => setView({ mode: "gallery" })}
+          onCreated={handleImported}
         />
       )}
 

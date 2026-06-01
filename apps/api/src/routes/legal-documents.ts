@@ -13,6 +13,7 @@
 // Joined Deal alias mirrors graphs.ts so the frontend contract is shared.
 
 import { Router } from 'express';
+import multer from 'multer';
 import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
@@ -28,6 +29,16 @@ import {
   sendLegalDocument,
   LegalDocSendError,
 } from '../services/legalDocSendService.js';
+import {
+  makeUploadLegalDocumentHandler,
+} from '../services/legalDocImportService.js';
+
+// 25 MB cap mirrors the template-parse upload — the underlying parser is
+// shared and rejects anything it can't decode with INVALID_FILE_FORMAT.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 25 * 1024 * 1024, files: 1 },
+});
 
 const router = Router();
 
@@ -74,6 +85,10 @@ const sendBodySchema = z.object({
   subject: z.string().max(500).optional(),
   message: z.string().max(20_000).optional(),
 });
+
+// Upload-existing schemas live in legalDocImportService — keeps the route
+// file under the 500-line cap and lets the import path be unit-tested
+// independently of Express plumbing.
 
 function isMissingTableError(error: { code?: string } | null): boolean {
   if (!error) return false;
@@ -332,6 +347,19 @@ router.post('/deals/:dealId/legal-documents', async (req, res) => {
     res.status(500).json({ error: 'Failed to create legal document' });
   }
 });
+
+// ============================================================
+// POST /deals/:dealId/legal-documents/upload — import existing NDA
+// ============================================================
+//
+// Multipart import for an NDA already sent or signed outside the app.
+// Skips template + Google Doc + Gmail send; stores parsed HTML as both
+// content + contentSnapshot. DRAFT rejected — handler in import service.
+router.post(
+  '/deals/:dealId/legal-documents/upload',
+  upload.single('file'),
+  makeUploadLegalDocumentHandler({ resolveInternalUserId }),
+);
 
 // ============================================================
 // PATCH /legal-documents/:id — update fields incl. content

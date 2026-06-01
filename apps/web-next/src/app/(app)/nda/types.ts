@@ -146,6 +146,27 @@ export interface UpdateTemplateBody {
   verifiedAt?: string | null;
 }
 
+// Payload for POST /deals/:dealId/legal-documents/upload (multipart).
+// Sent as form-data fields alongside the `file` + `kind` parts — the
+// frontend assembles a FormData rather than a JSON body. Status must be
+// SENT or SIGNED; DRAFT goes through the template flow so token
+// substitution can't be skipped.
+export interface UploadExistingMetadata {
+  title: string;
+  status: "SENT" | "SIGNED";
+  counterpartyName?: string;
+  counterpartyEmail?: string;
+  counterpartyAddress?: string;
+  jurisdiction?: string;
+  effectiveDate?: string; // YYYY-MM-DD
+  expiresAt?: string;     // YYYY-MM-DD
+  sentAt?: string;        // ISO datetime
+  signedAt?: string;      // ISO datetime
+  sentToEmail?: string;
+}
+
+export type UploadExistingKind = "docx" | "html" | "md";
+
 // Payload for POST /legal-documents/:id/send.
 export interface SendDocBody {
   toEmail?: string;
