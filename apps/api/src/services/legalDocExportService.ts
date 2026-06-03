@@ -55,11 +55,13 @@ export interface ExportLegalDocumentInput {
   organizationId: string;
   userId: string; // internal User.id — for the Workspace token lookup
   format: DriveExportFormat;
-  // Optional HTML used as the temp Doc body instead of the raw `content`
-  // column — the eSign flow passes token-substituted content with a Dropbox
-  // Sign signature block appended. Only applies on the temp-Doc path (DRAFT,
-  // no googleDocId); when the doc already has a persistent googleDocId we
-  // export that Doc untouched, so the override is ignored.
+  // Optional HTML rendered instead of the stored document — the eSign flow
+  // passes token-substituted content with the Dropbox Sign text-tag signature
+  // block placed in it. When set it ALWAYS forces a throwaway Doc built from
+  // this HTML, even if the row has a persistent googleDocId: that shared Doc
+  // carries no text tags, so exporting it would strip the signature fields and
+  // Dropbox would auto-place a single one. The download path omits this and
+  // keeps exporting the persistent Doc.
   contentOverride?: string;
 }
 
@@ -152,11 +154,18 @@ export async function exportLegalDocument(
     );
   }
 
-  // Reuse the persistent Doc when we have one; otherwise spin a temp Doc.
-  let fileId = doc.googleDocId;
+  // Pick the source Doc:
+  //   1. contentOverride (eSign) → always a throwaway Doc built from it, so the
+  //      text-tag signature block actually reaches the PDF.
+  //   2. else a persistent googleDocId → export it directly (download path).
+  //   3. else (plain draft) → a throwaway Doc from the raw content.
+  let fileId: string;
   let tempFileId: string | null = null;
-  if (!fileId) {
-    const body = input.contentOverride ?? doc.content;
+  const overrideBody = input.contentOverride?.trim()
+    ? input.contentOverride
+    : null;
+  if (overrideBody || !doc.googleDocId) {
+    const body = overrideBody ?? doc.content;
     if (!body || !body.trim()) {
       throw new LegalDocExportError('NO_CONTENT', 'Document has no content to export', 409);
     }
@@ -171,6 +180,8 @@ export async function exportLegalDocument(
     } catch (err) {
       throw mapDriveErr(err);
     }
+  } else {
+    fileId = doc.googleDocId;
   }
 
   let bytes: Buffer;

@@ -43,33 +43,39 @@ export function visibleSignatureBlockHtml(): string {
   ].join('');
 }
 
-// Swap every marker for `block`. Standalone-paragraph markers (the common
-// case — the button inserts the marker as its own <p>) have their whole <p>
-// replaced; any leftover inline marker is replaced literally. When no marker
-// exists, append the block only if `appendIfMissing`.
+// Swap every marker for a freshly-built block. `blockFor(index)` is called once
+// per marker with a 0-based index, so the eSign path can give each field a
+// unique id (the email path ignores it). Standalone-paragraph markers (the
+// common case — the button inserts the marker as its own <p>) have their whole
+// <p> replaced; any leftover inline marker is replaced one at a time. When no
+// marker exists, append a single block only if `appendIfMissing`.
 function placeBlock(
   html: string,
-  block: string,
+  blockFor: (index: number) => string,
   appendIfMissing: boolean,
 ): string {
   if (!html.includes(SIGNATURE_BLOCK_MARKER)) {
-    return appendIfMissing ? html + block : html;
+    return appendIfMissing ? html + blockFor(0) : html;
   }
-  const out = html
-    .replace(MARKER_PARAGRAPH_RE, block)
-    .split(SIGNATURE_BLOCK_MARKER)
-    .join(block);
+  let index = 0;
+  let out = html.replace(MARKER_PARAGRAPH_RE, () => blockFor(index++));
+  // A plain-string replace() hits only the first match, so loop to give every
+  // leftover inline marker its own index.
+  while (out.includes(SIGNATURE_BLOCK_MARKER)) {
+    out = out.replace(SIGNATURE_BLOCK_MARKER, () => blockFor(index++));
+  }
   return out;
 }
 
-// eSign path: marker → hidden Dropbox text tags; append at end if none placed.
+// eSign path: marker → hidden Dropbox text tags (one unique field id each);
+// append at end if none placed.
 export function placeEsignSignatureBlock(html: string): string {
-  return placeBlock(html, signatureBlockHtml(), true);
+  return placeBlock(html, (index) => signatureBlockHtml(index), true);
 }
 
 // Email path: marker → visible signature line; leave the body untouched if
 // none placed (preserves the pre-existing "editable Doc has no signature line"
 // behaviour).
 export function placeVisibleSignatureBlock(html: string): string {
-  return placeBlock(html, visibleSignatureBlockHtml(), false);
+  return placeBlock(html, () => visibleSignatureBlockHtml(), false);
 }
