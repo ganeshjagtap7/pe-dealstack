@@ -38,6 +38,8 @@ import { granolaProvider } from './integrations/granola/index.js';
 import { gmailProvider } from './integrations/gmail/index.js';
 import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
 import legalDocumentsRouter from './routes/legal-documents.js';
+import legalDocEsignRouter from './routes/legal-doc-esign.js';
+import dropboxSignWebhookRouter from './routes/dropbox-sign-webhook.js';
 import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
 // (disabled — see banner below)
 // import legalDocWebhooksRouter from './routes/legal-doc-webhooks.js';
@@ -243,6 +245,11 @@ app.use('/api/public/invitations', invitationsAcceptRouter);
 // /api/integrations router below — Express matches routes in registration order.
 app.use('/api/integrations', integrationsPublicRouter);
 
+// Dropbox Sign eSignature webhook — provider POSTs signed-document events here
+// with no auth header (authenticity = HMAC event_hash, verified in the route).
+// MUST be mounted BEFORE the authenticated routers below.
+app.use('/api/webhooks', dropboxSignWebhookRouter);
+
 // ─── DISABLED UNTIL PROD (Drive push signature detection) ───────────────
 // files.watch push needs a GCP-domain-verified HTTPS callback; *.vercel.app
 // cannot be verified, so push never fires on preview/Vercel. Active detection
@@ -288,6 +295,7 @@ app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware,
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, watchlistRouter);
 app.use('/api/integrations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, integrationsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocEsignRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
 
 // Admin security: dashboard router mounted BEFORE the isolation-test router (different paths but ordered for clarity)

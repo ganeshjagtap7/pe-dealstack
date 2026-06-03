@@ -8,6 +8,7 @@ import { useUser } from "@/providers/UserProvider";
 import { DownloadMenu, DraftEsignHint } from "./DownloadMenu";
 import { Editor, type EditorHandle } from "./Editor";
 import { SendModal } from "./SendModal";
+import { SendForSignatureModal } from "./SendForSignatureModal";
 import { SentActionBar } from "./SentActionBar";
 import { TokenInsertPanel } from "./TokenInsertPanel";
 import { STATUS_LABELS, STATUS_ORDER } from "./constants";
@@ -18,6 +19,7 @@ import type {
   LegalDocument,
   LegalDocumentWithDeal,
   SendDocResponse,
+  SendForSignatureResponse,
   UpdateDocBody,
 } from "./types";
 
@@ -69,6 +71,7 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sendOpen, setSendOpen] = useState(false);
+  const [signOpen, setSignOpen] = useState(false);
   // When viewing a SENT doc we default to the snapshot; user can toggle.
   const [showSnapshot, setShowSnapshot] = useState(doc.status === "SENT");
   // Edit shows raw `[TOKEN]` literals; Preview substitutes them with current
@@ -166,6 +169,26 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
     setShowSnapshot(true);
   }
 
+  function handleSignSent(resp: SendForSignatureResponse, toEmail: string) {
+    setSignOpen(false);
+    // Server rendered the PDF, dispatched the Dropbox Sign request, and
+    // flipped status → SENT. Mirror locally + bubble up. The row goes SIGNED
+    // later via the webhook once the counterparty signs.
+    const updated: LegalDocument = {
+      ...doc,
+      status: "SENT",
+      sentAt: resp.sentAt,
+      sentToEmail: toEmail || doc.sentToEmail,
+    };
+    onSaved(updated);
+    const mode = resp.testMode ? " (test mode)" : "";
+    showToast(
+      `Signature request sent to ${toEmail}${mode}`,
+      "success",
+    );
+    setForm((prev) => ({ ...prev, status: "SENT" }));
+  }
+
   const displayedContent = useMemo(() => {
     if (showSnapshot && hasSnapshot) return doc.contentSnapshot ?? "";
     if (isPreview) {
@@ -249,6 +272,18 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
             className="px-3 py-1.5 rounded-md text-xs font-semibold text-[#003366] border border-[#003366]/30 hover:bg-[#E6EEF5]/50"
           >
             {hasGoogleDoc ? "Re-send via email" : "Send via email"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setSignOpen(true)}
+            disabled={!form.content.trim()}
+            className="px-3 py-1.5 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1.5 hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: "#003366" }}
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              draw
+            </span>
+            Send for signature
           </button>
           {showSaveButton && (
             <button
@@ -459,6 +494,13 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
         doc={doc}
         onCancel={() => setSendOpen(false)}
         onSent={handleSent}
+      />
+
+      <SendForSignatureModal
+        open={signOpen}
+        doc={doc}
+        onCancel={() => setSignOpen(false)}
+        onSent={handleSignSent}
       />
     </div>
   );

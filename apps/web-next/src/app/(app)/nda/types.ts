@@ -211,3 +211,22 @@ export interface SendDocResponse {
   // can soften its success toast ("Already sent" vs "Sent").
   alreadySent?: boolean;
 }
+
+// Payload for POST /legal-documents/:id/send-for-signature. Sends the doc as a
+// locked Dropbox Sign signature request (PDF) instead of an editable Doc link.
+export interface SendForSignatureBody {
+  toEmail?: string;
+  signerName?: string;
+  subject?: string;
+  message?: string;
+}
+
+export interface SendForSignatureResponse {
+  ok: true;
+  signatureRequestId: string;
+  // True while DROPBOX_SIGN_TEST_MODE !== "false" — the request is free,
+  // non-binding, and the signed PDF carries a test-mode watermark.
+  testMode: boolean;
+  sentToEmail: string;
+  sentAt: string;
+}

@@ -36,6 +36,8 @@ import { granolaProvider } from './integrations/granola/index.js';
 import { gmailProvider } from './integrations/gmail/index.js';
 import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
 import legalDocumentsRouter from './routes/legal-documents.js';
+import legalDocEsignRouter from './routes/legal-doc-esign.js';
+import dropboxSignWebhookRouter from './routes/dropbox-sign-webhook.js';
 import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
 import dealAccessTimelineRouter from './routes/deal-access-timeline.js';
 import dealsTrashRouter from './routes/deals-trash.js';
@@ -292,6 +294,9 @@ app.use('/api/public/invitations', invitationsAcceptRouter);
 // since Express matches routes in registration order.
 app.use('/api/integrations', integrationsPublicRouter);
 
+// Dropbox Sign eSignature webhook — public (HMAC-verified), mounted before auth.
+app.use('/api/webhooks', dropboxSignWebhookRouter);
+
 // ========================================
 // Protected Routes (require authentication + org resolution)
 // ========================================
@@ -342,6 +347,7 @@ app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware,
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, watchlistRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocEsignRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
 app.use('/api/usage', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, usageRouter);
 
