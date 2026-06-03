@@ -13,14 +13,19 @@
 //      can still see their sender identity in the modal.
 //
 // Always 200 — `connected: false` (with optional error code) when the
-// token is missing or Gmail rejects the profile lookup, so the frontend
-// can render a "Workspace not connected" warning instead of an error.
+// token is missing or the userinfo lookup fails, so the frontend can
+// render a "Workspace not connected" warning instead of an error.
+//
+// The email + connected check resolves via the OAuth `userinfo` endpoint
+// (userinfo.email scope), NOT Gmail — so the NDA import/Picker flow, which
+// only needs Drive, isn't blocked on a missing gmail.send grant. Gmail send
+// permission is checked separately at actual send time.
 
 import { Router, Request, Response } from 'express';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getProviderAccessToken } from '../integrations/_platform/tokenStore.js';
-import { getMyProfile } from '../integrations/googleGmail/client.js';
+import { getUserInfo } from '../integrations/googleCalendar/client.js';
 
 const router = Router();
 
@@ -85,19 +90,24 @@ router.get('/workspace-email', async (req: Request, res: Response) => {
     }
 
     try {
-      const profile = await getMyProfile(accessToken);
+      // Resolve the connected account's email via the OAuth `userinfo`
+      // endpoint (needs only userinfo.email, which every connection grants)
+      // rather than Gmail's profile (which needs gmail.send). The NDA *import*
+      // flow only needs Drive access; gating "connected" on Gmail would block
+      // import for users who haven't granted gmail.send yet. The send step
+      // checks/triggers a gmail re-auth on its own when it actually needs it.
+      const info = await getUserInfo(accessToken);
       const body: WorkspaceEmailResponse = {
-        email: profile.emailAddress,
+        email: info.email,
         connected: true,
       };
       res.json(body);
       return;
     } catch (err) {
-      // Token exists but Gmail's profile endpoint failed — could be a
-      // transient API blip, a revoked token, or missing gmail.send scope.
-      // Surface as 200 with `connected: false` + an error code so the
-      // frontend renders the actionable "reconnect" CTA.
-      log.warn('auth-workspace-email: getMyProfile failed', {
+      // Token exists but the userinfo lookup failed — a transient API blip or
+      // a revoked token. Surface as 200 with `connected: false` + an error
+      // code so the frontend renders the actionable "reconnect" CTA.
+      log.warn('auth-workspace-email: getUserInfo failed', {
         userId: internalUser.id,
         message: err instanceof Error ? err.message : String(err),
       });
