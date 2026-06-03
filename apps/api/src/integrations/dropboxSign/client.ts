@@ -112,6 +112,10 @@ export interface SendSignatureRequestInput {
   // Echoed back on every webhook event — used to correlate the signed PDF
   // with our LegalDocument row.
   metadata: Record<string, string>;
+  // When true, send use_text_tags=1 + hide_text_tags=1 so Dropbox places
+  // signer fields where our [sig|…]/[date|…] markers sit in the document and
+  // whites the markers out — instead of auto-placing fields at the end.
+  useTextTags?: boolean;
 }
 
 export interface SendSignatureRequestResult {
@@ -124,6 +128,10 @@ export interface SendSignatureRequestResult {
  * Multipart form-data: Dropbox Sign reads the binary from `file[0]` and the
  * scalar fields by name. Returns the signature_request_id we persist for
  * later download + webhook correlation.
+ *
+ * Field placement: with `useTextTags` we tell Dropbox to read in-document
+ * text tags (see integrations/dropboxSign/textTags.ts) so the signature lands
+ * where our marker is; without it, Dropbox auto-places the field.
  */
 export async function sendSignatureRequest(
   input: SendSignatureRequestInput,
@@ -140,6 +148,13 @@ export async function sendSignatureRequest(
   form.append('signers[0][email_address]', input.signer.email);
   form.append('signers[0][name]', input.signer.name);
   form.append('test_mode', input.testMode ? '1' : '0');
+  if (input.useTextTags) {
+    // Parse [type|req|signerN] markers in the document and whiteout the marker
+    // text in the output PDF. hide_text_tags requires each tag on its own line
+    // — signatureBlockHtml() guarantees that.
+    form.append('use_text_tags', '1');
+    form.append('hide_text_tags', '1');
+  }
   for (const [key, value] of Object.entries(input.metadata)) {
     form.append(`metadata[${key}]`, value);
   }

@@ -26,6 +26,7 @@ import {
   downloadSignedPdf,
   DropboxSignError,
 } from '../integrations/dropboxSign/client.js';
+import { signatureBlockHtml } from '../integrations/dropboxSign/textTags.js';
 
 export type LegalDocEsignErrorCode =
   | 'NOT_CONFIGURED'
@@ -140,7 +141,9 @@ export async function sendLegalDocForSignature(
 
   // Render the document to a PDF — same Drive export the download button uses,
   // so the signer sees exactly the resolved-token wording the counterparty
-  // would get in the Google Doc.
+  // would get in the Google Doc. We append a Dropbox Sign signature text-tag
+  // block so the signature/date fields land in a defined spot at the end
+  // rather than wherever Dropbox would auto-place them.
   let pdf;
   try {
     pdf = await exportLegalDocument({
@@ -148,6 +151,7 @@ export async function sendLegalDocForSignature(
       organizationId: input.organizationId,
       userId: input.userId,
       format: 'pdf',
+      appendHtml: signatureBlockHtml(),
     });
   } catch (err) {
     if (err instanceof LegalDocExportError) {
@@ -172,6 +176,7 @@ export async function sendLegalDocForSignature(
       subject: input.subject?.trim() || `${doc.title || 'Document'} — signature request`,
       message: input.message?.trim() || undefined,
       signer: { email: recipient, name: signerName },
+      useTextTags: true,
       metadata: {
         legalDocumentId: doc.id,
         organizationId: doc.organizationId,
