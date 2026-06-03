@@ -33,13 +33,11 @@ import {
   mapDriveErrorToSendError,
   mapGmailErrorToSendError,
 } from './legalDocSendHelpers.js';
-import {
-  substituteTokens,
-  type LegalDocTokenValues,
-} from './legalDocSubstituteService.js';
+import { substituteTokens } from './legalDocSubstituteService.js';
 import {
   loadDealForLegalDoc,
   loadOrgForLegalDoc,
+  buildLegalDocTokenValues,
 } from './legalDocLookups.js';
 // (disabled — see banner below)
 // import { registerSignatureWatch } from './legalDocSignatureWatchService.js';
@@ -369,17 +367,7 @@ export async function sendLegalDocument(
   // The live `content` column is left untouched — the user keeps their
   // tokens visible in the editor for repeated sends. Only the snapshot
   // + the Google Doc body see the substituted output.
-  const todayIso = new Date().toISOString().slice(0, 10);
-  const tokenValues: LegalDocTokenValues = {
-    COUNTERPARTY_NAME: doc.counterpartyName ?? '',
-    COUNTERPARTY_ADDRESS: doc.counterpartyAddress ?? '',
-    COUNTERPARTY_EMAIL: doc.counterpartyEmail ?? '',
-    EFFECTIVE_DATE: doc.effectiveDate ?? '',
-    JURISDICTION: doc.jurisdiction ?? '',
-    DEAL_NAME: deal?.name ?? deal?.company?.name ?? '',
-    FIRM_NAME: org?.name ?? '',
-    TODAY: todayIso,
-  };
+  const tokenValues = buildLegalDocTokenValues(doc, deal, org);
   // `doc.content` is guaranteed non-null here — the NO_CONTENT check above
   // only skips for the imported path, which already returned.
   const substitutedContent = substituteTokens(doc.content as string, tokenValues);

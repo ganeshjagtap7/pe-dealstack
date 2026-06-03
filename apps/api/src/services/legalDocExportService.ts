@@ -55,12 +55,12 @@ export interface ExportLegalDocumentInput {
   organizationId: string;
   userId: string; // internal User.id — for the Workspace token lookup
   format: DriveExportFormat;
-  // Optional HTML appended to the document body before the temp Doc is built —
-  // used by the eSign flow to inject a Dropbox Sign signature text-tag block.
-  // Only applies on the temp-Doc path (DRAFT, no googleDocId); when the doc
-  // already has a persistent googleDocId we export that Doc untouched, so the
-  // append is skipped and Dropbox falls back to auto-placing the field.
-  appendHtml?: string;
+  // Optional HTML used as the temp Doc body instead of the raw `content`
+  // column — the eSign flow passes token-substituted content with a Dropbox
+  // Sign signature block appended. Only applies on the temp-Doc path (DRAFT,
+  // no googleDocId); when the doc already has a persistent googleDocId we
+  // export that Doc untouched, so the override is ignored.
+  contentOverride?: string;
 }
 
 export interface ExportLegalDocumentResult {
@@ -156,15 +156,15 @@ export async function exportLegalDocument(
   let fileId = doc.googleDocId;
   let tempFileId: string | null = null;
   if (!fileId) {
-    if (!doc.content || !doc.content.trim()) {
+    const body = input.contentOverride ?? doc.content;
+    if (!body || !body.trim()) {
       throw new LegalDocExportError('NO_CONTENT', 'Document has no content to export', 409);
     }
-    const html = input.appendHtml ? `${doc.content}${input.appendHtml}` : doc.content;
     try {
       const created = await createDocFromHtml(
         accessToken,
         doc.title || 'Document',
-        html,
+        body,
       );
       fileId = created.id;
       tempFileId = created.id;

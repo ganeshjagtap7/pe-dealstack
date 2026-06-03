@@ -27,6 +27,12 @@ import {
   DropboxSignError,
 } from '../integrations/dropboxSign/client.js';
 import { signatureBlockHtml } from '../integrations/dropboxSign/textTags.js';
+import { substituteTokens } from './legalDocSubstituteService.js';
+import {
+  loadDealForLegalDoc,
+  loadOrgForLegalDoc,
+  buildLegalDocTokenValues,
+} from './legalDocLookups.js';
 
 export type LegalDocEsignErrorCode =
   | 'NOT_CONFIGURED'
@@ -87,16 +93,23 @@ export interface SendForSignatureResult {
 interface EsignDocRow {
   id: string;
   organizationId: string;
+  dealId: string;
   title: string;
+  content: string | null;
   counterpartyName: string | null;
+  counterpartyAddress: string | null;
   counterpartyEmail: string | null;
+  jurisdiction: string | null;
+  effectiveDate: string | null;
   metadata: Record<string, unknown> | null;
 }
 
 async function loadDoc(id: string, orgId: string): Promise<EsignDocRow> {
   const { data, error } = await supabase
     .from('LegalDocument')
-    .select('id, organizationId, title, counterpartyName, counterpartyEmail, metadata')
+    .select(
+      'id, organizationId, dealId, title, content, counterpartyName, counterpartyAddress, counterpartyEmail, jurisdiction, effectiveDate, metadata',
+    )
     .eq('id', id)
     .eq('organizationId', orgId)
     .maybeSingle();
@@ -139,11 +152,21 @@ export async function sendLegalDocForSignature(
   const signerName =
     (input.signerName ?? doc.counterpartyName ?? '').trim() || recipient;
 
-  // Render the document to a PDF — same Drive export the download button uses,
-  // so the signer sees exactly the resolved-token wording the counterparty
-  // would get in the Google Doc. We append a Dropbox Sign signature text-tag
-  // block so the signature/date fields land in a defined spot at the end
-  // rather than wherever Dropbox would auto-place them.
+  // Resolve tokens (same map as the emailed Google Doc copy) and append a
+  // Dropbox Sign signature text-tag block, so the signer gets the finished
+  // wording with signature/date fields in a defined spot — not raw [TOKEN]
+  // literals and an auto-placed field. Only possible when we have in-app HTML;
+  // an imported gdoc (content null, googleDocId set) exports its own Doc
+  // untouched and falls back to Dropbox auto-placement.
+  let contentOverride: string | undefined;
+  if (doc.content && doc.content.trim()) {
+    const deal = await loadDealForLegalDoc(doc.dealId, input.organizationId);
+    const org = await loadOrgForLegalDoc(input.organizationId);
+    const tokenValues = buildLegalDocTokenValues(doc, deal, org);
+    contentOverride = substituteTokens(doc.content, tokenValues) + signatureBlockHtml();
+  }
+
+  // Render the document to a PDF — same Drive export the download button uses.
   let pdf;
   try {
     pdf = await exportLegalDocument({
@@ -151,7 +174,7 @@ export async function sendLegalDocForSignature(
       organizationId: input.organizationId,
       userId: input.userId,
       format: 'pdf',
-      appendHtml: signatureBlockHtml(),
+      contentOverride,
     });
   } catch (err) {
     if (err instanceof LegalDocExportError) {

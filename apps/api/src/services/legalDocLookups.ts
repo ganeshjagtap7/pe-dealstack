@@ -12,6 +12,7 @@
 // the migration is a drop-in swap.
 
 import { supabase } from '../supabase.js';
+import type { LegalDocTokenValues } from './legalDocSubstituteService.js';
 
 export interface LegalDocDealRow {
   id: string;
@@ -49,4 +50,37 @@ export async function loadOrgForLegalDoc(
     .maybeSingle();
   if (error) throw error;
   return (data as LegalDocOrgRow | null) ?? null;
+}
+
+// The LegalDocument columns that map directly onto substitution tokens. Both
+// the send path and the eSignature path pass their loaded doc row here.
+export interface LegalDocTokenFields {
+  counterpartyName: string | null;
+  counterpartyAddress: string | null;
+  counterpartyEmail: string | null;
+  effectiveDate: string | null;
+  jurisdiction: string | null;
+}
+
+/**
+ * Builds the token → value map used by substituteTokens. Single source of
+ * truth shared by legalDocSendService (Google Doc copy emailed to the
+ * counterparty) and legalDocEsignService (PDF sent for signature) so the two
+ * paths can't drift on what a token resolves to. TODAY is the call time.
+ */
+export function buildLegalDocTokenValues(
+  fields: LegalDocTokenFields,
+  deal: LegalDocDealRow | null,
+  org: LegalDocOrgRow | null,
+): LegalDocTokenValues {
+  return {
+    COUNTERPARTY_NAME: fields.counterpartyName ?? '',
+    COUNTERPARTY_ADDRESS: fields.counterpartyAddress ?? '',
+    COUNTERPARTY_EMAIL: fields.counterpartyEmail ?? '',
+    EFFECTIVE_DATE: fields.effectiveDate ?? '',
+    JURISDICTION: fields.jurisdiction ?? '',
+    DEAL_NAME: deal?.name ?? deal?.company?.name ?? '',
+    FIRM_NAME: org?.name ?? '',
+    TODAY: new Date().toISOString().slice(0, 10),
+  };
 }
