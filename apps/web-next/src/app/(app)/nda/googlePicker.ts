@@ -156,6 +156,22 @@ function loadGapiPicker(): Promise<void> {
   return gapiPickerPromise;
 }
 
+/**
+ * Warm both SDK scripts ahead of the user's click. Call this on mount of any UI
+ * that will open the Picker. Critical for popups: browsers only allow a popup
+ * during a user gesture, and an `await` on a still-loading script pushes
+ * `requestAccessToken()` past that gesture window → the popup gets blocked. If
+ * the scripts are already loaded by click time, the awaits in `pickGoogleDoc`
+ * resolve on the microtask queue (which preserves user activation) and the
+ * popup opens reliably. Fire-and-forget — errors surface on the real pick.
+ */
+export function preloadGooglePicker(): void {
+  if (typeof window === "undefined") return;
+  if (!getGooglePickerConfig().isConfigured) return;
+  void loadGis().catch(() => {});
+  void loadGapiPicker().catch(() => {});
+}
+
 // ------------------------------- token flow ------------------------------- //
 
 /**
@@ -175,6 +191,12 @@ function requestAccessToken(clientId: string, hint?: string): Promise<string> {
       client_id: clientId,
       scope: DRIVE_FILE_SCOPE,
       hint,
+      // Always show the account chooser. `hint` pre-selects the connected
+      // Workspace account, but the browser may be signed into a different one
+      // (e.g. a personal gmail) — without this the popup silently locks onto
+      // that wrong account and the per-file grant never reaches the server
+      // token. select_account lets the user switch to / add the right account.
+      prompt: "select_account",
       callback: (response) => {
         if (settled) return;
         settled = true;
@@ -195,14 +217,21 @@ function requestAccessToken(clientId: string, hint?: string): Promise<string> {
         if (settled) return;
         settled = true;
         console.warn("[nda] picker token error_callback", error);
-        // Popup closed / blocked / non-OAuth failure. Treat a user-dismissed
-        // popup as a soft failure the caller can show without alarm.
-        reject(
-          new Error(
-            error.message ||
-              "Google sign-in was dismissed before granting access.",
-          ),
-        );
+        // GIS reports the failure kind in `error.type`. Distinguish a truly
+        // blocked popup from a user who closed it — the old code called both
+        // "blocked", which was the false-positive you saw.
+        let message: string;
+        if (error.type === "popup_failed_to_open") {
+          message =
+            "Your browser blocked the Google sign-in popup. Allow popups for this site, then click again.";
+        } else if (error.type === "popup_closed") {
+          message =
+            "Google sign-in was closed before you finished. Click to try again.";
+        } else {
+          message =
+            error.message || "Google sign-in didn't complete. Try again.";
+        }
+        reject(new Error(message));
       },
     });
     try {

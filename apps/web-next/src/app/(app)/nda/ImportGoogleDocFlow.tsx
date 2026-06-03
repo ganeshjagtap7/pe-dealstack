@@ -13,6 +13,7 @@ import {
 import {
   getGooglePickerConfig,
   pickGoogleDoc,
+  preloadGooglePicker,
   type PickedGoogleDoc,
 } from "./googlePicker";
 import type { LegalDocument } from "./types";
@@ -131,6 +132,12 @@ function ImportGdocForm({
   // Set when the connected-account check says Google isn't linked, so we can
   // render an inline CTA to Settings instead of opening the picker.
   const [notConnected, setNotConnected] = useState(false);
+  // Connected-account lookup, resolved on mount (NOT on click). Keeping the
+  // network call out of the click handler is what lets the Picker popup open
+  // within the user gesture — an await between click and requestAccessToken
+  // gets the popup blocked. `connected: null` = still loading / unknown.
+  const [wsConnected, setWsConnected] = useState<boolean | null>(null);
+  const [wsEmail, setWsEmail] = useState<string | undefined>(undefined);
 
   const busy = picking || submitting;
 
@@ -142,27 +149,55 @@ function ImportGdocForm({
     return () => window.removeEventListener("keydown", onKey);
   }, [onCancel, busy]);
 
-  // Opens the Picker after confirming Google Workspace is connected. We fetch
-  // the connected account email first and pass it to the Picker as the login
-  // hint — the browser may be signed into a DIFFERENT Google account than the
-  // one connected server-side, which would otherwise grant access to the wrong
-  // Drive and fail the server-side import.
+  // On mount: warm the Google SDK scripts and resolve the connected account so
+  // the click handler can open the popup synchronously (no awaits before
+  // requestAccessToken → no popup-blocked false positives).
+  useEffect(() => {
+    preloadGooglePicker();
+    let cancelled = false;
+    api
+      .get<WorkspaceEmailResponse>("/auth/workspace-email")
+      .then((ws) => {
+        if (cancelled) return;
+        setWsConnected(ws.connected);
+        setWsEmail(ws.email ?? undefined);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        // Leave connection state unknown rather than blocking — the pick can
+        // still proceed (the account chooser lets the user pick the right
+        // one), and the server import surfaces a real error if truly missing.
+        console.warn("[nda] workspace-email lookup failed", err);
+        setWsConnected(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Opens the Picker. The connected-account check + email hint were resolved on
+  // mount (see the effect above), so this handler has NO awaits before
+  // pickGoogleDoc — the popup opens inside the user gesture. The hint passes the
+  // server-connected account email so the chooser pre-selects the right Google
+  // account (the browser may be signed into a different one).
   async function handleChoose() {
     if (busy || !pickerConfig.isConfigured) return;
     setError(null);
     setNotConnected(false);
+    // Only hard-block when we KNOW Google isn't connected. While the lookup is
+    // still loading (null), let the pick proceed — the chooser handles account
+    // selection and the server import reports a real error if needed.
+    if (wsConnected === false) {
+      setNotConnected(true);
+      const msg =
+        "Connect Google Workspace in Settings → Integrations before importing a Doc.";
+      setError(msg);
+      showToast(msg, "error", { title: "Google not connected" });
+      return;
+    }
     setPicking(true);
     try {
-      const ws = await api.get<WorkspaceEmailResponse>("/auth/workspace-email");
-      if (!ws.connected) {
-        setNotConnected(true);
-        const msg =
-          "Connect Google Workspace in Settings → Integrations before importing a Doc.";
-        setError(msg);
-        showToast(msg, "error", { title: "Google not connected" });
-        return;
-      }
-      const doc = await pickGoogleDoc({ hint: ws.email ?? undefined });
+      const doc = await pickGoogleDoc({ hint: wsEmail });
       if (!doc) return; // user cancelled the picker — no-op
       setPicked(doc);
       // Prefill the title from the Doc's name (still editable) only if the
