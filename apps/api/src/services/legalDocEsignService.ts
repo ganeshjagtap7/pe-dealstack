@@ -26,7 +26,7 @@ import {
   downloadSignedPdf,
   DropboxSignError,
 } from '../integrations/dropboxSign/client.js';
-import { signatureBlockHtml } from '../integrations/dropboxSign/textTags.js';
+import { placeEsignSignatureBlock } from './legalDocSignatureBlock.js';
 import { substituteTokens } from './legalDocSubstituteService.js';
 import {
   loadDealForLegalDoc,
@@ -152,18 +152,21 @@ export async function sendLegalDocForSignature(
   const signerName =
     (input.signerName ?? doc.counterpartyName ?? '').trim() || recipient;
 
-  // Resolve tokens (same map as the emailed Google Doc copy) and append a
-  // Dropbox Sign signature text-tag block, so the signer gets the finished
-  // wording with signature/date fields in a defined spot — not raw [TOKEN]
-  // literals and an auto-placed field. Only possible when we have in-app HTML;
-  // an imported gdoc (content null, googleDocId set) exports its own Doc
-  // untouched and falls back to Dropbox auto-placement.
+  // Resolve tokens (same map as the emailed Google Doc copy) and place the
+  // Dropbox Sign signature text-tag block where the user dropped the
+  // [SIGNATURE_BLOCK] marker (or appended at the end if they placed none), so
+  // the signer gets the finished wording with signature/date fields in a
+  // defined spot — not raw [TOKEN] literals and an auto-placed field. Only
+  // possible when we have in-app HTML; an imported gdoc (content null,
+  // googleDocId set) exports its own Doc untouched and Dropbox auto-places.
   let contentOverride: string | undefined;
   if (doc.content && doc.content.trim()) {
     const deal = await loadDealForLegalDoc(doc.dealId, input.organizationId);
     const org = await loadOrgForLegalDoc(input.organizationId);
     const tokenValues = buildLegalDocTokenValues(doc, deal, org);
-    contentOverride = substituteTokens(doc.content, tokenValues) + signatureBlockHtml();
+    contentOverride = placeEsignSignatureBlock(
+      substituteTokens(doc.content, tokenValues),
+    );
   }
 
   // Render the document to a PDF — same Drive export the download button uses.

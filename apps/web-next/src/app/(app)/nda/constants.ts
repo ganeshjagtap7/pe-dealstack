@@ -86,6 +86,13 @@ export function tokenLiteral(key: TokenKey): string {
   return `[${key}]`;
 }
 
+// Marker the user drops to choose where the signature field goes. Not a value
+// token (no entry in TOKEN_KEYS) — it's structural: the backend swaps it for a
+// Dropbox text-tag block on "Send for signature" or a visible signature line
+// on email. Mirrors SIGNATURE_BLOCK_MARKER in
+// apps/api/src/services/legalDocSignatureBlock.ts — keep the two in sync.
+export const SIGNATURE_BLOCK_MARKER = "[SIGNATURE_BLOCK]";
+
 // Returns the subset of TOKEN_KEYS present in the given HTML body, in the
 // same order as TOKEN_KEYS. The template verifier uses this both to compute
 // `placeholderKeys` on save and to render the "tokens present" checklist.

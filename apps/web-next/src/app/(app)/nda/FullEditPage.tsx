@@ -12,7 +12,7 @@ import { SendForSignatureModal } from "./SendForSignatureModal";
 import { SentActionBar } from "./SentActionBar";
 import { TokenInsertPanel } from "./TokenInsertPanel";
 import { STATUS_LABELS, STATUS_ORDER } from "./constants";
-import { substituteTokens } from "./tokens";
+import { renderSignaturePlaceholder, substituteTokens } from "./tokens";
 import { ViewModeToggle, type ViewMode } from "./ViewModeToggle";
 import type {
   DocStatus,
@@ -196,15 +196,17 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
       // /users/profile, not /users/me) — undefined renders the muted
       // "__firm name__" placeholder; picks up a real value once AppUser has it.
       const firmName = (user as { firmName?: string } | null)?.firmName;
-      return substituteTokens(form.content, {
-        counterpartyName: form.counterpartyName,
-        counterpartyAddress: form.counterpartyAddress,
-        counterpartyEmail: form.counterpartyEmail,
-        effectiveDate: form.effectiveDate,
-        jurisdiction: form.jurisdiction,
-        dealName: doc.deal?.target || doc.deal?.projectName,
-        firmName,
-      });
+      return renderSignaturePlaceholder(
+        substituteTokens(form.content, {
+          counterpartyName: form.counterpartyName,
+          counterpartyAddress: form.counterpartyAddress,
+          counterpartyEmail: form.counterpartyEmail,
+          effectiveDate: form.effectiveDate,
+          jurisdiction: form.jurisdiction,
+          dealName: doc.deal?.target || doc.deal?.projectName,
+          firmName,
+        }),
+      );
     }
     return form.content;
   }, [

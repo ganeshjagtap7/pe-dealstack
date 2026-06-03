@@ -9,6 +9,8 @@
 // No regex, no fuzzy matching — String.replaceAll on the literal `[TOKEN]`
 // marker, same contract as the backend.
 
+import { SIGNATURE_BLOCK_MARKER } from "./constants";
+
 // Same key set as the backend's LEGAL_DOC_TOKEN_KEYS — keep these in sync.
 const TOKEN_KEYS = [
   "COUNTERPARTY_NAME",
@@ -109,4 +111,39 @@ export function substituteTokens(
     out = out.replaceAll(`[${key}]`, value);
   }
   return out;
+}
+
+// Standalone-paragraph form of the signature marker — see the backend's
+// MARKER_PARAGRAPH_RE. Keep the escaped marker text in sync with
+// SIGNATURE_BLOCK_MARKER.
+const SIGNATURE_PARAGRAPH_RE =
+  /<p\b[^>]*>(?:\s|&nbsp;|&#160;|<br\s*\/?>)*\[SIGNATURE_BLOCK\](?:\s|&nbsp;|&#160;|<br\s*\/?>)*<\/p>/gi;
+
+// Preview chrome for the dropped signature field — a dashed box so the user
+// can see WHERE the signature lands. This is preview-only; the real output is
+// hidden Dropbox text tags (eSign) or an underscored line (email).
+function signaturePreviewHtml(): string {
+  return [
+    '<div style="margin-top:32px;padding:14px 16px;border:1px dashed #94a3b8;border-radius:6px;background:#f8fafc;">',
+    '<div style="font-size:11px;text-transform:uppercase;letter-spacing:0.05em;color:#64748b;margin-bottom:10px;">Signature field</div>',
+    '<p style="margin:0 0 2px;font-weight:bold;">Signature</p>',
+    '<p style="margin:0 0 18px;color:#94a3b8;">______________________________</p>',
+    '<p style="margin:0 0 2px;font-weight:bold;">Date</p>',
+    '<p style="margin:0;color:#94a3b8;">__________________</p>',
+    "</div>",
+  ].join("");
+}
+
+/**
+ * Replace `[SIGNATURE_BLOCK]` markers with a visible preview placeholder so the
+ * preview pane doesn't show the raw marker text. Mirrors the backend's
+ * placeBlock: swap the whole standalone <p>, then any leftover inline marker.
+ * Preview-only — the backend does the real substitution at send time.
+ */
+export function renderSignaturePlaceholder(bodyHtml: string): string {
+  if (!bodyHtml.includes(SIGNATURE_BLOCK_MARKER)) return bodyHtml;
+  return bodyHtml
+    .replace(SIGNATURE_PARAGRAPH_RE, signaturePreviewHtml())
+    .split(SIGNATURE_BLOCK_MARKER)
+    .join(signaturePreviewHtml());
 }

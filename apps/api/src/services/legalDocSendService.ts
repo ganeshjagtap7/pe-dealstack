@@ -34,6 +34,7 @@ import {
   mapGmailErrorToSendError,
 } from './legalDocSendHelpers.js';
 import { substituteTokens } from './legalDocSubstituteService.js';
+import { placeVisibleSignatureBlock } from './legalDocSignatureBlock.js';
 import {
   loadDealForLegalDoc,
   loadOrgForLegalDoc,
@@ -369,8 +370,12 @@ export async function sendLegalDocument(
   // + the Google Doc body see the substituted output.
   const tokenValues = buildLegalDocTokenValues(doc, deal, org);
   // `doc.content` is guaranteed non-null here — the NO_CONTENT check above
-  // only skips for the imported path, which already returned.
-  const substitutedContent = substituteTokens(doc.content as string, tokenValues);
+  // only skips for the imported path, which already returned. A
+  // [SIGNATURE_BLOCK] marker (if the user placed one) becomes a visible
+  // signature line in the hand-signed Google Doc.
+  const substitutedContent = placeVisibleSignatureBlock(
+    substituteTokens(doc.content as string, tokenValues),
+  );
 
   // ── Create the Google Doc ───────────────────────────────────────────
   let createdDoc: { id: string; webViewLink: string };
