@@ -13,6 +13,7 @@ import type { TeaserCriterion, TeaserFit, TeaserVerdict } from './firmTeaserType
 
 export const TEASER_MODEL = 'claude-sonnet-4-6';
 const TEASER_MAX_TOKENS = 700;
+const PROMPT_GEN_MAX_TOKENS = 1100;
 const VALID_VERDICTS: ReadonlySet<string> = new Set(['fit', 'partial', 'miss']);
 
 // Deal fields pulled for the teaser context — mirrors deals-chat-ai.ts so the
@@ -242,4 +243,70 @@ export async function generateTeaser({
     });
     return { headline: rawText.trim(), fits: [] };
   }
+}
+
+// ─── System-prompt authoring ────────────────────────────────────────
+
+interface GeneratePromptArgs {
+  name?: string;
+  notes?: string;
+  criteria: TeaserCriterion[];
+  today: string;
+}
+
+/**
+ * Expand a firm's rough recommendations + criteria into an elaborate, reusable
+ * SYSTEM PROMPT for the teaser writer. Powers the settings "GEN" button: the
+ * user jots notes, GEN writes the full prompt, the user edits + saves it as the
+ * profile's systemPrompt. Returns plain text (no JSON) for an editable textarea.
+ *
+ * `today` MUST be injected at call time (repo rule: the model never infers the
+ * current date itself).
+ */
+export async function generateSystemPrompt({
+  name,
+  notes,
+  criteria,
+  today,
+}: GeneratePromptArgs): Promise<string> {
+  if (!isClaudeEnabled() || !anthropic) {
+    throw new Error('Claude is not enabled (ANTHROPIC_API_KEY missing)');
+  }
+
+  const profileName = name?.trim() || 'Investment Profile';
+  const system = [
+    `Today's date is ${today}.`,
+    '',
+    'You help a private-equity firm AUTHOR a reusable system prompt. The prompt',
+    'you write will later instruct another model to produce short INTERNAL triage',
+    'teasers — one-line "why this deal fits us, and the catch" notes for the',
+    "firm's own deal team, NOT outbound marketing.",
+    '',
+    `The firm has given their rough recommendations + criteria for one named`,
+    `profile ("${profileName}"). Expand them into a clear, well-structured system`,
+    'prompt the firm can save and edit. The prompt you write should:',
+    '- Establish the internal-triage voice ("why this fits us, and the catch").',
+    "- Direct the writer to weigh the firm's criteria and surface fit vs. catch.",
+    "- Be specific to THIS firm's stated preferences — not generic boilerplate.",
+    '- Read as instructions addressed to the teaser-writing model.',
+    '- Never invent firm preferences that were not provided.',
+    '',
+    'Return ONLY the system-prompt text — no preamble, no markdown fences, no',
+    'commentary. It is shown verbatim in an editable textarea.',
+  ].join('\n');
+
+  const parts = [`Profile name: ${profileName}`, '', 'Criteria:', renderCriteria(criteria)];
+  if (notes?.trim()) {
+    parts.push('', "Firm's notes / recommendations:", notes.trim());
+  }
+
+  const response = await anthropic.messages.create({
+    model: TEASER_MODEL,
+    max_tokens: PROMPT_GEN_MAX_TOKENS,
+    system,
+    messages: [{ role: 'user', content: parts.join('\n') }],
+  });
+
+  const rawText = extractResponseText(response.content as Array<{ type: string; text?: string }>);
+  return stripJsonFences(rawText).trim();
 }

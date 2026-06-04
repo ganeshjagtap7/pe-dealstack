@@ -14,14 +14,15 @@ import { log } from '../utils/logger.js';
 import { isClaudeEnabled } from './anthropic.js';
 import { getTodayIso } from '../utils/dates.js';
 import {
+  generateSystemPrompt,
   generateTeaser,
   loadDealForTeaser,
   TEASER_MODEL,
-  type PreviewProfile,
 } from './firmTeaserGenerator.js';
 import type {
   DealTeaser,
   FirmTeaserConfig,
+  TeaserCriterion,
   TeaserFit,
   TeaserProfile,
 } from './firmTeaserTypes.js';
@@ -222,14 +223,13 @@ async function upsertTeaserRow(args: {
 
 // ─── Public service operations ──────────────────────────────────────
 
-/** Generate a teaser WITHOUT persisting (powers the settings "GEN" preview). */
-export async function previewTeaser(args: {
-  dealId: string;
-  orgId: string;
-  profile: PreviewProfile;
-}): Promise<{ headline: string; fits: TeaserFit[] }> {
-  const deal = await loadDealForTeaser(args.dealId, args.orgId);
-  return generateTeaser({ deal, profile: args.profile, today: getTodayIso() });
+/** Expand a profile's criteria + notes into an elaborate system prompt (settings "GEN"). */
+export async function generateProfilePrompt(args: {
+  name?: string;
+  notes?: string;
+  criteria: TeaserCriterion[];
+}): Promise<string> {
+  return generateSystemPrompt({ ...args, today: getTodayIso() });
 }
 
 /** Generate or regenerate the teaser for ONE profile and upsert it. */

@@ -11,7 +11,7 @@ import { log } from '../utils/logger.js';
 import {
   getFirmTeaserConfig,
   saveFirmTeaserConfig,
-  previewTeaser,
+  generateProfilePrompt,
   type TeaserProfile,
 } from '../services/firmTeaserService.js';
 
@@ -37,13 +37,10 @@ const saveBodySchema = z.object({
   profiles: z.array(profileSchema),
 });
 
-const previewBodySchema = z.object({
-  dealId: z.string(),
-  profile: z.object({
-    name: z.string().optional(),
-    systemPrompt: z.string(),
-    criteria: z.array(criterionSchema),
-  }),
+const generatePromptBodySchema = z.object({
+  name: z.string().optional(),
+  notes: z.string().optional(),
+  criteria: z.array(criterionSchema),
 });
 
 // ─── GET /api/firm-teaser → { profiles } ────────────────────────────
@@ -75,26 +72,23 @@ router.put('/', async (req, res) => {
   }
 });
 
-// ─── POST /api/firm-teaser/preview → { teaser } (NOT persisted) ─────
-router.post('/preview', async (req, res) => {
+// ─── POST /api/firm-teaser/generate-prompt → { systemPrompt } (NOT persisted) ──
+// Expands the user's rough recommendations + criteria into an elaborate system
+// prompt for the settings "GEN" button. Auth/org-scope is enforced by the
+// middleware chain; this route reads/writes no org-scoped data.
+router.post('/generate-prompt', async (req, res) => {
   try {
-    const orgId = getOrgId(req);
-    const parsed = previewBodySchema.safeParse(req.body);
+    const parsed = generatePromptBodySchema.safeParse(req.body);
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
     }
 
-    const { dealId, profile } = parsed.data;
-    const teaser = await previewTeaser({ dealId, orgId, profile });
-    res.json({ teaser });
+    const systemPrompt = await generateProfilePrompt(parsed.data);
+    res.json({ systemPrompt });
   } catch (error) {
-    log.error('firm-teaser: preview failed', error);
-    const message = error instanceof Error ? error.message : 'Failed to generate preview';
-    // Deal-not-found surfaces as a 404; everything else is a 500.
-    if (message.startsWith('Deal not found')) {
-      return res.status(404).json({ error: 'Deal not found' });
-    }
-    res.status(500).json({ error: 'Failed to generate teaser preview', message });
+    log.error('firm-teaser: generate-prompt failed', error);
+    const message = error instanceof Error ? error.message : 'Failed to generate system prompt';
+    res.status(500).json({ error: 'Failed to generate system prompt', message });
   }
 });
 

@@ -4,22 +4,15 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, NotFoundError } from "@/lib/api";
 import { useToast } from "@/providers/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
-import type { Deal } from "@/types";
 import type { TeaserCriterion, TeaserProfile } from "@/lib/teaser";
 import { ProfilePicker } from "./firm-teaser/ProfilePicker";
 import { CriteriaEditor } from "./firm-teaser/CriteriaEditor";
-import {
-  TeaserPreview,
-  type DealOption,
-  type PreviewResult,
-} from "./firm-teaser/TeaserPreview";
 
 // ─── Constants ──────────────────────────────────────────────────────
 
 const ROUTES = {
   config: "/firm-teaser",
-  preview: "/firm-teaser/preview",
-  deals: "/deals?limit=50",
+  generatePrompt: "/firm-teaser/generate-prompt",
 } as const;
 
 // Banker Blue per repo style rules (inline, not a Tailwind class).
@@ -42,10 +35,6 @@ function makeCriterion(): TeaserCriterion {
   return { id: crypto.randomUUID(), label: "", value: "" };
 }
 
-function dealLabel(deal: Deal): string {
-  return deal.name || deal.companyName || deal.company?.name || "Untitled deal";
-}
-
 // ─── Component ──────────────────────────────────────────────────────
 
 export function FirmTeaserSection() {
@@ -57,13 +46,9 @@ export function FirmTeaserSection() {
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
-  // Preview state
-  const [deals, setDeals] = useState<DealOption[]>([]);
-  const [dealsLoading, setDealsLoading] = useState(true);
-  const [selectedDealId, setSelectedDealId] = useState("");
+  // GEN (system-prompt authoring) state
   const [generating, setGenerating] = useState(false);
-  const [previewResult, setPreviewResult] = useState<PreviewResult | null>(null);
-  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeId) ?? null,
@@ -103,29 +88,6 @@ export function FirmTeaserSection() {
     };
   }, [showToast]);
 
-  // ── Load deals for the preview picker ────────────────────────────
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await api.get<Deal[]>(ROUTES.deals);
-        if (cancelled) return;
-        const list = Array.isArray(data) ? data : [];
-        setDeals(list.map((d) => ({ id: d.id, label: dealLabel(d) })));
-      } catch (err) {
-        if (cancelled) return;
-        // Non-blocking: the picker just shows "No deals available".
-        console.warn("[settings/firm-teaser] failed to load deals:", err);
-        setDeals([]);
-      } finally {
-        if (!cancelled) setDealsLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   // ── Profile mutation helpers ─────────────────────────────────────
   const patchActive = useCallback(
     (patch: Partial<TeaserProfile>) => {
@@ -143,6 +105,7 @@ export function FirmTeaserSection() {
     const next = makeProfile();
     setProfiles((prev) => [...prev, next]);
     setActiveId(next.id);
+    setGenerateError(null);
   };
 
   const handleRename = (id: string, name: string) => {
@@ -197,35 +160,33 @@ export function FirmTeaserSection() {
     }
   };
 
-  // ── Generate preview ─────────────────────────────────────────────
-  const handleGenerate = async () => {
-    if (!activeProfile || !selectedDealId) return;
+  // ── Generate system prompt from notes + criteria ─────────────────
+  const handleGeneratePrompt = async () => {
+    if (!activeProfile) return;
     setGenerating(true);
-    setPreviewError(null);
+    setGenerateError(null);
     try {
-      const data = await api.post<{ teaser: PreviewResult }>(ROUTES.preview, {
-        dealId: selectedDealId,
-        profile: {
-          name: activeProfile.name,
-          systemPrompt: activeProfile.systemPrompt,
-          criteria: activeProfile.criteria,
-        },
+      const data = await api.post<{ systemPrompt: string }>(ROUTES.generatePrompt, {
+        name: activeProfile.name,
+        notes: activeProfile.systemPrompt,
+        criteria: activeProfile.criteria,
       });
-      setPreviewResult({
-        headline: data?.teaser?.headline ?? "",
-        fits: Array.isArray(data?.teaser?.fits) ? data.teaser.fits : [],
-      });
+      const generated = typeof data?.systemPrompt === "string" ? data.systemPrompt.trim() : "";
+      if (!generated) {
+        setGenerateError("Generation returned an empty prompt — try again.");
+        return;
+      }
+      patchActive({ systemPrompt: generated });
+      showToast("System prompt generated", "success");
     } catch (err) {
-      console.warn("[settings/firm-teaser] preview failed:", err);
-      const msg =
+      console.warn("[settings/firm-teaser] generate-prompt failed:", err);
+      setGenerateError(
         err instanceof NotFoundError
-          ? "Preview is not available yet (endpoint not deployed)."
+          ? "Generation is not available yet (endpoint not deployed)."
           : err instanceof Error
             ? err.message
-            : "Failed to generate preview";
-      setPreviewError(msg);
-      setPreviewResult(null);
-      showToast(msg, "error");
+            : "Failed to generate system prompt",
+      );
     } finally {
       setGenerating(false);
     }
@@ -272,34 +233,27 @@ export function FirmTeaserSection() {
             <ProfilePicker
               profiles={profiles}
               activeId={activeId}
-              onSelect={setActiveId}
+              onSelect={(id) => {
+                setActiveId(id);
+                setGenerateError(null);
+              }}
               onAdd={handleAddProfile}
               onRename={handleRename}
               onRequestDelete={setDeleteId}
             />
 
             {activeProfile ? (
-              <>
-                <CriteriaEditor
-                  criteria={activeProfile.criteria}
-                  systemPrompt={activeProfile.systemPrompt}
-                  onAddCriterion={handleAddCriterion}
-                  onUpdateCriterion={handleUpdateCriterion}
-                  onRemoveCriterion={handleRemoveCriterion}
-                  onSystemPromptChange={(value) => patchActive({ systemPrompt: value })}
-                />
-
-                <TeaserPreview
-                  deals={deals}
-                  dealsLoading={dealsLoading}
-                  selectedDealId={selectedDealId}
-                  onSelectDeal={setSelectedDealId}
-                  onGenerate={handleGenerate}
-                  generating={generating}
-                  result={previewResult}
-                  error={previewError}
-                />
-              </>
+              <CriteriaEditor
+                criteria={activeProfile.criteria}
+                systemPrompt={activeProfile.systemPrompt}
+                onAddCriterion={handleAddCriterion}
+                onUpdateCriterion={handleUpdateCriterion}
+                onRemoveCriterion={handleRemoveCriterion}
+                onSystemPromptChange={(value) => patchActive({ systemPrompt: value })}
+                onGenerate={handleGeneratePrompt}
+                generating={generating}
+                generateError={generateError}
+              />
             ) : (
               <p className="rounded-lg border border-dashed border-border-subtle bg-[#F8F9FA] px-3 py-6 text-center text-sm text-text-muted">
                 No teaser profiles yet. Click &ldquo;Add profile&rdquo; to create your first one.
