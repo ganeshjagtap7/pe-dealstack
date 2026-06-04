@@ -10,6 +10,7 @@ import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { resolveUserId } from './notifications.js';
 import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
+import { generateTeasersForDeal } from '../services/firmTeaserService.js';
 
 const subRouter = Router();
 
@@ -225,6 +226,16 @@ subRouter.post('/text', async (req, res) => {
     }
 
     await AuditLog.aiIngest(req, docName, deal.id);
+
+    // Auto-generate firm-teaser blurbs for newly-created deals (blocking,
+    // best-effort — never fail ingest on teaser error).
+    if (!isUpdate) {
+      try {
+        await generateTeasersForDeal({ dealId: deal.id, orgId });
+      } catch (teaserErr) {
+        log.error('Text ingest: firm-teaser auto-gen failed', teaserErr, { dealId: deal.id });
+      }
+    }
 
     log.info('Text ingest complete', { dealId: deal.id, isUpdate });
 

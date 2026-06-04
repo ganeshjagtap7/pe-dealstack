@@ -10,6 +10,7 @@ import { createNotification, resolveUserId } from './notifications.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF } from './ingest-shared.js';
 import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
+import { generateTeasersForDeal } from '../services/firmTeaserService.js';
 
 // Configure multer for file uploads
 const upload = multer({
@@ -311,6 +312,14 @@ subRouter.post('/ai/ingest', upload.single('file'), async (req, res) => {
           });
         }
       }).catch(err => log.error('Notification error (ingest)', err));
+    }
+
+    // Auto-generate firm-teaser blurbs for the new deal (blocking, best-effort
+    // — never fail ingest on teaser error).
+    try {
+      await generateTeasersForDeal({ dealId: deal.id, orgId });
+    } catch (teaserErr) {
+      log.error('AI Ingest: firm-teaser auto-gen failed', teaserErr, { dealId: deal.id });
     }
 
     log.info('AI Ingest complete', { dealId: deal.id, filename: safeName, confidence: extractedData.overallConfidence });

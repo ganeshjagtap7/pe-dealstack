@@ -13,6 +13,7 @@ import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
 import { resolveUserId } from './notifications.js';
 import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
+import { generateTeasersForDeal } from '../services/firmTeaserService.js';
 
 const router = Router();
 
@@ -516,6 +517,17 @@ router.post('/', upload.single('file'), async (req, res) => {
           if (result) log.info('Auto multi-doc analysis complete', { dealId: deal.id, conflicts: result.conflicts.length });
         })
         .catch(err => log.error('Auto multi-doc analysis failed', err));
+    }
+
+    // Auto-generate firm-teaser blurbs for newly-created deals. BLOCKS the
+    // response so the teasers are ready when the client renders the deal.
+    // Best-effort: a teaser failure must never fail ingest.
+    if (!isUpdate) {
+      try {
+        await generateTeasersForDeal({ dealId: deal.id, orgId });
+      } catch (teaserErr) {
+        log.error('Ingest: firm-teaser auto-gen failed', teaserErr, { dealId: deal.id });
+      }
     }
 
     log.info('Ingest complete', { dealId: deal.id, isUpdate });

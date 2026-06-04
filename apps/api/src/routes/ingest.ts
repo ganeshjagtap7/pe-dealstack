@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
+import { generateTeasersForDeal } from '../services/firmTeaserService.js';
 
 // Re-export shared utilities for backwards compatibility
 export { extractTextFromPDF, formatValueWithUnit, upload } from './ingest-shared.js';
@@ -149,6 +150,17 @@ router.post('/:dealId/review', async (req, res) => {
       previousValues: { name: deal.name, industry: deal.industry, revenue: deal.revenue, ebitda: deal.ebitda },
       newValues: updates,
     });
+
+    // On approval the deal becomes ACTIVE (and the user may have corrected
+    // fields) — (re)generate firm-teaser blurbs so they reflect the approved
+    // data. Blocking + best-effort; never fail the review on teaser error.
+    if (approved) {
+      try {
+        await generateTeasersForDeal({ dealId, orgId });
+      } catch (teaserErr) {
+        log.error('Review: firm-teaser auto-gen failed', teaserErr, { dealId });
+      }
+    }
 
     res.json({
       success: true,

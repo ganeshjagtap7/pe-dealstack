@@ -12,6 +12,7 @@ import { ProfileSection, type UserProfile } from "./ProfileSection";
 import { NotificationsSection, DEFAULT_NOTIFICATION_PREFS } from "./NotificationsSection";
 import { TeamSection } from "./TeamSection";
 import { FirmProfileSection } from "./FirmProfileSection";
+import { FirmTeaserSection } from "./FirmTeaserSection";
 import { AiUsageSection } from "./AiUsageSection";
 import { IntegrationsSection } from "./IntegrationsSection";
 import { NDATemplatesSection } from "./NDATemplatesSection";
@@ -24,6 +25,7 @@ const NAV_SECTIONS = [
   { id: "notifications", label: "Notifications", icon: "notifications" },
   { id: "team", label: "Team", icon: "group" },
   { id: "firm-profile", label: "Firm Profile", icon: "domain" },
+  { id: "firm-teaser", label: "Firm Teaser", icon: "auto_awesome" },
   { id: "integrations", label: "Integrations", icon: "extension" },
   { id: "ai-usage", label: "AI Usage", icon: "analytics" },
 ] as const;
@@ -327,6 +329,8 @@ export default function SettingsPage() {
           <TeamSection onToast={showToast} />
 
           <FirmProfileSection />
+
+          <FirmTeaserSection />
 
           <IntegrationsSection onToast={showToast} />
 

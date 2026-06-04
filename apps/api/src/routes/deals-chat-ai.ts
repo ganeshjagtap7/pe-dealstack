@@ -236,20 +236,31 @@ router.post('/:dealId/chat', async (req, res) => {
 
       const firmProfile = (orgData?.settings as any)?.firmProfile;
       if (firmProfile) {
+        // Stored firm-profile fields (see routes/onboarding-firm.ts +
+        // settings/FirmProfileSection.tsx): firmName, description, headquarters,
+        // founded, aum, investmentFocus, sectorFocus, dealSize, notableDeals,
+        // teamSize, website. Some list-like fields (investmentFocus, sectorFocus,
+        // notableDeals) may be stored as either a string or a string[].
+        const asText = (v: unknown): string | null => {
+          if (Array.isArray(v)) return v.filter(Boolean).join(', ') || null;
+          if (typeof v === 'string') return v.trim() || null;
+          return null;
+        };
+
         contextParts.push('\n=== YOUR FIRM CONTEXT ===');
-        if (firmProfile.description) contextParts.push(`Firm: ${firmProfile.description}`);
-        if (firmProfile.strategy) contextParts.push(`Strategy: ${firmProfile.strategy}`);
-        if (firmProfile.sectors?.length) contextParts.push(`Sectors: ${firmProfile.sectors.join(', ')}`);
-        if (firmProfile.checkSizeRange) contextParts.push(`Check Size: ${firmProfile.checkSizeRange}`);
-        if (firmProfile.investmentCriteria) contextParts.push(`Investment Criteria: ${firmProfile.investmentCriteria}`);
-        if (firmProfile.portfolioCompanies?.length) {
-          const names = firmProfile.portfolioCompanies.map((c: any) => c.name).join(', ');
-          contextParts.push(`Portfolio: ${names}`);
-        }
-        if (firmProfile.recentDeals?.length) {
-          const deals = firmProfile.recentDeals.map((d: any) => d.title).join(', ');
-          contextParts.push(`Recent Deals: ${deals}`);
-        }
+        if (firmProfile.firmName) contextParts.push(`Firm: ${firmProfile.firmName}`);
+        if (firmProfile.description) contextParts.push(`About: ${firmProfile.description}`);
+        const strategy = asText(firmProfile.investmentFocus);
+        if (strategy) contextParts.push(`Strategy: ${strategy}`);
+        const sectors = asText(firmProfile.sectorFocus);
+        if (sectors) contextParts.push(`Sectors: ${sectors}`);
+        if (firmProfile.dealSize) contextParts.push(`Check Size: ${firmProfile.dealSize}`);
+        if (firmProfile.aum) contextParts.push(`AUM: ${firmProfile.aum}`);
+        const notableDeals = asText(firmProfile.notableDeals);
+        if (notableDeals) contextParts.push(`Notable Deals: ${notableDeals}`);
+        if (firmProfile.headquarters) contextParts.push(`Headquarters: ${firmProfile.headquarters}`);
+        if (firmProfile.founded) contextParts.push(`Founded: ${firmProfile.founded}`);
+        if (firmProfile.teamSize) contextParts.push(`Team Size: ${firmProfile.teamSize}`);
       }
 
       // Also inject person context if available

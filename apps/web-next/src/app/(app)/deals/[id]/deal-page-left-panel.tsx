@@ -9,6 +9,7 @@ import {
   type DocItem,
   type Activity,
   type Tab,
+  TABS,
   OverviewTab,
   DocumentsTab,
   ActivityTab,
@@ -21,6 +22,7 @@ import {
   DealViewers,
   FinancialStatusBadge,
 } from "./components";
+import { DealTeasers } from "./DealTeasers";
 
 // ---------------------------------------------------------------------------
 // Left panel — deal content (icon, title, stage pipeline, metadata, financial
@@ -146,7 +148,7 @@ export function DealPageLeftPanel({
 
         {/* Tabs */}
         <div className="flex items-center gap-1 border-b border-border-subtle mt-1">
-          {(["Overview", "Documents", "Activity"] as const).map((tab) => (
+          {TABS.map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -190,6 +192,7 @@ export function DealPageLeftPanel({
               dealId={deal.id}
             />
           )}
+          {activeTab === "Teaser" && <DealTeasers dealId={dealId} />}
         </div>
       </div>
     </section>

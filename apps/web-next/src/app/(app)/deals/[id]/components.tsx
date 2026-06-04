@@ -127,7 +127,7 @@ export const PIPELINE_STAGES = [
 
 export const TERMINAL_STAGES = ["PASSED", "CLOSED_WON", "CLOSED_LOST"];
 
-export const TABS = ["Overview", "Documents", "Activity"] as const;
+export const TABS = ["Overview", "Documents", "Activity", "Teaser"] as const;
 export type Tab = (typeof TABS)[number];
 
 // ---------------------------------------------------------------------------
