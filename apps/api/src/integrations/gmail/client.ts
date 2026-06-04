@@ -326,3 +326,68 @@ export async function listMessagesForDeal(
   } while (pageToken && out.length < cap);
   return out.slice(0, cap);
 }
+
+// Language common in sourcing / intro emails from bankers and brokers. Used to
+// keyword-scope the broad inbox scan so we don't fetch + AI-extract every email.
+export const DEAL_SOURCING_TERMS = [
+  'confidential information memorandum',
+  'CIM',
+  'teaser',
+  'investment opportunity',
+  'acquisition opportunity',
+  'for sale',
+  'off-market',
+  'enterprise value',
+  'EBITDA',
+  'buyout',
+];
+
+/**
+ * Broad inbox query for NEW deal candidates — powers the dashboard inbox scan.
+ * Unlike listMessagesSince / listMessagesForDeal, this does NOT require known
+ * contact emails (a brand-new deal has no contacts yet). It keyword-scopes to
+ * deal-sourcing language and drops Gmail's promotions/social buckets to cut
+ * newsletter noise. Caps total results at `cap`.
+ */
+export async function listRecentDealCandidates(
+  accessToken: string,
+  since: Date,
+  cap = 15
+): Promise<{ id: string; threadId: string }[]> {
+  const afterUnix = Math.floor(since.getTime() / 1000);
+  const keywordClause = DEAL_SOURCING_TERMS
+    .map(t => (t.includes(' ') ? `"${t}"` : t))
+    .join(' OR ');
+  const q = `after:${afterUnix} (${keywordClause}) -category:promotions -category:social -in:chats`;
+
+  const out: { id: string; threadId: string }[] = [];
+  let pageToken: string | undefined = undefined;
+  let pageCount = 0;
+  const MAX_PAGES = 3;
+  do {
+    const remaining = cap - out.length;
+    if (remaining <= 0) break;
+    const params = new URLSearchParams({ q, maxResults: String(Math.min(100, remaining)) });
+    if (pageToken) params.set('pageToken', pageToken);
+    const url = `${GMAIL_BASE}/messages?${params.toString()}`;
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      signal: AbortSignal.timeout(15_000),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Gmail listRecentDealCandidates failed: ${res.status} ${text}`);
+    }
+    const page = (await res.json()) as GmailListMessagesResponse;
+    if (page.messages) {
+      for (const m of page.messages) {
+        out.push(m);
+        if (out.length >= cap) break;
+      }
+    }
+    pageToken = page.nextPageToken;
+    pageCount++;
+    if (pageCount >= MAX_PAGES) break;
+  } while (pageToken && out.length < cap);
+  return out.slice(0, cap);
+}

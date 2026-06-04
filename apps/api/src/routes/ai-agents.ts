@@ -14,6 +14,7 @@ import { runContactEnrichment } from '../services/agents/contactEnrichment/index
 import { generateMeetingPrep } from '../services/agents/meetingPrep/index.js';
 import { runSignalMonitor } from '../services/agents/signalMonitor/index.js';
 import { generateEmailDraft, getEmailTemplates } from '../services/agents/emailDrafter/index.js';
+import { scanInboxForDeals } from '../services/inboxDealScanService.js';
 
 const router = Router();
 
@@ -118,6 +119,31 @@ router.post('/ai/scan-signals', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Signal scan error', error);
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
+  }
+});
+
+// ─── Inbox Deal Scan ──────────────────────────────────────────────
+
+const scanInboxSchema = z.object({
+  lookbackDays: z.number().int().min(1).max(60).optional(),
+});
+
+// POST /api/ai/scan-inbox - Read the user's Gmail and return deal CANDIDATES
+// for review. Review-first: writes nothing to the DB.
+router.post('/ai/scan-inbox', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const authUserId = req.user?.id;
+    if (!authUserId) return res.status(401).json({ error: 'Not authenticated' });
+    // A bad optional `lookbackDays` must NOT 400 the whole scan — fall back to default.
+    const parsed = scanInboxSchema.safeParse(req.body ?? {});
+    const lookbackDays = parsed.success ? parsed.data.lookbackDays : undefined;
+    const result = await scanInboxForDeals({ orgId, authUserId, lookbackDays });
+    res.json(result);
+  } catch (error: any) {
+    log.error('Inbox deal scan error', error);
     const { statusCode, userMessage } = classifyAIErrorObject(error);
     res.status(statusCode).json({ error: userMessage });
   }

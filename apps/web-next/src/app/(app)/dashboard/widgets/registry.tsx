@@ -12,6 +12,7 @@ import { RecentActivityWidget } from "./recent-activity";
 import { TeamPerformanceWidget } from "./team-performance";
 import { DocumentAlertsWidget } from "./document-alerts";
 import { WatchlistWidget } from "./watchlist";
+import { InboxDealsWidget } from "./inbox-deals";
 
 // ---------------------------------------------------------------------------
 // Core widget IDs — rendered inline in page.tsx, not via the optional grid.
@@ -36,7 +37,8 @@ export type WidgetId =
   | "recent-activity"
   | "team-performance"
   | "document-alerts"
-  | "watchlist";
+  | "watchlist"
+  | "inbox-deals";
 
 export interface WidgetMeta {
   id: WidgetId;
@@ -171,6 +173,13 @@ export const WIDGETS: WidgetMeta[] = [
     Component: WatchlistWidget,
   },
   {
+    id: "inbox-deals",
+    title: "Inbox Deal Finder",
+    description: "Scan your inbox for potential new deals and create them in one click.",
+    icon: "forward_to_inbox",
+    Component: InboxDealsWidget,
+  },
+  {
     id: "market-multiples",
     title: "Market Multiples",
     description: "Static EV/EBITDA + EV/Revenue reference table.",
@@ -179,4 +188,4 @@ export const WIDGETS: WidgetMeta[] = [
   },
 ];
 
-export const DEFAULT_VISIBLE: WidgetId[] = ["quick-actions", "deal-funnel", "upcoming-deadlines"];
+export const DEFAULT_VISIBLE: WidgetId[] = ["quick-actions", "deal-funnel", "upcoming-deadlines", "inbox-deals"];
