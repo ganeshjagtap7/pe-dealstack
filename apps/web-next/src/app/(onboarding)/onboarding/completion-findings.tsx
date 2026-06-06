@@ -137,7 +137,7 @@ export function CompletionFindings({
             setTitle(
               `Your AI analyst found ${top5.length} thing${top5.length > 1 ? "s" : ""} on your deal.`,
             );
-            setSubtitle("Here's a preview. Click any finding to see the exact page it came from.");
+            setSubtitle("Preview below. Click any finding to jump to source.");
             setFindings(top5);
             setLoading(false);
             return;
@@ -158,7 +158,7 @@ export function CompletionFindings({
           if (statements.length > 0) {
             setTitle("Your workspace is ready.");
             setSubtitle(
-              `We extracted ${statements.length} financial statement${statements.length > 1 ? "s" : ""} from your deal. Dive in to see the full analysis.`,
+              `We pulled ${statements.length} financial statement${statements.length > 1 ? "s" : ""}. Open the deal to dig in.`,
             );
             setStatementCount(statements.length);
             setLoading(false);
@@ -180,7 +180,7 @@ export function CompletionFindings({
     function renderNoFindings() {
       if (cancelled) return;
       setTitle("Your workspace is ready.");
-      setSubtitle("Your AI analyst is still processing. Findings will appear on your dashboard shortly.");
+      setSubtitle("Your AI analyst is still on it. Findings will land on Home as they come in.");
       setNoFindings(true);
       setLoading(false);
     }
@@ -294,9 +294,9 @@ export function CompletionFindings({
             </span>
           </div>
           <div>
-            <div className="text-[13.5px] font-semibold text-text-main">AI extraction in progress</div>
+            <div className="text-[13.5px] font-semibold text-text-main">AI extraction running</div>
             <div className="text-[12px] text-text-muted mt-0.5">
-              Red flags, financials, and signals will stream in as they&apos;re discovered.
+              Red flags, financials, and signals will land as we find them.
             </div>
           </div>
         </div>

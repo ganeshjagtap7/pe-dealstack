@@ -70,8 +70,8 @@ export function ActivePrioritiesWidget({ deals, loading }: ActivePrioritiesWidge
             ) : deals.length === 0 ? (
               <tr><td colSpan={5} className="px-5 py-10 text-center">
                 <span className="material-symbols-outlined text-text-muted text-[32px] mb-2 block opacity-60">priority_high</span>
-                <p className="text-sm font-medium text-text-main">No active priorities</p>
-                <p className="text-xs text-text-muted mt-1">Deals needing immediate attention will appear here</p>
+                <p className="text-sm font-medium text-text-main">Nothing burning yet.</p>
+                <p className="text-xs text-text-muted mt-1">Deals that need a decision today land here.</p>
               </td></tr>
             ) : deals.map((deal) => {
               const style = STAGE_STYLES[deal.stage] || STAGE_STYLES.INITIAL_REVIEW;
@@ -167,8 +167,8 @@ export function MyTasksWidget({
         ) : tasks.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-8 text-text-muted">
             <span className="material-symbols-outlined text-3xl mb-2 text-secondary">task_alt</span>
-            <span className="text-sm font-medium">All caught up!</span>
-            <span className="text-xs mt-0.5">No tasks assigned to you</span>
+            <span className="text-sm font-medium">Nothing on your plate.</span>
+            <span className="text-xs mt-0.5">Tasks assigned to you show up here.</span>
           </div>
         ) : tasks.slice(0, 5).map((task, i) => {
           const done = task.status === "COMPLETED";
@@ -269,15 +269,15 @@ export function AiDealSignalsWidget({
       {scanning ? (
         <div className="flex flex-col items-center justify-center py-8">
           <span className="material-symbols-outlined text-primary text-2xl animate-spin mb-2">radar</span>
-          <p className="text-sm text-text-muted">Scanning portfolio for signals...</p>
+          <p className="text-sm text-text-muted">Reading the portfolio...</p>
         </div>
       ) : signalResult ? (
         <SignalResults result={signalResult} />
       ) : (
         <div className="p-5 text-center">
           <span className="material-symbols-outlined text-text-muted text-2xl mb-2">monitoring</span>
-          <p className="text-sm font-medium text-text-main mb-1">Portfolio Signal Monitor</p>
-          <p className="text-xs text-text-muted">Click &quot;Scan Signals&quot; to analyze your portfolio for risks, opportunities, and actionable deal signals using AI.</p>
+          <p className="text-sm font-medium text-text-main mb-1">Watch the portfolio.</p>
+          <p className="text-xs text-text-muted">Hit &quot;Scan Signals&quot; to surface risks, opportunities, and follow-ups across the book.</p>
         </div>
       )}
     </div>

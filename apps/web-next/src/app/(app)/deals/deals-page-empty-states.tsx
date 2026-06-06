@@ -32,8 +32,8 @@ export function NoMatchingDealsState() {
   return (
     <div className="flex flex-col items-center justify-center py-20">
       <span className="material-symbols-outlined text-text-muted text-4xl mb-4">search_off</span>
-      <p className="text-text-main font-medium mb-2">No deals found</p>
-      <p className="text-text-muted text-sm">Try adjusting your filters</p>
+      <p className="text-text-main font-medium mb-2">Nothing matches.</p>
+      <p className="text-text-muted text-sm">Try adjusting your filters.</p>
     </div>
   );
 }
@@ -46,9 +46,9 @@ export function WelcomeEmptyState({ onCreate }: { onCreate: () => void }) {
           rocket_launch
         </span>
       </div>
-      <p className="text-text-main font-bold text-xl mb-2 tracking-tight">Welcome to Your Deal Pipeline</p>
+      <p className="text-text-main font-bold text-xl mb-2 tracking-tight">Your pipeline starts here.</p>
       <p className="text-text-muted text-sm text-center max-w-md mb-8 leading-relaxed">
-        Start building your deal flow. Create your first deal or import from a spreadsheet to track through sourcing, due diligence, and close.
+        Add a deal manually, or import a spreadsheet. We&apos;ll track it through sourcing, diligence, and close.
       </p>
       <div className="flex items-center gap-3">
         <button
@@ -58,7 +58,7 @@ export function WelcomeEmptyState({ onCreate }: { onCreate: () => void }) {
           style={{ backgroundColor: "#003366" }}
         >
           <span className="material-symbols-outlined text-[18px]">add_circle</span>
-          Create Your First Deal
+          Add a deal
         </button>
         <button
           type="button"
@@ -66,7 +66,7 @@ export function WelcomeEmptyState({ onCreate }: { onCreate: () => void }) {
           className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary transition-all"
         >
           <span className="material-symbols-outlined text-[18px]">upload_file</span>
-          Import Deals
+          Import from spreadsheet
         </button>
       </div>
     </div>
