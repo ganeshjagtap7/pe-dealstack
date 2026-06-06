@@ -17,6 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: "admin", label: "Admin", icon: "admin_panel_settings", href: "/admin", adminOnly: true },
   { id: "divider", label: "", icon: "", href: "", divider: true },
   { id: "ai-reports", label: "AI Reports", icon: "auto_awesome", href: "/memo-builder", isAI: true, memberOnly: true },
+  { id: "valuations", label: "Valuations", icon: "calculate", href: "/valuations", isAI: true, memberOnly: true },
 ];
 
 export const STAGES = [
