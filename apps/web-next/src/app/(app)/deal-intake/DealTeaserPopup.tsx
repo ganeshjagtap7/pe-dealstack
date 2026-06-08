@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { api } from "@/lib/api";
 import { formatRelativeTime } from "@/lib/formatters";
 import type { DealTeaser } from "@/lib/teaser";
 import { TeaserFitChip } from "@/app/(app)/deals/[id]/deal-teaser-fit-chip";
+import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
+import { useToast } from "@/providers/ToastProvider";
 
 // ---------------------------------------------------------------------------
 // DealTeaserPopup — fires right after a new deal is created from the intake
@@ -12,8 +15,9 @@ import { TeaserFitChip } from "@/app/(app)/deals/[id]/deal-teaser-fit-chip";
 // profiles (the "firm teaser"). One card per profile: headline + a
 // criterion-by-criterion fit/partial/miss breakdown, reusing TeaserFitChip.
 //
-// Read-only by design (no regenerate) — this is a first-look summary; the full
-// teaser tab on the deal page handles regeneration. Portals to document.body at
+// No regenerate here (the deal-page teaser tab owns that). It doubles as a
+// first-look gate: from a poor-fit summary the analyst can Reject the deal,
+// which soft-deletes it (recoverable from Trash). Portals to document.body at
 // a higher z-index than the ingest modal (z-[10000]) so it layers on top.
 // ---------------------------------------------------------------------------
 
@@ -24,18 +28,42 @@ interface DealTeaserPopupProps {
   teasers: DealTeaser[];
   onClose: () => void;
   onViewDeal: () => void;
+  // Called after the deal is rejected (soft-deleted) so the parent can clear
+  // the now-stale "Deal Created" state.
+  onRejected: () => void;
 }
 
-export function DealTeaserPopup({ deal, teasers, onClose, onViewDeal }: DealTeaserPopupProps) {
-  // Esc to close. The intake modal owns body scroll-lock while it's open, so we
-  // don't touch document.body.style here.
+export function DealTeaserPopup({ deal, teasers, onClose, onViewDeal, onRejected }: DealTeaserPopupProps) {
+  const { showToast } = useToast();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+
+  // Esc closes the confirm first (if open), otherwise the popup. The intake
+  // modal owns body scroll-lock while it's open, so we don't touch
+  // document.body.style here.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key !== "Escape") return;
+      if (confirmOpen) setConfirmOpen(false);
+      else onClose();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, confirmOpen]);
+
+  const handleReject = async () => {
+    setRejecting(true);
+    try {
+      await api.delete(`/deals/${deal.id}`);
+      showToast("Deal rejected and removed", "success");
+      onRejected();
+    } catch (err) {
+      console.warn("[deal-intake] reject deal failed:", err);
+      showToast(err instanceof Error ? err.message : "Couldn't reject the deal", "error");
+      setRejecting(false);
+      setConfirmOpen(false);
+    }
+  };
 
   if (typeof document === "undefined") return null;
 
@@ -84,26 +112,50 @@ export function DealTeaserPopup({ deal, teasers, onClose, onViewDeal }: DealTeas
           ))}
         </div>
 
-        {/* Footer */}
-        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border-subtle bg-background-body px-6 py-4">
+        {/* Footer — Reject (left) gates a poor-fit deal; Close / View deal (right) */}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-t border-border-subtle bg-background-body px-6 py-4">
           <button
             type="button"
-            onClick={onClose}
-            className="rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-gray-50"
+            onClick={() => setConfirmOpen(true)}
+            disabled={rejecting}
+            className="inline-flex items-center gap-2 rounded-lg border border-red-200 px-4 py-2 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
           >
-            Close
+            <span className={`material-symbols-outlined text-[18px] ${rejecting ? "animate-spin" : ""}`}>
+              {rejecting ? "progress_activity" : "block"}
+            </span>
+            {rejecting ? "Rejecting..." : "Reject deal"}
           </button>
-          <button
-            type="button"
-            onClick={onViewDeal}
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
-            style={{ backgroundColor: BANKER_BLUE }}
-          >
-            <span className="material-symbols-outlined text-[18px]">open_in_new</span>
-            View deal
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg border border-border-subtle px-4 py-2 text-sm font-medium text-text-secondary transition-colors hover:bg-gray-50"
+            >
+              Close
+            </button>
+            <button
+              type="button"
+              onClick={onViewDeal}
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+              style={{ backgroundColor: BANKER_BLUE }}
+            >
+              <span className="material-symbols-outlined text-[18px]">open_in_new</span>
+              View deal
+            </button>
+          </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmOpen}
+        variant="danger"
+        title="Reject this deal?"
+        message={`This removes ${deal.name} from your pipeline. You can restore it from Trash within 30 days.`}
+        confirmLabel="Reject & delete"
+        cancelLabel="Keep deal"
+        onConfirm={handleReject}
+        onCancel={() => setConfirmOpen(false)}
+      />
     </div>,
     document.body,
   );

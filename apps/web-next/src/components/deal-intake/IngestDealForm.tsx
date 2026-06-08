@@ -465,6 +465,10 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
             onClose?.();
             window.location.href = `/deals/${teaserPopup.deal.id}`;
           }}
+          onRejected={() => {
+            setTeaserPopup(null);
+            resetForm();
+          }}
         />
       )}
     </div>
