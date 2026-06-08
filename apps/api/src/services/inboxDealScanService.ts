@@ -18,6 +18,7 @@ import {
   markStatus,
 } from '../integrations/_platform/tokenStore.js';
 import {
+  getAttachment,
   getMessageFull,
   listRecentDealCandidates,
   refreshAccessToken,
@@ -25,6 +26,7 @@ import {
 import type { Integration } from '../integrations/_platform/types.js';
 import type { GmailMessageFull } from '../integrations/gmail/types.js';
 import { extractDealDataFromText } from './aiExtractor.js';
+import { extractTextFromPDF } from './pdfExtractor.js';
 
 // ─── Tunables (no magic numbers) ───────────────────────────────────
 const LOOKBACK_DAYS_DEFAULT = 14;
@@ -41,6 +43,11 @@ const MIN_CANDIDATE_CONFIDENCE = 40;
 const MIN_EXTRACT_TEXT_LEN = 100;
 const TOKEN_REFRESH_SAFETY_MS = 60_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+// PDF attachment handling — teasers/CIMs often ARE the attached PDF, so pull
+// their text too. Bounded to keep a synchronous dashboard scan fast + cheap.
+const MAX_PDF_ATTACHMENTS_PER_EMAIL = 2;
+const MAX_PDF_BYTES = 15 * 1024 * 1024; // skip giant pitch decks
+const MAX_PDF_TEXT_CHARS = 8000; // cap added per email to bound LLM token cost
 
 // ─── Public types ──────────────────────────────────────────────────
 
@@ -174,6 +181,57 @@ function gateFinancial(field: { value: number | null; confidence: number }): num
   return field.value != null && field.confidence >= FIELD_FLOOR ? field.value : null;
 }
 
+/**
+ * Pull text from a message's PDF attachments (teasers/CIMs are frequently the
+ * attachment, not the body). Uses the lightweight pdf-parse extractor — this is
+ * a first-look candidate scan, so the high-fidelity LlamaParse pass is left to
+ * the real ingest pipeline that runs when the user confirms a candidate.
+ * Bounded by count, byte size, and total chars; per-PDF failures are skipped.
+ */
+async function extractPdfAttachmentsText(
+  accessToken: string,
+  message: GmailMessageFull,
+): Promise<string> {
+  const pdfs = message.attachments
+    .filter(
+      (a) =>
+        a.attachmentId &&
+        (a.mimeType === 'application/pdf' || a.filename.toLowerCase().endsWith('.pdf'))
+    )
+    .slice(0, MAX_PDF_ATTACHMENTS_PER_EMAIL);
+  if (pdfs.length === 0) return '';
+
+  const chunks: string[] = [];
+  for (const att of pdfs) {
+    if (att.size && att.size > MAX_PDF_BYTES) {
+      log.info('inboxDealScan: skipping oversized PDF attachment', {
+        messageId: message.id,
+        filename: att.filename,
+        size: att.size,
+      });
+      continue;
+    }
+    try {
+      const buffer = await getAttachment(accessToken, message.id, att.attachmentId);
+      const extracted = await extractTextFromPDF(buffer);
+      const text = extracted?.text?.replace(/\u0000/g, '').trim();
+      if (text) chunks.push(text);
+    } catch (err) {
+      log.warn('inboxDealScan: PDF attachment extract failed (skipping)', {
+        messageId: message.id,
+        filename: att.filename,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  let combined = chunks.join('\n\n').trim();
+  if (combined.length > MAX_PDF_TEXT_CHARS) {
+    combined = combined.slice(0, MAX_PDF_TEXT_CHARS) + '…';
+  }
+  return combined;
+}
+
 // ─── Entry point ───────────────────────────────────────────────────
 
 export async function scanInboxForDeals(args: {
@@ -258,8 +316,15 @@ export async function scanInboxForDeals(args: {
       const subject = m.headers.Subject || '(no subject)';
       const from = m.headers.From || 'unknown';
       const bodyText = m.body || m.snippet || '';
-      const text = `Subject: ${subject}\nFrom: ${from}\n\n${bodyText}`;
-      if (text.length < MIN_EXTRACT_TEXT_LEN) return null;
+
+      // Teasers/CIMs often arrive AS a PDF with a near-empty body — pull the
+      // attachment text so those emails clear the length floor below.
+      const pdfText = await extractPdfAttachmentsText(accessToken, m);
+
+      const segments = [`Subject: ${subject}`, `From: ${from}`, '', bodyText];
+      if (pdfText) segments.push('', '--- Attached document ---', pdfText);
+      const text = segments.join('\n');
+      if (text.trim().length < MIN_EXTRACT_TEXT_LEN) return null;
       try {
         const data = await extractDealDataFromText(text);
         if (!data) return null;

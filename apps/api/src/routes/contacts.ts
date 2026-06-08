@@ -28,6 +28,17 @@ const createContactSchema = z.object({
   linkedinUrl: z.string().max(500).optional().or(z.literal('')),
   notes: z.string().max(5000).optional().or(z.literal('')),
   tags: z.array(z.string().max(50)).max(20).optional(),
+  // Follow-up reminder. Accept an ISO 8601 datetime (with or without offset)
+  // or a date-only string (YYYY-MM-DD), or null to clear (PATCH).
+  followUpAt: z
+    .union([
+      z.string().datetime({ offset: true }),
+      z.string().datetime(),
+      z.string().date(),
+    ])
+    .nullable()
+    .optional(),
+  followUpNote: z.string().max(500).optional().or(z.literal('')),
 });
 
 const updateContactSchema = createContactSchema.partial();
@@ -244,6 +255,8 @@ router.post('/', async (req: any, res) => {
         linkedinUrl: data.linkedinUrl || null,
         notes: data.notes || null,
         tags: data.tags || [],
+        followUpAt: data.followUpAt || null,
+        followUpNote: data.followUpNote || null,
         createdBy: req.user?.id,
         organizationId: orgId,
       })
@@ -306,6 +319,9 @@ router.patch('/:id', async (req: any, res) => {
     if (data.linkedinUrl !== undefined) updates.linkedinUrl = data.linkedinUrl || null;
     if (data.notes !== undefined) updates.notes = data.notes || null;
     if (data.tags !== undefined) updates.tags = data.tags;
+    // followUpAt: accept an ISO string to set, or explicit null to clear.
+    if (data.followUpAt !== undefined) updates.followUpAt = data.followUpAt ?? null;
+    if (data.followUpNote !== undefined) updates.followUpNote = data.followUpNote || null;
 
     const orgId = getOrgId(req);
 

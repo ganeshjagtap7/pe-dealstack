@@ -46,6 +46,38 @@ interface Connection {
   contact: { id: string; firstName: string; lastName: string; type: string; company?: string; title?: string };
 }
 
+interface EnrichmentSuggestedFollowUp {
+  date?: string;
+  action?: string;
+}
+
+interface ContactEnrichment {
+  summary?: string;
+  insights?: string[];
+  suggestedTags?: string[];
+  suggestedFollowUp?: EnrichmentSuggestedFollowUp | null;
+  [key: string]: unknown;
+}
+
+// Returns true when a follow-up date is in the past (date-only comparison).
+function isFollowUpOverdue(followUpAt?: string | null): boolean {
+  if (!followUpAt) return false;
+  const due = new Date(followUpAt);
+  if (Number.isNaN(due.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  due.setHours(0, 0, 0, 0);
+  return due.getTime() < today.getTime();
+}
+
+// Normalises an ISO/string date into a yyyy-mm-dd value for <input type="date">.
+function toDateInputValue(value?: string | null): string {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toISOString().split("T")[0];
+}
+
 // ─── Detail Panel ──────────────────────────────────────────
 
 export function DetailPanel({
@@ -67,6 +99,9 @@ export function DetailPanel({
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [unlinkDealId, setUnlinkDealId] = useState<string | null>(null);
   const [removeConnectionId, setRemoveConnectionId] = useState<string | null>(null);
+  const [savingFollowUp, setSavingFollowUp] = useState(false);
+  const [enriching, setEnriching] = useState(false);
+  const [enrichment, setEnrichment] = useState<ContactEnrichment | null>(null);
   const { showToast } = useToast();
 
   const loadContact = useCallback(async () => {
@@ -115,6 +150,31 @@ export function DetailPanel({
       onRefresh();
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to delete contact", "error");
+    }
+  }
+
+  // PATCH followUpAt. Pass null to clear. Optimistically reloads the contact.
+  async function updateFollowUp(value: string | null) {
+    setSavingFollowUp(true);
+    try {
+      await api.patch(`/contacts/${contactId}`, { followUpAt: value });
+      await loadContact();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to update follow-up", "error");
+    } finally {
+      setSavingFollowUp(false);
+    }
+  }
+
+  async function handleAskAi() {
+    setEnriching(true);
+    try {
+      const data = await api.post<ContactEnrichment>("/ai/enrich-contact", { contactId });
+      setEnrichment(data);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to get AI suggestions", "error");
+    } finally {
+      setEnriching(false);
     }
   }
 
@@ -200,6 +260,78 @@ export function DetailPanel({
               {!contact.email && !contact.phone && !contact.linkedinUrl && <p className="text-text-muted text-sm italic p-2">No contact information added</p>}
             </div>
           </div>
+
+          {/* Follow-up */}
+          {(() => {
+            const overdue = isFollowUpOverdue(contact.followUpAt);
+            return (
+              <div className="mb-6">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Follow-up</h4>
+                <div className={cn("flex items-center gap-2 p-2.5 rounded-lg border", overdue ? "border-red-200 bg-red-50/60" : "border-border-subtle bg-gray-50")}>
+                  <span className={cn("material-symbols-outlined text-[18px]", overdue ? "text-red-500" : "text-text-muted")}>{overdue ? "event_busy" : "event"}</span>
+                  <input
+                    type="date"
+                    value={toDateInputValue(contact.followUpAt)}
+                    disabled={savingFollowUp}
+                    onChange={(e) => updateFollowUp(e.target.value || null)}
+                    className={cn("flex-1 rounded-md border bg-white px-2.5 py-1.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors disabled:opacity-50", overdue ? "border-red-300 text-red-700" : "border-border-subtle text-text-main")}
+                  />
+                  {contact.followUpAt && (
+                    <button onClick={() => updateFollowUp(null)} disabled={savingFollowUp} className="p-1.5 rounded hover:bg-white text-text-muted hover:text-red-500 transition-colors disabled:opacity-50" title="Clear follow-up">
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  )}
+                </div>
+                {overdue && <p className="text-[11px] text-red-600 font-medium mt-1.5 flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">warning</span>Follow-up is overdue</p>}
+              </div>
+            );
+          })()}
+
+          {/* AI Suggestions */}
+          {enrichment && (
+            <div className="mb-6 p-4 rounded-lg border border-primary/20 bg-blue-50/30">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">auto_awesome</span>AI Suggestions</h4>
+                <button onClick={() => setEnrichment(null)} className="p-1 rounded hover:bg-white text-text-muted hover:text-text-main transition-colors"><span className="material-symbols-outlined text-[16px]">close</span></button>
+              </div>
+              {enrichment.summary && <p className="text-sm text-text-secondary leading-relaxed mb-3">{enrichment.summary}</p>}
+              {enrichment.insights && enrichment.insights.length > 0 && (
+                <ul className="flex flex-col gap-1.5 mb-3">
+                  {enrichment.insights.map((ins, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
+                      <span className="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">lightbulb</span>
+                      <span>{ins}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {enrichment.suggestedTags && enrichment.suggestedTags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {enrichment.suggestedTags.map((t, i) => <span key={i} className="px-2.5 py-1 rounded-full bg-white text-text-secondary text-xs font-medium border border-border-subtle">{t}</span>)}
+                </div>
+              )}
+              {enrichment.suggestedFollowUp && (enrichment.suggestedFollowUp.date || enrichment.suggestedFollowUp.action) && (
+                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-white border border-primary/15">
+                  <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">event_upcoming</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-0.5">Suggested Follow-up</p>
+                    {enrichment.suggestedFollowUp.action && <p className="text-sm text-text-secondary leading-relaxed">{enrichment.suggestedFollowUp.action}</p>}
+                    {enrichment.suggestedFollowUp.date && <p className="text-xs text-text-muted mt-0.5">{toDateInputValue(enrichment.suggestedFollowUp.date) || enrichment.suggestedFollowUp.date}</p>}
+                  </div>
+                  {enrichment.suggestedFollowUp.date && (
+                    <button
+                      onClick={() => updateFollowUp(enrichment.suggestedFollowUp!.date!)}
+                      disabled={savingFollowUp}
+                      className="shrink-0 px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors disabled:opacity-50"
+                      style={{ backgroundColor: "#003366" }}
+                    >
+                      Apply
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Tags */}
           {tags.length > 0 && (
@@ -325,6 +457,9 @@ export function DetailPanel({
             </button>
             <button onClick={() => setLinkDealOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
               <span className="material-symbols-outlined text-[16px]">link</span>Link Deal
+            </button>
+            <button onClick={handleAskAi} disabled={enriching} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all disabled:opacity-50">
+              <span className={cn("material-symbols-outlined text-[16px]", enriching && "animate-spin")}>{enriching ? "sync" : "auto_awesome"}</span>{enriching ? "Asking..." : "Ask AI"}
             </button>
             <button onClick={() => setEditModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
               <span className="material-symbols-outlined text-[16px]">edit</span>Edit

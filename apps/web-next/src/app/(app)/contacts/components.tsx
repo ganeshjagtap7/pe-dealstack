@@ -18,6 +18,7 @@ export interface Contact {
   tags?: string[];
   linkedinUrl?: string;
   lastInteractionAt?: string;
+  followUpAt?: string | null;
   interactions?: Interaction[];
   linkedDeals?: LinkedDeal[];
   createdAt: string;

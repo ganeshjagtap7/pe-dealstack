@@ -135,6 +135,62 @@ router.get('/insights/stale', async (req: any, res) => {
   }
 });
 
+// ─── GET /api/contacts/insights/follow-ups — Due & upcoming follow-ups ─
+
+router.get('/insights/follow-ups', async (req: any, res) => {
+  try {
+    const orgId = getOrgId(req);
+    // Window for "upcoming" follow-ups (default 7 days ahead).
+    const days = Math.min(Math.max(Number(req.query.days) || 7, 1), 90);
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const horizonIso = new Date(now.getTime() + days * 24 * 60 * 60 * 1000).toISOString();
+
+    const fields = 'id, firstName, lastName, type, company, email, followUpAt, followUpNote, lastContactedAt';
+
+    // Overdue: followUpAt <= now
+    const { data: overdueRows, error: errOverdue } = await supabase
+      .from('Contact')
+      .select(fields)
+      .eq('organizationId', orgId)
+      .not('followUpAt', 'is', null)
+      .lte('followUpAt', nowIso)
+      .order('followUpAt', { ascending: true })
+      .limit(50);
+    if (errOverdue) throw errOverdue;
+
+    // Upcoming: now < followUpAt <= horizon
+    const { data: upcomingRows, error: errUpcoming } = await supabase
+      .from('Contact')
+      .select(fields)
+      .eq('organizationId', orgId)
+      .gt('followUpAt', nowIso)
+      .lte('followUpAt', horizonIso)
+      .order('followUpAt', { ascending: true })
+      .limit(50);
+    if (errUpcoming) throw errUpcoming;
+
+    const overdue = (overdueRows || []).map((c: any) => ({
+      ...c,
+      daysOverdue: Math.floor((now.getTime() - new Date(c.followUpAt).getTime()) / 86400000),
+    }));
+    const upcoming = (upcomingRows || []).map((c: any) => ({
+      ...c,
+      daysUntil: Math.ceil((new Date(c.followUpAt).getTime() - now.getTime()) / 86400000),
+    }));
+
+    res.json({
+      overdue,
+      upcoming,
+      counts: { overdue: overdue.length, upcoming: upcoming.length },
+      windowDays: days,
+    });
+  } catch (error) {
+    log.error('Follow-ups error', error);
+    res.status(500).json({ error: 'Failed to load follow-ups' });
+  }
+});
+
 // ─── GET /api/contacts/insights/scores — Relationship strength scores ─
 
 router.get('/insights/scores', async (req: any, res) => {

@@ -12,6 +12,10 @@ export type TeaserProfile = {
   name: string;
   systemPrompt: string;
   criteria: TeaserCriterion[];
+  // Firm context (uploaded-doc text + pasted notes) that grounds GEN's
+  // system-prompt authoring. An authoring input only — it does NOT affect
+  // generated teasers, so it stays out of the stale-teaser diff.
+  contextText?: string;
   updatedAt: string;
 };
 

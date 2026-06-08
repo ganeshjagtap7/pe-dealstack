@@ -10,6 +10,7 @@ import ingestRouter from './ai-ingest.js';
 import portfolioRouter from './ai-portfolio.js';
 import aiAgentsRouter from './ai-agents.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
+import { runGlobalChat, normalizeContext } from '../services/globalChatService.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { MODEL_REASONING, MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { classifyAIErrorObject } from '../utils/aiErrors.js';
@@ -28,6 +29,47 @@ const chatMessageSchema = z.object({
     role: z.enum(['user', 'assistant']),
     content: z.string(),
   })).optional(),
+});
+
+// Global (non-deal-scoped) floating-chat contract: { message, context }
+const globalChatSchema = z.object({
+  message: z.string().min(1),
+  context: z.string().default('general'),
+});
+
+// POST /api/ai/chat - Global floating AI chat (dashboard/deals/contacts/memo/general)
+// Backs the non-deal branch of the frontend AIAssistant. Per-deal chat goes
+// through /deals/:dealId/chat instead. Response: { response, model }.
+router.post('/ai/chat', async (req, res) => {
+  try {
+    if (!isLLMAvailable()) {
+      return res.status(503).json({
+        error: 'AI service unavailable',
+        message: 'No LLM API key configured',
+      });
+    }
+
+    const orgId = getOrgId(req);
+    const { message, context } = globalChatSchema.parse(req.body);
+
+    const result = await runGlobalChat({
+      orgId,
+      message,
+      context: normalizeContext(context),
+    });
+
+    res.json({
+      response: result.response,
+      model: result.model,
+    });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    log.error('Error in global AI chat', error);
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
+  }
 });
 
 // POST /api/deals/:dealId/chat - Chat with AI about a deal (ReAct Agent)

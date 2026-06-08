@@ -14,7 +14,7 @@ import { STAGE_STYLES, STAGE_LABELS } from "@/lib/constants";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { api } from "@/lib/api";
 import { Deal, Task, fmtNextAction } from "./components";
-import { SignalResults } from "./dashboard-modals";
+import { InboxDealsModal, type InboxDealCandidate } from "./widgets/inbox-deals-modal";
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /*  Active Priorities widget                                               */
@@ -205,19 +205,31 @@ export function MyTasksWidget({
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /*  AI Deal Signals widget                                                 */
+/*                                                                          */
+/*  Repurposed: this prominent widget now runs the Gmail inbox deal scan    */
+/*  (POST /ai/scan-inbox) and surfaces new-deal candidates via the shared   */
+/*  InboxDealsModal (review-first — a Deal is created only when the user    */
+/*  clicks "Create deal"). The portfolio-signals scanner (/ai/scan-signals) */
+/*  is intentionally left in place on the backend; only this widget's       */
+/*  wiring changed.                                                         */
 /* ──────────────────────────────────────────────────────────────────────── */
 
-type SignalScanResult = {
-  signals?: Array<{ title: string; description: string; severity: string; signalType: string; dealName: string; suggestedAction: string }>;
-  processedCount?: number;
+// Returned by POST /ai/scan-inbox. `candidates` carries the same shape the
+// InboxDealsModal renders, so the type is imported (not redefined) from there.
+export type InboxScanResult = {
+  connected: boolean;
+  scanned: number;
+  candidates: InboxDealCandidate[];
 };
+
+const INBOX_LOOKBACK_DAYS = 14;
 
 interface AiDealSignalsWidgetProps {
   scanning: boolean;
-  signalResult: SignalScanResult | null;
+  signalResult: InboxScanResult | null;
   signalError: string | null;
   setScanning: (v: boolean) => void;
-  setSignalResult: (v: SignalScanResult | null) => void;
+  setSignalResult: (v: InboxScanResult | null) => void;
   setSignalError: (v: string | null) => void;
 }
 
@@ -229,12 +241,15 @@ export function AiDealSignalsWidget({
   setSignalResult,
   setSignalError,
 }: AiDealSignalsWidgetProps) {
+  const candidates = signalResult?.connected ? signalResult.candidates : [];
+  const showModal = candidates.length > 0;
+
   return (
     <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
       <div className="p-5 border-b border-border-subtle flex items-center justify-between bg-white">
         <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-primary text-[20px]">radar</span>
-          <h3 className="font-bold text-text-main text-base">AI Deal Signals</h3>
+          <span className="material-symbols-outlined text-primary text-[20px]">forward_to_inbox</span>
+          <h3 className="font-bold text-text-main text-base">Inbox Deal Finder</h3>
         </div>
         <button
           onClick={async () => {
@@ -242,11 +257,13 @@ export function AiDealSignalsWidget({
             setSignalResult(null);
             setSignalError(null);
             try {
-              const result = await api.get<SignalScanResult>("/ai/scan-signals");
+              const result = await api.post<InboxScanResult>("/ai/scan-inbox", {
+                lookbackDays: INBOX_LOOKBACK_DAYS,
+              });
               setSignalResult(result);
             } catch (err) {
-              console.warn("[dashboard] scan-signals failed:", err);
-              setSignalError("Couldn't scan signals — please try again.");
+              console.warn("[dashboard] scan-inbox failed:", err);
+              setSignalError("Couldn't scan inbox — please try again.");
               setTimeout(() => setSignalError(null), 5000);
             } finally {
               setScanning(false);
@@ -256,8 +273,8 @@ export function AiDealSignalsWidget({
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-60"
           style={{ backgroundColor: "#003366" }}
         >
-          <span className={cn("material-symbols-outlined text-[16px]", scanning && "animate-spin")}>{scanning ? "progress_activity" : "radar"}</span>
-          {scanning ? "Scanning..." : "Scan Signals"}
+          <span className={cn("material-symbols-outlined text-[16px]", scanning && "animate-spin")}>{scanning ? "progress_activity" : "forward_to_inbox"}</span>
+          {scanning ? "Scanning..." : "Scan inbox"}
         </button>
       </div>
       {signalError && (
@@ -268,17 +285,39 @@ export function AiDealSignalsWidget({
       )}
       {scanning ? (
         <div className="flex flex-col items-center justify-center py-8">
-          <span className="material-symbols-outlined text-primary text-2xl animate-spin mb-2">radar</span>
-          <p className="text-sm text-text-muted">Scanning portfolio for signals...</p>
+          <span className="material-symbols-outlined text-primary text-2xl animate-spin mb-2">forward_to_inbox</span>
+          <p className="text-sm text-text-muted">Scanning your inbox for new deals...</p>
         </div>
-      ) : signalResult ? (
-        <SignalResults result={signalResult} />
+      ) : signalResult && !signalResult.connected ? (
+        <div className="p-5 text-center">
+          <span className="material-symbols-outlined text-text-muted text-2xl mb-2">link_off</span>
+          <p className="text-sm font-medium text-text-main mb-1">Connect Gmail to scan</p>
+          <p className="text-xs text-text-muted">
+            Connect Gmail in{" "}
+            <Link href="/settings" className="font-medium text-primary hover:text-primary-hover">
+              Settings
+            </Link>{" "}
+            &rarr; Integrations to scan your inbox for new deal candidates.
+          </p>
+        </div>
+      ) : signalResult && candidates.length === 0 ? (
+        <div className="p-5 text-center">
+          <span className="material-symbols-outlined text-text-muted text-2xl mb-2">mark_email_read</span>
+          <p className="text-sm font-medium text-text-main mb-1">No new deals found</p>
+          <p className="text-xs text-text-muted">No new deal candidates turned up in your recent inbox.</p>
+        </div>
       ) : (
         <div className="p-5 text-center">
-          <span className="material-symbols-outlined text-text-muted text-2xl mb-2">monitoring</span>
-          <p className="text-sm font-medium text-text-main mb-1">Portfolio Signal Monitor</p>
-          <p className="text-xs text-text-muted">Click &quot;Scan Signals&quot; to analyze your portfolio for risks, opportunities, and actionable deal signals using AI.</p>
+          <span className="material-symbols-outlined text-text-muted text-2xl mb-2">forward_to_inbox</span>
+          <p className="text-sm font-medium text-text-main mb-1">Inbox Deal Finder</p>
+          <p className="text-xs text-text-muted">Click &quot;Scan inbox&quot; to scan your inbox for new deal candidates and create them in one click.</p>
         </div>
+      )}
+      {showModal && (
+        <InboxDealsModal
+          candidates={candidates}
+          onClose={() => setSignalResult(null)}
+        />
       )}
     </div>
   );

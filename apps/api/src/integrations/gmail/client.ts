@@ -1,5 +1,6 @@
 import { log } from '../../utils/logger.js';
 import type {
+  GmailAttachmentMeta,
   GmailListMessagesResponse,
   GmailMessage,
   GmailMessageFull,
@@ -213,6 +214,33 @@ function extractBodyFromPayload(payload: GmailMessagePart | undefined, maxLen = 
   return combined;
 }
 
+/**
+ * Walk the MIME tree and collect named attachments that have a fetchable
+ * attachmentId. extractBodyFromPayload deliberately ignores these; callers that
+ * want attachment bytes (e.g. PDF teasers) use this + getAttachment().
+ */
+function collectAttachments(payload: GmailMessagePart | undefined): GmailAttachmentMeta[] {
+  if (!payload) return [];
+  const out: GmailAttachmentMeta[] = [];
+  const walk = (part: GmailMessagePart) => {
+    const attachmentId = part.body?.attachmentId;
+    const filename = (part.filename ?? '').trim();
+    if (attachmentId && filename) {
+      out.push({
+        attachmentId,
+        filename,
+        mimeType: (part.mimeType ?? '').toLowerCase(),
+        size: part.body?.size ?? 0,
+      });
+    }
+    if (part.parts?.length) {
+      for (const child of part.parts) walk(child);
+    }
+  };
+  walk(payload);
+  return out;
+}
+
 function headerValue(headers: GmailMessagePart['headers'], name: string): string {
   if (!headers) return '';
   const wanted = name.toLowerCase();
@@ -244,6 +272,7 @@ export async function getMessageFull(
     threadId: msg.threadId,
     snippet: msg.snippet ?? '',
     body: extractBodyFromPayload(msg.payload, 4000),
+    attachments: collectAttachments(msg.payload),
     headers: {
       Subject: headerValue(headers, 'Subject'),
       From: headerValue(headers, 'From'),
@@ -254,6 +283,30 @@ export async function getMessageFull(
       InReplyTo: headerValue(headers, 'In-Reply-To'),
     },
   };
+}
+
+/**
+ * Download a single attachment's bytes. The Gmail API returns base64url-encoded
+ * data; we decode straight to a Buffer for PDF/text extraction. gmail.readonly
+ * already permits this — no extra scope.
+ */
+export async function getAttachment(
+  accessToken: string,
+  messageId: string,
+  attachmentId: string,
+): Promise<Buffer> {
+  const url = `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}/attachments/${encodeURIComponent(attachmentId)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gmail getAttachment failed: ${res.status} ${text}`);
+  }
+  const json = (await res.json()) as { data?: string; size?: number };
+  if (!json.data) throw new Error('Gmail getAttachment: empty attachment data');
+  return Buffer.from(json.data, 'base64url');
 }
 
 /**

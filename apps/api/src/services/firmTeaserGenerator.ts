@@ -251,6 +251,12 @@ interface GeneratePromptArgs {
   name?: string;
   notes?: string;
   criteria: TeaserCriterion[];
+  /**
+   * Optional free-text firm context (pasted notes and/or text extracted from an
+   * uploaded doc). When present, the authored prompt is grounded in it. Transient
+   * — never persisted; supplied per GEN call.
+   */
+  contextText?: string;
   today: string;
 }
 
@@ -267,6 +273,7 @@ export async function generateSystemPrompt({
   name,
   notes,
   criteria,
+  contextText,
   today,
 }: GeneratePromptArgs): Promise<string> {
   if (!isClaudeEnabled() || !anthropic) {
@@ -290,14 +297,22 @@ export async function generateSystemPrompt({
     "- Be specific to THIS firm's stated preferences — not generic boilerplate.",
     '- Read as instructions addressed to the teaser-writing model.',
     '- Never invent firm preferences that were not provided.',
+    contextText?.trim()
+      ? '- Ground the prompt in the supplied "Firm context" block; reflect the firm’s actual stated focus, sectors, and constraints rather than restating the criteria verbatim.'
+      : '',
     '',
     'Return ONLY the system-prompt text — no preamble, no markdown fences, no',
     'commentary. It is shown verbatim in an editable textarea.',
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
   const parts = [`Profile name: ${profileName}`, '', 'Criteria:', renderCriteria(criteria)];
   if (notes?.trim()) {
     parts.push('', "Firm's notes / recommendations:", notes.trim());
+  }
+  if (contextText?.trim()) {
+    parts.push('', 'Firm context (from uploaded doc + notes):', contextText.trim());
   }
 
   const response = await anthropic.messages.create({

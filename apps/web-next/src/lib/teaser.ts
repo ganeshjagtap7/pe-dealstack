@@ -29,6 +29,10 @@ export interface TeaserProfile {
   name: string;
   systemPrompt: string;
   criteria: TeaserCriterion[];
+  // Firm context (uploaded-doc text + pasted notes) grounding the GEN
+  // system-prompt authoring. Persisted with the profile, but an authoring
+  // input only — it does not affect generated teasers.
+  contextText?: string;
   updatedAt: string;
 }
 

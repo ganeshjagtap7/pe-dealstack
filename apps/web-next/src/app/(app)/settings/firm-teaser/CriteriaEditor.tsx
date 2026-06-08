@@ -1,9 +1,21 @@
 "use client";
 
+import { useRef, useState } from "react";
 import type { TeaserCriterion } from "@/lib/teaser";
+import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 
 // Banker Blue per repo style rules (inline, not a Tailwind class).
 const BANKER_BLUE = "#003366";
+
+// File types the firm-context extractor accepts (mirrors the backend contract).
+const CONTEXT_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.txt,.csv";
+
+// Response shape from POST /firm-teaser/extract-context (multipart field `file`).
+interface ExtractContextResponse {
+  text: string;
+  filename: string;
+  chars: number;
+}
 
 // Editor for the active profile's criteria rows ("rec questions" in the sketch:
 // each is a label + the firm's answer/threshold) and the system-prompt box. GEN
@@ -13,25 +25,83 @@ const BANKER_BLUE = "#003366";
 export function CriteriaEditor({
   criteria,
   systemPrompt,
+  contextText,
   onAddCriterion,
   onUpdateCriterion,
   onRemoveCriterion,
   onSystemPromptChange,
+  onContextTextChange,
   onGenerate,
   generating,
   generateError,
 }: {
   criteria: TeaserCriterion[];
   systemPrompt: string;
+  contextText: string;
   onAddCriterion: () => void;
   onUpdateCriterion: (id: string, patch: Partial<Pick<TeaserCriterion, "label" | "value">>) => void;
   onRemoveCriterion: (id: string) => void;
   onSystemPromptChange: (value: string) => void;
+  onContextTextChange: (value: string) => void;
   onGenerate: () => void;
   generating: boolean;
   generateError: string | null;
 }) {
-  const canGenerate = !generating && (criteria.length > 0 || systemPrompt.trim().length > 0);
+  const canGenerate =
+    !generating &&
+    (criteria.length > 0 || systemPrompt.trim().length > 0 || contextText.trim().length > 0);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [lastUpload, setLastUpload] = useState<{ filename: string; chars: number } | null>(null);
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Reset the input so re-selecting the same file fires onChange again.
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await authFetchRaw("/firm-teaser/extract-context", {
+        method: "POST",
+        body: formData,
+      });
+      if (!res.ok) {
+        let message = `Extraction failed (${res.status}).`;
+        try {
+          const body = (await res.json()) as { error?: string; message?: string };
+          message = body?.error || body?.message || message;
+        } catch (parseErr) {
+          // Non-JSON error body — keep the status-based message.
+          console.warn("[settings/firm-teaser] non-JSON extract-context error body:", parseErr);
+        }
+        throw new Error(message);
+      }
+      const data = (await res.json()) as ExtractContextResponse;
+      const extracted = typeof data?.text === "string" ? data.text.trim() : "";
+      if (!extracted) {
+        setUploadError("No text could be extracted from that file.");
+        return;
+      }
+      // Append the extracted doc text into the editable context field.
+      const next = contextText.trim().length > 0 ? `${contextText.trim()}\n\n${extracted}` : extracted;
+      onContextTextChange(next);
+      setLastUpload({
+        filename: data.filename || file.name,
+        chars: typeof data.chars === "number" ? data.chars : extracted.length,
+      });
+    } catch (err) {
+      console.warn("[settings/firm-teaser] extract-context failed:", err);
+      setUploadError(err instanceof Error ? err.message : "Failed to extract document text.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -85,6 +155,65 @@ export function CriteriaEditor({
                 </button>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Firm context — pasted free-text + extracted document text. Grounds
+          GEN and is persisted with the profile (an authoring input only — it
+          does not affect generated teasers). */}
+      <div>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <label className="text-xs font-bold uppercase tracking-wider text-text-secondary">
+            Firm context
+          </label>
+          <div className="flex items-center gap-2">
+            {lastUpload && (
+              <span className="text-xs text-text-muted" title={lastUpload.filename}>
+                {lastUpload.filename} · {lastUpload.chars.toLocaleString()} chars
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-border-subtle px-3 py-1.5 text-xs font-semibold text-text-secondary transition-colors hover:border-primary hover:text-primary disabled:cursor-not-allowed disabled:opacity-50"
+              title="Upload a document to extract its text into the firm context"
+            >
+              {uploading ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin text-[15px]">
+                    progress_activity
+                  </span>
+                  Extracting…
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined text-[15px]">upload_file</span>
+                  Upload document
+                </>
+              )}
+            </button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={CONTEXT_ACCEPT}
+              onChange={handleFileSelected}
+              className="hidden"
+            />
+          </div>
+        </div>
+        <textarea
+          value={contextText}
+          onChange={(e) => onContextTextChange(e.target.value)}
+          rows={6}
+          placeholder="Paste any firm context to ground the prompt — investment thesis, portfolio examples, past deals, IC notes — or upload a document above to extract its text here. It grounds GEN and is saved with the profile."
+          className="w-full resize-y rounded-lg border border-border-subtle px-3 py-2.5 text-sm leading-relaxed outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
+        />
+        {uploadError && (
+          <div className="mt-2 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <span className="material-symbols-outlined text-[16px]">error</span>
+            {uploadError}
           </div>
         )}
       </div>

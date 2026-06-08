@@ -113,6 +113,10 @@ export async function saveFirmTeaserConfig(
       name: incoming.name,
       systemPrompt: incoming.systemPrompt ?? '',
       criteria,
+      // Persist the firm context (GEN authoring input). It deliberately does
+      // NOT participate in profileContentChanged, so editing it never marks
+      // existing teasers stale.
+      contextText: incoming.contextText ?? prev?.contextText ?? '',
       updatedAt: incoming.updatedAt ?? nowIso,
     };
 
@@ -228,6 +232,7 @@ export async function generateProfilePrompt(args: {
   name?: string;
   notes?: string;
   criteria: TeaserCriterion[];
+  contextText?: string;
 }): Promise<string> {
   return generateSystemPrompt({ ...args, today: getTodayIso() });
 }

@@ -170,6 +170,7 @@ export function FirmTeaserSection() {
         name: activeProfile.name,
         notes: activeProfile.systemPrompt,
         criteria: activeProfile.criteria,
+        contextText: activeProfile.contextText ?? "",
       });
       const generated = typeof data?.systemPrompt === "string" ? data.systemPrompt.trim() : "";
       if (!generated) {
@@ -246,10 +247,12 @@ export function FirmTeaserSection() {
               <CriteriaEditor
                 criteria={activeProfile.criteria}
                 systemPrompt={activeProfile.systemPrompt}
+                contextText={activeProfile.contextText ?? ""}
                 onAddCriterion={handleAddCriterion}
                 onUpdateCriterion={handleUpdateCriterion}
                 onRemoveCriterion={handleRemoveCriterion}
                 onSystemPromptChange={(value) => patchActive({ systemPrompt: value })}
+                onContextTextChange={(value) => patchActive({ contextText: value })}
                 onGenerate={handleGeneratePrompt}
                 generating={generating}
                 generateError={generateError}
