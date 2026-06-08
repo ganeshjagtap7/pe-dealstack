@@ -48,6 +48,18 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const MAX_PDF_ATTACHMENTS_PER_EMAIL = 2;
 const MAX_PDF_BYTES = 15 * 1024 * 1024; // skip giant pitch decks
 const MAX_PDF_TEXT_CHARS = 8000; // cap added per email to bound LLM token cost
+// Overall wall-clock budget for ALL PDF download+parse work across the whole
+// scan. Big decks can hang a synchronous dashboard "Scan inbox"; once this
+// shared deadline passes we stop fetching/parsing attachments and fall back to
+// body text only. Tracked as an unread attachment so the user is told.
+const PDF_WORK_BUDGET_MS = 20_000;
+// Overall cap on bytes downloaded for PDF parsing across the whole scan — a
+// second guard rail alongside the time budget so a few mid-sized decks can't
+// blow up memory / bandwidth even if they each parse quickly.
+const PDF_TOTAL_BYTES_BUDGET = 40 * 1024 * 1024;
+// Extracted PDF text shorter than this is treated as "couldn't read" (scanned /
+// image-only decks return little or no text from pdf-parse).
+const MIN_PDF_TEXT_LEN = 64;
 
 // ─── Public types ──────────────────────────────────────────────────
 
@@ -74,6 +86,12 @@ export interface InboxScanResult {
   connected: boolean;
   scanned: number;
   candidates: InboxDealCandidate[];
+  // Count of PDF attachments that existed on scanned emails but yielded no
+  // usable text — scanned/image-only PDFs (pdf-parse returns ~nothing), files
+  // that threw, oversized files, or attachments skipped once the PDF time/byte
+  // budget was exhausted. Surfaced so a silently-empty deck is visible to the
+  // user instead of vanishing.
+  attachmentsUnread: number;
 }
 
 // ─── Internal helpers (replicated locally — no routes→services coupling) ──
@@ -182,15 +200,40 @@ function gateFinancial(field: { value: number | null; confidence: number }): num
 }
 
 /**
+ * Shared, mutable PDF-work budget threaded through every per-message call to
+ * `extractPdfAttachmentsText`. The scan runs the per-message mapper with bounded
+ * concurrency, so all workers read/mutate this single object to enforce ONE
+ * wall-clock deadline and ONE total-bytes cap across the whole scan.
+ */
+interface PdfWorkBudget {
+  /** Absolute wall-clock deadline (epoch ms). Past this: stop all PDF work. */
+  deadlineAt: number;
+  /** Bytes downloaded for PDF parsing so far (across all messages). */
+  bytesUsed: number;
+  /** Running count of PDF attachments that existed but yielded no usable text. */
+  attachmentsUnread: number;
+}
+
+function makePdfWorkBudget(): PdfWorkBudget {
+  return { deadlineAt: Date.now() + PDF_WORK_BUDGET_MS, bytesUsed: 0, attachmentsUnread: 0 };
+}
+
+/**
  * Pull text from a message's PDF attachments (teasers/CIMs are frequently the
  * attachment, not the body). Uses the lightweight pdf-parse extractor — this is
  * a first-look candidate scan, so the high-fidelity LlamaParse pass is left to
  * the real ingest pipeline that runs when the user confirms a candidate.
- * Bounded by count, byte size, and total chars; per-PDF failures are skipped.
+ *
+ * Bounded by per-email count, per-file byte size, and total chars — AND by a
+ * shared, scan-wide time + bytes budget (see PdfWorkBudget). Once the budget is
+ * exhausted we stop fetching/parsing and fall back to body text only. Every PDF
+ * that existed but produced no usable text (scanned/image-only, threw,
+ * oversized, or skipped by budget) bumps `budget.attachmentsUnread`.
  */
 async function extractPdfAttachmentsText(
   accessToken: string,
   message: GmailMessageFull,
+  budget: PdfWorkBudget,
 ): Promise<string> {
   const pdfs = message.attachments
     .filter(
@@ -203,20 +246,50 @@ async function extractPdfAttachmentsText(
 
   const chunks: string[] = [];
   for (const att of pdfs) {
+    // Budget exhausted (time or bytes): skip this and every remaining PDF, but
+    // count each as unread so the email isn't silently dropped.
+    if (Date.now() >= budget.deadlineAt || budget.bytesUsed >= PDF_TOTAL_BYTES_BUDGET) {
+      log.info('inboxDealScan: PDF budget exhausted — skipping attachment', {
+        messageId: message.id,
+        filename: att.filename,
+        bytesUsed: budget.bytesUsed,
+      });
+      budget.attachmentsUnread++;
+      continue;
+    }
     if (att.size && att.size > MAX_PDF_BYTES) {
       log.info('inboxDealScan: skipping oversized PDF attachment', {
         messageId: message.id,
         filename: att.filename,
         size: att.size,
       });
+      budget.attachmentsUnread++;
+      continue;
+    }
+    // Don't start a download that would blow past the total-bytes budget.
+    if (att.size && budget.bytesUsed + att.size > PDF_TOTAL_BYTES_BUDGET) {
+      log.info('inboxDealScan: PDF total-bytes budget would be exceeded — skipping', {
+        messageId: message.id,
+        filename: att.filename,
+        size: att.size,
+        bytesUsed: budget.bytesUsed,
+      });
+      budget.attachmentsUnread++;
       continue;
     }
     try {
       const buffer = await getAttachment(accessToken, message.id, att.attachmentId);
+      budget.bytesUsed += buffer.length;
       const extracted = await extractTextFromPDF(buffer);
       const text = extracted?.text?.replace(/\u0000/g, '').trim();
-      if (text) chunks.push(text);
+      if (text && text.length >= MIN_PDF_TEXT_LEN) {
+        chunks.push(text);
+      } else {
+        // Existed but unreadable (scanned/image-only deck → little/no text).
+        budget.attachmentsUnread++;
+      }
     } catch (err) {
+      budget.attachmentsUnread++;
       log.warn('inboxDealScan: PDF attachment extract failed (skipping)', {
         messageId: message.id,
         filename: att.filename,
@@ -240,7 +313,12 @@ export async function scanInboxForDeals(args: {
   lookbackDays?: number;
 }): Promise<InboxScanResult> {
   const { orgId, authUserId } = args;
-  const notConnected: InboxScanResult = { connected: false, scanned: 0, candidates: [] };
+  const notConnected: InboxScanResult = {
+    connected: false,
+    scanned: 0,
+    candidates: [],
+    attachmentsUnread: 0,
+  };
 
   // 1. Clamp lookback to [1, 60], default 14.
   const lookbackDays = Math.min(
@@ -280,7 +358,7 @@ export async function scanInboxForDeals(args: {
   const headers = await listRecentDealCandidates(accessToken, since, MAX_SCAN_EMAILS);
   if (headers.length === 0) {
     log.info('inboxDealScan: no candidate emails in window', { orgId, lookbackDays });
-    return { connected: true, scanned: 0, candidates: [] };
+    return { connected: true, scanned: 0, candidates: [], attachmentsUnread: 0 };
   }
 
   // 6. Fetch full bodies with bounded concurrency; drop per-message failures.
@@ -301,13 +379,17 @@ export async function scanInboxForDeals(args: {
   );
   const messages = fetched.filter((m): m is GmailMessageFull => m !== null);
   if (messages.length === 0) {
-    return { connected: true, scanned: 0, candidates: [] };
+    return { connected: true, scanned: 0, candidates: [], attachmentsUnread: 0 };
   }
 
   // 7. Existing org company names for dedupe.
   const existingNames = await loadExistingCompanyNames(orgId);
 
   // 8. Build extraction text per message and run the extractor (bounded concurrency).
+  // One shared PDF-work budget for the whole scan: a single wall-clock deadline
+  // (~20s) + total-bytes cap across all messages, so big decks can't hang the
+  // dashboard "Scan inbox". Workers mutate it as they go.
+  const pdfBudget = makePdfWorkBudget();
   type Extracted = { message: GmailMessageFull; data: Awaited<ReturnType<typeof extractDealDataFromText>> };
   const extracted = await mapWithConcurrency<GmailMessageFull, Extracted | null>(
     messages,
@@ -319,7 +401,7 @@ export async function scanInboxForDeals(args: {
 
       // Teasers/CIMs often arrive AS a PDF with a near-empty body — pull the
       // attachment text so those emails clear the length floor below.
-      const pdfText = await extractPdfAttachmentsText(accessToken, m);
+      const pdfText = await extractPdfAttachmentsText(accessToken, m, pdfBudget);
 
       const segments = [`Subject: ${subject}`, `From: ${from}`, '', bodyText];
       if (pdfText) segments.push('', '--- Attached document ---', pdfText);
@@ -381,8 +463,14 @@ export async function scanInboxForDeals(args: {
     orgId,
     scanned: messages.length,
     candidates: candidates.length,
+    attachmentsUnread: pdfBudget.attachmentsUnread,
   });
 
   // 11. Done.
-  return { connected: true, scanned: messages.length, candidates };
+  return {
+    connected: true,
+    scanned: messages.length,
+    candidates,
+    attachmentsUnread: pdfBudget.attachmentsUnread,
+  };
 }

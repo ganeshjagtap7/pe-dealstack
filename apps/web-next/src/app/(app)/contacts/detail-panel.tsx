@@ -59,6 +59,13 @@ interface ContactEnrichment {
   [key: string]: unknown;
 }
 
+// Response of POST /ai/suggest-follow-up — a single lightweight LLM call.
+interface FollowUpSuggestion {
+  date: string;
+  action: string;
+  reasoning: string;
+}
+
 // Returns true when a follow-up date is in the past (date-only comparison).
 function isFollowUpOverdue(followUpAt?: string | null): boolean {
   if (!followUpAt) return false;
@@ -102,6 +109,8 @@ export function DetailPanel({
   const [savingFollowUp, setSavingFollowUp] = useState(false);
   const [enriching, setEnriching] = useState(false);
   const [enrichment, setEnrichment] = useState<ContactEnrichment | null>(null);
+  const [suggestingFollowUp, setSuggestingFollowUp] = useState(false);
+  const [followUpSuggestion, setFollowUpSuggestion] = useState<FollowUpSuggestion | null>(null);
   const { showToast } = useToast();
 
   const loadContact = useCallback(async () => {
@@ -163,6 +172,20 @@ export function DetailPanel({
       showToast(err instanceof Error ? err.message : "Failed to update follow-up", "error");
     } finally {
       setSavingFollowUp(false);
+    }
+  }
+
+  // Cheap, genuinely-AI follow-up suggestion — a SINGLE bounded LLM call.
+  // Does NOT run the full enrichment agent (no web scrape / research).
+  async function handleSuggestFollowUp() {
+    setSuggestingFollowUp(true);
+    try {
+      const data = await api.post<FollowUpSuggestion>("/ai/suggest-follow-up", { contactId });
+      setFollowUpSuggestion(data);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to suggest a follow-up", "error");
+    } finally {
+      setSuggestingFollowUp(false);
     }
   }
 
@@ -266,7 +289,18 @@ export function DetailPanel({
             const overdue = isFollowUpOverdue(contact.followUpAt);
             return (
               <div className="mb-6">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Follow-up</h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted">Follow-up</h4>
+                  <button
+                    onClick={handleSuggestFollowUp}
+                    disabled={suggestingFollowUp}
+                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-primary hover:bg-primary-light transition-colors disabled:opacity-50"
+                    title="Use AI to suggest a follow-up date based on recent interactions"
+                  >
+                    <span className={cn("material-symbols-outlined text-[14px]", suggestingFollowUp && "animate-spin")}>{suggestingFollowUp ? "sync" : "auto_awesome"}</span>
+                    {suggestingFollowUp ? "Thinking..." : "Suggest follow-up"}
+                  </button>
+                </div>
                 <div className={cn("flex items-center gap-2 p-2.5 rounded-lg border", overdue ? "border-red-200 bg-red-50/60" : "border-border-subtle bg-gray-50")}>
                   <span className={cn("material-symbols-outlined text-[18px]", overdue ? "text-red-500" : "text-text-muted")}>{overdue ? "event_busy" : "event"}</span>
                   <input
@@ -283,6 +317,36 @@ export function DetailPanel({
                   )}
                 </div>
                 {overdue && <p className="text-[11px] text-red-600 font-medium mt-1.5 flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">warning</span>Follow-up is overdue</p>}
+
+                {/* AI follow-up suggestion (cheap single LLM call) */}
+                {followUpSuggestion && (
+                  <div className="mt-2.5 p-3 rounded-lg border border-primary/20 bg-blue-50/30">
+                    <div className="flex items-start gap-2.5">
+                      <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">event_upcoming</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold uppercase tracking-wider text-primary">Suggested Follow-up</p>
+                          <button onClick={() => setFollowUpSuggestion(null)} className="p-0.5 rounded hover:bg-white text-text-muted hover:text-text-main transition-colors" title="Dismiss">
+                            <span className="material-symbols-outlined text-[14px]">close</span>
+                          </button>
+                        </div>
+                        <p className="text-sm text-text-secondary leading-relaxed mt-0.5">{followUpSuggestion.action}</p>
+                        {followUpSuggestion.reasoning && <p className="text-xs text-text-muted mt-1 italic">{followUpSuggestion.reasoning}</p>}
+                        <div className="flex items-center justify-between gap-2 mt-2">
+                          <p className="text-xs text-text-muted">{toDateInputValue(followUpSuggestion.date) || followUpSuggestion.date}</p>
+                          <button
+                            onClick={async () => { await updateFollowUp(followUpSuggestion.date); setFollowUpSuggestion(null); }}
+                            disabled={savingFollowUp}
+                            className="shrink-0 px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors disabled:opacity-50"
+                            style={{ backgroundColor: "#003366" }}
+                          >
+                            Apply
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })()}

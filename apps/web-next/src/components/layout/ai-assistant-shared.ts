@@ -13,6 +13,24 @@ export interface ChatMessage {
   content: string;
 }
 
+// How many recent turns to send to the backend as conversation memory.
+// The backend re-caps this (last ~8 turns / bounded chars); we send a small
+// window to keep the request light.
+export const MAX_HISTORY_TURNS_SENT = 8;
+
+/**
+ * Build the bounded `history` payload for an /ai/chat request from the local
+ * message list. Excludes the just-sent user message (caller passes the list
+ * BEFORE appending it), drops the synthetic welcome message, and caps to the
+ * most recent MAX_HISTORY_TURNS_SENT turns.
+ */
+export function buildHistoryPayload(messages: ChatMessage[]): ChatMessage[] {
+  return messages
+    .filter((m) => (m.role === "user" || m.role === "assistant") && typeof m.content === "string")
+    .slice(-MAX_HISTORY_TURNS_SENT)
+    .map((m) => ({ role: m.role, content: m.content }));
+}
+
 export interface ChatResponse {
   response?: string;
   message?: string;

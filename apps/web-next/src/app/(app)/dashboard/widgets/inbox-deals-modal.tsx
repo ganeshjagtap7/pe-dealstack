@@ -38,6 +38,12 @@ export interface InboxDealCandidate {
 interface InboxDealsModalProps {
   candidates: InboxDealCandidate[];
   onClose: () => void;
+  // Count of PDF attachments on scanned emails that couldn't be read (scanned /
+  // image-only decks, parse failures, oversized, or skipped once the scan's PDF
+  // time/byte budget ran out). Optional so existing call sites that only pass
+  // `candidates` still type-check; surfaced as a note when > 0 so a silently
+  // empty deck doesn't just vanish.
+  attachmentsUnread?: number;
 }
 
 // Format a candidate.date defensively — Gmail dates should be ISO, but guard
@@ -203,7 +209,11 @@ function CandidateCard({
   );
 }
 
-export function InboxDealsModal({ candidates, onClose }: InboxDealsModalProps) {
+export function InboxDealsModal({
+  candidates,
+  onClose,
+  attachmentsUnread = 0,
+}: InboxDealsModalProps) {
   const [items, setItems] = useState<InboxDealCandidate[]>(candidates);
 
   useEffect(() => {
@@ -239,6 +249,15 @@ export function InboxDealsModal({ candidates, onClose }: InboxDealsModalProps) {
           </button>
         </div>
         <div className="max-h-[60vh] overflow-y-auto p-6">
+          {attachmentsUnread > 0 && (
+            <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800">
+              <span className="material-symbols-outlined mt-px text-[14px]">picture_as_pdf</span>
+              <span>
+                {attachmentsUnread} attached PDF{attachmentsUnread === 1 ? "" : "s"} couldn&apos;t be
+                read — open the email to import manually.
+              </span>
+            </div>
+          )}
           {items.length === 0 ? (
             <div className="py-8 text-center text-text-muted">
               <span className="material-symbols-outlined mb-2 block text-3xl opacity-60">

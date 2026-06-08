@@ -31,10 +31,14 @@ const chatMessageSchema = z.object({
   })).optional(),
 });
 
-// Global (non-deal-scoped) floating-chat contract: { message, context }
+// Global (non-deal-scoped) floating-chat contract: { message, context, history }
 const globalChatSchema = z.object({
   message: z.string().min(1),
   context: z.string().default('general'),
+  history: z.array(z.object({
+    role: z.enum(['user', 'assistant']),
+    content: z.string(),
+  })).optional(),
 });
 
 // POST /api/ai/chat - Global floating AI chat (dashboard/deals/contacts/memo/general)
@@ -50,12 +54,13 @@ router.post('/ai/chat', async (req, res) => {
     }
 
     const orgId = getOrgId(req);
-    const { message, context } = globalChatSchema.parse(req.body);
+    const { message, context, history } = globalChatSchema.parse(req.body);
 
     const result = await runGlobalChat({
       orgId,
       message,
       context: normalizeContext(context),
+      history,
     });
 
     res.json({

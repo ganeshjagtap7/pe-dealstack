@@ -10,6 +10,7 @@ import {
   ContactModal, InsightCards,
 } from "./components";
 import { DetailPanel } from "./detail-panel";
+import { FollowUpsBanner } from "./follow-ups-banner";
 import { CSVImportModal } from "./csv-import-modal";
 import { ContactCard, ContactRow, TABLE_HEADERS, TABLE_TH_CLS } from "./list-items";
 import { CONTACTS_PAGE_SIZE, SORT_OPTIONS, groupContacts, sortGroupKeys } from "./list-utils";
@@ -331,6 +332,9 @@ export default function ContactsPage() {
           </button>
         </div>
       </div>
+
+      {/* Follow-ups due banner — calls GET /contacts/insights/follow-ups */}
+      {!loading && <FollowUpsBanner onOpenContact={setDetailContactId} />}
 
       {/* Insight Cards */}
       {!loading && <InsightCards totalContacts={totalContacts} />}

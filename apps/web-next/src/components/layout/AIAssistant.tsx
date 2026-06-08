@@ -12,6 +12,7 @@ import { useParams, usePathname } from "next/navigation";
 import { api, NotFoundError } from "@/lib/api";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import {
+  buildHistoryPayload,
   detectContext,
   getWelcomeMessage,
   type ChatContext,
@@ -172,7 +173,14 @@ export function AIAssistant() {
       const trimmed = text.trim();
       if (!trimmed || isLoading) return;
 
-      setMessages((prev) => [...prev, { role: "user", content: trimmed }]);
+      // Capture the conversation so far (before this turn) for memory, then
+      // append the new user message. The functional updater gives us the live
+      // list even though `messages` in this closure may be stale.
+      let priorMessages: ChatMessage[] = [];
+      setMessages((prev) => {
+        priorMessages = prev;
+        return [...prev, { role: "user", content: trimmed }];
+      });
       setIsLoading(true);
 
       try {
@@ -185,6 +193,7 @@ export function AIAssistant() {
           data = await api.post<ChatResponse>("/ai/chat", {
             message: trimmed,
             context: context.type,
+            history: buildHistoryPayload(priorMessages),
           });
         }
 

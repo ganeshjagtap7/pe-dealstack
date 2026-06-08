@@ -11,6 +11,7 @@ import { supabase } from '../supabase.js';
 
 // Agent imports
 import { runContactEnrichment } from '../services/agents/contactEnrichment/index.js';
+import { suggestContactFollowUp } from '../services/contactFollowUpSuggester.js';
 import { generateMeetingPrep } from '../services/agents/meetingPrep/index.js';
 import { runSignalMonitor } from '../services/agents/signalMonitor/index.js';
 import { generateEmailDraft, getEmailTemplates } from '../services/agents/emailDrafter/index.js';
@@ -57,6 +58,65 @@ router.post('/ai/enrich-contact', async (req, res) => {
     res.json(result);
   } catch (error: any) {
     log.error('Contact enrichment error', error);
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
+  }
+});
+
+// ─── Suggest Follow-up (lightweight — single LLM call) ────────────
+// Replaces the misuse of the full enrichment agent for follow-up timing.
+// Reads the contact's recent interactions and returns a model-decided
+// follow-up date + action. SUGGESTION ONLY — never writes followUpAt.
+
+const suggestFollowUpSchema = z.object({
+  contactId: z.string().uuid(),
+});
+
+// POST /api/ai/suggest-follow-up - Suggest a follow-up date + action
+router.post('/ai/suggest-follow-up', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const { contactId } = suggestFollowUpSchema.parse(req.body);
+
+    // Fetch + org-scope the contact.
+    const { data: contact, error } = await supabase
+      .from('Contact')
+      .select('id, firstName, lastName, company, title, type, lastContactedAt')
+      .eq('id', contactId)
+      .eq('organizationId', orgId)
+      .single();
+
+    if (error || !contact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    // Pull recent interactions for this contact (cheap, bounded).
+    const { data: interactions } = await supabase
+      .from('ContactInteraction')
+      .select('type, title, date')
+      .eq('contactId', contactId)
+      .order('date', { ascending: false })
+      .limit(12);
+
+    const fullName = `${contact.firstName} ${contact.lastName}`.trim();
+    log.info('Suggesting contact follow-up', { contactId, name: fullName });
+
+    const suggestion = await suggestContactFollowUp({
+      fullName,
+      type: contact.type,
+      company: contact.company,
+      title: contact.title,
+      lastContactedAt: contact.lastContactedAt,
+      interactions: (interactions || []).map((i: any) => ({
+        type: i.type,
+        title: i.title,
+        date: i.date,
+      })),
+    });
+
+    res.json(suggestion);
+  } catch (error: any) {
+    log.error('Suggest follow-up error', error);
     const { statusCode, userMessage } = classifyAIErrorObject(error);
     res.status(statusCode).json({ error: userMessage });
   }
