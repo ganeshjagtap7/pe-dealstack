@@ -297,6 +297,75 @@ function metaHeader(msg: GmailMessage, name: string): string {
   return found?.value ?? '';
 }
 
+/**
+ * Pure transform: tally From/To/Cc addresses across messages into ranked
+ * contact suggestions. Excludes the user's own address, automated senders, and
+ * emails already in the CRM; ranks by frequency then recency; caps at `cap`.
+ * Exported for unit testing (no Gmail/Supabase deps).
+ */
+export function buildContactSuggestions(
+  messages: GmailMessage[],
+  ownEmail: string | null,
+  existingEmails: Set<string>,
+  cap: number = MAX_SUGGESTIONS,
+): ContactSuggestion[] {
+  interface Tally {
+    email: string;
+    name: string | null;
+    company: string | null;
+    emailCount: number;
+    lastEmailMs: number;
+  }
+  const byEmail = new Map<string, Tally>();
+
+  for (const msg of messages) {
+    if (!msg) continue;
+    const dateStr = metaHeader(msg, 'Date');
+    const dateMs = dateStr ? Date.parse(dateStr) : NaN;
+    const whenMs = Number.isFinite(dateMs) ? dateMs : 0;
+
+    const addresses = [
+      ...parseAddressList(metaHeader(msg, 'From')),
+      ...parseAddressList(metaHeader(msg, 'To')),
+      ...parseAddressList(metaHeader(msg, 'Cc')),
+    ];
+
+    for (const addr of addresses) {
+      const email = addr.email;
+      if (!email) continue;
+      if (ownEmail && email === ownEmail) continue;
+      if (isAutomatedAddress(email)) continue;
+      if (existingEmails.has(email)) continue;
+
+      const existing = byEmail.get(email);
+      if (existing) {
+        existing.emailCount++;
+        if (whenMs > existing.lastEmailMs) existing.lastEmailMs = whenMs;
+        if (!existing.name && addr.name) existing.name = addr.name;
+      } else {
+        byEmail.set(email, {
+          email,
+          name: addr.name,
+          company: inferCompanyFromEmail(email),
+          emailCount: 1,
+          lastEmailMs: whenMs,
+        });
+      }
+    }
+  }
+
+  return Array.from(byEmail.values())
+    .sort((a, b) => b.emailCount - a.emailCount || b.lastEmailMs - a.lastEmailMs)
+    .slice(0, cap)
+    .map((t) => ({
+      email: t.email,
+      name: t.name,
+      company: t.company,
+      emailCount: t.emailCount,
+      lastEmailDate: t.lastEmailMs ? new Date(t.lastEmailMs).toISOString() : '',
+    }));
+}
+
 // ─── Entry point: scanCorrespondents ───────────────────────────────
 
 /**
@@ -377,65 +446,10 @@ export async function scanCorrespondents(
     }
   );
 
-  // Tally per-email.
-  interface Tally {
-    email: string;
-    name: string | null;
-    company: string | null;
-    emailCount: number;
-    lastEmailMs: number;
-  }
-  const byEmail = new Map<string, Tally>();
-  let scanned = 0;
-
-  for (const msg of fetched) {
-    if (!msg) continue;
-    scanned++;
-    const dateStr = metaHeader(msg, 'Date');
-    const dateMs = dateStr ? Date.parse(dateStr) : NaN;
-    const whenMs = Number.isFinite(dateMs) ? dateMs : 0;
-
-    const addresses = [
-      ...parseAddressList(metaHeader(msg, 'From')),
-      ...parseAddressList(metaHeader(msg, 'To')),
-      ...parseAddressList(metaHeader(msg, 'Cc')),
-    ];
-
-    for (const addr of addresses) {
-      const email = addr.email;
-      if (!email) continue;
-      if (ownEmail && email === ownEmail) continue;
-      if (isAutomatedAddress(email)) continue;
-      if (existingEmails.has(email)) continue;
-
-      const existing = byEmail.get(email);
-      if (existing) {
-        existing.emailCount++;
-        if (whenMs > existing.lastEmailMs) existing.lastEmailMs = whenMs;
-        if (!existing.name && addr.name) existing.name = addr.name;
-      } else {
-        byEmail.set(email, {
-          email,
-          name: addr.name,
-          company: inferCompanyFromEmail(email),
-          emailCount: 1,
-          lastEmailMs: whenMs,
-        });
-      }
-    }
-  }
-
-  // Rank by frequency, then recency; take top N.
-  const suggestions: ContactSuggestion[] = Array.from(byEmail.values())
-    .sort((a, b) => b.emailCount - a.emailCount || b.lastEmailMs - a.lastEmailMs)
-    .slice(0, MAX_SUGGESTIONS)
-    .map((t) => ({
-      email: t.email,
-      name: t.name,
-      company: t.company,
-      emailCount: t.emailCount,
-      lastEmailDate: t.lastEmailMs ? new Date(t.lastEmailMs).toISOString() : '',
-    }));
+  // Tally + rank into suggestions (pure logic — unit-tested via buildContactSuggestions).
+  const validMsgs = fetched.filter((m): m is GmailMessage => m !== null);
+  const scanned = validMsgs.length;
+  const suggestions = buildContactSuggestions(validMsgs, ownEmail, existingEmails);
 
   log.info('gmailContacts: scanCorrespondents complete', {
     orgId,
