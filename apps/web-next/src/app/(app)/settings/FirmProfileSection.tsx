@@ -221,10 +221,13 @@ export function FirmProfileSection() {
             onClick={handleRefresh}
             disabled={refreshing || extracting || (!orgWebsite.trim() && !orgLinkedin.trim() && !firmDocText.trim())}
             title={!orgWebsite.trim() && !orgLinkedin.trim() && !firmDocText.trim() ? "Add a website, LinkedIn URL, or firm document/notes below first" : undefined}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-border-subtle hover:bg-gray-50 transition-colors shadow-sm text-primary disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold rounded-lg text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ backgroundColor: "#003366" }}
           >
-            <span className="material-symbols-outlined text-[16px]">refresh</span>
-            Refresh profile
+            <span className={`material-symbols-outlined text-[16px] ${refreshing ? "animate-spin" : ""}`}>
+              {refreshing ? "progress_activity" : firmProfile ? "refresh" : "travel_explore"}
+            </span>
+            {refreshing ? "Researching…" : firmProfile ? "Refresh profile" : "Research firm"}
           </button>
         </div>
       </div>
@@ -254,7 +257,7 @@ export function FirmProfileSection() {
             />
           </label>
           <p className="md:col-span-2 text-xs text-text-muted">
-            Provide at least one source below — a URL, an uploaded document, or pasted notes — then click <span className="font-medium">Refresh profile</span>. The AI researches your firm and saves the result below.
+            Provide at least one source below — a URL, an uploaded document, or pasted notes — then click <span className="font-medium">Research firm</span> in the top-right. The AI researches your firm and saves the result below.
           </p>
         </div>
 
