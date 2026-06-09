@@ -288,8 +288,13 @@ router.post('/enrich-firm', async (req: Request, res: Response) => {
     if (!userId) return res.status(401).json({ error: 'Not authenticated' });
 
     const { websiteUrl, linkedinUrl } = req.body;
-    if (!websiteUrl && !linkedinUrl) {
-      return res.status(400).json({ error: 'Provide at least a websiteUrl or linkedinUrl' });
+    // Firm-provided doc/notes is a valid standalone source (a profile can be
+    // built from it even with no website/LinkedIn). Capped to bound token cost.
+    const documentText = typeof req.body.documentText === 'string'
+      ? req.body.documentText.slice(0, 20000)
+      : '';
+    if (!websiteUrl && !linkedinUrl && !documentText) {
+      return res.status(400).json({ error: 'Provide at least a websiteUrl, linkedinUrl, or firm document/notes' });
     }
 
     // Try to resolve org — but don't block if it's not available yet (new users)
@@ -337,6 +342,7 @@ router.post('/enrich-firm', async (req: Request, res: Response) => {
       websiteUrl: websiteUrl || '',
       linkedinUrl: linkedinUrl || '',
       firmName,
+      documentText,
       userId,
       organizationId: orgId,
     });
