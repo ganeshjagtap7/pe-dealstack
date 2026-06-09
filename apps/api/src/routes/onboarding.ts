@@ -280,6 +280,50 @@ router.post('/dismiss', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/onboarding/firm-inputs
+// Persists the Firm Profile source inputs (website / LinkedIn / notes) onto
+// Organization.settings WITHOUT running the research agent — so what the user
+// typed survives reloads and is available to a later "Research firm" run. Writes
+// the SAME top-level keys the Firm Profile UI reads + the research save node sets.
+router.post('/firm-inputs', async (req: Request, res: Response) => {
+  let orgId: string;
+  try {
+    orgId = getOrgId(req);
+  } catch {
+    return res.status(400).json({ error: 'Organization not set up yet' });
+  }
+
+  const websiteUrl = typeof req.body.websiteUrl === 'string' ? req.body.websiteUrl.trim() : undefined;
+  const linkedinUrl = typeof req.body.linkedinUrl === 'string' ? req.body.linkedinUrl.trim() : undefined;
+  const documentText = typeof req.body.documentText === 'string' ? req.body.documentText.slice(0, 20000) : undefined;
+
+  try {
+    const { data: org, error: fetchError } = await supabase
+      .from('Organization')
+      .select('settings')
+      .eq('id', orgId)
+      .single();
+    if (fetchError) throw fetchError;
+
+    const existingSettings = (org?.settings || {}) as Record<string, any>;
+    const updatedSettings = { ...existingSettings };
+    if (websiteUrl !== undefined) updatedSettings.firmWebsite = websiteUrl;
+    if (linkedinUrl !== undefined) updatedSettings.firmLinkedin = linkedinUrl;
+    if (documentText !== undefined) updatedSettings.firmDocText = documentText;
+
+    const { error: updateError } = await supabase
+      .from('Organization')
+      .update({ settings: updatedSettings })
+      .eq('id', orgId);
+    if (updateError) throw updateError;
+
+    res.json({ success: true });
+  } catch (error: any) {
+    log.error('Onboarding firm-inputs save failed', { error: error.message, orgId });
+    res.status(500).json({ error: 'Failed to save firm inputs' });
+  }
+});
+
 // POST /api/onboarding/enrich-firm
 // Runs firm research agent → scrapes, searches, synthesizes, verifies, saves
 router.post('/enrich-firm', async (req: Request, res: Response) => {

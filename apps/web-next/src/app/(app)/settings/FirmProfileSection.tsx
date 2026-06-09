@@ -27,6 +27,7 @@ interface UserMeResponse {
       firmProfile?: FirmProfileData;
       firmWebsite?: string;
       firmLinkedin?: string;
+      firmDocText?: string;
     };
   };
 }
@@ -60,6 +61,7 @@ export function FirmProfileSection() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [refreshStatus, setRefreshStatus] = useState<{
     type: "success" | "error" | "loading";
     text: string;
@@ -107,6 +109,7 @@ export function FirmProfileSection() {
       setFirmProfile(orgSettings.firmProfile || null);
       setOrgWebsite(orgSettings.firmWebsite || data?.organization?.website || "");
       setOrgLinkedin(orgSettings.firmLinkedin || "");
+      setFirmDocText(orgSettings.firmDocText || "");
       setLoadError(false);
     } catch (err) {
       console.warn("[settings/firm-profile] failed to load:", err);
@@ -165,6 +168,25 @@ export function FirmProfileSection() {
     }
   };
 
+  const handleSave = async () => {
+    setSaving(true);
+    setRefreshStatus({ type: "loading", text: "Saving…" });
+    try {
+      await api.post("/onboarding/firm-inputs", {
+        websiteUrl: orgWebsite,
+        linkedinUrl: orgLinkedin,
+        documentText: firmDocText,
+      });
+      setRefreshStatus({ type: "success", text: "Saved" });
+      setTimeout(() => setRefreshStatus(null), 1500);
+    } catch (err) {
+      console.warn("[settings/firm-profile] save failed:", err);
+      setRefreshStatus({ type: "error", text: "Save failed. Try again." });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const displayFields = firmProfile
     ? FIELDS.map((f) => ({
         label: f.label,
@@ -216,6 +238,17 @@ export function FirmProfileSection() {
               {refreshStatus.text}
             </div>
           )}
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving || refreshing || extracting}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border border-border-subtle hover:bg-gray-50 transition-colors shadow-sm text-text-secondary disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <span className={`material-symbols-outlined text-[16px] ${saving ? "animate-spin" : ""}`}>
+              {saving ? "progress_activity" : "save"}
+            </span>
+            {saving ? "Saving…" : "Save"}
+          </button>
           <button
             type="button"
             onClick={handleRefresh}
