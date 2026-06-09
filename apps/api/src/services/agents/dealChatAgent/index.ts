@@ -12,6 +12,7 @@ import { SHARED_GUARDRAILS } from '../guardrails.js';
 import { log } from '../../../utils/logger.js';
 import { classifyAIError } from '../../../utils/aiErrors.js';
 import { getTodayIso } from '../../../utils/dates.js';
+import { getFirmContextBlock } from '../../firmContextService.js';
 
 // Build the deal-agent system prompt fresh per call so today's date reflects
 // the real wall clock (the agent reasons about "recent news", "last 90 days",
@@ -232,7 +233,13 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
     // (see services/financialCrossVerify.ts for the same pattern). When the
     // chat provider is OpenAI/OpenRouter, the cache_control field is silently
     // ignored downstream so this is safe to include unconditionally.
-    const systemPromptText = buildDealAgentSystemPrompt(today) + '\n' + SHARED_GUARDRAILS;
+    // Firm-wide standing context (single AI-generated firm-context doc). Empty
+    // when none generated yet — guard and prepend nothing. Sits ABOVE the base
+    // agent prompt + guardrails, and stays inside the cached stable block since
+    // the firm-context doc is stable across turns within a session.
+    const firmContext = await getFirmContextBlock(input.orgId);
+    const firmContextBlock = firmContext ? `=== FIRM CONTEXT ===\n${firmContext}\n\n` : '';
+    const systemPromptText = firmContextBlock + buildDealAgentSystemPrompt(today) + '\n' + SHARED_GUARDRAILS;
     const dealContextText = `Current Deal Context:\n${input.dealContext}\n\nDeal ID: ${input.dealId}\nOrganization ID: ${input.orgId}`;
     // Anthropic only accepts ONE system message and it must be the first
     // message in the conversation — passing two SystemMessages here triggered

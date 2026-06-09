@@ -25,6 +25,7 @@ import { supabase } from '../supabase.js';
 import { getChatModel } from './llm.js';
 import { log } from '../utils/logger.js';
 import { formatFinancialValue } from '../utils/financialFormat.js';
+import { getFirmContextBlock } from './firmContextService.js';
 
 // Usage-tracking operation label (see services/llm.ts). Matches the label the
 // portfolio chat route uses so global-chat traffic lands in the same bucket.
@@ -251,13 +252,18 @@ export async function runGlobalChat(params: {
   // Fix C: surface a specifically-named deal's data regardless of context.
   const mentionedDeal = await buildMentionedDealContext(orgId, message);
 
+  // Firm-wide standing context (single AI-generated firm-context doc). Empty
+  // string when none has been generated yet — guard and inject nothing.
+  const firmContext = await getFirmContextBlock(orgId);
+  const firmContextBlock = firmContext ? `=== FIRM CONTEXT ===\n${firmContext}\n\n` : '';
+
   // Portfolio-aware contexts get a bounded portfolio summary injected.
   let systemPrompt: string;
   let maxTokens: number;
   if (PORTFOLIO_CONTEXTS.has(context)) {
     const portfolio = await buildPortfolioContext(orgId);
     maxTokens = 1200;
-    systemPrompt = `You are an AI portfolio assistant for ${orgName}, a Private Equity firm. Answer the user's question using ONLY the firm's portfolio data below. Cite specific numbers (revenue, EBITDA, IRR, stage) and deal names where relevant. All monetary figures below are already in display units — quote them exactly as written, do NOT re-scale or append your own unit suffix. If the data doesn't contain the answer, say so plainly rather than guessing. Be concise.
+    systemPrompt = `${firmContextBlock}You are an AI portfolio assistant for ${orgName}, a Private Equity firm. Answer the user's question using ONLY the firm's portfolio data below. Cite specific numbers (revenue, EBITDA, IRR, stage) and deal names where relevant. All monetary figures below are already in display units — quote them exactly as written, do NOT re-scale or append your own unit suffix. If the data doesn't contain the answer, say so plainly rather than guessing. Be concise.
 
 Today's date: ${today}
 
@@ -266,7 +272,7 @@ ${portfolio}${mentionedDeal}`;
   } else {
     // contacts / memo / general → lightweight, no extra data fetch.
     maxTokens = 800;
-    systemPrompt = `You are an AI assistant inside ${orgName}'s Private Equity deal management platform. You help users navigate deals, contacts, data rooms, and investment memos. Give concise, practical answers. You do NOT have broad access to deal or contact records in this conversation — if the user asks about a specific deal's data not provided below, point them to that deal's page where a deal-scoped assistant has full context. All monetary figures provided are already in display units — quote them exactly, do NOT re-scale.
+    systemPrompt = `${firmContextBlock}You are an AI assistant inside ${orgName}'s Private Equity deal management platform. You help users navigate deals, contacts, data rooms, and investment memos. Give concise, practical answers. You do NOT have broad access to deal or contact records in this conversation — if the user asks about a specific deal's data not provided below, point them to that deal's page where a deal-scoped assistant has full context. All monetary figures provided are already in display units — quote them exactly, do NOT re-scale.
 
 Today's date: ${today}${mentionedDeal}`;
   }

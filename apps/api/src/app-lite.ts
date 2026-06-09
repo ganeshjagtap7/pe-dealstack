@@ -46,6 +46,7 @@ import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
 import dealsTrashRouter from './routes/deals-trash.js';
 import dealsTeasersRouter from './routes/deals-teasers.js';
 import firmTeaserRouter from './routes/firm-teaser.js';
+import firmContextRouter from './routes/firm-context.js';
 import graphsRouter from './routes/graphs.js';
 import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
 import { supabase } from './supabase.js';
@@ -277,6 +278,7 @@ app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, us
 app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealsTeasersRouter);
 app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealsRouter);
 app.use('/api/firm-teaser', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, firmTeaserRouter);
+app.use('/api/firm-context', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, firmContextRouter);
 app.use('/api/companies', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, companiesRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, activitiesRouter);
 app.use('/api/documents', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, documentsAlertsRouter);

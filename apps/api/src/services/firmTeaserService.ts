@@ -13,6 +13,7 @@ import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { isClaudeEnabled } from './anthropic.js';
 import { getTodayIso } from '../utils/dates.js';
+import { getFirmContextBlock } from './firmContextService.js';
 import {
   generateSystemPrompt,
   generateTeaser,
@@ -311,9 +312,14 @@ export async function generateTeasersForDeal(args: { dealId: string; orgId: stri
   const deal = await loadDealForTeaser(args.dealId, args.orgId);
   const today = getTodayIso();
 
+  // Firm-wide standing context (single AI-generated firm-context doc). Empty
+  // when none generated yet — passed through to generateTeaser, which guards
+  // the empty case and prepends nothing.
+  const firmContext = await getFirmContextBlock(args.orgId);
+
   const results = await Promise.allSettled(
     config.profiles.map(async (profile) => {
-      const { headline, fits } = await generateTeaser({ deal, profile, today });
+      const { headline, fits } = await generateTeaser({ deal, profile, today, firmContext });
       await upsertTeaserRow({ dealId: args.dealId, orgId: args.orgId, profile, headline, fits });
     }),
   );

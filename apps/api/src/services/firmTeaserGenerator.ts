@@ -162,6 +162,12 @@ interface GenerateArgs {
   deal: DealRow;
   profile: PreviewProfile;
   today: string;
+  /**
+   * Firm-wide standing context (single AI-generated firm-context doc). When a
+   * non-empty string, it is prepended ABOVE the teaser system prompt so teasers
+   * reflect the firm's overall context. Empty/undefined → nothing is injected.
+   */
+  firmContext?: string;
 }
 
 /**
@@ -177,13 +183,18 @@ export async function generateTeaser({
   deal,
   profile,
   today,
+  firmContext,
 }: GenerateArgs): Promise<{ headline: string; fits: TeaserFit[] }> {
   if (!isClaudeEnabled() || !anthropic) {
     throw new Error('Claude is not enabled (ANTHROPIC_API_KEY missing)');
   }
 
   const profileName = profile.name?.trim() || 'Investment Profile';
+  const firmContextLines = firmContext?.trim()
+    ? [`=== FIRM CONTEXT ===`, firmContext.trim(), '']
+    : [];
   const system = [
+    ...firmContextLines,
     `Today's date is ${today}.`,
     '',
     'You are an internal private-equity analyst writing a short TRIAGE teaser for',
