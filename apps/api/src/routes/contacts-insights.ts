@@ -2,8 +2,30 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
+import { scanCorrespondents } from '../services/gmailContactsService.js';
 
 const router = Router();
+
+// ─── GET /api/contacts/insights/gmail-suggestions — Suggest contacts from Gmail ─
+// Bounded, org-scoped scan of the user's recent Gmail correspondents. Returns
+// { connected:false } (never an error) when Gmail isn't linked. Namespaced under
+// /insights so the `/:id` route in contacts.ts can't shadow it.
+
+router.get('/insights/gmail-suggestions', async (req: any, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const authUserId = req.user?.id;
+    if (!authUserId) {
+      return res.json({ connected: false, scanned: 0, suggestions: [] });
+    }
+    const days = Number(req.query.days) || undefined;
+    const result = await scanCorrespondents(orgId, authUserId, days as number);
+    res.json(result);
+  } catch (error) {
+    log.error('Gmail suggestions error', error);
+    res.status(500).json({ error: 'Failed to scan Gmail for contact suggestions' });
+  }
+});
 
 // ─── GET /api/contacts/insights/timeline — Recent interactions across all contacts ─
 

@@ -12,6 +12,8 @@ import {
 } from "./components";
 import { LinkDealModal, ConnectionModal } from "./detail-modals";
 import { IntegrationActivityFeed } from "@/components/integrations/IntegrationActivityFeed";
+import { ContactEmailSummary } from "./ContactEmailSummary";
+import { ContactAskAI } from "./ContactAskAI";
 
 // ─── Config ───────────────────────────────────────────────
 
@@ -145,6 +147,7 @@ export function DetailPanel({
       setEditModalOpen(false);
       await loadContact();
       onRefresh();
+      showToast("Contact updated", "success");
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Failed to save contact", "error");
     }
@@ -283,6 +286,12 @@ export function DetailPanel({
               {!contact.email && !contact.phone && !contact.linkedinUrl && <p className="text-text-muted text-sm italic p-2">No contact information added</p>}
             </div>
           </div>
+
+          {/* Email Summary (Gmail threads) */}
+          <ContactEmailSummary contactId={contactId} />
+
+          {/* Ask AI about this contact (scoped chat) */}
+          <ContactAskAI contactId={contactId} contactName={contact.firstName || "this contact"} />
 
           {/* Follow-up */}
           {(() => {
