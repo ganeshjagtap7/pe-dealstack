@@ -10,7 +10,7 @@ import ingestRouter from './ai-ingest.js';
 import portfolioRouter from './ai-portfolio.js';
 import aiAgentsRouter from './ai-agents.js';
 import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
-import { runGlobalChat, normalizeContext } from '../services/globalChatService.js';
+import { runGlobalChatAgent, streamGlobalChatAgent } from '../services/agents/globalChatAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { MODEL_REASONING, MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { classifyAIErrorObject } from '../utils/aiErrors.js';
@@ -41,9 +41,13 @@ const globalChatSchema = z.object({
   })).optional(),
 });
 
-// POST /api/ai/chat - Global floating AI chat (dashboard/deals/contacts/memo/general)
+// POST /api/ai/chat - Global (org-scoped) AI chat — NON-STREAMING FALLBACK.
+// Routes through the org-scoped, tool-using ReAct agent (globalChatAgent).
 // Backs the non-deal branch of the frontend AIAssistant. Per-deal chat goes
-// through /deals/:dealId/chat instead. Response: { response, model }.
+// through /deals/:dealId/chat instead.
+// Response: { response, model, actions? } where actions are proposed actions
+// the frontend executes (navigate / draftEmail / createTask / changeStage /
+// addNote). This endpoint MUST always work (it's the SSE fallback).
 router.post('/ai/chat', async (req, res) => {
   try {
     if (!isLLMAvailable()) {
@@ -56,22 +60,79 @@ router.post('/ai/chat', async (req, res) => {
     const orgId = getOrgId(req);
     const { message, context, history } = globalChatSchema.parse(req.body);
 
-    const result = await runGlobalChat({
-      orgId,
-      message,
-      context: normalizeContext(context),
-      history,
-    });
+    const result = await runGlobalChatAgent({ orgId, message, context, history });
 
     res.json({
       response: result.response,
       model: result.model,
+      ...(result.actions && { actions: result.actions }),
     });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
     }
     log.error('Error in global AI chat', error);
+    const { statusCode, userMessage } = classifyAIErrorObject(error);
+    res.status(statusCode).json({ error: userMessage });
+  }
+});
+
+// POST /api/ai/chat/stream - Global (org-scoped) AI chat — SSE STREAMING.
+// Same body { message, context, history? }. Emits Server-Sent Events:
+//   event: token  data: {"text":"..."}                  — incremental answer text
+//   event: tool   data: {"tool":"search_documents","status":"running"|"done"}
+//   event: done   data: {"response":"...","model":"...","actions":[...]}
+//   event: error  data: {"message":"..."}
+// Buffering is disabled (Cache-Control: no-cache, X-Accel-Buffering: no) and
+// each event is flushed as it's produced.
+router.post('/ai/chat/stream', async (req, res) => {
+  // Helper: write one SSE event and flush (flush exists when compression
+  // middleware is active; guard for environments without it).
+  const send = (event: string, data: unknown) => {
+    res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    (res as any).flush?.();
+  };
+
+  try {
+    if (!isLLMAvailable()) {
+      return res.status(503).json({
+        error: 'AI service unavailable',
+        message: 'No LLM API key configured',
+      });
+    }
+
+    const orgId = getOrgId(req);
+    const { message, context, history } = globalChatSchema.parse(req.body);
+
+    res.status(200);
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    (res as any).flushHeaders?.();
+
+    try {
+      for await (const ev of streamGlobalChatAgent({ orgId, message, context, history })) {
+        send(ev.event, ev.data);
+      }
+    } catch (streamErr) {
+      // The agent generator maps its own errors to an 'error' event, so this
+      // only catches truly unexpected throws mid-stream. Headers are already
+      // sent, so we can't change status — emit an error event instead.
+      log.error('Error mid-stream in global AI chat stream', streamErr);
+      send('error', { message: 'The assistant encountered an error while streaming.' });
+    }
+    res.end();
+  } catch (error) {
+    // Pre-stream errors (validation, org scope) — headers not yet sent.
+    if (res.headersSent) {
+      send('error', { message: 'Request failed.' });
+      return res.end();
+    }
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({ error: 'Validation error', details: error.errors });
+    }
+    log.error('Error in global AI chat stream', error);
     const { statusCode, userMessage } = classifyAIErrorObject(error);
     res.status(statusCode).json({ error: userMessage });
   }
