@@ -410,23 +410,26 @@ export function DetailPanel({
           </div>
         </div>
 
-        {/* Actions Bar */}
-        <div className="shrink-0 border-t border-border-subtle px-6 py-3">
-          <div className="flex items-center gap-2">
-            <button onClick={() => setShowInteractionForm(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+        {/* Actions Bar — three labeled primary actions stretch evenly;
+            Edit/Delete are icon-only so the row never wraps or clips in the
+            450px panel. */}
+        <div className="shrink-0 border-t border-border-subtle px-4 py-3 bg-surface-card">
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => setShowInteractionForm(true)} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary whitespace-nowrap hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
               <span className="material-symbols-outlined text-[16px]">edit_note</span>Add Note
             </button>
-            <button onClick={() => setLinkDealOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+            <button onClick={() => setLinkDealOpen(true)} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary whitespace-nowrap hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
               <span className="material-symbols-outlined text-[16px]">link</span>Link Deal
             </button>
-            <button onClick={handleAskAi} disabled={enriching} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all disabled:opacity-50">
-              <span className={cn("material-symbols-outlined text-[16px]", enriching && "animate-spin")}>{enriching ? "sync" : "auto_awesome"}</span>{enriching ? "Asking..." : "Ask AI"}
+            <button onClick={handleAskAi} disabled={enriching} className="flex-1 flex items-center justify-center gap-1.5 px-2 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary whitespace-nowrap hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all disabled:opacity-50">
+              <span className={cn("material-symbols-outlined text-[16px]", enriching && "animate-spin")}>{enriching ? "sync" : "auto_awesome"}</span>{enriching ? "Asking…" : "Ask AI"}
             </button>
-            <button onClick={() => setEditModalOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border-subtle text-sm font-medium text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
-              <span className="material-symbols-outlined text-[16px]">edit</span>Edit
+            <div className="w-px h-6 bg-border-subtle mx-0.5 shrink-0" aria-hidden="true" />
+            <button onClick={() => setEditModalOpen(true)} title="Edit contact" aria-label="Edit contact" className="shrink-0 p-2 rounded-lg border border-border-subtle text-text-secondary hover:border-primary/30 hover:text-primary hover:bg-primary-light/50 transition-all">
+              <span className="material-symbols-outlined text-[18px] block">edit</span>
             </button>
-            <button onClick={() => setDeleteConfirmOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition-all">
-              <span className="material-symbols-outlined text-[16px]">delete</span>Delete
+            <button onClick={() => setDeleteConfirmOpen(true)} title="Delete contact" aria-label="Delete contact" className="shrink-0 p-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-all">
+              <span className="material-symbols-outlined text-[18px] block">delete</span>
             </button>
           </div>
         </div>
