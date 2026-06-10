@@ -6,6 +6,37 @@ import {
   Contact, TYPE_CONFIG, SCORE_CONFIG,
   getInitials, getRelationshipLabel,
 } from "./components";
+import {
+  STRENGTH_TIER_STYLE, strengthTierForContact, strengthTooltip,
+} from "@/lib/contacts/strength";
+
+// Small green/amber/gray relationship-strength pill — the core list-triage
+// affordance. Tier semantics live in lib/contacts/strength.ts so the list and
+// the detail panel agree. Renders even for unscored contacts (cold) so every
+// row carries a consistent signal.
+function StrengthPill({
+  contact, contactScores, className,
+}: {
+  contact: Contact;
+  contactScores: Record<string, { score: number; label: string }>;
+  className?: string;
+}) {
+  const score = contactScores[contact.id];
+  const tier = strengthTierForContact(score);
+  const style = STRENGTH_TIER_STYLE[tier];
+  return (
+    <span
+      title={strengthTooltip(score)}
+      className={cn(
+        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide shrink-0",
+        style.bg, style.text, className,
+      )}
+    >
+      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", style.dot)} />
+      {style.label}
+    </span>
+  );
+}
 
 // ─── Contact card (grid view) and row (list view) renderers ─────────────────
 // Extracted from page.tsx so the page module stays under the 500-line budget.
@@ -123,6 +154,7 @@ export function ContactRow({
           <div className="min-w-0">
             <p className="text-sm font-semibold text-text-main truncate flex items-center gap-1.5">
               {contact.firstName} {contact.lastName}
+              <StrengthPill contact={contact} contactScores={contactScores} />
               {isFollowUpOverdue(contact.followUpAt) && (
                 <span className="material-symbols-outlined text-[14px] text-red-500 shrink-0" title="Follow-up overdue">event_busy</span>
               )}

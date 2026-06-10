@@ -68,6 +68,14 @@ interface FollowUpSuggestion {
   reasoning: string;
 }
 
+// Abort the suggestion fetch if it outruns this — the single LLM call should be
+// quick; beyond this we stop the spinner and offer a retry instead of hanging.
+const SUGGEST_FOLLOW_UP_TIMEOUT_MS = 10_000;
+
+// followUpNote is capped server-side (PATCH /contacts validator) — mirror it
+// here so the applied suggestion text never gets rejected for length.
+const FOLLOW_UP_NOTE_MAX_LEN = 500;
+
 // Returns true when a follow-up date is in the past (date-only comparison).
 function isFollowUpOverdue(followUpAt?: string | null): boolean {
   if (!followUpAt) return false;
@@ -113,6 +121,8 @@ export function DetailPanel({
   const [enrichment, setEnrichment] = useState<ContactEnrichment | null>(null);
   const [suggestingFollowUp, setSuggestingFollowUp] = useState(false);
   const [followUpSuggestion, setFollowUpSuggestion] = useState<FollowUpSuggestion | null>(null);
+  const [followUpSuggestFailed, setFollowUpSuggestFailed] = useState(false);
+  const [pulseSuggestion, setPulseSuggestion] = useState(false);
   const { showToast } = useToast();
 
   const loadContact = useCallback(async () => {
@@ -180,15 +190,55 @@ export function DetailPanel({
 
   // Cheap, genuinely-AI follow-up suggestion — a SINGLE bounded LLM call.
   // Does NOT run the full enrichment agent (no web scrape / research).
+  // Races the request against a hard timeout so the spinner can't hang forever;
+  // on timeout we surface a retry affordance instead of a perpetual "Thinking...".
   async function handleSuggestFollowUp() {
     setSuggestingFollowUp(true);
+    setFollowUpSuggestFailed(false);
+    let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const data = await api.post<FollowUpSuggestion>("/ai/suggest-follow-up", { contactId });
+      const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error("Suggestion timed out — please try again.")),
+          SUGGEST_FOLLOW_UP_TIMEOUT_MS,
+        );
+      });
+      const data = await Promise.race([
+        api.post<FollowUpSuggestion>("/ai/suggest-follow-up", { contactId }),
+        timeout,
+      ]);
       setFollowUpSuggestion(data);
+      setPulseSuggestion(true);
+      setTimeout(() => setPulseSuggestion(false), 1500);
     } catch (err) {
+      setFollowUpSuggestFailed(true);
       showToast(err instanceof Error ? err.message : "Failed to suggest a follow-up", "error");
     } finally {
+      if (timer) clearTimeout(timer);
       setSuggestingFollowUp(false);
+    }
+  }
+
+  // Apply a suggested follow-up: set the date AND persist the suggested action
+  // text into the contact's follow-up note. We never clobber an existing note —
+  // if the user already wrote one, theirs wins (the suggestion is advisory).
+  async function applyFollowUpSuggestion(suggestion: FollowUpSuggestion) {
+    setSavingFollowUp(true);
+    try {
+      const existingNote = (contact as { followUpNote?: string | null } | null)?.followUpNote?.trim();
+      const body: Record<string, unknown> = { followUpAt: suggestion.date };
+      if (!existingNote && suggestion.action.trim()) {
+        // followUpNote is capped at 500 chars by the PATCH validator.
+        body.followUpNote = suggestion.action.trim().slice(0, FOLLOW_UP_NOTE_MAX_LEN);
+      }
+      await api.patch(`/contacts/${contactId}`, body);
+      await loadContact();
+      setFollowUpSuggestion(null);
+      showToast("Follow-up applied", "success");
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to apply follow-up", "error");
+    } finally {
+      setSavingFollowUp(false);
     }
   }
 
@@ -327,9 +377,28 @@ export function DetailPanel({
                 </div>
                 {overdue && <p className="text-[11px] text-red-600 font-medium mt-1.5 flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">warning</span>Follow-up is overdue</p>}
 
+                {/* Retry affordance when the suggestion fetch failed/timed out */}
+                {followUpSuggestFailed && !suggestingFollowUp && !followUpSuggestion && (
+                  <div className="mt-2.5 flex items-center justify-between gap-2 p-2.5 rounded-lg border border-amber-200 bg-amber-50/60">
+                    <p className="text-xs text-amber-700 flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px]">error_outline</span>
+                      Couldn&apos;t get a suggestion.
+                    </p>
+                    <button
+                      onClick={handleSuggestFollowUp}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-primary hover:bg-primary-light transition-colors"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">refresh</span>Retry
+                    </button>
+                  </div>
+                )}
+
                 {/* AI follow-up suggestion (cheap single LLM call) */}
                 {followUpSuggestion && (
-                  <div className="mt-2.5 p-3 rounded-lg border border-primary/20 bg-blue-50/30">
+                  <div className={cn(
+                    "mt-2.5 p-3 rounded-lg border border-primary/20 bg-blue-50/30 transition-all duration-500",
+                    pulseSuggestion && "ring-2 ring-primary/50 ring-offset-1 animate-pulse",
+                  )}>
                     <div className="flex items-start gap-2.5">
                       <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">event_upcoming</span>
                       <div className="flex-1 min-w-0">
@@ -344,7 +413,7 @@ export function DetailPanel({
                         <div className="flex items-center justify-between gap-2 mt-2">
                           <p className="text-xs text-text-muted">{toDateInputValue(followUpSuggestion.date) || followUpSuggestion.date}</p>
                           <button
-                            onClick={async () => { await updateFollowUp(followUpSuggestion.date); setFollowUpSuggestion(null); }}
+                            onClick={() => applyFollowUpSuggestion(followUpSuggestion)}
                             disabled={savingFollowUp}
                             className="shrink-0 px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors disabled:opacity-50"
                             style={{ backgroundColor: "#003366" }}

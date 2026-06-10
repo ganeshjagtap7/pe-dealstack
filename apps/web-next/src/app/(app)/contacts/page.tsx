@@ -14,7 +14,10 @@ import { FollowUpsBanner } from "./follow-ups-banner";
 import { GmailSuggestions } from "./GmailSuggestions";
 import { CSVImportModal } from "./csv-import-modal";
 import { ContactCard, ContactRow, TABLE_HEADERS, TABLE_TH_CLS } from "./list-items";
-import { CONTACTS_PAGE_SIZE, SORT_OPTIONS, groupContacts, sortGroupKeys } from "./list-utils";
+import {
+  CONTACTS_PAGE_SIZE, SORT_OPTIONS, groupContacts, sortGroupKeys,
+  isStrengthSort, sortContactsByStrength,
+} from "./list-utils";
 import {
   ContactsGridSkeleton, ContactsTableSkeleton,
   ContactsErrorState, ContactsEmptyState,
@@ -65,7 +68,9 @@ export default function ContactsPage() {
       const params = new URLSearchParams();
       if (filters.search) params.set("search", filters.search);
       if (filters.type) params.set("type", filters.type);
-      params.set("sortBy", filters.sortBy);
+      // Strength is a client-side sort (not in the API's sortBy enum) — fall
+      // back to a stable server order and reorder after load.
+      params.set("sortBy", isStrengthSort(filters.sortBy) ? "createdAt" : filters.sortBy);
       params.set("sortOrder", filters.sortOrder);
       params.set("limit", String(CONTACTS_PAGE_SIZE));
       params.set("offset", "0");
@@ -138,7 +143,9 @@ export default function ContactsPage() {
       const params = new URLSearchParams();
       if (filters.search) params.set("search", filters.search);
       if (filters.type) params.set("type", filters.type);
-      params.set("sortBy", filters.sortBy);
+      // Strength is a client-side sort (not in the API's sortBy enum) — fall
+      // back to a stable server order and reorder after load.
+      params.set("sortBy", isStrengthSort(filters.sortBy) ? "createdAt" : filters.sortBy);
       params.set("sortOrder", filters.sortOrder);
       params.set("limit", String(CONTACTS_PAGE_SIZE));
       params.set("offset", String(currentOffset));
@@ -202,7 +209,9 @@ export default function ContactsPage() {
       const params = new URLSearchParams();
       if (filters.search) params.set("search", filters.search);
       if (filters.type) params.set("type", filters.type);
-      params.set("sortBy", filters.sortBy);
+      // Strength is a client-side sort (not in the API's sortBy enum) — fall
+      // back to a stable server order and reorder after load.
+      params.set("sortBy", isStrengthSort(filters.sortBy) ? "createdAt" : filters.sortBy);
       params.set("sortOrder", filters.sortOrder);
       const res = await fetch(`/api/contacts/export?${params}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error("Export failed");
@@ -222,7 +231,10 @@ export default function ContactsPage() {
 
   // ─── Group by Company derived state ───────────────────────
 
-  const grouped = groupByCompany ? groupContacts(contacts) : {};
+  const displayContacts = isStrengthSort(filters.sortBy)
+    ? sortContactsByStrength(contacts, contactScores, filters.sortOrder as "asc" | "desc")
+    : contacts;
+  const grouped = groupByCompany ? groupContacts(displayContacts) : {};
   const sortedGroupKeys = groupByCompany ? sortGroupKeys(grouped) : [];
   const hasMore = contacts.length < totalContacts;
   const remaining = totalContacts - contacts.length;
@@ -382,8 +394,8 @@ export default function ContactsPage() {
       {/* Add contacts from your inbox — lazy, non-blocking Gmail suggestions */}
       {!loading && <GmailSuggestions onContactAdded={loadContacts} />}
 
-      {/* Insight Cards */}
-      {!loading && <InsightCards totalContacts={totalContacts} />}
+      {/* Insight Cards — "Needs attention" stale contacts */}
+      {!loading && <InsightCards totalContacts={totalContacts} onOpenContact={setDetailContactId} />}
 
       {/* Content */}
       {loading ? (
@@ -415,10 +427,10 @@ export default function ContactsPage() {
           ))}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{contacts.map(renderCard)}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{displayContacts.map(renderCard)}</div>
       ) : (
         <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden overflow-x-auto">
-          <table className="w-full min-w-[600px]">{tableHead}<tbody>{contacts.map(renderRow)}</tbody></table>
+          <table className="w-full min-w-[600px]">{tableHead}<tbody>{displayContacts.map(renderRow)}</tbody></table>
         </div>
       )}
 

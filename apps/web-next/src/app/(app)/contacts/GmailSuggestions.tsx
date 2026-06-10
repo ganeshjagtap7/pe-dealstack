@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { api, ApiError } from "@/lib/api";
 import { cn } from "@/lib/cn";
 import { formatRelativeTime, getInitials } from "@/lib/formatters";
 import { useToast } from "@/providers/ToastProvider";
@@ -108,6 +108,11 @@ function SuggestionRow({
 
 const MAX_VISIBLE = 6;
 
+// POST /contacts returns 409 when a contact with the same email already exists
+// in the org (e.g. a double-clicked suggestion, or it was added elsewhere). We
+// treat that as success: the contact is in the list, so drop the suggestion.
+const HTTP_CONFLICT = 409;
+
 export function GmailSuggestions({ onContactAdded }: { onContactAdded?: () => void }) {
   const { showToast } = useToast();
   const [data, setData] = useState<GmailSuggestionsResponse | null>(null);
@@ -158,7 +163,17 @@ export function GmailSuggestions({ onContactAdded }: { onContactAdded?: () => vo
     }
   }
 
+  // Remove a suggestion from the list once it's been added (or already exists).
+  function removeSuggestion(email: string) {
+    setData((prev) =>
+      prev ? { ...prev, suggestions: prev.suggestions.filter((x) => x.email !== email) } : prev,
+    );
+  }
+
   async function handleAdd(s: GmailSuggestion) {
+    // Guard against double-clicks: the button is disabled while in flight, but
+    // bail early too so a rapid second invocation never fires a second request.
+    if (addingEmail === s.email) return;
     setAddingEmail(s.email);
     try {
       const { firstName, lastName } = splitName(s.name, s.email);
@@ -168,13 +183,18 @@ export function GmailSuggestions({ onContactAdded }: { onContactAdded?: () => vo
         email: s.email,
         ...(s.company ? { company: s.company } : {}),
       });
-      // Drop the added person from the list.
-      setData((prev) =>
-        prev ? { ...prev, suggestions: prev.suggestions.filter((x) => x.email !== s.email) } : prev,
-      );
+      removeSuggestion(s.email);
       showToast(`Added ${displayName(s)} to contacts`, "success");
       onContactAdded?.();
     } catch (err) {
+      // 409 = the contact already exists (race on a double-click, or added
+      // elsewhere). Treat as success: drop it from the list and tell the user.
+      if (err instanceof ApiError && err.status === HTTP_CONFLICT) {
+        removeSuggestion(s.email);
+        showToast("Already in your contacts", "success");
+        onContactAdded?.();
+        return;
+      }
       showToast(err instanceof Error ? err.message : "Failed to add contact", "error");
     } finally {
       setAddingEmail(null);
