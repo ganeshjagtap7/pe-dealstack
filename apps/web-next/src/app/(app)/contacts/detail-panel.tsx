@@ -208,7 +208,7 @@ export function DetailPanel({
     return (
       <>
         <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-        <div className="fixed top-0 right-0 h-full w-[450px] max-w-full bg-surface-card shadow-2xl z-50 flex flex-col border-l border-border-subtle">
+        <div className="right-drawer fixed top-0 right-0 h-full w-[450px] max-w-full bg-surface-card shadow-2xl z-50 flex flex-col border-l border-border-subtle">
           <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle">
             <h2 className="text-lg font-bold text-text-main">Contact Details</h2>
             <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-text-muted"><span className="material-symbols-outlined text-[20px]">close</span></button>
@@ -231,7 +231,7 @@ export function DetailPanel({
   return (
     <>
       <div className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
-      <div className="fixed top-0 right-0 h-full w-[450px] max-w-full bg-surface-card shadow-2xl z-50 flex flex-col border-l border-border-subtle">
+      <div className="right-drawer fixed top-0 right-0 h-full w-[450px] max-w-full bg-surface-card shadow-2xl z-50 flex flex-col border-l border-border-subtle">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border-subtle shrink-0">
           <h2 className="text-lg font-bold text-text-main">Contact Details</h2>
