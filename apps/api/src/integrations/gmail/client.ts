@@ -444,3 +444,21 @@ export async function listRecentDealCandidates(
   } while (pageToken && out.length < cap);
   return out.slice(0, cap);
 }
+
+// format=full returns the raw message payload with body parts (base64url-encoded),
+// for callers that parse the MIME tree themselves (extractBodyText/getHeaderMap in
+// mapper.ts — the auto-deal classifier flow). getMessageFull above returns a
+// pre-parsed view instead. Costs ~5x more bytes than format=metadata, so only
+// call this when the pre-filter has already decided the message is worth classifying.
+export async function getMessageRaw(accessToken: string, messageId: string): Promise<GmailMessage> {
+  const url = `${GMAIL_BASE}/messages/${encodeURIComponent(messageId)}?format=full`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(20_000),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Gmail getMessageRaw failed: ${res.status} ${text}`);
+  }
+  return (await res.json()) as GmailMessage;
+}

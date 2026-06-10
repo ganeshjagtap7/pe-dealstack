@@ -1,4 +1,4 @@
-import type { GmailMessage } from './types.js';
+import type { GmailMessage, GmailMessagePart } from './types.js';
 
 export interface ParsedAddress {
   name: string | null;
@@ -115,4 +115,67 @@ export function extractAddressEmails(message: GmailMessage): string[] {
     parseAddressList(v).forEach(a => all.push(a.email));
   }
   return all;
+}
+
+// Headers helper exposed for callers that need raw header lookup
+// (pre-filter inspects Auto-Submitted, List-Id, etc.).
+export function getHeaderMap(message: GmailMessage): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const h of message.payload?.headers ?? []) {
+    out[h.name] = h.value;
+  }
+  return out;
+}
+
+function decodeBase64Url(data: string): string {
+  // Gmail returns body data as base64url. Node's Buffer accepts the alphabet
+  // but not the padding rules — normalize first.
+  const normalized = data.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = normalized.length % 4 === 0 ? '' : '='.repeat(4 - (normalized.length % 4));
+  try {
+    return Buffer.from(normalized + pad, 'base64').toString('utf-8');
+  } catch {
+    return '';
+  }
+}
+
+function htmlToText(html: string): string {
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .trim();
+}
+
+// Walks the (possibly nested) MIME tree and returns the first non-empty plain-text
+// body it finds, falling back to a stripped HTML body. Skips attachment parts.
+export function extractBodyText(message: GmailMessage): string {
+  const collectByMime = (mime: string): string => {
+    const found: string[] = [];
+    const walk = (part: GmailMessagePart | undefined): void => {
+      if (!part) return;
+      const isAttachment = !!(part.filename && part.filename.length > 0);
+      if (!isAttachment && part.mimeType === mime && part.body?.data) {
+        const decoded = decodeBase64Url(part.body.data);
+        if (decoded.trim().length > 0) found.push(decoded);
+      }
+      for (const sub of part.parts ?? []) walk(sub);
+    };
+    walk(message.payload);
+    return found.join('\n').trim();
+  };
+
+  const plain = collectByMime('text/plain');
+  if (plain.length > 0) return plain;
+  const html = collectByMime('text/html');
+  if (html.length > 0) return htmlToText(html);
+  return (message.snippet ?? '').trim();
 }

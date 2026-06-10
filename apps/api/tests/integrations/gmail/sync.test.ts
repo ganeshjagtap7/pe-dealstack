@@ -41,8 +41,16 @@ describe('gmailProvider.sync', () => {
       saveTokens: vi.fn(),
     }));
 
-    // Mock the org's contacts list (used to build the Gmail q filter) AND the matcher.
-    const upsert = vi.fn().mockResolvedValue({ error: null });
+    // Mock the org's contacts list (used to build the Gmail q filter),
+    // the org settings (auto-deal toggle — defaults OFF in this test) and
+    // the matcher.
+    const upsert = vi.fn();
+    const upsertSelect = vi.fn();
+    const upsertSingle = vi
+      .fn()
+      .mockResolvedValue({ data: { id: 'act-1' }, error: null });
+    upsertSelect.mockReturnValue({ single: upsertSingle });
+    upsert.mockReturnValue({ select: upsertSelect });
     const fromMock = vi.fn();
     fromMock.mockReturnValueOnce({  // org contacts → emails for q filter
       select: vi.fn().mockReturnThis(),
@@ -50,6 +58,11 @@ describe('gmailProvider.sync', () => {
         data: [{ email: 'john@acme.com' }, { email: 'sara@beta.io' }],
         error: null,
       }),
+    });
+    fromMock.mockReturnValueOnce({  // getAutoDealSettings: Organization lookup
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      maybeSingle: vi.fn().mockResolvedValue({ data: { settings: {} }, error: null }),
     });
     fromMock.mockReturnValueOnce({  // matcher: Contact lookup
       select: vi.fn().mockReturnThis(),
@@ -63,7 +76,7 @@ describe('gmailProvider.sync', () => {
       select: vi.fn().mockReturnThis(),
       in: vi.fn().mockResolvedValue({ data: [{ dealId: 'd-1' }], error: null }),
     });
-    fromMock.mockReturnValueOnce({ upsert });  // upsert IntegrationActivity
+    fromMock.mockReturnValueOnce({ upsert });  // upsert IntegrationActivity (returns .select().single())
     vi.doMock('../../../src/supabase.js', () => ({
       supabase: { from: fromMock },
     }));
