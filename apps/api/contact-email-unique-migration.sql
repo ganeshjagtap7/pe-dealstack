@@ -40,6 +40,12 @@ BEGIN;
 -- Build a mapping from each duplicate contact id -> the kept id for its
 -- (lower(email), organizationId) group. Only groups with >1 row appear here,
 -- and the kept row maps to itself only implicitly (it is excluded as a "dup").
+-- Materialize the dup -> keep mapping into a temp table so every step below
+-- (which mutates "Contact") sees a stable snapshot. CREATE TEMP TABLE ... AS
+-- (not SELECT ... INTO TEMP) — the Supabase SQL editor mis-parses the INTO
+-- form ("relation TEMP does not exist").
+DROP TABLE IF EXISTS _contact_dedup_map;
+CREATE TEMP TABLE _contact_dedup_map AS
 WITH ranked AS (
   SELECT
     id,
@@ -51,17 +57,10 @@ WITH ranked AS (
     ) AS keep_id
   FROM "Contact"
   WHERE email IS NOT NULL AND email <> ''
-),
-dup_map AS (
-  -- Materialize the dup -> keep mapping into a temp table so every step below
-  -- (which mutates "Contact") sees a stable snapshot.
-  SELECT id AS dup_id, keep_id
-  FROM ranked
-  WHERE id <> keep_id
 )
-SELECT dup_id, keep_id
-INTO TEMP TABLE _contact_dedup_map
-FROM dup_map;
+SELECT id AS dup_id, keep_id
+FROM ranked
+WHERE id <> keep_id;
 
 -- ── ContactInteraction: no unique constraint, repoint unconditionally. ──
 UPDATE "ContactInteraction" ci

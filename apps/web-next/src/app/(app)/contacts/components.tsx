@@ -274,18 +274,16 @@ function StaleItem({ c, onOpen }: { c: StaleContact; onOpen: (id: string) => voi
 export function InsightCards({ onOpenContact }: { totalContacts: number; onOpenContact: (id: string) => void }) {
   const [contacts, setContacts] = useState<StaleContact[] | null>(null);
   const [loading, setLoading] = useState(true);
-  const [dismissed, setDismissed] = useState(false);
-
-  // Hydrate dismiss state from sessionStorage on mount (no SSR access).
-  useEffect(() => {
+  // Lazy-init from sessionStorage so we don't sync state in an effect
+  // (matches the quick-notes widget idiom).
+  const [dismissed, setDismissed] = useState(() => {
     try {
-      if (sessionStorage.getItem(STORAGE_KEYS.contactsStaleDismissed) === "1") {
-        setDismissed(true);
-      }
+      return sessionStorage.getItem(STORAGE_KEYS.contactsStaleDismissed) === "1";
     } catch (err) {
       console.warn("[contacts] stale dismiss read failed:", err);
+      return false;
     }
-  }, []);
+  });
 
   useEffect(() => {
     let active = true;

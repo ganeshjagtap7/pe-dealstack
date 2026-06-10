@@ -7,93 +7,20 @@ import { cn } from "@/lib/cn";
 import { useToast } from "@/providers/ToastProvider";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
-  Contact, Interaction, LinkedDeal, TYPE_CONFIG, SCORE_CONFIG,
+  Contact, TYPE_CONFIG, LinkedDeal,
   ContactFormData, ContactModal, DeleteConfirmModal,
 } from "./components";
 import { LinkDealModal, ConnectionModal } from "./detail-modals";
 import { IntegrationActivityFeed } from "@/components/integrations/IntegrationActivityFeed";
 import { ContactEmailSummary } from "./ContactEmailSummary";
 import { ContactAskAI } from "./ContactAskAI";
-
-// ─── Config ───────────────────────────────────────────────
-
-const INTERACTION_ICONS: Record<string, string> = {
-  NOTE: "edit_note", MEETING: "groups", CALL: "call", EMAIL: "mail", OTHER: "more_horiz",
-};
-
-const STAGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  INITIAL_REVIEW: { bg: "bg-blue-50", text: "text-blue-700", label: "Initial Review" },
-  DUE_DILIGENCE:  { bg: "bg-blue-50", text: "text-primary", label: "Due Diligence" },
-  IOI_SUBMITTED:  { bg: "bg-amber-50", text: "text-amber-700", label: "IOI Submitted" },
-  LOI_SUBMITTED:  { bg: "bg-purple-50", text: "text-purple-700", label: "LOI Submitted" },
-  NEGOTIATION:    { bg: "bg-orange-50", text: "text-orange-700", label: "Negotiation" },
-  CLOSING:        { bg: "bg-teal-50", text: "text-teal-700", label: "Closing" },
-  PASSED:         { bg: "bg-gray-100", text: "text-gray-600", label: "Passed" },
-  CLOSED_WON:     { bg: "bg-green-50", text: "text-green-700", label: "Closed Won" },
-  CLOSED_LOST:    { bg: "bg-red-50", text: "text-red-700", label: "Closed Lost" },
-};
-
-const RELATIONSHIP_TYPE_CONFIG: Record<string, { label: string; icon: string; bg: string; text: string }> = {
-  KNOWS:         { label: "Knows",         icon: "handshake",    bg: "bg-blue-100",    text: "text-blue-700" },
-  REFERRED_BY:   { label: "Referred by",   icon: "share",        bg: "bg-purple-100",  text: "text-purple-700" },
-  REPORTS_TO:    { label: "Reports to",    icon: "account_tree", bg: "bg-amber-100",   text: "text-amber-700" },
-  COLLEAGUE:     { label: "Colleague",     icon: "group",        bg: "bg-emerald-100", text: "text-emerald-700" },
-  INTRODUCED_BY: { label: "Introduced by", icon: "person_add",   bg: "bg-pink-100",    text: "text-pink-700" },
-};
-
-interface Connection {
-  id: string;
-  type: string;
-  notes?: string;
-  contact: { id: string; firstName: string; lastName: string; type: string; company?: string; title?: string };
-}
-
-interface EnrichmentSuggestedFollowUp {
-  date?: string;
-  action?: string;
-}
-
-interface ContactEnrichment {
-  summary?: string;
-  insights?: string[];
-  suggestedTags?: string[];
-  suggestedFollowUp?: EnrichmentSuggestedFollowUp | null;
-  [key: string]: unknown;
-}
-
-// Response of POST /ai/suggest-follow-up — a single lightweight LLM call.
-interface FollowUpSuggestion {
-  date: string;
-  action: string;
-  reasoning: string;
-}
-
-// Abort the suggestion fetch if it outruns this — the single LLM call should be
-// quick; beyond this we stop the spinner and offer a retry instead of hanging.
-const SUGGEST_FOLLOW_UP_TIMEOUT_MS = 10_000;
-
-// followUpNote is capped server-side (PATCH /contacts validator) — mirror it
-// here so the applied suggestion text never gets rejected for length.
-const FOLLOW_UP_NOTE_MAX_LEN = 500;
-
-// Returns true when a follow-up date is in the past (date-only comparison).
-function isFollowUpOverdue(followUpAt?: string | null): boolean {
-  if (!followUpAt) return false;
-  const due = new Date(followUpAt);
-  if (Number.isNaN(due.getTime())) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-  return due.getTime() < today.getTime();
-}
-
-// Normalises an ISO/string date into a yyyy-mm-dd value for <input type="date">.
-function toDateInputValue(value?: string | null): string {
-  if (!value) return "";
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toISOString().split("T")[0];
-}
+import {
+  Connection, ContactEnrichment, FollowUpSuggestion,
+  INTERACTION_ICONS, STAGE_STYLES, RELATIONSHIP_TYPE_CONFIG,
+  SUGGEST_FOLLOW_UP_TIMEOUT_MS, FOLLOW_UP_NOTE_MAX_LEN,
+} from "./detail-panel-types";
+import { InteractionStats, AddInteractionForm } from "./detail-panel-sections";
+import { FollowUpSection, EnrichmentBox } from "./detail-panel-followup";
 
 // ─── Detail Panel ──────────────────────────────────────────
 
@@ -344,135 +271,27 @@ export function DetailPanel({
           <ContactAskAI contactId={contactId} contactName={contact.firstName || "this contact"} />
 
           {/* Follow-up */}
-          {(() => {
-            const overdue = isFollowUpOverdue(contact.followUpAt);
-            return (
-              <div className="mb-6">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted">Follow-up</h4>
-                  <button
-                    onClick={handleSuggestFollowUp}
-                    disabled={suggestingFollowUp}
-                    className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-primary hover:bg-primary-light transition-colors disabled:opacity-50"
-                    title="Use AI to suggest a follow-up date based on recent interactions"
-                  >
-                    <span className={cn("material-symbols-outlined text-[14px]", suggestingFollowUp && "animate-spin")}>{suggestingFollowUp ? "sync" : "auto_awesome"}</span>
-                    {suggestingFollowUp ? "Thinking..." : "Suggest follow-up"}
-                  </button>
-                </div>
-                <div className={cn("flex items-center gap-2 p-2.5 rounded-lg border", overdue ? "border-red-200 bg-red-50/60" : "border-border-subtle bg-gray-50")}>
-                  <span className={cn("material-symbols-outlined text-[18px]", overdue ? "text-red-500" : "text-text-muted")}>{overdue ? "event_busy" : "event"}</span>
-                  <input
-                    type="date"
-                    value={toDateInputValue(contact.followUpAt)}
-                    disabled={savingFollowUp}
-                    onChange={(e) => updateFollowUp(e.target.value || null)}
-                    className={cn("flex-1 rounded-md border bg-white px-2.5 py-1.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors disabled:opacity-50", overdue ? "border-red-300 text-red-700" : "border-border-subtle text-text-main")}
-                  />
-                  {contact.followUpAt && (
-                    <button onClick={() => updateFollowUp(null)} disabled={savingFollowUp} className="p-1.5 rounded hover:bg-white text-text-muted hover:text-red-500 transition-colors disabled:opacity-50" title="Clear follow-up">
-                      <span className="material-symbols-outlined text-[16px]">close</span>
-                    </button>
-                  )}
-                </div>
-                {overdue && <p className="text-[11px] text-red-600 font-medium mt-1.5 flex items-center gap-1"><span className="material-symbols-outlined text-[13px]">warning</span>Follow-up is overdue</p>}
-
-                {/* Retry affordance when the suggestion fetch failed/timed out */}
-                {followUpSuggestFailed && !suggestingFollowUp && !followUpSuggestion && (
-                  <div className="mt-2.5 flex items-center justify-between gap-2 p-2.5 rounded-lg border border-amber-200 bg-amber-50/60">
-                    <p className="text-xs text-amber-700 flex items-center gap-1">
-                      <span className="material-symbols-outlined text-[14px]">error_outline</span>
-                      Couldn&apos;t get a suggestion.
-                    </p>
-                    <button
-                      onClick={handleSuggestFollowUp}
-                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium text-primary hover:bg-primary-light transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[14px]">refresh</span>Retry
-                    </button>
-                  </div>
-                )}
-
-                {/* AI follow-up suggestion (cheap single LLM call) */}
-                {followUpSuggestion && (
-                  <div className={cn(
-                    "mt-2.5 p-3 rounded-lg border border-primary/20 bg-blue-50/30 transition-all duration-500",
-                    pulseSuggestion && "ring-2 ring-primary/50 ring-offset-1 animate-pulse",
-                  )}>
-                    <div className="flex items-start gap-2.5">
-                      <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">event_upcoming</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold uppercase tracking-wider text-primary">Suggested Follow-up</p>
-                          <button onClick={() => setFollowUpSuggestion(null)} className="p-0.5 rounded hover:bg-white text-text-muted hover:text-text-main transition-colors" title="Dismiss">
-                            <span className="material-symbols-outlined text-[14px]">close</span>
-                          </button>
-                        </div>
-                        <p className="text-sm text-text-secondary leading-relaxed mt-0.5">{followUpSuggestion.action}</p>
-                        {followUpSuggestion.reasoning && <p className="text-xs text-text-muted mt-1 italic">{followUpSuggestion.reasoning}</p>}
-                        <div className="flex items-center justify-between gap-2 mt-2">
-                          <p className="text-xs text-text-muted">{toDateInputValue(followUpSuggestion.date) || followUpSuggestion.date}</p>
-                          <button
-                            onClick={() => applyFollowUpSuggestion(followUpSuggestion)}
-                            disabled={savingFollowUp}
-                            className="shrink-0 px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors disabled:opacity-50"
-                            style={{ backgroundColor: "#003366" }}
-                          >
-                            Apply
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
+          <FollowUpSection
+            followUpAt={contact.followUpAt}
+            savingFollowUp={savingFollowUp}
+            suggestingFollowUp={suggestingFollowUp}
+            followUpSuggestion={followUpSuggestion}
+            followUpSuggestFailed={followUpSuggestFailed}
+            pulseSuggestion={pulseSuggestion}
+            onSuggest={handleSuggestFollowUp}
+            onUpdateFollowUp={updateFollowUp}
+            onApplySuggestion={applyFollowUpSuggestion}
+            onDismissSuggestion={() => setFollowUpSuggestion(null)}
+          />
 
           {/* AI Suggestions */}
           {enrichment && (
-            <div className="mb-6 p-4 rounded-lg border border-primary/20 bg-blue-50/30">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-primary flex items-center gap-1.5"><span className="material-symbols-outlined text-[16px]">auto_awesome</span>AI Suggestions</h4>
-                <button onClick={() => setEnrichment(null)} className="p-1 rounded hover:bg-white text-text-muted hover:text-text-main transition-colors"><span className="material-symbols-outlined text-[16px]">close</span></button>
-              </div>
-              {enrichment.summary && <p className="text-sm text-text-secondary leading-relaxed mb-3">{enrichment.summary}</p>}
-              {enrichment.insights && enrichment.insights.length > 0 && (
-                <ul className="flex flex-col gap-1.5 mb-3">
-                  {enrichment.insights.map((ins, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-text-secondary">
-                      <span className="material-symbols-outlined text-[16px] text-primary shrink-0 mt-0.5">lightbulb</span>
-                      <span>{ins}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {enrichment.suggestedTags && enrichment.suggestedTags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
-                  {enrichment.suggestedTags.map((t, i) => <span key={i} className="px-2.5 py-1 rounded-full bg-white text-text-secondary text-xs font-medium border border-border-subtle">{t}</span>)}
-                </div>
-              )}
-              {enrichment.suggestedFollowUp && (enrichment.suggestedFollowUp.date || enrichment.suggestedFollowUp.action) && (
-                <div className="flex items-start gap-2.5 p-3 rounded-lg bg-white border border-primary/15">
-                  <span className="material-symbols-outlined text-[18px] text-primary shrink-0 mt-0.5">event_upcoming</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-bold uppercase tracking-wider text-text-muted mb-0.5">Suggested Follow-up</p>
-                    {enrichment.suggestedFollowUp.action && <p className="text-sm text-text-secondary leading-relaxed">{enrichment.suggestedFollowUp.action}</p>}
-                    {enrichment.suggestedFollowUp.date && <p className="text-xs text-text-muted mt-0.5">{toDateInputValue(enrichment.suggestedFollowUp.date) || enrichment.suggestedFollowUp.date}</p>}
-                  </div>
-                  {enrichment.suggestedFollowUp.date && (
-                    <button
-                      onClick={() => updateFollowUp(enrichment.suggestedFollowUp!.date!)}
-                      disabled={savingFollowUp}
-                      className="shrink-0 px-3 py-1.5 rounded-md text-white text-xs font-medium hover:opacity-90 transition-colors disabled:opacity-50"
-                      style={{ backgroundColor: "#003366" }}
-                    >
-                      Apply
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+            <EnrichmentBox
+              enrichment={enrichment}
+              savingFollowUp={savingFollowUp}
+              onDismiss={() => setEnrichment(null)}
+              onApplyFollowUpDate={(date) => updateFollowUp(date)}
+            />
           )}
 
           {/* Tags */}
@@ -501,7 +320,7 @@ export function DetailPanel({
                     <div className="size-8 rounded-full flex items-center justify-center shrink-0 text-[10px] font-bold" style={{ backgroundColor: ctc.avatarBg, color: ctc.avatarText }}>{getInitials(c.firstName, c.lastName)}</div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-text-main truncate group-hover:text-primary">{c.firstName} {c.lastName}</p>
-                      <p className="text-[10px] text-text-muted truncate">{c.company || ""}{c.title ? " \u00B7 " + c.title : ""}</p>
+                      <p className="text-[10px] text-text-muted truncate">{c.company || ""}{c.title ? " · " + c.title : ""}</p>
                     </div>
                     <span className={cn("px-2 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider shrink-0", rtc.bg, rtc.text)}>{rtc.label}</span>
                     <button onClick={() => setRemoveConnectionId(conn.id)} className="p-1 rounded hover:bg-red-50 text-text-muted hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 shrink-0" title="Remove">
@@ -639,127 +458,3 @@ export function DetailPanel({
     </>
   );
 }
-
-// ─── Interaction Stats ─────────────────────────────────────
-
-function InteractionStats({ interactions, scoreData }: { interactions: Interaction[]; scoreData?: { score: number; label: string } }) {
-  const typeCounts: Record<string, number> = { NOTE: 0, MEETING: 0, CALL: 0, EMAIL: 0, OTHER: 0 };
-  for (const inter of interactions) typeCounts[inter.type] = (typeCounts[inter.type] || 0) + 1;
-  const dates = interactions.map((i) => new Date(i.date || i.createdAt).getTime());
-  const oldest = Math.min(...dates);
-  const newest = Math.max(...dates);
-  const monthSpan = Math.max(1, (newest - oldest) / (30 * 86400000));
-  const avgPerMonth = (interactions.length / monthSpan).toFixed(1);
-
-  return (
-    <div className="mb-6">
-      <h4 className="text-xs font-bold uppercase tracking-wider text-text-muted mb-3">Interaction Stats</h4>
-      <div className="grid grid-cols-3 gap-2 mb-2">
-        <div className="p-2.5 rounded-lg bg-gray-50 border border-border-subtle text-center">
-          <p className="text-lg font-bold text-text-main">{interactions.length}</p>
-          <p className="text-[10px] text-text-muted font-medium uppercase">Total</p>
-        </div>
-        <div className="p-2.5 rounded-lg bg-gray-50 border border-border-subtle text-center">
-          <p className="text-lg font-bold text-text-main">~{avgPerMonth}</p>
-          <p className="text-[10px] text-text-muted font-medium uppercase">Per Month</p>
-        </div>
-        {scoreData ? (() => {
-          const sc = SCORE_CONFIG[scoreData.label] || SCORE_CONFIG.Cold;
-          return (
-            <div className={cn("p-2.5 rounded-lg border border-border-subtle text-center", sc.bg)}>
-              <p className={cn("text-lg font-bold", sc.text)}>{scoreData.score}</p>
-              <p className={cn("text-[10px] font-medium uppercase", sc.text)}>{scoreData.label}</p>
-            </div>
-          );
-        })() : (
-          <div className="p-2.5 rounded-lg bg-gray-50 border border-border-subtle text-center">
-            <p className="text-lg font-bold text-text-muted">--</p>
-            <p className="text-[10px] text-text-muted font-medium uppercase">Score</p>
-          </div>
-        )}
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {Object.entries(typeCounts).filter(([, c]) => c > 0).map(([type, count]) => {
-          const icon = INTERACTION_ICONS[type] || INTERACTION_ICONS.OTHER;
-          return (
-            <span key={type} className="flex items-center gap-1 px-2 py-1 rounded-md bg-gray-50 border border-border-subtle text-[11px] text-text-secondary font-medium">
-              <span className="material-symbols-outlined text-[14px]">{icon}</span> {count} {type.charAt(0) + type.slice(1).toLowerCase()}{count !== 1 ? "s" : ""}
-            </span>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Add Interaction Form ──────────────────────────────────
-
-function AddInteractionForm({ contactId, onDone, onCancel }: { contactId: string; onDone: () => void; onCancel: () => void }) {
-  const [type, setType] = useState("NOTE");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0]);
-  const [submitting, setSubmitting] = useState(false);
-  const [formError, setFormError] = useState<string | null>(null);
-  const { showToast } = useToast();
-
-  async function handleSubmit() {
-    if (!title.trim() && !description.trim()) {
-      setFormError("Please enter a title or description.");
-      return;
-    }
-    setFormError(null);
-    setSubmitting(true);
-    try {
-      const body: Record<string, string> = { type };
-      if (title.trim()) body.title = title.trim();
-      if (description.trim()) body.description = description.trim();
-      if (date) body.date = date;
-      await api.post(`/contacts/${contactId}/interactions`, body);
-      onDone();
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : "Failed to add interaction", "error");
-    }
-    finally { setSubmitting(false); }
-  }
-
-  const inputCls = "w-full rounded-md border border-border-subtle bg-white px-2.5 py-1.5 text-sm text-text-main focus:border-primary focus:ring-1 focus:ring-primary/30 transition-colors";
-
-  return (
-    <div className="mb-4 p-4 rounded-lg border border-primary/20 bg-blue-50/20">
-      <div className="flex items-center justify-between mb-3">
-        <h5 className="text-sm font-semibold text-text-main">New Interaction</h5>
-        <button onClick={onCancel} className="p-1 rounded hover:bg-white text-text-muted hover:text-text-main transition-colors"><span className="material-symbols-outlined text-[16px]">close</span></button>
-      </div>
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">Type</label>
-            <select value={type} onChange={(e) => setType(e.target.value)} className={inputCls}>
-              <option value="NOTE">Note</option><option value="MEETING">Meeting</option>
-              <option value="CALL">Call</option><option value="EMAIL">Email</option>
-              <option value="OTHER">Other</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-text-secondary mb-1">Date</label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className={inputCls} />
-          </div>
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Title</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Brief summary..." className={inputCls} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-1">Description</label>
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={3} placeholder="Details about this interaction..." className={cn(inputCls, "resize-none")} />
-        </div>
-        {formError && <p className="text-xs text-red-600">{formError}</p>}
-        <button onClick={handleSubmit} disabled={submitting} className="self-end px-4 py-1.5 rounded-md text-white text-sm font-medium hover:opacity-90 transition-colors flex items-center gap-1.5 disabled:opacity-50" style={{ backgroundColor: "#003366" }}>
-          <span className="material-symbols-outlined text-[16px]">save</span>{submitting ? "Saving..." : "Save"}
-        </button>
-      </div>
-    </div>
-  );
-}
-
