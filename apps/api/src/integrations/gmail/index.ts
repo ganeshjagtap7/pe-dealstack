@@ -22,7 +22,7 @@ import {
   getUserInfo,
   listMessagesSince,
   getMessage,
-  getMessageFull,
+  getMessageRaw,
 } from './client.js';
 import {
   gmailMessageToIntegrationActivity,
@@ -285,7 +285,7 @@ export const gmailProvider: IntegrationProvider = {
         classifierBudget--;
 
         // Fetch full body for classification + extraction.
-        const full = await getMessageFull(accessToken, m.id);
+        const full = await getMessageRaw(accessToken, m.id);
         const bodyText = extractBodyText(full);
 
         // Re-read headers from the full message (in case metadata header set

@@ -58,6 +58,38 @@ export function DealActionsMenu({
               <span className="material-symbols-outlined text-[18px]">edit_note</span>
               Draft Email
             </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                // Hand off to the /graphs page with the deal context pre-filled
+                // so the Builder opens directly instead of forcing the user
+                // through the DealPicker modal — they're already on this deal.
+                const qs = new URLSearchParams({ dealId, dealLabel: dealName });
+                window.location.href = `/graphs?${qs.toString()}`;
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">monitoring</span>
+              Add a Graph
+            </button>
+            <button
+              onClick={() => {
+                setOpen(false);
+                // Same handoff shape as Add a Graph — deep-links to /nda with
+                // the deal context pre-filled and `create=1` so the page
+                // skips the DealPicker and lands on the template-picker step.
+                const qs = new URLSearchParams({
+                  dealId,
+                  dealLabel: dealName,
+                  create: "1",
+                });
+                window.location.href = `/nda?${qs.toString()}`;
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-sm text-text-secondary hover:bg-primary-light hover:text-primary transition-colors"
+            >
+              <span className="material-symbols-outlined text-[18px]">gavel</span>
+              New NDA
+            </button>
             <div className="border-t border-border-subtle my-1" />
             <button
               onClick={() => {

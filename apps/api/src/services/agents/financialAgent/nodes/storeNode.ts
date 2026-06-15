@@ -13,7 +13,12 @@ import { recordExtractionLearning } from '../../../agentMemory.js';
 import { log } from '../../../../utils/logger.js';
 import type { FinancialAgentStateType } from '../state.js';
 import type { AgentStep } from '../state.js';
-import type { ClassifiedStatement, FinancialPeriod } from '../../../financialClassifier.js';
+import {
+  applySourceTextDollarOverride,
+  type ClassificationResult,
+  type ClassifiedStatement,
+  type FinancialPeriod,
+} from '../../../financialClassifier.js';
 import {
   parsePeriodToYearMonth,
   getLineItemDollars,
@@ -230,11 +235,19 @@ export async function storeNode(
     }
 
     // Build a ClassificationResult from the current (possibly corrected) statements
-    const classificationToStore = {
+    const classificationToStore: ClassificationResult = {
       statements,
       overallConfidence: state.overallConfidence,
       warnings: state.warnings,
     };
+
+    // Last-mile unit guard: run the source-quote dollar override on the
+    // statements about to be persisted. This is the canonical hook —
+    // catches the path where extraction ran cleanly (no self-correct loop)
+    // but the LLM still mis-tagged a synthesized period (LTM, "Current
+    // Month") whose `_source` quotes literally cite "$1,473" / "~$15,600".
+    // Idempotent on rows that the upstream classifier already corrected.
+    applySourceTextDollarOverride(classificationToStore);
 
     // Compute composite confidence
     const mathScore = scoreMathValidation(

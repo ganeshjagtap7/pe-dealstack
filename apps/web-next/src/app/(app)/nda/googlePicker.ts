@@ -1,0 +1,325 @@
+// Self-contained Google Picker + GIS token-client helper for the NDA
+// "bring your own Google Doc" intake. NOT a React component — pure browser
+// glue the ImportGoogleDocFlow UI calls.
+//
+// Why the Picker (and not a pasted URL): the server's connected OAuth scope is
+// `drive.file` (per-file access). Drive returns 404 for any Doc the user
+// authored themselves, so a pasted link can't be fetched. The Picker is
+// Google's own file-chooser; selecting a Doc there grants OUR app per-file
+// `drive.file` access to exactly that file, which the server-side token (same
+// OAuth client + same user) then inherits. So the user picks, and the import
+// succeeds.
+//
+// To get a browser access token WITHOUT exposing the server token we use the
+// GIS token client to mint a fresh token scoped ONLY to drive.file. We pass the
+// server-connected account email as `hint` so the consent popup targets the
+// right Google account even if the browser is logged into a different one.
+
+// Scope requested for the browser token — read/write access limited to files
+// the user explicitly opens/creates via this app (incl. Picker selections).
+const DRIVE_FILE_SCOPE = "https://www.googleapis.com/auth/drive.file";
+
+// MIME type for native Google Docs. Filters the Picker to just Docs (no
+// Sheets/Slides/PDFs) since NDAs are always Docs in this flow.
+const GOOGLE_DOC_MIME = "application/vnd.google-apps.document";
+
+// Script URLs + idempotency guard attributes. We inject each at most once and
+// reuse the in-flight promise on concurrent calls.
+const GIS_SRC = "https://accounts.google.com/gsi/client";
+const GAPI_SRC = "https://apis.google.com/js/api.js";
+
+export interface GooglePickerConfig {
+  clientId: string;
+  apiKey: string;
+  appId: string;
+}
+
+/**
+ * Reads the three NEXT_PUBLIC_GOOGLE_* values inlined at build time (see the
+ * `env` block in next.config.ts). Returns them plus `isConfigured`, true only
+ * when ALL three are non-empty — the UI uses that to enable/disable the button.
+ */
+export function getGooglePickerConfig(): GooglePickerConfig & {
+  isConfigured: boolean;
+} {
+  const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || "";
+  const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY || "";
+  const appId = process.env.NEXT_PUBLIC_GOOGLE_APP_ID || "";
+  return {
+    clientId,
+    apiKey,
+    appId,
+    isConfigured: Boolean(clientId && apiKey && appId),
+  };
+}
+
+/** Convenience boolean for callers that only need the configured check. */
+export const isGooglePickerConfigured: boolean =
+  getGooglePickerConfig().isConfigured;
+
+/** Shape returned to the caller when a Doc is picked. */
+export interface PickedGoogleDoc {
+  fileId: string;
+  name: string;
+  url: string;
+}
+
+// ----------------------------- script loading ----------------------------- //
+
+// Cache the load promises so repeated picks don't re-inject scripts.
+let gisPromise: Promise<void> | null = null;
+let gapiPickerPromise: Promise<void> | null = null;
+
+/** Injects a <script src> once, resolving on load and rejecting on error. */
+function injectScript(src: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (typeof document === "undefined") {
+      reject(new Error("Google Picker is only available in the browser."));
+      return;
+    }
+    const existing = document.querySelector<HTMLScriptElement>(
+      `script[src="${src}"]`,
+    );
+    if (existing) {
+      if (existing.dataset.loaded === "true") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener(
+        "error",
+        () => reject(new Error(`Failed to load ${src}`)),
+        { once: true },
+      );
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.defer = true;
+    script.addEventListener(
+      "load",
+      () => {
+        script.dataset.loaded = "true";
+        resolve();
+      },
+      { once: true },
+    );
+    script.addEventListener(
+      "error",
+      () => reject(new Error(`Failed to load ${src}`)),
+      { once: true },
+    );
+    document.head.appendChild(script);
+  });
+}
+
+/** Loads GIS (token client) once. */
+function loadGis(): Promise<void> {
+  if (!gisPromise) {
+    gisPromise = injectScript(GIS_SRC).catch((err) => {
+      // Reset so a later attempt can retry rather than reusing a rejected
+      // promise forever.
+      gisPromise = null;
+      throw err;
+    });
+  }
+  return gisPromise;
+}
+
+/** Loads gapi, then the 'picker' module, resolving when google.picker exists. */
+function loadGapiPicker(): Promise<void> {
+  if (!gapiPickerPromise) {
+    gapiPickerPromise = injectScript(GAPI_SRC)
+      .then(
+        () =>
+          new Promise<void>((resolve, reject) => {
+            const gapi = window.gapi;
+            if (!gapi) {
+              reject(new Error("Google API script loaded without window.gapi."));
+              return;
+            }
+            gapi.load("picker", () => {
+              if (window.google?.picker) {
+                resolve();
+              } else {
+                reject(new Error("Google Picker module failed to initialize."));
+              }
+            });
+          }),
+      )
+      .catch((err) => {
+        gapiPickerPromise = null;
+        throw err;
+      });
+  }
+  return gapiPickerPromise;
+}
+
+/**
+ * Warm both SDK scripts ahead of the user's click. Call this on mount of any UI
+ * that will open the Picker. Critical for popups: browsers only allow a popup
+ * during a user gesture, and an `await` on a still-loading script pushes
+ * `requestAccessToken()` past that gesture window → the popup gets blocked. If
+ * the scripts are already loaded by click time, the awaits in `pickGoogleDoc`
+ * resolve on the microtask queue (which preserves user activation) and the
+ * popup opens reliably. Fire-and-forget — errors surface on the real pick.
+ */
+export function preloadGooglePicker(): void {
+  if (typeof window === "undefined") return;
+  if (!getGooglePickerConfig().isConfigured) return;
+  void loadGis().catch(() => {});
+  void loadGapiPicker().catch(() => {});
+}
+
+// ------------------------------- token flow ------------------------------- //
+
+/**
+ * Mints a fresh browser access token via GIS, scoped to drive.file only.
+ * `hint` pre-selects the Google account (the server-connected Workspace email)
+ * so the user doesn't accidentally consent under a different logged-in account.
+ */
+function requestAccessToken(clientId: string, hint?: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const oauth2 = window.google?.accounts?.oauth2;
+    if (!oauth2) {
+      reject(new Error("Google sign-in failed to load. Try again."));
+      return;
+    }
+    let settled = false;
+    const client = oauth2.initTokenClient({
+      client_id: clientId,
+      scope: DRIVE_FILE_SCOPE,
+      hint,
+      // Always show the account chooser. `hint` pre-selects the connected
+      // Workspace account, but the browser may be signed into a different one
+      // (e.g. a personal gmail) — without this the popup silently locks onto
+      // that wrong account and the per-file grant never reaches the server
+      // token. select_account lets the user switch to / add the right account.
+      prompt: "select_account",
+      callback: (response) => {
+        if (settled) return;
+        settled = true;
+        if (response.error || !response.access_token) {
+          const detail =
+            response.error_description || response.error || "unknown error";
+          console.warn("[nda] picker token error", response);
+          reject(
+            new Error(
+              `Google didn't grant access (${detail}). Make sure you pick the account you connected in Settings.`,
+            ),
+          );
+          return;
+        }
+        resolve(response.access_token);
+      },
+      error_callback: (error) => {
+        if (settled) return;
+        settled = true;
+        console.warn("[nda] picker token error_callback", error);
+        // GIS reports the failure kind in `error.type`. Distinguish a truly
+        // blocked popup from a user who closed it — the old code called both
+        // "blocked", which was the false-positive you saw.
+        let message: string;
+        if (error.type === "popup_failed_to_open") {
+          message =
+            "Your browser blocked the Google sign-in popup. Allow popups for this site, then click again.";
+        } else if (error.type === "popup_closed") {
+          message =
+            "Google sign-in was closed before you finished. Click to try again.";
+        } else {
+          message =
+            error.message || "Google sign-in didn't complete. Try again.";
+        }
+        reject(new Error(message));
+      },
+    });
+    try {
+      client.requestAccessToken();
+    } catch (err) {
+      if (settled) return;
+      settled = true;
+      console.warn("[nda] picker requestAccessToken threw", err);
+      reject(new Error("Couldn't start Google sign-in. Try again."));
+    }
+  });
+}
+
+// ------------------------------- picker flow ------------------------------ //
+
+/**
+ * Opens the Google Picker so the user selects ONE of their Google Docs.
+ *
+ * Resolves with `{ fileId, name, url }` on selection, `null` if the user
+ * cancels/closes the picker, and REJECTS with a toast-friendly Error on any
+ * browser/Google failure (script load, token denial, missing config).
+ *
+ * @param hint - Google account email to pre-select in the consent popup
+ *               (the server-connected Workspace email).
+ */
+export async function pickGoogleDoc({
+  hint,
+}: {
+  hint?: string;
+}): Promise<PickedGoogleDoc | null> {
+  const { clientId, apiKey, appId, isConfigured } = getGooglePickerConfig();
+  if (!isConfigured) {
+    throw new Error(
+      "Google Drive picker isn't configured. Set NEXT_PUBLIC_GOOGLE_CLIENT_ID, NEXT_PUBLIC_GOOGLE_API_KEY and NEXT_PUBLIC_GOOGLE_APP_ID.",
+    );
+  }
+  if (typeof window === "undefined") {
+    throw new Error("Google Picker is only available in the browser.");
+  }
+
+  // Load both SDKs (idempotent) in parallel, then mint a token.
+  try {
+    await Promise.all([loadGis(), loadGapiPicker()]);
+  } catch (err) {
+    console.warn("[nda] picker script load failed", err);
+    throw new Error(
+      "Couldn't load Google Drive. Check your connection and try again.",
+    );
+  }
+
+  const token = await requestAccessToken(clientId, hint);
+
+  const pickerNs = window.google?.picker;
+  if (!pickerNs) {
+    throw new Error("Google Picker failed to initialize. Try again.");
+  }
+
+  return new Promise<PickedGoogleDoc | null>((resolve, reject) => {
+    try {
+      const view = new pickerNs.DocsView(pickerNs.ViewId.DOCUMENTS).setMimeTypes(
+        GOOGLE_DOC_MIME,
+      );
+      const picker = new pickerNs.PickerBuilder()
+        .addView(view)
+        .setOAuthToken(token)
+        .setDeveloperKey(apiKey)
+        .setAppId(appId)
+        .setOrigin(window.location.origin)
+        .setTitle("Select a Google Doc to import")
+        .setCallback((data) => {
+          if (data.action === pickerNs.Action.PICKED) {
+            const doc = data.docs?.[0];
+            if (!doc) {
+              resolve(null);
+              return;
+            }
+            resolve({ fileId: doc.id, name: doc.name, url: doc.url });
+            return;
+          }
+          if (data.action === pickerNs.Action.CANCEL) {
+            resolve(null);
+          }
+        })
+        .build();
+      picker.setVisible(true);
+    } catch (err) {
+      console.warn("[nda] picker build failed", err);
+      reject(new Error("Couldn't open Google Drive picker. Try again."));
+    }
+  });
+}

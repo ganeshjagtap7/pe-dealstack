@@ -9,6 +9,7 @@ import { runMemoChatAgent } from '../services/agents/memoAgent/index.js';
 import { isLLMAvailable } from '../services/llm.js';
 import { MODEL_REASONING } from '../utils/aiModels.js';
 import { classifyAIErrorObject } from '../utils/aiErrors.js';
+import { getFirmContextBlock } from '../services/firmContextService.js';
 
 const router = Router();
 
@@ -126,6 +127,11 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 
     const context = contextParts.join('\n');
 
+    // Firm-wide standing context (single AI-generated firm-context doc). Empty
+    // when none generated yet — guard and inject nothing.
+    const firmContext = await getFirmContextBlock(orgId);
+    const firmContextBlock = firmContext ? `=== FIRM CONTEXT ===\n${firmContext}\n\n` : '';
+
     // Build section-specific prompt
     const sectionPrompt = customPrompt ||
       `Generate content for the "${section.title}" section of this investment committee memo.
@@ -138,7 +144,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
     const response = await trackedChatCompletion('memo_generation', {
       model: MODEL_REASONING,
       messages: [
-        { role: 'system', content: MEMO_ANALYST_PROMPT },
+        { role: 'system', content: `${firmContextBlock}${MEMO_ANALYST_PROMPT}` },
         { role: 'system', content: `Context:\n${context}` },
         { role: 'user', content: sectionPrompt }
       ],

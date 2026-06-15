@@ -16,8 +16,15 @@ import {
   type FinancialStatement,
   CHART_TOOLTIP,
   CHART_LEGEND,
+  analyzeActualDollarSeries,
+  scaleActualToUnit,
+  suggestedMaxExcludingOutliers,
 } from "./deal-financials-charts-shared";
-import { formatFinancialValue, toActualDollars } from "@/lib/formatters";
+import {
+  formatChartAxisValue,
+  formatFinancialValue,
+  toActualDollars,
+} from "@/lib/formatters";
 
 // Re-export so existing consumers (deal-financials.tsx) don't have to change
 // their import paths after the file split.
@@ -80,10 +87,44 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
   const labels = rows.map((r) => r.period);
   // Convert each row's stored value into actual dollars using its own
   // `unitScale` so the y-axis auto-scales correctly even when periods mix scales.
-  const revenues = rows.map((r) => toActualDollars(r.lineItems?.revenue ?? null, r.unitScale));
-  const ebitdas = rows.map((r) => toActualDollars(r.lineItems?.ebitda ?? null, r.unitScale));
+  const revenuesActual = rows.map((r) =>
+    toActualDollars(r.lineItems?.revenue ?? null, r.unitScale),
+  );
+  const ebitdasActual = rows.map((r) =>
+    toActualDollars(r.lineItems?.ebitda ?? null, r.unitScale),
+  );
   const margins = rows.map((r) => r.lineItems?.ebitda_margin_pct ?? null);
   const currency = rows[0]?.currency ?? "USD";
+
+  // Detect outlier rows (typical cause: a single statement mis-tagged with
+  // the wrong unitScale, multiplying its value by 1e3 or 1e6 vs the rest).
+  // We analyse the combined revenue + EBITDA series so the threshold reflects
+  // the chart's real magnitude band — flagging an outlier in either field
+  // counts as an outlier for that row.
+  const revAnalysis = analyzeActualDollarSeries(revenuesActual);
+  const ebdAnalysis = analyzeActualDollarSeries(ebitdasActual);
+  // Pick the display unit from whichever series has a usable median; revenue
+  // is the larger series typically, so prefer it when both exist.
+  const displayUnit = revAnalysis.median != null ? revAnalysis.unit : ebdAnalysis.unit;
+  const rowOutliers = revAnalysis.outliers.map((o, i) => o || ebdAnalysis.outliers[i]);
+  const hasOutlier = rowOutliers.some(Boolean);
+
+  // Scale dataset values into the chosen display unit so Chart.js's tick
+  // callback can render the tick as-is. Outlier rows keep their (huge)
+  // value so the analyst can see them — but they are excluded from the
+  // suggestedMax computation so the y-axis stays anchored to the sane
+  // majority of the dataset.
+  const revenues = revenuesActual.map((v) => scaleActualToUnit(v, displayUnit));
+  const ebitdas = ebitdasActual.map((v) => scaleActualToUnit(v, displayUnit));
+
+  const revMax = suggestedMaxExcludingOutliers(revenuesActual, rowOutliers);
+  const ebdMax = suggestedMaxExcludingOutliers(ebitdasActual, rowOutliers);
+  const suggestedMaxActual =
+    revMax != null && ebdMax != null
+      ? Math.max(revMax, ebdMax)
+      : revMax ?? ebdMax;
+  const suggestedMax =
+    suggestedMaxActual != null ? scaleActualToUnit(suggestedMaxActual, displayUnit) : null;
 
   const data: ChartData<"bar" | "line", (number | null)[], string> = {
     labels,
@@ -154,7 +195,22 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
             const v = ctx.raw as number | null;
             if (v === null || v === undefined) return "";
             if (ctx.dataset.yAxisID === "y1") return ` EBITDA Margin: ${Number(v).toFixed(1)}%`;
-            return ` ${ctx.dataset.label}: ${formatFinancialValue(v, "ACTUALS", { currency })}`;
+            // `v` is in the picked display unit; convert back to actual
+            // dollars for `formatFinancialValue` so it picks the best
+            // human-readable scale and the user sees the true magnitude
+            // (especially helpful when a row is an outlier).
+            const idx = ctx.dataIndex;
+            const actual =
+              ctx.dataset.label === "Revenue"
+                ? revenuesActual[idx]
+                : ctx.dataset.label === "EBITDA"
+                  ? ebitdasActual[idx]
+                  : null;
+            const display = actual != null
+              ? formatFinancialValue(actual, "ACTUALS", { currency })
+              : formatChartAxisValue(v, displayUnit, { currency });
+            const flag = rowOutliers[idx] ? " ⚠ inconsistent unit" : "";
+            return ` ${ctx.dataset.label}: ${display}${flag}`;
           },
         },
       },
@@ -171,12 +227,18 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
         ticks: {
           font: { size: 10, family: "Inter" },
           color: "#9ca3af",
-          callback: (v) => formatFinancialValue(Number(v), "ACTUALS", { currency }),
+          // `v` is already in the picked display unit (K/M/B/units) — render
+          // the tick using `formatChartAxisValue` so the suffix is consistent
+          // across the axis and never mis-labels e.g. raw $1,500 as $0.0M.
+          callback: (v) => formatChartAxisValue(Number(v), displayUnit, { currency }),
           padding: 8,
         },
         grid: { color: "rgba(0,0,0,0.04)" },
         border: { display: false },
         beginAtZero: true,
+        // Anchor the y-axis to the sane majority of the dataset so a single
+        // mis-tagged outlier row doesn't blow the scale (DMpro bug B2).
+        ...(suggestedMax != null ? { suggestedMax } : {}),
       },
       y1: {
         type: "linear",
@@ -197,6 +259,20 @@ export function RevenueChart({ statements }: { statements: FinancialStatement[] 
   return (
     <div className="w-full">
       {toolbar}
+      {hasOutlier ? (
+        <div
+          className="flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2"
+          role="status"
+        >
+          <span aria-hidden="true">⚠</span>
+          <span>
+            Inconsistent unit detected — one or more statements have a value{" "}
+            {">"}1000x the median. The y-axis is scaled to the rest of the
+            dataset; outlier rows still render but their bars may overflow.
+            Review extraction on the flagged period(s).
+          </span>
+        </div>
+      ) : null}
       <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
         {/* @ts-expect-error -- react-chartjs-2 mixed type chart has loose generics */}
         <Chart ref={canvasRef} type="bar" data={data} options={options} />
@@ -254,8 +330,67 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
 
   const labels = rows.map((r) => r.period);
   // Convert per-row to actual dollars so the y-axis auto-scales uniformly.
-  const li = (row: FinancialStatement, key: string) => toActualDollars(row.lineItems?.[key] ?? 0, row.unitScale) ?? 0;
+  const liActual = (row: FinancialStatement, key: string) =>
+    toActualDollars(row.lineItems?.[key] ?? 0, row.unitScale) ?? 0;
   const currency = rows[0]?.currency ?? "USD";
+
+  // Outlier detection on the balance sheet: pick the largest balance-sheet
+  // signal per row (total_assets when present, otherwise sum of asset
+  // line items) and analyze that series. A row mis-tagged with the wrong
+  // unitScale inflates every line item by the same factor, so a single
+  // metric is enough to catch it.
+  const rowSignals = rows.map((r) => {
+    const ta = toActualDollars(r.lineItems?.total_assets ?? null, r.unitScale);
+    if (ta != null && ta !== 0) return ta;
+    // Fallback: sum the asset stack so we still flag rows missing total_assets.
+    return (
+      liActual(r, "cash") +
+      liActual(r, "accounts_receivable") +
+      liActual(r, "inventory") +
+      liActual(r, "ppe_net") +
+      liActual(r, "goodwill") +
+      liActual(r, "intangibles")
+    );
+  });
+  const bsAnalysis = analyzeActualDollarSeries(rowSignals);
+  const displayUnit = bsAnalysis.unit;
+  const rowOutliers = bsAnalysis.outliers;
+  const hasOutlier = bsAnalysis.hasOutlier;
+
+  // Scale every line-item value into the picked display unit. Outliers keep
+  // their (huge) value — the suggestedMax below clamps the axis to the
+  // sane majority so the chart stays usable.
+  const li = (row: FinancialStatement, key: string) =>
+    scaleActualToUnit(liActual(row, key), displayUnit) ?? 0;
+
+  // Compute per-row totals (assets stack and liab+equity stack) in actual
+  // dollars, then use the larger of the two non-outlier maxes as the
+  // suggestedMax. This is what would normally drive the y-axis scaling.
+  const assetTotalsActual = rows.map(
+    (r) =>
+      liActual(r, "cash") +
+      liActual(r, "accounts_receivable") +
+      liActual(r, "inventory") +
+      liActual(r, "ppe_net") +
+      liActual(r, "goodwill") +
+      liActual(r, "intangibles"),
+  );
+  const liabTotalsActual = rows.map(
+    (r) =>
+      liActual(r, "total_current_liabilities") +
+      liActual(r, "long_term_debt") +
+      liActual(r, "total_equity"),
+  );
+  const assetsMax = suggestedMaxExcludingOutliers(assetTotalsActual, rowOutliers);
+  const liabMax = suggestedMaxExcludingOutliers(liabTotalsActual, rowOutliers);
+  const suggestedMaxActual =
+    assetsMax != null && liabMax != null
+      ? Math.max(assetsMax, liabMax)
+      : assetsMax ?? liabMax;
+  const suggestedMax =
+    suggestedMaxActual != null
+      ? scaleActualToUnit(suggestedMaxActual, displayUnit)
+      : null;
 
   const data: ChartData<"bar", number[], string> = {
     labels,
@@ -286,7 +421,18 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
           label: (ctx) => {
             const v = ctx.raw as number;
             if (!v) return "";
-            return ` ${ctx.dataset.label}: ${formatFinancialValue(v, "ACTUALS", { currency })}`;
+            // `v` is in `displayUnit`; convert back to actual dollars so
+            // `formatFinancialValue` picks the right human magnitude.
+            const actual =
+              displayUnit === "units"
+                ? v
+                : displayUnit === "K"
+                  ? v * 1_000
+                  : displayUnit === "M"
+                    ? v * 1_000_000
+                    : v * 1_000_000_000;
+            const flag = rowOutliers[ctx.dataIndex] ? " ⚠ inconsistent unit" : "";
+            return ` ${ctx.dataset.label}: ${formatFinancialValue(actual, "ACTUALS", { currency })}${flag}`;
           },
         },
       },
@@ -310,11 +456,12 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
         ticks: {
           font: { size: 10, family: "Inter" },
           color: "#9ca3af",
-          callback: (v) => formatFinancialValue(Number(v), "ACTUALS", { currency }),
+          callback: (v) => formatChartAxisValue(Number(v), displayUnit, { currency }),
           padding: 8,
         },
         grid: { color: "rgba(0,0,0,0.04)" },
         border: { display: false },
+        ...(suggestedMax != null ? { suggestedMax } : {}),
       },
     },
   };
@@ -322,6 +469,19 @@ export function BalanceSheetChart({ statements }: { statements: FinancialStateme
   return (
     <div className="w-full">
       {toolbar}
+      {hasOutlier ? (
+        <div
+          className="flex items-start gap-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-2"
+          role="status"
+        >
+          <span aria-hidden="true">⚠</span>
+          <span>
+            Inconsistent unit detected on at least one balance-sheet period —
+            value {">"}1000x the median. Axis scaled to the rest of the
+            dataset; review extraction on the flagged period(s).
+          </span>
+        </div>
+      ) : null}
       <div className="relative w-full bg-white rounded-lg border border-gray-200 p-4" style={{ height: 320 }}>
         <Chart type="bar" data={data} options={options} />
       </div>

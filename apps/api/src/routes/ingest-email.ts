@@ -8,6 +8,7 @@ import { getIconForIndustry } from '../services/dealMerger.js';
 import { AuditLog } from '../services/auditLog.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
+import { generateTeasersForDeal } from '../services/firmTeaserService.js';
 import { createDealFromEmail } from '../integrations/gmail/autoCreateDeal.js';
 
 const subRouter = Router();
@@ -90,6 +91,14 @@ subRouter.post('/email', upload.single('file'), async (req: any, res) => {
 
     // 4. Audit log (route layer holds `req`).
     await AuditLog.aiIngest(req, `Email — ${emailData.subject}`, dealId);
+
+    // Auto-generate firm-teaser blurbs for the new deal (blocking,
+    // best-effort — never fail ingest on teaser error).
+    try {
+      await generateTeasersForDeal({ dealId, orgId });
+    } catch (teaserErr) {
+      log.error('Email ingest: firm-teaser auto-gen failed', teaserErr, { dealId });
+    }
 
     log.info('Email ingest complete', {
       dealId,
@@ -201,6 +210,15 @@ subRouter.post('/bulk', upload.single('file'), async (req, res) => {
           .single();
 
         if (dealErr) throw dealErr;
+
+        // Auto-generate firm-teaser blurbs for each imported deal (best-effort;
+        // a teaser failure must not fail the row).
+        try {
+          await generateTeasersForDeal({ dealId: deal.id, orgId });
+        } catch (teaserErr) {
+          log.error('Bulk ingest: firm-teaser auto-gen failed', teaserErr, { dealId: deal.id });
+        }
+
         results.success.push({ companyName: row.companyName, dealId: deal.id });
       } catch (err) {
         log.warn('Row import failed', { companyName: row.companyName, error: (err as any).message });

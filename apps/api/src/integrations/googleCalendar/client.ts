@@ -10,10 +10,23 @@ const USERINFO_URL = 'https://www.googleapis.com/oauth2/v2/userinfo';
 const CAL_BASE = 'https://www.googleapis.com/calendar/v3/calendars/primary';
 const AUTHORIZE_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 
+// Provider scope set. Originally Calendar-only, then expanded to include
+// Drive (file create/manage) + Docs (batchUpdate for placeholder substitution)
+// so the NDA send flow can create a real Google Doc with this same token.
+// Gmail send scope was added so the NDA flow can email the Doc link from
+// the user's own Workspace Gmail (multi-tenant — no domain verification).
+// The provider is now displayed as "Google Workspace" but its `id` is still
+// `google_calendar` (so existing connections keep working). When a user
+// connected before this scope expansion sends an NDA, the Drive or Gmail
+// call will 403/401 with "insufficient scope" — the frontend then triggers
+// a re-authorize.
 export const CALENDAR_SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
+  'https://www.googleapis.com/auth/drive.file',
+  'https://www.googleapis.com/auth/documents',
+  'https://www.googleapis.com/auth/gmail.send',
 ];
 
 function googleClientCreds(): { id: string; secret: string } {

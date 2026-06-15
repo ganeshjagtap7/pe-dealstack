@@ -12,6 +12,7 @@
 import { openaiDirect, trackedDirectResponsesCreate } from '../openai.js';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
+import { getTodayIso } from '../utils/dates.js';
 import type { ClassificationResult, ClassifiedStatement, FinancialPeriod, StatementType, PeriodType, UnitScale } from './financialClassifier.js';
 
 // ─── System prompt (same intent as classifyFinancials, optimised for vision) ──
@@ -55,7 +56,7 @@ export async function classifyFinancialsVision(
     // Must hit OpenAI directly — OpenRouter does not proxy /v1/responses.
     const response = await trackedDirectResponsesCreate('financial_extraction', {
       model: 'gpt-4.1',
-      instructions: buildExtractionPrompt({ includeSourceCitations: false, currencyHint }),
+      instructions: buildExtractionPrompt({ includeSourceCitations: false, currencyHint, todayIso: getTodayIso() }),
       input: [
         {
           role: 'user',

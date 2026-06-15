@@ -3,8 +3,23 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyContactAccess, verifyDealAccess } from '../middleware/orgScope.js';
+import { getContactEmailSummary } from '../services/gmailContactsService.js';
+import { chatAboutContact } from '../services/contactChatService.js';
 
 const router = Router();
+
+const chatSchema = z.object({
+  message: z.string().min(1).max(4000),
+  history: z
+    .array(
+      z.object({
+        role: z.enum(['user', 'assistant']),
+        content: z.string().max(8000),
+      })
+    )
+    .max(40)
+    .optional(),
+});
 
 // ─── Validation Schemas ──────────────────────────────────────
 
@@ -277,6 +292,57 @@ router.delete('/:id/connections/:connectionId', async (req: any, res) => {
   } catch (error) {
     log.error('Delete connection error', error);
     res.status(500).json({ error: 'Failed to remove connection' });
+  }
+});
+
+// ─── GET /api/contacts/:id/email-summary — AI summary of email history ─
+// Bounded, org-scoped. Returns { connected:false } (never an error) when Gmail
+// isn't linked. Sub-path of /:id so it's safe from the /:id route in contacts.ts.
+
+router.get('/:id/email-summary', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(id, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    const authUserId = req.user?.id;
+    if (!authUserId) {
+      return res.json({ connected: false, threadCount: 0, lastContact: null, summary: '', highlights: [] });
+    }
+
+    const result = await getContactEmailSummary(orgId, id, authUserId);
+    res.json(result);
+  } catch (error) {
+    log.error('Contact email summary error', error);
+    res.status(500).json({ error: 'Failed to summarize contact emails' });
+  }
+});
+
+// ─── POST /api/contacts/:id/chat — Contact-scoped AI Q&A ─
+
+router.post('/:id/chat', async (req: any, res) => {
+  try {
+    const { id } = req.params;
+    const orgId = getOrgId(req);
+    const contactAccess = await verifyContactAccess(id, orgId);
+    if (!contactAccess) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    const validation = chatSchema.safeParse(req.body);
+    if (!validation.success) {
+      return res.status(400).json({ error: 'Invalid input', details: validation.error.errors });
+    }
+
+    const { message, history } = validation.data;
+    const result = await chatAboutContact(orgId, id, message, history ?? [], req.user?.id);
+    res.json(result);
+  } catch (error) {
+    log.error('Contact chat error', error);
+    res.status(500).json({ error: 'Failed to chat about contact' });
   }
 });
 

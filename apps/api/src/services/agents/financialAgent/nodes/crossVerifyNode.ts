@@ -12,6 +12,7 @@
 import { ChatAnthropic } from '@langchain/anthropic';
 import { isClaudeEnabled } from '../../../../services/anthropic.js';
 import { log } from '../../../../utils/logger.js';
+import { getTodayIso } from '../../../../utils/dates.js';
 import type { FinancialAgentStateType, AgentStep } from '../state.js';
 import type { ClassifiedStatement } from '../../../financialClassifier.js';
 import { VERIFY_SAMPLE_SIZE } from '../config.js';
@@ -296,11 +297,15 @@ export async function crossVerifyNode(
     });
     let response;
     try {
+      // Today's date is computed fresh per call so relative-period reasoning
+      // ("FY", "LTM", "current quarter") anchors to wall-clock, not the
+      // model's training cutoff.
+      const today = getTodayIso();
       response = await claude.invoke([
         {
           role: 'system',
           content:
-            'You are a financial data verification assistant. You verify extracted financial values against source documents. Respond ONLY with a valid JSON array — no markdown, no code fences, no explanation.',
+            `You are a financial data verification assistant. Today's date is ${today}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days"). You verify extracted financial values against source documents. Respond ONLY with a valid JSON array — no markdown, no code fences, no explanation.`,
         },
         { role: 'user', content: userPrompt },
       ]);

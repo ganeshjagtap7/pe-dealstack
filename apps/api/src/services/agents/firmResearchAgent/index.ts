@@ -9,6 +9,8 @@ export interface FirmResearchInput {
   firmName: string;
   userId: string;
   organizationId: string;
+  /** Firm-provided doc/free text — authoritative source for synthesis. */
+  documentText?: string;
 }
 
 export interface FirmResearchResult {
@@ -58,6 +60,7 @@ export async function runFirmResearch(input: FirmResearchInput): Promise<FirmRes
       websiteUrl: input.websiteUrl,
       linkedinUrl: input.linkedinUrl,
       firmName: input.firmName,
+      documentText: input.documentText || '',
       userId: input.userId,
       organizationId: input.organizationId,
     });

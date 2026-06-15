@@ -30,6 +30,8 @@ import {
 } from "@/app/(app)/deal-intake/components";
 import { FollowUpQuestions, WarningBanner } from "@/app/(app)/deal-intake/intake-widgets";
 import { FileUploadPanel, TextInputPanel } from "@/app/(app)/deal-intake/tab-panels";
+import { DealTeaserPopup } from "@/app/(app)/deal-intake/DealTeaserPopup";
+import type { DealTeaser } from "@/lib/teaser";
 
 interface IngestDealFormProps {
   /** "page" renders the standalone /deal-intake page chrome (heading + outer scroll
@@ -69,6 +71,12 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
   const [result, setResult] = useState<IngestResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<{ title: string; message: string } | null>(null);
+
+  /* ---- Firm-teaser popup (firm-criteria fit, shown right after create) ---- */
+  const [teaserPopup, setTeaserPopup] = useState<{
+    deal: { id: string; name: string };
+    teasers: DealTeaser[];
+  } | null>(null);
 
   /* ---- Follow-up questions ---- */
   const [followUpQuestions, setFollowUpQuestions] = useState<FollowUpQuestion[]>([]);
@@ -205,6 +213,20 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
     }
   };
 
+  // After a NEW deal is created, surface its firm-criteria teaser as a popup.
+  // Teasers are generated server-side during ingest (blocking), so they're
+  // ready by the time we get here. No profiles configured -> empty list ->
+  // skip the popup silently. The deal is already created either way.
+  const maybeShowTeaserPopup = useCallback(async (deal: { id: string; name: string }) => {
+    try {
+      const { teasers } = await api.get<{ teasers: DealTeaser[] }>(`/deals/${deal.id}/teasers`);
+      if (teasers && teasers.length > 0) setTeaserPopup({ deal, teasers });
+    } catch (err) {
+      // Endpoint not live / no teasers — non-fatal, just don't pop up.
+      console.warn("[deal-intake] teaser popup fetch failed:", err);
+    }
+  }, []);
+
   const handleUploadFile = async () => {
     if (!selectedFile) return;
     if (mode === "existing" && !selectedDeal) { setError("Please select a deal first."); return; }
@@ -224,6 +246,9 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       if (!response.ok) throw new Error((data as unknown as { message?: string; error?: string }).message || (data as unknown as { error?: string }).error || "Upload failed");
       setResult(data);
       fireFollowUp(data);
+      if (mode === "new" && data.deal?.id) {
+        maybeShowTeaserPopup({ id: data.deal.id, name: data.deal.name });
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Upload failed"); }
     finally { endProcessing(); }
   };
@@ -252,6 +277,9 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       const data = await api.post<IngestResponse>("/ingest/text", body);
       setResult(data);
       fireFollowUp(data);
+      if (mode === "new" && data.deal?.id) {
+        maybeShowTeaserPopup({ id: data.deal.id, name: data.deal.name });
+      }
     } catch (err) { setError(err instanceof Error ? err.message : "Text extraction failed"); }
     finally { endProcessing(); }
   };
@@ -426,6 +454,22 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
             </div>
           )}
         </div>
+      )}
+
+      {teaserPopup && (
+        <DealTeaserPopup
+          deal={teaserPopup.deal}
+          teasers={teaserPopup.teasers}
+          onClose={() => setTeaserPopup(null)}
+          onViewDeal={() => {
+            onClose?.();
+            window.location.href = `/deals/${teaserPopup.deal.id}`;
+          }}
+          onRejected={() => {
+            setTeaserPopup(null);
+            resetForm();
+          }}
+        />
       )}
     </div>
   );
