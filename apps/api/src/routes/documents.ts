@@ -51,6 +51,30 @@ const documentsQuerySchema = z.object({
   search: z.string().max(200).optional(),
 });
 
+// Resolve Document.uploadedBy → { id, name, avatar } via a batched query and
+// attach it as `uploader` (null when unknown). This replaces the PostgREST
+// embed `uploader:User!uploadedBy(...)`, which 500s with PGRST200 because
+// Document.uploadedBy has no FK to User (see vdr-schema.sql). Once the FK is
+// added by foreign-keys-migration.sql the embed would work too, but resolving
+// it here keeps the endpoint correct regardless of DB constraint state.
+async function attachUploaders<T extends { uploadedBy?: string | null }>(
+  rows: T[],
+): Promise<Array<T & { uploader: { id: string; name: string | null; avatar: string | null } | null }>> {
+  const ids = [...new Set(
+    rows.map((d) => d.uploadedBy).filter((id): id is string => !!id),
+  )];
+  if (ids.length === 0) {
+    return rows.map((d) => ({ ...d, uploader: null }));
+  }
+  const { data: users, error } = await supabase
+    .from('User')
+    .select('id, name, avatar')
+    .in('id', ids);
+  if (error) throw error;
+  const byId = new Map((users || []).map((u: any) => [u.id, u]));
+  return rows.map((d) => ({ ...d, uploader: byId.get(d.uploadedBy as string) ?? null }));
+}
+
 // ─── GET /api/deals/:dealId/documents — List documents for a deal ───
 
 router.get('/deals/:dealId/documents', async (req, res) => {
@@ -64,11 +88,14 @@ router.get('/deals/:dealId/documents', async (req, res) => {
 
     const { type, folderId, tags, search } = documentsQuerySchema.parse(req.query);
 
+    // NOTE: `uploader` is resolved with a separate query rather than the
+    // PostgREST embed `uploader:User!uploadedBy(...)`. Document.uploadedBy has
+    // no FK to User (see vdr-schema.sql), so the embed raises PGRST200 and 500s.
+    // The folder embed is kept — its FK (Document.folderId → Folder) exists.
     let query = supabase
       .from('Document')
       .select(`
         *,
-        uploader:User!uploadedBy(id, name, avatar),
         folder:Folder!folderId(id, name)
       `)
       .eq('dealId', dealId)
@@ -94,8 +121,10 @@ router.get('/deals/:dealId/documents', async (req, res) => {
 
     if (error) throw error;
 
+    const rows = await attachUploaders(data || []);
+
     // Filter by tags if provided (client-side for now)
-    let filteredData = data || [];
+    let filteredData = rows;
     if (tags) {
       const tagArray = (tags as string).split(',');
       filteredData = filteredData.filter((doc: any) =>
@@ -125,10 +154,7 @@ router.get('/folders/:folderId/documents', async (req, res) => {
 
     let query = supabase
       .from('Document')
-      .select(`
-        *,
-        uploader:User!uploadedBy(id, name, avatar)
-      `)
+      .select('*')
       .eq('folderId', folderId)
       .order('createdAt', { ascending: false });
 
@@ -144,7 +170,7 @@ router.get('/folders/:folderId/documents', async (req, res) => {
 
     if (error) throw error;
 
-    res.json(data || []);
+    res.json(await attachUploaders(data || []));
   } catch (error) {
     log.error('Error fetching folder documents', error);
     res.status(500).json({ error: 'Failed to fetch documents' });
@@ -215,7 +241,6 @@ router.patch('/documents/:id', async (req, res) => {
       .eq('id', id)
       .select(`
         *,
-        uploader:User!uploadedBy(id, name, avatar),
         folder:Folder!folderId(id, name)
       `)
       .single();
@@ -227,7 +252,8 @@ router.patch('/documents/:id', async (req, res) => {
       throw error;
     }
 
-    res.json(document);
+    const [withUploader] = await attachUploaders([document]);
+    res.json(withUploader);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return res.status(400).json({ error: 'Validation error', details: error.errors });
