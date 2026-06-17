@@ -9,9 +9,9 @@
 //   tier 4  GPT-4.1-nano (OpenRouter) / GPT-4o-mini (direct)  → sentiment, routing
 //
 // Routing strategy (post-OpenRouter-deprecation for tier 1):
-//   - Tier 1 prefers Anthropic direct (claude-sonnet-4-5) via @langchain/anthropic
+//   - Tier 1 prefers Anthropic direct (claude-sonnet-4-6) via @langchain/anthropic
 //     when ANTHROPIC_API_KEY is set. Falls back to OpenAI direct ('gpt-4o') when
-//     only OPENAI_API_KEY is set. Falls back to OpenRouter ('anthropic/claude-sonnet-4.5')
+//     only OPENAI_API_KEY is set. Falls back to OpenRouter ('anthropic/claude-sonnet-4.6')
 //     only when neither anthropic nor openai keys are present but OPENROUTER_API_KEY is.
 //   - Tier 2-4 retain the legacy OpenRouter routing for now (the user only flagged
 //     tier 1 as the routing problem). If OPENROUTER_API_KEY is set, the `openai`
@@ -30,9 +30,9 @@ export const AI_MODELS = {
   TIER1:
     process.env.LLM_TIER1_MODEL ||
     (hasAnthropic
-      ? 'claude-sonnet-4-5'
+      ? 'claude-sonnet-4-6'
       : useOpenRouter
-        ? 'anthropic/claude-sonnet-4.5'
+        ? 'anthropic/claude-sonnet-4.6'
         : 'gpt-4o'),
   /** Tier 2 — general including vision */
   TIER2:

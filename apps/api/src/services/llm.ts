@@ -212,7 +212,7 @@ function shouldFallbackToOpenAI(err: any): boolean {
 interface FallbackEntry {
   /** Lazy builder for the fallback — only invoked on first need. */
   build: () => BaseChatModel;
-  /** Human-readable name used in logs (e.g. 'claude-sonnet-4-5#fallback-key'). */
+  /** Human-readable name used in logs (e.g. 'claude-sonnet-4-6#fallback-key'). */
   name: string;
 }
 
@@ -331,11 +331,11 @@ const MODELS = {
     extraction: 'gemini-1.5-pro',
   },
   anthropic: {
-    // Claude Sonnet 4.5 — current tier-1 reasoning model (knowledge cutoff Jan 2026).
-    chat: process.env.LLM_CHAT_MODEL || 'claude-sonnet-4-5',
+    // Claude Sonnet 4.6 — current tier-1 reasoning model (knowledge cutoff Jan 2026).
+    chat: process.env.LLM_CHAT_MODEL || 'claude-sonnet-4-6',
     // Claude Haiku 4.5 — fast/cheap option. Use the dated alias for stability.
     fast: process.env.LLM_FAST_MODEL || 'claude-haiku-4-5-20251001',
-    extraction: 'claude-sonnet-4-5',
+    extraction: 'claude-sonnet-4-6',
   },
 } as const;
 
@@ -498,7 +498,7 @@ function buildTier1FallbackChain(
   const chain: FallbackEntry[] = [];
   if (process.env.ANTHROPIC_API_KEY_FALLBACK) {
     chain.push({
-      name: `claude-sonnet-4-5#anthropic-fallback-key`,
+      name: `claude-sonnet-4-6#anthropic-fallback-key`,
       build: () => {
         const built = buildTier1AnthropicFallback(operation, temperature, maxTokens);
         if (!built) throw new Error('Anthropic fallback unavailable (ANTHROPIC_API_KEY_FALLBACK missing at build time)');

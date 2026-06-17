@@ -4,7 +4,7 @@ import { getOrgId } from '../middleware/orgScope.js';
 import { runFirmResearch, runDeepResearch } from '../services/agents/firmResearchAgent/index.js';
 import { log } from '../utils/logger.js';
 import { extractNameFromDomain } from '../utils/urlHelpers.js';
-import { runWithUsageContext } from '../middleware/usageContext.js';
+import { runWithUsageContext, resolveInternalUserId } from '../middleware/usageContext.js';
 import firmProfileRouter from './onboarding-firm.js';
 
 const router = Router();
@@ -400,8 +400,12 @@ router.post('/enrich-firm', async (req: Request, res: Response) => {
     // task is attributed to the correct user/org — AsyncLocalStorage is lost
     // once the HTTP response has been sent.
     if (result.success && result.firmProfile && (websiteUrl || linkedinUrl)) {
+      // usageContextMiddleware never ran for this background task, so resolve
+      // the auth UUID to the internal User.id here — UsageEvent.userId is an FK
+      // to User.id and inserting the raw auth UUID fails with FK 23503.
+      const internalUserId = await resolveInternalUserId(userId);
       void runWithUsageContext(
-        { userId, organizationId: orgId, source: 'background' },
+        { userId: internalUserId ?? userId, organizationId: orgId, source: 'background' },
         async () => {
           await runDeepResearch({
             phase1Profile: result.firmProfile!,
