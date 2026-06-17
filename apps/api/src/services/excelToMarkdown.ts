@@ -6,9 +6,19 @@
  * Output is stored in Document.extractedText for RAG + AI chat context.
  */
 
-import XLSX from 'xlsx';
+import { createRequire } from 'module';
+import type * as XLSX from 'xlsx';
 import { log } from '../utils/logger.js';
 import { scoreSheet, detectUnitScale, SKIP_PATTERNS } from './excelFinancialExtractor.js';
+
+// Lazy-load `xlsx` (SheetJS, ~5MB) so it no longer loads at module init on
+// every lite serverless cold start — it's only needed when converting an
+// uploaded spreadsheet. Type-only import keeps the XLSX.* type annotations.
+const require = createRequire(import.meta.url);
+let _xlsx: typeof XLSX | null = null;
+function getXLSX(): typeof XLSX {
+  return (_xlsx ??= require('xlsx'));
+}
 
 /**
  * Convert an Excel buffer to Markdown tables.
@@ -17,7 +27,7 @@ import { scoreSheet, detectUnitScale, SKIP_PATTERNS } from './excelFinancialExtr
  */
 export function excelToMarkdown(buffer: Buffer): string | null {
   try {
-    const workbook = XLSX.read(buffer, {
+    const workbook = getXLSX().read(buffer, {
       type: 'buffer',
       cellDates: true,
       cellNF: false,
@@ -76,7 +86,7 @@ export function excelToMarkdown(buffer: Buffer): string | null {
  */
 function sheetToMarkdownTable(sheet: XLSX.WorkSheet, sheetName: string): string | null {
   // Get rows as arrays (header: 1 = array-of-arrays mode)
-  const rows: any[][] = XLSX.utils.sheet_to_json(sheet, {
+  const rows: any[][] = getXLSX().utils.sheet_to_json(sheet, {
     header: 1,
     defval: '',
     blankrows: false,

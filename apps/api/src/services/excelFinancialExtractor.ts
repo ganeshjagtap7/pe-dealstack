@@ -12,8 +12,20 @@
  *   5. Send scored sheets first, skip junk sheets entirely
  */
 
-import XLSX from 'xlsx';
+import { createRequire } from 'module';
+import type * as XLSX from 'xlsx';
 import { log } from '../utils/logger.js';
+
+// `xlsx` (SheetJS) is a large dependency (~5MB) that was loaded at module
+// init on every cold start of the lite serverless bundle — even though it is
+// only needed when a user uploads a spreadsheet. Load it lazily via require()
+// on first use so it no longer slows cold starts. `import type * as XLSX`
+// keeps the type annotations (XLSX.WorkSheet, …) with zero runtime cost.
+const require = createRequire(import.meta.url);
+let _xlsx: typeof XLSX | null = null;
+function getXLSX(): typeof XLSX {
+  return (_xlsx ??= require('xlsx'));
+}
 
 // ─── Sheet Scoring ────────────────────────────────────────────
 
@@ -74,6 +86,7 @@ export function scoreSheet(name: string): number {
  * Returns a human-readable string like "Units: $000s (thousands)" or null.
  */
 export function detectUnitScale(sheet: XLSX.WorkSheet): string | null {
+  const XLSX = getXLSX();
   const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1');
   const maxRow = Math.min(range.e.r, 8); // check first 8 rows only
 
@@ -107,7 +120,7 @@ export function detectUnitScale(sheet: XLSX.WorkSheet): string | null {
  * Returns cleaner text that's more token-efficient for AI classifier.
  */
 function sheetToCleanCSV(sheet: XLSX.WorkSheet): string {
-  const csv = XLSX.utils.sheet_to_csv(sheet, {
+  const csv = getXLSX().utils.sheet_to_csv(sheet, {
     blankrows: false,
     strip: true,
   });
@@ -144,7 +157,7 @@ function sheetToCleanCSV(sheet: XLSX.WorkSheet): string {
  */
 export function extractTextFromExcel(buffer: Buffer): string | null {
   try {
-    const workbook = XLSX.read(buffer, {
+    const workbook = getXLSX().read(buffer, {
       type: 'buffer',
       cellDates: true,
       cellNF: false,
