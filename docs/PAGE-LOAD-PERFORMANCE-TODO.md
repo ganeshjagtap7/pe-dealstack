@@ -7,11 +7,27 @@
 
 ---
 
+## Status at a glance
+
+| Phase | Scope | Status |
+|---|---|---|
+| **0** | Cut redundant auth round-trips (api.ts + middleware) | ✅ **Done** (committed) |
+| **2** | API cold starts — lazy-load resend/xlsx/csv-parse in lite bundle | ✅ **Done** (committed) — measure delta in CI/prod |
+| **3** | Hot-route skeletons (dashboard/deals/contacts) | ✅ **Partly done** — skeletons shipped; data-layer (SWR/server-render) still open |
+| **4** | Lazy-load chart.js (html2pdf already lazy; prefetch already on) | ✅ **Done** (committed) — confirm bundle sizes via build |
+| **5** | Static-render marketing pages | ✅ **Verified** — already static (no code change needed); confirm via build route table |
+| **1** | Measure baseline metrics | ⬜ **Needs you** — requires Vercel dashboard + browser on prod |
+| **6** | Local JWT verification (getClaims) | ⬜ **Optional / needs you** — requires Supabase asymmetric keys + refresh handling |
+
+> What's left for a developer: **Phase 1** (capture before/after numbers — only you can, needs prod access), the **data-layer half of Phase 3** (SWR cache or server-render hot pages), confirming **build numbers** for Phases 4/5, and optionally **Phase 6**.
+
+---
+
 ## TL;DR
 
 Slow page-to-page navigation in production is caused by **stacked, sequential network round-trips on every navigation**, an **uncached/force-dynamic render path**, a **heavy cold-starting API lambda**, and a **fetch-on-mount data pattern** that shows a spinner before any data loads.
 
-This PR already lands the two **safe, high-impact** fixes (Phase 0 below). The rest of this document is the roadmap for the developer to finish the job. Do the phases in order; **measure before and after each phase** so we can prove the wins.
+Phases 0, 2, 4 and the skeleton half of 3 are **implemented in this PR**; Phase 5 was **verified already-correct**. The remaining work (baseline measurement, the data-layer half of Phase 3, and optional Phase 6) is detailed below. **Measure before/after (Phase 1) so we can prove the wins.**
 
 ---
 
@@ -68,61 +84,65 @@ We need numbers to prove each phase helps and to avoid guessing.
 
 ## Phase 2 — Cut API cold starts (high impact on first-load)
 
+> **STATUS: ✅ Implemented in this PR.** Commit `perf(api): lazy-load heavy deps…`.
+
 **Problem:** the single catch-all API function bundles every heavy dependency, so the lambda is large and cold-starts slowly. See `serverExternalPackages` in `next.config.ts` and the bundle picker in `src/lib/api-bundles.ts` (`app-lite.js` vs `app-ai.js`).
 
-- [ ] **Audit what's in the "lite" bundle.** Confirm `pickBundle()` routes non-AI traffic (deals, contacts, dashboard, auth) to `app-lite.js` and that `app-lite.js` does **not** transitively import LangChain/OpenAI/Anthropic/Azure/xlsx/pdf-parse. Build the API and inspect bundle sizes:
-  ```bash
-  npm run build:api
-  ls -la apps/api/dist/   # compare app-lite vs app-ai sizes
-  ```
-- [ ] **Lazy-import heavy deps** inside the route handlers that actually use them (dynamic `await import(...)`), not at module top-level, so they don't load on cold start of unrelated routes.
-- [ ] **Right-size the function.** In `vercel.json` the AI function has `memory: 1769`. Check whether the lite/common path needs that much; smaller memory can cold-start faster (test both — more memory = more CPU on Vercel, so measure, don't assume).
-- [ ] **Consider keeping the hot function warm** (Vercel Fluid Compute / a cron ping to a cheap health endpoint every few minutes) **only if** measured cold starts are a real user problem after the bundle split.
-- [ ] Re-measure API cold start and fill in the table.
+- [x] **Audited the "lite" bundle.** `pickBundle()` already routes non-AI traffic to `app-lite.js`, and `app-lite.ts` excludes the AI routers. Confirmed (via import-chain trace) that LangChain/OpenAI/Anthropic/Azure/pdf-parse/mammoth are **NOT** reachable from app-lite — they only load in `app-ai`.
+- [x] **Lazy-loaded the heavy deps that *were* reachable from lite at module-init:**
+  - `resend` in `services/staffAccessNotifier.ts` — pulled in by `staffAccessLogger` (mounted on nearly every route), so it loaded on **every** cold start. Now lazy via `await import('resend')` + cached client.
+  - `xlsx` (SheetJS, ~5MB) in `services/excelFinancialExtractor.ts`, `services/excelToMarkdown.ts`, `services/dealImportMapper.ts` — now lazy via `createRequire()` on first spreadsheet parse (matches `azureDocIntelligence.ts`/`pdfExtractor.ts` pattern). `import type` keeps the type annotations.
+  - `csv-parse` in `services/dealImportMapper.ts` — lazy on first CSV import.
+- [ ] **(Still open) Verify the delta.** Run `npm run build:api` then compare `app-lite` cold-start `Init Duration` in Vercel logs before/after. Fill the Phase 1 table.
+- [ ] **(Still open / optional) Right-size the function.** In `vercel.json` the AI function has `memory: 1769`. Test whether the lite path cold-starts faster at lower memory (more memory = more CPU on Vercel, so measure, don't assume).
+- [ ] **(Still open / optional) Keep the hot function warm** (Vercel Fluid Compute / cron ping) **only if** measured cold starts are still a real problem.
 
-**Acceptance:** non-AI API routes cold-start meaningfully faster (target Init Duration < 1.5s) and warm calls are unaffected.
+**Acceptance:** non-AI API routes cold-start meaningfully faster (target Init Duration < 1.5s) and warm calls are unaffected. _Code shipped; measurement pending (Phase 1)._
 
 ---
 
 ## Phase 3 — Fix the fetch-on-mount pattern (biggest perceived-speed win)
 
+> **STATUS: ✅ Skeletons + prefetch done in this PR. Data-layer (A/B) still open — the bigger lift.**
+
 **Problem:** pages are client components that mount, show a spinner, then fetch. Navigation feels like "blank → spinner → content" instead of "instant".
 
-Pick **one** consistent approach (recommend **A** for hot pages, **B** everywhere else):
+- [x] **Skeletons, not spinners.** Added layout-shaped `loading.tsx` for the busiest routes — `dashboard/loading.tsx`, `deals/loading.tsx`, `contacts/loading.tsx` — using the existing `components/ui/Skeleton` primitive. (Generic `(app)/loading.tsx` spinner remains as the fallback for other routes; add `data-room/loading.tsx` next.)
+- [x] **`<Link>` prefetch confirmed on.** No `prefetch={false}` anywhere in the app — App-router prefetch is fully enabled.
+- [ ] **(Still open — the real win) Pick a data-loading strategy.** The skeleton only shows during the route/RSC transition; the *in-page* spinner (client fetch-on-mount) is still there. Choose one:
+  - **A — Server-render initial data for hot pages.** Move the first fetch for `/dashboard` and `/deals` into a Server Component / route-level `loadData()` so HTML arrives with data. Keep interactivity in child client components.
+  - **B — Add a client cache (SWR or React Query).** Wrap `api.ts` so revisiting a page shows **cached data instantly** then revalidates. Centralize in a `useApi` hook so all 150+ pages benefit without rewrites. **Recommended** — lowest blast radius, biggest perceived win on repeat nav.
+  - Then swap the in-page spinners to reuse the same skeleton components.
 
-- [ ] **A — Server-render initial data for hot pages.** Move the first data fetch for `/dashboard` and `/deals` into a Server Component (or a route-level `loadData()` awaited in the server page) so the HTML arrives with data. Keep interactivity in child client components. See `apps/web-next/CLAUDE.md` → "Server components are the default."
-- [ ] **B — Add a client cache (SWR or React Query).** Wrap `api.ts` calls so revisiting a page shows **cached data instantly** then revalidates in the background. This kills the spinner on repeat navigations. Centralize in a hook (e.g. `useApi`) so all 150+ pages benefit without rewrites.
-- [ ] **Skeletons, not spinners.** Replace the generic spinner (`src/app/(app)/loading.tsx`) and per-page loading states with **layout-shaped skeletons** so the page feels populated immediately. Add `loading.tsx` to the busiest route segments (`/dashboard`, `/deals`, `/contacts`, `/data-room`).
-- [ ] **Confirm `<Link>` prefetch is on.** App-router `<Link>` prefetches by default — grep for `prefetch={false}` and remove unless intentional. Prefetching warms the next route while the user hovers.
-
-**Acceptance:** repeat navigation between two visited pages shows content with **no full-screen spinner**; first-visit shows a layout skeleton, not a blank spinner.
+**Acceptance:** repeat navigation between two visited pages shows content with **no full-screen spinner**; first-visit shows a layout skeleton, not a blank spinner. _Skeletons shipped; the no-spinner-on-data goal needs the data-layer step._
 
 ---
 
 ## Phase 4 — Client bundle size
 
+> **STATUS: ✅ Implemented in this PR.** Commit `perf(web-next): lazy-load chart.js…`.
+
 **Problem:** 152 client components; heavy libs may ship on routes that don't need them.
 
-- [ ] Run the production build and read the per-route JS sizes:
-  ```bash
-  cd apps/web-next && npm run build   # check the route table in output
-  ```
-  Optionally add `@next/bundle-analyzer` temporarily to visualize.
-- [ ] **Dynamic-import heavy, rarely-used libs:** `chart.js` / `react-chartjs-2` (only on pages with charts) and `html2pdf.js` (only when the user exports a PDF). Use `next/dynamic` with `{ ssr: false }` for these.
-- [ ] Look for accidental barrel-import bloat (importing a whole module for one helper).
+- [x] **Dynamic-imported chart.js.** `deal-financials.tsx` now loads `RevenueChart`/`GrowthChart`/`BalanceSheetChart` via `next/dynamic({ ssr:false })`; `internal/usage/page.tsx` does the same for `CostBreakdown`. chart.js + react-chartjs-2 no longer ship in those pages' initial bundles.
+- [x] **html2pdf.js already lazy** — `memo-builder/export.ts` already used `await import("html2pdf.js")`. No change needed.
+- [ ] **(Still open) Confirm bundle sizes via the build route table** (`cd apps/web-next && npm run build`). Optionally add `@next/bundle-analyzer`. Look for any remaining barrel-import bloat.
 
-**Acceptance:** largest route JS bundle < ~250KB gzipped; charts/PDF libs no longer in the shared/common chunk.
+**Acceptance:** largest route JS bundle < ~250KB gzipped; charts/PDF libs no longer in the shared/common chunk. _chart.js/html2pdf split done; confirm sizes in CI build._
 
 ---
 
 ## Phase 5 — Static-render the marketing/public pages
 
+> **STATUS: ✅ Verified already-correct — no code change needed.**
+
 **Problem:** the marketing/legal/docs pages (`/`, `/pricing`, `/security`, `/privacy-policy`, etc.) don't need per-request rendering.
 
-- [ ] Confirm these routes are **statically rendered / ISR**, not dynamic. They should not inherit `force-dynamic`. (`force-dynamic` belongs only on `(app)`/`(auth)` where auth state is per-request — see the comment in `src/app/(app)/layout.tsx`.)
+- [x] **Confirmed static.** `export const dynamic = "force-dynamic"` exists **only** on `(app)/layout.tsx` and `(onboarding)/layout.tsx` (both correctly auth-gated). The marketing/legal pages have no dynamic export and call no `cookies()`/`headers()`/auth APIs, so Next statically renders them by default.
+- [ ] **(Still open) Confirm in the build route table** that `/`, `/pricing`, `/security`, etc. show as `○ (Static)` / `● (SSG)` rather than `ƒ (Dynamic)`. (Couldn't run a full build in the worktree — Turbopack root-inference quirk; run in CI or the main checkout.)
 - [ ] Verify the security headers from `next.config.ts` still apply to the static pages.
 
-**Acceptance:** public pages serve from cache/CDN with TTFB dominated by network, not compute.
+**Acceptance:** public pages serve from cache/CDN with TTFB dominated by network, not compute. _Static rendering confirmed by static analysis; build-table confirmation pending._
 
 ---
 
@@ -147,8 +167,18 @@ Pick **one** consistent approach (recommend **A** for hot pages, **B** everywher
 
 ## Definition of done
 
-- [ ] Phases 1–5 complete with before/after numbers filled into the Phase 1 table.
-- [ ] p75 dashboard navigation feels < 1s on a warm session; no full-screen spinner on repeat nav.
-- [ ] `npx tsc --noEmit`, `npm test`, `npm run lint` all clean in `apps/web-next`.
-- [ ] `npm run build` succeeds and route bundle sizes are within target.
+- [x] Phases 0, 2, 4 implemented + Phase 3 skeletons + Phase 5 verified (this PR).
+- [x] Changed/new files type-check clean; `api` + `web-next` test suites pass; lint clean.
+- [ ] **Phase 1 baseline + after numbers** captured and filled into the Phase 1 table (needs prod access).
+- [ ] **Phase 3 data-layer** (SWR cache or server-render) shipped so there's no in-page spinner on repeat nav.
+- [ ] `npm run build` succeeds in CI (after main's pre-existing RefObject type errors are resolved) and the route table confirms static marketing pages + chart.js out of initial chunks.
+- [ ] p75 dashboard navigation feels < 1s on a warm session.
 - [ ] PR description summarizes the measured improvement.
+
+---
+
+## Verification done in this PR (and its limits)
+
+- **API** (`apps/api`): `npx tsc --noEmit` clean for all changed files (only a pre-existing `pdf-lib` error remains, unrelated); `staff-access-logger` tests pass (exercises the lazy-Resend path).
+- **Web** (`apps/web-next`): `npx tsc --noEmit` clean for all changed/new files; full `npm test` (52) passes; `eslint` clean.
+- **Could NOT run locally:** a full `next build` — the worktree hits a Turbopack workspace-root quirk, and `main` has 13 pre-existing `RefObject` type errors (already fixed on the security branch) that block the build. So the **route table / bundle-size numbers and the cold-start delta must be confirmed in CI/prod** (Phase 1). Nothing here changes runtime behavior in a way the type-checker + unit tests wouldn't catch, but the perf *magnitude* is unmeasured until then.
