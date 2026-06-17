@@ -168,6 +168,35 @@ END
 $$;
 
 -- ───────────────────────────────────────────────────────────
+-- Document → User (uploadedBy): the FK was left commented out in
+-- vdr-schema.sql (the `uploadedBy` column is added as a bare UUID),
+-- so PostgREST can't resolve the `uploader:User!uploadedBy` embed
+-- used by GET /deals/:dealId/documents — it returns PGRST200 → 500.
+-- Adding the constraint resolves the relationship.
+-- ───────────────────────────────────────────────────────────
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'Document') THEN
+    RAISE NOTICE 'Document table not found — skipping';
+    RETURN;
+  END IF;
+
+  -- Normalise the column to UUID so the FK to User(id) is type-compatible.
+  IF (SELECT data_type FROM information_schema.columns
+      WHERE table_name = 'Document' AND column_name = 'uploadedBy') = 'text' THEN
+    ALTER TABLE "Document" ALTER COLUMN "uploadedBy" TYPE UUID USING "uploadedBy"::uuid;
+  END IF;
+
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'Document_uploadedBy_fkey') THEN
+    ALTER TABLE "Document"
+      ADD CONSTRAINT "Document_uploadedBy_fkey"
+        FOREIGN KEY ("uploadedBy") REFERENCES "User"("id") ON DELETE SET NULL NOT VALID;
+  END IF;
+END
+$$;
+
+-- ───────────────────────────────────────────────────────────
 -- Force PostgREST to rebuild its relationship cache
 -- ───────────────────────────────────────────────────────────
 
