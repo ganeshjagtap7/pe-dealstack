@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, type DragEvent } from "react";
+import { useEffect, useState, useMemo, useRef, type DragEvent } from "react";
 import { api } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   SORT_OPTIONS,
@@ -28,15 +29,12 @@ import { exportDealsToCSV } from "./deals-csv-export";
 
 export default function DealsPage() {
   const { openDealIntake } = useIngestDealModal();
-  const [deals, setDeals] = useState<Deal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "kanban">("list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [stageModal, setStageModal] = useState(false);
   const [bulkPassConfirm, setBulkPassConfirm] = useState(false);
-  const [industries, setIndustries] = useState<string[]>([]);
   const [filters, setFilters] = useState<DealFilters>({
     stage: "",
     industry: "",
@@ -51,7 +49,55 @@ export default function DealsPage() {
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load view preference and metrics from localStorage
+  // Deals are read through the shared stale-while-revalidate cache, keyed by
+  // the active filters. Returning to /deals (or toggling back to a previously
+  // applied filter set) renders instantly from cache and revalidates in the
+  // background instead of re-fetching behind a skeleton every time.
+  const dealsKey = useMemo(() => {
+    const params = new URLSearchParams();
+    if (filters.stage) params.set("stage", filters.stage);
+    if (filters.industry) params.set("industry", filters.industry);
+    if (filters.minDealSize) params.set("minDealSize", filters.minDealSize);
+    if (filters.maxDealSize) params.set("maxDealSize", filters.maxDealSize);
+    if (filters.priority) params.set("priority", filters.priority);
+    if (filters.search) params.set("search", filters.search);
+    if (filters.sortBy) params.set("sortBy", filters.sortBy);
+    if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
+    params.set("limit", "50");
+    return `/deals?${params.toString()}`;
+  }, [filters]);
+
+  const {
+    data: rawDeals,
+    isLoading: loading,
+    error: fetchError,
+    refetch: loadDeals,
+    mutate: mutateDeals,
+  } = useApiQuery<Deal[]>(dealsKey);
+
+  // Flatten company.name into companyName so cards can display it.
+  const deals = useMemo<Deal[]>(
+    () =>
+      (rawDeals ?? []).map((d) => ({
+        ...d,
+        companyName: d.companyName || d.company?.name || undefined,
+      })),
+    [rawDeals],
+  );
+  const industries = useMemo(
+    () => [...new Set(deals.map((d) => d.industry).filter(Boolean) as string[])].sort(),
+    [deals],
+  );
+  // Fetch failures drive the full ErrorState; mutation failures reuse it too
+  // (matches the previous single-error-state behaviour).
+  const error = fetchError?.message ?? actionError;
+
+  // Load view preference and metrics from localStorage. Done in an effect
+  // (not lazy useState init) on purpose: reading localStorage during the
+  // initial render would diverge from the server-rendered HTML and cause a
+  // hydration mismatch. Syncing from an external store post-mount is the
+  // correct pattern, so the set-state-in-effect rule is suppressed here.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.dealsView);
     if (saved === "kanban" || saved === "list") setView(saved);
@@ -68,41 +114,7 @@ export default function DealsPage() {
       console.warn("[deals] failed to read cached metrics:", err);
     }
   }, []);
-
-  const loadDeals = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (filters.stage) params.set("stage", filters.stage);
-      if (filters.industry) params.set("industry", filters.industry);
-      if (filters.minDealSize) params.set("minDealSize", filters.minDealSize);
-      if (filters.maxDealSize) params.set("maxDealSize", filters.maxDealSize);
-      if (filters.priority) params.set("priority", filters.priority);
-      if (filters.search) params.set("search", filters.search);
-      if (filters.sortBy) params.set("sortBy", filters.sortBy);
-      if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
-      params.set("limit", "50");
-
-      const data = await api.get<Deal[]>(`/deals?${params}`);
-      const raw = Array.isArray(data) ? data : [];
-      // Flatten company.name into companyName so cards can display it
-      const list = raw.map((d) => ({
-        ...d,
-        companyName: d.companyName || d.company?.name || undefined,
-      }));
-      setDeals(list);
-      setIndustries([...new Set(list.map((d) => d.industry).filter(Boolean) as string[])].sort());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load deals");
-    } finally {
-      setLoading(false);
-    }
-  }, [filters]);
-
-  useEffect(() => {
-    loadDeals();
-  }, [loadDeals]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Helpers
   const toggleView = (v: "list" | "kanban") => {
@@ -137,14 +149,14 @@ export default function DealsPage() {
   const handleDelete = async (id: string) => {
     try {
       await api.delete(`/deals/${id}`);
-      setDeals((prev) => prev.filter((d) => d.id !== id));
+      mutateDeals((prev) => (prev ?? []).filter((d) => d.id !== id));
       setSelected((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete deal");
+      setActionError(err instanceof Error ? err.message : "Failed to delete deal");
     }
     setDeleteTarget(null);
   };
@@ -156,11 +168,11 @@ export default function DealsPage() {
     const failed = results.filter((r) => r.status === "rejected");
     if (succeededIds.length > 0) {
       const succeededSet = new Set(succeededIds);
-      setDeals((prev) => prev.filter((d) => !succeededSet.has(d.id)));
+      mutateDeals((prev) => (prev ?? []).filter((d) => !succeededSet.has(d.id)));
     }
     if (failed.length > 0) {
       console.warn("[deals] bulk delete failures:", failed.map((r) => (r as PromiseRejectedResult).reason));
-      setError(`${failed.length} of ${ids.length} deletes failed.`);
+      setActionError(`${failed.length} of ${ids.length} deletes failed.`);
     }
     setSelected(new Set());
     setDeleteTarget(null);
@@ -172,7 +184,7 @@ export default function DealsPage() {
     const failed = results.filter((r) => r.status === "rejected");
     if (failed.length > 0) {
       console.warn("[deals] bulk stage-change failures:", failed.map((r) => (r as PromiseRejectedResult).reason));
-      setError(`${failed.length} of ${ids.length} stage updates failed.`);
+      setActionError(`${failed.length} of ${ids.length} stage updates failed.`);
     }
     setStageModal(false);
     clearSelection();
@@ -205,7 +217,7 @@ export default function DealsPage() {
   const handleRemoveSample = async (id: string) => {
     try {
       await api.delete(`/deals/${id}`);
-      setDeals((prev) => prev.filter((d) => d.id !== id));
+      mutateDeals((prev) => (prev ?? []).filter((d) => d.id !== id));
     } catch (err) {
       console.warn("[deals] removeSample failed:", err);
     }
@@ -221,13 +233,13 @@ export default function DealsPage() {
     if (!deal || deal.stage === newStage) return;
     const oldStage = deal.stage;
     // Optimistic update
-    setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
+    mutateDeals((prev) => (prev ?? []).map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
     try {
       await api.patch(`/deals/${dealId}`, { stage: newStage });
     } catch (err) {
       console.warn("[deals] kanban drop failed, reverting:", err);
       // Revert on error
-      setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: oldStage } : d)));
+      mutateDeals((prev) => (prev ?? []).map((d) => (d.id === dealId ? { ...d, stage: oldStage } : d)));
     }
   };
 

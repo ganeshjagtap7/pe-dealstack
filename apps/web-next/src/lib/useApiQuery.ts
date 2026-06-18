@@ -67,9 +67,19 @@ function subscribe(key: string, cb: () => void): () => void {
   };
 }
 
-/** Imperatively seed/replace a cache entry (e.g. after a mutation). */
-export function mutateApiCache<T>(key: string, data: T): void {
-  setState(key, { data, error: null, ts: Date.now() });
+/**
+ * Imperatively seed/replace a cache entry (e.g. after a mutation). Accepts a
+ * value or an updater `(prev) => next` for optimistic edits keyed off the
+ * current cached data.
+ */
+export function mutateApiCache<T>(
+  key: string,
+  data: T | ((prev: T | undefined) => T),
+): void {
+  const prev = store.get(key)?.data as T | undefined;
+  const next =
+    typeof data === "function" ? (data as (p: T | undefined) => T)(prev) : data;
+  setState(key, { data: next, error: null, ts: Date.now() });
 }
 
 /** Drop one key (or the whole cache) so the next read refetches. */
@@ -130,8 +140,8 @@ export interface UseApiQueryResult<T> {
   isValidating: boolean;
   /** Force a revalidation; resolves with fresh data (or undefined on error). */
   refetch: () => Promise<T | undefined>;
-  /** Replace this key's cached data locally (optimistic updates). */
-  mutate: (data: T) => void;
+  /** Replace this key's cached data locally (value or updater) — optimistic edits. */
+  mutate: (data: T | ((prev: T | undefined) => T)) => void;
 }
 
 export function useApiQuery<T>(
@@ -168,7 +178,7 @@ export function useApiQuery<T>(
   }, [key]);
 
   const mutate = useCallback(
-    (next: T) => {
+    (next: T | ((prev: T | undefined) => T)) => {
       if (key) mutateApiCache(key, next);
     },
     [key],

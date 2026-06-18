@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useMemo } from "react";
 import { api } from "@/lib/api";
+import { useApiQuery } from "@/lib/useApiQuery";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/providers/ToastProvider";
@@ -21,15 +22,12 @@ import {
 // ─── Page Component ────────────────────────────────────────
 
 export default function ContactsPage() {
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [totalContacts, setTotalContacts] = useState(0);
-  const [contactScores, setContactScores] = useState<Record<string, { score: number; label: string }>>({});
-  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filters, setFilters] = useState({ search: "", type: "", sortBy: "createdAt", sortOrder: "desc" });
-  const [currentOffset, setCurrentOffset] = useState(0);
+  // Pages fetched via "Load more" are appended here, scoped to the active query
+  // key so a filter change discards them without a reset effect.
+  const [appendedPages, setAppendedPages] = useState<{ key: string; items: Contact[] }>({ key: "", items: [] });
 
   // Modal / panel state
   const [modalOpen, setModalOpen] = useState(false);
@@ -55,36 +53,45 @@ export default function ContactsPage() {
 
   // ─── Data Loading ─────────────────────────────────────────
 
-  const loadContacts = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = new URLSearchParams();
-      if (filters.search) params.set("search", filters.search);
-      if (filters.type) params.set("type", filters.type);
-      params.set("sortBy", filters.sortBy);
-      params.set("sortOrder", filters.sortOrder);
-      params.set("limit", String(CONTACTS_PAGE_SIZE));
-      params.set("offset", "0");
-
-      const [data, scores] = await Promise.all([
-        api.get<{ contacts: Contact[]; total: number }>(`/contacts?${params}`),
-        api.get<{ scores: Record<string, { score: number; label: string }> }>("/contacts/insights/scores").catch(() => ({ scores: {} })),
-      ]);
-
-      const fetched = data.contacts || [];
-      setContacts(fetched);
-      setTotalContacts(data.total || 0);
-      setContactScores(scores.scores || {});
-      setCurrentOffset(fetched.length);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load contacts");
-    } finally {
-      setLoading(false);
-    }
+  // First page + scores come from the shared cache, so returning to /contacts
+  // renders the last-seen list instantly and revalidates in the background.
+  const contactsKey = useMemo(() => {
+    const params = new URLSearchParams();
+    if (filters.search) params.set("search", filters.search);
+    if (filters.type) params.set("type", filters.type);
+    params.set("sortBy", filters.sortBy);
+    params.set("sortOrder", filters.sortOrder);
+    params.set("limit", String(CONTACTS_PAGE_SIZE));
+    params.set("offset", "0");
+    return `/contacts?${params.toString()}`;
   }, [filters]);
 
-  useEffect(() => { loadContacts(); }, [loadContacts]);
+  const {
+    data: page1,
+    isLoading: loading,
+    error: fetchError,
+    refetch: refetchPage1,
+  } = useApiQuery<{ contacts: Contact[]; total: number }>(contactsKey);
+  const { data: scoresData, refetch: refetchScores } = useApiQuery<{
+    scores: Record<string, { score: number; label: string }>;
+  }>("/contacts/insights/scores");
+
+  // Appended pages only count for the current query key.
+  const contacts = useMemo(() => {
+    const ap = appendedPages.key === contactsKey ? appendedPages.items : [];
+    return [...(page1?.contacts ?? []), ...ap];
+  }, [page1, appendedPages, contactsKey]);
+  const totalContacts = page1?.total ?? 0;
+  const contactScores = scoresData?.scores ?? {};
+  const currentOffset = contacts.length;
+  const error = fetchError?.message ?? null;
+
+  // Refresh after a mutation: discard appended pages and revalidate page 1.
+  const loadContacts = useCallback(() => {
+    setAppendedPages({ key: "", items: [] });
+    refetchPage1();
+    refetchScores();
+  }, [refetchPage1, refetchScores]);
 
   // Close dropdowns on outside click (ref-based, no stopPropagation needed)
   useEffect(() => {
@@ -142,8 +149,10 @@ export default function ContactsPage() {
 
       const data = await api.get<{ contacts: Contact[]; total: number }>(`/contacts?${params}`);
       const newContacts = data.contacts || [];
-      setContacts((prev) => [...prev, ...newContacts]);
-      setCurrentOffset((prev) => prev + newContacts.length);
+      setAppendedPages((prev) => ({
+        key: contactsKey,
+        items: [...(prev.key === contactsKey ? prev.items : []), ...newContacts],
+      }));
     } catch (err) {
       console.error("Error loading more:", err);
     } finally {
