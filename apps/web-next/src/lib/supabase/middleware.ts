@@ -48,11 +48,15 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  // Refresh the session token. getUser() validates against the auth server and
-  // rotates the cookie when the access token is close to expiry.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Validate the session. getClaims() verifies the JWT signature LOCALLY when
+  // the project uses asymmetric signing keys (no network round-trip) and only
+  // falls back to a getUser() network call for legacy HS256 tokens — so it is
+  // never slower than getUser() and is faster once asymmetric keys are enabled.
+  // It still refreshes an expiring access token, because getClaims() delegates
+  // to getSession(), which calls _callRefreshToken() on expiry and rotates the
+  // cookie via the setAll handler above. So sessions are not dropped.
+  const { data: claimsData } = await supabase.auth.getClaims();
+  const user = claimsData?.claims ?? null;
 
   if (!user && needsAuthGate) {
     const url = request.nextUrl.clone();
