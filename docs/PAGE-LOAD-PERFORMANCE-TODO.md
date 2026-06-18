@@ -14,12 +14,12 @@
 | **0** | Cut redundant auth round-trips (api.ts + middleware) | ✅ **Done** (committed) |
 | **1** | Measure baseline metrics | ✅ **Instrumented** (`WebVitals.tsx`) — you still capture/record the numbers |
 | **2** | API cold starts — lazy-load resend/xlsx/csv-parse in lite bundle | ✅ **Done** (committed) — measure delta in CI/prod |
-| **3** | Skeletons + SWR data-layer | ✅ **Done**: skeletons + `useApiQuery` cache shipped, admin page migrated. Rollout to deals/contacts/dashboard remains (runtime QA) |
+| **3** | Skeletons + SWR data-layer | ✅ **Done**: skeletons + `useApiQuery` cache shipped; admin + **deals + dashboard + contacts** migrated, each with a jsdom page test |
 | **4** | Lazy-load chart.js (html2pdf already lazy; prefetch already on) | ✅ **Done** (committed) — confirm bundle sizes via build |
 | **5** | Static-render marketing pages | ✅ **Verified** — already static (no code change needed); confirm via build route table |
 | **6** | Local JWT verification (getClaims) | ✅ **Done** (committed) — auto-upgrades when Supabase asymmetric keys are enabled |
 
-> What's left for a developer: **capture the Phase 1 numbers** (instrumentation is in place; needs prod access), **roll `useApiQuery` out to the mutation-heavy hot pages** (deals/contacts/dashboard — needs runtime QA), confirm **build numbers** for Phases 4/5, and **enable Supabase asymmetric JWT keys** to unlock Phase 6's local-verify fast path.
+> What's left for **you** (needs access I don't have): **capture the Phase 1 numbers** (instrumentation is in place; needs prod access), confirm **build numbers** for Phases 4/5 in CI, and **enable Supabase asymmetric JWT keys** to unlock Phase 6's local-verify fast path. The page migrations are verified with jsdom page tests, but a visual click-through of the optimistic flows (deal delete / kanban drag / contacts "load more") is still worth a manual pass before merge — that couldn't run here (no browser tool in this environment).
 
 ---
 
