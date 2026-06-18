@@ -186,11 +186,26 @@ router.post('/deals/:dealId/graphs', async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Mirror the GET handlers: a missing CustomGraph table means the
+      // custom-graph migration hasn't been applied in this environment.
+      if (isMissingTableError(error)) {
+        return res.status(503).json({
+          error: 'Graphs are not available yet — run the custom-graph migration.',
+        });
+      }
+      throw error;
+    }
 
     res.status(201).json(data);
   } catch (err) {
-    log.error('POST /api/deals/:dealId/graphs error', err);
+    // Log the underlying DB error details so the 500 isn't opaque (FK
+    // violations, type mismatches, etc. were previously swallowed).
+    log.error('POST /api/deals/:dealId/graphs error', {
+      message: (err as { message?: string })?.message,
+      code: (err as { code?: string })?.code,
+      details: (err as { details?: string })?.details,
+    });
     res.status(500).json({ error: 'Failed to create graph' });
   }
 });

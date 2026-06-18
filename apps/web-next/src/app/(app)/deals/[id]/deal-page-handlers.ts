@@ -163,17 +163,24 @@ export async function uploadDocuments(
     const { data: sessionData } = await supabase.auth.getSession();
     const token = sessionData.session?.access_token;
 
-    const formData = new FormData();
-    Array.from(files).forEach((f) => formData.append("files", f));
+    // The API endpoint is multer.single('file') — it accepts ONE file under the
+    // field name `file`. Sending `files` (plural) or multiple files in one
+    // request triggers MulterError "Unexpected field" (LIMIT_UNEXPECTED_FILE) →
+    // 500. Upload each selected file in its own request under the `file` field.
+    const newDocs: DocItem[] = [];
+    for (const f of Array.from(files)) {
+      const formData = new FormData();
+      formData.append("file", f);
 
-    const res = await fetch(`/api/deals/${dealId}/documents`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: formData,
-    });
-    if (!res.ok) throw new Error("Upload failed");
-    const result = await res.json();
-    const newDocs: DocItem[] = result.documents || result || [];
+      const res = await fetch(`/api/deals/${dealId}/documents`, {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: formData,
+      });
+      if (!res.ok) throw new Error("Upload failed");
+      const doc = await res.json();
+      newDocs.push(doc);
+    }
     setDocuments((prev) => [...prev, ...newDocs]);
   } catch (err) {
     showToast(err instanceof Error ? err.message : "Document upload failed", "error");

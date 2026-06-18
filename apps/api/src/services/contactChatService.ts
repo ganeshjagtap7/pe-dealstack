@@ -45,7 +45,7 @@ export async function chatAboutContact(
   history: ContactChatHistoryItem[] = [],
   authUserId?: string
 ): Promise<ContactChatResult> {
-  const modelName = 'claude-sonnet-4-5';
+  const modelName = 'claude-sonnet-4-6';
 
   // 1. Contact fields (org-scoped).
   const { data: contact } = await supabase
