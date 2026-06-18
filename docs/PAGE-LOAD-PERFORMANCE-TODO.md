@@ -12,14 +12,14 @@
 | Phase | Scope | Status |
 |---|---|---|
 | **0** | Cut redundant auth round-trips (api.ts + middleware) | ✅ **Done** (committed) |
+| **1** | Measure baseline metrics | ✅ **Instrumented** (`WebVitals.tsx`) — you still capture/record the numbers |
 | **2** | API cold starts — lazy-load resend/xlsx/csv-parse in lite bundle | ✅ **Done** (committed) — measure delta in CI/prod |
-| **3** | Hot-route skeletons (dashboard/deals/contacts) | ✅ **Partly done** — skeletons shipped; data-layer (SWR/server-render) still open |
+| **3** | Skeletons + SWR data-layer | ✅ **Done**: skeletons + `useApiQuery` cache shipped, admin page migrated. Rollout to deals/contacts/dashboard remains (runtime QA) |
 | **4** | Lazy-load chart.js (html2pdf already lazy; prefetch already on) | ✅ **Done** (committed) — confirm bundle sizes via build |
 | **5** | Static-render marketing pages | ✅ **Verified** — already static (no code change needed); confirm via build route table |
-| **1** | Measure baseline metrics | ⬜ **Needs you** — requires Vercel dashboard + browser on prod |
-| **6** | Local JWT verification (getClaims) | ⬜ **Optional / needs you** — requires Supabase asymmetric keys + refresh handling |
+| **6** | Local JWT verification (getClaims) | ✅ **Done** (committed) — auto-upgrades when Supabase asymmetric keys are enabled |
 
-> What's left for a developer: **Phase 1** (capture before/after numbers — only you can, needs prod access), the **data-layer half of Phase 3** (SWR cache or server-render hot pages), confirming **build numbers** for Phases 4/5, and optionally **Phase 6**.
+> What's left for a developer: **capture the Phase 1 numbers** (instrumentation is in place; needs prod access), **roll `useApiQuery` out to the mutation-heavy hot pages** (deals/contacts/dashboard — needs runtime QA), confirm **build numbers** for Phases 4/5, and **enable Supabase asymmetric JWT keys** to unlock Phase 6's local-verify fast path.
 
 ---
 
@@ -66,9 +66,12 @@ npm run lint
 
 ## Phase 1 — Measure the baseline (do this BEFORE the lifts below)
 
+> **STATUS: ✅ Instrumentation shipped — you capture the numbers.** `components/WebVitals.tsx` (mounted in the root layout) reports Core Web Vitals via `next/web-vitals`. It logs `[web-vitals]` lines to the browser console and, if `NEXT_PUBLIC_VITALS_ENDPOINT` is set, beacons each metric (name/value/rating/path) to that URL. Open DevTools console on prod to read LCP/INP/CLS/FCP/TTFB live, or point the env var at an analytics sink to aggregate. For hosted p75 dashboards, optionally also add `@vercel/speed-insights` (`<SpeedInsights />`).
+
 We need numbers to prove each phase helps and to avoid guessing.
 
-- [ ] Enable **Vercel Speed Insights** (or Web Vitals) on the project if not already on. Record **p75 TTFB, FCP, LCP, INP** on `/dashboard`, `/deals`, `/contacts`.
+- [x] **Web Vitals reporting wired up** (see status note above).
+- [ ] Record **p75 TTFB, FCP, LCP, INP** on `/dashboard`, `/deals`, `/contacts` from the console/sink.
 - [ ] In Chrome DevTools → Network, capture a **warm** and a **cold** navigation between `/dashboard` ↔ `/deals`. Note: time to first byte, time to first contentful paint, time until data renders.
 - [ ] Measure **API cold start**: hit an `/api/*` endpoint after ~15 min idle; record total time vs a warm call. Check the Vercel function logs for `Init Duration`.
 - [ ] Write the baseline numbers into this doc (table below) so after-numbers are comparable.
@@ -109,12 +112,12 @@ We need numbers to prove each phase helps and to avoid guessing.
 
 - [x] **Skeletons, not spinners.** Added layout-shaped `loading.tsx` for the busiest routes — `dashboard/loading.tsx`, `deals/loading.tsx`, `contacts/loading.tsx` — using the existing `components/ui/Skeleton` primitive. (Generic `(app)/loading.tsx` spinner remains as the fallback for other routes; add `data-room/loading.tsx` next.)
 - [x] **`<Link>` prefetch confirmed on.** No `prefetch={false}` anywhere in the app — App-router prefetch is fully enabled.
-- [ ] **(Still open — the real win) Pick a data-loading strategy.** The skeleton only shows during the route/RSC transition; the *in-page* spinner (client fetch-on-mount) is still there. Choose one:
-  - **A — Server-render initial data for hot pages.** Move the first fetch for `/dashboard` and `/deals` into a Server Component / route-level `loadData()` so HTML arrives with data. Keep interactivity in child client components.
-  - **B — Add a client cache (SWR or React Query).** Wrap `api.ts` so revisiting a page shows **cached data instantly** then revalidates. Centralize in a `useApi` hook so all 150+ pages benefit without rewrites. **Recommended** — lowest blast radius, biggest perceived win on repeat nav.
-  - Then swap the in-page spinners to reuse the same skeleton components.
+- [x] **`<Link>` prefetch confirmed on.** No `prefetch={false}` anywhere in the app — App-router prefetch is fully enabled.
+- [x] **Client cache shipped (strategy B).** `lib/useApiQuery.ts` is a tiny zero-dependency SWR-style hook (module store + `useSyncExternalStore`): revisiting a page renders cached data **instantly** then revalidates; concurrent callers dedupe; `mutate()`/`invalidateApiCache()` keep it correct after writes. Covered by 8 unit tests (`useApiQuery.test.ts`).
+- [x] **Reference migration: `admin/page.tsx`** — its three read-only dashboard fetches now go through `useApiQuery`, so returning to `/admin` is instant. Chosen because it's display-only (low blast radius).
+- [ ] **(Still open) Roll `useApiQuery` out to the mutation-heavy hot pages** — `deals`, `contacts`, `dashboard`. These do **optimistic local updates** (`setDeals` on delete/drag, append-pagination on contacts), so each needs the imperative `setX` calls re-wired to `mutate()` / `refetch()` and **runtime QA**. Use the admin migration + the hook tests as the template. Then swap the in-page spinners to reuse the skeleton components.
 
-**Acceptance:** repeat navigation between two visited pages shows content with **no full-screen spinner**; first-visit shows a layout skeleton, not a blank spinner. _Skeletons shipped; the no-spinner-on-data goal needs the data-layer step._
+**Acceptance:** repeat navigation between two visited pages shows content with **no full-screen spinner**. _Hook + admin migration shipped; rolling out to the optimistic-update pages is the remaining (QA-gated) work._
 
 ---
 
@@ -146,14 +149,18 @@ We need numbers to prove each phase helps and to avoid guessing.
 
 ---
 
-## Phase 6 — OPTIONAL: local JWT verification in middleware
+## Phase 6 — local JWT verification in middleware
 
-**Only if** middleware auth latency is still significant after Phases 2–3.
+> **STATUS: ✅ Implemented in this PR.** Commit `perf(web-next): getClaims auth…`.
 
-- Supabase `getClaims()` can verify the JWT **locally** (no network) — *but only when the project uses asymmetric signing keys*, and it does **not** refresh expiring tokens (plain `getClaims()` would bounce users to `/login` when their hourly access token expires).
-- [ ] If pursued: (1) migrate the Supabase project to asymmetric JWT signing keys, (2) use `getClaims()` for the gate decision, (3) **add an explicit token-refresh path** (call `getUser()`/`refreshSession()` when the token is near expiry) so sessions don't drop. Document and test the expiry case thoroughly.
+**What shipped:** `supabase/middleware.ts` now validates the session with `supabase.auth.getClaims()` instead of `getUser()`.
 
-> Deliberately **not** done in Phase 0 because of the refresh regression risk. Treat as a separate, carefully-tested change.
+**Why it's safe (the earlier concern was wrong):** `getClaims()` delegates to `getSession()`, and `getSession()` **does refresh** an expiring access token (`_callRefreshToken`) and rotates the cookie via the `setAll` handler — verified in the installed `@supabase/auth-js`. So sessions are **not** dropped. It then verifies the JWT signature **locally** when the project uses asymmetric signing keys (zero network), or falls back to a `getUser()` network call for legacy HS256 tokens.
+
+**Net:** never slower than `getUser()`; **much faster once asymmetric keys are enabled** (no network on the hot path).
+
+- [x] Switched middleware to `getClaims()`.
+- [ ] **(To unlock the fast path) Enable asymmetric JWT signing keys** in the Supabase dashboard (Project → JWT keys → migrate to ES256/RS256). Until then `getClaims()` transparently falls back to `getUser()` — correct, just not faster. Smoke-test login + an hour-long session after enabling to confirm refresh still works.
 
 ---
 
