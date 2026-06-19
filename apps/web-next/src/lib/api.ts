@@ -32,14 +32,15 @@ export class ApiError extends Error {
 
 async function getAuthHeaders(): Promise<HeadersInit> {
   const supabase = createClient();
-  // Use getUser() — getSession() reads from local storage without server
-  // validation (Supabase docs warn against relying on it for auth checks).
-  // We still need the session for the access_token, but only fetch it after
-  // confirming the user is valid.
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if (error || !user) {
-    return { "Content-Type": "application/json" };
-  }
+  // getSession() reads from cookies/storage with no network round-trip. We
+  // don't validate the user here — we only need to attach the JWT so the API
+  // can authenticate the request. The API verifies the token signature on
+  // every request (apps/api/src/middleware/auth.ts); if it's expired or
+  // tampered with we get a 401 and redirect to /login below. The previous
+  // implementation called getUser() (a server-validated round-trip to
+  // Supabase auth) before every fetch, which added one network hop per API
+  // call — multiplied by ~14 parallel fetches on dashboard mount, that was
+  // hundreds of ms of avoidable latency per page navigation.
   const { data } = await supabase.auth.getSession();
   const token = data.session?.access_token;
   return {
