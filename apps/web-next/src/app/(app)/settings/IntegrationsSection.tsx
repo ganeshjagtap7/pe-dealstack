@@ -18,6 +18,8 @@ const PROVIDER_CATALOG: ProviderCatalogEntry[] = [
   { id: "granola",         name: "Granola",         desc: "Auto-import meeting transcripts",        icon: "mic",         available: true },
   { id: "gmail",           name: "Gmail",           desc: "Sync deal-related emails",               icon: "mail",        available: true },
   { id: "google_calendar", name: "Google Workspace", desc: "Calendar events + NDA Google Docs",     icon: "workspaces",  available: true },
+  { id: "outlook",         name: "Outlook",          desc: "Sync deal-related emails",              icon: "mail",        available: true },
+  { id: "microsoft365",    name: "Microsoft 365",    desc: "Calendar events + OneDrive files",      icon: "workspaces",  available: true },
   { id: "fireflies",       name: "Fireflies",       desc: "Auto-import meeting transcripts",        icon: "mic",         available: false },
   { id: "otter",           name: "Otter",           desc: "Auto-import meeting transcripts",        icon: "graphic_eq",  available: false },
 ];
