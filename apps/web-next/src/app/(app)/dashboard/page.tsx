@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useUser } from "@/providers/UserProvider";
 import { api } from "@/lib/api";
-import { useApiQuery } from "@/lib/useApiQuery";
 import { cn } from "@/lib/cn";
 import { WelcomeModal } from "@/components/onboarding/WelcomeModal";
 import { OnboardingChecklist } from "@/components/onboarding/OnboardingChecklist";
@@ -21,7 +20,7 @@ import {
   PortfolioAllocation,
 } from "./components";
 import { TasksModal } from "./dashboard-modals";
-import { ActivePrioritiesWidget, MyTasksWidget, AiDealSignalsWidget } from "./dashboard-widgets";
+import { ActivePrioritiesWidget, MyTasksWidget, AiDealSignalsWidget, type InboxScanResult } from "./dashboard-widgets";
 import { CustomizeDashboardModal } from "./widgets/customize-modal";
 import { DraggableWidget } from "./widgets/draggable-widget";
 import { useVisibleWidgets } from "./widgets/useVisibleWidgets";
@@ -31,38 +30,12 @@ import type { WidgetId, CoreWidgetId } from "./widgets/registry";
 export default function DashboardPage() {
   const { user } = useUser();
   const { showToast } = useToast();
-
-  // Dashboard data via the shared stale-while-revalidate cache: returning to
-  // the dashboard renders the last-seen deals/tasks instantly and revalidates
-  // in the background instead of re-fetching behind a spinner.
-  const dealsQuery = useApiQuery<Deal[] | { deals: Deal[] }>(
-    "/deals?limit=100&sortBy=updatedAt&sortOrder=desc",
-  );
-  const tasksQuery = useApiQuery<{ tasks: Task[] } | Task[]>("/tasks?limit=20");
-
-  const allDeals = useMemo<Deal[]>(() => {
-    const v = dealsQuery.data;
-    return v === undefined ? [] : Array.isArray(v) ? v : v.deals || [];
-  }, [dealsQuery.data]);
-
-  // Active Priorities: filter active, sort by priority (HIGH first), top 5 —
-  // matches the legacy loadActivePriorities behaviour.
-  const deals = useMemo<Deal[]>(() => {
-    const PRIORITY_ORDER: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
-    return allDeals
-      .filter((d) => d.status !== "ARCHIVED" && d.status !== "PASSED")
-      .sort((a, b) => (PRIORITY_ORDER[a.priority || ""] ?? 99) - (PRIORITY_ORDER[b.priority || ""] ?? 99))
-      .slice(0, 5);
-  }, [allDeals]);
-
-  const tasks = useMemo<Task[]>(() => {
-    const t = tasksQuery.data;
-    return t === undefined ? [] : Array.isArray(t) ? t : t.tasks || [];
-  }, [tasksQuery.data]);
-
-  const loading = dealsQuery.isLoading || tasksQuery.isLoading;
+  const [allDeals, setAllDeals] = useState<Deal[]>([]);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [signalResult, setSignalResult] = useState<{ signals?: Array<{ title: string; description: string; severity: string; signalType: string; dealName: string; suggestedAction: string }>; processedCount?: number } | null>(null);
+  const [signalResult, setSignalResult] = useState<InboxScanResult | null>(null);
   const [stageModal, setStageModal] = useState<{ label: string; stages: string[] } | null>(null);
   const [tasksModalOpen, setTasksModalOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);
@@ -114,6 +87,42 @@ export default function DashboardPage() {
     draggingCoreRef.current = null;
   }, []);
 
+  useEffect(() => {
+    async function load() {
+      try {
+        const [dealsRes, tasksRes] = await Promise.allSettled([
+          api.get<Deal[] | { deals: Deal[] }>("/deals?limit=100&sortBy=updatedAt&sortOrder=desc"),
+          api.get<{ tasks: Task[] } | Task[]>("/tasks?limit=20"),
+        ]);
+        if (dealsRes.status === "fulfilled") {
+          // API returns plain array; handle both formats for safety
+          const rawDeals = Array.isArray(dealsRes.value)
+            ? dealsRes.value
+            : (dealsRes.value as { deals: Deal[] }).deals || [];
+          setAllDeals(rawDeals);
+          // Active Priorities: filter active, sort by priority (HIGH first) — matches legacy loadActivePriorities
+          const PRIORITY_ORDER: Record<string, number> = { HIGH: 0, MEDIUM: 1, LOW: 2 };
+          const activeForPriorities = rawDeals
+            .filter((d) => d.status !== "ARCHIVED" && d.status !== "PASSED")
+            .sort((a, b) => (PRIORITY_ORDER[a.priority || ""] ?? 99) - (PRIORITY_ORDER[b.priority || ""] ?? 99))
+            .slice(0, 5);
+          setDeals(activeForPriorities);
+        } else {
+          console.warn("[dashboard] failed to load deals:", dealsRes.reason);
+        }
+        if (tasksRes.status === "fulfilled") {
+          const t = tasksRes.value;
+          setTasks(Array.isArray(t) ? t : t.tasks || []);
+        } else {
+          console.warn("[dashboard] failed to load tasks:", tasksRes.reason);
+        }
+      } catch (err) {
+        console.warn("[dashboard] load error:", err);
+      } finally { setLoading(false); }
+    }
+    load();
+  }, []);
+
   // Esc exits layout edit mode — mirrors onKeyDown in layout-editor.js
   useEffect(() => {
     if (!isEditing) return;
@@ -127,23 +136,14 @@ export default function DashboardPage() {
   const [taskError, setTaskError] = useState<string | null>(null);
   const [signalError, setSignalError] = useState<string | null>(null);
 
-  // Optimistically set a task's status in the cache. mutate() returns a plain
-  // array; the `tasks` memo tolerates both the array and {tasks} shapes, so a
-  // background revalidation can safely overwrite it with the raw response.
-  const setTaskStatus = (taskId: string, status: string) =>
-    tasksQuery.mutate((prev) => {
-      const list = prev === undefined ? [] : Array.isArray(prev) ? prev : prev.tasks || [];
-      return list.map((t) => (t.id === taskId ? { ...t, status } : t));
-    });
-
   const toggleTask = async (taskId: string, currentStatus: string) => {
     const newStatus = currentStatus === "COMPLETED" ? "PENDING" : "COMPLETED";
-    setTaskStatus(taskId, newStatus);
+    setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: newStatus } : t)));
     try {
       await api.patch(`/tasks/${taskId}`, { status: newStatus });
     } catch (err) {
       console.warn("[dashboard] toggleTask failed:", err);
-      setTaskStatus(taskId, currentStatus);
+      setTasks((prev) => prev.map((t) => (t.id === taskId ? { ...t, status: currentStatus } : t)));
       setTaskError("Couldn't update task — please try again.");
       setTimeout(() => setTaskError(null), 3500);
     }
@@ -180,11 +180,11 @@ export default function DashboardPage() {
     pct: sectorTotal > 0 ? Math.round((count / sectorTotal) * 100) : 0,
     color: SECTOR_COLORS[i] || SECTOR_COLORS[SECTOR_COLORS.length - 1],
   }));
-  // Build conic-gradient stops from cumulative percentages (no render-time
-  // mutation — prefix sums keep this pure for the react-hooks/immutability rule).
-  const gradientParts = allocation.map((a, i) => {
-    const start = allocation.slice(0, i).reduce((sum, x) => sum + x.pct, 0);
-    return `${a.color} ${start}% ${start + a.pct}%`;
+  let cumPct = 0;
+  const gradientParts = allocation.map((a) => {
+    const start = cumPct;
+    cumPct += a.pct;
+    return `${a.color} ${start}% ${cumPct}%`;
   });
 
   // Helper: wraps a core widget in edit-mode decoration (dashed border, drag handle)

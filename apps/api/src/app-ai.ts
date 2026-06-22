@@ -10,6 +10,11 @@ import financialsRouter from './routes/financials.js';
 import memosRouter from './routes/memos.js';
 import ingestRouter from './routes/ingest.js';
 import onboardingRouter from './routes/onboarding.js';
+import graphsRouter from './routes/graphs.js';
+import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
+import legalDocumentsRouter from './routes/legal-documents.js';
+import legalDocumentTemplatesRouter from './routes/legal-document-templates.js';
+import authWorkspaceEmailRouter from './routes/auth-workspace-email.js';
 import { authMiddleware, enforceOrgMfaMiddleware } from './middleware/auth.js';
 import { orgMiddleware } from './middleware/orgScope.js';
 import { usageContextMiddleware } from './middleware/usageContext.js';
@@ -160,7 +165,17 @@ app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageCon
 app.use('/api/ingest', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, ingestRouter);
 app.use('/api/memos', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, memosRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, onboardingRouter);
+// CustomGraph CRUD — /api/graphs and /api/deals/:dealId/graphs
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, graphsRouter);
+// financials timeseries — /api/deals/:dealId/financials/timeseries
+app.use('/api/deals', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, dealsFinancialsTimeseriesRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, financialsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
+app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentTemplatesRouter);
+
+// Auth-scoped self-service routes (MFA bypass active for /api/auth/* in
+// middleware). No orgMiddleware — handler resolves the User row itself.
+app.use('/api/auth', authMiddleware, authWorkspaceEmailRouter);
 
 // ========================================
 // AI Routes (mixed - some protected, some public)

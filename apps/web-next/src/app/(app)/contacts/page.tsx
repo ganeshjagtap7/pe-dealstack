@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef, useMemo } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
-import { useApiQuery } from "@/lib/useApiQuery";
 import { cn } from "@/lib/cn";
 import { createClient } from "@/lib/supabase/client";
 import { useToast } from "@/providers/ToastProvider";
@@ -11,9 +10,14 @@ import {
   ContactModal, InsightCards,
 } from "./components";
 import { DetailPanel } from "./detail-panel";
+import { FollowUpsBanner } from "./follow-ups-banner";
+import { GmailSuggestions } from "./GmailSuggestions";
 import { CSVImportModal } from "./csv-import-modal";
 import { ContactCard, ContactRow, TABLE_HEADERS, TABLE_TH_CLS } from "./list-items";
-import { CONTACTS_PAGE_SIZE, SORT_OPTIONS, groupContacts, sortGroupKeys } from "./list-utils";
+import {
+  CONTACTS_PAGE_SIZE, SORT_OPTIONS, groupContacts, sortGroupKeys,
+  isStrengthSort, sortContactsByStrength,
+} from "./list-utils";
 import {
   ContactsGridSkeleton, ContactsTableSkeleton,
   ContactsErrorState, ContactsEmptyState,
@@ -22,12 +26,15 @@ import {
 // ─── Page Component ────────────────────────────────────────
 
 export default function ContactsPage() {
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [totalContacts, setTotalContacts] = useState(0);
+  const [contactScores, setContactScores] = useState<Record<string, { score: number; label: string }>>({});
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [filters, setFilters] = useState({ search: "", type: "", sortBy: "createdAt", sortOrder: "desc" });
-  // Pages fetched via "Load more" are appended here, scoped to the active query
-  // key so a filter change discards them without a reset effect.
-  const [appendedPages, setAppendedPages] = useState<{ key: string; items: Contact[] }>({ key: "", items: [] });
+  const [currentOffset, setCurrentOffset] = useState(0);
 
   // Modal / panel state
   const [modalOpen, setModalOpen] = useState(false);
@@ -42,6 +49,7 @@ export default function ContactsPage() {
   const { showToast } = useToast();
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Refs for dropdown outside-click detection
   const typeButtonRef = useRef<HTMLButtonElement>(null);
@@ -53,45 +61,38 @@ export default function ContactsPage() {
 
   // ─── Data Loading ─────────────────────────────────────────
 
-  // First page + scores come from the shared cache, so returning to /contacts
-  // renders the last-seen list instantly and revalidates in the background.
-  const contactsKey = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.search) params.set("search", filters.search);
-    if (filters.type) params.set("type", filters.type);
-    params.set("sortBy", filters.sortBy);
-    params.set("sortOrder", filters.sortOrder);
-    params.set("limit", String(CONTACTS_PAGE_SIZE));
-    params.set("offset", "0");
-    return `/contacts?${params.toString()}`;
+  const loadContacts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (filters.search) params.set("search", filters.search);
+      if (filters.type) params.set("type", filters.type);
+      // Strength is a client-side sort (not in the API's sortBy enum) — fall
+      // back to a stable server order and reorder after load.
+      params.set("sortBy", isStrengthSort(filters.sortBy) ? "createdAt" : filters.sortBy);
+      params.set("sortOrder", filters.sortOrder);
+      params.set("limit", String(CONTACTS_PAGE_SIZE));
+      params.set("offset", "0");
+
+      const [data, scores] = await Promise.all([
+        api.get<{ contacts: Contact[]; total: number }>(`/contacts?${params}`),
+        api.get<{ scores: Record<string, { score: number; label: string }> }>("/contacts/insights/scores").catch(() => ({ scores: {} })),
+      ]);
+
+      const fetched = data.contacts || [];
+      setContacts(fetched);
+      setTotalContacts(data.total || 0);
+      setContactScores(scores.scores || {});
+      setCurrentOffset(fetched.length);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load contacts");
+    } finally {
+      setLoading(false);
+    }
   }, [filters]);
 
-  const {
-    data: page1,
-    isLoading: loading,
-    error: fetchError,
-    refetch: refetchPage1,
-  } = useApiQuery<{ contacts: Contact[]; total: number }>(contactsKey);
-  const { data: scoresData, refetch: refetchScores } = useApiQuery<{
-    scores: Record<string, { score: number; label: string }>;
-  }>("/contacts/insights/scores");
-
-  // Appended pages only count for the current query key.
-  const contacts = useMemo(() => {
-    const ap = appendedPages.key === contactsKey ? appendedPages.items : [];
-    return [...(page1?.contacts ?? []), ...ap];
-  }, [page1, appendedPages, contactsKey]);
-  const totalContacts = page1?.total ?? 0;
-  const contactScores = scoresData?.scores ?? {};
-  const currentOffset = contacts.length;
-  const error = fetchError?.message ?? null;
-
-  // Refresh after a mutation: discard appended pages and revalidate page 1.
-  const loadContacts = useCallback(() => {
-    setAppendedPages({ key: "", items: [] });
-    refetchPage1();
-    refetchScores();
-  }, [refetchPage1, refetchScores]);
+  useEffect(() => { loadContacts(); }, [loadContacts]);
 
   // Close dropdowns on outside click (ref-based, no stopPropagation needed)
   useEffect(() => {
@@ -142,17 +143,17 @@ export default function ContactsPage() {
       const params = new URLSearchParams();
       if (filters.search) params.set("search", filters.search);
       if (filters.type) params.set("type", filters.type);
-      params.set("sortBy", filters.sortBy);
+      // Strength is a client-side sort (not in the API's sortBy enum) — fall
+      // back to a stable server order and reorder after load.
+      params.set("sortBy", isStrengthSort(filters.sortBy) ? "createdAt" : filters.sortBy);
       params.set("sortOrder", filters.sortOrder);
       params.set("limit", String(CONTACTS_PAGE_SIZE));
       params.set("offset", String(currentOffset));
 
       const data = await api.get<{ contacts: Contact[]; total: number }>(`/contacts?${params}`);
       const newContacts = data.contacts || [];
-      setAppendedPages((prev) => ({
-        key: contactsKey,
-        items: [...(prev.key === contactsKey ? prev.items : []), ...newContacts],
-      }));
+      setContacts((prev) => [...prev, ...newContacts]);
+      setCurrentOffset((prev) => prev + newContacts.length);
     } catch (err) {
       console.error("Error loading more:", err);
     } finally {
@@ -166,6 +167,19 @@ export default function ContactsPage() {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
     searchTimeoutRef.current = setTimeout(() => setFilters((f) => ({ ...f, search: value })), 300);
   }
+
+  function clearSearch() {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    if (searchInputRef.current) searchInputRef.current.value = "";
+    setFilters((f) => ({ ...f, search: "" }));
+  }
+
+  function clearAllFilters() {
+    clearSearch();
+    setFilters((f) => ({ ...f, search: "", type: "" }));
+  }
+
+  const hasActiveFilters = !!(filters.search || filters.type);
 
   function openAddModal() { setEditingContact(null); setModalOpen(true); }
 
@@ -195,7 +209,9 @@ export default function ContactsPage() {
       const params = new URLSearchParams();
       if (filters.search) params.set("search", filters.search);
       if (filters.type) params.set("type", filters.type);
-      params.set("sortBy", filters.sortBy);
+      // Strength is a client-side sort (not in the API's sortBy enum) — fall
+      // back to a stable server order and reorder after load.
+      params.set("sortBy", isStrengthSort(filters.sortBy) ? "createdAt" : filters.sortBy);
       params.set("sortOrder", filters.sortOrder);
       const res = await fetch(`/api/contacts/export?${params}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
       if (!res.ok) throw new Error("Export failed");
@@ -215,7 +231,10 @@ export default function ContactsPage() {
 
   // ─── Group by Company derived state ───────────────────────
 
-  const grouped = groupByCompany ? groupContacts(contacts) : {};
+  const displayContacts = isStrengthSort(filters.sortBy)
+    ? sortContactsByStrength(contacts, contactScores, filters.sortOrder as "asc" | "desc")
+    : contacts;
+  const grouped = groupByCompany ? groupContacts(displayContacts) : {};
   const sortedGroupKeys = groupByCompany ? sortGroupKeys(grouped) : [];
   const hasMore = contacts.length < totalContacts;
   const remaining = totalContacts - contacts.length;
@@ -258,8 +277,13 @@ export default function ContactsPage() {
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <span className="material-symbols-outlined text-text-muted group-focus-within:text-primary transition-colors text-[18px]">search</span>
             </div>
-            <input type="text" defaultValue={filters.search} onChange={(e) => handleSearchChange(e.target.value)}
-              className="block w-64 rounded-lg border border-border-subtle bg-surface-card py-2 pl-10 pr-4 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm" placeholder="Search contacts..." />
+            <input ref={searchInputRef} type="text" defaultValue={filters.search} onChange={(e) => handleSearchChange(e.target.value)}
+              className="block w-64 rounded-lg border border-border-subtle bg-surface-card py-2 pl-10 pr-9 text-sm text-text-main placeholder-text-muted focus:ring-1 focus:ring-primary focus:border-primary transition-all shadow-sm" placeholder="Search name, company, email..." />
+            {filters.search && (
+              <button onClick={clearSearch} className="absolute inset-y-0 right-0 flex items-center pr-3 text-text-muted hover:text-text-secondary transition-colors" title="Clear search" aria-label="Clear search">
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            )}
           </div>
 
           {/* Type Filter */}
@@ -341,8 +365,37 @@ export default function ContactsPage() {
         </div>
       </div>
 
-      {/* Insight Cards */}
-      {!loading && <InsightCards totalContacts={totalContacts} />}
+      {/* Active filter chips */}
+      {hasActiveFilters && (
+        <div className="flex items-center gap-2 flex-wrap -mt-2">
+          <span className="text-xs font-medium text-text-muted">Filters:</span>
+          {filters.search && (
+            <button onClick={clearSearch} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-light text-primary text-xs font-medium hover:opacity-80 transition-opacity">
+              <span className="material-symbols-outlined text-[14px]">search</span>
+              &ldquo;{filters.search}&rdquo;
+              <span className="material-symbols-outlined text-[14px]">close</span>
+            </button>
+          )}
+          {filters.type && (
+            <button onClick={() => setFilters((f) => ({ ...f, type: "" }))} className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-light text-primary text-xs font-medium hover:opacity-80 transition-opacity">
+              {TYPE_CONFIG[filters.type]?.label || filters.type}
+              <span className="material-symbols-outlined text-[14px]">close</span>
+            </button>
+          )}
+          <button onClick={clearAllFilters} className="text-xs font-medium text-text-muted hover:text-text-secondary transition-colors underline">
+            Clear all
+          </button>
+        </div>
+      )}
+
+      {/* Follow-ups due banner — calls GET /contacts/insights/follow-ups */}
+      {!loading && <FollowUpsBanner onOpenContact={setDetailContactId} />}
+
+      {/* Add contacts from your inbox — lazy, non-blocking Gmail suggestions */}
+      {!loading && <GmailSuggestions onContactAdded={loadContacts} />}
+
+      {/* Insight Cards — "Needs attention" stale contacts */}
+      {!loading && <InsightCards totalContacts={totalContacts} onOpenContact={setDetailContactId} />}
 
       {/* Content */}
       {loading ? (
@@ -350,7 +403,7 @@ export default function ContactsPage() {
       ) : error ? (
         <ContactsErrorState error={error} onRetry={loadContacts} />
       ) : contacts.length === 0 ? (
-        <ContactsEmptyState filtered={!!(filters.search || filters.type)} onAdd={openAddModal} />
+        <ContactsEmptyState filtered={hasActiveFilters} onAdd={openAddModal} />
       ) : groupByCompany ? (
         <div className="flex flex-col gap-5">
           {sortedGroupKeys.map((company) => (
@@ -374,10 +427,10 @@ export default function ContactsPage() {
           ))}
         </div>
       ) : viewMode === "grid" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{contacts.map(renderCard)}</div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">{displayContacts.map(renderCard)}</div>
       ) : (
         <div className="bg-surface-card rounded-lg border border-border-subtle shadow-card overflow-hidden overflow-x-auto">
-          <table className="w-full min-w-[600px]">{tableHead}<tbody>{contacts.map(renderRow)}</tbody></table>
+          <table className="w-full min-w-[600px]">{tableHead}<tbody>{displayContacts.map(renderRow)}</tbody></table>
         </div>
       )}
 

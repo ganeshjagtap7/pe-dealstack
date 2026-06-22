@@ -12,6 +12,8 @@ import { mergeIntoExistingDeal, getIconForIndustry } from '../services/dealMerge
 import { getOrgId } from '../middleware/orgScope.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
 import { resolveUserId } from './notifications.js';
+import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
+import { generateTeasersForDeal } from '../services/firmTeaserService.js';
 
 const router = Router();
 
@@ -164,13 +166,15 @@ router.post('/', upload.single('file'), async (req, res) => {
       needsReview: aiData.needsReview,
     });
 
-    // Financial validation
+    // Financial validation — sourceLength enables short-doc bounds
     const financialCheck = validateFinancials({
       revenue: aiData.revenue.value,
       ebitda: aiData.ebitda.value,
       ebitdaMargin: aiData.ebitdaMargin?.value,
       revenueGrowth: aiData.revenueGrowth?.value,
       employees: aiData.employees?.value,
+      dealSize: aiData.dealSize?.value,
+      sourceLength: extractedText.length,
     });
     if (!financialCheck.isValid) {
       aiData.needsReview = true;
@@ -229,6 +233,16 @@ router.post('/', upload.single('file'), async (req, res) => {
       const dealIcon = getIconForIndustry(aiData.industry.value);
       const dealStatus = aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE';
 
+      // Per-field confidence floor — values below this don't auto-populate
+      // the Deal table. Same gate as merge path (see dealMerger.ts).
+      const FIELD_FLOOR = 60;
+      const safeRevenue = aiData.revenue.value != null && aiData.revenue.confidence >= FIELD_FLOOR
+        ? aiData.revenue.value : null;
+      const safeEbitda = aiData.ebitda.value != null && aiData.ebitda.confidence >= FIELD_FLOOR
+        ? aiData.ebitda.value : null;
+      const safeDealSize = aiData.dealSize?.value != null && aiData.dealSize.confidence >= FIELD_FLOOR
+        ? aiData.dealSize.value : null;
+
       // User-provided deal context (optional fields from ingest form)
       const userSource = req.body?.source || null;
       const userThesis = req.body?.userThesis || null;
@@ -262,10 +276,10 @@ router.post('/', upload.single('file'), async (req, res) => {
           priority: userPriority,
           industry: aiData.industry.value,
           description: aiData.description.value,
-          revenue: aiData.revenue.value,
-          ebitda: aiData.ebitda.value,
+          revenue: safeRevenue,
+          ebitda: safeEbitda,
           currency: aiData.currency || 'USD',
-          dealSize: aiData.dealSize?.value || null,
+          dealSize: safeDealSize,
           aiThesis: userThesis || aiData.summary,
           icon: dealIcon,
           ...(userSource ? { source: userSource } : {}),
@@ -315,11 +329,36 @@ router.post('/', upload.single('file'), async (req, res) => {
     // Step 6: Create document record with confidence data
     log.debug('Step 6: Creating document record');
 
+    // Auto-classify by filename + mimeType. Spreadsheets default to
+    // FINANCIALS so the re-extract loop in financials-extraction.ts
+    // (which filters `type IN ('CIM','FINANCIALS')`) picks them up.
     let docType = 'OTHER';
     const lowerName = documentName.toLowerCase();
+    const lowerMime = (mimeType ?? '').toLowerCase();
+    const looksLikeSpreadsheet =
+      lowerName.endsWith('.xlsx') ||
+      lowerName.endsWith('.xls') ||
+      lowerName.endsWith('.csv') ||
+      lowerMime.includes('spreadsheet') ||
+      lowerMime.includes('excel') ||
+      lowerMime === 'text/csv' ||
+      lowerMime === 'application/csv';
+
     if (lowerName.includes('cim') || lowerName.includes('confidential')) docType = 'CIM';
     else if (lowerName.includes('teaser')) docType = 'TEASER';
-    else if (lowerName.includes('financial') || lowerName.includes('model')) docType = 'FINANCIALS';
+    else if (
+      lowerName.includes('financial') ||
+      lowerName.includes('model') ||
+      lowerName.includes('p&l') ||
+      lowerName.includes('p_l') ||
+      lowerName.includes('income') ||
+      lowerName.includes('balance') ||
+      lowerName.includes('cashflow') ||
+      lowerName.includes('cash flow') ||
+      lowerName.includes('master sheet') ||
+      lowerName.includes('mastersheet') ||
+      looksLikeSpreadsheet
+    ) docType = 'FINANCIALS';
     else if (lowerName.includes('loi') || lowerName.includes('letter')) docType = 'LOI';
     else if (lowerName.includes('due diligence') || lowerName.includes('dd')) docType = 'DD_REPORT';
 
@@ -353,48 +392,65 @@ router.post('/', upload.single('file'), async (req, res) => {
       ingestFolderId = folders?.[0]?.id || null;
     }
 
-    const { data: document, error: docError } = await supabase
-      .from('Document')
-      .insert({
+    // Dedup: if a Document with the same (dealId, name, fileSize) already
+    // exists, reuse it instead of creating a duplicate row. Mostly relevant in
+    // the existing-deal (merge) path where users sometimes re-upload the same
+    // file by accident — we don't want a second ingest/extraction pass.
+    const existingDuplicate = await findExistingDocument(deal.id, documentName, file.size, { requireFileUrl: true });
+    let document: any;
+    if (existingDuplicate) {
+      logDuplicateSkip(existingDuplicate, {
         dealId: deal.id,
-        folderId: ingestFolderId,
         name: documentName,
-        type: docType,
-        fileUrl,
         fileSize: file.size,
-        mimeType,
-        extractedData: {
-          companyName: aiData.companyName,
-          industry: aiData.industry,
-          description: aiData.description,
-          revenue: aiData.revenue,
-          ebitda: aiData.ebitda,
-          ebitdaMargin: aiData.ebitdaMargin,
-          dealSize: aiData.dealSize,
-          revenueGrowth: aiData.revenueGrowth,
-          employees: aiData.employees,
-          foundedYear: aiData.foundedYear,
-          headquarters: aiData.headquarters,
-          keyRisks: aiData.keyRisks,
-          investmentHighlights: aiData.investmentHighlights,
-          summary: aiData.summary,
-          overallConfidence: aiData.overallConfidence,
-          needsReview: aiData.needsReview,
-          reviewReasons: aiData.reviewReasons,
-        },
-        extractedText,
-        status: aiData.needsReview ? 'pending_review' : 'analyzed',
-        confidence: aiData.overallConfidence / 100,
-        aiAnalyzedAt: new Date().toISOString(),
-      })
-      .select()
-      .single();
+        newFileUrl: fileUrl,
+      });
+      document = existingDuplicate;
+    } else {
+      const { data: insertedDoc, error: docError } = await supabase
+        .from('Document')
+        .insert({
+          dealId: deal.id,
+          folderId: ingestFolderId,
+          name: documentName,
+          type: docType,
+          fileUrl,
+          fileSize: file.size,
+          mimeType,
+          extractedData: {
+            companyName: aiData.companyName,
+            industry: aiData.industry,
+            description: aiData.description,
+            revenue: aiData.revenue,
+            ebitda: aiData.ebitda,
+            ebitdaMargin: aiData.ebitdaMargin,
+            dealSize: aiData.dealSize,
+            revenueGrowth: aiData.revenueGrowth,
+            employees: aiData.employees,
+            foundedYear: aiData.foundedYear,
+            headquarters: aiData.headquarters,
+            keyRisks: aiData.keyRisks,
+            investmentHighlights: aiData.investmentHighlights,
+            summary: aiData.summary,
+            overallConfidence: aiData.overallConfidence,
+            needsReview: aiData.needsReview,
+            reviewReasons: aiData.reviewReasons,
+          },
+          extractedText,
+          status: aiData.needsReview ? 'pending_review' : 'analyzed',
+          confidence: aiData.overallConfidence / 100,
+          aiAnalyzedAt: new Date().toISOString(),
+        })
+        .select()
+        .single();
 
-    if (docError) {
-      log.error('Document creation error', docError);
-      throw docError;
+      if (docError) {
+        log.error('Document creation error', docError);
+        throw docError;
+      }
+      document = insertedDoc;
+      log.debug('Created document', { name: document.name, id: document.id });
     }
-    log.debug('Created document', { name: document.name, id: document.id });
 
     // Step 7: Trigger RAG embedding in background
     if (extractedText && extractedText.length > 0) {
@@ -461,6 +517,17 @@ router.post('/', upload.single('file'), async (req, res) => {
           if (result) log.info('Auto multi-doc analysis complete', { dealId: deal.id, conflicts: result.conflicts.length });
         })
         .catch(err => log.error('Auto multi-doc analysis failed', err));
+    }
+
+    // Auto-generate firm-teaser blurbs for newly-created deals. BLOCKS the
+    // response so the teasers are ready when the client renders the deal.
+    // Best-effort: a teaser failure must never fail ingest.
+    if (!isUpdate) {
+      try {
+        await generateTeasersForDeal({ dealId: deal.id, orgId });
+      } catch (teaserErr) {
+        log.error('Ingest: firm-teaser auto-gen failed', teaserErr, { dealId: deal.id });
+      }
     }
 
     log.info('Ingest complete', { dealId: deal.id, isUpdate });

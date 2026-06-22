@@ -49,3 +49,30 @@ export interface GmailTokenResponse {
   token_type?: string;
   id_token?: string;
 }
+
+/** Metadata for a downloadable message attachment (filename + id to fetch). */
+export interface GmailAttachmentMeta {
+  attachmentId: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+}
+
+/** Parsed full Gmail message — body extracted from MIME parts. */
+export interface GmailMessageFull {
+  id: string;
+  threadId: string;
+  snippet: string;
+  body: string;
+  /** Named attachments with a fetchable attachmentId (body parsing ignores these). */
+  attachments: GmailAttachmentMeta[];
+  headers: {
+    Subject: string;
+    From: string;
+    To: string;
+    Cc: string;
+    Date: string;
+    MessageId: string;
+    InReplyTo: string;
+  };
+}

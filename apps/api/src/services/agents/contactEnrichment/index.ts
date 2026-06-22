@@ -58,6 +58,7 @@ export async function runContactEnrichment(input: EnrichmentInput): Promise<Enri
       sources: [],
       steps: [{ timestamp: new Date().toISOString(), node: 'agent', message: 'No LLM provider configured' }],
       error: 'No LLM provider configured',
+      suggestedFollowUp: null,
     };
   }
 
@@ -92,5 +93,7 @@ export async function runContactEnrichment(input: EnrichmentInput): Promise<Enri
     sources: result.sources,
     steps: result.steps,
     error: result.error,
+    // SUGGESTION ONLY — computed in gatherNode, threaded via enrichedData. Never auto-written.
+    suggestedFollowUp: result.enrichedData?.suggestedFollowUp ?? null,
   };
 }

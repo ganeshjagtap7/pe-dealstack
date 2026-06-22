@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef, type DragEvent } from "react";
+import { useEffect, useState, useCallback, useRef, type DragEvent } from "react";
 import { api } from "@/lib/api";
-import { useApiQuery } from "@/lib/useApiQuery";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import {
   SORT_OPTIONS,
@@ -13,7 +12,11 @@ import {
 } from "@/lib/constants";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
 import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
-import type { Deal, DealFilters } from "@/types";
+import type {
+  Deal,
+  DealFilters,
+  FinancialSummariesMap,
+} from "@/types";
 import {
   DeleteModal,
   StageChangeModal,
@@ -29,12 +32,26 @@ import { exportDealsToCSV } from "./deals-csv-export";
 
 export default function DealsPage() {
   const { openDealIntake } = useIngestDealModal();
-  const [actionError, setActionError] = useState<string | null>(null);
+  const [deals, setDeals] = useState<Deal[]>([]);
+  // Latest INCOME_STATEMENT summary per deal — fetched in parallel with
+  // the deals list so cards can render revenue/EBITDA at the correct
+  // unitScale instead of falling through formatCurrency() (which assumes
+  // MILLIONS and turns extracted "$6.7K" data into "$6.7M").
+  const [summaries, setSummaries] = useState<FinancialSummariesMap>({});
+  // True until the bulk financial-summaries fetch resolves. While true,
+  // the cards render an em-dash for revenue/EBITDA instead of falling
+  // through to formatCurrency(deal.revenue / deal.ebitda) — which assumes
+  // MILLIONS and prints stale legacy column data at the wrong magnitude
+  // (e.g. deal.ebitda = 21.5 stored at thousands → "$21.5M").
+  const [summariesLoading, setSummariesLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<"list" | "kanban">("list");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleteTarget, setDeleteTarget] = useState<{ id: string; name: string } | null>(null);
   const [stageModal, setStageModal] = useState(false);
   const [bulkPassConfirm, setBulkPassConfirm] = useState(false);
+  const [industries, setIndustries] = useState<string[]>([]);
   const [filters, setFilters] = useState<DealFilters>({
     stage: "",
     industry: "",
@@ -49,55 +66,7 @@ export default function DealsPage() {
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Deals are read through the shared stale-while-revalidate cache, keyed by
-  // the active filters. Returning to /deals (or toggling back to a previously
-  // applied filter set) renders instantly from cache and revalidates in the
-  // background instead of re-fetching behind a skeleton every time.
-  const dealsKey = useMemo(() => {
-    const params = new URLSearchParams();
-    if (filters.stage) params.set("stage", filters.stage);
-    if (filters.industry) params.set("industry", filters.industry);
-    if (filters.minDealSize) params.set("minDealSize", filters.minDealSize);
-    if (filters.maxDealSize) params.set("maxDealSize", filters.maxDealSize);
-    if (filters.priority) params.set("priority", filters.priority);
-    if (filters.search) params.set("search", filters.search);
-    if (filters.sortBy) params.set("sortBy", filters.sortBy);
-    if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
-    params.set("limit", "50");
-    return `/deals?${params.toString()}`;
-  }, [filters]);
-
-  const {
-    data: rawDeals,
-    isLoading: loading,
-    error: fetchError,
-    refetch: loadDeals,
-    mutate: mutateDeals,
-  } = useApiQuery<Deal[]>(dealsKey);
-
-  // Flatten company.name into companyName so cards can display it.
-  const deals = useMemo<Deal[]>(
-    () =>
-      (rawDeals ?? []).map((d) => ({
-        ...d,
-        companyName: d.companyName || d.company?.name || undefined,
-      })),
-    [rawDeals],
-  );
-  const industries = useMemo(
-    () => [...new Set(deals.map((d) => d.industry).filter(Boolean) as string[])].sort(),
-    [deals],
-  );
-  // Fetch failures drive the full ErrorState; mutation failures reuse it too
-  // (matches the previous single-error-state behaviour).
-  const error = fetchError?.message ?? actionError;
-
-  // Load view preference and metrics from localStorage. Done in an effect
-  // (not lazy useState init) on purpose: reading localStorage during the
-  // initial render would diverge from the server-rendered HTML and cause a
-  // hydration mismatch. Syncing from an external store post-mount is the
-  // correct pattern, so the set-state-in-effect rule is suppressed here.
-  /* eslint-disable react-hooks/set-state-in-effect */
+  // Load view preference and metrics from localStorage
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.dealsView);
     if (saved === "kanban" || saved === "list") setView(saved);
@@ -114,7 +83,66 @@ export default function DealsPage() {
       console.warn("[deals] failed to read cached metrics:", err);
     }
   }, []);
-  /* eslint-enable react-hooks/set-state-in-effect */
+
+  const loadDeals = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      if (filters.stage) params.set("stage", filters.stage);
+      if (filters.industry) params.set("industry", filters.industry);
+      if (filters.minDealSize) params.set("minDealSize", filters.minDealSize);
+      if (filters.maxDealSize) params.set("maxDealSize", filters.maxDealSize);
+      if (filters.priority) params.set("priority", filters.priority);
+      if (filters.search) params.set("search", filters.search);
+      if (filters.sortBy) params.set("sortBy", filters.sortBy);
+      if (filters.sortOrder) params.set("sortOrder", filters.sortOrder);
+      params.set("limit", "50");
+
+      const data = await api.get<Deal[]>(`/deals?${params}`);
+      const raw = Array.isArray(data) ? data : [];
+      // Flatten company.name into companyName so cards can display it
+      const list = raw.map((d) => ({
+        ...d,
+        companyName: d.companyName || d.company?.name || undefined,
+      }));
+      setDeals(list);
+      setIndustries([...new Set(list.map((d) => d.industry).filter(Boolean) as string[])].sort());
+
+      // Bulk financial summaries — does NOT block the initial cards
+      // render (names/stages/AI thesis appear immediately), but the
+      // cards hold revenue/EBITDA as em-dash skeletons until this
+      // resolves so we never paint stale legacy column data through
+      // formatCurrency() (which assumes MILLIONS).
+      setSummariesLoading(true);
+      void (async () => {
+        try {
+          const dealIds = list.map((d) => d.id).join(",");
+          if (!dealIds) {
+            setSummaries({});
+            return;
+          }
+          const resp = await api.get<{ summaries: FinancialSummariesMap }>(
+            `/deals/financial-summaries?dealIds=${encodeURIComponent(dealIds)}`,
+          );
+          setSummaries(resp?.summaries ?? {});
+        } catch (err) {
+          console.warn("[deals] financial summaries fetch failed:", err);
+          setSummaries({});
+        } finally {
+          setSummariesLoading(false);
+        }
+      })();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load deals");
+    } finally {
+      setLoading(false);
+    }
+  }, [filters]);
+
+  useEffect(() => {
+    loadDeals();
+  }, [loadDeals]);
 
   // Helpers
   const toggleView = (v: "list" | "kanban") => {
@@ -149,14 +177,14 @@ export default function DealsPage() {
   const handleDelete = async (id: string) => {
     try {
       await api.delete(`/deals/${id}`);
-      mutateDeals((prev) => (prev ?? []).filter((d) => d.id !== id));
+      setDeals((prev) => prev.filter((d) => d.id !== id));
       setSelected((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
     } catch (err) {
-      setActionError(err instanceof Error ? err.message : "Failed to delete deal");
+      setError(err instanceof Error ? err.message : "Failed to delete deal");
     }
     setDeleteTarget(null);
   };
@@ -168,11 +196,11 @@ export default function DealsPage() {
     const failed = results.filter((r) => r.status === "rejected");
     if (succeededIds.length > 0) {
       const succeededSet = new Set(succeededIds);
-      mutateDeals((prev) => (prev ?? []).filter((d) => !succeededSet.has(d.id)));
+      setDeals((prev) => prev.filter((d) => !succeededSet.has(d.id)));
     }
     if (failed.length > 0) {
       console.warn("[deals] bulk delete failures:", failed.map((r) => (r as PromiseRejectedResult).reason));
-      setActionError(`${failed.length} of ${ids.length} deletes failed.`);
+      setError(`${failed.length} of ${ids.length} deletes failed.`);
     }
     setSelected(new Set());
     setDeleteTarget(null);
@@ -184,7 +212,7 @@ export default function DealsPage() {
     const failed = results.filter((r) => r.status === "rejected");
     if (failed.length > 0) {
       console.warn("[deals] bulk stage-change failures:", failed.map((r) => (r as PromiseRejectedResult).reason));
-      setActionError(`${failed.length} of ${ids.length} stage updates failed.`);
+      setError(`${failed.length} of ${ids.length} stage updates failed.`);
     }
     setStageModal(false);
     clearSelection();
@@ -200,8 +228,10 @@ export default function DealsPage() {
     await handleBulkStage("PASSED");
   };
 
-  // CSV Export
-  const exportSelectedToCSV = () => exportDealsToCSV(deals, selected);
+  // CSV Export — pass the in-memory summaries map so revenue/EBITDA
+  // columns render at the correct unitScale instead of through
+  // formatCurrency(deal.revenue) (which assumes MILLIONS).
+  const exportSelectedToCSV = () => exportDealsToCSV(deals, selected, summaries);
 
   // Save metrics preference to localStorage (and server if available)
   const handleMetricsApply = (metrics: MetricKey[]) => {
@@ -217,7 +247,7 @@ export default function DealsPage() {
   const handleRemoveSample = async (id: string) => {
     try {
       await api.delete(`/deals/${id}`);
-      mutateDeals((prev) => (prev ?? []).filter((d) => d.id !== id));
+      setDeals((prev) => prev.filter((d) => d.id !== id));
     } catch (err) {
       console.warn("[deals] removeSample failed:", err);
     }
@@ -233,13 +263,13 @@ export default function DealsPage() {
     if (!deal || deal.stage === newStage) return;
     const oldStage = deal.stage;
     // Optimistic update
-    mutateDeals((prev) => (prev ?? []).map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
+    setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: newStage } : d)));
     try {
       await api.patch(`/deals/${dealId}`, { stage: newStage });
     } catch (err) {
       console.warn("[deals] kanban drop failed, reverting:", err);
       // Revert on error
-      mutateDeals((prev) => (prev ?? []).map((d) => (d.id === dealId ? { ...d, stage: oldStage } : d)));
+      setDeals((prev) => prev.map((d) => (d.id === dealId ? { ...d, stage: oldStage } : d)));
     }
   };
 
@@ -341,6 +371,8 @@ export default function DealsPage() {
               onDelete={(id, name) => setDeleteTarget({ id, name })}
               activeMetrics={activeMetrics}
               onRemoveSample={handleRemoveSample}
+              summary={summaries[deal.id]}
+              summariesLoading={summariesLoading}
             />
           ))}
           <UploadCard onClick={openDealIntake} />
@@ -353,6 +385,8 @@ export default function DealsPage() {
           dragOverStage={dragOverStage}
           setDragOverStage={setDragOverStage}
           onDrop={handleKanbanDrop}
+          summaries={summaries}
+          summariesLoading={summariesLoading}
         />
       )}
 
