@@ -98,39 +98,46 @@ router.post('/deals/:dealId/financials/resolve', async (req, res) => {
       return res.status(404).json({ error: 'No versions found for this period' });
     }
 
-    // Deactivate all versions
+    // Determine the winner BEFORE mutating anything. A resolved period must
+    // never be left with zero active versions — that silently hides the
+    // period from the reconciler, producing empty ground truth even though
+    // the data was extracted. So require an explicit choice and validate it
+    // belongs to this period.
+    const versionIds = new Set(versions.map((v: any) => v.id));
+    const targetId = chosenVersionId ?? (customLineItems ? versions[0].id : undefined);
+
+    if (!targetId) {
+      return res.status(400).json({
+        error: 'Must provide chosenVersionId or customLineItems to resolve a conflict',
+      });
+    }
+    if (!versionIds.has(targetId)) {
+      return res.status(400).json({
+        error: 'chosenVersionId does not belong to this statementType/period',
+      });
+    }
+
+    // Deactivate every version for this period…
     const allIds = versions.map((v: any) => v.id);
     await supabase
       .from('FinancialStatement')
       .update({ isActive: false, mergeStatus: 'user_resolved' })
       .in('id', allIds);
 
-    if (customLineItems) {
-      // User provided custom values
-      const targetId = chosenVersionId ?? versions[0].id;
-      await supabase
-        .from('FinancialStatement')
-        .update({
-          isActive: true,
-          mergeStatus: 'user_resolved',
-          lineItems: customLineItems,
-          extractionSource: 'manual',
-          reviewedAt: new Date().toISOString(),
-          reviewedBy: user?.id ?? null,
-        })
-        .eq('id', targetId);
-    } else if (chosenVersionId) {
-      // User picked an existing version
-      await supabase
-        .from('FinancialStatement')
-        .update({
-          isActive: true,
-          mergeStatus: 'user_resolved',
-          reviewedAt: new Date().toISOString(),
-          reviewedBy: user?.id ?? null,
-        })
-        .eq('id', chosenVersionId);
-    }
+    // …then reactivate exactly the winner, so the period always keeps one
+    // active statement.
+    await supabase
+      .from('FinancialStatement')
+      .update({
+        isActive: true,
+        mergeStatus: 'user_resolved',
+        reviewedAt: new Date().toISOString(),
+        reviewedBy: user?.id ?? null,
+        ...(customLineItems
+          ? { lineItems: customLineItems, extractionSource: 'manual' }
+          : {}),
+      })
+      .eq('id', targetId);
 
     // Refresh cache so deal headline reflects the newly active version.
     await refreshDealCache(dealId);
