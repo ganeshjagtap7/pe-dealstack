@@ -27,6 +27,8 @@ import {
   extractBodyText,
 } from './mapper.js';
 import { runDealEmailClassifier } from '../../services/agents/dealEmailClassifier/index.js';
+import { shouldSkipForAI } from './preFilter.js';
+import { createDealFromOutlookEmail, ensureContactOnDeal } from './autoCreateDeal.js';
 
 const DEFAULT_BACKFILL_DAYS = 90;
 const TOKEN_REFRESH_SAFETY_MS = 60 * 1000;
@@ -44,18 +46,6 @@ function redirectUri(): string {
   // this and microsoft365's path must be registered as redirect URIs on the
   // single shared Azure app.
   return `${base}/api/integrations/oauth/outlook/callback`;
-}
-
-async function getOrgContactEmails(organizationId: string): Promise<Set<string>> {
-  const { data } = await supabase
-    .from('Contact')
-    .select('email')
-    .eq('organizationId', organizationId);
-  return new Set(
-    (data ?? [])
-      .map((r: { email: string | null }) => r.email?.trim().toLowerCase())
-      .filter((e): e is string => !!e)
-  );
 }
 
 async function ensureFreshAccessToken(integration: Integration): Promise<string> {
@@ -149,11 +139,6 @@ export const outlookProvider: IntegrationProvider = {
   async sync(integration, options: SyncOptions): Promise<SyncResult> {
     const accessToken = await ensureFreshAccessToken(integration);
 
-    const knownEmails = await getOrgContactEmails(integration.organizationId);
-    if (knownEmails.size === 0) {
-      return { itemsSynced: 0, itemsMatched: 0, errors: [] };
-    }
-
     const since =
       options.since ??
       (integration.lastSyncAt
@@ -167,26 +152,81 @@ export const outlookProvider: IntegrationProvider = {
 
     for (const message of messages) {
       try {
-        const emails = extractAddressEmails(message);
-        // Cheap local filter before any DB / LLM work: only messages that
-        // touch a known contact are stored (keeps the activity feed relevant).
-        if (!emails.some((e) => knownEmails.has(e))) continue;
+        // 1. Drop clearly-automated mail (no-reply/bulk) before any LLM spend.
+        //    Conservative — never matches a real person's deal email.
+        if (shouldSkipForAI(message)) continue;
+        if (classifierBudget <= 0) break;
+        classifierBudget--;
 
+        // 2. Fetch the body and classify: is this a DEAL email?
+        const full = await getMessageWithBody(accessToken, message.id);
+        const fromEmail =
+          full.from?.emailAddress?.address?.toLowerCase() ??
+          full.sender?.emailAddress?.address?.toLowerCase() ?? '';
+        const fromName =
+          full.from?.emailAddress?.name ?? full.sender?.emailAddress?.name ?? null;
+        const toEmails = (full.toRecipients ?? [])
+          .map((r) => r.emailAddress?.address ?? '')
+          .filter(Boolean);
+        const bodyText = extractBodyText(full);
+        const occurredAt = full.receivedDateTime ? new Date(full.receivedDateTime) : new Date();
+
+        const classification = await runDealEmailClassifier({
+          subject: full.subject || '(no subject)',
+          fromName,
+          fromEmail,
+          toEmails,
+          date: full.receivedDateTime ?? null,
+          bodyText,
+        });
+
+        // 3. Only deal emails go further. Non-deal mail is ignored (not logged).
+        if (!classification || !classification.isRelevant) continue;
+
+        // 4. Does it map to an existing deal (via a participant who's a contact)?
+        const participantEmails = extractAddressEmails(full);
         const match = await matchEmailAddressesToDeals({
           organizationId: integration.organizationId,
-          emails,
+          emails: participantEmails,
         });
-        const hasMatch =
-          match.matchedDealIds.length > 0 || match.matchedContactIds.length > 0;
-        if (!hasMatch) continue;
+        let dealIds = match.matchedDealIds;
+        let contactIds = match.matchedContactIds;
 
+        // 5. No existing deal → silently create one, then link the sender contact.
+        if (dealIds.length === 0) {
+          const fromHeader = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
+          const result = await createDealFromOutlookEmail({
+            organizationId: integration.organizationId,
+            userId: integration.userId,
+            email: {
+              subject: full.subject || '(no subject)',
+              from: fromHeader,
+              date: occurredAt,
+              bodyText,
+            },
+            messageId: full.internetMessageId ?? message.id,
+            conversationId: full.conversationId ?? null,
+          });
+          if (result.dealId) {
+            dealIds = [result.dealId];
+            const contactId = await ensureContactOnDeal({
+              organizationId: integration.organizationId,
+              dealId: result.dealId,
+              email: fromEmail,
+              name: fromName,
+            });
+            if (contactId && !contactIds.includes(contactId)) contactIds = [...contactIds, contactId];
+          }
+        }
+
+        // 6. Log the email as activity (linked to the deal/contact) + classifier output.
         const row = outlookMessageToIntegrationActivity({
-          message,
+          message: full,
           integrationId: integration.id,
           organizationId: integration.organizationId,
           userId: integration.userId,
-          dealIds: match.matchedDealIds,
-          contactIds: match.matchedContactIds,
+          dealIds,
+          contactIds,
         });
         const { data: inserted, error: activityErr } = await supabase
           .from('IntegrationActivity')
@@ -197,43 +237,18 @@ export const outlookProvider: IntegrationProvider = {
           errors.push(`message ${message.id}: ${activityErr.message}`);
           continue;
         }
-        itemsMatched++;
-
-        // Store classifier output (deal relevance) for a capped subset.
-        // Auto-create/update of deals is intentionally deferred — that path
-        // is currently Gmail-coupled; Outlook stores relevance for the future
-        // review queue, matching Gmail's default (auto-deal OFF) behaviour.
-        if (classifierBudget <= 0) continue;
-        classifierBudget--;
-
-        const full = await getMessageWithBody(accessToken, message.id);
-        const fromEmail =
-          full.from?.emailAddress?.address?.toLowerCase() ??
-          full.sender?.emailAddress?.address?.toLowerCase() ?? '';
-        const fromName = full.from?.emailAddress?.name ?? null;
-        const toEmails = (full.toRecipients ?? [])
-          .map((r) => r.emailAddress?.address ?? '')
-          .filter(Boolean);
-
-        const classification = await runDealEmailClassifier({
-          subject: full.subject || '(no subject)',
-          fromName,
-          fromEmail,
-          toEmails,
-          date: full.receivedDateTime ?? null,
-          bodyText: extractBodyText(full),
-        });
-        if (classification && inserted?.id) {
+        if (inserted?.id) {
           await supabase
             .from('IntegrationActivity')
             .update({ dealRelevance: classification })
             .eq('id', inserted.id);
         }
+        itemsMatched++;
       } catch (err) {
-        const message2 = err instanceof Error ? err.message : 'unknown error';
-        errors.push(`message ${message.id}: ${message2}`);
+        const msg = err instanceof Error ? err.message : 'unknown error';
+        errors.push(`message ${message.id}: ${msg}`);
         log.warn('outlook: per-message sync failed (continuing)', {
-          messageId: message.id, message: message2,
+          messageId: message.id, message: msg,
         });
       }
     }
