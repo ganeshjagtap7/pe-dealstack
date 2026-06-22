@@ -119,7 +119,10 @@ export async function createDealFromOutlookEmail(params: {
     companyId,
     organizationId,
     stage: 'INITIAL_REVIEW',
-    status: aiData.needsReview ? 'PENDING_REVIEW' : 'ACTIVE',
+    // Always ACTIVE so the auto-created deal shows in the Deals list
+    // (which filters to status=ACTIVE). The needsReview flag below is still
+    // set, so it stays marked for review without being hidden.
+    status: 'ACTIVE',
     industry: aiData.industry.value,
     description: aiData.description.value,
     revenue: gatedNumber(aiData.revenue),

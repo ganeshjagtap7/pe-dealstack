@@ -183,40 +183,48 @@ export const outlookProvider: IntegrationProvider = {
         // 3. Only deal emails go further. Non-deal mail is ignored (not logged).
         if (!classification || !classification.isRelevant) continue;
 
-        // 4. Does it map to an existing deal (via a participant who's a contact)?
-        const participantEmails = extractAddressEmails(full);
-        const match = await matchEmailAddressesToDeals({
-          organizationId: integration.organizationId,
-          emails: participantEmails,
-        });
-        let dealIds = match.matchedDealIds;
-        let contactIds = match.matchedContactIds;
+        // 4. Route by the COMPANY the email is about — NOT by who sent it.
+        //    createDealFromOutlookEmail extracts the company, then either
+        //    attaches to the existing deal for that company or creates a new
+        //    one. So one banker emailing about many companies yields one deal
+        //    per company (no funneling onto whatever deal they're already on).
+        let dealIds: string[] = [];
+        let contactIds: string[] = [];
+        const fromHeader = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
-        // 5. No existing deal → silently create one, then link the sender contact.
-        if (dealIds.length === 0) {
-          const fromHeader = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
-          const result = await createDealFromOutlookEmail({
+        const dealResult = await createDealFromOutlookEmail({
+          organizationId: integration.organizationId,
+          userId: integration.userId,
+          email: {
+            subject: full.subject || '(no subject)',
+            from: fromHeader,
+            date: occurredAt,
+            bodyText,
+          },
+          messageId: full.internetMessageId ?? message.id,
+          conversationId: full.conversationId ?? null,
+        });
+
+        if (dealResult.dealId) {
+          dealIds = [dealResult.dealId];
+          const contactId = await ensureContactOnDeal({
             organizationId: integration.organizationId,
-            userId: integration.userId,
-            email: {
-              subject: full.subject || '(no subject)',
-              from: fromHeader,
-              date: occurredAt,
-              bodyText,
-            },
-            messageId: full.internetMessageId ?? message.id,
-            conversationId: full.conversationId ?? null,
+            dealId: dealResult.dealId,
+            email: fromEmail,
+            name: fromName,
           });
-          if (result.dealId) {
-            dealIds = [result.dealId];
-            const contactId = await ensureContactOnDeal({
-              organizationId: integration.organizationId,
-              dealId: result.dealId,
-              email: fromEmail,
-              name: fromName,
-            });
-            if (contactId && !contactIds.includes(contactId)) contactIds = [...contactIds, contactId];
-          }
+          if (contactId) contactIds = [contactId];
+        } else {
+          // No company could be extracted (e.g. a vague reply) — fall back to
+          // the sender's existing contact/deal links so the email still lands
+          // somewhere sensible rather than being orphaned.
+          const participantEmails = extractAddressEmails(full);
+          const match = await matchEmailAddressesToDeals({
+            organizationId: integration.organizationId,
+            emails: participantEmails,
+          });
+          dealIds = match.matchedDealIds;
+          contactIds = match.matchedContactIds;
         }
 
         // 6. Log the email as activity (linked to the deal/contact) + classifier output.
