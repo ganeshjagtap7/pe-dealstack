@@ -20,7 +20,7 @@ import {
   refreshMicrosoftToken,
   getMicrosoftUserInfo,
 } from '../microsoft/client.js';
-import { OUTLOOK_SCOPES, listMessagesSince, getMessageWithBody } from './client.js';
+import { OUTLOOK_SCOPES, listMessagesSince, getMessageWithBody, listAttachments } from './client.js';
 import {
   outlookMessageToIntegrationActivity,
   extractAddressEmails,
@@ -29,6 +29,7 @@ import {
 import { runDealEmailClassifier } from '../../services/agents/dealEmailClassifier/index.js';
 import { shouldSkipForAI } from './preFilter.js';
 import { createDealFromOutlookEmail, ensureContactOnDeal } from './autoCreateDeal.js';
+import { uploadEmailAttachmentsToDeal } from './attachments.js';
 
 const DEFAULT_BACKFILL_DAYS = 90;
 const TOKEN_REFRESH_SAFETY_MS = 60 * 1000;
@@ -251,6 +252,28 @@ export const outlookProvider: IntegrationProvider = {
             .update({ dealRelevance: classification })
             .eq('id', inserted.id);
         }
+
+        // 7. If the email carried file attachments and we have a deal, save them
+        //    into that deal's Documents (Data Room). Stored only — the user runs
+        //    "Extract Financials" on demand. Best-effort: never fails the sync.
+        if (full.hasAttachments && dealIds.length > 0) {
+          try {
+            const files = await listAttachments(accessToken, message.id);
+            if (files.length > 0) {
+              await uploadEmailAttachmentsToDeal({
+                organizationId: integration.organizationId,
+                dealId: dealIds[0],
+                userId: integration.userId,
+                attachments: files,
+              });
+            }
+          } catch (attErr) {
+            log.warn('outlook: attachment sync failed (continuing)', {
+              messageId: message.id, err: (attErr as Error).message,
+            });
+          }
+        }
+
         itemsMatched++;
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'unknown error';

@@ -2,7 +2,7 @@
 // shared ../microsoft/client.ts (one Azure app backs Outlook + Microsoft 365).
 
 import { graphGet } from '../microsoft/client.js';
-import type { GraphListResponse, GraphMessage } from './types.js';
+import type { GraphListResponse, GraphMessage, GraphFileAttachment } from './types.js';
 
 // Minimal scope set for reading mail. `offline_access` is what yields a
 // refresh token; the openid/profile/email/User.Read trio identifies the
@@ -17,7 +17,7 @@ export const OUTLOOK_SCOPES = [
 ];
 
 const MESSAGE_SELECT =
-  'id,subject,bodyPreview,receivedDateTime,conversationId,internetMessageId,from,sender,toRecipients,ccRecipients';
+  'id,subject,bodyPreview,receivedDateTime,conversationId,internetMessageId,hasAttachments,from,sender,toRecipients,ccRecipients';
 
 // First page of messages received since `since`, newest first. We cap at one
 // page (top) in v1 rather than paginating the whole mailbox — a connected
@@ -48,4 +48,18 @@ export async function getMessageWithBody(
 ): Promise<GraphMessage> {
   const path = `/me/messages/${encodeURIComponent(id)}?$select=${MESSAGE_SELECT},body`;
   return graphGet<GraphMessage>(accessToken, path);
+}
+
+// File attachments on a message. Filters to real file attachments that carry
+// inline bytes (`#microsoft.graph.fileAttachment`), dropping inline images and
+// item/reference attachments that we can't store directly.
+export async function listAttachments(
+  accessToken: string,
+  messageId: string
+): Promise<GraphFileAttachment[]> {
+  const path = `/me/messages/${encodeURIComponent(messageId)}/attachments`;
+  const data = await graphGet<GraphListResponse<GraphFileAttachment>>(accessToken, path);
+  return (data.value ?? []).filter(
+    (a) => a['@odata.type'] === '#microsoft.graph.fileAttachment' && !a.isInline
+  );
 }
