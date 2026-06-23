@@ -32,11 +32,30 @@ if (!apiKey) {
 // LANGSMITH_TRACING is unset/false.
 const tracingEnabled = process.env.LANGSMITH_TRACING === 'true';
 
+// Client-level request timeout backstop (ms). The LangSmith wrapOpenAI proxy can
+// drop the per-request RequestOptions second arg (which carries `timeout`), so a
+// call site passing `{ timeout: 120000 }` silently falls back to the SDK's
+// 10-minute default — observed as an ~18-min hang (10min × retries). Setting this
+// on the client constructor guarantees a ceiling even when per-request options are
+// lost. Individual call sites can still pass a *tighter* per-request timeout when
+// the wrapper preserves it. 3 min is a safe ceiling for the longest legit
+// extraction call while being well under the 10-min default.
+const CLIENT_REQUEST_TIMEOUT_MS = 180_000; // 3 min
+
+// Explicit retry count (matches the SDK default of 2, made explicit so the
+// worst-case wall-clock is predictable and self-documenting):
+//   worst case ≈ (1 + maxRetries) × timeout = (1 + 2) × 180s = 540s (9 min).
+const CLIENT_MAX_RETRIES = 2;
+
 const rawOpenAI = apiKey
   ? new OpenAI({
       apiKey,
       baseURL: useOpenRouter ? OPENROUTER_BASE_URL : undefined,
       defaultHeaders: useOpenRouter ? OPENROUTER_HEADERS : undefined,
+      // Backstop caps (see CLIENT_REQUEST_TIMEOUT_MS / CLIENT_MAX_RETRIES above):
+      // applies even when wrapOpenAI drops the per-request `timeout` option.
+      timeout: CLIENT_REQUEST_TIMEOUT_MS,
+      maxRetries: CLIENT_MAX_RETRIES,
     })
   : null;
 
@@ -49,7 +68,16 @@ export const openai = rawOpenAI
 // Direct OpenAI client (never routed through OpenRouter). Required for code paths
 // that depend on OpenAI-specific endpoints like the Responses API (PDF file inputs
 // for vision extraction), which OpenRouter does not proxy.
-const rawOpenAIDirect = openAIKey ? new OpenAI({ apiKey: openAIKey }) : null;
+const rawOpenAIDirect = openAIKey
+  ? new OpenAI({
+      apiKey: openAIKey,
+      // Same backstop caps as rawOpenAI (see CLIENT_REQUEST_TIMEOUT_MS /
+      // CLIENT_MAX_RETRIES above): guards against wrapOpenAI dropping the
+      // per-request `timeout` option.
+      timeout: CLIENT_REQUEST_TIMEOUT_MS,
+      maxRetries: CLIENT_MAX_RETRIES,
+    })
+  : null;
 
 export const openaiDirect = rawOpenAIDirect
   ? (tracingEnabled

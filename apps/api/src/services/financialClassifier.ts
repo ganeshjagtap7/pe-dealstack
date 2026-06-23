@@ -141,6 +141,46 @@ export interface ClassifyOptions {
   lineItemHints?: string;
 }
 
+// ─── Output-size guard (wide-grid source-citation gating) ─────────────────
+//
+// Source citations (`_source` quotes per row, per period) are by far the
+// dominant output-size driver. For a typical small annual statement
+// (5-7 periods × ~15 line items) they cost little and meaningfully help
+// per-row unit detection (see applySourceTextDollarOverride below). But for
+// a WIDE monthly grid — e.g. 12-36 month columns × ~30 line items, each with
+// a quote string — they roughly DOUBLE the emitted JSON. That pushes the
+// completion past the max_tokens cap: the model grinds for many minutes and
+// then truncates mid-JSON (finish_reason 'length'), which fails JSON.parse
+// and surfaces to the user as a silent "no financial data found". This was
+// the BYQ Supply monthly-P&L failure: ~18.5 min, zero statements.
+//
+// So we gate citations OFF once the request is "large": more than
+// MAX_PERIODS_FOR_CITATIONS implied periods, or a source text longer than
+// CITATION_TEXT_BUDGET chars (a proxy for many periods × line items when we
+// have no explicit period-hint block to count). Below those thresholds we
+// keep citations ON, where they earn their keep on unit detection.
+const MAX_PERIODS_FOR_CITATIONS = 6;
+const CITATION_TEXT_BUDGET = 12_000;
+
+/**
+ * Estimate how many periods this request will ask the model to emit by
+ * counting "- Column X:" lines — the formatter emits exactly one per detected
+ * period (see formatPeriodHintBlock in excelStructureHints.ts).
+ *
+ * CRITICAL: the Excel path calls `classifyFinancials(sheet.text)` with NO
+ * `options` argument (see financialAgent/nodes/extractNode.ts), so the column
+ * map is NOT in `options.expectedPeriods` there — it's embedded directly in
+ * the sheet text we send to the model. A wide grid also produces COMPACT input
+ * (a 12-column monthly P&L is only ~7K chars) but HUGE output, so the
+ * text-length heuristic misses it. We therefore scan the actual `sentText`
+ * for the column block and take the max with any `options.expectedPeriods`
+ * hint. Returns 0 only when neither source carries a column map.
+ */
+function estimateExpectedPeriods(sentText: string, expectedPeriods?: string): number {
+  const count = (s?: string) => (s ? (s.match(/^-\s+Column\s+/gim)?.length ?? 0) : 0);
+  return Math.max(count(sentText), count(expectedPeriods));
+}
+
 /**
  * Extract full 3-statement financial model from raw document text.
  * Returns one ClassifiedStatement per statement type found,
@@ -177,12 +217,27 @@ export async function classifyFinancials(
   // dollar amounts but whose numeric tables have no scale header at all.
   const hasSmallDollars = hasExplicitSmallDollarAmounts(truncatedText);
 
+  // Decide whether to ask for per-row source citations. Citations are the
+  // dominant output-size driver, so we gate them OFF for wide grids (many
+  // periods, or a long source text when we have no period-hint block to
+  // count) to keep the JSON under the max_tokens cap. They stay ON for
+  // typical small annual statements where they help per-row unit detection
+  // (applySourceTextDollarOverride) — see the constants above for the
+  // tradeoff rationale.
+  const estimatedPeriods = estimateExpectedPeriods(truncatedText, options?.expectedPeriods);
+  const includeSourceCitations =
+    estimatedPeriods > 0
+      ? estimatedPeriods <= MAX_PERIODS_FOR_CITATIONS
+      : truncatedText.length <= CITATION_TEXT_BUDGET;
+
   log.debug('Financial classifier starting', {
     textLength: truncatedText.length,
     explicitUnitFromText,
     hasSmallDollars,
     hasPeriodHints: Boolean(options?.expectedPeriods),
     hasLineItemHints: Boolean(options?.lineItemHints),
+    estimatedPeriods,
+    includeSourceCitations,
   });
 
   try {
@@ -192,7 +247,9 @@ export async function classifyFinancials(
         {
           role: 'system',
           content: buildExtractionPrompt({
-            includeSourceCitations: true,
+            // Wide-grid gate: drop _source quotes when the request is large
+            // (they roughly double the output and cause length-truncation).
+            includeSourceCitations,
             expectedPeriods: options?.expectedPeriods,
             lineItemHints: options?.lineItemHints,
           }),
@@ -215,13 +272,52 @@ export async function classifyFinancials(
       max_tokens: 32000,
     }, { timeout: 120000 });
 
+    const finishReason = response.choices[0]?.finish_reason;
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      log.error('Financial classifier: no response content');
+      log.error('Financial classifier: no response content', { finishReason });
       return null;
     }
 
-    const raw = JSON.parse(content) as ClassificationResult;
+    // Truncation guard. finish_reason 'length' means the model hit the
+    // max_tokens cap mid-JSON — the content is incomplete and JSON.parse will
+    // throw. This is NOT a genuine "no financial data" result: the data was
+    // there, the output budget ran out. Log loudly (the old code silently
+    // returned null here, which surfaced as "No financial data found" with no
+    // signal that anything failed). The wide-grid citation gate above is the
+    // primary fix; this is the safety net + the diagnostic that distinguishes
+    // a truncated/failed extraction from a real empty document.
+    if (finishReason === 'length') {
+      log.error(
+        'Financial classifier: response TRUNCATED — hit max_tokens cap mid-JSON (finish_reason "length"). Extraction failed, NOT a genuine empty result.',
+        {
+          finishReason,
+          maxTokens: 32000,
+          includeSourceCitations,
+          estimatedPeriods,
+          contentLength: content.length,
+          contentTail: content.slice(-400),
+        },
+      );
+      return null;
+    }
+
+    let raw: ClassificationResult;
+    try {
+      raw = JSON.parse(content) as ClassificationResult;
+    } catch (parseErr) {
+      // Parse failure with a non-'length' finish_reason. Log the finish_reason
+      // and a snippet rather than swallowing it in the outer catch (which used
+      // to hide the cause entirely).
+      log.error('Financial classifier: failed to JSON.parse model response', {
+        finishReason,
+        contentLength: content.length,
+        contentHead: content.slice(0, 400),
+        contentTail: content.slice(-400),
+        error: parseErr,
+      });
+      return null;
+    }
 
     // Normalize and validate the response
     const result = normalizeClassificationResult(raw);
@@ -247,6 +343,20 @@ export async function classifyFinancials(
     // the parsed numeric value. Catches synthesized periods (LTM, "Current
     // Month") and rows where the value is a few thousand — both miss the
     // <100 magnitude threshold of the small-dollar guard.
+    //
+    // NOTE on citations-off (wide grids): when includeSourceCitations is false
+    // there are no `_source` keys, so this pass finds zero matches and is a
+    // no-op. That's fine — unit detection for these Excel grids does not depend
+    // on per-row quotes. The Excel extractor injects an explicit sheet-level
+    // marker into rawText (excelFinancialExtractor.ts):
+    //   - MILLIONS/THOUSANDS/BILLIONS markers carry "$M"/"$000s"/"$B", which
+    //     detectExplicitUnitInText recognizes above, so the LLM's scale is
+    //     trusted by applyExplicitUnitOverride.
+    //   - The ACTUALS marker ("Values in this sheet are in ACTUAL DOLLARS") has
+    //     no scale token, so detectExplicitUnitInText returns null; that makes
+    //     applyExplicitUnitOverride force any stray MILLIONS/THOUSANDS/BILLIONS
+    //     back to ACTUALS. Either way the document-level guard stays fully
+    //     effective without citations.
     applySourceTextDollarOverride(result);
 
     log.debug('Financial classifier completed', {
