@@ -5,6 +5,8 @@ export type ProviderId =
   | 'granola'
   | 'gmail'
   | 'google_calendar'
+  | 'outlook'
+  | 'microsoft365'
   | 'fireflies'
   | 'otter'
   | '_mock';

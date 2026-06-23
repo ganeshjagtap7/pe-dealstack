@@ -37,6 +37,8 @@ import { registerProvider } from './integrations/_platform/registry.js';
 import { granolaProvider } from './integrations/granola/index.js';
 import { gmailProvider } from './integrations/gmail/index.js';
 import { googleCalendarProvider } from './integrations/googleCalendar/index.js';
+import { outlookProvider } from './integrations/outlook/index.js';
+import { microsoft365Provider } from './integrations/microsoft365/index.js';
 import legalDocumentsRouter from './routes/legal-documents.js';
 import legalDocEsignRouter from './routes/legal-doc-esign.js';
 import dropboxSignWebhookRouter from './routes/dropbox-sign-webhook.js';
@@ -325,6 +327,8 @@ app.use('/api/internal', authMiddleware, internalRouter);
 registerProvider(granolaProvider);
 registerProvider(gmailProvider);
 registerProvider(googleCalendarProvider);
+registerProvider(outlookProvider);
+registerProvider(microsoft365Provider);
 
 // Sentry error handler (must be before custom error handler)
 if (process.env.SENTRY_DSN) {
