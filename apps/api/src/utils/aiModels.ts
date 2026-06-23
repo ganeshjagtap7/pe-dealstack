@@ -4,26 +4,33 @@
 //
 // Tier mapping (per architecture decision — see Peos AI Model.pdf):
 //   tier 1  Claude Sonnet 4.5 (Anthropic direct) / GPT-4o (OpenAI direct) → memos, deal chat, extraction, analysis, meeting prep
-//   tier 2  GPT-4.1 (OpenRouter) / GPT-4o (direct)            → classification, vision, insights, signals, enrichment
-//   tier 3  GPT-4.1-mini (OpenRouter) / GPT-4o-mini (direct)  → emails, search, quick tasks
-//   tier 4  GPT-4.1-nano (OpenRouter) / GPT-4o-mini (direct)  → sentiment, routing
+//   tier 2  GPT-4.1 (OpenAI direct or OpenRouter)       → classification, vision, insights, signals, enrichment
+//   tier 3  GPT-4.1-mini (OpenAI direct or OpenRouter)  → emails, search, quick tasks
+//   tier 4  GPT-4.1-nano (OpenAI direct or OpenRouter)  → sentiment, routing
 //
-// Routing strategy (post-OpenRouter-deprecation for tier 1):
+// Routing strategy (direct providers preferred; OpenRouter is fallback-only):
 //   - Tier 1 prefers Anthropic direct (claude-sonnet-4-6) via @langchain/anthropic
 //     when ANTHROPIC_API_KEY is set. Falls back to OpenAI direct ('gpt-4o') when
 //     only OPENAI_API_KEY is set. Falls back to OpenRouter ('anthropic/claude-sonnet-4.6')
 //     only when neither anthropic nor openai keys are present but OPENROUTER_API_KEY is.
-//   - Tier 2-4 retain the legacy OpenRouter routing for now (the user only flagged
-//     tier 1 as the routing problem). If OPENROUTER_API_KEY is set, the `openai`
-//     SDK in src/openai.ts is pointed at openrouter.ai and the prefixed names below
-//     ("openai/gpt-4.1") route through OpenRouter to the right model.
+//   - Tier 2-4 prefer OpenAI direct (the gpt-4.1 family: gpt-4.1 / -mini / -nano)
+//     whenever OPENAI_API_KEY is set. They route through OpenRouter ("openai/gpt-4.1"
+//     plus the SDK base-URL swap in src/openai.ts) ONLY when no direct OpenAI key
+//     exists — otherwise OpenRouter's separate credit balance 402s ("Insufficient
+//     credits") even while the OpenAI key is healthy. gpt-4.1 (not gpt-4o) is the
+//     direct tier-2 model because financial extraction needs a 32K completion
+//     budget that gpt-4o (16,384 cap) can't serve.
 //   - Per-tier env overrides (LLM_TIER1_MODEL, ...) always win.
 
 import dotenv from 'dotenv';
 dotenv.config();
 
-const useOpenRouter = !!process.env.OPENROUTER_API_KEY;
 const hasAnthropic = !!process.env.ANTHROPIC_API_KEY;
+// Single source of truth for routing — prefer direct OpenAI whenever
+// OPENAI_API_KEY is present (see isOpenRouterEnabled below). Used both for the
+// tier model names here and the SDK base-URL swap in src/openai.ts, so they
+// can never disagree about which provider a call lands on.
+const useOpenRouter = isOpenRouterEnabled();
 
 export const AI_MODELS = {
   /** Tier 1 — premium reasoning */
@@ -34,18 +41,21 @@ export const AI_MODELS = {
       : useOpenRouter
         ? 'anthropic/claude-sonnet-4.6'
         : 'gpt-4o'),
-  /** Tier 2 — general including vision */
+  /** Tier 2 — general including vision. Direct path uses gpt-4.1 (NOT gpt-4o):
+   *  it supports a 32K-token completion budget that financial extraction needs
+   *  for wide monthly grids. gpt-4o caps completions at 16,384 and 400s on the
+   *  32K request (see services/financialClassifier.ts). */
   TIER2:
     process.env.LLM_TIER2_MODEL ||
-    (useOpenRouter ? 'openai/gpt-4.1' : 'gpt-4o'),
+    (useOpenRouter ? 'openai/gpt-4.1' : 'gpt-4.1'),
   /** Tier 3 — fast/cheap */
   TIER3:
     process.env.LLM_TIER3_MODEL ||
-    (useOpenRouter ? 'openai/gpt-4.1-mini' : 'gpt-4o-mini'),
+    (useOpenRouter ? 'openai/gpt-4.1-mini' : 'gpt-4.1-mini'),
   /** Tier 4 — ultra-fast/cheap */
   TIER4:
     process.env.LLM_TIER4_MODEL ||
-    (useOpenRouter ? 'openai/gpt-4.1-nano' : 'gpt-4o-mini'),
+    (useOpenRouter ? 'openai/gpt-4.1-nano' : 'gpt-4.1-nano'),
 } as const;
 
 // ─── Semantic aliases — use these in call sites ────────────────────
@@ -68,7 +78,12 @@ export const MODEL_NANO = AI_MODELS.TIER4;
 export const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 
 export function isOpenRouterEnabled(): boolean {
-  return !!process.env.OPENROUTER_API_KEY;
+  // OpenRouter is a fallback gateway only: prefer direct OpenAI whenever
+  // OPENAI_API_KEY is set. Routing tier 2-4 traffic through OpenRouter bills
+  // its separate credit balance and 402s ("Insufficient credits") even when
+  // the OpenAI key is healthy — so only fall back to it when there is NO
+  // direct OpenAI key to use.
+  return !!process.env.OPENROUTER_API_KEY && !process.env.OPENAI_API_KEY;
 }
 
 /**

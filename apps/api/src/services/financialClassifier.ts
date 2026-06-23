@@ -208,7 +208,10 @@ export async function classifyFinancials(
       // line items + source quotes per period. The 16K budget was tuned for
       // 5-7 annual periods × 1-2 channels and silently truncated wide
       // monthly grids (the LLM either gave up at 16K or skipped months).
-      // GPT-4.1 / Claude Sonnet 4.5 both accept up to 32K via OpenRouter.
+      // REQUIRES a model whose completion cap is >= 32K: gpt-4.1 (direct or via
+      // OpenRouter) and Claude Sonnet 4.6 qualify; gpt-4o caps at 16,384 and
+      // 400s on this request. MODEL_CLASSIFICATION (tier 2) must therefore stay
+      // on the gpt-4.1 family — see utils/aiModels.ts.
       max_tokens: 32000,
     }, { timeout: 120000 });
 
