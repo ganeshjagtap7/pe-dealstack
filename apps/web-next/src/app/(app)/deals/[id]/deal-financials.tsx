@@ -1,15 +1,28 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import dynamic from "next/dynamic";
 import { api, NotFoundError } from "@/lib/api";
 import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { useToast } from "@/providers/ToastProvider";
-import {
-  type FinancialStatement,
-  RevenueChart,
-  GrowthChart,
-  BalanceSheetChart,
-} from "./deal-financials-charts";
+import { type FinancialStatement } from "./deal-financials-charts";
+
+// chart.js + react-chartjs-2 are heavy. The charts only render conditionally
+// (on the relevant tab + chart type), so load them lazily — this keeps
+// chart.js out of the deal page's initial bundle and defers it until a chart
+// is actually viewed. ssr:false is safe: this is already a client subtree.
+const RevenueChart = dynamic(
+  () => import("./deal-financials-charts").then((m) => m.RevenueChart),
+  { ssr: false },
+);
+const GrowthChart = dynamic(
+  () => import("./deal-financials-charts").then((m) => m.GrowthChart),
+  { ssr: false },
+);
+const BalanceSheetChart = dynamic(
+  () => import("./deal-financials-charts").then((m) => m.BalanceSheetChart),
+  { ssr: false },
+);
 import {
   TAB_CONFIG,
   type ChartType,
