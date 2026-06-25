@@ -25,21 +25,21 @@ export function ChecklistView({
   const firstIncomplete = TASKS.find((t) => !completed.has(t.id));
 
   const heading = allDone
-    ? "You're all set."
+    ? "You're live."
     : doneCount === 0
-      ? "Three steps to your first deal."
-      : "You're making progress.";
+      ? "Three steps, then a deal lands on your desk."
+      : "Keep going.";
   const sub = allDone
-    ? "Your AI analyst already found things on your deal."
+    ? "Your AI analyst already flagged things on the CIM. Take a look."
     : doneCount === 0
-      ? "Do them in order, top to bottom. Under 3 minutes."
-      : `${TASKS.length - doneCount} ${TASKS.length - doneCount === 1 ? "step" : "steps"} left. Your AI analyst is working in the background.`;
+      ? "Top to bottom. Under three minutes."
+      : `${TASKS.length - doneCount} ${TASKS.length - doneCount === 1 ? "step" : "steps"} left. We're already pulling on the deal in the background.`;
 
   return (
     <main className="max-w-6xl mx-auto px-6 py-10 pb-10 overflow-y-auto">
       <div className="mb-6">
         <div className="text-[11px] uppercase tracking-widest text-text-muted font-medium mb-2">
-          Getting started · {doneCount} of {TASKS.length} complete
+          Setup · {doneCount} of {TASKS.length} complete
         </div>
         <h2 className="font-display text-[32px] leading-[1.15] font-bold tracking-tight text-text-main">{heading}</h2>
         <p className="mt-2 text-[14px] text-text-secondary max-w-2xl">{sub}</p>
@@ -120,11 +120,11 @@ export function ChecklistView({
           </div>
           <div>
             <div className="text-[13.5px] font-semibold text-text-main flex items-center gap-2">
-              Your AI analyst is already working
+              Your AI analyst is on the CIM
               <PulseDot />
             </div>
             <div className="text-[12.5px] text-text-secondary mt-0.5">
-              Findings stream into Home as they&apos;re discovered — no need to wait.
+              Findings post to Home as they land — no reason to sit here.
             </div>
           </div>
         </div>
@@ -152,7 +152,7 @@ export function ChecklistView({
           <div className="mt-5 pt-5 border-t border-border-subtle flex items-center justify-between gap-4 flex-wrap">
             <div className="text-[12.5px] text-text-muted flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px]">info</span>
-              Every finding traces to a page + cell in the source document.
+              Every finding cites a page and a cell. Click through to source any time.
             </div>
             <button
               type="button"
@@ -160,7 +160,7 @@ export function ChecklistView({
               className="inline-flex items-center gap-1.5 rounded-lg px-5 py-2.5 text-white font-semibold text-sm transition-all hover:opacity-90"
               style={{ backgroundColor: "#003366" }}
             >
-              Open your deal
+              Open the deal
               <span className="material-symbols-outlined text-[18px]">arrow_forward</span>
             </button>
           </div>
