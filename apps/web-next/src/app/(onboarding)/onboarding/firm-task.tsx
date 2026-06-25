@@ -120,7 +120,7 @@ export function FirmTaskModal({
   return (
     <TaskModalShell
       icon="business"
-      title="Define your investment focus"
+      title="Set your investment thesis"
       onClose={onClose}
       onComplete={onComplete}
       canComplete={canComplete}
@@ -128,7 +128,7 @@ export function FirmTaskModal({
       busyLabel="Saving..."
     >
       <p className="text-[13.5px] text-text-secondary mb-4">
-        Help us tailor AI findings to your strategy. This takes 30 seconds.
+        We tune the AI to your strategy so findings show up the way your IC reads them. 30 seconds.
       </p>
 
       <label className="block text-[12px] font-medium text-text-secondary mb-1.5">Firm website</label>
@@ -196,7 +196,7 @@ export function FirmTaskModal({
         ))}
       </div>
 
-      <label className="block text-[12px] font-medium text-text-secondary mb-1.5">Sectors you focus on</label>
+      <label className="block text-[12px] font-medium text-text-secondary mb-1.5">Sectors you screen</label>
       <div className="flex flex-wrap gap-2">
         {DEFAULT_SECTORS.map((s) => {
           const selected = value.sectors.includes(s);
@@ -240,7 +240,7 @@ export function FirmTaskModal({
             value={customSector}
             onChange={(e) => setCustomSector(e.target.value)}
             onKeyDown={handleCustomKey}
-            placeholder="e.g. Real Estate, Biotech..."
+            placeholder="e.g. Insurance services, Specialty distribution..."
             className="flex-1 px-3 py-2 text-[13px] rounded-lg border border-border-subtle focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
           />
           <button
@@ -327,7 +327,7 @@ function EnrichmentPanel({
     return (
       <div className="mb-4 p-3 rounded-lg bg-primary-light/40 flex items-center gap-2 text-[12px] text-primary font-medium">
         <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-        Researching your firm — scanning website, searching news &amp; deals...
+        Pulling your firm — site, recent deals, press...
       </div>
     );
   }
@@ -337,7 +337,7 @@ function EnrichmentPanel({
         <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
           check_circle
         </span>
-        Profile saved — AI will use this context across your deals.
+        Thesis saved. The AI will read every deal through this lens.
       </div>
     );
   }
@@ -358,7 +358,7 @@ function EnrichmentPanel({
           <span className="material-symbols-outlined text-[16px]" style={{ fontVariationSettings: "'FILL' 1" }}>
             check_circle
           </span>
-          Profile researched
+          Thesis loaded
           {firm.confidence === "low" && <span className="text-amber-600">(low confidence)</span>}
         </div>
         <div className="flex items-center gap-2">
@@ -375,7 +375,7 @@ function EnrichmentPanel({
             className="text-[11px] font-semibold text-white px-3 py-1 rounded-md hover:opacity-90 transition-opacity"
             style={{ backgroundColor: "#003366" }}
           >
-            Use this profile
+            Use this thesis
           </button>
         </div>
       </div>
@@ -402,7 +402,7 @@ function EnrichmentPanel({
         {phase2 === "polling" && (
           <div className="flex items-center gap-2 text-[11px] text-primary font-medium">
             <div className="w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-            Researching deeper — following leads, checking press, social...
+            Going deeper — cross-checking press, portfolio, public filings...
           </div>
         )}
         {phase2 === "complete" && (
@@ -413,8 +413,8 @@ function EnrichmentPanel({
             >
               auto_awesome
             </span>
-            Deep research complete
-            {phase2Count > 0 && <> — {phase2Count} additional insight{phase2Count > 1 ? "s" : ""} found and saved</>}
+            Background research done
+            {phase2Count > 0 && <> — {phase2Count} more thing{phase2Count > 1 ? "s" : ""} surfaced</>}
           </div>
         )}
         {phase2 === "timeout" && (
@@ -425,7 +425,7 @@ function EnrichmentPanel({
             >
               check_circle
             </span>
-            Deep research saved — more insights will appear in your dashboard.
+            Background research saved — more will land on Home as it comes in.
           </div>
         )}
       </div>

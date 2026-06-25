@@ -32,13 +32,13 @@ export function TeamTaskModal({
   return (
     <TaskModalShell
       icon="group_add"
-      title="Invite your team"
+      title="Bring in your deal team"
       onClose={onClose}
       onComplete={onComplete}
       completeLabel="Mark as done"
     >
       <p className="text-[13.5px] text-text-secondary mb-4">
-        Invite your deal team. They&apos;ll see the same AI findings and can comment on any cell.
+        Add the people working the deal with you. Same findings, comment cell-by-cell.
       </p>
 
       <div className="space-y-2 mb-3">

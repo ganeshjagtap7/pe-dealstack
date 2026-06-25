@@ -28,32 +28,32 @@ interface OnboardingStatus {
 const STEPS: StepDef[] = [
   {
     id: "createDeal",
-    label: "Create your first deal",
-    description: "Set up a deal to start tracking it through your pipeline",
+    label: "Stand up your first deal",
+    description: "Create the deal so it shows up in pipeline.",
     href: "/deals",
   },
   {
     id: "uploadDocument",
-    label: "Upload a CIM or financial document",
-    description: "Upload a PDF or Excel file to the Data Room",
+    label: "Drop the CIM in the data room",
+    description: "PDF or Excel — we read it.",
     href: null,
   },
   {
     id: "reviewExtraction",
-    label: "Review AI-extracted financials",
-    description: "See how AI reads your documents and builds financial tables",
+    label: "Check the financials we pulled",
+    description: "See what we lifted out — tables, footnotes, segment splits.",
     href: null,
   },
   {
     id: "tryDealChat",
-    label: "Try Deal Chat",
-    description: "Ask a question about your deal in natural language",
+    label: "Ask the deal a question",
+    description: "Plain English. No prompts to write.",
     href: null,
   },
   {
     id: "inviteTeamMember",
-    label: "Invite a team member",
-    description: "Add an analyst or partner to your organization",
+    label: "Bring in the deal team",
+    description: "Add an analyst, VP, or partner so they can mark up the same deal.",
     href: "/settings",
   },
 ];
@@ -107,7 +107,7 @@ export function OnboardingChecklist() {
             <span className="material-symbols-outlined text-white text-lg">flag</span>
           </div>
           <div>
-            <h3 className="font-bold text-[#111418] text-sm">Getting Started</h3>
+            <h3 className="font-bold text-[#111418] text-sm">Setup</h3>
             <p className="text-xs text-slate-400">
               {completed}/{STEPS.length} completed
             </p>

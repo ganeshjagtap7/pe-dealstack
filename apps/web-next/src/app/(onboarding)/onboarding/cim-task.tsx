@@ -61,15 +61,15 @@ export function CimTaskModal({
   return (
     <TaskModalShell
       icon="upload_file"
-      title="Upload your first deal"
+      title="Drop in your first CIM"
       onClose={onClose}
       onComplete={onComplete}
       canComplete={canComplete}
       busy={busy}
-      busyLabel={sampleId ? "Creating demo deal..." : "Uploading..."}
+      busyLabel={sampleId ? "Creating demo deal..." : "Uploading the CIM..."}
     >
       <p className="text-[13.5px] text-text-secondary mb-4">
-        Drop a CIM, teaser, or balance sheet. We&apos;ll parse every table and chart.
+        CIM, teaser, IM, balance sheet — we read every table, footnote, and chart.
       </p>
 
       <div
@@ -103,7 +103,7 @@ export function CimTaskModal({
               <div className="text-[13.5px] font-semibold text-text-main">
                 {SAMPLE_NAMES[sampleId!] ?? "Sample deal selected"}
               </div>
-              <div className="text-[12px] text-text-muted">Demo data will be loaded into your workspace</div>
+              <div className="text-[12px] text-text-muted">We&apos;ll load it into your workspace as if it were a real deal</div>
             </div>
           </div>
         ) : (
@@ -121,7 +121,7 @@ export function CimTaskModal({
               </>
             ) : (
               <>
-                <div className="text-[14px] font-semibold text-text-main">Drop your CIM here</div>
+                <div className="text-[14px] font-semibold text-text-main">Drop a CIM here</div>
                 <div className="text-[12px] text-text-muted mt-1">PDF · XLSX · DOCX · up to 50MB</div>
               </>
             )}
@@ -136,7 +136,7 @@ export function CimTaskModal({
         />
       </div>
 
-      <div className="text-[12px] text-text-muted text-center my-3">— or try one of these —</div>
+      <div className="text-[12px] text-text-muted text-center my-3">— or kick the tires on a sample —</div>
 
       <div className="space-y-2">
         <SampleOption
@@ -153,7 +153,7 @@ export function CimTaskModal({
         <SampleOption
           id="pinecrest"
           title="Pinecrest Dermatology"
-          subtitle="Healthcare roll-up · $160M revenue"
+          subtitle="Healthcare roll-up · $160M revenue · founder-led"
           selected={sampleId === "pinecrest"}
           onSelect={() => {
             onSample("pinecrest");
