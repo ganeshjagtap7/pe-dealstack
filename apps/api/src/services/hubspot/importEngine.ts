@@ -98,16 +98,28 @@ export async function runImportBatch(jobId: string, token: string): Promise<bool
   }
 
   // Advance cursor or move to the next object.
+  // Use a cancel-guarded update: .neq('status', 'cancelled') ensures a concurrent
+  // cancel cannot be clobbered. If updated is null, the job was cancelled — stop.
   if (page.nextCursor) {
-    await saveJob(jobId, { objectCounts: counts, currentObject: current, cursor: page.nextCursor, status: 'running' });
+    const { data: updated } = await supabase.from('ImportJob')
+      .update({ objectCounts: counts, currentObject: current, cursor: page.nextCursor, status: 'running' })
+      .eq('id', jobId).neq('status', 'cancelled').select('id').maybeSingle();
+    if (!updated) return false; // cancelled mid-batch
     return true;
   }
   const nextObject = ORDER[objectIndex + 1] ?? null;
   if (nextObject) {
-    await saveJob(jobId, { objectCounts: counts, currentObject: nextObject, cursor: null, status: 'running' });
+    const { data: updated } = await supabase.from('ImportJob')
+      .update({ objectCounts: counts, currentObject: nextObject, cursor: null, status: 'running' })
+      .eq('id', jobId).neq('status', 'cancelled').select('id').maybeSingle();
+    if (!updated) return false; // cancelled mid-batch
     return true;
   }
-  await saveJob(jobId, { objectCounts: counts, currentObject: null, cursor: null, status: 'completed', finishedAt: new Date().toISOString() });
+  const { data: updated } = await supabase.from('ImportJob')
+    .update({ objectCounts: counts, currentObject: null, cursor: null, status: 'completed', finishedAt: new Date().toISOString() })
+    .eq('id', jobId).neq('status', 'cancelled').select('id').maybeSingle();
+  // If updated is null the job was cancelled — status already 'cancelled', return false.
+  void updated;
   return false;
 }
 

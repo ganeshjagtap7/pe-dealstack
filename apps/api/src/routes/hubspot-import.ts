@@ -11,6 +11,13 @@ const router = Router();
 const connectSchema = z.object({ token: z.string().min(10) });
 const MAX_BATCHES = 1000; // safety bound on the drive loop
 
+/** Map the Supabase auth UUID (req.user.id) to the internal User.id (PK). */
+async function resolveInternalUserId(authId: string | undefined): Promise<string | null> {
+  if (!authId) return null;
+  const { data } = await supabase.from('User').select('id').eq('authId', authId).single();
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
 // GET /connect → { connected }
 router.get('/connect', async (req: Request, res: Response) => {
   const orgId = getOrgId(req);
@@ -27,11 +34,13 @@ router.post('/connect', async (req: Request, res: Response) => {
   const ok = await new HubSpotClient(parsed.data.token).validateToken();
   if (!ok) return res.status(400).json({ error: 'HubSpot rejected this token. Check the Private App scopes (crm.objects.read).' });
 
+  const internalUserId = await resolveInternalUserId(req.user?.id);
+
   await supabase.from('HubSpotConnection').upsert({
     organizationId: orgId,
     authType: 'private_app',
     accessToken: encryptField(parsed.data.token),
-    connectedBy: (req as any).user?.id ?? null,
+    connectedBy: internalUserId,
     updatedAt: new Date().toISOString(),
   }, { onConflict: 'organizationId' });
 
@@ -51,11 +60,23 @@ router.post('/import', async (req: Request, res: Response) => {
   const { data: conn } = await supabase
     .from('HubSpotConnection').select('accessToken').eq('organizationId', orgId).maybeSingle();
   if (!conn) return res.status(400).json({ error: 'Connect HubSpot before importing' });
-  const token = decryptField((conn as { accessToken: string }).accessToken)!;
+
+  // I3: guard null decrypted token before doing any more work
+  const token = decryptField((conn as { accessToken: string }).accessToken);
+  if (!token) return res.status(500).json({ error: 'HubSpot connection could not be decrypted' });
+
+  // I1: return existing in-flight job rather than spawning a second drive loop
+  const { data: existing } = await supabase
+    .from('ImportJob').select('id')
+    .eq('organizationId', orgId).in('status', ['queued', 'running'])
+    .maybeSingle();
+  if (existing) return res.status(202).json({ jobId: (existing as { id: string }).id });
+
+  const internalUserId = await resolveInternalUserId(req.user?.id);
 
   const { data: job } = await supabase.from('ImportJob').insert({
     organizationId: orgId, source: 'hubspot', status: 'running',
-    objectCounts: {}, startedBy: (req as any).user?.id ?? null, startedAt: new Date().toISOString(),
+    objectCounts: {}, startedBy: internalUserId, startedAt: new Date().toISOString(),
   }).select('id').maybeSingle();
   const jobId = (job as { id: string }).id;
 
