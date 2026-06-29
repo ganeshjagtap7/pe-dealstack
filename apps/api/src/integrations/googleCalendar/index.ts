@@ -51,9 +51,13 @@ async function ensureFreshAccessToken(integration: Integration): Promise<string>
   return refreshed.access_token;
 }
 
+// Provider id stays `google_calendar` for backward compatibility with
+// existing Integration rows. Display fields are relabeled to "Google
+// Workspace" because the same token now also powers Drive (NDA Doc
+// creation) and Docs scopes — see CALENDAR_SCOPES in client.ts.
 export const googleCalendarProvider: IntegrationProvider = {
   id: 'google_calendar',
-  displayName: 'Google Calendar',
+  displayName: 'Google Workspace',
   scopes: CALENDAR_SCOPES,
 
   async initiateAuth(userId, organizationId): Promise<InitiateAuthResult> {

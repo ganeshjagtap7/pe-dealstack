@@ -1,8 +1,22 @@
-import { Resend } from 'resend';
+import type { Resend } from 'resend';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+// This module is pulled in by staffAccessLogger, which is mounted on (almost)
+// every API route — so it loads on every lite serverless cold start. `resend`
+// is only needed when an email is actually sent, so load it lazily on first
+// use instead of at module init. `undefined` = not yet resolved.
+let resendClient: Resend | null | undefined;
+async function getResend(): Promise<Resend | null> {
+  if (resendClient !== undefined) return resendClient;
+  if (!process.env.RESEND_API_KEY) {
+    resendClient = null;
+    return null;
+  }
+  const { Resend } = await import('resend');
+  resendClient = new Resend(process.env.RESEND_API_KEY);
+  return resendClient;
+}
 
 export interface StaffAccessEvent {
   staffEmail: string;
@@ -90,6 +104,7 @@ async function fireWebhook(url: string, slackPayload: unknown): Promise<void> {
 }
 
 async function fireEmail(to: string, orgName: string | null, event: StaffAccessEvent): Promise<void> {
+  const resend = await getResend();
   if (!resend) return;
   const subject = event.testMode
     ? '[Test] Pocket Fund staff access notification'

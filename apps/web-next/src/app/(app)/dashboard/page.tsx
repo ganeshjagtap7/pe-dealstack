@@ -20,7 +20,7 @@ import {
   PortfolioAllocation,
 } from "./components";
 import { TasksModal } from "./dashboard-modals";
-import { ActivePrioritiesWidget, MyTasksWidget, AiDealSignalsWidget } from "./dashboard-widgets";
+import { ActivePrioritiesWidget, MyTasksWidget, AiDealSignalsWidget, type InboxScanResult } from "./dashboard-widgets";
 import { CustomizeDashboardModal } from "./widgets/customize-modal";
 import { DraggableWidget } from "./widgets/draggable-widget";
 import { useVisibleWidgets } from "./widgets/useVisibleWidgets";
@@ -35,7 +35,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
-  const [signalResult, setSignalResult] = useState<{ signals?: Array<{ title: string; description: string; severity: string; signalType: string; dealName: string; suggestedAction: string }>; processedCount?: number } | null>(null);
+  const [signalResult, setSignalResult] = useState<InboxScanResult | null>(null);
   const [stageModal, setStageModal] = useState<{ label: string; stages: string[] } | null>(null);
   const [tasksModalOpen, setTasksModalOpen] = useState(false);
   const [customizeOpen, setCustomizeOpen] = useState(false);

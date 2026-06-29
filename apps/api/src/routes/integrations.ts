@@ -10,7 +10,7 @@ import type { ProviderId, Integration } from '../integrations/_platform/types.js
 const router = Router();
 
 const PROVIDER_IDS: ProviderId[] = [
-  'granola', 'gmail', 'google_calendar', 'fireflies', 'otter',
+  'granola', 'gmail', 'google_calendar', 'outlook', 'microsoft365', 'fireflies', 'otter',
 ];
 
 const PUBLIC_FIELDS = `id, organizationId, userId, provider, status,
