@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { HubSpotClient } from '../src/services/hubspot/client.js';
+import { HubSpotClient, MAX_PROPERTIES } from '../src/services/hubspot/client.js';
 
 const mkRes = (status: number, body: unknown, headers: Record<string, string> = {}) => ({
   ok: status >= 200 && status < 300,
@@ -44,5 +44,56 @@ describe('HubSpotClient', () => {
     expect(page.results).toEqual([]);
     expect(page.nextCursor).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('HubSpotClient.listPropertyNames', () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it('keeps custom (hubspotDefined=false) + standard, drops system hs_* / hubspotDefined', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mkRes(200, { results: [
+      { name: 'name', hubspotDefined: true },
+      { name: 'fund_vintage', hubspotDefined: false },
+      { name: 'sector_focus', hubspotDefined: false },
+      { name: 'hs_object_id', hubspotDefined: true },
+      { name: 'hubspot_owner_id', hubspotDefined: true },
+    ] })));
+    const names = await new HubSpotClient('tok').listPropertyNames('companies');
+    expect(names).toContain('fund_vintage');
+    expect(names).toContain('sector_focus');
+    expect(names).toContain('name');
+    expect(names).not.toContain('hs_object_id');
+    expect(names).not.toContain('hubspot_owner_id');
+  });
+
+  it('falls back to the standard set when discovery fails (non-200)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mkRes(403, { message: 'no scope' })));
+    const names = await new HubSpotClient('tok').listPropertyNames('deals');
+    expect(names).toEqual(expect.arrayContaining(['dealname', 'amount']));
+  });
+
+  it('caps the list at MAX_PROPERTIES (custom prioritized) without throwing', async () => {
+    const many = Array.from({ length: MAX_PROPERTIES + 50 }, (_, i) => ({ name: `custom_${i}`, hubspotDefined: false }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mkRes(200, { results: many })));
+    const names = await new HubSpotClient('tok').listPropertyNames('contacts');
+    expect(names.length).toBe(MAX_PROPERTIES);
+  });
+});
+
+describe('HubSpotClient.listPage properties override', () => {
+  beforeEach(() => vi.restoreAllMocks());
+  it('sends the supplied properties list in the query', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mkRes(200, { results: [], paging: undefined }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new HubSpotClient('tok').listPage('companies', { limit: 20, properties: ['name', 'fund_vintage'] });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('properties=name%2Cfund_vintage');
+  });
+  it('falls back to the standard list when no properties supplied', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mkRes(200, { results: [], paging: undefined }));
+    vi.stubGlobal('fetch', fetchMock);
+    await new HubSpotClient('tok').listPage('companies', { limit: 20 });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('properties=name');
   });
 });
