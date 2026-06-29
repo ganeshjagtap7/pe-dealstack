@@ -54,6 +54,7 @@ import adminSecurityRouter from './routes/admin-security.js';
 import adminSecurityDashboardRouter from './routes/admin-security-dashboard.js';
 import internalRouter from './routes/internal-usage.js';
 import usageRouter from './routes/usage.js';
+import hubspotImportRouter from './routes/hubspot-import.js';
 import graphsRouter from './routes/graphs.js';
 import dealsFinancialsTimeseriesRouter from './routes/deals-financials-timeseries.js';
 import { supabase } from './supabase.js';
@@ -346,6 +347,10 @@ app.use('/api/organizations', authMiddleware, orgMiddleware, enforceOrgMfaMiddle
 app.use('/api/tasks', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, tasksRouter);
 app.use('/api/export', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, exportRouter);
 app.use('/api/onboarding', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, onboardingRouter);
+// More-specific /hubspot prefix MUST be mounted BEFORE the generic
+// integrationsRouter, whose POST /:provider/connect would otherwise capture
+// /api/integrations/hubspot/connect (:provider="hubspot") and return 404.
+app.use('/api/integrations/hubspot', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, hubspotImportRouter);
 app.use('/api/integrations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, integrationsRouter);
 // Dashboard mounted alongside the existing isolation-test router (different paths).
 app.use('/api/admin/security', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, adminSecurityDashboardRouter);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { api, ApiError } from "@/lib/api";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
@@ -48,6 +48,31 @@ const STATUS_BADGE: Record<IntegrationStatus, { bg: string; fg: string; label: s
   error:         { bg: "#FEF2F2", fg: "#991B1B", label: "Error" },
   revoked:       { bg: "#F3F4F6", fg: "#374151", label: "Disconnected" },
 };
+
+// ─── HubSpot types ──────────────────────────────────────────────────
+
+interface HubSpotJobCounts {
+  total: number;
+  processed: number;
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+}
+
+interface HubSpotImportJob {
+  id: string;
+  status: string;
+  currentObject: string | null;
+  objectCounts: Record<string, HubSpotJobCounts>;
+  error?: string | null;
+}
+
+const HUBSPOT_OBJECTS = ["companies", "contacts", "deals"] as const;
+
+const POLL_TERMINAL = new Set(["completed", "failed", "cancelled"]);
+
+// ────────────────────────────────────────────────────────────────────
 
 interface Props {
   onToast: (message: string, type: "success" | "error") => void;
@@ -210,9 +235,212 @@ export function IntegrationsSection({ onToast }: Props) {
         onConfirm={() => confirmDisconnect && handleDisconnectConfirmed(confirmDisconnect)}
         onCancel={() => setConfirmDisconnect(null)}
       />
+
+      {/* HubSpot CRM import panel */}
+      <div className="border-t border-border-subtle">
+        <HubSpotPanel onToast={onToast} />
+      </div>
     </section>
   );
 }
+
+// ─── HubSpot CRM import panel ────────────────────────────────────────
+
+interface HubSpotPanelProps {
+  onToast: (message: string, type: "success" | "error") => void;
+}
+
+function HubSpotPanel({ onToast }: HubSpotPanelProps) {
+  const [connected, setConnected] = useState(false);
+  const [token, setToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [job, setJob] = useState<HubSpotImportJob | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    api.get<{ connected: boolean }>("/integrations/hubspot/connect")
+      .then((r) => setConnected(r.connected))
+      .catch(() => {});
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  async function connect() {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await api.post<{ connected: boolean }>("/integrations/hubspot/connect", { token });
+      setConnected(r.connected);
+      setToken("");
+      onToast("HubSpot connected", "success");
+    } catch (err) {
+      const msg =
+        err instanceof ApiError ? err.message :
+        err instanceof Error ? err.message :
+        "Failed to connect";
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function disconnect() {
+    setBusy(true);
+    try {
+      await api.delete<{ connected: boolean }>("/integrations/hubspot/connect");
+      setConnected(false);
+      setJob(null);
+      onToast("HubSpot disconnected", "success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Disconnect failed";
+      onToast(`Disconnect failed: ${msg}`, "error");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function startImport() {
+    if (pollRef.current) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { jobId } = await api.post<{ jobId: string }>("/integrations/hubspot/import", {});
+      // Immediately fetch initial state, then poll every 2 s
+      const fetchJob = async () => {
+        const j = await api.get<HubSpotImportJob>(`/integrations/hubspot/import/${jobId}`);
+        setJob(j);
+        if (POLL_TERMINAL.has(j.status) && pollRef.current) {
+          clearInterval(pollRef.current);
+          pollRef.current = null;
+          if (j.status === "completed") onToast("HubSpot import finished", "success");
+          else onToast(`Import ended with status: ${j.status}`, "error");
+        }
+      };
+      void fetchJob();
+      pollRef.current = setInterval(() => {
+        fetchJob().catch(console.warn);
+      }, 2000);
+    } catch (err) {
+      const msg =
+        err instanceof ApiError ? err.message :
+        err instanceof Error ? err.message :
+        "Failed to start import";
+      setError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const isImporting = job?.status === "running";
+
+  return (
+    <div className="px-6 py-5">
+      <div className="flex items-center gap-3 mb-4">
+        <div
+          className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+          style={{ backgroundColor: "#FF7A59", color: "#fff" }}
+        >
+          <span className="material-symbols-outlined text-[20px]">hub</span>
+        </div>
+        <div>
+          <div className="text-sm font-bold text-text-main">HubSpot CRM Import</div>
+          <div className="text-xs text-text-muted">
+            One-time import of contacts, companies, and deals from HubSpot.
+          </div>
+        </div>
+      </div>
+
+      {!connected ? (
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-text-secondary mb-1">
+              HubSpot Private App token
+            </label>
+            <input
+              type="password"
+              value={token}
+              onChange={(e) => setToken(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && token.length >= 10) connect(); }}
+              placeholder="pat-na1-…"
+              disabled={busy}
+              className="w-full border border-border-subtle rounded-md px-3 py-2 text-sm focus:outline-none disabled:opacity-50"
+            />
+            <p className="mt-1 text-xs text-text-muted">
+              HubSpot → Settings → Integrations → Private Apps. Needs{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">crm.objects.read</code> scopes.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={connect}
+            disabled={busy || token.length < 10}
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            style={{ backgroundColor: "#003366" }}
+          >
+            {busy ? "Connecting…" : "Connect HubSpot"}
+          </button>
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span
+              className="inline-flex items-center gap-1.5 text-sm font-semibold px-2 py-0.5 rounded"
+              style={{ backgroundColor: "#ECFDF5", color: "#047857" }}
+            >
+              <span className="text-[10px]">●</span> HubSpot connected
+            </span>
+            <button
+              type="button"
+              onClick={disconnect}
+              disabled={busy}
+              className="text-xs font-semibold text-text-secondary hover:text-red-600 disabled:opacity-50"
+            >
+              Disconnect
+            </button>
+          </div>
+
+          <button
+            type="button"
+            onClick={startImport}
+            disabled={busy || isImporting}
+            className="rounded-lg px-4 py-2 text-sm font-semibold text-white disabled:opacity-50"
+            style={{ backgroundColor: "#003366" }}
+          >
+            {isImporting ? "Importing…" : "Import from HubSpot"}
+          </button>
+
+          {job && (
+            <div className="rounded-lg border border-border-subtle bg-gray-50 p-4 space-y-2">
+              {HUBSPOT_OBJECTS.map((obj) => {
+                const c = job.objectCounts?.[obj];
+                return (
+                  <div key={obj} className="flex items-center justify-between text-sm">
+                    <span className="capitalize text-text-secondary">{obj}</span>
+                    <span className="text-text-main font-medium">
+                      {c ? `${c.created + c.updated} imported · ${c.failed} failed` : "—"}
+                    </span>
+                  </div>
+                );
+              })}
+              <div className="pt-1 text-xs text-text-muted">
+                Status: <span className="font-semibold">{job.status}</span>
+                {job.currentObject ? ` (syncing ${job.currentObject})` : ""}
+                {job.error ? ` — ${job.error}` : ""}
+              </div>
+            </div>
+          )}
+
+          {error && <p className="text-sm text-red-600">{error}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Provider card ────────────────────────────────────────────────────
 
 interface CardProps {
   provider: ProviderCatalogEntry;
