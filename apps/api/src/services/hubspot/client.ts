@@ -52,8 +52,10 @@ export class HubSpotClient {
     if (kept.length > MAX_PROPERTIES) {
       const custom = kept.filter((n) => !std.has(n));
       const standard = kept.filter((n) => std.has(n));
-      const capped = [...custom, ...standard].slice(0, MAX_PROPERTIES);
-      log.warn(`[hubspot] ${object} has ${kept.length} kept properties; capping at ${MAX_PROPERTIES}`);
+      const ordered = [...custom, ...standard];
+      const capped = ordered.slice(0, MAX_PROPERTIES);
+      const dropped = ordered.slice(MAX_PROPERTIES);
+      log.warn(`[hubspot] ${object} has ${kept.length} kept properties; capping at ${MAX_PROPERTIES}. Dropped: ${dropped.join(', ')}`);
       return capped;
     }
     return kept;
