@@ -4,7 +4,9 @@ import { log } from '../../utils/logger.js';
 const BASE = 'https://api.hubapi.com';
 const MAX_RETRIES = 5;
 
-const PROPERTIES: Record<HubSpotObjectType, string[]> = {
+export const MAX_PROPERTIES = 250;
+
+export const STANDARD_PROPERTIES: Record<HubSpotObjectType, string[]> = {
   companies: ['name', 'industry', 'domain', 'description'],
   contacts: ['firstname', 'lastname', 'email', 'phone', 'jobtitle', 'associatedcompanyid'],
   deals: ['dealname', 'amount', 'dealstage', 'pipeline', 'description'],
@@ -37,12 +39,35 @@ export class HubSpotClient {
     return res.ok;
   }
 
+  async listPropertyNames(object: HubSpotObjectType): Promise<string[]> {
+    const res = await this.requestWithBackoff(`${BASE}/crm/v3/properties/${object}`);
+    if (!res.ok) {
+      log.warn(`[hubspot] property discovery failed for ${object}: ${res.status}`);
+      return [...STANDARD_PROPERTIES[object]];
+    }
+    const data = (await res.json()) as { results?: Array<{ name: string; hubspotDefined?: boolean }> };
+    const std = new Set(STANDARD_PROPERTIES[object]);
+    const kept = (data.results ?? []).filter((p) => p.hubspotDefined === false || std.has(p.name)).map((p) => p.name);
+    for (const s of STANDARD_PROPERTIES[object]) if (!kept.includes(s)) kept.push(s);
+    if (kept.length > MAX_PROPERTIES) {
+      const custom = kept.filter((n) => !std.has(n));
+      const standard = kept.filter((n) => std.has(n));
+      const ordered = [...custom, ...standard];
+      const capped = ordered.slice(0, MAX_PROPERTIES);
+      const dropped = ordered.slice(MAX_PROPERTIES);
+      log.warn(`[hubspot] ${object} has ${kept.length} kept properties; capping at ${MAX_PROPERTIES}. Dropped: ${dropped.join(', ')}`);
+      return capped;
+    }
+    return kept;
+  }
+
   async listPage(
     object: HubSpotObjectType,
-    opts: { limit?: number; after?: string },
+    opts: { limit?: number; after?: string; properties?: string[] },
   ): Promise<ListPage> {
     const params = new URLSearchParams({ limit: String(opts.limit ?? 100) });
-    params.set('properties', PROPERTIES[object].join(','));
+    const props = opts.properties && opts.properties.length ? opts.properties : STANDARD_PROPERTIES[object];
+    params.set('properties', props.join(','));
     if (object === 'deals') params.set('associations', 'companies');
     if (opts.after) params.set('after', opts.after);
     const res = await this.requestWithBackoff(`${BASE}/crm/v3/objects/${object}?${params.toString()}`);

@@ -53,7 +53,8 @@ export async function runImportBatch(jobId: string, token: string): Promise<bool
 
   let page;
   try {
-    page = await client.listPage(current, { limit: BATCH, after: job.cursor ?? undefined });
+    const properties = await client.listPropertyNames(current);
+    page = await client.listPage(current, { limit: BATCH, after: job.cursor ?? undefined, properties });
   } catch (err) {
     log.error(`[hubspot] batch fetch failed for ${current}: ${(err as Error).message}`);
     await saveJob(jobId, { status: 'failed', error: (err as Error).message, finishedAt: new Date().toISOString() });

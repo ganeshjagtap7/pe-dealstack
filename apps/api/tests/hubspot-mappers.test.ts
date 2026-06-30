@@ -24,6 +24,12 @@ describe('mapCompany', () => {
   it('falls back to "Unknown Company" when name missing', () => {
     expect(mapCompany({ id: '1', properties: {} }).name).toBe('Unknown Company');
   });
+
+  it('preserves a client custom property verbatim in hubspotProperties', () => {
+    const out = mapCompany({ id: '1', properties: { name: 'Acme', fund_vintage: '2021', sector_focus: 'SaaS' } });
+    expect(out.hubspotProperties).toEqual({ fund_vintage: '2021', sector_focus: 'SaaS' });
+    expect(out.name).toBe('Acme');
+  });
 });
 
 describe('mapContact', () => {
