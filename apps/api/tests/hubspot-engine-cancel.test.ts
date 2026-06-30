@@ -32,7 +32,9 @@ vi.mock('../src/utils/logger.js', () => ({
 // HubSpotClient mock — listPage returns one company + nextCursor.
 // ---------------------------------------------------------------------------
 vi.mock('../src/services/hubspot/client.js', () => ({
-  HubSpotClient: vi.fn().mockImplementation(function () { return { listPage: mockListPage }; }),
+  HubSpotClient: vi.fn().mockImplementation(function () {
+    return { listPage: mockListPage, listPropertyNames: vi.fn().mockResolvedValue(['name']) };
+  }),
 }));
 
 // ---------------------------------------------------------------------------
