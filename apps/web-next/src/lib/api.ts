@@ -69,11 +69,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({} as Record<string, unknown>));
+    const errField =
+      (body as { error?: unknown; message?: unknown }).error ??
+      (body as { message?: unknown }).message;
     const message =
-      (body as { error?: string; message?: string }).error ||
-      (body as { message?: string }).message ||
-      res.statusText ||
-      `API error ${res.status}`;
+      typeof errField === "string" && errField
+        ? errField
+        : errField != null
+          ? JSON.stringify(errField)
+          : res.statusText || `API error ${res.status}`;
     const code = (body as { code?: string }).code;
 
     // Org has enforced 2FA but the user hasn't enrolled — bounce them to
