@@ -21,6 +21,7 @@ import tasksRouter from './routes/tasks.js';
 import contactsRouter from './routes/contacts.js';
 import exportRouter from './routes/export.js';
 import dealImportRouter from './routes/deal-import.js';
+import hubspotImportRouter from './routes/hubspot-import.js';
 import internalRouter from './routes/internal-usage.js';
 import usageRouter from './routes/usage.js';
 import auditExportRouter from './routes/audit-export.js';
@@ -303,6 +304,9 @@ app.use('/api/tasks', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, us
 app.use('/api/export', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, exportRouter);
 app.use('/api/contacts', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, contactsRouter);
 app.use('/api/watchlist', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, watchlistRouter);
+// hubspot import mounted BEFORE the generic integrationsRouter so /hubspot/* isn't
+// swallowed by integrationsRouter's /:provider/connect catch-all.
+app.use('/api/integrations/hubspot', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, hubspotImportRouter);
 app.use('/api/integrations', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, integrationsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocumentsRouter);
 app.use('/api', authMiddleware, orgMiddleware, enforceOrgMfaMiddleware, usageContextMiddleware, staffAccessLogger, legalDocEsignRouter);
