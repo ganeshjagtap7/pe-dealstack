@@ -14,7 +14,7 @@ import { comparePeriodChronologically } from "./deal-financials-period-scope";
 import { STAGE_LABELS } from "@/lib/constants";
 import { api } from "@/lib/api";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { type DealDetail, type TeamMember, PIPELINE_STAGES, TERMINAL_STAGES } from "./components";
+import { type DealDetail, type TeamMember, PIPELINE_STAGES, TERMINAL_STAGES } from "./deal-detail-shared";
 
 // Minimal shape of an income-statement row needed to render the headline
 // Revenue / EBITDA cards. Mirrors the public columns the API returns from

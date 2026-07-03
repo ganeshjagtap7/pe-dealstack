@@ -17,7 +17,7 @@
 // It does NOT block invocation — the user can always send the prompt.
 // ---------------------------------------------------------------------------
 
-import type { DealDetail } from "@/app/(app)/deals/[id]/components";
+import type { DealDetail } from "@/app/(app)/deals/[id]/deal-detail-shared";
 
 // Re-export the canonical type under the name the spec uses, so consumers
 // can `import type { Deal } from "@/lib/dealchat-skills"` without having

@@ -38,6 +38,14 @@ export function buildExtractionPrompt(options?: {
   todayIso?: string;
   expectedPeriods?: string;
   lineItemHints?: string;
+  /**
+   * Opt-in guidance appended to the prompt — period-hygiene rules and/or
+   * few-shot exemplars from the extraction eval harness
+   * (src/services/extraction-evals/fewshot.ts). Additive: when omitted the
+   * prompt is byte-for-byte unchanged, so it can be A/B'd through the harness
+   * before being switched on in production.
+   */
+  extraGuidance?: string;
 }): string {
   const {
     includeSourceCitations = true,
@@ -47,7 +55,12 @@ export function buildExtractionPrompt(options?: {
     todayIso = getTodayIso(),
     expectedPeriods,
     lineItemHints,
+    extraGuidance,
   } = options ?? {};
+
+  const extraGuidanceBlock = extraGuidance && extraGuidance.trim().length > 0
+    ? `\n${extraGuidance.trim()}\n`
+    : '';
 
   const currencyHintLine = currencyHint
     ? `\nNOTE: The document currency has been pre-detected as ${currencyHint}. Verify this against the document content.\n`
@@ -91,7 +104,7 @@ export function buildExtractionPrompt(options?: {
 Today's date is ${todayIso}. Use this for any relative period inference (FY, LTM, "current quarter", "last N days").
 
 Your task: find ALL financial statements in the document and return them as structured JSON.
-${currencyHintLine}${dateContextLine}${hintsBlock}
+${currencyHintLine}${dateContextLine}${hintsBlock}${extraGuidanceBlock}
 STEP 0 — IDENTIFY CURRENCY:
 Before extracting any financial data, determine the document currency:
 - Look for symbols: $, €, £, ₹, ¥

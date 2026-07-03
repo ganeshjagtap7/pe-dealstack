@@ -11,6 +11,59 @@ export { UserBlockedError } from './services/usage/enforcement.js';
 
 dotenv.config();
 
+// ─── max_tokens safety net ─────────────────────────────────────────
+//
+// Defensive guard so a misconfigured / env-overridden model can never send a
+// `max_tokens` above the model's completion cap and 400 (e.g. the production
+// error: "max_tokens is too large: 32000. This model supports at most 16384
+// completion tokens"). This is a belt-and-suspenders backstop — the primary
+// fix is switching model tiers — so we only clamp KNOWN models and otherwise
+// leave params untouched.
+//
+// Keys are matched via substring so OpenRouter-prefixed names (e.g.
+// 'openai/gpt-4o') also match. Order matters: check gpt-4.1 BEFORE gpt-4o.
+const MODEL_MAX_COMPLETION_TOKENS: ReadonlyArray<readonly [string, number]> = [
+  ['gpt-4.1', 32768],
+  ['gpt-4o', 16384],
+];
+
+function resolveCompletionCap(model: string | undefined): number | undefined {
+  if (!model) return undefined;
+  for (const [needle, cap] of MODEL_MAX_COMPLETION_TOKENS) {
+    if (model.includes(needle)) return cap;
+  }
+  return undefined;
+}
+
+/**
+ * If `params` requests `max_tokens` / `max_completion_tokens` above the resolved
+ * completion cap for `model`, returns a shallow-cloned params object with the
+ * offending value(s) reduced to the cap. Unknown models (no cap match) and
+ * in-range values are returned unchanged (original reference). Never mutates the
+ * caller's object.
+ */
+function clampMaxTokens<T extends Record<string, any>>(
+  model: string | undefined,
+  params: T,
+  operation?: string,
+): T {
+  const cap = resolveCompletionCap(model);
+  if (cap === undefined || !params) return params;
+
+  let clamped: T | undefined;
+  for (const key of ['max_tokens', 'max_completion_tokens'] as const) {
+    const requested = (params as any)[key];
+    if (typeof requested === 'number' && requested > cap) {
+      log.warn(
+        `[openai] clamping max_tokens ${requested} -> ${cap} for model ${model} (operation: ${operation ?? 'n/a'}); model completion cap exceeded`,
+      );
+      if (!clamped) clamped = { ...params };
+      (clamped as any)[key] = cap;
+    }
+  }
+  return clamped ?? params;
+}
+
 // Prefer OpenRouter (unified gateway routing Claude + GPT-4.1 family) when configured.
 // OpenRouter is OpenAI-API-compatible, so the existing OpenAI SDK works as a drop-in
 // once we swap the baseURL and key. Falls back to direct OpenAI otherwise.
@@ -197,10 +250,11 @@ export async function trackedChatCompletion(
   const model = (params as any).model as string;
   const provider: 'openrouter' | 'openai' = useOpenRouter ? 'openrouter' : 'openai';
   await enforceUserGate(operation, model, provider);
+  const safeParams = clampMaxTokens(model, params as any, operation);
   const start = Date.now();
   try {
     const response: any = await withTrace(operation, extras, () =>
-      openai!.chat.completions.create(params as any, options),
+      openai!.chat.completions.create(safeParams as any, options),
     );
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
     const completionTokens = response?.usage?.completion_tokens ?? 0;
@@ -244,10 +298,11 @@ export async function trackedDirectChatCompletion(
   if (!openaiDirect) throw new Error('Direct OpenAI client not configured');
   const model = (params as any).model as string;
   await enforceUserGate(operation, model, 'openai');
+  const safeParams = clampMaxTokens(model, params as any, operation);
   const start = Date.now();
   try {
     const response: any = await withTrace(operation, extras, () =>
-      openaiDirect!.chat.completions.create(params as any, options),
+      openaiDirect!.chat.completions.create(safeParams as any, options),
     );
     const promptTokens = response?.usage?.prompt_tokens ?? 0;
     const completionTokens = response?.usage?.completion_tokens ?? 0;

@@ -447,3 +447,54 @@ describe('normalizePeriodLabel — edges', () => {
     expect(normalizePeriodLabel('Q1   2026')).toBe('Q1 2026');
   });
 });
+
+// ─── Fiscal-year / calendar-year → bare year collapse ────────────
+//
+// Real extractions emit the spreadsheet's "FY2024" header AND a narrative
+// "2024", producing two FinancialStatement rows for one fiscal year. These
+// must normalise to the same key so dedup merges them.
+
+describe('normalizePeriodLabel — FY/CY year collapses onto bare year', () => {
+  it('FY2024 → 2024', () => {
+    expect(normalizePeriodLabel('FY2024')).toBe('2024');
+  });
+
+  it('FY24 → 2024 (2-digit year folded to 20XX)', () => {
+    expect(normalizePeriodLabel('FY24')).toBe('2024');
+  });
+
+  it('"FY 2024" (spaced) → 2024', () => {
+    expect(normalizePeriodLabel('FY 2024')).toBe('2024');
+  });
+
+  it('"2024 FY" (year-first) → 2024', () => {
+    expect(normalizePeriodLabel('2024 FY')).toBe('2024');
+  });
+
+  it('CY2024 → 2024', () => {
+    expect(normalizePeriodLabel('CY2024')).toBe('2024');
+  });
+
+  it('case-insensitive: fy2024 / cy2024 → 2024', () => {
+    expect(normalizePeriodLabel('fy2024')).toBe('2024');
+    expect(normalizePeriodLabel('cy2024')).toBe('2024');
+  });
+
+  it('FY2024 and 2024 produce the SAME key (so they dedup)', () => {
+    expect(normalizePeriodLabel('FY2024')).toBe(normalizePeriodLabel('2024'));
+    expect(normalizePeriodLabel('FY2025')).toBe(normalizePeriodLabel('2025'));
+    expect(normalizePeriodLabel('FY2023')).toBe(normalizePeriodLabel('2023'));
+  });
+
+  it('does NOT collapse estimate/forecast variants (they stay distinct projections)', () => {
+    expect(normalizePeriodLabel('FY26 Est')).toBe('FY26 Est');
+    expect(normalizePeriodLabel('FY26 Est')).not.toBe('2026');
+    expect(normalizePeriodLabel('FY26 Forecast')).toBe('FY26 Forecast');
+    expect(normalizePeriodLabel('2026 FY Est')).not.toBe('2026');
+  });
+
+  it('does NOT touch the estimate suffix "2026E" (distinct projected label)', () => {
+    expect(normalizePeriodLabel('2026E')).toBe('2026E');
+    expect(normalizePeriodLabel('2026E')).not.toBe('2026');
+  });
+});

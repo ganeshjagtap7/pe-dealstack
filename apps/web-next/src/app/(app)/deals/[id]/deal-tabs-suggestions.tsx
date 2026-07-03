@@ -2,7 +2,7 @@
 
 import { formatHeadlineValue, pickHeadlineMetrics } from "@/lib/formatters";
 import type { FinancialSummary } from "@/types";
-import type { DealDetail } from "./components";
+import type { DealDetail } from "./deal-detail-shared";
 
 // ---------------------------------------------------------------------------
 // Suggestion Chips — personalized prompts based on deal data.

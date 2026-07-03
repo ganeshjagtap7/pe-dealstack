@@ -163,6 +163,30 @@ export function normalizePeriodLabel(label: string): string {
     s = `${fyOtherMatch[1].toUpperCase()} ${capitalize(fyOtherMatch[2])}`;
   }
 
+  // 4c-bis. Pure fiscal-year / calendar-year labels collapse onto the bare
+  //   4-digit year so "FY2024" / "FY24" / "FY 2024" / "2024 FY" / "CY2024"
+  //   all dedup against a bare "2024" row (real extractions emit both the
+  //   spreadsheet's "FY2024" header AND a narrative "2024", producing two
+  //   statements for one fiscal year — see the InstateMe CIM which yielded
+  //   2024 + FY2024, 2025 + FY2025, 2023 + FY2023).
+  //
+  //   Only YEAR-ONLY forms match — a trailing qualifier ("FY26 Est",
+  //   "FY26 Forecast") means a projection/estimate and is handled above and
+  //   kept as a DISTINCT label, so this must run AFTER 4a-4c and requires an
+  //   end anchor right after the year. HISTORICAL vs PROJECTED are already
+  //   in separate dedup buckets, so collapsing the label here never merges a
+  //   projection into an actual.
+  {
+    const fyYear =
+      s.match(/^FY\s?(\d{2,4})$/i) || // FY2024, FY24, "FY 2024"
+      s.match(/^(\d{2,4})\s?FY$/i) || // "2024 FY", 24FY
+      s.match(/^CY\s?(\d{4})$/i); //    CY2024
+    if (fyYear) {
+      const yr = normalizeYear(fyYear[1]);
+      if (yr) return yr;
+    }
+  }
+
   // 4d. YTD synonyms.  Order matters — try the most specific first.
   //
   //   "YTD Total (Jan-Apr 20, 2026)"  →  "YTD 2026"   (year extracted)

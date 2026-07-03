@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:org-isolation": "vitest run tests/org-isolation.test.ts --no-file-parallelism",
+    "eval:extraction": "tsx src/services/extraction-evals/runner.ts",
     "clean": "rm -rf dist node_modules"
   },
   "dependencies": {

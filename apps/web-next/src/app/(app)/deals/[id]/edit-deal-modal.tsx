@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { STAGE_LABELS, STAGES } from "@/lib/constants";
 import { CURRENCY_SYMBOLS, formatCurrency, getCurrencySymbol } from "@/lib/formatters";
 import { api } from "@/lib/api";
-import type { DealDetail } from "./components";
+import type { DealDetail } from "./deal-detail-shared";
 
 // Ported from deal-edit.js (showEditDealModal + saveDealChangesFromModal).
 // Stored deal values are in millions of the original currency; the unit selector

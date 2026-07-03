@@ -6,7 +6,7 @@ import type { Skill } from "@/lib/dealchat-skills";
 import { unmetRequirements } from "@/lib/dealchat-skills";
 import { api } from "@/lib/api";
 import { useUser } from "@/providers/UserProvider";
-import type { DealDetail } from "./components";
+import type { DealDetail } from "./deal-detail-shared";
 
 // Provider IDs that satisfy the `mailIntegration` requirement on a skill.
 // When Outlook ships, add `outlook_mail` and `outlook_calendar` here — single

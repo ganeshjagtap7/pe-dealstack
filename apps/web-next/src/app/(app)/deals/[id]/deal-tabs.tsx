@@ -2,9 +2,8 @@
 
 import { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { cn } from "@/lib/cn";
-import type { ChatMessage, DealDetail } from "./components";
-import { ClearChatModal } from "./components";
-import { AISettingsModal } from "./deal-panels";
+import type { ChatMessage, DealDetail } from "./deal-detail-shared";
+import { ClearChatModal, AISettingsModal } from "./deal-panels";
 import { api } from "@/lib/api";
 import { authFetchRaw } from "@/app/(app)/deal-intake/components";
 import { SuggestionChips } from "./deal-tabs-suggestions";

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useToast } from "@/providers/ToastProvider";
 import { formatRelativeTime, formatFileSize, getDocIcon } from "@/lib/formatters";
-import type { DocItem } from "./components";
+import type { DocItem } from "./deal-detail-shared";
 
 // ---------------------------------------------------------------------------
 // Document row — ported from deal-documents.js (updateDocumentsList +
