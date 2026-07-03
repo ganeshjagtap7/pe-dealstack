@@ -1,3 +1,13 @@
+// Client component on purpose: this fallback renders <Skeleton.Line/> /
+// <Skeleton.Circle/>, whose sub-components are static members attached to the
+// Skeleton client component via Object.assign. Static members are NOT reachable
+// across the server->client reference boundary — as a Server Component this
+// file would see `Skeleton.Line` as undefined and throw React error #130
+// ("element type is invalid: got undefined") on load (loading.tsx is the
+// Suspense fallback, so it only renders during load). "use client" keeps
+// Skeleton in the client graph so the compound access resolves.
+"use client";
+
 import { Skeleton } from "@/components/ui/Skeleton";
 
 /**

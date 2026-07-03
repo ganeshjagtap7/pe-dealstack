@@ -1,3 +1,10 @@
+// Client component on purpose: renders compound <Skeleton.Line/> etc., whose
+// static members (attached via Object.assign) don't survive the server->client
+// reference boundary. As a Server Component this fallback would read
+// `Skeleton.Line` as undefined and throw React error #130 on load. See
+// dashboard/loading.tsx for the full explanation.
+"use client";
+
 import { Skeleton } from "@/components/ui/Skeleton";
 
 /**
