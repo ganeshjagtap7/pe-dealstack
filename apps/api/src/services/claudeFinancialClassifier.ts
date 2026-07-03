@@ -31,6 +31,7 @@ import { ChatAnthropic } from '@langchain/anthropic';
 import { SystemMessage, HumanMessage } from '@langchain/core/messages';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
+import { periodHygieneGuidanceIfEnabled } from './extraction-evals/fewshot.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
 import {
   applyExplicitUnitOverride,
@@ -124,6 +125,9 @@ export async function classifyFinancialsWithClaude(
     includeSourceCitations: true,
     expectedPeriods: options?.expectedPeriods,
     lineItemHints: options?.lineItemHints,
+    // Opt-in period-hygiene guidance (EXTRACTION_PERIOD_HYGIENE flag);
+    // undefined when off, leaving the prompt unchanged.
+    extraGuidance: periodHygieneGuidanceIfEnabled(),
   });
 
   log.debug('Claude classifier starting', {

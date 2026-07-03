@@ -58,3 +58,19 @@ export function formatFewShotBlock(examples: FewShotExample[] = FEW_SHOT_EXAMPLE
 export function buildPeriodHygieneGuidance(): string {
   return `${PERIOD_HYGIENE_RULES}\n\n${formatFewShotBlock()}`;
 }
+
+/**
+ * Production A/B gate. Returns the period-hygiene guidance when the env flag
+ * EXTRACTION_PERIOD_HYGIENE is truthy ("1"/"true"/"on"), else undefined.
+ *
+ * This lets the guidance be validated on a real deployment by flipping ONE env
+ * var (e.g. in a Vercel preview) with no code change. Default OFF → the
+ * extraction prompt is byte-for-byte unchanged, so turning it on is a clean
+ * A/B: re-run the same document with the flag on vs off and compare.
+ */
+export function periodHygieneGuidanceIfEnabled(): string | undefined {
+  const flag = (process.env.EXTRACTION_PERIOD_HYGIENE ?? '').trim().toLowerCase();
+  return flag === '1' || flag === 'true' || flag === 'on'
+    ? buildPeriodHygieneGuidance()
+    : undefined;
+}
