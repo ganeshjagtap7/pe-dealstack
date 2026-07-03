@@ -4,7 +4,7 @@ import { useState } from "react";
 import { STAGE_LABELS } from "@/lib/constants";
 import { MeetingPrepModal } from "@/components/deal-actions/MeetingPrepModal";
 import { DraftEmailModal } from "@/components/deal-actions/DraftEmailModal";
-import type { TeamMember } from "./components";
+import type { TeamMember } from "./deal-detail-shared";
 
 export { EditDealModal } from "./edit-deal-modal";
 export { ManageTeamModal } from "./manage-team-modal";

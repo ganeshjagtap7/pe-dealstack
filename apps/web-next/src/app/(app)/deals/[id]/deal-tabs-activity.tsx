@@ -2,7 +2,7 @@
 
 import { formatRelativeTime } from "@/lib/formatters";
 import { IntegrationActivityFeed } from "@/components/integrations/IntegrationActivityFeed";
-import type { Activity } from "./components";
+import type { Activity } from "./deal-detail-shared";
 
 // ---------------------------------------------------------------------------
 // Activity Tab
