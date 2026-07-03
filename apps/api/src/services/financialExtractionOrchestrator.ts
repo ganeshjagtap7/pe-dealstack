@@ -3,6 +3,7 @@ import { extractDealDataFromText, ExtractedDealData } from './aiExtractor.js';
 import { classifyFinancials, ClassificationResult, ClassifiedStatement } from './financialClassifier.js';
 import { dedupeStatementPeriods, mergeStatementsBySameType } from './financialPeriodNormalizer.js';
 import { refreshDealCache } from './dealCacheWriteback.js';
+import { financialSourceAuthorityRank } from './financialSourceAuthority.js';
 import { log } from '../utils/logger.js';
 
 // ─── Types ────────────────────────────────────────────────────
@@ -151,6 +152,20 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
   let hasConflicts = false;
   const now = new Date().toISOString();
 
+  // Source-authority map for cross-document conflict resolution. A dedicated
+  // financials spreadsheet outranks a CIM/teaser narrative, so the P&L wins the
+  // active slot for a period even when the CIM extracted first or scored higher
+  // confidence. Fetched once for the deal; missing docs rank lowest.
+  const { data: dealDocs } = await supabase
+    .from('Document')
+    .select('id, type, mimeType, name')
+    .eq('dealId', input.dealId);
+  const docMetaById = new Map<string, { type?: string | null; mimeType?: string | null; name?: string | null }>(
+    (dealDocs ?? []).map((d) => [d.id as string, d as { type?: string | null; mimeType?: string | null; name?: string | null }]),
+  );
+  const rankOf = (documentId: string | null | undefined): number =>
+    financialSourceAuthorityRank(documentId ? docMetaById.get(documentId) : undefined);
+
   for (const stmt of classification.statements) {
     for (const periodData of stmt.periods) {
       try {
@@ -175,42 +190,71 @@ export async function runDeepPass(input: OrchestrationInput): Promise<DeepPassRe
         const isConflict = existing && existing.documentId !== (input.documentId ?? null);
 
         if (isConflict) {
-          // CONFLICT: different document already has active data for this period
+          // CONFLICT: a different document already has an active row for this
+          // period. Resolve by SOURCE AUTHORITY, not first-writer or
+          // confidence: a P&L spreadsheet (rank 3) beats a CIM/teaser narrative
+          // (rank 2). Only a genuine tie (equal-rank sources) stays needs_review.
+          const incomingRank = rankOf(input.documentId ?? null);
+          const existingRank = rankOf(existing.documentId);
+          const incomingWins = incomingRank > existingRank;
+          const tie = incomingRank === existingRank;
+
           log.info('Deep pass: conflict detected', {
             dealId: input.dealId, statementType: stmt.statementType,
             period: periodData.period, existingDocId: existing.documentId,
-            newDocId: input.documentId,
+            newDocId: input.documentId, incomingRank, existingRank,
+            resolution: incomingWins ? 'incoming_wins_by_authority' : tie ? 'tie_needs_review' : 'existing_wins_by_authority',
           });
 
-          // Mark existing row as needs_review (keep it active)
-          await supabase
-            .from('FinancialStatement')
-            .update({ mergeStatus: 'needs_review' })
-            .eq('id', existing.id);
+          if (incomingWins) {
+            // Deactivate EVERY currently-active row for this period first (to
+            // respect the one-active-per-period partial unique index), then the
+            // upsert below installs the higher-authority incoming row as active.
+            await supabase
+              .from('FinancialStatement')
+              .update({ isActive: false, mergeStatus: 'auto' })
+              .eq('dealId', input.dealId)
+              .eq('statementType', stmt.statementType)
+              .eq('period', periodData.period)
+              .eq('isActive', true);
+          } else {
+            // Existing source outranks or ties the incoming one → keep it
+            // active. Flag for user review only on a true tie; a strictly
+            // weaker incoming source is auto-resolved (no review needed).
+            await supabase
+              .from('FinancialStatement')
+              .update({ mergeStatus: tie ? 'needs_review' : 'auto' })
+              .eq('id', existing.id);
+          }
 
-          // Insert new row as inactive + needs_review
+          // Upsert (not insert) so a re-extraction of the incoming doc updates
+          // its own prior row instead of violating the (deal,type,period,doc)
+          // unique constraint.
           const { data, error } = await supabase
             .from('FinancialStatement')
-            .insert({
-              dealId: input.dealId,
-              documentId: input.documentId ?? null,
-              statementType: stmt.statementType,
-              period: periodData.period,
-              periodType: periodData.periodType,
-              lineItems: periodData.lineItems,
-              currency: stmt.currency,
-              unitScale: stmt.unitScale,
-              extractionConfidence: periodData.confidence,
-              extractionSource: source,
-              extractedAt: now,
-              isActive: false,
-              mergeStatus: 'needs_review',
-            })
+            .upsert(
+              {
+                dealId: input.dealId,
+                documentId: input.documentId ?? null,
+                statementType: stmt.statementType,
+                period: periodData.period,
+                periodType: periodData.periodType,
+                lineItems: periodData.lineItems,
+                currency: stmt.currency,
+                unitScale: stmt.unitScale,
+                extractionConfidence: periodData.confidence,
+                extractionSource: source,
+                extractedAt: now,
+                isActive: incomingWins,
+                mergeStatus: incomingWins ? 'auto' : tie ? 'needs_review' : 'auto',
+              },
+              { onConflict: 'dealId,statementType,period,documentId' },
+            )
             .select('id')
             .single();
 
           if (error) {
-            log.error('Deep pass: conflict insert failed', {
+            log.error('Deep pass: conflict upsert failed', {
               dealId: input.dealId, statementType: stmt.statementType,
               period: periodData.period, error,
             });

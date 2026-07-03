@@ -2,6 +2,7 @@ import { openai, isAIEnabled, trackedChatCompletion } from '../openai.js';
 import { MODEL_CLASSIFICATION } from '../utils/aiModels.js';
 import { log } from '../utils/logger.js';
 import { buildExtractionPrompt } from './extractionPrompt.js';
+import { periodHygieneGuidanceIfEnabled } from './extraction-evals/fewshot.js';
 import { MAX_TEXT_LENGTH } from './agents/financialAgent/config.js';
 import { validateLineItems } from './financialSchema.js';
 
@@ -195,6 +196,9 @@ export async function classifyFinancials(
             includeSourceCitations: true,
             expectedPeriods: options?.expectedPeriods,
             lineItemHints: options?.lineItemHints,
+            // Opt-in period-hygiene guidance (EXTRACTION_PERIOD_HYGIENE flag);
+            // undefined when off, leaving the prompt unchanged.
+            extraGuidance: periodHygieneGuidanceIfEnabled(),
           }),
         },
         {
