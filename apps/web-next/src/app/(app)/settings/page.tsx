@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SecuritySection } from "./SecuritySection";
-import { type PrefsState } from "./PreferencesSection";
+import { PreferencesSection, type PrefsState } from "./PreferencesSection";
 import { ProfileSection, type UserProfile } from "./ProfileSection";
 import { NotificationsSection, DEFAULT_NOTIFICATION_PREFS } from "./NotificationsSection";
 import { TeamSection } from "./TeamSection";
@@ -22,6 +22,7 @@ import { NDATemplatesSection } from "./NDATemplatesSection";
 
 const NAV_SECTIONS = [
   { id: "general", label: "General", icon: "person" },
+  { id: "preferences", label: "Preferences", icon: "tune" },
   { id: "security", label: "Security", icon: "shield" },
   { id: "notifications", label: "Notifications", icon: "notifications" },
   { id: "team", label: "Team", icon: "group" },
@@ -320,7 +321,7 @@ export default function SettingsPage() {
 
           <SecuritySection onToast={showToast} />
 
-          {/* Preferences section hidden for now */}
+          <PreferencesSection prefs={prefs} onChange={updatePrefs} />
 
           <NotificationsSection
             notificationPrefs={notificationPrefs}
