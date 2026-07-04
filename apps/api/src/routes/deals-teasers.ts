@@ -11,7 +11,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
-import { getDealTeasers, regenerateDealTeaser } from '../services/firmTeaserService.js';
 
 const router = Router();
 
@@ -30,6 +29,7 @@ router.get('/:id/teasers', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
+    const { getDealTeasers } = await import('../services/firmTeaserService.js');
     const teasers = await getDealTeasers(dealId, orgId);
     res.json({ teasers });
   } catch (error) {
@@ -54,6 +54,7 @@ router.post('/:id/teasers', async (req, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
+    const { regenerateDealTeaser } = await import('../services/firmTeaserService.js');
     const teaser = await regenerateDealTeaser({ dealId, orgId, profileId: parsed.data.profileId });
     res.json({ teaser });
   } catch (error) {

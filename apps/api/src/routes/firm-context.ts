@@ -12,11 +12,6 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
-import {
-  generateFirmContext,
-  getFirmContext,
-  saveFirmContext,
-} from '../services/firmContextService.js';
 
 const router = Router();
 
@@ -28,6 +23,7 @@ const saveBodySchema = z.object({
 router.get('/', async (req, res) => {
   try {
     const orgId = getOrgId(req);
+    const { getFirmContext } = await import('../services/firmContextService.js');
     const firmContext = await getFirmContext(orgId);
     res.json({ firmContext });
   } catch (error) {
@@ -40,6 +36,7 @@ router.get('/', async (req, res) => {
 router.post('/generate', async (req, res) => {
   try {
     const orgId = getOrgId(req);
+    const { generateFirmContext } = await import('../services/firmContextService.js');
     const ctx = await generateFirmContext(orgId);
     res.json(ctx);
   } catch (error) {
@@ -57,6 +54,7 @@ router.put('/', async (req, res) => {
     if (!parsed.success) {
       return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
     }
+    const { saveFirmContext } = await import('../services/firmContextService.js');
     await saveFirmContext(orgId, parsed.data.text);
     res.json({ ok: true });
   } catch (error) {

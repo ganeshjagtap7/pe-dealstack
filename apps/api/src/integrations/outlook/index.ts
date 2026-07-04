@@ -26,9 +26,7 @@ import {
   extractAddressEmails,
   extractBodyText,
 } from './mapper.js';
-import { runDealEmailClassifier } from '../../services/agents/dealEmailClassifier/index.js';
 import { shouldSkipForAI } from './preFilter.js';
-import { createDealFromOutlookEmail, ensureContactOnDeal } from './autoCreateDeal.js';
 import { uploadEmailAttachmentsToDeal } from './attachments.js';
 
 const DEFAULT_BACKFILL_DAYS = 90;
@@ -172,6 +170,7 @@ export const outlookProvider: IntegrationProvider = {
         const bodyText = extractBodyText(full);
         const occurredAt = full.receivedDateTime ? new Date(full.receivedDateTime) : new Date();
 
+        const { runDealEmailClassifier } = await import('../../services/agents/dealEmailClassifier/index.js');
         const classification = await runDealEmailClassifier({
           subject: full.subject || '(no subject)',
           fromName,
@@ -193,6 +192,7 @@ export const outlookProvider: IntegrationProvider = {
         let contactIds: string[] = [];
         const fromHeader = fromName ? `${fromName} <${fromEmail}>` : fromEmail;
 
+        const { createDealFromOutlookEmail, ensureContactOnDeal } = await import('./autoCreateDeal.js');
         const dealResult = await createDealFromOutlookEmail({
           organizationId: integration.organizationId,
           userId: integration.userId,

@@ -32,9 +32,6 @@ import {
   parseEmailAddress,
 } from './mapper.js';
 import { shouldSkipForAI } from './preFilter.js';
-import { runDealEmailClassifier } from '../../services/agents/dealEmailClassifier/index.js';
-import { createDealFromEmail } from './autoCreateDeal.js';
-import { autoUpdateDealFromEmail } from './autoUpdateDeal.js';
 
 const DEFAULT_BACKFILL_DAYS = 90;
 const TOKEN_REFRESH_SAFETY_MS = 60 * 1000;
@@ -297,6 +294,7 @@ export const gmailProvider: IntegrationProvider = {
           ? new Date(Number(meta.internalDate)).toISOString()
           : dateHeader ?? new Date().toISOString();
 
+        const { runDealEmailClassifier } = await import('../../services/agents/dealEmailClassifier/index.js');
         const classification = await runDealEmailClassifier({
           subject,
           fromName,
@@ -322,6 +320,7 @@ export const gmailProvider: IntegrationProvider = {
           // Phase C: known deal — propose / apply field updates.
           for (const dealId of match.matchedDealIds) {
             try {
+              const { autoUpdateDealFromEmail } = await import('./autoUpdateDeal.js');
               await autoUpdateDealFromEmail({
                 dealId,
                 organizationId: integration.organizationId,
@@ -344,6 +343,7 @@ export const gmailProvider: IntegrationProvider = {
         } else if (classification.confidence >= autoDeal.autoCreateThreshold) {
           // Phase B: new sender + high confidence → create a Deal.
           try {
+            const { createDealFromEmail } = await import('./autoCreateDeal.js');
             const result = await createDealFromEmail({
               organizationId: integration.organizationId,
               userId: integration.userId,

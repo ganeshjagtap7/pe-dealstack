@@ -5,11 +5,6 @@ import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess, verifyDocumentAccess, verifyFolderAccess } from '../middleware/orgScope.js';
 import { getSignedDownloadUrl, extractStoragePath, downloadFileBuffer } from '../utils/storage.js';
-import { watermarkPdf } from '../services/pdfWatermark.js';
-import { extractTextFromPDF } from '../services/pdfExtractor.js';
-import { excelToMarkdown } from '../services/excelToMarkdown.js';
-import { isExcelFile } from '../services/excelFinancialExtractor.js';
-import { embedDocument } from '../rag.js';
 
 // Sub-routers
 import documentsUploadRouter from './documents-upload.js';
@@ -360,6 +355,7 @@ router.get('/documents/:id/download', async (req, res) => {
         if (!buffer) {
           throw new Error('Storage download returned null');
         }
+        const { watermarkPdf } = await import('../services/pdfWatermark.js');
         const stamped = await watermarkPdf(buffer, {
           email: viewerEmail,
           ip: viewerIp,
@@ -452,7 +448,10 @@ router.post('/documents/:id/analyze', async (req, res) => {
     const buffer = Buffer.from(await fileData.arrayBuffer());
     let extractedText: string | null = null;
 
-    // Route by file type
+    // Route by file type (lazy-load parsers so lite bundle stays light)
+    const { extractTextFromPDF } = await import('../services/pdfExtractor.js');
+    const { excelToMarkdown } = await import('../services/excelToMarkdown.js');
+    const { isExcelFile } = await import('../services/excelFinancialExtractor.js');
     if (doc.mimeType === 'application/pdf') {
       const pdfResult = await extractTextFromPDF(buffer);
       extractedText = pdfResult?.text?.replace(/\u0000/g, '') || null;
@@ -481,6 +480,7 @@ router.post('/documents/:id/analyze', async (req, res) => {
     if (updateError) throw updateError;
 
     // Trigger RAG embedding (fire-and-forget)
+    const { embedDocument } = await import('../rag.js');
     embedDocument(id, doc.dealId, extractedText).catch(err =>
       log.error('RAG re-analyze embed error', err)
     );

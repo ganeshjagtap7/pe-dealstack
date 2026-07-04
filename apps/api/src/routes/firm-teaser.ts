@@ -9,14 +9,8 @@ import { z } from 'zod';
 import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
 import { extractTextFromPDF, upload } from './ingest-shared.js';
-import { extractTextFromWord } from '../services/documentParser.js';
 import { extractTextFromExcel, isExcelFile } from '../services/excelFinancialExtractor.js';
-import {
-  getFirmTeaserConfig,
-  saveFirmTeaserConfig,
-  generateProfilePrompt,
-  type TeaserProfile,
-} from '../services/firmTeaserService.js';
+import type { TeaserProfile } from '../services/firmTeaserService.js';
 
 const router = Router();
 
@@ -57,6 +51,7 @@ const generatePromptBodySchema = z.object({
 router.get('/', async (req, res) => {
   try {
     const orgId = getOrgId(req);
+    const { getFirmTeaserConfig } = await import('../services/firmTeaserService.js');
     const config = await getFirmTeaserConfig(orgId);
     res.json({ profiles: config.profiles });
   } catch (error) {
@@ -74,6 +69,7 @@ router.put('/', async (req, res) => {
       return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
     }
 
+    const { saveFirmTeaserConfig } = await import('../services/firmTeaserService.js');
     const profiles = await saveFirmTeaserConfig(orgId, parsed.data.profiles as TeaserProfile[]);
     res.json({ profiles });
   } catch (error) {
@@ -118,6 +114,7 @@ router.post('/extract-context', upload.single('file'), async (req, res) => {
       mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
       mimeType === 'application/msword'
     ) {
+      const { extractTextFromWord } = await import('../services/documentParser.js');
       extractedText = await extractTextFromWord(file.buffer);
       if (!extractedText) {
         return res.status(400).json({ error: 'Failed to extract text from Word document' });
@@ -156,6 +153,7 @@ router.post('/generate-prompt', async (req, res) => {
       return res.status(400).json({ error: 'Invalid body', details: parsed.error.flatten() });
     }
 
+    const { generateProfilePrompt } = await import('../services/firmTeaserService.js');
     const systemPrompt = await generateProfilePrompt(parsed.data);
     res.json({ systemPrompt });
   } catch (error) {
