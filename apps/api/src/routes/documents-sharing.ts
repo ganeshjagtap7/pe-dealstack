@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { Resend } from 'resend';
 import { log } from '../utils/logger.js';
 import { notifyDealTeam, resolveUserId } from './notifications.js';
-import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
+import { getOrgId, verifyDealAccess, verifyDocumentAccess } from '../middleware/orgScope.js';
 
 // Initialize Resend for document request emails
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
@@ -15,12 +15,26 @@ const router = Router();
 router.post('/documents/:id/link', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
     const schema = z.object({
       targetDealId: z.string().uuid(),
     });
     const { targetDealId } = schema.parse(req.body);
 
-    // Fetch original document
+    // SECURITY: both the source document and the target deal must belong to the
+    // caller's organization. Without these checks any authenticated user could
+    // copy another tenant's document (and its extracted financials) into their
+    // own deal, or inject a document into another tenant's deal.
+    const sourceAccess = await verifyDocumentAccess(id, orgId);
+    if (!sourceAccess) {
+      return res.status(404).json({ error: 'Document not found' });
+    }
+    const targetDeal = await verifyDealAccess(targetDealId, orgId);
+    if (!targetDeal) {
+      return res.status(404).json({ error: 'Target deal not found' });
+    }
+
+    // Fetch the full original document (verifyDocumentAccess returns only id/dealId)
     const { data: original, error: fetchErr } = await supabase
       .from('Document')
       .select('*')
@@ -29,17 +43,6 @@ router.post('/documents/:id/link', async (req, res) => {
 
     if (fetchErr || !original) {
       return res.status(404).json({ error: 'Document not found' });
-    }
-
-    // Verify target deal exists
-    const { data: targetDeal, error: dealErr } = await supabase
-      .from('Deal')
-      .select('id, name')
-      .eq('id', targetDealId)
-      .single();
-
-    if (dealErr || !targetDeal) {
-      return res.status(404).json({ error: 'Target deal not found' });
     }
 
     // Create new Document row pointing at same storage file

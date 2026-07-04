@@ -62,26 +62,17 @@ export async function orgMiddleware(
       // User exists but has no Organization — find existing or create one
       try {
         const firmName = req.user.firmName || req.user.email?.split('@')[0] || 'My Firm';
-        const slug = firmName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 100);
+        const slug = firmName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').substring(0, 100) || 'org';
 
-        // First try to find an existing org with same name (might exist from a previous failed attempt)
-        let newOrg: { id: string } | null = null;
-        const { data: existingOrg } = await supabase
+        // SECURITY: never attach to an existing org by name — firmName is
+        // user-controlled, so a name match would let a user join another
+        // tenant's org. Always create a fresh org for a user who has none.
+        const uniqueSlug = `${slug}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+        const { data: newOrg } = await supabase
           .from('Organization')
+          .insert({ name: firmName, slug: uniqueSlug })
           .select('id')
-          .eq('name', firmName)
           .single();
-
-        if (existingOrg) {
-          newOrg = existingOrg;
-        } else {
-          const { data: createdOrg } = await supabase
-            .from('Organization')
-            .insert({ name: firmName, slug: `${slug}-${Date.now().toString(36)}` })
-            .select('id')
-            .single();
-          newOrg = createdOrg;
-        }
 
         if (newOrg) {
           await supabase
