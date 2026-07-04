@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { findOrCreateUser } from '../services/userService.js';
+import { getCachedUserContext, setCachedUserContext } from './authContextCache.js';
 
 /**
  * Organization scoping middleware.
@@ -17,6 +18,17 @@ export async function orgMiddleware(
 ): Promise<void> {
   try {
     if (!req.user?.id) {
+      return next();
+    }
+
+    // Fast path: a warm lambda serves the User→{org,role} lookup from a
+    // short-TTL cache instead of a DB round trip on every request. Only
+    // populated (below) for users who already have an organization, so a
+    // cache hit always carries a usable organizationId.
+    const cached = getCachedUserContext(req.user.id);
+    if (cached?.organizationId) {
+      if (cached.role) req.user.role = cached.role;
+      req.user.organizationId = cached.organizationId;
       return next();
     }
 
@@ -58,6 +70,12 @@ export async function orgMiddleware(
 
     if (userRecord?.organizationId) {
       req.user.organizationId = userRecord.organizationId;
+      // Cache for subsequent warm requests (short TTL — see authContextCache).
+      setCachedUserContext(req.user.id, {
+        userId: userRecord.id,
+        organizationId: userRecord.organizationId,
+        role: userRecord.role ? String(userRecord.role) : null,
+      });
     } else if (userRecord && !userRecord.organizationId) {
       // User exists but has no Organization — find existing or create one
       try {
