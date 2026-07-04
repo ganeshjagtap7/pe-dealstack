@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { Resend } from 'resend';
-import { mergeIntoExistingDeal } from '../services/dealMerger.js';
 import { log } from '../utils/logger.js';
 import { notifyDealTeam, resolveUserId } from './notifications.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
@@ -71,6 +70,7 @@ router.post('/documents/:id/link', async (req, res) => {
     // If original had extracted data, merge into target deal
     if (original.extractedData) {
       try {
+        const { mergeIntoExistingDeal } = await import('../services/dealMerger.js');
         await mergeIntoExistingDeal(targetDealId, original.extractedData, (req as any).user?.id, original.name);
         log.info('Target deal auto-updated from linked document', { targetDealId, documentName: original.name });
       } catch (mergeError) {

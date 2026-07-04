@@ -7,8 +7,6 @@ import { supabase } from '../supabase.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
-import { isLLMAvailable } from '../services/llm.js';
-import { runDealChatAgent } from '../services/agents/dealChatAgent/index.js';
 import { generateFallbackResponse } from '../services/chatHelpers.js';
 import { getTodayIso } from '../utils/dates.js';
 import { formatDealHeadline } from '../utils/financialFormat.js';
@@ -165,7 +163,8 @@ router.post('/:dealId/chat', async (req, res) => {
       throw dealError;
     }
 
-    // Check AI availability
+    // Check AI availability (lazy-load LLM stack so lite bundle stays light)
+    const { isLLMAvailable } = await import('../services/llm.js');
     if (!isLLMAvailable()) {
       return res.json({
         response: generateFallbackResponse(message, deal),
@@ -304,6 +303,7 @@ router.post('/:dealId/chat', async (req, res) => {
     // relative-period reasoning ("recent news", "last 90 days", "current
     // quarter") against the request's wall-clock day — never a hardcoded or
     // module-scope-cached date.
+    const { runDealChatAgent } = await import('../services/agents/dealChatAgent/index.js');
     const result = await runDealChatAgent({
       dealId,
       orgId: deal.organizationId,

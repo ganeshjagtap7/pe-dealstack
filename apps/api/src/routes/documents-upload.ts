@@ -2,20 +2,14 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import multer from 'multer';
-import { extractDealDataFromText, ExtractedDealData } from '../services/aiExtractor.js';
-import { mergeIntoExistingDeal } from '../services/dealMerger.js';
+import type { ExtractedDealData } from '../services/aiExtractor.js';
 import { AuditLog, logFromRequest, AUDIT_ACTIONS, RESOURCE_TYPES, SEVERITY } from '../services/auditLog.js';
 import { validateFile, sanitizeFilename, isPotentiallyDangerous, ALLOWED_MIME_TYPES } from '../services/fileValidator.js';
-import { embedDocument } from '../rag.js';
 import { AICache } from '../services/aiCache.js';
 import { log } from '../utils/logger.js';
 import { notifyDealTeam, resolveUserId } from './notifications.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
-import { tryCompleteOnboardingStep } from './onboarding.js';
-import { excelToMarkdown } from '../services/excelToMarkdown.js';
-import { isExcelFile } from '../services/excelFinancialExtractor.js';
 import { extractTextFromPDF } from '../services/pdfExtractor.js';
-import { runDeepPass } from '../services/financialExtractionOrchestrator.js';
 import { acquireExtractionSlot, releaseExtractionSlot } from '../services/agents/financialAgent/concurrency.js';
 import { findExistingDocument, logDuplicateSkip } from '../services/documentDedup.js';
 
@@ -45,6 +39,13 @@ const documentTypes = ['CIM', 'TEASER', 'FINANCIALS', 'LEGAL', 'NDA', 'LOI', 'EM
 // POST /api/deals/:dealId/documents - Upload document
 router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) => {
   try {
+    // Lazy-load heavy extraction deps so the shared lite bundle stays light on cold start
+    const { extractDealDataFromText } = await import('../services/aiExtractor.js');
+    const { embedDocument } = await import('../rag.js');
+    const { tryCompleteOnboardingStep } = await import('./onboarding.js');
+    const { excelToMarkdown } = await import('../services/excelToMarkdown.js');
+    const { isExcelFile } = await import('../services/excelFinancialExtractor.js');
+    const { runDeepPass } = await import('../services/financialExtractionOrchestrator.js');
     const { dealId } = req.params;
     const orgId = getOrgId(req);
     const dealAccess = await verifyDealAccess(dealId, orgId);
@@ -482,6 +483,7 @@ router.post('/deals/:dealId/documents', upload.single('file'), async (req, res) 
     let updatedFields: string[] = [];
     if (autoUpdateDeal && aiExtractedData) {
       try {
+        const { mergeIntoExistingDeal } = await import('../services/dealMerger.js');
         const mergeResult = await mergeIntoExistingDeal(dealId, aiExtractedData, (req as any).user?.id, documentName);
         dealUpdated = true;
         updatedFields = Object.keys(mergeResult.deal || {}).filter(k =>

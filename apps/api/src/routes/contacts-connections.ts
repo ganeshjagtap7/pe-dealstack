@@ -3,8 +3,6 @@ import { supabase } from '../supabase.js';
 import { z } from 'zod';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyContactAccess, verifyDealAccess } from '../middleware/orgScope.js';
-import { getContactEmailSummary } from '../services/gmailContactsService.js';
-import { chatAboutContact } from '../services/contactChatService.js';
 
 const router = Router();
 
@@ -313,6 +311,7 @@ router.get('/:id/email-summary', async (req: any, res) => {
       return res.json({ connected: false, threadCount: 0, lastContact: null, summary: '', highlights: [] });
     }
 
+    const { getContactEmailSummary } = await import('../services/gmailContactsService.js');
     const result = await getContactEmailSummary(orgId, id, authUserId);
     res.json(result);
   } catch (error) {
@@ -338,6 +337,7 @@ router.post('/:id/chat', async (req: any, res) => {
     }
 
     const { message, history } = validation.data;
+    const { chatAboutContact } = await import('../services/contactChatService.js');
     const result = await chatAboutContact(orgId, id, message, history ?? [], req.user?.id);
     res.json(result);
   } catch (error) {

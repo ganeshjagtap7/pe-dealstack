@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { AuditLog } from '../services/auditLog.js';
 import { log } from '../utils/logger.js';
-import { analyzeMultipleDocuments } from '../services/multiDocAnalyzer.js';
 
 const router = Router();
 
@@ -22,6 +21,7 @@ router.post('/:id/analyze', async (req: any, res) => {
       return res.status(404).json({ error: 'Deal not found' });
     }
 
+    const { analyzeMultipleDocuments } = await import('../services/multiDocAnalyzer.js');
     const result = await analyzeMultipleDocuments(dealId);
 
     if (!result) {

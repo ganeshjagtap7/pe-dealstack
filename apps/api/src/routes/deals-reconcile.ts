@@ -18,13 +18,10 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId, verifyDealAccess } from '../middleware/orgScope.js';
-import {
-  rowsToReconcilerInput,
-  runQuantitativeReconciliationPhase1,
-  runQuantitativeReconciliationPhase2,
-  type FinancialStatementRow,
-  type NarrativeDocumentInput,
-  type DealRecordInput,
+import type {
+  FinancialStatementRow,
+  NarrativeDocumentInput,
+  DealRecordInput,
 } from '../services/quantitativeReconciler.js';
 
 const router = Router();
@@ -82,6 +79,11 @@ router.get('/:id/reconcile', async (req, res) => {
     if (stmtsErr) throw stmtsErr;
 
     const rows = (stmts ?? []) as FinancialStatementRow[];
+    const {
+      rowsToReconcilerInput,
+      runQuantitativeReconciliationPhase1,
+      runQuantitativeReconciliationPhase2,
+    } = await import('../services/quantitativeReconciler.js');
     const reconcilerInput = rowsToReconcilerInput(rows);
     const askingPriceUsd =
       typeof deal.dealSize === 'number' && deal.dealSize > 0

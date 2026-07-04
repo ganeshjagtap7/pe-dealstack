@@ -2,7 +2,6 @@ import { Router } from 'express';
 import { supabase } from '../supabase.js';
 import { getOrgId } from '../middleware/orgScope.js';
 import { log } from '../utils/logger.js';
-import { scanCorrespondents } from '../services/gmailContactsService.js';
 
 const router = Router();
 
@@ -19,6 +18,7 @@ router.get('/insights/gmail-suggestions', async (req: any, res) => {
       return res.json({ connected: false, scanned: 0, suggestions: [] });
     }
     const days = Number(req.query.days) || undefined;
+    const { scanCorrespondents } = await import('../services/gmailContactsService.js');
     const result = await scanCorrespondents(orgId, authUserId, days as number);
     res.json(result);
   } catch (error) {

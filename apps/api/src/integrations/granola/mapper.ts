@@ -1,5 +1,4 @@
 import { log } from '../../utils/logger.js';
-import { runTranscriptAnalysis } from '../../services/agents/meetingTranscriptAgent/index.js';
 import type { MeetingInsight } from '../../services/agents/meetingTranscriptAgent/schema.js';
 import type { GranolaNoteWithTranscript } from './types.js';
 
@@ -51,6 +50,7 @@ export async function granolaNoteToIntegrationActivity(params: {
 
   let aiExtraction: MeetingInsight | null = null;
   try {
+    const { runTranscriptAnalysis } = await import('../../services/agents/meetingTranscriptAgent/index.js');
     aiExtraction = await runTranscriptAnalysis({
       title: note.title,
       attendees: note.attendees,
