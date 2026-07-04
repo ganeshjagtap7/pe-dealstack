@@ -11,6 +11,26 @@
 import type { Dispatch, SetStateAction } from "react";
 import { api } from "@/lib/api";
 import { createClient } from "@/lib/supabase/client";
+
+/**
+ * Read the AI Context Settings the user saved in the deal-page modal
+ * (localStorage "pe-ai-settings") so they can be sent with each chat message.
+ * Returns {} when nothing is set. Previously these settings were written but
+ * never read, so the controls had no effect.
+ */
+function readAiChatSettings(): { responseStyle?: string; includeCitations?: boolean } {
+  try {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem("pe-ai-settings") : null;
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { responseStyle?: string; includeCitations?: boolean };
+    const out: { responseStyle?: string; includeCitations?: boolean } = {};
+    if (parsed.responseStyle) out.responseStyle = parsed.responseStyle;
+    if (typeof parsed.includeCitations === "boolean") out.includeCitations = parsed.includeCitations;
+    return out;
+  } catch {
+    return {};
+  }
+}
 import {
   type DealDetail,
   type DocItem,
@@ -235,6 +255,7 @@ export async function sendPrompt(
   try {
     const data = await api.post<ChatResponseShape>(`/deals/${dealId}/chat`, {
       message: trimmed,
+      ...readAiChatSettings(),
     });
     const responseText =
       data.response || (data as unknown as { content?: string }).content || "";

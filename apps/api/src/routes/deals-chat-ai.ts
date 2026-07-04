@@ -126,7 +126,13 @@ router.post('/:dealId/chat', async (req, res) => {
 
   try {
     const { dealId } = req.params;
-    const { message, history = [] } = req.body;
+    const { message, history = [], responseStyle, includeCitations } = req.body;
+    // AI Context Settings from the deal-page modal. Whitelist the style so a bad
+    // client value can't inject arbitrary prompt text.
+    const safeResponseStyle = ['detailed', 'concise', 'executive'].includes(responseStyle)
+      ? (responseStyle as 'detailed' | 'concise' | 'executive')
+      : undefined;
+    const safeIncludeCitations = typeof includeCitations === 'boolean' ? includeCitations : undefined;
 
     if (!message || typeof message !== 'string') {
       return res.status(400).json({ error: 'Message is required' });
@@ -312,6 +318,8 @@ router.post('/:dealId/chat', async (req, res) => {
       history: history.slice(-10),
       today: getTodayIso(),
       userId: userId ?? undefined,
+      responseStyle: safeResponseStyle,
+      includeCitations: safeIncludeCitations,
     });
 
     await supabase.from('ChatMessage').insert({

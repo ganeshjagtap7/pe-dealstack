@@ -180,6 +180,36 @@ export interface DealChatInput {
    * Optional for backward compat — those tools degrade gracefully if absent.
    */
   userId?: string;
+  /** User's "Response Style" preference (deal-page AI Context Settings). */
+  responseStyle?: 'detailed' | 'concise' | 'executive';
+  /** User's "Include citations from documents" preference. */
+  includeCitations?: boolean;
+}
+
+/**
+ * Turn the user's AI Context Settings into a short system-prompt directive.
+ * Returns '' when nothing is set so default behavior (and prompt caching) is
+ * unchanged. Kept inside the stable system block — it's constant per user
+ * session, so the Anthropic prefix cache still hits within a session.
+ */
+function buildResponsePreferences(
+  responseStyle?: DealChatInput['responseStyle'],
+  includeCitations?: boolean,
+): string {
+  const parts: string[] = [];
+  if (responseStyle === 'concise') {
+    parts.push('Respond with concise summaries: lead with the answer, keep it short, skip preamble.');
+  } else if (responseStyle === 'executive') {
+    parts.push('Respond as an executive briefing: high-level and decision-oriented, a few tight sentences or bullets, no low-level detail unless explicitly asked.');
+  } else if (responseStyle === 'detailed') {
+    parts.push('Respond with detailed, thorough analysis and supporting reasoning.');
+  }
+  if (includeCitations === false) {
+    parts.push('Do not append document citations.');
+  } else if (includeCitations === true) {
+    parts.push('When you state a fact drawn from a deal document, cite the source document name in parentheses.');
+  }
+  return parts.length ? `\n\n=== RESPONSE PREFERENCES ===\n${parts.join(' ')}` : '';
 }
 
 export interface DealChatResult {
@@ -239,7 +269,8 @@ export async function runDealChatAgent(input: DealChatInput): Promise<DealChatRe
     // the firm-context doc is stable across turns within a session.
     const firmContext = await getFirmContextBlock(input.orgId);
     const firmContextBlock = firmContext ? `=== FIRM CONTEXT ===\n${firmContext}\n\n` : '';
-    const systemPromptText = firmContextBlock + buildDealAgentSystemPrompt(today) + '\n' + SHARED_GUARDRAILS;
+    const systemPromptText = firmContextBlock + buildDealAgentSystemPrompt(today) + '\n' + SHARED_GUARDRAILS
+      + buildResponsePreferences(input.responseStyle, input.includeCitations);
     const dealContextText = `Current Deal Context:\n${input.dealContext}\n\nDeal ID: ${input.dealId}\nOrganization ID: ${input.orgId}`;
     // Anthropic only accepts ONE system message and it must be the first
     // message in the conversation — passing two SystemMessages here triggered
