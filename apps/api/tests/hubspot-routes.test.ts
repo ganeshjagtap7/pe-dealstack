@@ -9,7 +9,7 @@ vi.mock('../src/middleware/orgScope.js', () => ({ getOrgId: () => 'org-A' }));
 vi.mock('../src/services/encryption.js', () => ({
   encryptField: (v: string) => `enc:${v}`, decryptField: (v: string) => v.replace(/^enc:/, ''),
 }));
-const validateToken = vi.fn().mockResolvedValue(true);
+const validateToken = vi.fn().mockResolvedValue({ ok: true, status: 200, category: null });
 vi.mock('../src/services/hubspot/client.js', () => ({
   HubSpotClient: vi.fn().mockImplementation(function () { return { validateToken }; }),
 }));
@@ -34,15 +34,42 @@ const chain = (overrides: Record<string, any> = {}) => ({
 });
 
 describe('hubspot-import routes', () => {
-  beforeEach(() => { vi.clearAllMocks(); validateToken.mockResolvedValue(true); });
+  beforeEach(() => { vi.clearAllMocks(); validateToken.mockResolvedValue({ ok: true, status: 200, category: null }); });
 
-  it('POST /connect rejects an invalid token', async () => {
-    validateToken.mockResolvedValue(false);
-    // resolveInternalUserId won't be reached (token validation fails first),
-    // but from() is still called for future potential queries — supply a safe default.
+  it('POST /connect maps a 401 to an invalid-token message', async () => {
+    validateToken.mockResolvedValue({ ok: false, status: 401, category: 'INVALID_AUTHENTICATION' });
     mockSupabase.from.mockReturnValue(chain());
     const res = await request(await buildApp()).post('/api/integrations/hubspot/connect').send({ token: 'bad-token-1234' });
     expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/did not recognize/i);
+    expect(res.body.error).toMatch(/pat-/);
+  });
+
+  it('POST /connect maps MISSING_SCOPES to a message listing the required scopes', async () => {
+    validateToken.mockResolvedValue({ ok: false, status: 403, category: 'MISSING_SCOPES' });
+    mockSupabase.from.mockReturnValue(chain());
+    const res = await request(await buildApp()).post('/api/integrations/hubspot/connect').send({ token: 'scopeless-token' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('crm.objects.companies.read');
+    expect(res.body.error).toContain('crm.objects.contacts.read');
+    expect(res.body.error).toContain('crm.objects.deals.read');
+  });
+
+  it('POST /connect reports the HTTP status for other HubSpot failures', async () => {
+    validateToken.mockResolvedValue({ ok: false, status: 502, category: null });
+    mockSupabase.from.mockReturnValue(chain());
+    const res = await request(await buildApp()).post('/api/integrations/hubspot/connect').send({ token: 'some-token-1234' });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain('502');
+  });
+
+  it('POST /connect trims whitespace around the pasted token', async () => {
+    const HubSpotClientMock = (await import('../src/services/hubspot/client.js')).HubSpotClient as unknown as ReturnType<typeof vi.fn>;
+    const singleMock = vi.fn().mockResolvedValueOnce({ data: { id: 'internal-user-1' } });
+    mockSupabase.from.mockReturnValue(chain({ single: singleMock }));
+    const res = await request(await buildApp()).post('/api/integrations/hubspot/connect').send({ token: '  pat-na1-abc123  \n' });
+    expect(res.status).toBe(200);
+    expect(HubSpotClientMock).toHaveBeenCalledWith('pat-na1-abc123');
   });
 
   it('POST /connect stores an encrypted token and returns connected', async () => {

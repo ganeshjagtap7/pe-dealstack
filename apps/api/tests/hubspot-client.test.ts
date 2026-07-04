@@ -12,16 +12,33 @@ const mkRes = (status: number, body: unknown, headers: Record<string, string> = 
 describe('HubSpotClient', () => {
   beforeEach(() => vi.restoreAllMocks());
 
-  it('validateToken returns true on 200', async () => {
+  it('validateToken returns ok with status on 200', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mkRes(200, { total: 3 })));
     const c = new HubSpotClient('tok');
-    expect(await c.validateToken()).toBe(true);
+    expect(await c.validateToken()).toEqual({ ok: true, status: 200, category: null });
   });
 
-  it('validateToken returns false on 401', async () => {
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mkRes(401, { message: 'bad' })));
+  it('validateToken surfaces status and category on 401', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mkRes(401, { status: 'error', message: 'bad', category: 'INVALID_AUTHENTICATION' })));
     const c = new HubSpotClient('tok');
-    expect(await c.validateToken()).toBe(false);
+    expect(await c.validateToken()).toEqual({ ok: false, status: 401, category: 'INVALID_AUTHENTICATION' });
+  });
+
+  it('validateToken surfaces MISSING_SCOPES on 403', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(mkRes(403, { status: 'error', message: 'no scopes', category: 'MISSING_SCOPES' })));
+    const c = new HubSpotClient('tok');
+    expect(await c.validateToken()).toEqual({ ok: false, status: 403, category: 'MISSING_SCOPES' });
+  });
+
+  it('validateToken tolerates a non-JSON error body', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: false, status: 500,
+      headers: { get: () => null },
+      json: async () => { throw new Error('not json'); },
+      text: async () => 'Internal Server Error',
+    }));
+    const c = new HubSpotClient('tok');
+    expect(await c.validateToken()).toEqual({ ok: false, status: 500, category: null });
   });
 
   it('listPage returns results and next cursor', async () => {

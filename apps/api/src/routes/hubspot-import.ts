@@ -8,7 +8,17 @@ import { HubSpotClient } from '../services/hubspot/client.js';
 import { runImportBatch } from '../services/hubspot/importEngine.js';
 
 const router = Router();
-const connectSchema = z.object({ token: z.string().min(10) });
+const connectSchema = z.object({ token: z.string().trim().min(10) });
+
+const REQUIRED_SCOPES = 'crm.objects.companies.read, crm.objects.contacts.read, crm.objects.deals.read';
+
+function tokenRejectionMessage(v: { status: number; category: string | null }): string {
+  if (v.status === 401) return 'HubSpot did not recognize this token. Paste the full Private App access token (it starts with "pat-").';
+  if (v.status === 403 || v.category === 'MISSING_SCOPES') {
+    return `Your HubSpot Private App is missing required scopes. In HubSpot \u2192 Settings \u2192 Integrations \u2192 Private Apps, grant: ${REQUIRED_SCOPES}, then try again.`;
+  }
+  return `HubSpot rejected this token (HTTP ${v.status}). Try regenerating the Private App token.`;
+}
 const MAX_BATCHES = 1000; // safety bound on the drive loop
 
 /** Map the Supabase auth UUID (req.user.id) to the internal User.id (PK). */
@@ -31,8 +41,11 @@ router.post('/connect', async (req: Request, res: Response) => {
   if (!parsed.success) return res.status(400).json({ error: 'A HubSpot token is required' });
   const orgId = getOrgId(req);
 
-  const ok = await new HubSpotClient(parsed.data.token).validateToken();
-  if (!ok) return res.status(400).json({ error: 'HubSpot rejected this token. Check the Private App scopes (crm.objects.read).' });
+  const validation = await new HubSpotClient(parsed.data.token).validateToken();
+  if (!validation.ok) {
+    log.warn(`[hubspot] token validation failed for org ${orgId}: HTTP ${validation.status} category=${validation.category ?? 'unknown'}`);
+    return res.status(400).json({ error: tokenRejectionMessage(validation) });
+  }
 
   const internalUserId = await resolveInternalUserId(req.user?.id);
 

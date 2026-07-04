@@ -17,6 +17,12 @@ export interface ListPage {
   nextCursor: string | null;
 }
 
+export interface TokenValidation {
+  ok: boolean;
+  status: number;
+  category: string | null; // HubSpot error category, e.g. MISSING_SCOPES / INVALID_AUTHENTICATION
+}
+
 export class HubSpotClient {
   constructor(private token: string) {}
 
@@ -34,9 +40,17 @@ export class HubSpotClient {
     throw new Error('HubSpot rate limit: exceeded max retries');
   }
 
-  async validateToken(): Promise<boolean> {
+  async validateToken(): Promise<TokenValidation> {
     const res = await this.requestWithBackoff(`${BASE}/crm/v3/objects/companies?limit=1`);
-    return res.ok;
+    if (res.ok) return { ok: true, status: res.status, category: null };
+    let category: string | null = null;
+    try {
+      const body = (await res.json()) as { category?: string };
+      category = body.category ?? null;
+    } catch {
+      // HubSpot error bodies are JSON, but don't fail validation reporting if not
+    }
+    return { ok: false, status: res.status, category };
   }
 
   async listPropertyNames(object: HubSpotObjectType): Promise<string[]> {
