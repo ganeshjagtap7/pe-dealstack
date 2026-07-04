@@ -277,6 +277,18 @@ router.delete('/:id/connections/:connectionId', async (req: any, res) => {
       return res.status(404).json({ error: 'Contact not found' });
     }
 
+    // SECURITY: the connection must actually reference the verified contact —
+    // otherwise owning any one contact would let a user delete an arbitrary
+    // ContactRelationship row by id.
+    const { data: conn } = await supabase
+      .from('ContactRelationship')
+      .select('id, contactId, relatedContactId')
+      .eq('id', connectionId)
+      .single();
+    if (!conn || (conn.contactId !== id && conn.relatedContactId !== id)) {
+      return res.status(404).json({ error: 'Connection not found' });
+    }
+
     const { error } = await supabase
       .from('ContactRelationship')
       .delete()
