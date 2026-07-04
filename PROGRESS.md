@@ -12872,3 +12872,24 @@ START → Extract → Verify → Validate → Store → END
 | `docs/AI-AGENT-DOCUMENTATION.html` | **New** — full AI agent architecture documentation |
 
 ---
+
+### Fix — July 4, 2026 — 12:35 PM IST — HubSpot connect 400 diagnostics
+
+**Problem:** On production (lmmos.ai), saving a HubSpot Private App token in Settings → Integrations returned `400` with the generic message "HubSpot rejected this token. Check the Private App scopes (crm.objects.read)." — no way to tell whether the token was invalid or missing scopes.
+
+**Root cause:** `HubSpotClient.validateToken()` probed `GET /crm/v3/objects/companies?limit=1` and returned only a boolean, discarding HubSpot's HTTP status and error category (`INVALID_AUTHENTICATION` vs `MISSING_SCOPES`). Nothing was logged server-side. The UI help text also referenced `crm.objects.read`, which is not a real HubSpot scope — the Private App needs the granular scopes `crm.objects.companies.read`, `crm.objects.contacts.read`, `crm.objects.deals.read`.
+
+**Fix:**
+- `validateToken()` now returns `{ ok, status, category }` (parses HubSpot's error body).
+- `POST /connect` maps 401 → "HubSpot did not recognize this token…", 403/`MISSING_SCOPES` → message listing the three required scopes, other statuses → message including the HTTP code; failure details are logged with `log.warn`.
+- Pasted token is trimmed (`z.string().trim()`) so stray whitespace/newlines can't corrupt the Bearer header.
+- Settings UI help text now lists the three real granular scopes.
+
+| File | Changes |
+|------|---------|
+| `apps/api/src/services/hubspot/client.ts` | `validateToken` returns `TokenValidation` (status + HubSpot error category) |
+| `apps/api/src/routes/hubspot-import.ts` | Granular 400 messages per failure mode, server-side warn log, token trim |
+| `apps/web-next/src/app/(app)/settings/IntegrationsSection.tsx` | Correct scope names in help text |
+| `apps/api/tests/hubspot-client.test.ts` / `hubspot-routes.test.ts` | 8 new/updated tests (19 total, all green) |
+
+---

@@ -368,8 +368,10 @@ function HubSpotPanel({ onToast }: HubSpotPanelProps) {
               className="w-full border border-border-subtle rounded-md px-3 py-2 text-sm focus:outline-none disabled:opacity-50"
             />
             <p className="mt-1 text-xs text-text-muted">
-              HubSpot → Settings → Integrations → Private Apps. Needs{" "}
-              <code className="text-xs bg-gray-100 px-1 rounded">crm.objects.read</code> scopes.
+              HubSpot → Settings → Integrations → Private Apps. Under Scopes, grant{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">crm.objects.companies.read</code>,{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">crm.objects.contacts.read</code> and{" "}
+              <code className="text-xs bg-gray-100 px-1 rounded">crm.objects.deals.read</code>.
             </p>
           </div>
           <button
