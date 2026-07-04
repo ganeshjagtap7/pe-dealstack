@@ -1,6 +1,6 @@
 "use client";
 
-import { RefObject, useRef } from "react";
+import { RefObject } from "react";
 import DOMPurify from "dompurify";
 import { cn } from "@/lib/cn";
 import { renderMarkdown } from "@/lib/markdown";
@@ -43,7 +43,6 @@ export function MemoChat({
   onToggleChat,
   chatEndRef,
 }: MemoChatProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   if (!chatOpen) return null;
 
   return (
@@ -167,13 +166,6 @@ export function MemoChat({
           />
           <div className="absolute right-2 bottom-2 flex items-center gap-1">
             <button
-              onClick={() => fileInputRef.current?.click()}
-              className="p-1.5 text-slate-400 hover:text-primary rounded-lg transition-colors"
-              title="Upload context"
-            >
-              <span className="material-symbols-outlined text-[20px]">attach_file</span>
-            </button>
-            <button
               onClick={onSend}
               disabled={!chatInput.trim() || sendingChat}
               className="p-1.5 text-white rounded-lg hover:opacity-90 transition-opacity shadow-sm disabled:opacity-40"
@@ -189,17 +181,6 @@ export function MemoChat({
             AI can make mistakes. Review generated financial data.
           </span>
         </div>
-        {/* Hidden file input */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          className="hidden"
-          accept=".pdf,.xlsx,.xls,.doc,.docx,.csv"
-          multiple
-          onChange={() => {
-            if (fileInputRef.current) fileInputRef.current.value = "";
-          }}
-        />
       </div>
     </aside>
   );
