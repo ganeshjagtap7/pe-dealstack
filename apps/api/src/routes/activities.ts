@@ -167,10 +167,41 @@ router.post('/deals/:dealId/activities', async (req, res) => {
   }
 });
 
+// GET /api/activities/recent - Get recent activities across the caller's org.
+// NOTE: must be registered BEFORE '/activities/:id' or Express matches "recent"
+// as an :id value and this handler becomes unreachable.
+router.get('/activities/recent', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+    const { limit } = recentActivitiesQuerySchema.parse(req.query);
+
+    // SECURITY: scope to the caller's org via the parent Deal. The inner join
+    // drops any activity whose deal is not in this org, so no cross-tenant rows
+    // leak into the feed.
+    const { data, error } = await supabase
+      .from('Activity')
+      .select(`
+        *,
+        deal:Deal!inner(id, name, icon, industry)
+      `)
+      .eq('deal.organizationId', orgId)
+      .order('createdAt', { ascending: false })
+      .limit(limit);
+
+    if (error) throw error;
+
+    res.json(data || []);
+  } catch (error) {
+    log.error('Error fetching recent activities', error);
+    res.status(500).json({ error: 'Failed to fetch recent activities' });
+  }
+});
+
 // GET /api/activities/:id - Get single activity
 router.get('/activities/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
 
     const { data, error } = await supabase
       .from('Activity')
@@ -185,6 +216,13 @@ router.get('/activities/:id', async (req, res) => {
       throw error;
     }
 
+    // SECURITY: activities are deal-owned — confirm the parent deal is in the
+    // caller's org before returning (otherwise any user could read any activity
+    // by id, leaking deal names / prior field values / mentions across tenants).
+    if (!data?.dealId || !(await verifyDealAccess(data.dealId, orgId))) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
+
     res.json(data);
   } catch (error) {
     log.error('Error fetching activity', error);
@@ -196,6 +234,18 @@ router.get('/activities/:id', async (req, res) => {
 router.delete('/activities/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // SECURITY: verify the activity's parent deal is in the caller's org before
+    // deleting — otherwise any user could delete any tenant's activity by id.
+    const { data: existing } = await supabase
+      .from('Activity')
+      .select('id, dealId')
+      .eq('id', id)
+      .single();
+    if (!existing?.dealId || !(await verifyDealAccess(existing.dealId, orgId))) {
+      return res.status(404).json({ error: 'Activity not found' });
+    }
 
     const { error } = await supabase
       .from('Activity')
@@ -208,29 +258,6 @@ router.delete('/activities/:id', async (req, res) => {
   } catch (error) {
     log.error('Error deleting activity', error);
     res.status(500).json({ error: 'Failed to delete activity' });
-  }
-});
-
-// GET /api/activities/recent - Get recent activities across all deals
-router.get('/activities/recent', async (req, res) => {
-  try {
-    const { limit } = recentActivitiesQuerySchema.parse(req.query);
-
-    const { data, error } = await supabase
-      .from('Activity')
-      .select(`
-        *,
-        deal:Deal(id, name, icon, industry)
-      `)
-      .order('createdAt', { ascending: false })
-      .limit(limit);
-
-    if (error) throw error;
-
-    res.json(data || []);
-  } catch (error) {
-    log.error('Error fetching recent activities', error);
-    res.status(500).json({ error: 'Failed to fetch recent activities' });
   }
 });
 
