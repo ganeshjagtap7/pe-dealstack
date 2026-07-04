@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId } from '../middleware/orgScope.js';
+import { invalidateOrgMfa } from '../middleware/authContextCache.js';
 import {
   logAuditEvent,
   AUDIT_ACTIONS,
@@ -83,6 +84,12 @@ router.patch('/me', async (req: Request, res: Response) => {
     if (error || !data) {
       log.error('organizations/me update failed', error);
       return res.status(500).json({ error: 'Update failed' });
+    }
+
+    // MFA policy may have changed — drop the cached value so the new setting
+    // is enforced on the very next request rather than after the TTL.
+    if (updates.requireMFA !== undefined) {
+      invalidateOrgMfa(orgId);
     }
 
     if (updates.requireMFA !== undefined) {

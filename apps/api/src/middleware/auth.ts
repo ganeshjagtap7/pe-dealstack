@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
+import { getCachedOrgMfa, setCachedOrgMfa } from './authContextCache.js';
 
 // User type for authenticated requests
 export interface AuthUser {
@@ -201,17 +202,25 @@ export const enforceOrgMfaMiddleware = async (
       return;
     }
 
-    const { data: org, error: orgErr } = await supabase
-      .from('Organization')
-      .select('requireMFA')
-      .eq('id', orgId)
-      .single();
+    // Short-TTL cache: requireMFA is looked up on every request, but changes
+    // rarely. On a miss we hit the DB and cache the result (see authContextCache).
+    let requireMFA = getCachedOrgMfa(orgId);
+    if (requireMFA === undefined) {
+      const { data: org, error: orgErr } = await supabase
+        .from('Organization')
+        .select('requireMFA')
+        .eq('id', orgId)
+        .single();
 
-    if (orgErr || !org) {
-      next(); // fail-open on transient lookup error
-      return;
+      if (orgErr || !org) {
+        next(); // fail-open on transient lookup error (not cached)
+        return;
+      }
+      requireMFA = !!org.requireMFA;
+      setCachedOrgMfa(orgId, requireMFA);
     }
-    if (!org.requireMFA) {
+
+    if (!requireMFA) {
       next();
       return;
     }

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { requirePermission, PERMISSIONS } from '../middleware/rbac.js';
 import { getOrgId } from '../middleware/orgScope.js';
+import { invalidateUserContext } from '../middleware/authContextCache.js';
 import { AuditLog } from '../services/auditLog.js';
 
 // Sub-routers
@@ -209,6 +210,12 @@ router.patch('/:id', requirePermission(PERMISSIONS.USER_EDIT), async (req: Reque
         return res.status(404).json({ error: 'User not found' });
       }
       throw error;
+    }
+
+    // A role/org change must take effect immediately, not after the auth
+    // cache TTL — drop this user's cached context (keyed by their auth UUID).
+    if (user?.authId) {
+      invalidateUserContext(user.authId as string);
     }
 
     // Audit log - log role changes with higher severity
