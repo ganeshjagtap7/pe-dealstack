@@ -193,6 +193,35 @@ export default function OnboardingPage() {
         if (!ok) return;
       }
 
+      // Team step: actually send the invitations the user typed. Previously the
+      // rows were collected and thrown away. Onboarding role labels are cosmetic
+      // (Analyst/VP/Partner/Admin); the API enum is ADMIN/MEMBER/VIEWER, so map
+      // Admin→ADMIN and everyone else→MEMBER (roles can be changed in Settings).
+      if (taskId === "team") {
+        const validInvites = teamInvites.filter((r) =>
+          /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(r.email.trim()),
+        );
+        if (validInvites.length > 0) {
+          setBusyTask(taskId);
+          const results = await Promise.allSettled(
+            validInvites.map((r) =>
+              api.post("/invitations", {
+                email: r.email.trim(),
+                role: r.role === "Admin" ? "ADMIN" : "MEMBER",
+              }),
+            ),
+          );
+          setBusyTask(null);
+          const sent = results.filter((x) => x.status === "fulfilled").length;
+          if (sent > 0) {
+            showToast(`Sent ${sent} invitation${sent > 1 ? "s" : ""}`, "success");
+          }
+          if (sent < validInvites.length) {
+            showToast("Some invitations couldn't be sent — you can retry from Settings → Team.", "error");
+          }
+        }
+      }
+
       setCompleted((prev) => {
         const next = new Set(prev);
         next.add(taskId);
@@ -206,7 +235,7 @@ export default function OnboardingPage() {
       setActiveTask(null);
       void markServerStep(taskId);
     },
-    [cimFile, firmData, markServerStep, sampleDealId, saveFirmProfile, showToast, uploadCimFile],
+    [cimFile, firmData, markServerStep, sampleDealId, saveFirmProfile, showToast, teamInvites, uploadCimFile],
   );
 
   const doneCount = completed.size;

@@ -3,13 +3,11 @@
 import { TaskModalShell } from "./task-modal-shell";
 import { TEAM_ROLES, TeamInvite } from "./types";
 
-// Team invite task — dynamic rows of (email, role). Matches legacy
-// behavior: the form collects data but does NOT submit invites during
-// onboarding (onboarding-tasks.js team task +
-// onboarding-flow.js completeTask — no POST to /invitations). Users
-// send real invites later from Settings. The role labels here are
-// visual-only; the Settings invite flow uses the API's enum
-// (ADMIN/MEMBER/VIEWER).
+// Team invite task — dynamic rows of (email, role). On "Mark as done" the
+// parent's completeTask("team") POSTs each valid row to /invitations (see
+// page.tsx). The role labels here are visual-only (Analyst/VP/Partner/Admin);
+// completeTask maps them to the API enum (ADMIN/MEMBER/VIEWER) — Admin→ADMIN,
+// everyone else→MEMBER — and roles can be changed later in Settings → Team.
 export function TeamTaskModal({
   invites,
   onChange,
