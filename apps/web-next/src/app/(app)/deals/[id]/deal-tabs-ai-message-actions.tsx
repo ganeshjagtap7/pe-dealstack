@@ -10,21 +10,13 @@ import { renderMarkdown } from "@/lib/markdown";
 // ---------------------------------------------------------------------------
 
 export function AIMessageActions({ content }: { content: string }) {
-  const [helpful, setHelpful] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  // Note: a "Helpful" thumbs-up was removed here — it only set local state and
+  // recorded nothing (no feedback endpoint exists). Re-add it wired to a real
+  // feedback endpoint if/when AI-response feedback is captured.
   return (
     <div className="flex gap-2 ml-1 mt-1">
-      <button
-        onClick={() => setHelpful(true)}
-        className={cn(
-          "text-[10px] flex items-center gap-1 transition-colors font-medium",
-          helpful ? "text-primary" : "text-text-muted hover:text-primary"
-        )}
-      >
-        <span className="material-symbols-outlined text-sm">thumb_up</span>
-        {helpful ? "Marked helpful" : "Helpful"}
-      </button>
       <button
         onClick={async () => {
           try {
