@@ -82,14 +82,18 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
 
     if (memoError) throw memoError;
 
-    // Get section
+    // Get section — bound to the verified memo (SECURITY: prevents reading a
+    // section that belongs to a memo in another org)
     const { data: section, error: sectionError } = await supabase
       .from('MemoSection')
       .select('*')
       .eq('id', sectionId)
+      .eq('memoId', id)
       .single();
 
-    if (sectionError) throw sectionError;
+    if (sectionError || !section) {
+      return res.status(404).json({ error: 'Section not found' });
+    }
 
     // Build context
     const contextParts = [];
@@ -165,6 +169,7 @@ router.post('/:id/sections/:sectionId/generate', async (req, res) => {
         updatedAt: new Date().toISOString(),
       })
       .eq('id', sectionId)
+      .eq('memoId', id) // SECURITY: bind the update to the verified memo
       .select()
       .single();
 

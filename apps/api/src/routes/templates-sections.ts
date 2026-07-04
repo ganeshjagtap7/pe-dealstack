@@ -125,6 +125,7 @@ router.patch('/:id/sections/:sectionId', async (req, res) => {
       .from('MemoTemplateSection')
       .update(validation.data)
       .eq('id', sectionId)
+      .eq('templateId', id) // SECURITY: bind the section to the verified template
       .select()
       .single();
 
@@ -150,7 +151,8 @@ router.delete('/:id/sections/:sectionId', async (req, res) => {
     const { error } = await supabase
       .from('MemoTemplateSection')
       .delete()
-      .eq('id', sectionId);
+      .eq('id', sectionId)
+      .eq('templateId', id); // SECURITY: bind the section to the verified template
 
     if (error) throw error;
 
@@ -183,6 +185,7 @@ router.post('/:id/sections/reorder', async (req, res) => {
         .from('MemoTemplateSection')
         .update({ sortOrder })
         .eq('id', sectionId)
+        .eq('templateId', id) // SECURITY: only reorder sections of the verified template
     );
 
     await Promise.all(updates);

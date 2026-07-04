@@ -144,6 +144,7 @@ router.patch('/:id/sections/:sectionId', async (req, res) => {
       .from('MemoSection')
       .update(validation.data)
       .eq('id', sectionId)
+      .eq('memoId', id) // SECURITY: bind the section to the verified memo
       .select()
       .single();
 
@@ -169,7 +170,8 @@ router.delete('/:id/sections/:sectionId', async (req, res) => {
     const { error } = await supabase
       .from('MemoSection')
       .delete()
-      .eq('id', sectionId);
+      .eq('id', sectionId)
+      .eq('memoId', id); // SECURITY: bind the section to the verified memo
 
     if (error) throw error;
 
@@ -202,6 +204,7 @@ router.post('/:id/sections/reorder', async (req, res) => {
         .from('MemoSection')
         .update({ sortOrder })
         .eq('id', sectionId)
+        .eq('memoId', id) // SECURITY: only reorder sections of the verified memo
     );
 
     await Promise.all(updates);

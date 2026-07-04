@@ -279,6 +279,14 @@ router.delete('/:id', requirePermission(PERMISSIONS.USER_DELETE), async (req: Re
 router.get('/:id/deals', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // SECURITY: only expose data for a user in the caller's own organization
+    const { data: targetUser } = await supabase
+      .from('User').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
 
     const { data: teamMemberships, error } = await supabase
       .from('DealTeamMember')
@@ -315,6 +323,15 @@ router.get('/:id/deals', async (req: Request, res: Response, next: NextFunction)
 router.get('/:id/notifications', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { id } = req.params;
+    const orgId = getOrgId(req);
+
+    // SECURITY: only expose notifications for a user in the caller's own org
+    const { data: targetUser } = await supabase
+      .from('User').select('id').eq('id', id).eq('organizationId', orgId).single();
+    if (!targetUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
     const params = userNotificationsQuerySchema.parse(req.query);
 
     let query = supabase
