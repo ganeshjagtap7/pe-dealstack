@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useUser } from "@/providers/UserProvider";
 import { useApiQuery } from "@/lib/useApiQuery";
 import { formatCurrency } from "@/lib/formatters";
@@ -39,6 +40,17 @@ export default function AdminPage() {
   const role = (user?.systemRole || user?.role || "").toUpperCase();
   const canManage = role === ADMIN_MANAGEMENT_ROLE;
   const canView = ADMIN_VISIBLE_ROLES.has(role);
+
+  // Deep-link support: /admin?modal=task opens the Create Task modal (used by
+  // the dashboard "Create Task" quick action, which previously just landed here
+  // without opening anything). Only honored for users who can manage.
+  const searchParams = useSearchParams();
+  const modalParam = searchParams.get("modal");
+  useEffect(() => {
+    if (canManage && (modalParam === "task" || modalParam === "assign" || modalParam === "review" || modalParam === "reminder")) {
+      setOpenModal(modalParam);
+    }
+  }, [canManage, modalParam]);
 
   // Read-only dashboard data via the shared stale-while-revalidate cache, so
   // returning to /admin renders instantly from cache and revalidates in the

@@ -34,7 +34,7 @@ export function QuickActionsWidget() {
     { icon: "person_add", label: "Add Contact", href: "/contacts" },
   ];
   if (isAdmin) {
-    actions.push({ icon: "task_alt", label: "Create Task", href: "/admin" });
+    actions.push({ icon: "task_alt", label: "Create Task", href: "/admin?modal=task" });
   }
 
   return (
