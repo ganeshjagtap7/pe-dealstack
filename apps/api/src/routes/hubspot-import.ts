@@ -10,7 +10,12 @@ import { runImportBatch } from '../services/hubspot/importEngine.js';
 const router = Router();
 const connectSchema = z.object({ token: z.string().trim().min(10) });
 
-const REQUIRED_SCOPES = 'crm.objects.companies.read, crm.objects.contacts.read, crm.objects.deals.read';
+// Object-read scopes let us import records; schema-read scopes let us discover the
+// client's custom properties (GET /crm/v3/properties/{object}) so custom fields aren't
+// silently dropped. Both sets are required for a lossless import.
+const REQUIRED_SCOPES =
+  'crm.objects.companies.read, crm.objects.contacts.read, crm.objects.deals.read, ' +
+  'crm.schemas.companies.read, crm.schemas.contacts.read, crm.schemas.deals.read';
 
 function tokenRejectionMessage(v: { status: number; category: string | null }): string {
   if (v.status === 401) return 'HubSpot did not recognize this token. Paste the full Private App access token (it starts with "pat-").';
