@@ -5,7 +5,7 @@
 //
 // Read is open to any org member (so the create-NDA modal can show
 // the template picker). Write — parse / create / update / delete —
-// is gated to ADMIN via requireMinimumRole.
+// is open to authenticated org members for now.
 
 import { Router } from 'express';
 import multer from 'multer';
@@ -13,7 +13,6 @@ import { z } from 'zod';
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getOrgId } from '../middleware/orgScope.js';
-import { requireMinimumRole, ROLES } from '../middleware/rbac.js';
 import {
   parseTemplateFile,
   sanitiseLegalDocHtml,
@@ -133,12 +132,11 @@ router.get('/legal-document-templates', async (req, res) => {
 });
 
 // ============================================================
-// POST /legal-document-templates/parse — admin only, multipart
+// POST /legal-document-templates/parse — org member upload, multipart
 // ============================================================
 
 router.post(
   '/legal-document-templates/parse',
-  requireMinimumRole(ROLES.ADMIN),
   upload.single('file'),
   async (req, res) => {
     try {
@@ -185,12 +183,11 @@ router.post(
 );
 
 // ============================================================
-// POST /legal-document-templates — admin only (save verified)
+// POST /legal-document-templates — org member save verified
 // ============================================================
 
 router.post(
   '/legal-document-templates',
-  requireMinimumRole(ROLES.ADMIN),
   async (req, res) => {
     try {
       const orgId = getOrgId(req);
@@ -235,12 +232,11 @@ router.post(
 );
 
 // ============================================================
-// PATCH /legal-document-templates/:id — admin only
+// PATCH /legal-document-templates/:id — org member update
 // ============================================================
 
 router.patch(
   '/legal-document-templates/:id',
-  requireMinimumRole(ROLES.ADMIN),
   async (req, res) => {
     try {
       const orgId = getOrgId(req);
@@ -296,12 +292,11 @@ router.patch(
 );
 
 // ============================================================
-// DELETE /legal-document-templates/:id — admin only (hard delete)
+// DELETE /legal-document-templates/:id — org member hard delete
 // ============================================================
 
 router.delete(
   '/legal-document-templates/:id',
-  requireMinimumRole(ROLES.ADMIN),
   async (req, res) => {
     try {
       const orgId = getOrgId(req);
