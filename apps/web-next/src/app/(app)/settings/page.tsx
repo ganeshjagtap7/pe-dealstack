@@ -7,7 +7,7 @@ import { cn } from "@/lib/cn";
 import Link from "next/link";
 import { ConfirmDialog } from "@/components/ui/ConfirmDialog";
 import { SecuritySection } from "./SecuritySection";
-import { type PrefsState } from "./PreferencesSection";
+import { PreferencesSection, type PrefsState } from "./PreferencesSection";
 import { ProfileSection, type UserProfile } from "./ProfileSection";
 import { NotificationsSection, DEFAULT_NOTIFICATION_PREFS } from "./NotificationsSection";
 import { TeamSection } from "./TeamSection";
@@ -22,6 +22,7 @@ import { NDATemplatesSection } from "./NDATemplatesSection";
 
 const NAV_SECTIONS = [
   { id: "general", label: "General", icon: "person" },
+  { id: "preferences", label: "Preferences", icon: "tune" },
   { id: "security", label: "Security", icon: "shield" },
   { id: "notifications", label: "Notifications", icon: "notifications" },
   { id: "team", label: "Team", icon: "group" },
@@ -167,23 +168,17 @@ export default function SettingsPage() {
     }
   };
 
-  const [confirmAction, setConfirmAction] = useState<"discard" | "deactivate" | null>(null);
+  const [confirmAction, setConfirmAction] = useState<"discard" | null>(null);
 
   const handleCancel = () => {
     if (!hasChanges) return;
     setConfirmAction("discard");
   };
 
-  const handleDeactivate = () => {
-    setConfirmAction("deactivate");
-  };
-
   const executeConfirm = () => {
     if (confirmAction === "discard") {
       if (profile) applyProfile(profile);
       setHasChanges(false);
-    } else if (confirmAction === "deactivate") {
-      showToast("Account deactivation is not available in this version", "error");
     }
     setConfirmAction(null);
   };
@@ -320,7 +315,7 @@ export default function SettingsPage() {
 
           <SecuritySection onToast={showToast} />
 
-          {/* Preferences section hidden for now */}
+          <PreferencesSection prefs={prefs} onChange={updatePrefs} />
 
           <NotificationsSection
             notificationPrefs={notificationPrefs}
@@ -342,21 +337,22 @@ export default function SettingsPage() {
 
           <AiUsageSection />
 
-          {/* Deactivate Account */}
+          {/* Deactivate Account — support-assisted (no self-serve destructive
+              action; previously this button opened a confirm dialog that just
+              errored "not available in this version"). */}
           <div className="flex items-center justify-between p-4 bg-red-50 border border-red-200 rounded-lg">
             <div>
               <h4 className="text-sm font-bold text-red-700">Deactivate Professional Account</h4>
               <p className="text-xs text-red-600/80">
-                Temporarily disable your analyst profile and data access.
+                To disable your profile and data access, contact our team — we&apos;ll confirm and process it for you.
               </p>
             </div>
-            <button
-              type="button"
-              onClick={handleDeactivate}
-              className="px-4 py-2 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50 transition-colors shadow-sm"
+            <a
+              href="mailto:hello@pocketfund.org?subject=Account%20deactivation%20request"
+              className="px-4 py-2 bg-white border border-red-200 text-red-600 text-xs font-bold rounded-lg hover:bg-red-50 transition-colors shadow-sm whitespace-nowrap"
             >
-              Deactivate
-            </button>
+              Contact support
+            </a>
           </div>
 
           {hasChanges && (
@@ -370,14 +366,10 @@ export default function SettingsPage() {
 
       <ConfirmDialog
         open={!!confirmAction}
-        title={confirmAction === "deactivate" ? "Deactivate Account" : "Discard Changes"}
-        message={
-          confirmAction === "deactivate"
-            ? "Are you sure you want to deactivate your account? This will disable your profile and data access."
-            : "Discard all unsaved changes? This cannot be undone."
-        }
-        confirmLabel={confirmAction === "deactivate" ? "Deactivate" : "Discard"}
-        variant={confirmAction === "deactivate" ? "danger" : "default"}
+        title="Discard Changes"
+        message="Discard all unsaved changes? This cannot be undone."
+        confirmLabel="Discard"
+        variant="default"
         onConfirm={executeConfirm}
         onCancel={() => setConfirmAction(null)}
       />

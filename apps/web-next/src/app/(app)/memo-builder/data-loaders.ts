@@ -126,10 +126,14 @@ interface UseOpenCreateModalArgs {
 // data. Normalises the dual response shape from /api/deals and /api/templates
 // so a bare-array response works the same as a wrapped one.
 export function useOpenCreateModal({ setShowCreate, setCreateForm, setDeals, setTemplates }: UseOpenCreateModalArgs) {
-  return useCallback(async (prefillDealId?: string) => {
+  return useCallback(async (prefillDealId?: string, prefillTemplateId?: string) => {
     setShowCreate(true);
-    if (prefillDealId) {
-      setCreateForm((f) => ({ ...f, dealId: prefillDealId }));
+    if (prefillDealId || prefillTemplateId) {
+      setCreateForm((f) => ({
+        ...f,
+        ...(prefillDealId ? { dealId: prefillDealId } : {}),
+        ...(prefillTemplateId ? { templateId: prefillTemplateId } : {}),
+      }));
     }
     try {
       // /api/deals can return either a bare DealOption[] (current handler in

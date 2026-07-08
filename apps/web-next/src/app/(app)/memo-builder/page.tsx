@@ -71,6 +71,7 @@ function MemoBuilderPageInner() {
   const urlDealId = searchParams.get("dealId");
   const urlMemoId = searchParams.get("memoId");
   const urlFromChat = searchParams.get("fromChat");
+  const urlTemplateId = searchParams.get("templateId");
   /* ---- State ---- */
   const [memos, setMemos] = useState<Memo[]>([]);
   const [loadingList, setLoadingList] = useState(true);
@@ -182,6 +183,17 @@ function MemoBuilderPageInner() {
     triggerGenerateAll,
   );
   useMemoIdEffect(urlMemoId, loadMemo);
+
+  // URL ?templateId=X (from the "Use Template" button in /templates) — open the
+  // Create modal pre-selected with that template. Runs once when the param
+  // appears; without this the templateId was silently dropped.
+  const templatePrefillDone = useRef(false);
+  useEffect(() => {
+    if (urlTemplateId && !templatePrefillDone.current) {
+      templatePrefillDone.current = true;
+      void openCreateModal(urlDealId ?? undefined, urlTemplateId);
+    }
+  }, [urlTemplateId, urlDealId, openCreateModal]);
 
   const handleCreate = createMemoHandler({
     createForm,

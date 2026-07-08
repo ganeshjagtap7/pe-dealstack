@@ -397,7 +397,7 @@ function DocSection({
       {/* Placeholder for missing content */}
       {section.hasPlaceholder && section.placeholderText && (
         <div className="p-4 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center">
-          <button className="inline-flex flex-col items-center gap-2 text-slate-400 hover:text-primary transition-colors group/add">
+          <button onClick={onGenerate} className="inline-flex flex-col items-center gap-2 text-slate-400 hover:text-primary transition-colors group/add">
             <div className="size-8 rounded-full bg-slate-200 flex items-center justify-center group-hover/add:bg-primary/10 transition-colors">
               <span className="material-symbols-outlined group-hover/add:text-primary">add</span>
             </div>

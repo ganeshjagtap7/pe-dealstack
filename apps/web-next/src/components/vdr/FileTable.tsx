@@ -94,14 +94,7 @@ export function FileTable({
             <thead className="bg-slate-50/80">
               <tr>
                 <th className="py-3.5 pl-4 pr-3 text-left text-xs font-semibold text-slate-500 sm:pl-6" scope="col">
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                      aria-label="Select all files"
-                    />
-                    Name
-                  </div>
+                  Name
                 </th>
                 <th className="px-3 py-3.5 text-left text-xs font-semibold text-slate-500 w-[40%]" scope="col">
                   AI Analysis
@@ -327,13 +320,6 @@ export function FileTable({
         </div>
       </div>
 
-      {files.length > 0 && (
-        <div className="flex justify-center mt-4">
-          <button className="text-xs font-medium text-slate-500 hover:text-primary transition-colors">
-            View all {files.length} files in {folderName}
-          </button>
-        </div>
-      )}
     </div>
   );
 }

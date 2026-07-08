@@ -33,6 +33,7 @@ export function TeamSection({
   const [loading, setLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
 
   const loadInvitations = useCallback(async () => {
     try {
@@ -78,6 +79,32 @@ export function TeamSection({
     }
     setCopiedId(inviteId);
     setTimeout(() => setCopiedId(null), 1500);
+  };
+
+  const resendInvite = async (id: string) => {
+    setBusyId(id);
+    try {
+      await api.post(`/invitations/${id}/resend`, {});
+      onToast("Invitation resent", "success");
+      await loadInvitations();
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Failed to resend invitation", "error");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const revokeInvite = async (id: string) => {
+    setBusyId(id);
+    try {
+      await api.delete(`/invitations/${id}`);
+      onToast("Invitation revoked", "success");
+      await loadInvitations();
+    } catch (err) {
+      onToast(err instanceof Error ? err.message : "Failed to revoke invitation", "error");
+    } finally {
+      setBusyId(null);
+    }
   };
 
   return (
@@ -151,6 +178,30 @@ export function TeamSection({
                           {copiedId === inv.id ? "check" : "link"}
                         </span>
                         {copiedId === inv.id ? "Copied" : "Copy Link"}
+                      </button>
+                    )}
+                    {inv.status === "PENDING" && (
+                      <button
+                        type="button"
+                        onClick={() => resendInvite(inv.id)}
+                        disabled={busyId === inv.id}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md border border-border-subtle bg-white text-text-main hover:bg-gray-50 transition-colors disabled:opacity-50"
+                        title="Resend invitation email"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">outgoing_mail</span>
+                        Resend
+                      </button>
+                    )}
+                    {(inv.status === "PENDING" || inv.status === "EXPIRED") && (
+                      <button
+                        type="button"
+                        onClick={() => revokeInvite(inv.id)}
+                        disabled={busyId === inv.id}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-md border border-red-200 bg-white text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                        title="Revoke invitation"
+                      >
+                        <span className="material-symbols-outlined text-[16px]">close</span>
+                        Revoke
                       </button>
                     )}
                     <span
