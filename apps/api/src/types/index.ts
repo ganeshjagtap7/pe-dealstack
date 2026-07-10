@@ -75,6 +75,7 @@ export interface Deal {
   aiThesis: string | null;
   icon: string | null;
   assignedTo: string | null;
+  createdBy: string | null;
   tags: string[] | null;
   targetCloseDate: string | null;
   source: string | null;
@@ -89,6 +90,7 @@ export interface Deal {
 export interface DealWithRelations extends Deal {
   company: Company | null;
   assignedUser: Pick<User, 'id' | 'name' | 'avatar' | 'email' | 'title'> | null;
+  createdByUser: Pick<User, 'id' | 'name' | 'avatar' | 'email' | 'title'> | null;
   teamMembers: DealTeamMemberWithUser[];
   documents: Document[];
   activities: Activity[];

@@ -271,6 +271,7 @@ router.post('/', upload.single('file'), async (req, res) => {
           name: companyName,
           companyId: company.id,
           organizationId: orgId,
+          createdBy: req.user?.internalId ?? null,
           stage: 'INITIAL_REVIEW',
           status: dealStatus,
           priority: userPriority,

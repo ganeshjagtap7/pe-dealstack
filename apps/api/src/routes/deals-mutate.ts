@@ -67,11 +67,13 @@ router.post('/', requirePermission(PERMISSIONS.DEAL_CREATE), async (req, res) =>
         source: data.source,
         customFields: data.customFields || {},
         organizationId: orgId,
+        createdBy: req.user?.internalId ?? null,
       })
       .select(`
         *,
         company:Company(*),
-        assignedUser:User!assignedTo(id, name, avatar, email)
+        assignedUser:User!assignedTo(id, name, avatar, email),
+        createdByUser:User!createdBy(id, name, avatar, email)
       `)
       .single();
 

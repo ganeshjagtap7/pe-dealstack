@@ -118,6 +118,7 @@ subRouter.post('/text', async (req, res) => {
           name: companyName,
           companyId: company.id,
           organizationId: orgId,
+          createdBy: req.user?.internalId ?? null,
           stage: 'INITIAL_REVIEW',
           status: dealStatus,
           industry: aiData.industry.value,

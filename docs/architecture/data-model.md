@@ -67,6 +67,7 @@ The unit of work. Owns documents, financials, activities, chats, memos.
 | `currency` | text | Default `USD` |
 | `industry`, `source`, `icon` | text | |
 | `assignedTo` | uuid FK → User | Lead |
+| `createdBy` | uuid FK → User | Who created the deal (stamped on every create path: manual, CSV/HubSpot import, AI ingest). Backfilled from `AuditLog` for pre-migration deals; NULL when unattributable. |
 | `targetCloseDate`, `actualCloseDate` | date | |
 | `tags` | text[] | |
 | `aiThesis` | text | LLM-generated thesis |
