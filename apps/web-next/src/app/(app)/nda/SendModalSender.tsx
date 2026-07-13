@@ -36,7 +36,7 @@ export function SenderLine({ state }: { state: WorkspaceEmailState }) {
           outgoing_mail
         </span>
         <div className="min-w-0">
-          From: checking your Workspace connection…
+          From: checking your Google connection…
         </div>
       </div>
     );
@@ -52,7 +52,7 @@ export function SenderLine({ state }: { state: WorkspaceEmailState }) {
           From:{" "}
           <span className="font-medium text-slate-700">{state.email}</span>{" "}
           <span className="text-slate-400">
-            (sent via your Google Workspace Gmail)
+            (sent via your connected Google account)
           </span>
         </div>
       </div>
@@ -66,7 +66,7 @@ export function SenderLine({ state }: { state: WorkspaceEmailState }) {
         warning
       </span>
       <div className="flex-1 min-w-0 leading-snug">
-        Google Workspace not connected — sends will fail.{" "}
+        Google not connected — sends will fail.{" "}
         <a
           href="/settings#section-integrations"
           className="font-semibold underline hover:no-underline"
@@ -95,7 +95,7 @@ export function SendingFromPill({ state }: { state: WorkspaceEmailState }) {
           <span className="material-symbols-outlined text-[14px] animate-pulse">
             sync
           </span>
-          Resolving your Workspace sender…
+          Resolving your Google sender…
         </div>
       </div>
     );
@@ -122,7 +122,7 @@ export function SendingFromPill({ state }: { state: WorkspaceEmailState }) {
         <span className="material-symbols-outlined text-[14px]">
           warning
         </span>
-        <span className="font-semibold">Workspace not connected</span>
+        <span className="font-semibold">Google not connected</span>
       </div>
     </div>
   );

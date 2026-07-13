@@ -21,6 +21,7 @@ import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getProviderAccessToken } from '../integrations/_platform/tokenStore.js';
 import { extractGoogleDocId, getDocMetadata } from '../integrations/googleDrive/client.js';
+import { isWorkspaceAccount } from '../integrations/googleCalendar/client.js';
 import { GoogleDriveError } from '../integrations/googleDrive/types.js';
 
 // Shared marker written to metadata.source so send + the frontend can tell an
@@ -36,6 +37,7 @@ export type LegalDocImportGdocErrorCode =
   | 'INVALID_GDOC_URL'
   | 'GOOGLE_NOT_CONNECTED'
   | 'GOOGLE_SCOPES_MISSING'
+  | 'WORKSPACE_REQUIRED'
   | 'GDOC_NOT_ACCESSIBLE'
   | 'DRIVE_API_ERROR';
 
@@ -134,8 +136,19 @@ export async function importGoogleDoc(input: ImportGoogleDocInput) {
   if (!accessToken) {
     throw new LegalDocImportGdocError(
       'GOOGLE_NOT_CONNECTED',
-      'Google Workspace is not connected for this user — open Settings → Integrations',
+      'Google is not connected for this user — open Settings → Integrations',
       409,
+    );
+  }
+
+  // Importing a Doc for the native Google Docs eSignature flow only makes
+  // sense on a Workspace account (personal accounts can't add an eSignature
+  // field). Gate it via the OAuth `hd` (hosted domain) claim.
+  if (!(await isWorkspaceAccount(accessToken))) {
+    throw new LegalDocImportGdocError(
+      'WORKSPACE_REQUIRED',
+      'Importing a Google Doc for signature requires a Google Workspace account',
+      403,
     );
   }
 

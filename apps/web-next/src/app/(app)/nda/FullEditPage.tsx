@@ -11,6 +11,7 @@ import { SendModal } from "./SendModal";
 import { SendForSignatureModal } from "./SendForSignatureModal";
 import { SentActionBar } from "./SentActionBar";
 import { TokenInsertPanel } from "./TokenInsertPanel";
+import { useWorkspaceStatus } from "./useWorkspaceStatus";
 import { STATUS_LABELS, STATUS_ORDER } from "./constants";
 import { renderSignaturePlaceholder, substituteTokens } from "./tokens";
 import { ViewModeToggle, type ViewMode } from "./ViewModeToggle";
@@ -66,6 +67,9 @@ function initialForm(doc: LegalDocumentWithDeal): FormState {
 export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
   const { showToast } = useToast();
   const { user } = useUser();
+  // Connected Google account status — `isWorkspace` gates the Google Docs
+  // eSignature "Request Signature" action in the sent-doc action bar.
+  const workspace = useWorkspaceStatus();
   const editorRef = useRef<EditorHandle | null>(null);
   const [form, setForm] = useState<FormState>(() => initialForm(doc));
   const [saving, setSaving] = useState(false);
@@ -322,6 +326,7 @@ export function FullEditPage({ doc, onBack, onSaved }: FullEditPageProps) {
               senderEmail={lastSenderEmail}
               showSnapshot={showSnapshot}
               onToggleView={() => setShowSnapshot((s) => !s)}
+              isWorkspace={workspace.loading ? null : workspace.isWorkspace}
             />
           )}
           {error && (

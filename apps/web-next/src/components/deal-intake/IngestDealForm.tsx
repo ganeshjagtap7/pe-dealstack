@@ -32,6 +32,25 @@ import { FollowUpQuestions, WarningBanner } from "@/app/(app)/deal-intake/intake
 import { FileUploadPanel, TextInputPanel } from "@/app/(app)/deal-intake/tab-panels";
 import { DealTeaserPopup } from "@/app/(app)/deal-intake/DealTeaserPopup";
 import type { DealTeaser } from "@/lib/teaser";
+import {
+  pickGoogleFile,
+  preloadGooglePicker,
+  isGooglePickerConfigured,
+} from "@/lib/googlePicker";
+
+// Drive MIME allow-list for ingest — mirrors the multipart upload's accepted
+// types plus native Google Docs/Sheets (exported server-side to PDF/XLSX).
+const DRIVE_INGEST_MIME_TYPES = [
+  "application/pdf",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "text/csv",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/msword",
+  "text/plain",
+  "application/vnd.google-apps.document",
+  "application/vnd.google-apps.spreadsheet",
+];
 
 interface IngestDealFormProps {
   /** "page" renders the standalone /deal-intake page chrome (heading + outer scroll
@@ -104,6 +123,9 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
     const timer = setTimeout(() => { if (dealSearch) searchDeals(dealSearch); }, 300);
     return () => clearTimeout(timer);
   }, [dealSearch, searchDeals]);
+
+  // Warm the Google Picker SDKs so the popup opens reliably on first click.
+  useEffect(() => { preloadGooglePicker(); }, []);
 
   useEffect(() => {
     if (!showDealDropdown) return;
@@ -267,6 +289,36 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
     finally { endProcessing(); }
   };
 
+  // Import a file straight from the user's Google Drive via the Picker, then
+  // run it through the same /ingest pipeline as an upload. Works for any
+  // connected Google account (personal or Workspace).
+  const handlePickGoogleDrive = async () => {
+    if (mode === "existing" && !selectedDeal) { setError("Please select a deal first."); return; }
+    let picked;
+    try {
+      picked = await pickGoogleFile({
+        mimeTypes: DRIVE_INGEST_MIME_TYPES,
+        title: "Select a file from Google Drive",
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Google Drive picker failed");
+      return;
+    }
+    if (!picked) return; // user cancelled the picker
+    beginProcessing("Importing from Google Drive...");
+    try {
+      const body: Record<string, string> = { fileId: picked.fileId };
+      if (mode === "existing" && selectedDeal) body.dealId = selectedDeal.id;
+      const data = await api.post<IngestResponse>("/ingest/drive", body);
+      setResult(data);
+      fireFollowUp(data);
+      if (mode === "new" && data.deal?.id) {
+        maybeShowTeaserPopup({ id: data.deal.id, name: data.deal.name });
+      }
+    } catch (err) { setError(err instanceof Error ? err.message : "Drive import failed"); }
+    finally { endProcessing(); }
+  };
+
   const handleExtractText = async () => {
     if (textInput.trim().length < 50) { setError("Please enter at least 50 characters of text."); return; }
     if (mode === "existing" && !selectedDeal) { setError("Please select a deal first."); return; }
@@ -349,21 +401,41 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       {!processing && !result && (
         <>
           {activeTab === "file" && (
-            <FileUploadPanel
-              selectedFile={selectedFile}
-              dragOver={dragOver}
-              setDragOver={setDragOver}
-              fileInputRef={fileInputRef}
-              onDrop={handleDrop}
-              onFileSelect={handleFileSelect}
-              onClear={clearFile}
-              onUpload={handleUploadFile}
-              onUploadDirect={handleUploadDirect}
-              processing={processing}
-              actionLabel={actionLabel}
-              showDirectUpload={mode === "existing"}
-              directUploadDisabled={!selectedFile || !selectedDeal || processing}
-            />
+            <div className="flex flex-col gap-4">
+              <FileUploadPanel
+                selectedFile={selectedFile}
+                dragOver={dragOver}
+                setDragOver={setDragOver}
+                fileInputRef={fileInputRef}
+                onDrop={handleDrop}
+                onFileSelect={handleFileSelect}
+                onClear={clearFile}
+                onUpload={handleUploadFile}
+                onUploadDirect={handleUploadDirect}
+                processing={processing}
+                actionLabel={actionLabel}
+                showDirectUpload={mode === "existing"}
+                directUploadDisabled={!selectedFile || !selectedDeal || processing}
+              />
+              {isGooglePickerConfigured && (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="h-px flex-1 bg-border-subtle" />
+                    <span className="text-xs text-text-muted">or</span>
+                    <div className="h-px flex-1 bg-border-subtle" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePickGoogleDrive}
+                    disabled={processing || (mode === "existing" && !selectedDeal)}
+                    className="flex items-center justify-center gap-2 rounded-lg border border-border-subtle bg-white px-4 py-2.5 text-sm font-medium text-text-secondary hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">add_to_drive</span>
+                    Import from Google Drive
+                  </button>
+                </>
+              )}
+            </div>
           )}
           {activeTab === "text" && (
             <TextInputPanel

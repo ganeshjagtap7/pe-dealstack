@@ -346,9 +346,9 @@ function ErrorBanner({ banner }: { banner: Banner }) {
   const message = (() => {
     switch (banner.kind) {
       case "googleNotConnected":
-        return "Google Workspace isn't connected yet. Connect it in Settings to send NDAs.";
+        return "Google isn't connected yet. Connect it in Settings to send NDAs.";
       case "googleScopesMissing":
-        return "Google Workspace is connected but needs a re-authorize to send mail. Reconnect in Settings.";
+        return "Google is connected but needs a re-authorize to send mail. Reconnect in Settings.";
       case "noRecipient":
         return "Fill in counterparty email first";
       case "noContent":

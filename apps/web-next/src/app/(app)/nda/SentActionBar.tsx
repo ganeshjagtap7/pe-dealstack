@@ -15,6 +15,11 @@ interface SentActionBarProps {
   senderEmail: string | null;
   showSnapshot: boolean;
   onToggleView: () => void;
+  // Whether the connected Google account is a Workspace account. Google Docs
+  // native eSignature is Workspace-only, so "Request Signature" is greyed out
+  // for personal accounts. `null` = still loading/unknown → leave enabled (the
+  // backend still guards with a WORKSPACE_REQUIRED error).
+  isWorkspace?: boolean | null;
 }
 
 // Response shape for POST /legal-documents/:id/request-signature. See
@@ -44,11 +49,16 @@ export function SentActionBar({
   senderEmail,
   showSnapshot,
   onToggleView,
+  isWorkspace = null,
 }: SentActionBarProps) {
   const { showToast } = useToast();
   const [requestingSig, setRequestingSig] = useState(false);
   const recipientLabel = sentToEmail || "the counterparty";
   const dateLabel = sentAt ? new Date(sentAt).toLocaleString() : "—";
+  // Google Docs eSignature is Workspace-only. Disable only when we KNOW the
+  // account is personal (isWorkspace === false); while unknown (null) keep it
+  // enabled and let the backend guard.
+  const signatureBlocked = isWorkspace === false;
 
   async function handleRequestSignature() {
     if (requestingSig) return;
@@ -120,10 +130,17 @@ export function SentActionBar({
         <button
           type="button"
           onClick={handleRequestSignature}
-          disabled={requestingSig}
+          disabled={requestingSig || signatureBlocked}
+          title={
+            signatureBlocked
+              ? "Requires a Google Workspace account — Google Docs eSignature isn't available on personal Google accounts"
+              : undefined
+          }
           className={cn(
             "px-3 py-1.5 rounded-md text-xs font-semibold text-white inline-flex items-center gap-1.5",
-            requestingSig ? "opacity-70 cursor-not-allowed" : "hover:opacity-90",
+            requestingSig || signatureBlocked
+              ? "opacity-60 cursor-not-allowed"
+              : "hover:opacity-90",
           )}
           style={{ backgroundColor: "#047857" }}
         >

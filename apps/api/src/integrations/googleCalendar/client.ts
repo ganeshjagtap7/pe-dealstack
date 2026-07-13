@@ -102,6 +102,20 @@ export async function getUserInfo(accessToken: string): Promise<GoogleCalendarUs
   return (await res.json()) as GoogleCalendarUserInfo;
 }
 
+/**
+ * True when the account behind `accessToken` is a managed Google Workspace
+ * account — detected via the `hd` (hosted domain) claim on the OAuth userinfo,
+ * which Google only sets for Workspace accounts (never personal @gmail.com).
+ *
+ * Used to gate the Google Docs native eSignature flow (Workspace-only). This
+ * makes a live userinfo call so it stays correct for connections made before
+ * we started persisting `settings.hostedDomain`.
+ */
+export async function isWorkspaceAccount(accessToken: string): Promise<boolean> {
+  const info = await getUserInfo(accessToken);
+  return Boolean(info.hd);
+}
+
 export async function listEventsBetween(
   accessToken: string,
   timeMin: Date,
