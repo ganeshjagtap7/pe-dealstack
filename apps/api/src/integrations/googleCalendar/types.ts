@@ -2,6 +2,11 @@ export interface GoogleCalendarUserInfo {
   email: string;
   name?: string;
   verified_email?: boolean;
+  // Hosted domain — present ONLY for managed Google Workspace accounts
+  // (e.g. "acme.com"). Absent for personal @gmail.com accounts. We use its
+  // presence as the "is this a Workspace account?" signal that gates the
+  // Google Docs native eSignature flow.
+  hd?: string;
 }
 
 export interface GoogleCalendarTimeRef {

@@ -52,6 +52,9 @@ interface ImportGdocBody {
 interface WorkspaceEmailResponse {
   email: string | null;
   connected: boolean;
+  // True only for managed Workspace accounts (OAuth `hd` claim). Importing a
+  // Doc for the native Google Docs eSignature flow requires Workspace.
+  isWorkspace?: boolean;
   error?: "not_connected" | "profile_fetch_failed" | "user_not_provisioned";
 }
 
@@ -138,8 +141,14 @@ function ImportGdocForm({
   // gets the popup blocked. `connected: null` = still loading / unknown.
   const [wsConnected, setWsConnected] = useState<boolean | null>(null);
   const [wsEmail, setWsEmail] = useState<string | undefined>(undefined);
+  // True only for managed Workspace accounts. The Google Docs eSignature flow
+  // an imported Doc feeds into is Workspace-only, so personal accounts can't
+  // import — the button is greyed with a tooltip.
+  const [wsIsWorkspace, setWsIsWorkspace] = useState<boolean>(false);
 
   const busy = picking || submitting;
+  // Connected to Google but NOT a Workspace account → import is unavailable.
+  const requiresWorkspace = wsConnected === true && !wsIsWorkspace;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -161,6 +170,7 @@ function ImportGdocForm({
         if (cancelled) return;
         setWsConnected(ws.connected);
         setWsEmail(ws.email ?? undefined);
+        setWsIsWorkspace(Boolean(ws.isWorkspace));
       })
       .catch((err) => {
         if (cancelled) return;
@@ -190,9 +200,19 @@ function ImportGdocForm({
     if (wsConnected === false) {
       setNotConnected(true);
       const msg =
-        "Connect Google Workspace in Settings → Integrations before importing a Doc.";
+        "Connect Google in Settings → Integrations before importing a Doc.";
       setError(msg);
       showToast(msg, "error", { title: "Google not connected" });
+      return;
+    }
+    // Importing a Doc for the native Google Docs eSignature flow is
+    // Workspace-only — a personal account has no eSignature panel to add the
+    // signer field with. Block early with an actionable message.
+    if (requiresWorkspace) {
+      const msg =
+        "Importing a Google Doc for signature requires a Google Workspace account.";
+      setError(msg);
+      showToast(msg, "error", { title: "Workspace required" });
       return;
     }
     setPicking(true);
@@ -319,15 +339,24 @@ function ImportGdocForm({
               <ChooseFromDriveButton
                 configured={pickerConfig.isConfigured}
                 picking={picking}
-                disabled={busy}
+                disabled={busy || requiresWorkspace}
                 onClick={handleChoose}
               />
             )}
-            <p className="mt-1.5 text-[11px] text-slate-500">
-              Pick a Doc from the Google account you connected in Settings
-              &rarr; Integrations. Choosing it here grants this app access to
-              that one file.
-            </p>
+            {requiresWorkspace ? (
+              <p className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-2.5 py-2 leading-snug">
+                Importing a Google Doc for signature requires a Google
+                Workspace account — Google Docs eSignature isn&rsquo;t
+                available on personal Google accounts. You can still compose,
+                send, and download NDAs.
+              </p>
+            ) : (
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                Pick a Doc from the Google account you connected in Settings
+                &rarr; Integrations. Choosing it here grants this app access to
+                that one file.
+              </p>
+            )}
           </Field>
 
           {/* The rest of the form only matters once a Doc is chosen. We keep it

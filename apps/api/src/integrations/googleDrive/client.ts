@@ -15,6 +15,7 @@ import {
   GoogleDriveError,
   type CreateDocResult,
   type DocMetadataResult,
+  type DriveFileMetadata,
 } from './types.js';
 
 const DRIVE_UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files';
@@ -28,6 +29,32 @@ const DRIVE_EXPORT_MIME = {
 } as const;
 
 export type DriveExportFormat = keyof typeof DRIVE_EXPORT_MIME;
+
+// Google-native source MIME → the binary format we export it to for ingest.
+// Docs → PDF (best text fidelity for the extractor), Sheets → XLSX (so the
+// Excel financial extractor picks it up), Slides → PDF. Native Google files
+// have no downloadable bytes, so they must be exported rather than fetched
+// with alt=media.
+const DRIVE_NATIVE_EXPORT: Record<string, { mimeType: string; ext: string }> = {
+  'application/vnd.google-apps.document': { mimeType: 'application/pdf', ext: 'pdf' },
+  'application/vnd.google-apps.spreadsheet': {
+    mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    ext: 'xlsx',
+  },
+  'application/vnd.google-apps.presentation': { mimeType: 'application/pdf', ext: 'pdf' },
+};
+
+/** True for native Google types (Docs/Sheets/Slides) that need `export`. */
+export function isGoogleNativeMime(mimeType: string): boolean {
+  return mimeType.startsWith('application/vnd.google-apps.');
+}
+
+/** Export target ({ mimeType, ext }) for a native Google type, or null. */
+export function driveExportTargetFor(
+  mimeType: string,
+): { mimeType: string; ext: string } | null {
+  return DRIVE_NATIVE_EXPORT[mimeType] ?? null;
+}
 
 const UPLOAD_TIMEOUT_MS = 30_000;
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -253,6 +280,112 @@ export async function exportDocAs(
     log.warn('googleDrive.exportDocAs: non-2xx', {
       status: res.status,
       format,
+      bodyPreview: text.slice(0, 200),
+    });
+    throw mapDriveError(res.status, text, 'Drive export failed');
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Fetch metadata (name + mimeType + size) for an arbitrary Drive file the
+ * user picked for ingest. Used to decide download-vs-export and to name the
+ * stored document. Same per-file `drive.file` access model as the NDA import
+ * flow — the Picker selection grants the app (and this server token) access.
+ */
+export async function getDriveFileMetadata(
+  accessToken: string,
+  fileId: string,
+): Promise<DriveFileMetadata> {
+  const fields = 'id,name,mimeType,size';
+  const url = `${DRIVE_FILES_URL}/${encodeURIComponent(
+    fileId,
+  )}?fields=${encodeURIComponent(fields)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw mapDriveError(res.status, text, 'Drive metadata fetch failed');
+  }
+
+  const json = (await res.json()) as {
+    id?: string;
+    name?: string;
+    mimeType?: string;
+    size?: string;
+  };
+  if (!json.id || !json.name || !json.mimeType) {
+    throw new GoogleDriveError(
+      'DRIVE_API_ERROR',
+      'Drive metadata response missing required fields',
+      res.status,
+      JSON.stringify(json).slice(0, 500),
+    );
+  }
+  return {
+    id: json.id,
+    name: json.name,
+    mimeType: json.mimeType,
+    // Drive returns size as a string; absent for native Google types.
+    size: json.size ? Number(json.size) : undefined,
+  };
+}
+
+/**
+ * Download the raw bytes of a binary Drive file (PDF, .xlsx, .docx, …) via
+ * `alt=media`. NOT valid for native Google types — use `exportDriveFile`.
+ */
+export async function downloadDriveFile(
+  accessToken: string,
+  fileId: string,
+): Promise<Buffer> {
+  const url = `${DRIVE_FILES_URL}/${encodeURIComponent(fileId)}?alt=media`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    log.warn('googleDrive.downloadDriveFile: non-2xx', {
+      status: res.status,
+      bodyPreview: text.slice(0, 200),
+    });
+    throw mapDriveError(res.status, text, 'Drive file download failed');
+  }
+
+  const arrayBuffer = await res.arrayBuffer();
+  return Buffer.from(arrayBuffer);
+}
+
+/**
+ * Export a native Google file (Docs/Sheets/Slides) to a binary format via
+ * `files.export`. `exportMimeType` comes from `driveExportTargetFor`.
+ * (Generalizes `exportDocAs`, which is limited to a Doc→docx/pdf enum.)
+ */
+export async function exportDriveFile(
+  accessToken: string,
+  fileId: string,
+  exportMimeType: string,
+): Promise<Buffer> {
+  const url = `${DRIVE_FILES_URL}/${encodeURIComponent(
+    fileId,
+  )}/export?mimeType=${encodeURIComponent(exportMimeType)}`;
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+    signal: AbortSignal.timeout(UPLOAD_TIMEOUT_MS),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    log.warn('googleDrive.exportDriveFile: non-2xx', {
+      status: res.status,
+      exportMimeType,
       bodyPreview: text.slice(0, 200),
     });
     throw mapDriveError(res.status, text, 'Drive export failed');

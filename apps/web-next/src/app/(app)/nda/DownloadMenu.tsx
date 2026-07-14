@@ -66,7 +66,7 @@ export function DownloadMenu({ docId, title, disabled }: DownloadMenuProps) {
         const code = (body as { code?: string }).code;
         if (code === "GOOGLE_NOT_CONNECTED" || code === "GOOGLE_SCOPES_MISSING") {
           throw new Error(
-            "Connect Google Workspace in Settings → Integrations to download.",
+            "Connect Google in Settings → Integrations to download.",
           );
         }
         const msg =

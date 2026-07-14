@@ -52,12 +52,14 @@ async function ensureFreshAccessToken(integration: Integration): Promise<string>
 }
 
 // Provider id stays `google_calendar` for backward compatibility with
-// existing Integration rows. Display fields are relabeled to "Google
-// Workspace" because the same token now also powers Drive (NDA Doc
-// creation) and Docs scopes — see CALENDAR_SCOPES in client.ts.
+// existing Integration rows. Displayed simply as "Google" — the connection
+// works for ANY Google account (personal or Workspace); the same token powers
+// Calendar, Drive (file ingest + NDA Doc creation) and Gmail-send. Only the
+// Google Docs native eSignature sub-feature is Workspace-gated (see the `hd`
+// signal captured in handleCallback). See CALENDAR_SCOPES in client.ts.
 export const googleCalendarProvider: IntegrationProvider = {
   id: 'google_calendar',
-  displayName: 'Google Workspace',
+  displayName: 'Google',
   scopes: CALENDAR_SCOPES,
 
   async initiateAuth(userId, organizationId): Promise<InitiateAuthResult> {
@@ -98,7 +100,14 @@ export const googleCalendarProvider: IntegrationProvider = {
       refreshTokenEncrypted: encryptForStorage(tokens.refresh_token ?? null),
       tokenExpiresAt: expiresAt,
       scopes: CALENDAR_SCOPES,
-      settings: { displayName: userInfo.name ?? null },
+      settings: {
+        displayName: userInfo.name ?? null,
+        // Persist the Workspace signal captured at connect. `hd` is set only
+        // for managed Workspace accounts (absent for personal @gmail.com).
+        // Drives the Google Docs eSignature gating in the NDA flow.
+        hostedDomain: userInfo.hd ?? null,
+        isWorkspace: Boolean(userInfo.hd),
+      },
       lastSyncAt: null, lastSyncError: null, consecutiveFailures: 0,
       updatedAt: now,
     };

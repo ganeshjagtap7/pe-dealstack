@@ -14,6 +14,16 @@ export interface DocMetadataResult {
   webViewLink: string;
 }
 
+// Lightweight metadata for an arbitrary Drive file picked for ingest.
+// `size` is absent for native Google types (Docs/Sheets), which have no
+// binary byte size until exported.
+export interface DriveFileMetadata {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: number;
+}
+
 export type GoogleDriveErrorCode =
   | 'DRIVE_API_ERROR'
   | 'INVALID_TOKEN'

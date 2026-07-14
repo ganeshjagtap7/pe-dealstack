@@ -36,10 +36,12 @@
 import { supabase } from '../supabase.js';
 import { log } from '../utils/logger.js';
 import { getProviderAccessToken } from '../integrations/_platform/tokenStore.js';
+import { isWorkspaceAccount } from '../integrations/googleCalendar/client.js';
 
 export type LegalDocSignatureErrorCode =
   | 'GOOGLE_NOT_CONNECTED'
   | 'GOOGLE_SCOPES_MISSING'
+  | 'WORKSPACE_REQUIRED'
   | 'NOT_SENT'
   | 'NO_GOOGLE_DOC'
   | 'DOCUMENT_NOT_FOUND'
@@ -157,8 +159,20 @@ export async function requestLegalDocSignature(
   if (!accessToken) {
     throw new LegalDocSignatureError(
       'GOOGLE_NOT_CONNECTED',
-      'Google Workspace is not connected for this user — open Settings → Integrations',
+      'Google is not connected for this user — open Settings → Integrations',
       409,
+    );
+  }
+
+  // Google Docs native eSignature (Tools -> eSignature) is a Workspace-only
+  // feature — personal @gmail.com accounts have no eSignature panel. Block the
+  // deep-link for non-Workspace accounts so we don't send them somewhere they
+  // can't complete. Detected via the OAuth `hd` (hosted domain) claim.
+  if (!(await isWorkspaceAccount(accessToken))) {
+    throw new LegalDocSignatureError(
+      'WORKSPACE_REQUIRED',
+      'Google Docs eSignature requires a Google Workspace account',
+      403,
     );
   }
 

@@ -63,4 +63,29 @@ describe('googleCalendar client', () => {
     const info = await getUserInfo('at');
     expect(info.email).toBe('me@firm.com');
   });
+
+  it('getUserInfo surfaces the hd (hosted domain) claim', async () => {
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      email: 'me@acme.com', name: 'Me', hd: 'acme.com',
+    }), { status: 200 })) as unknown as typeof fetch;
+    const { getUserInfo } = await import('../../../src/integrations/googleCalendar/client.js');
+    const info = await getUserInfo('at');
+    expect(info.hd).toBe('acme.com');
+  });
+
+  it('isWorkspaceAccount is true when hd is present (managed Workspace)', async () => {
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      email: 'me@acme.com', hd: 'acme.com',
+    }), { status: 200 })) as unknown as typeof fetch;
+    const { isWorkspaceAccount } = await import('../../../src/integrations/googleCalendar/client.js');
+    expect(await isWorkspaceAccount('at')).toBe(true);
+  });
+
+  it('isWorkspaceAccount is false for a personal account (no hd)', async () => {
+    global.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      email: 'me@gmail.com',
+    }), { status: 200 })) as unknown as typeof fetch;
+    const { isWorkspaceAccount } = await import('../../../src/integrations/googleCalendar/client.js');
+    expect(await isWorkspaceAccount('at')).toBe(false);
+  });
 });

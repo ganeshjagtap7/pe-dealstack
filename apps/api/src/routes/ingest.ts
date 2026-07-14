@@ -11,6 +11,7 @@ export { extractTextFromPDF, formatValueWithUnit, upload } from './ingest-shared
 
 // Sub-routers
 import ingestUploadRouter from './ingest-upload.js';
+import ingestDriveRouter from './ingest-drive.js';
 import ingestTextRouter from './ingest-text.js';
 import ingestUrlRouter from './ingest-url.js';
 import ingestEmailRouter from './ingest-email.js';
@@ -19,6 +20,7 @@ const router = Router();
 
 // Mount sub-routers
 router.use('/', ingestUploadRouter);
+router.use('/', ingestDriveRouter);
 router.use('/', ingestTextRouter);
 router.use('/', ingestUrlRouter);
 router.use('/', ingestEmailRouter);

@@ -48,6 +48,10 @@ async function resolveInternalUser(
 interface WorkspaceEmailResponse {
   email: string | null;
   connected: boolean;
+  // True only for managed Google Workspace accounts (derived from the OAuth
+  // `hd` hosted-domain claim). The NDA UI uses this to grey out the Google
+  // Docs native eSignature actions, which require a Workspace account.
+  isWorkspace?: boolean;
   error?: 'not_connected' | 'profile_fetch_failed' | 'user_not_provisioned';
 }
 
@@ -100,6 +104,9 @@ router.get('/workspace-email', async (req: Request, res: Response) => {
       const body: WorkspaceEmailResponse = {
         email: info.email,
         connected: true,
+        // `hd` is present only for managed Workspace accounts — gates the
+        // Google Docs eSignature actions in the NDA UI.
+        isWorkspace: Boolean(info.hd),
       };
       res.json(body);
       return;
