@@ -32,13 +32,17 @@ import { extractTextFromPDF } from './pdfExtractor.js';
 const LOOKBACK_DAYS_DEFAULT = 14;
 const LOOKBACK_DAYS_MIN = 1;
 const LOOKBACK_DAYS_MAX = 60;
-const MAX_SCAN_EMAILS = 12;
+const MAX_SCAN_EMAILS = 25;
 const EXTRACT_CONCURRENCY = 4;
 // Per-field confidence floor — same gate as the ingest routes. Only surface
 // revenue/ebitda/dealSize when the extractor is at least this confident.
 const FIELD_FLOOR = 60;
 // A candidate must clear this overall confidence to be worth showing for review.
 const MIN_CANDIDATE_CONFIDENCE = 40;
+// Lower bar for emails that carry a deal-document attachment (CIM/teaser/IM):
+// the attachment itself is a strong deal signal, so surface a borderline
+// extraction for review rather than dropping it.
+const MIN_CANDIDATE_CONFIDENCE_WITH_ATTACHMENT = 25;
 // Extraction text shorter than this is too thin to bother the LLM with.
 const MIN_EXTRACT_TEXT_LEN = 100;
 const TOKEN_REFRESH_SAFETY_MS = 60_000;
@@ -197,6 +201,21 @@ async function loadExistingCompanyNames(orgId: string): Promise<Set<string>> {
 // extractor's confidence for that field clears the floor.
 function gateFinancial(field: { value: number | null; confidence: number }): number | null {
   return field.value != null && field.confidence >= FIELD_FLOOR ? field.value : null;
+}
+
+// Filename fragments that mark an attachment as a deal document (CIM, teaser,
+// information memorandum). An email carrying one is a strong deal signal even
+// when its body has no deal language, so we prioritise it for PDF extraction and
+// hold it to a lower confidence bar when building candidates.
+const DEAL_ATTACHMENT_NAME_RE =
+  /\b(cim|teaser|information\s+memorandum|info\s*memo|memorandum|ioi)\b/i;
+
+/** The first deal-document attachment filename on a message, or null. */
+function dealAttachmentName(message: GmailMessageFull): string | null {
+  for (const a of message.attachments) {
+    if (a.filename && DEAL_ATTACHMENT_NAME_RE.test(a.filename)) return a.filename;
+  }
+  return null;
 }
 
 /**
@@ -382,6 +401,17 @@ export async function scanInboxForDeals(args: {
     return { connected: true, scanned: 0, candidates: [], attachmentsUnread: 0 };
   }
 
+  // Map each message to its deal-document attachment name (if any), then bubble
+  // those emails to the front so their (often large) PDFs get first claim on the
+  // shared PDF-work budget before it's exhausted by lower-signal emails.
+  const dealAttachByMsgId = new Map<string, string | null>();
+  for (const m of messages) dealAttachByMsgId.set(m.id, dealAttachmentName(m));
+  messages.sort(
+    (a, b) =>
+      Number(dealAttachByMsgId.get(b.id) != null) -
+      Number(dealAttachByMsgId.get(a.id) != null),
+  );
+
   // 7. Existing org company names for dedupe.
   const existingNames = await loadExistingCompanyNames(orgId);
 
@@ -429,12 +459,24 @@ export async function scanInboxForDeals(args: {
 
     const companyName = (data.companyName.value ?? '').trim();
     if (!companyName) continue;
-    if (data.overallConfidence < MIN_CANDIDATE_CONFIDENCE) continue;
+
+    // A deal-document attachment (CIM/teaser/IM) is itself a strong signal, so
+    // hold such emails to a lower confidence bar than a plain body-only email.
+    const attachmentName = dealAttachByMsgId.get(message.id) ?? null;
+    const confidenceFloor = attachmentName
+      ? MIN_CANDIDATE_CONFIDENCE_WITH_ATTACHMENT
+      : MIN_CANDIDATE_CONFIDENCE;
+    if (data.overallConfidence < confidenceFloor) continue;
 
     // Dedupe against existing org companies AND across this scan's candidates.
     const key = companyName.toLowerCase();
     if (existingNames.has(key)) continue;
     existingNames.add(key);
+
+    const reviewReasons = Array.isArray(data.reviewReasons) ? [...data.reviewReasons] : [];
+    if (attachmentName) {
+      reviewReasons.unshift(`Deal document attached: ${attachmentName}`);
+    }
 
     candidates.push({
       emailId: message.id,
@@ -452,7 +494,7 @@ export async function scanInboxForDeals(args: {
       ebitda: gateFinancial(data.ebitda),
       dealSize: gateFinancial(data.dealSize),
       overallConfidence: data.overallConfidence,
-      reviewReasons: Array.isArray(data.reviewReasons) ? data.reviewReasons : [],
+      reviewReasons,
     });
   }
 

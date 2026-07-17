@@ -13,4 +13,8 @@ export const STORAGE_KEYS = {
   aiAssistantHistory: "pe-ai-assistant-history",
   customGraphs: "pe-custom-graphs",
   contactsStaleDismissed: "pe-contacts-stale-dismissed",
+  // Last Inbox Deal Finder scan result, kept so the found candidates survive
+  // closing the review modal, remounting the dashboard, and navigation — rather
+  // than forcing a slow re-scan to see them again.
+  inboxScanResult: "pe-inbox-scan-result",
 } as const;

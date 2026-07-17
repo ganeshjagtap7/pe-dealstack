@@ -245,7 +245,21 @@ export function AiDealSignalsWidget({
   setSignalError,
 }: AiDealSignalsWidgetProps) {
   const candidates = signalResult?.connected ? signalResult.candidates : [];
-  const showModal = candidates.length > 0;
+  // The review overlay is opened explicitly (and auto-opened right after a fresh
+  // scan). Closing it no longer discards `signalResult`, so the found candidates
+  // persist in the widget body and can be reopened without re-scanning.
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  // Create/Dismiss in the modal lifts the change back to the parent's persisted
+  // signalResult so the count, the widget body, and localStorage stay in sync
+  // (and a dismissed card doesn't reappear on the next render).
+  const removeCandidate = (emailId: string) => {
+    if (!signalResult) return;
+    setSignalResult({
+      ...signalResult,
+      candidates: signalResult.candidates.filter((c) => c.emailId !== emailId),
+    });
+  };
 
   return (
     <div className="flex flex-col rounded-lg border border-border-subtle bg-surface-card shadow-card overflow-hidden group">
@@ -264,6 +278,8 @@ export function AiDealSignalsWidget({
                 lookbackDays: INBOX_LOOKBACK_DAYS,
               });
               setSignalResult(result);
+              // Auto-open the review overlay when a fresh scan finds candidates.
+              setReviewOpen(result.connected && result.candidates.length > 0);
             } catch (err) {
               console.warn("[dashboard] scan-inbox failed:", err);
               setSignalError("Couldn't scan inbox — please try again.");
@@ -303,6 +319,27 @@ export function AiDealSignalsWidget({
             &rarr; Integrations to scan your inbox for new deal candidates.
           </p>
         </div>
+      ) : candidates.length > 0 ? (
+        <div className="flex flex-col items-center gap-3 p-5 text-center">
+          <span className="material-symbols-outlined text-primary text-2xl">forward_to_inbox</span>
+          <div>
+            <p className="text-sm font-medium text-text-main mb-1">
+              {candidates.length} deal candidate{candidates.length === 1 ? "" : "s"} found
+            </p>
+            <p className="text-xs text-text-muted">
+              Review to create deals, or scan again for newer emails.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReviewOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-all"
+            style={{ backgroundColor: "#003366" }}
+          >
+            <span className="material-symbols-outlined text-[16px]">rate_review</span>
+            Review {candidates.length} candidate{candidates.length === 1 ? "" : "s"}
+          </button>
+        </div>
       ) : signalResult && candidates.length === 0 ? (
         <div className="p-5 text-center">
           <span className="material-symbols-outlined text-text-muted text-2xl mb-2">mark_email_read</span>
@@ -316,11 +353,12 @@ export function AiDealSignalsWidget({
           <p className="text-xs text-text-muted">Click &quot;Scan inbox&quot; to scan your inbox for new deal candidates and create them in one click.</p>
         </div>
       )}
-      {showModal && (
+      {reviewOpen && (
         <InboxDealsModal
           candidates={candidates}
           attachmentsUnread={signalResult?.attachmentsUnread ?? 0}
-          onClose={() => setSignalResult(null)}
+          onClose={() => setReviewOpen(false)}
+          onRemove={removeCandidate}
         />
       )}
     </div>

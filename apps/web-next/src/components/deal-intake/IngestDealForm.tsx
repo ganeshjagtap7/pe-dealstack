@@ -37,6 +37,7 @@ import {
   preloadGooglePicker,
   isGooglePickerConfigured,
 } from "@/lib/googlePicker";
+import { emitDealsChanged } from "@/lib/appEvents";
 
 // Drive MIME allow-list for ingest — mirrors the multipart upload's accepted
 // types plus native Google Docs/Sheets (exported server-side to PDF/XLSX).
@@ -267,6 +268,7 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       const data: IngestResponse = await response.json();
       if (!response.ok) throw new Error((data as unknown as { message?: string; error?: string }).message || (data as unknown as { error?: string }).error || "Upload failed");
       setResult(data);
+      emitDealsChanged({ dealId: data.deal?.id, source: "ingest-upload" });
       fireFollowUp(data);
       if (mode === "new" && data.deal?.id) {
         maybeShowTeaserPopup({ id: data.deal.id, name: data.deal.name });
@@ -285,6 +287,7 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Upload failed");
       setResult({ deal: { id: selectedDeal.id, name: selectedDeal.name }, isUpdate: true });
+      emitDealsChanged({ dealId: selectedDeal.id, source: "ingest-direct-upload" });
     } catch (err) { setError(err instanceof Error ? err.message : "Upload failed"); }
     finally { endProcessing(); }
   };
@@ -311,6 +314,9 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       if (mode === "existing" && selectedDeal) body.dealId = selectedDeal.id;
       const data = await api.post<IngestResponse>("/ingest/drive", body);
       setResult(data);
+      // Refresh any open list/data-room surface so the Drive-imported deal or
+      // document appears without a manual reload.
+      emitDealsChanged({ dealId: data.deal?.id, source: "ingest-drive" });
       fireFollowUp(data);
       if (mode === "new" && data.deal?.id) {
         maybeShowTeaserPopup({ id: data.deal.id, name: data.deal.name });
@@ -328,6 +334,7 @@ export function IngestDealForm({ variant = "page", onClose }: IngestDealFormProp
       if (mode === "existing" && selectedDeal) body.dealId = selectedDeal.id;
       const data = await api.post<IngestResponse>("/ingest/text", body);
       setResult(data);
+      emitDealsChanged({ dealId: data.deal?.id, source: "ingest-text" });
       fireFollowUp(data);
       if (mode === "new" && data.deal?.id) {
         maybeShowTeaserPopup({ id: data.deal.id, name: data.deal.name });

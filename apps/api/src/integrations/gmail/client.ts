@@ -395,6 +395,18 @@ export const DEAL_SOURCING_TERMS = [
   'buyout',
 ];
 
+// Attachment-FILENAME signals. Gmail free-text search does NOT match attachment
+// filenames — only the explicit `filename:` operator does — so a teaser/CIM sent
+// as "please find the attached" + a deck, with no deal keywords in the body, is
+// invisible to DEAL_SOURCING_TERMS above. These catch the file itself. Kept tight
+// to deal-document names (not a blanket has:attachment) so the scan isn't flooded
+// with every invoice/receipt/signature PDF.
+export const DEAL_ATTACHMENT_FILENAME_TERMS = [
+  'cim',
+  'teaser',
+  'memorandum',
+];
+
 /**
  * Broad inbox query for NEW deal candidates — powers the dashboard inbox scan.
  * Unlike listMessagesSince / listMessagesForDeal, this does NOT require known
@@ -411,7 +423,12 @@ export async function listRecentDealCandidates(
   const keywordClause = DEAL_SOURCING_TERMS
     .map(t => (t.includes(' ') ? `"${t}"` : t))
     .join(' OR ');
-  const q = `after:${afterUnix} (${keywordClause}) -category:promotions -category:social -in:chats`;
+  // OR in attachment-filename matches so an email whose ONLY deal signal is a
+  // CIM/teaser attachment (empty/uninformative body) still enters the scan.
+  const filenameClause = DEAL_ATTACHMENT_FILENAME_TERMS
+    .map(t => (t.includes(' ') ? `filename:"${t}"` : `filename:${t}`))
+    .join(' OR ');
+  const q = `after:${afterUnix} ((${keywordClause}) OR (${filenameClause})) -category:promotions -category:social -in:chats`;
 
   const out: { id: string; threadId: string }[] = [];
   let pageToken: string | undefined = undefined;
