@@ -188,11 +188,14 @@ function requestAccessToken(clientId: string, hint?: string): Promise<string> {
       client_id: clientId,
       scope: DRIVE_FILE_SCOPE,
       hint,
-      // Always show the account chooser. `hint` pre-selects the connected
-      // account, but the browser may be signed into a different one (e.g. a
-      // personal gmail) — without this the popup silently locks onto that wrong
-      // account and the per-file grant never reaches the server token.
-      prompt: "select_account",
+      // Minimum friction: silently reuse an existing drive.file grant instead of
+      // forcing the account chooser on every pick — the connected user who has
+      // already granted access shouldn't be asked to "sign in again" each time.
+      // `hint` still targets the server-connected account, and GIS shows UI only
+      // when it genuinely needs input (no existing grant, or the hinted account
+      // isn't signed into the browser). Empty string = "prompt only when
+      // required" in the GIS token model (default would be "select_account").
+      prompt: "",
       callback: (response) => {
         if (settled) return;
         settled = true;
@@ -241,6 +244,34 @@ function requestAccessToken(clientId: string, hint?: string): Promise<string> {
 }
 
 // ------------------------------- picker flow ------------------------------ //
+
+// The Picker SDK injects its own dialog (`.picker-dialog`) and backdrop
+// (`.picker-dialog-bg`) directly onto document.body at a LOW, hardcoded z-index
+// (~1000/1001) that PickerBuilder gives no API to change. Any app overlay that
+// portals to document.body at a higher z-index — e.g. the Ingest Deal modal at
+// z-[10000], which is exactly where the Drive picker is launched from — would
+// paint ON TOP of the picker, hiding it behind the ingest menu. Bump the picker
+// above every app layer so it always wins the stacking order (the menu then
+// correctly stays below the picker). The nodes are created asynchronously after
+// setVisible(true), so re-apply for a short bounded window until they appear.
+const PICKER_Z_INDEX = "2147483000"; // above the app's z-[10001] ceiling
+const PICKER_RAISE_FRAMES = 30; // ~0.5s of rAF ticks — cheap, self-terminating
+
+function raisePickerAboveApp(): void {
+  if (typeof document === "undefined" || typeof requestAnimationFrame === "undefined") {
+    return;
+  }
+  let frames = 0;
+  const bump = () => {
+    document
+      .querySelectorAll<HTMLElement>(".picker-dialog, .picker-dialog-bg")
+      .forEach((el) => {
+        el.style.zIndex = PICKER_Z_INDEX;
+      });
+    if (++frames < PICKER_RAISE_FRAMES) requestAnimationFrame(bump);
+  };
+  requestAnimationFrame(bump);
+}
 
 /**
  * Opens the Google Picker so the user selects ONE Drive file.
@@ -324,6 +355,9 @@ export async function pickGoogleFile({
         })
         .build();
       picker.setVisible(true);
+      // Ensure the picker paints above any app overlay it was launched from
+      // (e.g. the z-[10000] Ingest Deal modal) instead of behind it.
+      raisePickerAboveApp();
     } catch (err) {
       console.warn("[google-picker] picker build failed", err);
       reject(new Error("Couldn't open Google Drive picker. Try again."));

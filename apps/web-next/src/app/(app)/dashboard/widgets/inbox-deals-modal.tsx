@@ -38,6 +38,10 @@ export interface InboxDealCandidate {
 interface InboxDealsModalProps {
   candidates: InboxDealCandidate[];
   onClose: () => void;
+  // Create/Dismiss lifts the removal to the parent (which owns + persists the
+  // candidate list) instead of mutating a divergent local copy that would drop
+  // reviewed cards on the next render.
+  onRemove: (emailId: string) => void;
   // Count of PDF attachments on scanned emails that couldn't be read (scanned /
   // image-only decks, parse failures, oversized, or skipped once the scan's PDF
   // time/byte budget ran out). Optional so existing call sites that only pass
@@ -212,10 +216,9 @@ function CandidateCard({
 export function InboxDealsModal({
   candidates,
   onClose,
+  onRemove,
   attachmentsUnread = 0,
 }: InboxDealsModalProps) {
-  const [items, setItems] = useState<InboxDealCandidate[]>(candidates);
-
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -223,10 +226,6 @@ export function InboxDealsModal({
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, [onClose]);
-
-  const removeCandidate = (emailId: string) => {
-    setItems((prev) => prev.filter((c) => c.emailId !== emailId));
-  };
 
   return (
     <div
@@ -241,7 +240,7 @@ export function InboxDealsModal({
             <span className="material-symbols-outlined text-primary">forward_to_inbox</span>
             <h3 className="text-lg font-bold text-text-main">Inbox Deal Finder</h3>
             <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-text-muted">
-              {items.length}
+              {candidates.length}
             </span>
           </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-main">
@@ -258,7 +257,7 @@ export function InboxDealsModal({
               </span>
             </div>
           )}
-          {items.length === 0 ? (
+          {candidates.length === 0 ? (
             <div className="py-8 text-center text-text-muted">
               <span className="material-symbols-outlined mb-2 block text-3xl opacity-60">
                 done_all
@@ -267,12 +266,12 @@ export function InboxDealsModal({
             </div>
           ) : (
             <div className="space-y-3">
-              {items.map((candidate) => (
+              {candidates.map((candidate) => (
                 <CandidateCard
                   key={candidate.emailId}
                   candidate={candidate}
-                  onCreated={() => removeCandidate(candidate.emailId)}
-                  onDismiss={() => removeCandidate(candidate.emailId)}
+                  onCreated={() => onRemove(candidate.emailId)}
+                  onDismiss={() => onRemove(candidate.emailId)}
                 />
               ))}
             </div>

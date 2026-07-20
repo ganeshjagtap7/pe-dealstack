@@ -11,6 +11,7 @@ import {
   type MetricKey,
 } from "@/lib/constants";
 import { STORAGE_KEYS } from "@/lib/storageKeys";
+import { onDealsChanged } from "@/lib/appEvents";
 import { useIngestDealModal } from "@/providers/IngestDealModalProvider";
 import type {
   Deal,
@@ -84,8 +85,11 @@ export default function DealsPage() {
     }
   }, []);
 
-  const loadDeals = useCallback(async () => {
-    setLoading(true);
+  const loadDeals = useCallback(async (opts?: { silent?: boolean }) => {
+    // `silent` refetches keep the current list on screen (no skeleton flash) —
+    // used for background refreshes triggered by an ingest elsewhere or a tab
+    // refocus, as opposed to the initial load / filter change.
+    if (!opts?.silent) setLoading(true);
     setError(null);
     try {
       const params = new URLSearchParams();
@@ -142,6 +146,22 @@ export default function DealsPage() {
 
   useEffect(() => {
     loadDeals();
+  }, [loadDeals]);
+
+  // Auto-refresh: refetch silently (no skeleton) when a deal is ingested/updated
+  // elsewhere — e.g. a Google Drive import through the ingest modal — or when the
+  // tab regains focus (covers the background Gmail sync). Keeps the pipeline
+  // current without a manual reload.
+  useEffect(() => {
+    const off = onDealsChanged(() => loadDeals({ silent: true }));
+    const onVisible = () => {
+      if (document.visibilityState === "visible") loadDeals({ silent: true });
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      off();
+      document.removeEventListener("visibilitychange", onVisible);
+    };
   }, [loadDeals]);
 
   // Helpers
