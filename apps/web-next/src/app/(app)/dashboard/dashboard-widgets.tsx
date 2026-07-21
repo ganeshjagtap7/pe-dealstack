@@ -17,6 +17,13 @@ import { useState } from "react";
 import { Deal, Task, fmtNextAction } from "./components";
 import { InboxDealsModal, type InboxDealCandidate } from "./widgets/inbox-deals-modal";
 import { SignalResults } from "./dashboard-modals";
+import {
+  ScanTerminal,
+  ScanProcessSummary,
+  formatScanEvent,
+  type ScanEvent,
+  type TerminalLine,
+} from "./widgets/scan-terminal";
 
 /* ──────────────────────────────────────────────────────────────────────── */
 /*  Active Priorities widget                                               */
@@ -236,42 +243,6 @@ export type InboxScanResult = {
 
 const INBOX_LOOKBACK_DAYS = 14;
 
-// Compact "what the scan did" line: how the inbox was triaged into priority
-// tiers, and how many low-signal emails were filtered out before the LLM. Makes
-// the pickup process visible instead of a black box.
-function ScanProcessSummary({
-  process,
-}: {
-  process: NonNullable<InboxScanResult["process"]>;
-}) {
-  const tiers: Array<{ label: string; count: number; className: string }> = [
-    { label: "High", count: process.high, className: "bg-green-50 text-green-700" },
-    { label: "Med", count: process.medium, className: "bg-amber-50 text-amber-700" },
-    { label: "Low", count: process.low, className: "bg-gray-100 text-text-muted" },
-  ].filter((t) => t.count > 0);
-
-  return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="flex flex-wrap items-center justify-center gap-1.5">
-        {tiers.map((t) => (
-          <span
-            key={t.label}
-            className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", t.className)}
-          >
-            {t.count} {t.label}
-          </span>
-        ))}
-      </div>
-      <p className="text-[11px] text-text-muted">
-        Scanned {process.scanned} email{process.scanned === 1 ? "" : "s"}
-        {process.skippedLowSignal > 0 && (
-          <> · {process.skippedLowSignal} skipped as low-signal</>
-        )}
-      </p>
-    </div>
-  );
-}
-
 interface AiDealSignalsWidgetProps {
   scanning: boolean;
   signalResult: InboxScanResult | null;
@@ -294,6 +265,47 @@ export function AiDealSignalsWidget({
   // scan). Closing it no longer discards `signalResult`, so the found candidates
   // persist in the widget body and can be reopened without re-scanning.
   const [reviewOpen, setReviewOpen] = useState(false);
+  // Live terminal log — one line per streamed scan event. Cleared on each new
+  // scan, kept visible afterwards so the user can read what was picked up.
+  const [logLines, setLogLines] = useState<TerminalLine[]>([]);
+
+  const runScan = async () => {
+    setScanning(true);
+    setSignalResult(null);
+    setSignalError(null);
+    setLogLines([]);
+    const append = (line: TerminalLine) => setLogLines((prev) => [...prev, line]);
+    try {
+      await api.postStream(
+        "/ai/scan-inbox/stream",
+        { lookbackDays: INBOX_LOOKBACK_DAYS },
+        (obj) => {
+          const ev = obj as ScanEvent;
+          if (ev.t === "result") {
+            const result = ev.result as InboxScanResult;
+            setSignalResult(result);
+            append({
+              kind: "done",
+              text: `Done — ${result.candidates.length} candidate${result.candidates.length === 1 ? "" : "s"} to review`,
+            });
+            setReviewOpen(result.connected && result.candidates.length > 0);
+            return;
+          }
+          if (ev.t === "error") {
+            setSignalError(ev.msg);
+          }
+          const line = formatScanEvent(ev);
+          if (line) append(line);
+        },
+      );
+    } catch (err) {
+      console.warn("[dashboard] scan-inbox stream failed:", err);
+      setSignalError("Couldn't scan inbox — please try again.");
+      setTimeout(() => setSignalError(null), 5000);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   // Create/Dismiss in the modal lifts the change back to the parent's persisted
   // signalResult so the count, the widget body, and localStorage stay in sync
@@ -314,25 +326,7 @@ export function AiDealSignalsWidget({
           <h3 className="font-bold text-text-main text-base">Inbox Deal Finder</h3>
         </div>
         <button
-          onClick={async () => {
-            setScanning(true);
-            setSignalResult(null);
-            setSignalError(null);
-            try {
-              const result = await api.post<InboxScanResult>("/ai/scan-inbox", {
-                lookbackDays: INBOX_LOOKBACK_DAYS,
-              });
-              setSignalResult(result);
-              // Auto-open the review overlay when a fresh scan finds candidates.
-              setReviewOpen(result.connected && result.candidates.length > 0);
-            } catch (err) {
-              console.warn("[dashboard] scan-inbox failed:", err);
-              setSignalError("Couldn't scan inbox — please try again.");
-              setTimeout(() => setSignalError(null), 5000);
-            } finally {
-              setScanning(false);
-            }
-          }}
+          onClick={runScan}
           disabled={scanning}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all disabled:opacity-60"
           style={{ backgroundColor: "#003366" }}
@@ -347,12 +341,12 @@ export function AiDealSignalsWidget({
           {signalError}
         </div>
       )}
-      {scanning ? (
-        <div className="flex flex-col items-center justify-center py-8">
-          <span className="material-symbols-outlined text-primary text-2xl animate-spin mb-2">forward_to_inbox</span>
-          <p className="text-sm text-text-muted">Scanning your inbox for new deals...</p>
-        </div>
-      ) : signalResult && !signalResult.connected ? (
+      {/* Live terminal — shows while scanning and stays up afterwards so the
+          picked-up mail is auditable. */}
+      {(scanning || logLines.length > 0) && (
+        <ScanTerminal lines={logLines} scanning={scanning} />
+      )}
+      {scanning ? null : signalResult && !signalResult.connected ? (
         <div className="p-5 text-center">
           <span className="material-symbols-outlined text-text-muted text-2xl mb-2">link_off</span>
           <p className="text-sm font-medium text-text-main mb-1">Connect Gmail to scan</p>

@@ -107,6 +107,20 @@ export interface InboxScanProcess {
   low: number;
 }
 
+// ─── Live progress events ──────────────────────────────────────────
+// Emitted through the optional `onEvent` callback so the streaming route can
+// relay a terminal-style, real-time log of exactly which emails the scan sees,
+// scores, extracts, and surfaces — the user watches new mail get picked up.
+export type ScanEvent =
+  | { t: 'status'; msg: string }
+  | { t: 'listed'; count: number; lookbackDays: number }
+  | { t: 'email'; subject: string; from: string; score: number; priority: DealPriority; gated: boolean; signals: string[] }
+  | { t: 'extract'; subject: string }
+  | { t: 'candidate'; company: string; priority: DealPriority; confidence: number }
+  | { t: 'skip'; subject: string; reason: string }
+  | { t: 'result'; result: InboxScanResult }
+  | { t: 'error'; msg: string };
+
 export interface InboxScanResult {
   connected: boolean;
   scanned: number;
@@ -352,8 +366,18 @@ export async function scanInboxForDeals(args: {
   orgId: string;
   authUserId: string;
   lookbackDays?: number;
+  // Optional progress sink — the streaming route feeds each event to the client
+  // as a terminal log line. No-op for the plain (buffered) endpoint.
+  onEvent?: (ev: ScanEvent) => void;
 }): Promise<InboxScanResult> {
   const { orgId, authUserId } = args;
+  const emit = (ev: ScanEvent) => {
+    try {
+      args.onEvent?.(ev);
+    } catch {
+      // A broken client stream must never break the scan itself.
+    }
+  };
   const notConnected: InboxScanResult = {
     connected: false,
     scanned: 0,
@@ -387,6 +411,8 @@ export async function scanInboxForDeals(args: {
     return notConnected;
   }
 
+  emit({ t: 'status', msg: 'Connecting to Gmail…' });
+
   // 4. Ensure a fresh access token.
   const accessToken = await ensureFreshGmailToken(integration as Integration);
   if (!accessToken) {
@@ -395,8 +421,10 @@ export async function scanInboxForDeals(args: {
   }
 
   // 5. List recent deal-candidate emails (broad keyword scope, no contacts needed).
+  emit({ t: 'status', msg: `Searching inbox — last ${lookbackDays} days…` });
   const since = new Date(Date.now() - lookbackDays * MS_PER_DAY);
   const headers = await listRecentDealCandidates(accessToken, since, MAX_SCAN_EMAILS);
+  emit({ t: 'listed', count: headers.length, lookbackDays });
   if (headers.length === 0) {
     log.info('inboxDealScan: no candidate emails in window', { orgId, lookbackDays });
     return { connected: true, scanned: 0, candidates: [], attachmentsUnread: 0 };
@@ -429,18 +457,26 @@ export async function scanInboxForDeals(args: {
   // brushed a keyword (a newsletter that says "for sale") before we spend an LLM
   // call on them — which is what stops the scan "picking up randomly". It also
   // yields the priority + human-readable breakdown surfaced in the widget.
+  emit({ t: 'status', msg: `Scoring ${messages.length} email${messages.length === 1 ? '' : 's'} for deal signals…` });
   const signalByMsgId = new Map<string, ReturnType<typeof scoreDealSignals>>();
   const dealAttachByMsgId = new Map<string, string | null>();
   for (const m of messages) {
     dealAttachByMsgId.set(m.id, dealAttachmentName(m));
-    signalByMsgId.set(
-      m.id,
-      scoreDealSignals({
-        subject: m.headers.Subject || '',
-        body: m.body || m.snippet || '',
-        attachmentNames: m.attachments.map((a) => a.filename).filter(Boolean),
-      }),
-    );
+    const signal = scoreDealSignals({
+      subject: m.headers.Subject || '',
+      body: m.body || m.snippet || '',
+      attachmentNames: m.attachments.map((a) => a.filename).filter(Boolean),
+    });
+    signalByMsgId.set(m.id, signal);
+    emit({
+      t: 'email',
+      subject: m.headers.Subject || '(no subject)',
+      from: m.headers.From || 'unknown',
+      score: signal.score,
+      priority: signal.priority,
+      gated: signal.score < LLM_EXTRACTION_GATE,
+      signals: signal.signals,
+    });
   }
 
   // Gate out low-signal noise before the LLM; keep a count so the widget can
@@ -449,6 +485,10 @@ export async function scanInboxForDeals(args: {
     (m) => (signalByMsgId.get(m.id)?.score ?? 0) >= LLM_EXTRACTION_GATE,
   );
   const skippedLowSignal = messages.length - toExtract.length;
+  emit({
+    t: 'status',
+    msg: `${toExtract.length} passed the signal gate · ${skippedLowSignal} skipped — extracting with AI…`,
+  });
 
   // Highest-signal emails first — they get first claim on the shared PDF-work
   // budget (their decks are the ones worth parsing) and are extracted first.
@@ -472,6 +512,7 @@ export async function scanInboxForDeals(args: {
       const subject = m.headers.Subject || '(no subject)';
       const from = m.headers.From || 'unknown';
       const bodyText = m.body || m.snippet || '';
+      emit({ t: 'extract', subject });
 
       // Teasers/CIMs often arrive AS a PDF with a near-empty body — pull the
       // attachment text so those emails clear the length floor below.
@@ -501,8 +542,12 @@ export async function scanInboxForDeals(args: {
     if (!item || !item.data) continue;
     const { message, data } = item;
 
+    const subject = message.headers.Subject || '(no subject)';
     const companyName = (data.companyName.value ?? '').trim();
-    if (!companyName) continue;
+    if (!companyName) {
+      emit({ t: 'skip', subject, reason: 'no company name found' });
+      continue;
+    }
 
     // A deal-document attachment (CIM/teaser/IM) is itself a strong signal, so
     // hold such emails to a lower confidence bar than a plain body-only email.
@@ -510,11 +555,17 @@ export async function scanInboxForDeals(args: {
     const confidenceFloor = attachmentName
       ? MIN_CANDIDATE_CONFIDENCE_WITH_ATTACHMENT
       : MIN_CANDIDATE_CONFIDENCE;
-    if (data.overallConfidence < confidenceFloor) continue;
+    if (data.overallConfidence < confidenceFloor) {
+      emit({ t: 'skip', subject, reason: `low extraction confidence (${data.overallConfidence}%)` });
+      continue;
+    }
 
     // Dedupe against existing org companies AND across this scan's candidates.
     const key = companyName.toLowerCase();
-    if (existingNames.has(key)) continue;
+    if (existingNames.has(key)) {
+      emit({ t: 'skip', subject, reason: `"${companyName}" already exists` });
+      continue;
+    }
     existingNames.add(key);
 
     const reviewReasons = Array.isArray(data.reviewReasons) ? [...data.reviewReasons] : [];
@@ -523,6 +574,12 @@ export async function scanInboxForDeals(args: {
     }
 
     const signal = signalByMsgId.get(message.id);
+    emit({
+      t: 'candidate',
+      company: companyName,
+      priority: signal?.priority ?? 'low',
+      confidence: data.overallConfidence,
+    });
     candidates.push({
       emailId: message.id,
       threadId: message.threadId,
