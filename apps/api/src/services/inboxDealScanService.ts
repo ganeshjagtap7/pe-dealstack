@@ -27,6 +27,12 @@ import type { Integration } from '../integrations/_platform/types.js';
 import type { GmailMessageFull } from '../integrations/gmail/types.js';
 import { extractDealDataFromText } from './aiExtractor.js';
 import { extractTextFromPDF } from './pdfExtractor.js';
+import {
+  scoreDealSignals,
+  priorityRank,
+  LLM_EXTRACTION_GATE,
+  type DealPriority,
+} from './inboxDealSignals.js';
 
 // ─── Tunables (no magic numbers) ───────────────────────────────────
 const LOOKBACK_DAYS_DEFAULT = 14;
@@ -84,12 +90,28 @@ export interface InboxDealCandidate {
   dealSize: number | null; // millions, null if confidence < FIELD_FLOOR
   overallConfidence: number;
   reviewReasons: string[];
+  // Explainable pickup signals (inboxDealSignals.ts) — the "why this email was
+  // picked up, and at what priority" breakdown shown in the widget.
+  signalScore: number; // 0–100
+  priority: DealPriority; // 'high' | 'medium' | 'low'
+  signals: string[]; // matched deal signals, strongest first
+}
+
+// Compact, user-facing summary of how the scan triaged the inbox — powers the
+// "here's what the scan did" line in the Inbox Deal Finder widget.
+export interface InboxScanProcess {
+  scanned: number; // emails fetched from the keyword-scoped Gmail query
+  skippedLowSignal: number; // fetched but gated out before the LLM (noise)
+  high: number; // surfaced candidates by priority
+  medium: number;
+  low: number;
 }
 
 export interface InboxScanResult {
   connected: boolean;
   scanned: number;
   candidates: InboxDealCandidate[];
+  process?: InboxScanProcess;
   // Count of PDF attachments that existed on scanned emails but yielded no
   // usable text — scanned/image-only PDFs (pdf-parse returns ~nothing), files
   // that threw, oversized files, or attachments skipped once the PDF time/byte
@@ -401,15 +423,37 @@ export async function scanInboxForDeals(args: {
     return { connected: true, scanned: 0, candidates: [], attachmentsUnread: 0 };
   }
 
-  // Map each message to its deal-document attachment name (if any), then bubble
-  // those emails to the front so their (often large) PDFs get first claim on the
-  // shared PDF-work budget before it's exhausted by lower-signal emails.
+  // Score each message's deal-signal strength (cheap, no LLM) from its subject,
+  // body/snippet, and attachment filenames. This is the PRECISION gate: the
+  // Gmail query casts a wide net for recall, and this drops the emails that only
+  // brushed a keyword (a newsletter that says "for sale") before we spend an LLM
+  // call on them — which is what stops the scan "picking up randomly". It also
+  // yields the priority + human-readable breakdown surfaced in the widget.
+  const signalByMsgId = new Map<string, ReturnType<typeof scoreDealSignals>>();
   const dealAttachByMsgId = new Map<string, string | null>();
-  for (const m of messages) dealAttachByMsgId.set(m.id, dealAttachmentName(m));
-  messages.sort(
-    (a, b) =>
-      Number(dealAttachByMsgId.get(b.id) != null) -
-      Number(dealAttachByMsgId.get(a.id) != null),
+  for (const m of messages) {
+    dealAttachByMsgId.set(m.id, dealAttachmentName(m));
+    signalByMsgId.set(
+      m.id,
+      scoreDealSignals({
+        subject: m.headers.Subject || '',
+        body: m.body || m.snippet || '',
+        attachmentNames: m.attachments.map((a) => a.filename).filter(Boolean),
+      }),
+    );
+  }
+
+  // Gate out low-signal noise before the LLM; keep a count so the widget can
+  // show "N skipped as low-signal" instead of silently discarding them.
+  const toExtract = messages.filter(
+    (m) => (signalByMsgId.get(m.id)?.score ?? 0) >= LLM_EXTRACTION_GATE,
+  );
+  const skippedLowSignal = messages.length - toExtract.length;
+
+  // Highest-signal emails first — they get first claim on the shared PDF-work
+  // budget (their decks are the ones worth parsing) and are extracted first.
+  toExtract.sort(
+    (a, b) => (signalByMsgId.get(b.id)?.score ?? 0) - (signalByMsgId.get(a.id)?.score ?? 0),
   );
 
   // 7. Existing org company names for dedupe.
@@ -422,7 +466,7 @@ export async function scanInboxForDeals(args: {
   const pdfBudget = makePdfWorkBudget();
   type Extracted = { message: GmailMessageFull; data: Awaited<ReturnType<typeof extractDealDataFromText>> };
   const extracted = await mapWithConcurrency<GmailMessageFull, Extracted | null>(
-    messages,
+    toExtract,
     EXTRACT_CONCURRENCY,
     async (m) => {
       const subject = m.headers.Subject || '(no subject)';
@@ -478,6 +522,7 @@ export async function scanInboxForDeals(args: {
       reviewReasons.unshift(`Deal document attached: ${attachmentName}`);
     }
 
+    const signal = signalByMsgId.get(message.id);
     candidates.push({
       emailId: message.id,
       threadId: message.threadId,
@@ -495,16 +540,33 @@ export async function scanInboxForDeals(args: {
       dealSize: gateFinancial(data.dealSize),
       overallConfidence: data.overallConfidence,
       reviewReasons,
+      signalScore: signal?.score ?? 0,
+      priority: signal?.priority ?? 'low',
+      signals: signal?.signals ?? [],
     });
   }
 
-  // 10. Sort by overall confidence, highest first.
-  candidates.sort((a, b) => b.overallConfidence - a.overallConfidence);
+  // 10. Sort by priority tier first, then signal strength, then extraction
+  // confidence — so the strongest, most-clearly-a-deal emails sit at the top.
+  candidates.sort(
+    (a, b) =>
+      priorityRank(a.priority) - priorityRank(b.priority) ||
+      b.signalScore - a.signalScore ||
+      b.overallConfidence - a.overallConfidence,
+  );
+
+  const scanProcess: InboxScanProcess = {
+    scanned: messages.length,
+    skippedLowSignal,
+    high: candidates.filter((c) => c.priority === 'high').length,
+    medium: candidates.filter((c) => c.priority === 'medium').length,
+    low: candidates.filter((c) => c.priority === 'low').length,
+  };
 
   log.info('inboxDealScan: complete', {
     orgId,
-    scanned: messages.length,
     candidates: candidates.length,
+    ...scanProcess,
     attachmentsUnread: pdfBudget.attachmentsUnread,
   });
 
@@ -513,6 +575,7 @@ export async function scanInboxForDeals(args: {
     connected: true,
     scanned: messages.length,
     candidates,
+    process: scanProcess,
     attachmentsUnread: pdfBudget.attachmentsUnread,
   };
 }

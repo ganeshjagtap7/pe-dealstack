@@ -223,9 +223,54 @@ export type InboxScanResult = {
   scanned: number;
   candidates: InboxDealCandidate[];
   attachmentsUnread?: number;
+  // How the scan triaged the inbox — surfaced as a one-line "what the scan did"
+  // summary so the pickup process is visible, not a black box.
+  process?: {
+    scanned: number;
+    skippedLowSignal: number;
+    high: number;
+    medium: number;
+    low: number;
+  };
 };
 
 const INBOX_LOOKBACK_DAYS = 14;
+
+// Compact "what the scan did" line: how the inbox was triaged into priority
+// tiers, and how many low-signal emails were filtered out before the LLM. Makes
+// the pickup process visible instead of a black box.
+function ScanProcessSummary({
+  process,
+}: {
+  process: NonNullable<InboxScanResult["process"]>;
+}) {
+  const tiers: Array<{ label: string; count: number; className: string }> = [
+    { label: "High", count: process.high, className: "bg-green-50 text-green-700" },
+    { label: "Med", count: process.medium, className: "bg-amber-50 text-amber-700" },
+    { label: "Low", count: process.low, className: "bg-gray-100 text-text-muted" },
+  ].filter((t) => t.count > 0);
+
+  return (
+    <div className="flex flex-col items-center gap-1.5">
+      <div className="flex flex-wrap items-center justify-center gap-1.5">
+        {tiers.map((t) => (
+          <span
+            key={t.label}
+            className={cn("rounded-full px-2 py-0.5 text-[10px] font-bold", t.className)}
+          >
+            {t.count} {t.label}
+          </span>
+        ))}
+      </div>
+      <p className="text-[11px] text-text-muted">
+        Scanned {process.scanned} email{process.scanned === 1 ? "" : "s"}
+        {process.skippedLowSignal > 0 && (
+          <> · {process.skippedLowSignal} skipped as low-signal</>
+        )}
+      </p>
+    </div>
+  );
+}
 
 interface AiDealSignalsWidgetProps {
   scanning: boolean;
@@ -330,6 +375,9 @@ export function AiDealSignalsWidget({
               Review to create deals, or scan again for newer emails.
             </p>
           </div>
+          {signalResult?.process && (
+            <ScanProcessSummary process={signalResult.process} />
+          )}
           <button
             type="button"
             onClick={() => setReviewOpen(true)}
