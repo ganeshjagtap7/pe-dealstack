@@ -29,6 +29,7 @@ export async function orgMiddleware(
     if (cached?.organizationId) {
       if (cached.role) req.user.role = cached.role;
       req.user.organizationId = cached.organizationId;
+      req.user.internalId = cached.userId;
       return next();
     }
 
@@ -48,6 +49,9 @@ export async function orgMiddleware(
     if (userRecord?.role && req.user) {
       req.user.role = String(userRecord.role);
     }
+    if (userRecord?.id) {
+      req.user.internalId = userRecord.id;
+    }
 
     if (error && error.code === 'PGRST116') {
       // User record doesn't exist yet (first request after signup).
@@ -57,6 +61,9 @@ export async function orgMiddleware(
         const newUser = await findOrCreateUser(req.user);
         if (newUser?.organizationId) {
           req.user.organizationId = newUser.organizationId;
+        }
+        if (newUser?.id) {
+          req.user.internalId = newUser.id;
         }
       } catch (createErr) {
         log.error('Org middleware: auto-create user failed', createErr);

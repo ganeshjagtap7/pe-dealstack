@@ -197,6 +197,7 @@ subRouter.post('/bulk', upload.single('file'), async (req, res) => {
             name: row.companyName,
             companyId: company.id,
             organizationId: orgId,
+            createdBy: req.user?.internalId ?? null,
             stage: row.stage || 'INITIAL_REVIEW',
             status: 'ACTIVE',
             industry: row.industry,

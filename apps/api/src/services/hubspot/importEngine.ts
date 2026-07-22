@@ -16,6 +16,7 @@ async function loadJob(jobId: string) {
   return data as null | {
     id: string; organizationId: string; status: string;
     objectCounts: Record<string, Counters>; currentObject: string | null; cursor: string | null;
+    startedBy: string | null;
   };
 }
 
@@ -88,7 +89,7 @@ export async function runImportBatch(jobId: string, token: string): Promise<bool
         const res = await upsertByHubspotId('Deal', job.organizationId, m.hubspotId, {
           name: m.name, companyId, dealSize: m.dealSize, description: m.description,
           customFields: m.customFields, hubspotProperties: m.hubspotProperties,
-        }, { column: 'name', value: m.name });
+        }, { column: 'name', value: m.name }, { createdBy: job.startedBy ?? null });
         counts.deals[res] += 1;
       }
     } catch (err) {

@@ -282,6 +282,7 @@ router.post('/', async (req: Request, res: Response) => {
             customFields: deal.customFields || {},
             icon: 'business_center',
             organizationId: orgId,
+            createdBy: req.user?.internalId ?? null,
           },
         });
       }

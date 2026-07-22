@@ -27,6 +27,7 @@ export async function upsertByHubspotId(
   hubspotId: string,
   row: Record<string, unknown>,
   match?: { column: string; value: string | null },
+  insertOnly?: Record<string, unknown>,
 ): Promise<UpsertResult> {
   // 1. Match by hubspotId first.
   let { data: existing } = await supabase
@@ -49,6 +50,6 @@ export async function upsertByHubspotId(
     return 'updated';
   }
 
-  await supabase.from(table).insert({ ...row, organizationId: orgId, hubspotId });
+  await supabase.from(table).insert({ ...row, ...insertOnly, organizationId: orgId, hubspotId });
   return 'created';
 }

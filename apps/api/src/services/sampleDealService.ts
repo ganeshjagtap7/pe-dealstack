@@ -112,6 +112,7 @@ export async function createSampleDeal(orgId: string, userId: string): Promise<s
         companyId: company.id,
         organizationId: orgId,
         assignedTo: userId,
+        createdBy: userId,
       })
       .select('id')
       .single();

@@ -10,6 +10,8 @@ export interface AuthUser {
   name?: string;
   firmName?: string;
   organizationId?: string;
+  /** Internal User.id (NOT the Supabase auth UUID). Set by orgMiddleware. */
+  internalId?: string;
   role: string;
   user_metadata?: Record<string, unknown>;
 }

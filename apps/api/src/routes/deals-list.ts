@@ -1,10 +1,11 @@
 // ─── Deal list / detail routes ────────────────────────────────────
-// GET /api/deals/stats/summary — counts + by-stage breakdown
-// GET /api/deals               — list with company + assignedUser + team
-// GET /api/deals/:id           — single deal with full eager-loaded graph
+// GET /api/deals/stats/summary    — counts + by-stage breakdown
+// GET /api/deals/stats/by-creator — deal counts grouped by creator
+// GET /api/deals                  — list with company + assignedUser + team
+// GET /api/deals/:id              — single deal with full eager-loaded graph
 //
-// /stats/summary must be registered before /:id so the Express router
-// matches the literal path before the param route.
+// /stats/* must be registered before /:id so the Express router
+// matches the literal paths before the param route.
 
 import { Router, Request, Response, NextFunction } from 'express';
 import { supabase } from '../supabase.js';
@@ -68,6 +69,43 @@ router.get('/stats/summary', async (req, res) => {
   }
 });
 
+// GET /api/deals/stats/by-creator - Deal counts grouped by who created them
+router.get('/stats/by-creator', async (req, res) => {
+  try {
+    const orgId = getOrgId(req);
+
+    const { data: deals, error } = await supabase
+      .from('Deal')
+      .select('createdBy, createdByUser:User!createdBy(id, name, email)')
+      .eq('organizationId', orgId)
+      .is('deletedAt', null);
+
+    if (error) throw error;
+
+    const byCreator = new Map<string, { userId: string | null; name: string | null; email: string | null; count: number }>();
+    for (const deal of deals || []) {
+      const user = deal.createdByUser as unknown as { id: string; name: string | null; email: string | null } | null;
+      const key = user?.id || 'unattributed';
+      const entry = byCreator.get(key) || {
+        userId: user?.id || null,
+        name: user?.name || null,
+        email: user?.email || null,
+        count: 0,
+      };
+      entry.count++;
+      byCreator.set(key, entry);
+    }
+
+    res.json({
+      total: deals?.length || 0,
+      byCreator: [...byCreator.values()].sort((a, b) => b.count - a.count),
+    });
+  } catch (error) {
+    log.error('Error fetching by-creator stats', error);
+    res.status(500).json({ error: 'Failed to fetch creator statistics' });
+  }
+});
+
 // GET /api/deals - Get all deals with company info
 router.get('/', async (req, res) => {
   try {
@@ -80,6 +118,7 @@ router.get('/', async (req, res) => {
         *,
         company:Company(*),
         assignedUser:User!assignedTo(id, name, avatar, email),
+        createdByUser:User!createdBy(id, name, avatar, email),
         teamMembers:DealTeamMember(
           id,
           role,
@@ -140,6 +179,7 @@ router.get('/:id', async (req: Request, res: Response, next: NextFunction) => {
         *,
         company:Company(*),
         assignedUser:User!assignedTo(id, name, avatar, email, title),
+        createdByUser:User!createdBy(id, name, avatar, email, title),
         teamMembers:DealTeamMember(
           id,
           role,
