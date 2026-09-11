@@ -28,7 +28,9 @@ const createShareSchema = z.object({
 });
 
 function portalBaseUrl(): string {
-  return process.env.APP_URL || 'http://localhost:3002';
+  if (process.env.APP_URL) return process.env.APP_URL;
+  if (process.env.NODE_ENV === 'production') return 'https://pe-os.onrender.com';
+  return 'http://localhost:3002';
 }
 
 // POST /api/deals/:dealId/shares — create a share link

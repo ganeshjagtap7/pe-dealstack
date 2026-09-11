@@ -166,7 +166,8 @@ router.post('/deals/:dealId/document-requests', async (req, res) => {
     let emailSent = false;
     if (resend && recipientEmails.length > 0) {
       const fromEmail = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
-      const baseUrl = process.env.APP_URL || 'http://localhost:3000';
+      const baseUrl = process.env.APP_URL
+        || (process.env.NODE_ENV === 'production' ? 'https://pe-os.onrender.com' : 'http://localhost:3000');
       const vdrUrl = `${baseUrl}/vdr.html?dealId=${dealId}`;
 
       try {

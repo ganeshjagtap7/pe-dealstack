@@ -14,6 +14,14 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      # Self-links (invite/share/upload emails, memo share links, API
+      # reference base URL) fall back to this when unset. Without it the
+      # only live deployment was generating links to dead Vercel-era hosts
+      # (lmmos.ai / app.avise.io) or, in a few routes, http://localhost.
+      - key: APP_URL
+        value: https://pe-os.onrender.com
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://pe-os.onrender.com
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_ANON_KEY

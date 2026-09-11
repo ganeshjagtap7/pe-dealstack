@@ -161,6 +161,7 @@ const allowedOrigins = [
   'https://www.lmmos.ai',
   'https://pe-dealstack.vercel.app',
   'https://pe-dealstack-nextjs.vercel.app',
+  'https://pe-os.onrender.com',
   ...extraOrigins,
   ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:3003', 'http://localhost:5173'] : []),
 ];

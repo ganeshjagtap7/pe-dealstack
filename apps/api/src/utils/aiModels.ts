@@ -85,6 +85,6 @@ export function isAnthropicEnabled(): boolean {
 
 /** Headers OpenRouter recommends for attribution / rate-limit pools */
 export const OPENROUTER_HEADERS = {
-  'HTTP-Referer': process.env.APP_URL || 'https://lmmos.ai',
+  'HTTP-Referer': process.env.APP_URL || 'https://pe-os.onrender.com',
   'X-Title': 'lmmos',
 };

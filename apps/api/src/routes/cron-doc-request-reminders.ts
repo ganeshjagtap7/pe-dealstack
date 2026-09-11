@@ -20,7 +20,9 @@ const router = Router();
 const MAX_PER_RUN = 200;
 
 function uploadUrl(token: string): string {
-  return `${process.env.APP_URL || 'http://localhost:3002'}/upload/${token}`;
+  const base = process.env.APP_URL
+    || (process.env.NODE_ENV === 'production' ? 'https://pe-os.onrender.com' : 'http://localhost:3002');
+  return `${base}/upload/${token}`;
 }
 
 router.post('/', async (req: Request, res: Response) => {

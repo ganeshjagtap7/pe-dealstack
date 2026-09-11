@@ -51,7 +51,9 @@ const patchSchema = z.object({
 });
 
 function uploadBaseUrl(): string {
-  return process.env.APP_URL || 'http://localhost:3002';
+  if (process.env.APP_URL) return process.env.APP_URL;
+  if (process.env.NODE_ENV === 'production') return 'https://pe-os.onrender.com';
+  return 'http://localhost:3002';
 }
 
 function uploadUrl(token: string): string {

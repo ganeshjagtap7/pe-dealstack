@@ -41,11 +41,13 @@ export function getExpirationDate(): Date {
 // Resolve the public base URL the invite link should point to. Prefers the
 // caller's Origin header (so a preview-deployment admin gets links back to
 // THEIR preview, and a prod admin gets prod links) over the static APP_URL
-// env var. Falls back to APP_URL, then localhost for dev.
+// env var. Falls back to APP_URL, then the live Render deployment in prod,
+// then localhost for dev.
 function resolveBaseUrl(req?: Request): string {
   const origin = req?.headers?.origin;
   if (origin && /^https?:\/\//.test(origin)) return origin.replace(/\/$/, '');
   if (process.env.APP_URL) return process.env.APP_URL.replace(/\/$/, '');
+  if (process.env.NODE_ENV === 'production') return 'https://pe-os.onrender.com';
   return 'http://localhost:3000';
 }
 
